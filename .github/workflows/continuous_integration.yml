@@ -329,6 +329,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install boto3
+      - name: Get Commit SHA(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          SHA=${{ github.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+      - name: Get Commit SHA(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          SHA=${{ github.event.pull_request.head.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
       - name: Build Image Prediction Tutorial on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         run: |
@@ -339,7 +351,7 @@ jobs:
                                           --source-ref ${{ github.ref }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
                                           --wait
       - name: Build Image Prediction Tutorial on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
@@ -351,7 +363,7 @@ jobs:
                                           --source-ref ${{ github.event.pull_request.head.sha }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
   build_object_detection_tutorial:
     runs-on: ubuntu-latest
@@ -367,6 +379,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install boto3
+      - name: Get Commit SHA(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          SHA=${{ github.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+      - name: Get Commit SHA(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          SHA=${{ github.event.pull_request.head.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
       - name: Build Object Detection Tutorial on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         run: |
@@ -377,7 +401,7 @@ jobs:
                                           --source-ref ${{ github.ref }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
                                           --wait
       - name: Build Object Detection Tutorial on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
@@ -389,7 +413,7 @@ jobs:
                                           --source-ref ${{ github.event.pull_request.head.sha }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
   build_tabular_prediction_tutorial:
     runs-on: ubuntu-latest
@@ -405,6 +429,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install boto3
+      - name: Get Commit SHA(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          SHA=${{ github.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+      - name: Get Commit SHA(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          SHA=${{ github.event.pull_request.head.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
       - name: Build Tabular Prediction Tutorial on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         run: |
@@ -415,7 +451,7 @@ jobs:
                                           --source-ref ${{ github.ref }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
                                           --wait
       - name: Build Tabular Prediction Tutorial on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
@@ -427,7 +463,7 @@ jobs:
                                           --source-ref ${{ github.event.pull_request.head.sha }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
   build_text_prediction_tutorial:
     runs-on: ubuntu-latest
@@ -443,6 +479,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install boto3
+      - name: Get Commit SHA(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          SHA=${{ github.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+      - name: Get Commit SHA(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          SHA=${{ github.event.pull_request.head.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
       - name: Build Text Prediction Tutorial on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         run: |
@@ -453,7 +501,7 @@ jobs:
                                           --source-ref ${{ github.ref }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
                                           --wait
       - name: Build Text Prediction Tutorial on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
@@ -465,7 +513,7 @@ jobs:
                                           --source-ref ${{ github.event.pull_request.head.sha }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
   build_cloud_fit_deploy_tutorial:
     runs-on: ubuntu-latest
@@ -481,6 +529,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install boto3
+      - name: Get Commit SHA(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          SHA=${{ github.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+      - name: Get Commit SHA(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          SHA=${{ github.event.pull_request.head.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
       - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         run: |
@@ -491,7 +551,7 @@ jobs:
                                           --source-ref ${{ github.ref }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
                                           --wait
       - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
@@ -503,7 +563,7 @@ jobs:
                                           --source-ref ${{ github.event.pull_request.head.sha }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
   build_forecasting_tutorial:
     runs-on: ubuntu-latest
@@ -519,6 +579,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install boto3
+      - name: Get Commit SHA(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          SHA=${{ github.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+      - name: Get Commit SHA(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          SHA=${{ github.event.pull_request.head.sha }}
+          short_sha=$(git rev-parse --short "$SHA")
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
       - name: Build Forecasting Tutorial on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         run: |
@@ -529,7 +601,7 @@ jobs:
                                           --source-ref ${{ github.ref }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.ref }} ${{ github.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
                                           --wait
       - name: Build Forecasting Tutorial on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
@@ -541,5 +613,5 @@ jobs:
                                           --source-ref ${{ github.event.pull_request.head.sha }} \
                                           --work-dir . \
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.event.number }} ${{ github.event.pull_request.head.sha }}" \
+                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
