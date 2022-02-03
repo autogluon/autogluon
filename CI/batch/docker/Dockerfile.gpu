@@ -35,6 +35,7 @@ RUN apt-get update \
     libxext6 \
     emacs \
     vim \
+    pandoc \
  && apt-get autoremove -y \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \

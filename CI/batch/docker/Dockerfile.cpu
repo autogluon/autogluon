@@ -50,6 +50,7 @@ RUN apt-get update \
     libreadline-gplv2-dev \
     libc6-dev \
     cmake \
+    pandoc \
  && apt-get autoremove -y \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
