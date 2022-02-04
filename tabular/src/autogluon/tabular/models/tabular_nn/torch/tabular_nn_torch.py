@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import psutil
 import random
 import time
 import warnings
@@ -138,6 +139,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
              time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, verbosity=2, **kwargs):
         try_import_torch()
         import torch
+        torch.set_num_threads(num_cpus)
         from .tabular_torch_dataset import TabularTorchDataset
 
         start_time = time.time()
@@ -540,6 +542,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
+
+    def _get_default_resources(self):
+        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
+        num_cpus = psutil.cpu_count(logical=False)
+        num_gpus = 0
+        return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
         if self.model is not None:
