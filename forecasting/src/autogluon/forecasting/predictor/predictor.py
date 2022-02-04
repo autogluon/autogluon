@@ -6,10 +6,9 @@ import time
 import pandas as pd
 import numpy as np
 
+from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.task.base.base_task import schedulers
-from autogluon.core.utils import set_logger_verbosity
-from autogluon.core.utils.utils import setup_outputdir
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory

@@ -4,7 +4,7 @@ from gluonts.dataset.repository.datasets import dataset_recipes
 from gluonts.dataset.common import Dataset, ListDataset, FileDataset
 from gluonts.dataset.field_names import FieldName
 from autogluon.features.generators import IdentityFeatureGenerator, CategoryFeatureGenerator, FillNaFeatureGenerator
-from autogluon.core.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 import logging
 
 __all__ = ['TimeSeriesDataset', 'gluonts_builtin_datasets', 'rebuild_tabular', 'time_series_dataset', 'train_test_split_dataframe',

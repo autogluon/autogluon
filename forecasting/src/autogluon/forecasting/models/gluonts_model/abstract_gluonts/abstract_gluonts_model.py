@@ -12,11 +12,10 @@ from gluonts.evaluation.backtest import make_evaluation_predictions
 from gluonts.model.forecast import SampleForecast, QuantileForecast
 from gluonts.evaluation import Evaluator
 
-import autogluon.core.utils.savers.save_pkl as save_pkl
-import autogluon.core.utils.loaders.load_pkl as load_pkl
+from autogluon.core.utils.savers import save_pkl
+from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils import warning_filter
-from autogluon.core.task.base.base_predictor import BasePredictor
 from autogluon.core.constants import REFIT_FULL_SUFFIX
 
 from ....utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
@@ -289,6 +288,34 @@ class AbstractGluonTSModel(AbstractModel):
         self.best_configs.update(scheduler.get_best_config())
         return self._get_hpo_results(scheduler, scheduler_params, time_start)
 
+    @staticmethod
+    def _format_hpo_results(results):
+        """ Formats miscellaneous records captured by scheduler into user-viewable Results object. """
+
+        def _merge_scheduler_history(training_history, config_history, reward_attr):
+            trial_info = {}
+            for tid, config in config_history.items():
+                trial_info[tid] = {}
+                trial_info[tid]['config'] = config
+                if tid in training_history:
+                    trial_info[tid]['history'] = training_history[tid]
+                    trial_info[tid]['metadata'] = {}
+
+                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
+                        last_history = training_history[tid][-1]
+                        trial_info[tid][reward_attr] = last_history.pop(reward_attr)
+                        trial_info[tid]['metadata'].update(last_history)
+            return trial_info
+
+        training_history = results.pop('training_history')
+        config_history = results.pop('config_history')
+        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
+                                                         results['reward_attr'])
+        results[results['reward_attr']] = results['best_reward']
+        results['search_space'] = results['metadata'].pop('search_space')
+        results['search_strategy'] = results['metadata'].pop('search_strategy')
+        return results
+
     def _get_hpo_results(self, scheduler, scheduler_options, time_start):
         # Store results / models from this HPO run:
         best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
@@ -303,7 +330,7 @@ class AbstractGluonTSModel(AbstractModel):
             'args': model_trial.args
         }
 
-        hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
+        hpo_results = AbstractGluonTSModel._format_hpo_results(hpo_results)  # results summarizing HPO for this model
 
         hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}

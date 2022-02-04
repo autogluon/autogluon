@@ -135,6 +135,7 @@ extra/src/autogluon/extra/version.py
 tabular/src/autogluon/tabular/version.py
 text/src/autogluon/text/version.py
 vision/src/autogluon/vision/version.py
+forecasting/src/autogluon/forecasting/version.py
 
 AutogluonModels
 VERSION.minor

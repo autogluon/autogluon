@@ -8,11 +8,11 @@ import mxnet as mx
 
 logger = logging.getLogger(__name__)
 
-"""
-MQCNN model from Gluon-TS
-"""
-class MQCNNModel(AbstractGluonTSModel):
 
+class MQCNNModel(AbstractGluonTSModel):
+    """
+    MQCNN model from Gluon-TS
+    """
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "MQCNN",
                  eval_metric: str = None, hyperparameters=None, model=None, **kwargs):
         super().__init__(path=path,

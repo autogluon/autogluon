@@ -6,11 +6,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-"""
-DeepAR model from Gluon-TS
-"""
-class DeepARModel(AbstractGluonTSModel):
 
+class DeepARModel(AbstractGluonTSModel):
+    """
+    DeepAR model from Gluon-TS
+    """
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "DeepAR",
                  eval_metric: str = None, hyperparameters=None, model=None, **kwargs):
         super().__init__(path=path,

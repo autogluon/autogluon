@@ -1,9 +1,9 @@
 import warnings
 import logging
 
-from autogluon.core.utils import warning_filter
 
 __all__ = ['evaluator_warning_filter', 'serialize_warning_filter']
+
 
 class evaluator_warning_filter(object):
     def __enter__(self):
@@ -11,7 +11,6 @@ class evaluator_warning_filter(object):
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=FutureWarning)
         return self
-
 
     def __exit__(self, *args):
         warnings.filterwarnings("default", category=RuntimeWarning)

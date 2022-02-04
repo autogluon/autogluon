@@ -1,14 +1,17 @@
-from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
-from gluonts.nursery.autogluon_tabular.estimator import TabularEstimator
 import logging
+
+from autogluon.core.utils.exceptions import TimeLimitExceeded
+from gluonts.nursery.autogluon_tabular.estimator import TabularEstimator
+
+from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 
 logger = logging.getLogger(__name__)
 
-"""
-Autotabular model from Gluon-TS
-"""
-class AutoTabularModel(AbstractGluonTSModel):
 
+class AutoTabularModel(AbstractGluonTSModel):
+    """
+    Autotabular model from Gluon-TS
+    """
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "AutoTabular",
                  eval_metric: str = None, hyperparameters=None, model=None, **kwargs):
         super().__init__(path=path,
@@ -40,4 +43,4 @@ class AutoTabularModel(AbstractGluonTSModel):
             else:
                 self.model = self.model.train(train_data)
         else:
-            raise TimeLimitExceeded
+            raise TimeLimitExceeded()

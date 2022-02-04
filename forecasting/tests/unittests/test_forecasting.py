@@ -1,4 +1,3 @@
-import pandas as pd
 from autogluon.forecasting import ForecastingPredictor
 from autogluon.forecasting import TabularDataset
 import autogluon.core as ag
