@@ -64,8 +64,9 @@ Tutorials
       :title: Multimodal Prediction
       :link: tutorials/tabular_prediction/tabular-multimodal.html
 
-   .. card::
       How to solve problems that contain Image, Text, and Tabular features at the same time.
+
+   .. card::
       :title: Forecasting
       :link: tutorials/forecasting/index.html
 
