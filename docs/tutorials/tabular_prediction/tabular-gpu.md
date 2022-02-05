@@ -1,28 +1,26 @@
 # Training models with GPU support
 :label:`sec_tabulargpu`
 
-Training with GPU can significantly speed up base algorithms, but it is also a necessity for text and vision models where even on small tasks and the best CPUs the training can take forever without GPU acceleration. To enable GPU training, pass `num_gpus` parameter into a `fit()` call. All models
-with GPU support will automatically start using the acceleration.
+Training with GPU can significantly speed up base algorithms, and is a necessity for text and vision models where training without GPU is infeasibly slow. 
+CUDA toolkit is required for GPU training. Please refer to the [official documentation](https://docs.nvidia.com/cuda/) for the installation instructions.
 
 ```{.python}
-save_path = 'agModels-predictClass'
-predictor = TabularPredictor(label=label, path=save_path).fit(
+predictor = TabularPredictor(label=label).fit(
     train_data,
     ag_args_fit={'num_gpus': 1}
 )
 ```
 
-If GPU acceleration should be enabled just on a specific models, the same parameter can be passed into model `hyperparameters`:
+To enable GPU acceleration on only specific models, the same parameter can be passed into model `hyperparameters`:
 
 ```{.python}
-save_path = 'agModels-predictClass'  # specifies folder to store trained models
 hyperparameters = {
     'GBM': [
         {'ag_args_fit': {'num_gpus': 0}},  # Train with CPU
         {'ag_args_fit': {'num_gpus': 1}}   # Train with GPU
     ]
 }
-predictor = TabularPredictor(label=label, path=save_path).fit(
+predictor = TabularPredictor(label=label).fit(
     train_data, 
     hyperparameters=hyperparameters, 
 )
@@ -30,7 +28,8 @@ predictor = TabularPredictor(label=label, path=save_path).fit(
 
 ## Multi-modal
 
-In :ref:`sec_tabularprediction_multimodal` tutorial we presented how to train an ensemble which can utilize tabular, text and images. If available GPU don't have enough RAM to handle default model sizes or it is needed to speedup testing, different backends can be used:
+In :ref:`sec_tabularprediction_multimodal` tutorial we presented how to train an ensemble which can utilize tabular, text and images. 
+If available GPUs don't have enough VRAM to fit the default model, or it is needed to speedup testing, different backends can be used:
 
 Regular configuration is retrieved like this:
 
@@ -48,11 +47,11 @@ Text model preset to use can be set via:
 hyperparameters['AG_TEXT_NN'] = ['<preset>']
 ```
 
-The list of available text model presets is:
+Available text model presets:
 
 ```{.python .input}
 from autogluon.text.text_prediction.presets import ag_text_presets
-ag_text_presets
+ag_text_presets.list_keys()
 ```
 
 ### Vision models
@@ -72,7 +71,7 @@ _get_supported_models()[:10]  # there're more, we just show a few
 
 ## Enabling GPU for LightGBM
 
-When installed AutoGluon, out-of-the box it is using the LightGBM from a default installation. If `num_gpus` is set, the following warning will be displayed:
+The default installation of LightGBM does not support GPU training, however GPU support can be enabled via a special install. If `num_gpus` is set, the following warning will be displayed:
 
 ```
 Warning: GPU mode might not be installed for LightGBM, GPU training raised an exception. Falling back to CPU training...Refer to LightGBM GPU documentation: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-versionOne possible method is:	pip uninstall lightgbm -y	pip install lightgbm --install-option=--gpu
