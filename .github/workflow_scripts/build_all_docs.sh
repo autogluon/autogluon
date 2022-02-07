@@ -41,7 +41,7 @@ then
     other_doc_version_text='Dev Version Documentation'
     other_doc_version_branch='dev'
 fi
-escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
+# escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
 
 mkdir -p docs/_build/rst/tutorials/
 # aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/ --recursive
@@ -52,9 +52,9 @@ install_all
 setup_mxnet_gpu
 setup_torch
 
-sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini
-sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text}/g' docs/config.ini
-sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
+sed -i -e "s@###_PLACEHOLDER_WEB_CONTENT_ROOT_###@http://$site@g" docs/config.ini
+sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###@$other_doc_version_text@g" docs/config.ini
+sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_branch@g" docs/config.ini
 
 shopt -s extglob
 cd docs && d2lbook build rst && d2lbook build html
