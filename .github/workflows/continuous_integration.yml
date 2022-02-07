@@ -615,7 +615,7 @@ jobs:
   #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
   #                                         --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
   #                                         --wait
-build_all_docs:
+  build_all_docs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
