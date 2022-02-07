@@ -7,7 +7,6 @@ PR_NUMBER=$4
 
 source $(dirname "$0")/env_setup.sh
 
-index_update_str = ''
 if [[ -z $PR_NUMBER ]]
 then
     bucket='autogluon-ci'
@@ -53,7 +52,6 @@ sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###/${other_doc_version_text
 sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_branch}/g' docs/config.ini
 
 shopt -s extglob
-rm -rf ./docs/tutorials/!(index.rst)
 cd docs && d2lbook build rst && d2lbook build html
 aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
