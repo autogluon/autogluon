@@ -23,4 +23,4 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
 fi
 
 cd ..
-aws s3 cp --recursive docs/_build/rst/tutorials/tabular_prediction/ s3://autogluon-dev/build_docs/$PR_NUMBER/$COMMIT_SHA/tabular_prediction/ --quiet
+aws s3 cp --recursive docs/_build/rst/tutorials/tabular_prediction/ s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/tabular_prediction/ --quiet

@@ -9,7 +9,7 @@ To update the docker:
 
 ```shell
 # First export your ecr repo address as a environment variable
-export $AWS_ECR_REPO=${your_repo}
+export AWS_ECR_REPO=${your_repo}
 
 # This executes a command that logs into ECR.
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $AWS_ECR_REPO

@@ -25,8 +25,8 @@ cd $WORK_DIR
 /bin/bash -o pipefail -c "$COMMAND"
 COMMAND_EXIT_CODE=$?
 if [[ -f $SAVED_OUTPUT ]]; then
-  aws s3 cp $SAVED_OUTPUT s3://autogluon-dev/batch/$AWS_BATCH_JOB_ID/$SAVE_PATH --quiet;
+  aws s3 cp $SAVED_OUTPUT s3://autogluon-ci/batch/$AWS_BATCH_JOB_ID/$SAVE_PATH --quiet;
 elif [[ -d $SAVED_OUTPUT ]]; then
-  aws s3 cp --recursive $SAVED_OUTPUT s3://autogluon-dev/batch/$AWS_BATCH_JOB_ID/$SAVE_PATH --quiet;
+  aws s3 cp --recursive $SAVED_OUTPUT s3://autogluon-ci/batch/$AWS_BATCH_JOB_ID/$SAVE_PATH --quiet;
 fi;
 exit $COMMAND_EXIT_CODE
