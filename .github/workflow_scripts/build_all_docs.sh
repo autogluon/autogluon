@@ -5,6 +5,8 @@ GIT_REPO=$2
 COMMIT_SHA=$3
 PR_NUMBER=$4
 
+set -ex
+
 source $(dirname "$0")/env_setup.sh
 
 if [[ -z $PR_NUMBER ]]
@@ -45,6 +47,7 @@ mkdir -p docs/_build/rst/tutorials/
 # aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/
 aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ # test
 
+setup_build_contrib_env
 install_all
 setup_mxnet_gpu
 setup_torch
