@@ -44,8 +44,8 @@ fi
 escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
 
 mkdir -p docs/_build/rst/tutorials/
-# aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/
-aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ # test
+# aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/ --recursive
+aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ --recursive  # test
 
 setup_build_contrib_env
 install_all
@@ -58,6 +58,12 @@ sed -i -e 's/###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###/${other_doc_version_bra
 
 shopt -s extglob
 cd docs && d2lbook build rst && d2lbook build html
+
+COMMAND_EXIT_CODE=$?
+if [ $COMMAND_EXIT_CODE -ne 0 ]; then
+    exit COMMAND_EXIT_CODE
+fi
+
 aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
