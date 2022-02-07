@@ -76,6 +76,10 @@ class AbstractGluonTSModel(AbstractModel):
 
         self.epoch_counter = EpochCounter()
         self.params["callbacks"] = [self.epoch_counter]
+        self.params["eval_metric"] = eval_metric
+        self.params["name"] = name
+        self.params["hyperparameters"] = hyperparameters
+        self.params["path"] = path
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -249,44 +253,78 @@ class AbstractGluonTSModel(AbstractModel):
 
         Parameters
         __________
-        train_data: data for training
-
-        val_data: data for validation, used for evaluting parameter settings
-
-        scheduler_options: tuple in the form (scheduler_cls, scheduler_params)
-
-        time_limit: roughly how long will the hyperparameter tuning process last.
+        train_data:
+            data for training
+        val_data:
+            data for validation, used for evaluting parameter settings
+        scheduler_options:
+            tuple in the form (scheduler_cls, scheduler_params)
+        time_limit:
+            roughly how long will the hyperparameter tuning process last
         """
         time_start = time.time()
         logger.log(30, f"Start hyperparameter tuning for {self.name}")
         params_copy = self.params.copy()
 
         directory = self.path
+        scheduler_cls, scheduler_params = scheduler_options
+        scheduler_params["time_out"] = scheduler_params.get("time_out", time_limit)
 
-        dataset_train_filename = 'dataset_train.p'
+        if scheduler_cls is None or scheduler_params is None:
+            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
+
+        dataset_train_filename = 'dataset_train.pkl'
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=train_data)
 
-        dataset_val_filename = 'dataset_val.p'
+        dataset_val_filename = 'dataset_val.pkl'
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=val_data)
-        scheduler_func, scheduler_params = scheduler_options
-        scheduler_params["time_out"] = scheduler_params.get("time_out", time_limit)
-        util_args = dict(
-            train_data_path=dataset_train_filename,
-            val_data_path=dataset_val_filename,
-            directory=directory,
-            model=self,
+
+        train_fn_kwargs = dict(
+            model_cls=self.__class__,
+            init_params=params_copy,
             time_start=time_start,
-            time_limit=scheduler_params.get("time_out", time_limit)
+            time_limit=scheduler_params.get("time_out", time_limit),
+            fit_kwargs={},
+            train_path=train_path,
+            val_path=val_path,
         )
 
-        model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler = scheduler_func(model_trial, **scheduler_params)
+        scheduler = scheduler_cls(
+            model_trial,
+            search_space=self._get_search_space(),
+            train_fn_kwargs=train_fn_kwargs,
+            **scheduler_params
+        )
+
         scheduler.run()
         scheduler.join_jobs()
         self.best_configs.update(scheduler.get_best_config())
+
         return self._get_hpo_results(scheduler, scheduler_params, time_start)
+
+    def _get_default_searchspace(self) -> dict:
+        """
+        Get the default hyperparameter searchspace of the model.
+        See `autogluon.core.space` for available space classes.
+        Returns
+        -------
+        dict of hyperparameter search spaces.
+        """
+        return {}
+
+    def _get_search_space(self):
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+            default fixed value to default search space.
+        """
+        def_search_space = self._get_default_searchspace().copy()
+        # TODO: implement default search spaces and nondefault_params for forecasting models
+        # for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
+        #     def_search_space.pop(key, None)
+        params = self.params.copy()
+        params.update(def_search_space)
+        return params
 
     @staticmethod
     def _format_hpo_results(results):
@@ -327,7 +365,6 @@ class AbstractGluonTSModel(AbstractModel):
             'training_history': scheduler.training_history,
             'config_history': scheduler.config_history,
             'reward_attr': scheduler._reward_attr,
-            'args': model_trial.args
         }
 
         hpo_results = AbstractGluonTSModel._format_hpo_results(hpo_results)  # results summarizing HPO for this model
@@ -335,7 +372,7 @@ class AbstractGluonTSModel(AbstractModel):
         hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
-            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
+            file_id = f"T{trial+1}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
             hpo_models[trial_model_name] = trial_model_path
