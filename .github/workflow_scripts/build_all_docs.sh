@@ -24,6 +24,8 @@ else
             path='dev-branch'
         else
             path=$BRANCH
+        fi
+    fi
     bucket='autogluon-ci'  # TODO: update this to real bucket
     site=$bucket/$path
     if [[ $BRANCH == 'master' ]]; then flags=''; else flags=--delete; fi
