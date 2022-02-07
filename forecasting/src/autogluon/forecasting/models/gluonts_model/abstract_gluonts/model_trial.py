@@ -6,7 +6,7 @@ from autogluon.core.models.abstract.model_trial import init_model
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 
-from autogluon.forecasting.utils.metric_utils import metric_coefficient
+from ....utils.metric_utils import metric_coefficient
 
 
 logger = logging.getLogger(__name__)

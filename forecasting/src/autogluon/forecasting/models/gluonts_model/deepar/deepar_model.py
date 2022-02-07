@@ -1,8 +1,10 @@
-from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+import logging
+
 from autogluon.core.utils import warning_filter
 with warning_filter():
     from gluonts.model.deepar import DeepAREstimator
-import logging
+
+from ..abstract_gluonts import AbstractGluonTSModel
 
 logger = logging.getLogger(__name__)
 

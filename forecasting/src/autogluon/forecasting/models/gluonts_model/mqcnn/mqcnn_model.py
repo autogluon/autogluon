@@ -1,10 +1,12 @@
-from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+import logging
+
 from autogluon.core.utils import warning_filter
+import mxnet as mx
 with warning_filter():
     from gluonts.model.seq2seq import MQCNNEstimator
     from gluonts.mx.context import get_mxnet_context
-import logging
-import mxnet as mx
+
+from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 
 logger = logging.getLogger(__name__)
 

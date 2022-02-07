@@ -1,8 +1,8 @@
 import logging
 import time
 
-from .abstract_learner import AbstractLearner
-from ..trainer.auto_trainer import AutoTrainer
+from . import AbstractLearner
+from ..trainer import AutoTrainer
 
 logger = logging.getLogger(__name__)
 

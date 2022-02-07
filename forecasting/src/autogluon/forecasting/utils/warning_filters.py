@@ -1,6 +1,5 @@
-import warnings
 import logging
-
+import warnings
 
 __all__ = ['evaluator_warning_filter', 'serialize_warning_filter']
 

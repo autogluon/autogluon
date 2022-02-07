@@ -1,23 +1,19 @@
-from gluonts.mx.trainer.callback import Callback
-import time
 import logging
+import time
+
+from gluonts.mx.trainer.callback import Callback
 
 
 class EpochCounter(Callback):
-
     def __init__(self):
         self.count = 0
 
-    def on_epoch_end(
-        self,
-        **kwargs
-    ) -> bool:
+    def on_epoch_end(self, **kwargs) -> bool:
         self.count += 1
         return True
 
 
 class TimeLimitCallback(Callback):
-
     def __init__(self, time_limit=None):
         self.start_time = None
         self.time_limit = time_limit

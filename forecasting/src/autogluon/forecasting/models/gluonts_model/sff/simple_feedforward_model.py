@@ -1,16 +1,18 @@
-from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+import logging
+
 from autogluon.core.utils import warning_filter
 with warning_filter():
     from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
-import logging
+
+from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
 
 logger = logging.getLogger(__name__)
 
-"""
-SimpleFeedForward model from Gluon-TS
-"""
-class SimpleFeedForwardModel(AbstractGluonTSModel):
 
+class SimpleFeedForwardModel(AbstractGluonTSModel):
+    """
+    SimpleFeedForward model from Gluon-TS
+    """
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "SFF",
                  eval_metric: str = None, hyperparameters=None, model=None, **kwargs):
         super().__init__(path=path,

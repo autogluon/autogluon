@@ -5,8 +5,6 @@ from .model_presets.presets import get_preset_models
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['AutoTrainer', 'AbstractTrainer']
-
 
 class AutoTrainer(AbstractTrainer):
     def get_models(self, hyperparameters, **kwargs):

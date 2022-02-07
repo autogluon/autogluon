@@ -23,11 +23,12 @@ requirements = [
     'pandas',
     'psutil>=5.7.3,<5.9',
     'gluonts>=0.8.0',
+    'mxnet<2.0',
     f'autogluon.core=={version}',
 ]
 
 test_requirements = [
-    'pytest'
+    'pytest', 'flake8'
 ]
 
 install_requires = requirements + test_requirements

@@ -1,7 +1,9 @@
+import tempfile
+
+import autogluon.core as ag
+
 from autogluon.forecasting import ForecastingPredictor
 from autogluon.forecasting import TabularDataset
-import autogluon.core as ag
-import tempfile
 
 
 def test_forecasting_no_hpo():

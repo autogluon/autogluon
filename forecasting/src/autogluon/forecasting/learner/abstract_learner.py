@@ -1,9 +1,12 @@
-import random
 import os
+import random
+
 from gluonts.evaluation import Evaluator
-from autogluon.core.utils.savers import save_pkl, save_json
+
 from autogluon.core.utils.loaders import load_pkl
-from ..trainer.abstract_trainer import AbstractTrainer
+from autogluon.core.utils.savers import save_pkl, save_json
+
+from ..trainer import AbstractTrainer
 
 
 class AbstractLearner:

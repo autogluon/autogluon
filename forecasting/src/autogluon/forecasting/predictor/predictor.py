@@ -9,20 +9,25 @@ import numpy as np
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.utils.savers import save_pkl
-from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.decorators import apply_presets
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_pkl
 
 from gluonts.dataset.common import FileDataset, ListDataset
 from gluonts.evaluation import Evaluator
-from gluonts.model.forecast import SampleForecast, QuantileForecast
+from gluonts.model.forecast import QuantileForecast
 
 from ..configs.presets_configs import forecasting_presets_configs
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
-from ..utils.dataset_utils import time_series_dataset, rebuild_tabular, train_test_split_gluonts, \
-    train_test_split_dataframe, TimeSeriesDataset
+from ..utils.dataset_utils import (
+    time_series_dataset,
+    rebuild_tabular,
+    train_test_split_gluonts,
+    train_test_split_dataframe,
+    TimeSeriesDataset,
+)
 from ..utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger()  # return root logger

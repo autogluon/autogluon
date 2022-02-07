@@ -3,7 +3,7 @@ import logging
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from gluonts.nursery.autogluon_tabular.estimator import TabularEstimator
 
-from ..abstract_gluonts.abstract_gluonts_model import AbstractGluonTSModel
+from ..abstract_gluonts import AbstractGluonTSModel
 
 logger = logging.getLogger(__name__)
 
