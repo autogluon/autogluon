@@ -57,6 +57,7 @@ sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###@$other_doc_version_text@
 sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_branch@g" docs/config.ini
 
 shopt -s extglob
+rm -rf ./docs/tutorials/!(index.rst)
 cd docs && d2lbook build rst && d2lbook build html
 
 COMMAND_EXIT_CODE=$?
