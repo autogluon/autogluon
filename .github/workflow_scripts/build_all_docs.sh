@@ -10,8 +10,8 @@ source $(dirname "$0")/env_setup.sh
 index_update_str = ''
 if [[ -z $PR_NUMBER ]]
 then
-    bucket=''
-    path=$BRANCH/$COMMIT_SHA
+    bucket='autogluon-ci'
+    path=staging/$BRANCH/$COMMIT_SHA
     site=$bucket.s3-website-us-region.amazonaws.com/$path
     flags='--delete'
     cacheControl=''
@@ -25,7 +25,7 @@ else
             path='dev-branch'
         else
             path=$BRANCH
-    bucket=''
+    bucket='autogluon-ci'  # TODO: update this to real bucket
     site=$bucket/$path
     if [[ $BRANCH == 'master' ]]; then flags=''; else flags=--delete; fi
     cacheControl='--cache-control max-age=7200'
@@ -41,7 +41,8 @@ fi
 escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
 
 mkdir -p docs/_build/rst/tutorials/
-aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/
+# aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/
+aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ # test
 
 install_all
 setup_mxnet_gpu
@@ -57,7 +58,6 @@ cd docs && d2lbook build rst && d2lbook build html
 aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
-# TODO: update index_update_str
 if [[ $BRANCH == 'master' ]]
 then
     aws s3 cp root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
