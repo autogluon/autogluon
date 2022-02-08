@@ -616,7 +616,7 @@ jobs:
                                           --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
                                           --wait
   build_all_docs:
-    needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_forecasting_tutorial]
+    needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
