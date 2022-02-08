@@ -32,9 +32,7 @@ def test_hf_automodel_init(checkpoint_name):
     "checkpoint_name",
     [
         "swin_base_patch4_window7_224",
-        # "beit_base_patch16_224",
         "vit_small_patch16_384",
-        # "convmixer_1536_20",
         "resnet18",
         "legacy_seresnet18",
     ]
