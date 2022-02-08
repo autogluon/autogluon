@@ -22,9 +22,24 @@ install_requires = [
     'scipy',
     'pandas',
     'scikit-learn',
-
+    'fairscale',
+    'scikit-image',
+    'boto3',
+    'pytest',
+    'smart_open',
+    'pytorch_lightning>=1.5.9',
+    'torchmetrics',
+    'transformers>=4.16.2',
+    'Pillow',
+    'tqdm',
+    'pandas',
+    'nptyping',
+    'omegaconf',
+    'timm',
+    'pytest',
+    'sentencepiece',
     f'autogluon.core=={version}',
-    'autogluon-contrib-nlp==0.0.1b20210201',
+    # 'autogluon-contrib-nlp==0.0.1b20210201',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

@@ -1,0 +1,20 @@
+model:
+  names: "hf_text"
+  hf_text:
+#    checkpoint_name: "google/electra-base-discriminator"
+    checkpoint_name: 'microsoft/deberta-v3-small'
+#     checkpoint_name: 'bert-base-uncased'
+#    checkpoint_name: 'xlm-roberta-base'
+#    checkpoint_name: 'microsoft/deberta-base'
+#    checkpoint_name: 'roberta-base'
+#    checkpoint_name: "distilbert-base-uncased"
+#    checkpoint_name: "bert-base-chinese"
+#    checkpoint_name: "gpt2"
+    data_types:
+      - "text"
+    tokenizer_name: "hf_auto"
+#    merge: True  # Whether we will merge different text columns or treat them independently.
+    max_text_len: 512  # The maximum possible length.
+    insert_sep: True
+    text_segment_num: 2
+    stochastic_chunk: False
