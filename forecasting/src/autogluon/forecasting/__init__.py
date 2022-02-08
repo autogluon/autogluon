@@ -1,7 +1,9 @@
-from .version import __version__
 import logging
+try:
+    from .version import __version__
+except ImportError:
+    pass
 
 from .predictor.predictor import ForecastingPredictor
-from autogluon.core.dataset import TabularDataset
 
 logging.basicConfig(format='%(message)s')  # just print message in logs

@@ -138,6 +138,7 @@ class ForecastingPredictor:
         self.cardinality = None
         self.prev_inferred_static_features = {}
 
+    # TODO: simplify API (e.g., column names), break into simpler methods
     @apply_presets(forecasting_presets_configs)
     def fit(self,
             train_data,
