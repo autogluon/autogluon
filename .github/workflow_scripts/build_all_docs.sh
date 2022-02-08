@@ -9,6 +9,8 @@ set -ex
 
 source $(dirname "$0")/env_setup.sh
 
+if [[ -z $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; else build_docs_path=build_docs/$BRANCH/$COMMIT_SHA; fi
+
 if [[ (-z $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-ci'
@@ -44,7 +46,7 @@ fi
 # escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
 
 mkdir -p docs/_build/rst/tutorials/
-aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/ --recursive
+aws s3 cp s3://autogluon-ci/$build_docs_path docs/_build/rst/tutorials/ --recursive
 # aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ --recursive  # test
 
 setup_build_contrib_env
