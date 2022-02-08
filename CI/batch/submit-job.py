@@ -29,7 +29,7 @@ parser.add_argument('--name', help='name of the job', type=str, default='dummy')
 parser.add_argument('--job-type', help='type of job to submit.', type=str,
                     choices=job_type_info.keys(), default='CI-CPU')
 parser.add_argument('--source-ref',
-                    help='ref in GluonNLP main github. e.g. master, refs/pull/500/head',
+                    help='ref in AutoGluon main github. e.g. master, refs/pull/500/head',
                     type=str, default='master')
 parser.add_argument('--work-dir',
                     help='working directory inside the repo. e.g. scripts/preprocess',
@@ -37,15 +37,15 @@ parser.add_argument('--work-dir',
 parser.add_argument('--saved-output',
                     help='output to be saved, relative to working directory. '
                          'it can be either a single file or a directory',
-                    type=str, default='.')
+                    type=str, default='None')
 parser.add_argument('--save-path',
                     help='s3 path where files are saved.',
                     type=str, default='batch/temp/{}'.format(datetime.now().isoformat()))
 parser.add_argument('--command', help='command to run', type=str,
                     default='git rev-parse HEAD | tee stdout.log')
 parser.add_argument('--remote',
-                    help='git repo address. https://github.com/dmlc/gluon-nlp',
-                    type=str, default="https://github.com/dmlc/gluon-nlp")
+                    help='git repo address. https://github.com/awslabs/autogluon',
+                    type=str, default="https://github.com/awslabs/autogluon")
 parser.add_argument('--wait', help='block wait until the job completes. '
                     'Non-zero exit code if job fails.', action='store_true')
 parser.add_argument('--timeout', help='job timeout in seconds', default=None, type=int)

@@ -9,7 +9,7 @@ set -ex
 
 source $(dirname "$0")/env_setup.sh
 
-if [[ -z $PR_NUMBER ]]
+if [[ (-z $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-ci'
     path=staging/$BRANCH/$COMMIT_SHA
@@ -44,8 +44,8 @@ fi
 # escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
 
 mkdir -p docs/_build/rst/tutorials/
-# aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/ --recursive
-aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ --recursive  # test
+aws s3 cp s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/ docs/_build/rst/tutorials/ --recursive
+# aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ --recursive  # test
 
 setup_build_contrib_env
 install_all
@@ -68,7 +68,7 @@ fi
 aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
-if [[ $BRANCH == 'master' ]]
+if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
 then
     aws s3 cp root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
     echo "Uploaded root_index.html s3://${bucket}/index.html"
