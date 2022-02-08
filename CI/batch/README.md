@@ -29,7 +29,7 @@ python3 submit-job.py \
 --job-type CI-CPU \
 --source-ref master \
 --work-dir examples/tabular \
---remote https://github.com/dmlc/gluon-cv \
+--remote https://github.com/awslabs/autogluon \
 --command "python3 example_simple_tabular.py" \
 --wait
 ```

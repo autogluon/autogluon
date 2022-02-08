@@ -30,7 +30,7 @@ else
             path=$BRANCH
         fi
     fi
-    bucket='autogluon-ci'  # TODO: update this to real bucket
+    bucket='autogluon-website'  # TODO: update this to real bucket
     site=$bucket/$path
     if [[ $BRANCH == 'master' ]]; then flags=''; else flags=--delete; fi
     cacheControl='--cache-control max-age=7200'
