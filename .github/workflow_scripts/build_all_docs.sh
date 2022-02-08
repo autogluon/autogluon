@@ -9,9 +9,9 @@ set -ex
 
 source $(dirname "$0")/env_setup.sh
 
-if [[ -z $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; else build_docs_path=build_docs/$BRANCH/$COMMIT_SHA; fi
+if [[ -n $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; else build_docs_path=build_docs/$BRANCH/$COMMIT_SHA; fi
 
-if [[ (-z $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
+if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-ci'
     path=staging/$BRANCH/$COMMIT_SHA
