@@ -8,8 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import sklearn
-
-from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
+from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.models import AbstractModel
@@ -143,8 +142,10 @@ class NNFastAiTabularModel(AbstractModel):
             for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
         X = self._fill_missing(X)
-        cont_mean, cont_std = self._cont_normalization
-        X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+        if self.cont_columns:
+            cont_mean, cont_std = self._cont_normalization
+            X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+            X = X.copy()  # Removes potential DF fragmentation
         return X
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -449,6 +450,7 @@ class NNFastAiTabularModel(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
             ignored_type_group_raw=[R_OBJECT],
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
