@@ -1,5 +1,4 @@
 import argparse
-from this import d
 import boto3
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -10,7 +9,7 @@ parser.add_argument('--region', help='Default region when creating new connectio
                     default='us-east-1')
 parser.add_argument('--name', help='name of the job to be cancelled.', type=str,
                     default='')
-parser.add_argument('--job_type', help='name of the job to be cancelled.', type=str,
+parser.add_argument('--job-type', help='name of the job to be cancelled.', type=str,
                     default='CI-CPU')
 parser.add_argument('--reason', help='reason to cancel the job.', type=str,
                     default='Canelling because new commits related to same PR is pushed')
