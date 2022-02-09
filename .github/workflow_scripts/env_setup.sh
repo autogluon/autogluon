@@ -52,6 +52,7 @@ function install_text {
 }
 
 function install_vision {
+    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
     python3 -m pip install --upgrade -e vision/
 }
 
