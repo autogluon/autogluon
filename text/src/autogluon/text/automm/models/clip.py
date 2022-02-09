@@ -10,11 +10,24 @@ from .utils import init_weights
 
 
 class CLIPForImageText(nn.Module):
-    def __init__(self,
-                 prefix: str,
-                 checkpoint_name: str,
-                 num_classes: Optional[int] = 0,
-                 ):
+    def __init__(
+            self,
+            prefix: str,
+            checkpoint_name: str,
+            num_classes: Optional[int] = 0,
+    ):
+        """
+        Load pretrained CLIP from huggingface transformers
+
+        Parameters
+        ----------
+        prefix
+            The model prefix.
+        checkpoint_name
+            Name of the checkpoint.
+        num_classes
+            The number of classes.
+        """
         print(f"initializing {prefix}")
         super().__init__()
         self.model = CLIPModel.from_pretrained(checkpoint_name)

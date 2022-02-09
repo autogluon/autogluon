@@ -57,8 +57,57 @@ def infer_eval_metric(problem_type: str):
 
 def get_config(
         config: dict,
-        overrides: Optional[List[str]] = None,
+        overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
+    """
+    Construct configurations for model, data, optimization, and environment.
+    It supports to overrides some default configurations.
+
+    Parameters
+    ----------
+    config
+        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        The value of each key can be a string, yaml path, or DictConfig object. For example:
+        config = {
+                        "model": "fusion_mlp_image_text_tabular",
+                        "data": "default",
+                        "optimization": "adamw",
+                        "environment": "default",
+                    }
+            or
+            config = {
+                        "model": "/path/to/model/config.yaml",
+                        "data": "/path/to/data/config.yaml",
+                        "optimization": "/path/to/optimization/config.yaml",
+                        "environment": "/path/to/environment/config.yaml",
+                    }
+            or
+            config = {
+                        "model": OmegaConf.load("/path/to/model/config.yaml"),
+                        "data": OmegaConf.load("/path/to/data/config.yaml"),
+                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
+                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
+                    }
+    overrides
+        This is to override some default configurations.
+            For example, changing the text and image backbones can be done by formatting:
+
+            a string
+            overrides = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+
+            or a list of strings
+            overrides = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+
+            or a dictionary
+            overrides = {
+                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                        }
+
+    Returns
+    -------
+    Configurations as a DictConfig object
+    """
     all_configs = []
     for k, v in config.items():
         if isinstance(v, dict):
@@ -89,6 +138,26 @@ def select_model(
         config: DictConfig,
         df_preprocessor: MultiModalFeaturePreprocessor,
 ):
+    """
+    Filter model config through the detected modalities in the training data. If MultiModalFeaturePreprocessor
+    can't detect some modality, this function will remove the models that use this modality. This function is to
+    maximize the user flexibility in defining the config. For example, if one uses the "fusion_mlp_image_text_tabular"
+    as the model config template but the training data don't have images, this function will filter out all the models
+    using images, such as Swin Transformer and CLIP.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model"
+    df_preprocessor
+        A MultiModalFeaturePreprocessor object, which has called .fit() on the training data.
+        Column names of the same modality are grouped into one list. If a modality's list is empty,
+        it means the training data don't have this modality.
+
+    Returns
+    -------
+    Config with some unused models removed.
+    """
     data_status = {}
     for per_modality in ALL_MODALITIES:
         data_status[per_modality] = False
@@ -137,7 +206,28 @@ def init_df_preprocessor(
         train_df_x: pd.DataFrame,
         train_df_y: pd.Series,
 ):
+    """
+    Initialize the dataframe preprocessor by calling .fit().
 
+    Parameters
+    ----------
+    config
+        A DictConfig containing only the data config.
+    column_types
+        A dictionary that maps column names to their data types.
+        For example: `column_types = {"item_name": "text", "image": "image_path",
+        "product_description": "text", "height": "numerical"}`
+        may be used for a table with columns: "item_name", "brand", "product_description", and "height".
+    label_column
+        Name of the column that contains the target variable to predict.
+    train_df_x
+        A pd.DataFrame containing only the feature columns.
+    train_df_y
+        A pd.Series object containing only the label column.
+    Returns
+    -------
+    Initialized dataframe preprocessor.
+    """
     df_preprocessor = MultiModalFeaturePreprocessor(
         cfg=config,
         column_types=column_types,
@@ -155,6 +245,27 @@ def init_data_processors(
         config: DictConfig,
         num_categorical_columns: int,
 ):
+    """
+    Create the data processors according to the model config. This function creates one processor for
+    each modality of each model. For example, if one model config contains BERT, ViT, and CLIP, then
+    BERT would have its own text processor, ViT would have its own image processor, and CLIP would have
+    its own text and image processors. This is to support training arbitrary combinations of single-model
+    and multimodal models since two models may share the same modality but have different processing. Text
+    sequence length is a good example. BERT's sequence length is generally 512, while CLIP uses sequences of
+    length 77.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    num_categorical_columns
+        The number of categorical columns in the training dataframe.
+
+    Returns
+    -------
+    A dictionary with modalities as the keys. Each modality has a list of processors.
+    Note that "label" is also treated as a modality for convenience.
+    """
     names = config.model.names
     if isinstance(names, str):
         names = [names]
@@ -223,6 +334,26 @@ def create_model(
         num_numerical_columns: Optional[int] = None,
         num_categories: Optional[List[int]] = None,
 ):
+    """
+    Create models. It supports the auto models of huggingface text and timm image.
+    Multimodal models, e.g., CLIP, should be added case-by-case since their configs and usages
+    may be different. It uses MLP for the numerical features, categorical features, and late-fusion.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    num_classes
+        The class number for a classification task. It should be 1 for a regression task.
+    num_numerical_columns
+        The number of numerical columns in the training dataframe.
+    num_categories
+        The category number for each categorical column in the training dataframe.
+
+    Returns
+    -------
+    A Pytorch model
+    """
     names = config.model.names
     if isinstance(names, str):
         names = [names]
@@ -330,8 +461,22 @@ def make_exp_dir(
         create: Optional[bool] = True,
 ):
     """
-    Creates the exp dir of format e.g.:
-        experiments/2017_01_01/job_name_12_00_00/
+    Creates the exp dir of format e.g.,: root_path/2022_01_01/job_name_12_00_00/
+    This function is to better organize the training runs. It is recommended to call this
+    function and pass the returned "exp_dir" to "AutoMMPredictor.fit(save_path=exp_dir)".
+
+    Parameters
+    ----------
+    root_path
+        The basic path where to create saving directories for training runs.
+    job_name
+        The job names to name training runs.
+    create
+        Whether to make the directory.
+
+    Returns
+    -------
+    The formatted directory path.
     """
     tz = pytz.timezone('US/Pacific')
     ct = datetime.datetime.now(tz=tz)
@@ -354,8 +499,24 @@ def gather_top_k_ckpts(
     ckpt_dir: Optional[str] = None,
     ckpt_paths: Optional[List[str]] = None,
 ):
+    """
+    Gather the state_dicts of top k models. If "ckpt_paths" is not an empty list, it loads the models
+    from its paths. Otherwise, it will find available checkpoints in the "ckpt_dir". After loading all the
+    top k checkpoints, it cleans them. The lastest checkpoint "last.ckpt" is also removed since "last.ckpt"
+    is for resuming training in the middle, but the the training should be done when calling this function.
 
-    if ckpt_paths is None:
+    Parameters
+    ----------
+    ckpt_dir
+        The directory where we save all the top k checkpoints.
+    ckpt_paths
+        A list of top k checkpoint paths.
+
+    Returns
+    -------
+    A list of state_dicts and a checkpoint template to save the averaged checkpoint later.
+    """
+    if not ckpt_paths:
         ckpt_paths = []
         for file_name in os.listdir(ckpt_dir):
             if file_name.startswith("epoch"):
@@ -384,7 +545,22 @@ def average_checkpoints(
         out_path: str,
         ckpt_template: dict,
 ):
+    """
+    Average the state_dicts of top k checkpoints.
 
+    Parameters
+    ----------
+    all_state_dicts
+        A list of Pytorch state_dicts.
+    out_path
+        The path to save the averaged checkpoint.
+    ckpt_template
+        A dictionary of checkpoint template used during the training.
+
+    Returns
+    -------
+    The averaged state_dict.
+    """
     avg_state_dict = dict()
     for key in all_state_dicts[0]:
         arr = [state_dict[key] for state_dict in all_state_dicts]
@@ -400,6 +576,21 @@ def compute_score(
         metric_data: dict,
         metric_name: str,
 ) -> float:
+    """
+    Use sklearn to compute the score of one metric.
+
+    Parameters
+    ----------
+    metric_data
+        A dictionary with the groundtruth (Y_TRUE) and predicted values (Y_PRED, Y_PRED_PROB).
+        The predicted class probabilities are required to compute the roc_auc score.
+    metric_name
+        The name of metric to compute.
+
+    Returns
+    -------
+    Computed score.
+    """
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
         score = accuracy_score(

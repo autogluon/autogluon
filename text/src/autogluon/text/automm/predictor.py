@@ -14,7 +14,7 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import pytorch_lightning as pl
 from packaging import version
-from typing import Optional, List, Tuple, Dict
+from typing import Optional, List, Tuple, Dict, Union
 from sklearn.model_selection import train_test_split
 # from autogluon.core.utils import set_logger_verbosity
 # from autogluon.core.utils.loaders import load_pd
@@ -52,11 +52,45 @@ from .optimization.lit_module import LitModule
 
 from . import __version__
 
-logger = logging.getLogger()  # return root logger
+logger = logging.getLogger()
 
 
 class AutoMMPredictor:
 
+    """
+    AutoMMPredictor can predict the values of one dataframe column conditioned on the rest columns.
+    The prediction can be either a classification or regression problem. The feature columns can contain
+    image paths, text, numerical, and categorical features.
+
+    Parameters
+    ----------
+    label
+        Name of the column that contains the target variable to predict.
+    problem_type
+        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
+        (options: 'binary', 'multiclass', 'regression').
+        If `problem_type = None`, the prediction problem type is inferred
+        based on the label-values in provided dataset.
+    eval_metric
+        Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
+        Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+    path
+        Path to directory where models and intermediate outputs should be saved.
+        If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
+        will be created in the working directory to store all models.
+        Note: To call `fit()` twice and save all results of each fit,
+        you must specify different `path` locations or don't specify `path` at all.
+        Otherwise files from first `fit()` will be overwritten by second `fit()`.
+    verbosity
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+        where `L` ranges from 0 to 50
+        (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+    warn_if_exist
+        Whether to raise warning if the specified path already exists.
+
+    """
     def __init__(
             self,
             label: str,
@@ -117,12 +151,92 @@ class AutoMMPredictor:
             config: Optional[dict] = None,
             tuning_data: Optional[pd.DataFrame] = None,
             save_path: Optional[str] = None,
-            overrides=None,
-            column_types=None,
+            overrides: Optional[Union[str, Dict, List[str]]] = None,
+            column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
             init_only: Optional[bool] = False,
     ):
+        """
+        Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
+        which may contain image path, text, numeric, or categorical features.
+
+        Parameters
+        ----------
+        train_data
+            A dataframe containing training data.
+        config
+            A dictionary with four keys "model", "data", "optimization", and "environment".
+            Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
+            Strings should be the file names (DO NOT include the postfix ".yaml") in
+            automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
+            For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
+            config = {
+                        "model": "fusion_mlp_image_text_tabular",
+                        "data": "default",
+                        "optimization": "adamw",
+                        "environment": "default",
+                    }
+            or
+            config = {
+                        "model": "/path/to/model/config.yaml",
+                        "data": "/path/to/data/config.yaml",
+                        "optimization": "/path/to/optimization/config.yaml",
+                        "environment": "/path/to/environment/config.yaml",
+                    }
+            or
+            config = {
+                        "model": OmegaConf.load("/path/to/model/config.yaml"),
+                        "data": OmegaConf.load("/path/to/data/config.yaml"),
+                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
+                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
+                    }
+        tuning_data
+            A dataframe containing validation data, which should have the same columns as the train_data.
+            If `tuning_data = None`, `fit()` will automatically
+            hold out some random validation examples from `train_data`.
+        save_path
+            Path to directory where models and intermediate outputs should be saved.
+        overrides
+            This is to override some default configurations.
+            For example, changing the text and image backbones can be done by formatting:
+
+            a string
+            overrides = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+
+            or a list of strings
+            overrides = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+
+            or a dictionary
+            overrides = {
+                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                        }
+        column_types
+            A dictionary that maps column names to their data types.
+            For example: `column_types = {"item_name": "text", "image": "image_path",
+            "product_description": "text", "height": "numerical"}`
+            may be used for a table with columns: "item_name", "brand", "product_description", and "height".
+            If None, column_types will be automatically inferred from the data.
+            The current supported types are:
+                - "image_path": each row in this column is one image path.
+                - "text": each row in this column contains text (sentence, paragraph, etc.).
+                - "numerical": each row in this column contains a number.
+                - "categorical": each row in this column belongs to one of K categories.
+        holdout_frac
+            Fraction of train_data to holdout as tuning_data for optimizing hyper-parameters or
+            early stopping (ignored unless `tuning_data = None`).
+            Default value (if None) is selected based on the number of rows in the training data
+            and whether hyper-parameter-tuning is utilized.
+        seed
+            The random seed to use for this training run.
+        init_only
+            Whether to only initialize the model without training. This can be used when we want to
+            compare the model performance before and after training.
+        Returns
+        -------
+        An "AutoMMPredictor" object (itself).
+        """
         pl.seed_everything(seed, workers=True)
 
         if self._config is None:
@@ -448,6 +562,24 @@ class AutoMMPredictor:
             metrics: Optional[List[str]] = None,
             return_pred: Optional[bool] = False,
     ):
+        """
+        Evaluate model on a test dataset.
+
+        Parameters
+        ----------
+        data
+            A dataframe, containing the same columns as the training data
+        metrics
+            A list of metric names to report.
+            If None, we only return the score for the stored `_eval_metric_name`.
+        return_pred
+            Whether to return the prediction result of each row.
+
+        Returns
+        -------
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
+        """
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
@@ -490,7 +622,21 @@ class AutoMMPredictor:
             data: pd.DataFrame,
             as_pandas: Optional[bool] = True,
     ):
+        """
+        Predict values for the label column of new data
 
+        Parameters
+        ----------
+        data
+             The data to make predictions for. Should contain same column names as training data and
+              follow same format (except for the `label` column).
+        as_pandas
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+
+        Returns
+        -------
+        Array of predictions, one corresponding to each row in given dataset.
+        """
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
@@ -506,7 +652,27 @@ class AutoMMPredictor:
             as_pandas: Optional[bool] = True,
             as_multiclass: Optional[bool] = True,
     ):
+        """
+        Predict probabilities class probabilities rather than class labels.
+        This is only for the classification task. Calling it for a regression task will throw an exception.
 
+        Parameters
+        ----------
+        data
+            The data to make predictions for. Should contain same column names as training data and
+              follow same format (except for the `label` column).
+        as_pandas
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+        as_multiclass
+            Whether to return the probability of all labels or
+            just return the probability of the positive class for binary classification problems.
+
+        Returns
+        -------
+        Array of predicted class-probabilities, corresponding to each row in the given data.
+        When as_multiclass is True, the output will always have shape (#samples, #classes).
+        Otherwise, the output will have shape (#samples,)
+        """
         assert self._problem_type in [BINARY, MULTICLASS], \
             f"Problem {self._problem_type} has no probability output"
 
@@ -528,6 +694,23 @@ class AutoMMPredictor:
             data: pd.DataFrame,
             as_pandas: Optional[bool] = True,
     ):
+        """
+        Extract features for each sample, i.e., one row in the provided dataframe `data`.
+
+        Parameters
+        ----------
+        data
+            The data to extract embeddings for. Should contain same column names as training dataset and
+            follow same format (except for the `label` column).
+        as_pandas
+            Whether to return the output as a pandas DataFrame (True) or numpy array (False).
+
+        Returns
+        -------
+        Array of embeddings, corresponding to each row in the given data.
+        It will have shape (#samples, D) where the embedding dimension D is determined
+        by the neural network's architecture.
+        """
         features = self._predict(
             data=data,
             ret_type=FEATURES,
@@ -555,7 +738,14 @@ class AutoMMPredictor:
         return model
 
     def save(self, path: str):
+        """
+        Save this predictor to file in directory specified by `path`.
 
+        Parameters
+        ----------
+        path
+            The directory to save this predictor.
+        """
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(
             config=self._config,
@@ -590,6 +780,24 @@ class AutoMMPredictor:
             path: str,
             resume: Optional[bool] = False,
     ):
+        """
+        Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
+        can be completely or partially trained by .fit(). If a previous training has completed,
+        it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
+        collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
+
+        Parameters
+        ----------
+        path
+            The directory to load the predictor object.
+        resume
+            Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
+            broken during the middle and we want to resume the training from the last saved checkpoint.
+
+        Returns
+        -------
+        The loaded predictor object.
+        """
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
@@ -670,15 +878,16 @@ class AutoMMPredictor:
 
     @property
     def class_labels(self):
-        """The original name of the class labels.
+        """
+        The original name of the class labels.
         For example, the tabular data may contain classes equal to
         "entailment", "contradiction", "neutral". Internally, these will be converted to
         0, 1, 2, ...
         This function returns the original names of these raw labels.
+
         Returns
         -------
-        ret
-            List that contain the class names. It will be None if it's not a classification problem.
+        List that contain the class names. It will be None if it's not a classification problem.
         """
         if self._problem_type == MULTICLASS or self._problem_type == BINARY:
             return self._df_preprocessor.label_generator.classes_

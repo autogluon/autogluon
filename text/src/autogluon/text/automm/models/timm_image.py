@@ -15,8 +15,25 @@ class TimmAutoModelForImagePrediction(nn.Module):
             num_classes: Optional[int] = 0,
             mix_choice: Optional[str] = "all_logits",
     ):
+        """Image encoder based on backbones in TIMM.
+
+        Parameters
+        ----------
+        prefix
+            The prefix of the TimmAutoModelForImagePrediction model
+        checkpoint_name
+            Name of the timm checkpoint
+        num_classes
+            The number of classes
+        mix_choice
+            Choice used for mixing multiple images. We now support
+            - all_images
+                The images are directly summed up and passed to the network
+            - all_logits
+                The logits output from individual images are averaged to generate the final output.
+        """
         super().__init__()
-        # if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
+        # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
         print(f"initializing {checkpoint_name}")
         self.model = create_model(checkpoint_name, pretrained=True, num_classes=0)
         self.out_features = self.model.num_features
@@ -66,9 +83,11 @@ class TimmAutoModelForImagePrediction(nn.Module):
     def get_layer_ids(self,):
         """
         Assign id to each layer. Layer ids will be used in layerwise lr decay.
+
         Returns
         -------
-
+        name_to_id
+            A mapping between parameter name to the depth id.
         """
         model_prefix = "model"
         pre_encoder_patterns = ("embed", "cls_token", "stem", "bn1", "conv1")

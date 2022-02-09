@@ -24,7 +24,7 @@ model:
       - "numerical"
     merge: "concat"
   hf_text:
-    checkpoint_name: "google/electra-small-discriminator"
+    checkpoint_name: "google/electra-base-discriminator"
     data_types:
       - "text"
     tokenizer_name: "hf_auto"

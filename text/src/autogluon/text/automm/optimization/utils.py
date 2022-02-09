@@ -4,13 +4,9 @@ from torch import nn
 from torch import optim
 import json
 from torch.optim import AdamW
-from transformers import (
-    get_polynomial_decay_schedule_with_warmup,
-    get_cosine_schedule_with_warmup,
-    get_linear_schedule_with_warmup,
-)
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
+from .lr_scheduler import get_cosine_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup
 from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
 
 
