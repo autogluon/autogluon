@@ -59,14 +59,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Common-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Common-PR#${{ github.event.number }}
   test_core:
@@ -111,14 +111,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Core-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Core-PR#${{ github.event.number }}
   test_features:
@@ -163,14 +163,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Features-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Features-PR#${{ github.event.number }}
   test_tabular:
@@ -215,14 +215,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Tabular-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Tabular-PR#${{ github.event.number }}
   test_text:
@@ -267,14 +267,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Text-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Text-PR#${{ github.event.number }}
   test_vision:
@@ -319,14 +319,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Vision-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Vision-PR#${{ github.event.number }}
   test_forecasting:
@@ -371,14 +371,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Forecasting-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-Forecasting-PR#${{ github.event.number }}
   test_install:
@@ -423,14 +423,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Install-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-Install-PR#${{ github.event.number }}
   build_image_prediction_tutorial:
@@ -488,14 +488,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildImagePrediction-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildImagePrediction-PR#${{ github.event.number }}
   build_object_detection_tutorial:
@@ -553,14 +553,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildObjectDetection-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildObjectDetection-PR#${{ github.event.number }}
   build_tabular_prediction_tutorial:
@@ -618,14 +618,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildTabularPrediction-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildTabularPrediction-PR#${{ github.event.number }}
   build_text_prediction_tutorial:
@@ -683,14 +683,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildTextPrediction-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildTextPrediction-PR#${{ github.event.number }}
   build_cloud_fit_deploy_tutorial:
@@ -748,14 +748,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-CPU \
                                            --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }}
   build_forecasting_tutorial:
@@ -813,14 +813,14 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildForecasting-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildForecasting-PR#${{ github.event.number }}
   build_all_docs:
@@ -878,13 +878,13 @@ jobs:
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildAllDocs-${{ github.ref }}
       - name: Cancel Batch Job if Action Cancelled(For pull request)
         if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
         run: |
           echo "Cancelling job"
-          python ./CI/batch/cancel-jobs.py --region us-east-1 \
+          python ./CI/batch/cancel-job.py --region us-east-1 \
                                            --job-type CI-GPU \
                                            --name AutoGluon-BuildAllDocs-PR#${{ github.event.number }}
