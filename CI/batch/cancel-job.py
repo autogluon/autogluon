@@ -1,5 +1,6 @@
 import argparse
 import boto3
+import re
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -17,7 +18,7 @@ args = parser.parse_args()
 
 profile = args.profile
 region = args.region
-job_name = args.name
+job_name = re.sub('[^A-Za-z0-9_\-]', '', args.name)[:128]  # Enforce AWS Batch jobName rules
 job_type = args.job_type
 reason = args.reason
 
