@@ -14,7 +14,7 @@ if [[ -n $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-ci'
-    path=staging/$BRANCH/$COMMIT_SHA
+    path=staging/$PR_NUMBER/$COMMIT_SHA
     site=$bucket.s3-website-us-region.amazonaws.com/$path
     flags='--delete'
     cacheControl=''
@@ -43,11 +43,9 @@ then
     other_doc_version_text='Dev Version Documentation'
     other_doc_version_branch='dev'
 fi
-# escaped_context_root="${site//\\\\\//\\\\\\\\\/}"  # replace \\/ with \\\\/
 
 mkdir -p docs/_build/rst/tutorials/
 aws s3 cp s3://autogluon-ci/$build_docs_path docs/_build/rst/tutorials/ --recursive
-# aws s3 cp s3://autogluon-ci/build_docs/master/ee10b2d/ docs/_build/rst/tutorials/ --recursive  # test
 
 setup_build_contrib_env
 install_all

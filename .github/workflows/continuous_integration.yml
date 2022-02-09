@@ -874,6 +874,14 @@ jobs:
                                           --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
                                           --command "chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}" \
                                           --wait
+      - name: Comment on PR
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        uses: peter-evans/create-or-update-comment@v1.4.5
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
+            Docs are uploaded to http://autogluon-ci.s3.amazonaws.com/staging/${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
       - name: Cancel Batch Job if Action Cancelled(For push)
         if: ${{ cancelled() && github.event_name == 'push' }}
         run: |

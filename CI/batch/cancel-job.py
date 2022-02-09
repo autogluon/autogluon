@@ -27,6 +27,7 @@ batch = session.client(service_name='batch')
 
 
 def main():
+    # Find all jobs with job_name that are running or about to run and terminate them all.
     list_args = {
         "jobQueue": job_type,
         "filters": [{"name": "JOB_NAME", "values": [job_name]}],
