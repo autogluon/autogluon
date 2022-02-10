@@ -1,16 +1,29 @@
-import torch
 from typing import Optional, Union, Tuple, List, Dict
 from torch import nn
 from torch import optim
-import json
-from torch.optim import AdamW
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
-from .lr_scheduler import get_cosine_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup
+from .lr_scheduler import (
+    get_cosine_schedule_with_warmup,
+    get_polynomial_decay_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+)
 from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
 
 
 def get_loss_func(problem_type: str):
+    """
+    Choose a suitable Pytorch loss module based on the provided problem type.
+
+    Parameters
+    ----------
+    problem_type
+        Type of problem.
+
+    Returns
+    -------
+    A Pytorch loss module.
+    """
     if problem_type in [BINARY, MULTICLASS]:
         loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
@@ -25,6 +38,20 @@ def get_metric(
         metric_name: str,
         num_classes: Optional[int] = None,
 ):
+    """
+    Obtain a torchmerics.Metric from its name.
+
+    Parameters
+    ----------
+    metric_name
+        Name of metric
+    num_classes
+        Number of classes, used in the quadratic_kappa metric for binary classification.
+
+    Returns
+    -------
+    A torchmetrics.Metric object.
+    """
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
         return torchmetrics.Accuracy(), MAX
@@ -50,8 +77,32 @@ def get_optimizer(
         betas: Optional[Tuple[float, float]] = (0.9, 0.999),
         momentum: Optional[float] = 0.9,
 ):
+    """
+    Choose a Pytorch optimizer based on its name.
+
+    Parameters
+    ----------
+    optim_type
+        Name of optimizer.
+    optimizer_grouped_parameters
+        The model parameters to be optimized.
+    lr
+        Learning rate.
+    weight_decay
+        Optimizer weight decay.
+    eps
+        Optimizer eps.
+    betas
+        Optimizer betas.
+    momentum
+        Momentum used in the SGD optimizer.
+
+    Returns
+    -------
+    A Pytorch optimizer.
+    """
     if optim_type == "adamw":
-        optimizer = AdamW(
+        optimizer = optim.AdamW(
             optimizer_grouped_parameters,
             lr=lr,
             weight_decay=weight_decay,
@@ -59,13 +110,13 @@ def get_optimizer(
             betas=betas,
         )
     elif optim_type == "adam":
-        optimizer = torch.optim.Adam(
+        optimizer = optim.Adam(
             optimizer_grouped_parameters,
             lr=lr,
             weight_decay=weight_decay,
         )
     elif optim_type == "sgd":
-        optimizer = torch.optim.SGD(
+        optimizer = optim.SGD(
             optimizer_grouped_parameters,
             lr=lr,
             weight_decay=weight_decay,
@@ -84,7 +135,28 @@ def get_lr_scheduler(
         lr_schedule: str,
         end_lr: Union[float, int],
 ):
+    """
+    Get the learning rate scheduler from its name. Here we use our defined learning rate
+    scheduler instead of those imported from "transformers" because we want to support
+    Pytorch lightning's "ddp_spawn" training strategy.
 
+    Parameters
+    ----------
+    optimizer
+        A Pytorch optimizer.
+    num_max_steps
+        Number of maximum training steps.
+    num_warmup_steps
+        Number of steps to do learning rate warmup.
+    lr_schedule
+        Name of the learning rate scheduler.
+    end_lr
+        The final learning rate after decay.
+
+    Returns
+    -------
+    A learning rate scheduler.
+    """
     if lr_schedule == "cosine_decay":
         scheduler = get_cosine_schedule_with_warmup(
             optimizer=optimizer,
@@ -99,6 +171,12 @@ def get_lr_scheduler(
             lr_end=end_lr,
             power=1,
         )
+    elif lr_schedule == "linear_decay":
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer=optimizer,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_max_steps
+        )
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
 
@@ -106,6 +184,18 @@ def get_lr_scheduler(
 
 
 def get_weight_decay_param_names(model: nn.Module):
+    """
+    Set the layer normalization parameters and other layers' bias parameters not to use weight decay.
+
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+
+    Returns
+    -------
+    A list of parameter names not using weight decay.
+    """
     decay_param_names = get_parameter_names(model, [nn.LayerNorm])
     decay_param_names = [name for name in decay_param_names if "bias" not in name]
     return decay_param_names
@@ -117,6 +207,28 @@ def apply_single_lr(
         weight_decay: float,
         return_params: Optional[bool] = True,
 ):
+    """
+    Set to use a single learning rate for all parameters. Layer normalization parameters and other
+    layers' bias parameters don't use weight decay.
+
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+    lr
+        Learning rate.
+    weight_decay
+        Weight decay.
+    return_params
+        Whether to return parameters or their names. If you want to double-check
+        whether the learning rate setup is as expected, you can set "return_params=False",
+        and print the layer names along with their learning rates through
+        "print("Param groups = %s" % json.dumps(optimizer_grouped_parameters, indent=2))".
+
+    Returns
+    -------
+    The grouped parameters or their names.
+    """
     decay_param_names = get_weight_decay_param_names(model)
     optimizer_grouped_parameters = [
         {
@@ -140,7 +252,32 @@ def apply_two_stages_lr(
         weight_decay: float,
         return_params: Optional[bool] = True,
 ):
+    """
+    Set up the pretrained backbone to use a smaller learning rate (lr * lr_mult).
+    The newly added head layers use the normal learning rate (lr).
+    Layer normalization parameters and other layers' bias parameters don't use weight decay.
 
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+    lr
+        The learning rate.
+    lr_mult
+        The multiplier (0, 1) to scale down the learning rate.
+    weight_decay
+        Weight decay.
+    return_params
+        return_params
+        Whether to return parameters or their names. If you want to double-check
+        whether the learning rate setup is as expected, you can set "return_params=False",
+        and print the layer names along with their learning rates through
+        "print("Param groups = %s" % json.dumps(optimizer_grouped_parameters, indent=2))".
+
+    Returns
+    -------
+    The grouped parameters or their names.
+    """
     decay_param_names = get_weight_decay_param_names(model)
 
     optimizer_grouped_parameters = [
@@ -195,6 +332,29 @@ def apply_layerwise_lr_decay(
         lr_decay: float,
         weight_decay: float,
 ):
+    """
+    Assign monotonically decreasing learning rates for layers from the output end to the input end.
+    The intuition behind is that later layers are more task-related compared to the early layers.
+    Layer normalization parameters and other layers' bias parameters don't use weight decay.
+    If you want to double-check whether the learning rate setup is as expected,
+    you can print the layer names along with their learning rates through
+    "print("Param groups = %s" % json.dumps(parameter_group_names, indent=2))".
+
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+    lr
+        The learning rate.
+    lr_decay
+        The learning rate decay factor (0, 1).
+    weight_decay
+        Weight decay.
+
+    Returns
+    -------
+    The grouped parameters based on their layer ids and whether using weight decay.
+    """
     parameter_group_names = {}
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)

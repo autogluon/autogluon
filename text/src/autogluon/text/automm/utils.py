@@ -42,7 +42,18 @@ from .constants import (
 
 
 def infer_eval_metric(problem_type: str):
+    """
+    Use accuracy and rmse as the validation metrics for classification and regression, respectively.
 
+    Parameters
+    ----------
+    problem_type
+        The type of problem.
+
+    Returns
+    -------
+    The validation metric name.
+    """
     if problem_type in [MULTICLASS, BINARY]:
         eval_metric = ACCURACY
     elif problem_type == REGRESSION:
@@ -352,7 +363,7 @@ def create_model(
 
     Returns
     -------
-    A Pytorch model
+    A Pytorch model.
     """
     names = config.model.names
     if isinstance(names, str):
