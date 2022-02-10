@@ -6,7 +6,7 @@
 
 ## AutoML for Text, Image, and Tabular Data
 
-[![Build Status](https://ci.gluon.ai/view/all/job/autogluon/job/master/badge/icon)](https://ci.gluon.ai/view/all/job/autogluon/job/master/)
+[![Continuous Integration](https://github.com/yinweisu/autogluon/actions/workflows/continuous_integration.yml/badge.svg?branch=master&event=push)](https://github.com/yinweisu/autogluon/actions/workflows/continuous_integration.yml)
 [![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
 [![GitHub license](docs/static/apache2.svg)](./LICENSE)
 [![Downloads](https://pepy.tech/badge/autogluon)](https://pepy.tech/project/autogluon)
