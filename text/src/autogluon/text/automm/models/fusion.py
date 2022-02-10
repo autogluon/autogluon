@@ -19,6 +19,44 @@ class MultimodalFusionMLP(nn.Module):
             normalization: Optional[str] = "layer_norm",
             loss_weight: Optional[float] = None,
     ):
+        """
+        Use MLP to fuse different models' features (single-modal and multimodal).
+        Specifically, it adapts the features of each model to specified dimensions,
+        concatenates the adapted features, and fuses the features through MLP.
+
+        Parameters
+        ----------
+        prefix
+            The fusion model's prefix
+        models
+            The individual models whose output features will be fused.
+        hidden_features
+            A list of integers representing the hidden feature dimensions. For example,
+            [512, 128, 64] indicates three hidden MLP layers with their corresponding output
+            feature dimensions.
+        num_classes
+            The number of classes.
+        adapt_in_features
+            Choice of how to adapt the features of each model. We now support
+            - min
+                Adapt all features to the minimum dimension. For example, if three models have
+                feature dimensions [512, 768, 64], it will linearly map all the features to
+                dimension 64.
+            - max
+                Adapt all features to the maximum dimension. For example, if three models have
+                feature dimensions are [512, 768, 64], it will linearly map all the features to
+                dimension 768.
+        activation
+            Name of activation function.
+        dropout_prob
+            Dropout probability.
+        normalization
+            Name of normalization function.
+        loss_weight
+            The weight of individual models. For example, if we fuse the features of ViT, CLIP, and BERT,
+            The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
+            Basically, it supports adding an auxilliary loss for each individual model.
+        """
         super().__init__()
         if loss_weight is not None:
             assert loss_weight > 0
@@ -74,7 +112,25 @@ class MultimodalFusionMLP(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def forward(self, batch):
+    def forward(
+            self,
+            batch: dict,
+    ):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data. The fusion model doesn't need to
+            directly access the mini-batch data since it aims to fuse the individual models'
+            output features.
+
+        Returns
+        -------
+        If "loss_weight" is None, it returns dictionary containing the fusion model's logits and
+        features. Otherwise, it returns a list of dictionaries collecting all the models' output,
+        including the fusion model's.
+        """
         multimodal_features = []
         output = []
         for per_model, per_adapter in zip(self.model, self.adapter):
@@ -99,10 +155,22 @@ class MultimodalFusionMLP(nn.Module):
 
     def get_layer_ids(self,):
         """
-        Assign id to each layer. Layer ids will be used in layerwise lr decay.
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end.
+
+        It assumes that each individual model has the "name_to_id" attribute storing
+        the already computed model's layer ids. This function only collects those layer ids.
+        It also add prefixes for each model's parameter names since the fusion model wraps
+        those individual models, making the name scope changed. Configuring the optimizer
+        requires a full name of each parameter.
+
+        The layers defined in this class, e.g., head, adapter,
+        and, fusion_mlp, have id 0.
+
         Returns
         -------
-
+        A dictionary mapping the layer names (keys) to their ids (values).
         """
         model_prefix = "model"
         names = [n for n, _ in self.named_parameters()]

@@ -897,7 +897,9 @@ class AutoMMPredictor:
 
     @property
     def positive_class(self):
-        """Name of the class label that will be mapped to 1. This is only meaningful for binary classification problems.
+        """
+        Name of the class label that will be mapped to 1.
+        This is only meaningful for binary classification problems.
 
         It is useful for computing metrics such as F1 which require a positive and negative class.
         You may refer to https://en.wikipedia.org/wiki/F-score for more details.

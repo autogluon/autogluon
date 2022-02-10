@@ -3,6 +3,15 @@ from torch import nn
 
 
 def init_weights(module: nn.Module):
+    """
+    Initialize one module. It uses xavier_norm to initialize nn.Embedding
+    and xavier_uniform to initialize nn.Linear's weight.
+
+    Parameters
+    ----------
+    module
+        A Pytorch nn.Module
+    """
     if isinstance(module, nn.Embedding):
         nn.init.xavier_normal_(module.weight)
     elif isinstance(module, nn.Linear):
@@ -16,8 +25,24 @@ def init_weights(module: nn.Module):
 
 def assign_encoder_layer_ids(
         encoder_names: List[List[str]],
-        layer_keys: Optional[Tuple[str, ...]] = None,
 ):
+    """
+    Assign ids to encoder layers. The encoder may contain several blocks e.g., block1 and block2.
+    This function iterates through all the layers of each block from the input end towards the output end.
+    It increases 1 on the layer id when the detected digit in a layer name changes.
+
+    Parameters
+    ----------
+    encoder_names
+        Encoder layer names.
+
+    Returns
+    -------
+    name_to_id
+        The encoder layer-to-id mapping.
+    encoder_layer_num
+        The encoder layer number.
+    """
     name_to_id = {}
     cur_id = 0
     for i, group_names in enumerate(encoder_names):
@@ -53,6 +78,20 @@ def assign_non_encoder_layer_ids(
         non_encoder_names: List[str],
         layer_id: int,
 ):
+    """
+    Assign the provided id to non-encoder layers.
+
+    Parameters
+    ----------
+    non_encoder_names
+        Names layers not belonging to an encoder
+    layer_id
+        provided id
+
+    Returns
+    -------
+    A dictionary mapping the layer names (keys) to their ids (values).
+    """
     name_to_id = {}
     for n in non_encoder_names:
         name_to_id[n] = layer_id
@@ -60,6 +99,24 @@ def assign_non_encoder_layer_ids(
 
 
 def split_encoder_non_encoder(names: List[str]):
+    """
+    Group layer names into two types: encoder and non-encoder.
+    A layer belongs to encoder if its name contains at least one digit.
+    It uses this rule since a model's encoder in Pytorch's implementation
+    is generally wrapped by nn.Sequential() or nn.ModuleList(),
+    which produce digits in layer names.
+
+    Parameters
+    ----------
+    names
+        Model layer names
+    Returns
+    -------
+    encoder_names
+        A list of encoder layer names
+    non_encoder_names
+        A list of non-encoder layer names
+    """
     encoder_names = []
     non_encoder_names = []
     for n in names:
@@ -79,10 +136,40 @@ def group_param_names(
         names: List[str],
         pre_encoder_patterns: Tuple[str, ...],
         post_encoder_patterns: Tuple[str, ...],
-        enc_prefix: Optional[str] = None,
         model_prefix: Optional[str] = None,
 ):
+    """
+    Group layer names into three types: pre-encoder, encoder, and post-encoder.
+    If "model_prefix" is provided, the selected layer names must start with it.
+    In this case, the left names will be returned for the next-time processing.
+    This function first extracts the first-level children modules' names and
+    classify them into encoder and non-encoder layers. Note that an encoder may
+    consist of several manually named children modules, e.g., block1 and block2.
+    The non-encoder layers are further subdivided into pre-encoder and post-encoder.
 
+    Parameters
+    ----------
+    names
+        Model layer names
+    pre_encoder_patterns
+        Patterns to identify a layer as a pre-encoder layer. If a layer name contains one pattern,
+        the layer will be grouped into pre-encoder layers.
+    post_encoder_patterns
+        Patterns to identify a layer as a post-encoder layer. If a layer name contains one pattern,
+        the layer will be grouped into post-encoder layers.
+    model_prefix
+        A prefix to filter layer names. Only layer names starting with it will be selected.
+    Returns
+    -------
+    left_names
+        The layer names left for the next-time processing
+    encoder_names_grouped
+        Encoder layer names
+    pre_encoder_names
+        Names of layers before the encoder
+    post_encoder_names
+        Names of layers after the encoder
+    """
     # two set of patterns can't have intersections
     assert all(pre_p not in post_encoder_patterns for pre_p in pre_encoder_patterns)
 
@@ -130,6 +217,23 @@ def reverse_layer_ids(
         pre_enocder_name_to_id: dict,
         post_enocder_name_to_id: dict,
 ):
+    """
+    The layer ids need to increase when going from the output end to the input end.
+    We need to reverse the ids which were originally assigned in a decreasing order.
+
+    Parameters
+    ----------
+    encoder_name_to_id
+        The layer-to-id mapping of encoder layers.
+    pre_enocder_name_to_id
+        The layer-to-id mapping of pre-encoder layers.
+    post_enocder_name_to_id
+        The layer-to-id mapping of post-encoder layers.
+
+    Returns
+    -------
+    The layer-to-id mapping of all layers with layer ids reversed.
+    """
     name_to_id = {**pre_enocder_name_to_id, **encoder_name_to_id, **post_enocder_name_to_id}
     if len(name_to_id) > 0:
         layer_num = max(name_to_id.values())
@@ -146,16 +250,41 @@ def assign_layer_ids(
         names: List[str],
         pre_encoder_patterns: Tuple[str, ...],
         post_encoder_patterns: Tuple[str, ...],
-        enc_pre: Optional[str] = None,
         model_pre: Optional[str] = None,
-        layer_keys: Optional[Tuple[str, ...]] = None,
 ):
+    """
+    Assign ids to all layers. It splits a model into three parts: pre-encoder, encoder, and post-encoder.
+    Encoder is generally a stack of multiple similar layers, such as transformer layers. Since encoder is
+    generally wrapped by nn.Sequential() or nn.ModuleList(), its inside layer names contain digits.
+    It sets 0 as the ids of all post-encoder layers and a maximum id (layer_num) for the all the pre-encoder
+    layers. The encoder layers have decreasing ids from the input to the output ends.
+
+    Parameters
+    ----------
+    names
+        model layer names.
+    pre_encoder_patterns
+        Patterns to identify a layer as a pre-encoder layer. If a layer name contains one pattern,
+        the layer will be grouped into pre-encoder layers.
+    post_encoder_patterns
+        Patterns to identify a layer as a post-encoder layer. If a layer name contains one pattern,
+        the layer will be grouped into post-encoder layers.
+    model_pre
+        The layer names' prefix. Only the layer names with this prefix will be assigned ids. The left
+        layer names will be returned.
+
+    Returns
+    -------
+    name_to_id
+        A dictionary mapping the layer names (keys) to their ids (values).
+    left_names
+        The layer names not starting with the "model_pre".
+    """
     left_names, encoder_names, pre_encoder_names, post_encoder_names = \
         group_param_names(
             names=names,
             pre_encoder_patterns=pre_encoder_patterns,
             post_encoder_patterns=post_encoder_patterns,
-            enc_prefix=enc_pre,
             model_prefix=model_pre,
         )
     # add a constraint
@@ -167,7 +296,6 @@ def assign_layer_ids(
     encoder_name_to_id, encoder_layer_num = \
         assign_encoder_layer_ids(
             encoder_names=encoder_names,
-            layer_keys=layer_keys
         )
 
     pre_encoder_name_to_id = \

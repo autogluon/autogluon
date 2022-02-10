@@ -514,7 +514,10 @@ def gather_top_k_ckpts(
 
     Returns
     -------
-    A list of state_dicts and a checkpoint template to save the averaged checkpoint later.
+    all_state_dicts
+        A list of state_dicts
+    checkpoint
+        The checkpoint template to save the averaged checkpoint later.
     """
     if not ckpt_paths:
         ckpt_paths = []
@@ -624,21 +627,22 @@ def apply_omegaconf_overrides(
         overrides,
         check_key_exist=True,
 ):
-    """Apply omegaconf overrides
+    """
+    Apply omegaconf overrides.
 
     Parameters
     ----------
     conf
-        The base configuration
+        The base configuration.
     overrides
-        The overrides can be a string or a list
+        The overrides can be a string or a list.
     check_key_exist
-        Whether to check if all keys in the overrides must exist in the conf
+        Whether to check if all keys in the overrides must exist in the conf.
 
     Returns
     -------
     new_conf
-        The updated configuration
+        The updated configuration.
     """
     if isinstance(overrides, str):
         overrides = overrides.split()

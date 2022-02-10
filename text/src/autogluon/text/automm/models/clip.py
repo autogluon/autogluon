@@ -26,7 +26,7 @@ class CLIPForImageText(nn.Module):
         checkpoint_name
             Name of the checkpoint.
         num_classes
-            The number of classes.
+            The number of classes. 1 for a regression task.
         """
         print(f"initializing {prefix}")
         super().__init__()
@@ -44,7 +44,22 @@ class CLIPForImageText(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def forward(self, batch):
+    def forward(
+            self,
+            batch: dict,
+    ):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
         text_token_ids = batch[self.text_token_ids_key]
         text_valid_length = batch[self.text_valid_length_key]
         image = batch[self.image_key]
@@ -71,10 +86,13 @@ class CLIPForImageText(nn.Module):
 
     def get_layer_ids(self,):
         """
-        Assign id to each layer. Layer ids will be used in layerwise lr decay.
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end. The layers defined in this class, e.g., head, have id 0.
+
         Returns
         -------
-
+        A dictionary mapping the layer names (keys) to their ids (values).
         """
         model_prefixes = ["model.text_model", "model.vision_model", "model"]
         # later model prefixes can't starts with the early ones

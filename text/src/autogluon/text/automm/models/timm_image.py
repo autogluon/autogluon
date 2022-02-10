@@ -20,15 +20,15 @@ class TimmAutoModelForImagePrediction(nn.Module):
         Parameters
         ----------
         prefix
-            The prefix of the TimmAutoModelForImagePrediction model
+            The prefix of the TimmAutoModelForImagePrediction model.
         checkpoint_name
-            Name of the timm checkpoint
+            Name of the timm checkpoint.
         num_classes
-            The number of classes
+            The number of classes. 1 for a regression task.
         mix_choice
-            Choice used for mixing multiple images. We now support
+            Choice used for mixing multiple images. We now support.
             - all_images
-                The images are directly summed up and passed to the network
+                The images are directly averaged and passed to the model.
             - all_logits
                 The logits output from individual images are averaged to generate the final output.
         """
@@ -54,6 +54,18 @@ class TimmAutoModelForImagePrediction(nn.Module):
             self,
             batch: dict,
     ):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
         images = batch[self.image_key]
         image_valid_num = batch[self.image_valid_num_key]
         if self.mix_choice == "all_images":  # mix inputs
@@ -82,12 +94,17 @@ class TimmAutoModelForImagePrediction(nn.Module):
 
     def get_layer_ids(self,):
         """
-        Assign id to each layer. Layer ids will be used in layerwise lr decay.
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end. The layers defined in this class, e.g., head, have id 0.
+
+        Due to different backbone architectures in TIMM, this function may not always return the correct result.
+        Thus, you can use "print(json.dumps(name_to_id, indent=2))" to manually check whether
+        the layer ids are reasonable.
 
         Returns
         -------
-        name_to_id
-            A mapping between parameter name to the depth id.
+        A dictionary mapping the layer names (keys) to their ids (values).
         """
         model_prefix = "model"
         pre_encoder_patterns = ("embed", "cls_token", "stem", "bn1", "conv1")

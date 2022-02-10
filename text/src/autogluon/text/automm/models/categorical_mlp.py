@@ -19,6 +19,29 @@ class CategoricalMLP(nn.Module):
             normalization: Optional[str] = "layer_norm",
             num_classes: Optional[int] = 0,
     ):
+        """
+        MLP for categorical input. The input dimension is automatically computed based on
+        the number of categories in each categorical column.
+
+        Parameters
+        ----------
+        prefix
+            The model prefix.
+        num_categories
+            A list of integers. Each one is the number of categories in one categorical column.
+        out_features
+            Dimension of output features.
+        num_layers
+            Number of MLP layers.
+        activation
+            Name of activation function.
+        dropout_prob
+            Dropout probability.
+        normalization
+            Name of normalization function.
+        num_classes
+            Number of classes. 1 for a regression task.
+        """
         super().__init__()
         self.out_features = out_features
         max_embedding_dim = 100
@@ -74,7 +97,22 @@ class CategoricalMLP(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def forward(self, batch):
+    def forward(
+            self,
+            batch: dict,
+    ):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
         assert len(batch[self.categorical_key]) == len(self.column_embeddings)
         features = []
         for categorical_id, embed, mlp in zip(batch[self.categorical_key], self.column_embeddings, self.column_mlps):
@@ -89,7 +127,11 @@ class CategoricalMLP(nn.Module):
 
     def get_layer_ids(self,):
         """
-        All layers have the same id since there is no pre-trained transformers used here
+        All layers have the same id 0 since there is no pre-trained models used here.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
         for n, _ in self.named_parameters():

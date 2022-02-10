@@ -20,6 +20,30 @@ class NumericalMLP(nn.Module):
             normalization: Optional[str] = "layer_norm",
             num_classes: Optional[int] = 0,
     ):
+        """
+        MLP for numerical input.
+
+        Parameters
+        ----------
+        prefix
+            The model prefix.
+        in_features
+            Dimension of input features.
+        hidden_features
+            Dimension of hidden features.
+        out_features
+            Dimension of output features.
+        num_layers
+            Number of MLP layers.
+        activation
+            Name of activation function.
+        dropout_prob
+            Dropout probability.
+        normalization
+            Name of normalization function.
+        num_classes
+            Number of classes. 1 for a regression task.
+        """
         super().__init__()
         self.out_features = out_features
         self.mlp = MLP(
@@ -41,7 +65,22 @@ class NumericalMLP(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-    def forward(self, batch):
+    def forward(
+            self,
+            batch: dict,
+    ):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
         features = self.mlp(batch[self.numerical_key])
         logits = self.head(features)
 
@@ -52,7 +91,11 @@ class NumericalMLP(nn.Module):
 
     def get_layer_ids(self,):
         """
-        All layers have the same id since there is no pre-trained transformers used here
+        All layers have the same id 0 since there is no pre-trained models used here.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
         for n, _ in self.named_parameters():

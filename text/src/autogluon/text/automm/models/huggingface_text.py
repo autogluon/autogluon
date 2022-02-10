@@ -16,14 +16,16 @@ class HFAutoModelForTextPrediction(nn.Module):
             checkpoint_name: str = 'microsoft/deberta-v3-base',
             num_classes: Optional[int] = 0,
     ):
-        """Load a pretrained huggingface transformer backbone
+        """
+        Load a pretrained huggingface text transformer backbone.
 
         Parameters
         ----------
         prefix
-            The model prefix
+            The model prefix.
         checkpoint_name
-            Name of the checkpoint. We support loading checkpoint from Huggingface Models list: https://huggingface.co/models
+            Name of the checkpoint. We support loading checkpoint from
+            Huggingface Models list: https://huggingface.co/models
             For example, you may use
                 English backbones:
                     - 'microsoft/deberta-v3-base'
@@ -34,7 +36,7 @@ class HFAutoModelForTextPrediction(nn.Module):
                     - 'microsoft/mdeberta-v3-base'
                     - 'xlm-roberta-base'
         num_classes
-            The number of classes
+            The number of classes. 1 for a regression task.
         """
         super().__init__()
         print(f"initializing {checkpoint_name}")
@@ -67,11 +69,12 @@ class HFAutoModelForTextPrediction(nn.Module):
         Parameters
         ----------
         batch
-            The input batch data
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
 
         Returns
         -------
-
+            A dictionary with logits and features.
         """
         text_token_ids = batch[self.text_token_ids_key]
         if self.disable_seg_ids:
@@ -98,16 +101,19 @@ class HFAutoModelForTextPrediction(nn.Module):
         }
 
     def get_layer_ids(self):
+
         """
-        Assign id to each layer. Layer ids will be used in implementing the layer-wise learning rate decay.
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end. The layers defined in this class, e.g., head, have id 0.
 
         In the AutoModel scenario, this function may not always return the correct result.
-        Thus, we will check
+        Thus, you can use "print(json.dumps(name_to_id, indent=2))" to manually check whether
+        the layer ids are reasonable.
 
         Returns
         -------
-        name_to_id
-            A dictionary that contains the
+        A dictionary mapping the layer names (keys) to their ids (values).
         """
         model_prefix = "model"
         pre_encoder_patterns = ("embeddings", "LayerNorm", "wte", "wpe")

@@ -17,6 +17,22 @@ class Unit(nn.Module):
             activation: str,
             dropout_prob: float,
     ):
+        """
+        One MLP layer. It orders the operations as: norm -> fc -> act_fn -> dropout
+
+        Parameters
+        ----------
+        normalization
+            Name of activation function.
+        in_features
+            Dimension of input features.
+        out_features
+            Dimension of output features.
+        activation
+            Name of activation function.
+        dropout_prob
+            Dropout probability.
+        """
         super().__init__()
         if normalization == "layer_norm":
             self.norm = nn.LayerNorm(in_features)
@@ -47,6 +63,27 @@ class MLP(nn.Module):
             dropout_prob: Optional[float] = 0.5,
             normalization: Optional[str] = "layer_norm",
     ):
+        """
+        Multi-layer perceptron (MLP). If the hidden or output feature dimension is
+        not provided, we assign it the input feature dimension.
+
+        Parameters
+        ----------
+        in_features
+            Dimension of input features.
+        hidden_features
+            Dimension of hidden features.
+        out_features
+            Dimension of output features.
+        num_layers
+            Number of layers.
+        activation
+            Name of activation function.
+        dropout_prob
+            Dropout probability.
+        normalization
+            Name of normalization function.
+        """
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
