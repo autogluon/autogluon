@@ -99,12 +99,6 @@ def get_lr_scheduler(
             lr_end=end_lr,
             power=1,
         )
-    elif lr_schedule == "linear_decay":
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer=optimizer,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_max_steps
-        )
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
 

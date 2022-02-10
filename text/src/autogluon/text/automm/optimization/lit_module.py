@@ -33,6 +33,56 @@ class LitModule(pl.LightningModule):
             val_metric: Optional[torchmetrics.Metric] = None,
             test_metric: Optional[torchmetrics.Metric] = None,
     ):
+        """
+        Control the loops for training, evaluation, and prediction. This module is independent of
+        the model definition.
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+
+        Parameters
+        ----------
+        model
+            A Pytorch model
+        optim_type
+            Optimizer type. We now support:
+            - adamw
+            - adam
+            - sgd
+        lr_choice
+            How to set each layer's learning rate. If not specified, the default is a single
+            learnng rate for all layers. Otherwise, we now support two choices:
+            - two_stages
+                The layers in the pretrained models have a small learning rate (lr * lr_mult),
+                while the newly added head layers use the provided learning rate.
+            - layerwise_decay
+                The layers have decreasing learning rate from the output end to the input end.
+                The intuition is that later layers are more task-related, hence larger learning rates.
+        lr_schedule
+            Learning rate schedule. We now support:
+            - cosine_decay
+                Linear warmup followed by cosine decay
+            - polynomial_decay
+                Linear warmup followed by polynomial decay
+        lr
+            Learning rate.
+        lr_decay
+            The learning rate decay factor (0, 1). It is used only when lr_choice is "layerwise_decay".
+        end_lr
+            The final learning rate after decay.
+        lr_mult
+            The learning rate multiplier (0, 1). It is used only when lr_choice is "two_stages".
+        weight_decay
+            The weight decay to regularize layer weights' l2 norm.
+        warmup_steps
+            How many steps to warmup learning rate. If a float (0, 1), it would represent the
+            percentage of steps over all the training steps. The actual number is calculated as
+            "int(warmup_steps * max_steps)". If an integer, it would be the exact step number.
+        loss_func
+            A Pytorch loss module, e.g., nn.CrossEntropyLoss().
+        val_metric
+            A torchmetrics module used in the validation stage, e.g., torchmetrics.Accuracy().
+        test_metric
+            A torchmetrics module used in the test stage, e.g., torchmetrics.Accuracy().
+        """
         super().__init__()
         self.save_hyperparameters(ignore=["model", "val_metric", "test_metric", "loss_func"])
         self.model = model
@@ -82,11 +132,44 @@ class LitModule(pl.LightningModule):
         return output, loss
 
     def training_step(self, batch, batch_idx):
+        """
+        Per training step. This function is registered by pl.LightningModule.
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.core.lightning.html#pytorch_lightning.core.lightning.LightningModule.training_step
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the mini-batch data, including both input data and
+            ground-truth labels. The mini-batch data are passed to each individual model,
+            which indexes its required input data by keys with its model prefix. The
+            ground-truth labels are used here to compute the training loss.
+        batch_idx
+            Index of mini-batch.
+
+        Returns
+        -------
+        Average loss of the mini-batch data.
+        """
         output, loss = self._shared_step(batch)
         self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
+        """
+        Per validation step. This function is registered by pl.LightningModule.
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.core.lightning.html#pytorch_lightning.core.lightning.LightningModule.validation_step
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the mini-batch data, including both input data and
+            ground-truth labels. The mini-batch data are passed to each individual model,
+            which indexes its required input data by keys with its model prefix. The
+            ground-truth labels are used here to compute the validation loss and metric.
+            The validation metric is used for top k model selection and early stopping.
+        batch_idx
+            Index of mini-batch.
+        """
         output, loss = self._shared_step(batch)
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
@@ -96,6 +179,25 @@ class LitModule(pl.LightningModule):
         )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        """
+        Per prediction step. This function is registered by pl.LightningModule.
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.core.lightning.html#pytorch_lightning.core.lightning.LightningModule.predict_step
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the mini-batch data.
+            The mini-batch data are passed to each individual model,
+            which indexes its required input data by keys with its model prefix.
+            Ground-truth labels are not needed for prediction.
+        batch_idx
+            Index of mini-batch.
+        dataloader_idx
+            Index of dataloader.
+        Returns
+        -------
+        A dictionary with the mini-batch's logits and features.
+        """
         output = self.model(batch)
         if isinstance(output, dict):
             ret = output
@@ -104,6 +206,16 @@ class LitModule(pl.LightningModule):
         return ret
 
     def configure_optimizers(self):
+        """
+        Configure optimizer. This function is registered by pl.LightningModule.
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
+        Returns
+        -------
+        [optimizer]
+            Optimizer.
+        [sched]
+            Learning rate scheduler.
+        """
         if self.hparams.lr_choice == "two_stages":
             print("applying 2-stage learning rate...")
             grouped_parameters = apply_two_stages_lr(
