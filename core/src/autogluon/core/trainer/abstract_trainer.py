@@ -422,7 +422,7 @@ class AbstractTrainer:
         if not self.bagged_mode and level != 1:
             raise ValueError('Stack Ensembling is not valid for non-bagged mode.')
 
-        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit)
+        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.8)
         if ag_args_fit is None:
             ag_args_fit = {}
         ag_args_fit = ag_args_fit.copy()
@@ -496,7 +496,7 @@ class AbstractTrainer:
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
-        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit)
+        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
         if len(base_model_names) == 0:
             logger.log(20, f'No base models to train on, skipping auxiliary stack level {level}...')
             return []
