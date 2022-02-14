@@ -225,7 +225,7 @@ class AbstractTrainer:
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
     def train_multi_levels(self, X, y, hyperparameters: dict, X_val=None, y_val=None, X_unlabeled=None, base_model_names: List[str] = None,
                            core_kwargs: dict = None, aux_kwargs: dict = None, level_start=1, level_end=1, time_limit=None, name_suffix: str = None,
-                           relative_stack=True, level_time_modifier=0.333) -> List[str]:
+                           relative_stack=True, level_time_modifier=0.333, infer_limit=None, infer_limit_batch_size=None) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
@@ -288,43 +288,126 @@ class AbstractTrainer:
                 X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
                 models=hyperparameters, level=level, base_model_names=base_model_names,
                 core_kwargs=core_kwargs_level, aux_kwargs=aux_kwargs_level, name_suffix=name_suffix,
+                infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
             )
             model_names_fit += base_model_names + aux_models
         self._time_limit = None
         self.save()
         return model_names_fit
 
+    # TODO: Consider better greedy approximation method such as via fitting a weighted ensemble to evaluate the value of a subset.
+    def _filter_base_models_via_infer_limit(self,
+                                            base_model_names: List[str],
+                                            infer_limit: float,
+                                            infer_limit_modifier: float = 1.0,
+                                            as_child: bool = True,
+                                            verbose: bool = True) -> List[str]:
+        """
+        Returns a subset of base_model_names whose combined prediction time for 1 row of data does not exceed infer_limit seconds.
+        With the goal of selecting the best valid subset that is most valuable to stack ensembles who use them as base models,
+        this is a variant of the constrained knapsack problem and is NP-Hard and infeasible to exactly solve even with fewer than 10 models.
+        For practical purposes, this method applies a greedy approximation approach to selecting the subset
+        by simply removing models in reverse order of validation score until the remaining subset is valid.
+
+        Parameters
+        ----------
+        base_model_names: List[str]
+            List of model names. These models must already be added to the trainer.
+        infer_limit: float
+            Inference limit in seconds for 1 row of data. This is compared against values pre-computed during fit for the models.
+        infer_limit_modifier: float, default = 1.0
+            Modifier to multiply infer_limit by.
+            Set to <1.0 to provide headroom for stack models who take the returned subset as base models
+            so that the stack models are less likely to exceed infer_limit.
+        as_child: bool, default = True
+            If True, use the inference time of only 1 child model for bags instead of the overall inference time of the bag.
+            This is useful if the intent is to refit the models, as this will best estimate the inference time of the refit model.
+        verbose: bool, default = True
+            Whether to log the models that are removed.
+
+        Returns
+        -------
+        Returns valid subset of models that satisfy constraints.
+        """
+        if infer_limit is None or not base_model_names:
+            return base_model_names
+
+        base_model_names = base_model_names.copy()
+        num_models_og = len(base_model_names)
+        infer_limit_threshold = infer_limit * infer_limit_modifier  # Add headroom
+
+        if as_child:
+            attribute = 'predict_1_child_time'
+        else:
+            attribute = 'predict_1_time'
+
+        predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
+
+        messages_to_log = []
+
+        base_model_names_copy = base_model_names.copy()
+        for base_model_name in base_model_names_copy:
+            predict_1_time_full = self.get_model_attribute_full(model=base_model_name, attribute=attribute)
+            if predict_1_time_full >= infer_limit_threshold:
+                predict_1_time_full_set_old = predict_1_time_full_set
+                base_model_names.remove(base_model_name)
+                predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
+                if verbose:
+                    messages_to_log.append(f'\t{round(predict_1_time_full_set_old, 4)}s -> {round(predict_1_time_full_set, 4)}s ({base_model_name})')
+
+        score_val_dict = self.get_models_attribute_dict(attribute='val_score', models=base_model_names)
+        sorted_scores = sorted(score_val_dict.items(), key=lambda x: x[1])
+        i = 0
+        while base_model_names and (predict_1_time_full_set >= infer_limit_threshold):
+            # TODO: Incorporate score vs inference speed tradeoff in a smarter way
+            base_model_to_remove = sorted_scores[i][0]
+            predict_1_time_full_set_old = predict_1_time_full_set
+            base_model_names.remove(base_model_to_remove)
+            i += 1
+            predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
+            if verbose:
+                messages_to_log.append(f'\t{round(predict_1_time_full_set_old, 4)}s -> {round(predict_1_time_full_set, 4)}s ({base_model_to_remove})')
+
+        if messages_to_log:
+            logger.log(20, f'Removing {len(messages_to_log)}/{num_models_og} base models to satisfy inference constraint '
+                           f'(constraint={round(infer_limit_threshold, 4)}s) ...')
+            for msg in messages_to_log:
+                logger.log(20, msg)
+
+        return base_model_names
+
     def stack_new_level(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None, level=1, base_model_names: List[str] = None,
-                        core_kwargs: dict = None, aux_kwargs: dict = None, name_suffix: str = None) -> (List[str], List[str]):
+                        core_kwargs: dict = None, aux_kwargs: dict = None, name_suffix: str = None, infer_limit=None, infer_limit_batch_size=None) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
         if base_model_names is None:
             base_model_names = []
-        if level < 1:
-            raise AssertionError(f'Stack level must be >= 1, but level={level}.')
-        elif not base_model_names and level > 1:
-            logger.log(30, f'Warning: Training models at stack level {level}, but no base models were specified.')
-        elif base_model_names and level == 1:
-            raise AssertionError(f'Stack level 1 models cannot have base models, but base_model_names={base_model_names}.')
         core_kwargs = {} if core_kwargs is None else core_kwargs.copy()
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
+        if level < 1:
+            raise AssertionError(f'Stack level must be >= 1, but level={level}.')
+        if base_model_names and level == 1:
+            raise AssertionError(f'Stack level 1 models cannot have base models, but base_model_names={base_model_names}.')
         if name_suffix:
             core_kwargs['name_suffix'] = core_kwargs.get('name_suffix', '') + name_suffix
             aux_kwargs['name_suffix'] = aux_kwargs.get('name_suffix', '') + name_suffix
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=models,
-                                                level=level, base_model_names=base_model_names, **core_kwargs)
+                                                level=level, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, base_model_names=base_model_names, **core_kwargs)
 
         if X_val is None:
-            aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1, **aux_kwargs)
+            aux_models = self.stack_new_level_aux(X=X, y=y, base_model_names=core_models, level=level+1,
+                                                  infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs)
         else:
-            aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1, **aux_kwargs)
+            aux_models = self.stack_new_level_aux(X=X_val, y=y_val, fit=False, base_model_names=core_models, level=level+1,
+                                                  infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs)
         return core_models, aux_models
 
     def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
                              level=1, base_model_names: List[str] = None, stack_name='core',
                              ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel,
-                             name_suffix: str = None, get_models_func=None, refit_full=False, **kwargs) -> List[str]:
+                             name_suffix: str = None, get_models_func=None, refit_full=False,
+                             infer_limit=None, infer_limit_batch_size=None, **kwargs) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.
@@ -338,6 +421,13 @@ class AbstractTrainer:
             base_model_names = []
         if not self.bagged_mode and level != 1:
             raise ValueError('Stack Ensembling is not valid for non-bagged mode.')
+
+        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit)
+        if ag_args_fit is None:
+            ag_args_fit = {}
+        ag_args_fit = ag_args_fit.copy()
+        if infer_limit_batch_size is not None:
+            ag_args_fit['predict_1_batch_size'] = infer_limit_batch_size
 
         if isinstance(models, dict):
             get_models_kwargs = dict(
@@ -354,7 +444,7 @@ class AbstractTrainer:
                 elif level > 1:
                     base_model_names, base_model_paths, base_model_types = self._get_models_load_info(model_names=base_model_names)
                     if len(base_model_names) == 0:
-                        logger.log(20, 'No base models to train on, skipping stack level...')
+                        logger.log(20, f'No base models to train on, skipping stack level {level}...')
                         return []
                 else:
                     raise AssertionError(f'Stack level cannot be less than 1! level = {level}')
@@ -399,19 +489,30 @@ class AbstractTrainer:
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
-                            fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True) -> List[str]:
+                            fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True,
+                            infer_limit=None, infer_limit_batch_size=None) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
+        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit)
+        if len(base_model_names) == 0:
+            logger.log(20, f'No base models to train on, skipping auxiliary stack level {level}...')
+            return []
+
+        if infer_limit_batch_size is not None:
+            ag_args_fit = dict()
+            ag_args_fit['predict_1_batch_size'] = infer_limit_batch_size
+        else:
+            ag_args_fit = None
         X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
         return self.generate_weighted_ensemble(X=X_stack_preds, y=y,
-                                               level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1,
+                                               level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, ag_args_fit=ag_args_fit,
                                                stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix,
                                                get_models_func=get_models_func, check_if_best=check_if_best)
 
@@ -746,11 +847,19 @@ class AbstractTrainer:
         return copy.deepcopy(self.model_full_dict)
 
     # TODO: Take best performance model with lowest inference
-    def get_model_best(self, can_infer=None, allow_full=True):
+    def get_model_best(self, can_infer=None, allow_full=True, infer_limit=None):
         models = self.get_model_names(can_infer=can_infer)
         if not models:
             raise AssertionError('Trainer has no fit models that can infer.')
         model_performances = self.get_models_attribute_dict(attribute='val_score')
+        if infer_limit is not None:
+            model_inferences = self.get_models_attribute_full(models=models, attribute='predict_1_time')
+            for model_key in model_inferences:
+                if model_inferences[model_key] > infer_limit:
+                    models.remove(model_key)
+                    logger.log(20, f'Removing {model_key}')
+        if not models:
+            raise AssertionError(f'Trainer has no fit models that can infer while satisfying the constraints: (infer_limit={infer_limit}).')
         perfs = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
         if not perfs:
             model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
@@ -858,7 +967,7 @@ class AbstractTrainer:
             logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
         return unpersisted_models
 
-    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=1, n_repeats=1, stack_name=None, hyperparameters=None,
+    def generate_weighted_ensemble(self, X, y, level, base_model_names, k_fold=1, n_repeats=1, stack_name=None, hyperparameters=None, ag_args_fit=None,
                                    time_limit=None, name_suffix: str = None, save_bag_folds=None, check_if_best=True, child_hyperparameters=None,
                                    get_models_func=None) -> List[str]:
         if get_models_func is None:
@@ -894,6 +1003,7 @@ class AbstractTrainer:
                 random_state=level + self.random_state,
             ),
             ag_args={'name_bag_suffix': ''},
+            ag_args_fit=ag_args_fit,
             ag_args_ensemble={'save_bag_folds': save_bag_folds},
             name_suffix=name_suffix,
             level=level,
@@ -1063,14 +1173,6 @@ class AbstractTrainer:
         -------
         boolean, True if model was registered, False if model was found to be invalid and not registered.
         """
-        if model.val_score is not None:
-            if model.eval_metric.name != self.eval_metric.name:
-                logger.log(20, f'\tNote: model has different eval_metric than default.')
-            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation score   ({model.eval_metric.name})')
-        if model.fit_time is not None:
-            logger.log(20, f'\t{round(model.fit_time, 2)}s\t = Training   runtime')
-        if model.predict_time is not None:
-            logger.log(20, f'\t{round(model.predict_time, 2)}s\t = Validation runtime')
         if model.val_score is not None and np.isnan(model.val_score):
             logger.warning(f'WARNING: {model.name} has a val_score of {model.val_score} (NaN)! This should never happen. The model will not be saved to avoid instability.')
             return False
@@ -1079,10 +1181,18 @@ class AbstractTrainer:
             type_inner = model._child_type
         else:
             type_inner = type(model)
+        num_children = len(model.models) if hasattr(model, 'models') else 1
+        predict_child_time = model.predict_time / num_children if model.predict_time is not None else None
+        predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
+        fit_metadata = model.get_fit_metadata()
+        predict_1_batch_size = fit_metadata.get('predict_1_batch_size', None)
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
             predict_time=model.predict_time,
+            predict_1_time=model.predict_1_time,
+            predict_child_time=predict_child_time,
+            predict_1_child_time=predict_1_child_time,
             val_score=model.val_score,
             path=model.path,
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
@@ -1092,7 +1202,8 @@ class AbstractTrainer:
             is_valid=model.is_valid(),
             stack_name=stack_name,
             level=level,
-            **model._fit_metadata,
+            num_children=num_children,
+            **fit_metadata,
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
@@ -1104,6 +1215,29 @@ class AbstractTrainer:
                 elif level <= self.model_graph.nodes[base_model_name]['level']:
                     raise AssertionError(f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})")
                 self.model_graph.add_edge(base_model_name, model.name)
+        if model.val_score is not None:
+            if model.eval_metric.name != self.eval_metric.name:
+                logger.log(20, f'\tNote: model has different eval_metric than default.')
+            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation score   ({model.eval_metric.name})')
+        if model.fit_time is not None:
+            logger.log(20, f'\t{round(model.fit_time, 2)}s\t = Training   runtime')
+        if model.predict_time is not None:
+            logger.log(20, f'\t{round(model.predict_time, 2)}s\t = Validation runtime')
+        if model.predict_1_time is not None:
+            assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
+            time_unit = "s"
+            predict_1_time = model.predict_1_time
+            if round(predict_1_time, 2) == 0:
+                # TODO: Consider moving this to a dedicated function and using across package for nicer logging of time
+                time_unit = 'ms'
+                predict_1_time = predict_1_time*1000
+            logger.log(20, f'\t{round(predict_1_time, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
+            predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute='predict_1_time')
+            time_unit = "s"
+            if round(predict_1_time_full, 2) == 0:
+                time_unit = 'ms'
+                predict_1_time_full = predict_1_time_full * 1000
+            logger.log(20, f'\t{round(predict_1_time_full, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
         if self.low_memory:
             del model
         return True
@@ -1639,8 +1773,11 @@ class AbstractTrainer:
     # Sums the attribute value across all models that the provided model depends on, including itself.
     # For instance, this function can return the expected total predict_time of a model.
     # attribute is the name of the desired attribute to be summed, or a dictionary of model name -> attribute value if the attribute is not present in the graph.
-    def get_model_attribute_full(self, model, attribute, func=sum):
-        base_model_set = self.get_minimum_model_set(model)
+    def get_model_attribute_full(self, model: Union[str, List[str]], attribute: str, func=sum):
+        if isinstance(model, list):
+            base_model_set = self.get_minimum_models_set(model)
+        else:
+            base_model_set = self.get_minimum_model_set(model)
         if isinstance(attribute, dict):
             is_dict = True
         else:
@@ -1666,6 +1803,15 @@ class AbstractTrainer:
         else:
             attribute_full = 0
         return attribute_full
+
+    def get_models_attribute_full(self, models: List[str], attribute: str, func=sum):
+        """
+        For each model in models, returns the output of self.get_model_attribute_full mapped to a dict.
+        """
+        d = dict()
+        for model in models:
+            d[model] = self.get_model_attribute_full(model=model, attribute=attribute, func=func)
+        return d
 
     # Returns dictionary of model name -> attribute value for the provided attribute
     def get_models_attribute_dict(self, attribute, models: list = None) -> dict:

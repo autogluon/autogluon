@@ -181,10 +181,13 @@ class CatBoostModel(AbstractModel):
         fit_final_kwargs = dict(
             eval_set=eval_set,
             verbose=verbose,
-            use_best_model=True,
             # early_stopping_rounds=early_stopping_rounds,  # Disabled in favor of ES callback
             callbacks=callbacks,
         )
+
+        if eval_set is not None:
+            fit_final_kwargs['use_best_model'] = True
+
         self.model.fit(X, **fit_final_kwargs)
 
         self.params_trained['iterations'] = self.model.tree_count_

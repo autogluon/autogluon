@@ -287,6 +287,8 @@ class TabularPredictor:
             presets=None,
             hyperparameters=None,
             feature_metadata='infer',
+            infer_limit=None,
+            infer_limit_batch_size=None,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -499,6 +501,20 @@ class TabularPredictor:
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
+        infer_limit : float, default = None
+            The inference time limit in seconds per row to adhere to during fit.
+            If infer_limit=0.05 and infer_limit_batch_size=1000, AutoGluon will avoid training models that take longer than 50 ms/row to predict when given a batch of 1000 rows to predict (must predict 1000 rows in no more than 50 seconds).
+            If bagging is enabled, the inference time limit will be respected based on estimated inference speed of `_FULL` models after refit_full is called, NOT on the inference speed of the bagged ensembles.
+            If None, no limit is enforced.
+            If it is impossible to satisfy the constraint, an exception will be raised.
+        infer_limit_batch_size : int, default = None
+            The batch size to use when predicting in bulk to estimate per-row inference time.
+            Must be an integer greater than 0.
+            If None and `infer_limit` is specified, will default to 10000.
+            It is recommended to set to 10000 unless you must satisfy an online-inference scenario.
+            Small values, especially `infer_limit_batch_size=1`, will result in much larger per-row inference times and should be avoided if possible.
+            Refer to `infer_limit` for more details on how this is used.
+            If specified when `infer_limit=None`, the inference time will be logged during training but will not be limited.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -688,6 +704,12 @@ class TabularPredictor:
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
 
+        # TODO: constraint on inference time
+        # TODO: Enforce constraint when selecting best model
+        # TODO: Show in leaderboard somehow?
+        # TODO: Enable for arbitrary batch sizes
+        # TODO: Allow toggle for assuming refit vs no refit
+
         verbosity = kwargs.get('verbosity', self.verbosity)
         set_logger_verbosity(verbosity)
 
@@ -729,6 +751,7 @@ class TabularPredictor:
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data,
                                                                           tuning_data=tuning_data,
                                                                           unlabeled_data=unlabeled_data)
+        infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
         if hyperparameters is None:
             hyperparameters = 'default'
@@ -795,7 +818,8 @@ class TabularPredictor:
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
                           num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
+                          time_limit=time_limit, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
                           verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
 
@@ -804,13 +828,14 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
-            calibrate=kwargs['calibrate']
+            calibrate=kwargs['calibrate'],
+            infer_limit=infer_limit,
         )
         self.save()
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=False):
+                  calibrate=False, infer_limit=None):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -823,7 +848,9 @@ class TabularPredictor:
                 refit_full = 'all'
 
         if refit_full is not False:
-            trainer_model_best = self._trainer.get_model_best()
+            if infer_limit is not None:
+                infer_limit = infer_limit - self._learner.preprocess_1_time
+            trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
             self.refit_full(model=refit_full)
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
@@ -919,6 +946,7 @@ class TabularPredictor:
                 model.temperature_scalar = temp_scalar
                 model.save()
 
+    # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
@@ -2979,6 +3007,23 @@ class TabularPredictor:
             raise AssertionError(f'{name} contains {duplicate_count} duplicated indices. '
                                  'Please ensure DataFrame indices are unique.\n'
                                  f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
+
+    @staticmethod
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> (float, int):
+        if infer_limit_batch_size is not None:
+            if not isinstance(infer_limit_batch_size, int):
+                raise ValueError(f'infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}')
+            elif infer_limit_batch_size < 1:
+                raise AssertionError(f'infer_limit_batch_size must be >=1, value: {infer_limit_batch_size}')
+        if infer_limit is not None:
+            if not isinstance(infer_limit, (int, float)):
+                raise ValueError(f'infer_limit must be type int or float, but was instead type {type(infer_limit)}')
+            if infer_limit <= 0:
+                raise AssertionError(f'infer_limit must be greater than zero! (infer_limit={infer_limit})')
+        if infer_limit is not None and infer_limit_batch_size is None:
+            infer_limit_batch_size = 10000
+            logger.log(20, f'infer_limit specified, but infer_limit_batch_size was not specified. Setting infer_limit_batch_size={infer_limit_batch_size}')
+        return infer_limit, infer_limit_batch_size
 
     def _set_feature_generator(self, feature_generator='auto', feature_metadata=None, init_kwargs=None):
         if self._learner.feature_generator is not None:
