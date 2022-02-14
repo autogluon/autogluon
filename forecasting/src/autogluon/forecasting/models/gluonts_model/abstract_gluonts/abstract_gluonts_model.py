@@ -31,6 +31,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
     model_file_name = "model.pkl"
     gluonts_model_path = "gluon_ts"
+    # TODO: revisit time limit handling logic
     prev_fitting_time = []
 
     def __init__(self, path: str, freq: str, prediction_length: int, name: str, eval_metric: str = None,
@@ -127,6 +128,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         """
         Fitting the model.
         """
+        # TODO: revisit time limit handling logic
         if time_limit is not None:
             logger.log(30, f"Training model {self.name} for up to {time_limit}s...")
         else:
