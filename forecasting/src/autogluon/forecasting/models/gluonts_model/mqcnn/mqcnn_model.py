@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class MQCNNModel(AbstractGluonTSModel):
-    """
-    MQCNN model from Gluon-TS
-    """
+    """MQCNN model from Gluon-TS"""
     def __init__(self, path: str, freq: str, prediction_length: int, name: str = "MQCNN",
                  eval_metric: str = None, hyperparameters=None, model=None, **kwargs):
         super().__init__(path=path,
@@ -27,11 +25,6 @@ class MQCNNModel(AbstractGluonTSModel):
                          **kwargs)
 
     def create_model(self):
-        # if "ctx" in self.params:
-        #     logger.log(30, "Warning: MQCNN model from GluonTS has known issues running with GPU. "
-        #                    "Be careful when you use GPU for MQCNN.")
-        # else:
-        #     self.params["ctx"] = mx.context.cpu()
         if get_mxnet_context() != mx.context.cpu():
             self.params["hybridize"] = False
 

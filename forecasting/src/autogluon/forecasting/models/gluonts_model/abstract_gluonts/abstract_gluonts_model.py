@@ -19,14 +19,14 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils import warning_filter
 
 from ....utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
-from ...abstract import AbstractModel
+from ...abstract import AbstractForecastingModel
 from .model_trial import model_trial
 from .callback import EpochCounter, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 
 
-class AbstractGluonTSModel(AbstractModel):
+class AbstractGluonTSModel(AbstractForecastingModel):
 
     model_file_name = "model.pkl"
     gluonts_model_path = "gluon_ts"

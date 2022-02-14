@@ -4,7 +4,7 @@ import logging
 
 import autogluon.core as ag
 
-from ...models.abstract.abstract_model import AbstractModel
+from ...models.abstract.abstract_model import AbstractForecastingModel
 from ...models.gluonts_model.mqcnn import MQCNNModel
 from ...models.gluonts_model.sff import SimpleFeedForwardModel
 from ...models.gluonts_model.deepar import DeepARModel
@@ -113,8 +113,8 @@ def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameter
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")
             model_type = MODEL_TYPES[model]
-        elif not issubclass(model, AbstractModel):
-            logger.warning(f"Customized model {model} does not inherit from {AbstractModel}")
+        elif not issubclass(model, AbstractForecastingModel):
+            logger.warning(f"Customized model {model} does not inherit from {AbstractForecastingModel}")
             model_type = model
         else:
             logger.log(20, f'Custom Model Type Detected: {model}')
