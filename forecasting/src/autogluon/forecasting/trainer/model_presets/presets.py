@@ -8,7 +8,9 @@ from ...models.abstract.abstract_model import AbstractForecastingModel
 from ...models.gluonts_model.mqcnn import MQCNNModel
 from ...models.gluonts_model.sff import SimpleFeedForwardModel
 from ...models.gluonts_model.deepar import DeepARModel
-from ...models.gluonts_model.auto_tabular import AutoTabularModel  # TODO: this module is not fully prepared.
+from ...models.gluonts_model.auto_tabular import (
+    AutoTabularModel,
+)  # TODO: this module is not fully prepared.
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +21,7 @@ MODEL_TYPES = dict(
     DeepAR=DeepARModel,
     AutoTabular=AutoTabularModel,
 )
-
-DEFAULT_MODEL_NAMES = {
-    MQCNNModel: "MQCNN",
-    SimpleFeedForwardModel: "SFF",
-    DeepARModel: "DeepAR",
-    AutoTabularModel: "AutoTabular",
-}
-
+DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
     MQCNN=50,
     SFF=30,
@@ -37,15 +32,27 @@ DEFAULT_MODEL_PRIORITY = dict(
 
 def get_default_hps(key, prediction_length):
     DEFAULT_MODEL_HPS = {
-        "toy":{
+        "toy": {
             "SFF": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
             "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
         },
-        "toy_hpo":{
-            "SFF": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": ag.Int(5, 25)},
-            "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": ag.Int(5, 25)},
-            "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": ag.Int(5, 25)},
+        "toy_hpo": {
+            "SFF": {
+                "epochs": 5,
+                "num_batches_per_epoch": 10,
+                "context_length": ag.Int(5, 25),
+            },
+            "MQCNN": {
+                "epochs": 5,
+                "num_batches_per_epoch": 10,
+                "context_length": ag.Int(5, 25),
+            },
+            "DeepAR": {
+                "epochs": 5,
+                "num_batches_per_epoch": 10,
+                "context_length": ag.Int(5, 25),
+            },
         },
         "default": {
             "SFF": {},
@@ -55,21 +62,27 @@ def get_default_hps(key, prediction_length):
         },
         "default_hpo": {
             "MQCNN": {
-                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                         max(min(500, 12 * prediction_length), 4 * prediction_length),
-                                         default=prediction_length * 4),
+                "context_length": ag.Int(
+                    min(prediction_length, max(10, 2 * prediction_length), 250),
+                    max(min(500, 12 * prediction_length), 4 * prediction_length),
+                    default=prediction_length * 4,
+                ),
             },
             "DeepAR": {
-                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                         max(min(500, 12 * prediction_length), prediction_length),
-                                         default=prediction_length),
+                "context_length": ag.Int(
+                    min(prediction_length, max(10, 2 * prediction_length), 250),
+                    max(min(500, 12 * prediction_length), prediction_length),
+                    default=prediction_length,
+                ),
             },
             "SFF": {
-                'context_length': ag.Int(min(prediction_length, max(10, 2 * prediction_length), 250),
-                                         max(min(500, 12 * prediction_length), prediction_length),
-                                         default=prediction_length),
+                "context_length": ag.Int(
+                    min(prediction_length, max(10, 2 * prediction_length), 250),
+                    max(min(500, 12 * prediction_length), prediction_length),
+                    default=prediction_length,
+                ),
             },
-        }
+        },
     }
     return DEFAULT_MODEL_HPS[key]
 
@@ -77,21 +90,38 @@ def get_default_hps(key, prediction_length):
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 
-def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameters, hyperparameter_tune, use_feat_static_cat, use_feat_static_real, cardinality, **kwargs):
+def get_preset_models(
+    path,
+    prediction_length,
+    freq,
+    eval_metric,
+    hyperparameters,
+    hyperparameter_tune,
+    use_feat_static_cat,
+    use_feat_static_real,
+    cardinality,
+    **kwargs,
+):
     """
     Create a list of models according to hyperparameters. If hyperparamaters=None, will create models according to presets.
     """
     models = []
     if isinstance(hyperparameters, str):
-        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
+        hyperparameters = copy.deepcopy(
+            get_default_hps(hyperparameters, prediction_length)
+        )
     else:
         if not hyperparameter_tune:
-            hp_str = 'default'
+            hp_str = "default"
         else:
-            hp_str = 'default_hpo'
+            hp_str = "default_hpo"
         default_hps = copy.deepcopy(get_default_hps(hp_str, prediction_length))
         if hyperparameters is not None:
-            default_hps = {model: default_hps[model] for model in default_hps if model in hyperparameters}
+            default_hps = {
+                model: default_hps[model]
+                for model in default_hps
+                if model in hyperparameters
+            }
             for model in hyperparameters:
                 if model not in default_hps:
                     default_hps[model] = hyperparameters[model]
@@ -114,15 +144,26 @@ def get_preset_models(path, prediction_length, freq, eval_metric, hyperparameter
                 raise ValueError(f"Model {model} is not supported yet.")
             model_type = MODEL_TYPES[model]
         elif not issubclass(model, AbstractForecastingModel):
-            logger.warning(f"Customized model {model} does not inherit from {AbstractForecastingModel}")
+            logger.warning(
+                f"Customized model {model} does not inherit from {AbstractForecastingModel}"
+            )
             model_type = model
         else:
-            logger.log(20, f'Custom Model Type Detected: {model}')
+            logger.log(20, f"Custom Model Type Detected: {model}")
             model_type = model
 
-        models.append(model_type(path=path, freq=freq, prediction_length=prediction_length, eval_metric=eval_metric,
-                                 hyperparameters=model_hps, **kwargs))
+        models.append(
+            model_type(
+                path=path,
+                freq=freq,
+                prediction_length=prediction_length,
+                eval_metric=eval_metric,
+                hyperparameters=model_hps,
+                **kwargs,
+            )
+        )
     return models
+
 
 def verify_contains_searchspace(hyperparameters):
     for model in hyperparameters:
@@ -134,7 +175,10 @@ def verify_contains_searchspace(hyperparameters):
                 model_contains_searchspace = True
                 break
         if not model_contains_searchspace:
-            raise ValueError(f"Hyperparameter tuning specified, but no hyperparameter search space provided for {model}. Please convert one of the fixed hyperparameter values of this model to a search space and try again, or do not specify hyperparameter tuning.")
+            raise ValueError(
+                f"Hyperparameter tuning specified, but no hyperparameter search space provided for {model}. Please convert one of the fixed hyperparameter values of this model to a search space and try again, or do not specify hyperparameter tuning."
+            )
+
 
 def verify_no_searchspace(hyperparameters):
     for model in hyperparameters:
@@ -142,6 +186,6 @@ def verify_no_searchspace(hyperparameters):
         for hp in model_hps:
             hp_value = model_hps[hp]
             if isinstance(hp_value, ag.space.Space):
-                raise ValueError(f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. For {model}, hyperparameter {hp} currently given as search space: {hp_value}.")
-
-
+                raise ValueError(
+                    f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. For {model}, hyperparameter {hp} currently given as search space: {hp_value}."
+                )

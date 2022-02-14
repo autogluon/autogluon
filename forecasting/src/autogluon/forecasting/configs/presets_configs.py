@@ -1,3 +1,5 @@
+"""Preset configurations for autogluon.forecasting Predictors"""
+# TODO: change default HPO settings when other HPO strategies are available
 forecasting_presets_configs = dict(
     best_quality={
         "hyperparameters": "default_hpo",
