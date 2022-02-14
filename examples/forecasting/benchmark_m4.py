@@ -1,3 +1,7 @@
+"""Benchmark all autogluon.forecasting models on the M4 competition
+(https://en.wikipedia.org/wiki/Makridakis_Competitions) data
+sets as well as `traffic` and `electricity` data sets from GluonTS.
+"""
 import os
 import time
 
@@ -17,6 +21,7 @@ dataset_list = [
     "electricity",
 ]
 
+
 if __name__ == "__main__":
     os.makedirs("benchmark_results", exist_ok=True)
     for dataset_name in dataset_list:
@@ -26,6 +31,7 @@ if __name__ == "__main__":
         test_data = dataset.test
         prediction_length = dataset.metadata.prediction_length
         freq = dataset.metadata.freq
+
         predictor = ForecastingPredictor(
             path=f"autogluon_benchmark_{dataset_name}"
         ).fit(
@@ -49,5 +55,7 @@ if __name__ == "__main__":
             f"benchmark_results/results_{dataset_name}_{int(time.time())}.csv",
             index=False,
         )
+        print("Model Leaderboard")
         print(leaderboard)
-        print(predictor.evaluate(test_data))
+
+        print(f"Evaluation Result on Test Data: {predictor.evaluate(test_data)}")
