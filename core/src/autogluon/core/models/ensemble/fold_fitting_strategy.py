@@ -354,7 +354,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.time_end_fit = None
         self.fit_time = 0
         self.predict_time = 0
-        self.predict_1_time = 0
+        self.predict_1_time = None
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
         # initialize the model base to get necessary info for estimating memory usage
@@ -496,6 +496,8 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             self.time_end_fit = time_end_fit
         self.predict_time += predict_time
         if predict_1_time is not None:
+            if self.predict_1_time is None:
+                self.predict_1_time = 0
             self.predict_1_time += predict_1_time
 
     def _get_fold_time_limit(self, num_jobs):
