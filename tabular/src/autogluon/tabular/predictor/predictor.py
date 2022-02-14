@@ -505,6 +505,7 @@ class TabularPredictor:
             The inference time limit in seconds per row to adhere to during fit.
             If infer_limit=0.05 and infer_limit_batch_size=1000, AutoGluon will avoid training models that take longer than 50 ms/row to predict when given a batch of 1000 rows to predict (must predict 1000 rows in no more than 50 seconds).
             If bagging is enabled, the inference time limit will be respected based on estimated inference speed of `_FULL` models after refit_full is called, NOT on the inference speed of the bagged ensembles.
+            The inference times calculated for models are assuming `predictor.persist_models('all')` is called after fit.
             If None, no limit is enforced.
             If it is impossible to satisfy the constraint, an exception will be raised.
         infer_limit_batch_size : int, default = None
