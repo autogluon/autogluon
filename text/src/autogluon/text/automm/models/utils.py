@@ -10,7 +10,7 @@ def init_weights(module: nn.Module):
     Parameters
     ----------
     module
-        A Pytorch nn.Module
+        A Pytorch nn.Module.
     """
     if isinstance(module, nn.Embedding):
         nn.init.xavier_normal_(module.weight)
@@ -84,9 +84,9 @@ def assign_non_encoder_layer_ids(
     Parameters
     ----------
     non_encoder_names
-        Names layers not belonging to an encoder
+        Names layers not belonging to an encoder.
     layer_id
-        provided id
+        provided id.
 
     Returns
     -------
@@ -109,13 +109,13 @@ def split_encoder_non_encoder(names: List[str]):
     Parameters
     ----------
     names
-        Model layer names
+        Model layer names.
     Returns
     -------
     encoder_names
-        A list of encoder layer names
+        A list of encoder layer names.
     non_encoder_names
-        A list of non-encoder layer names
+        A list of non-encoder layer names.
     """
     encoder_names = []
     non_encoder_names = []
@@ -162,13 +162,13 @@ def group_param_names(
     Returns
     -------
     left_names
-        The layer names left for the next-time processing
+        The layer names left for the next-time processing.
     encoder_names_grouped
-        Encoder layer names
+        Encoder layer names.
     pre_encoder_names
-        Names of layers before the encoder
+        Names of layers before the encoder.
     post_encoder_names
-        Names of layers after the encoder
+        Names of layers after the encoder.
     """
     # two set of patterns can't have intersections
     assert all(pre_p not in post_encoder_patterns for pre_p in pre_encoder_patterns)

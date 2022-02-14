@@ -17,6 +17,12 @@ from torch.nn.modules.loss import _Loss
 
 
 class LitModule(pl.LightningModule):
+    """
+    Control the loops for training, evaluation, and prediction. This module is independent of
+    the model definition. This class inherits from the Pytorch Lightning's LightningModule:
+    https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+    """
+
     def __init__(
             self,
             model: nn.Module,
@@ -34,10 +40,6 @@ class LitModule(pl.LightningModule):
             test_metric: Optional[torchmetrics.Metric] = None,
     ):
         """
-        Control the loops for training, evaluation, and prediction. This module is independent of
-        the model definition.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
-
         Parameters
         ----------
         model
@@ -134,7 +136,7 @@ class LitModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """
         Per training step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.core.lightning.html#pytorch_lightning.core.lightning.LightningModule.training_step
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#training-loop
 
         Parameters
         ----------
@@ -157,7 +159,7 @@ class LitModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         """
         Per validation step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.core.lightning.html#pytorch_lightning.core.lightning.LightningModule.validation_step
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
 
         Parameters
         ----------
@@ -181,7 +183,7 @@ class LitModule(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         """
         Per prediction step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.core.lightning.html#pytorch_lightning.core.lightning.LightningModule.predict_step
+        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#prediction-loop
 
         Parameters
         ----------

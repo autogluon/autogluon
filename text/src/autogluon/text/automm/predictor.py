@@ -91,6 +91,7 @@ class AutoMMPredictor:
         Whether to raise warning if the specified path already exists.
 
     """
+
     def __init__(
             self,
             label: str,
@@ -623,7 +624,7 @@ class AutoMMPredictor:
             as_pandas: Optional[bool] = True,
     ):
         """
-        Predict values for the label column of new data
+        Predict values for the label column of new data.
 
         Parameters
         ----------

@@ -2,19 +2,22 @@ import collections
 import pandas as pd
 import warnings
 from typing import Union, Optional, List, Dict, Tuple
-from pandas import DataFrame, Series
-from ..constants import NULL, CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH, MULTICLASS, BINARY, REGRESSION
+from ..constants import (
+    NULL, CATEGORICAL, NUMERICAL, TEXT,
+    IMAGE_PATH, MULTICLASS, BINARY, REGRESSION,
+)
 
 
-def is_categorical_column(data: pd.Series,
-                          valid_data: pd.Series,
-                          threshold: int = None,
-                          ratio: Optional[float] = None,
-                          oov_ratio_threshold: Optional[float] = None,
-                          is_label: bool = False,
-                          ) -> bool:
-    """Check whether the column is a categorical column.
-
+def is_categorical_column(
+        data: pd.Series,
+        valid_data: pd.Series,
+        threshold: int = None,
+        ratio: Optional[float] = None,
+        oov_ratio_threshold: Optional[float] = None,
+        is_label: bool = False,
+) -> bool:
+    """
+    Identify whether a column is one categorical column.
     If the number of unique elements in the column is smaller than
 
         min(#Total Sample * ratio, threshold),
@@ -24,24 +27,23 @@ def is_categorical_column(data: pd.Series,
     Parameters
     ----------
     data
-        The column data
+        One column of a multimodal pd.DataFrame for training.
     valid_data
-        Additional validation data
+        One column of a multimodal pd.DataFrame for validation.
     threshold
-        The threshold for detecting categorical column
+        The threshold for detecting categorical column.
     ratio
-        The ratio detecting categorical column
+        The ratio detecting categorical column.
     oov_ratio_threshold
         The out-of-vocabulary ratio between training and validation.
         This is used to determine if the column is a categorical column.
-        Usually, a categorical column can tolerate a small OOV ratio
+        Usually, a categorical column can tolerate a small OOV ratio.
     is_label
         Whether the column is a label column.
 
     Returns
     -------
-    is_categorical
-        Whether the column is a categorical column
+    Whether the column is a categorical column.
     """
     if data.dtype.name == 'category':
         return True
@@ -73,24 +75,24 @@ def is_categorical_column(data: pd.Series,
         return False
 
 
-def is_numerical_column(data: pd.Series,
-                        valid_data: Optional[pd.Series] = None,
-                        ) -> bool:
-    """Try to identify if a column is a numerical column.
-
-    We adopted a very simple rule to verify if the column is a numerical column.
+def is_numerical_column(
+        data: pd.Series,
+        valid_data: Optional[pd.Series] = None,
+) -> bool:
+    """
+    Identify if a column is a numerical column.
+    Here it uses a very simple rule to verify if this is a numerical column.
 
     Parameters
     ----------
     data
-        The training data series
+        One column of a multimodal pd.DataFrame for training.
     valid_data
-        The validation data series
+        One column of a multimodal pd.DataFrame for validation.
 
     Returns
     -------
-    is_numerical
-        Whether the column is a numerical column
+    Whether the column is a numerical column.
     """
     try:
         numerical_data = pd.to_numeric(data)
@@ -101,18 +103,19 @@ def is_numerical_column(data: pd.Series,
         return False
 
 
-def is_imagepath_column(data: pd.Series,
-                        ) -> bool:
-    """Try to identify if a column is a image column.
-    We adopted a very simple rule to verify if the column is a image column.
+def is_imagepath_column(data: pd.Series) -> bool:
+    """
+    Identify if a column is one image-path column.
+    Here it uses a very simple rule to verify if this is an image-path column.
+
     Parameters
     ----------
     data
-        The training data series
+        One column of a multimodal pd.DataFrame for training.
+
     Returns
     -------
-    is_image
-        Whether the column is a image column
+    Whether the column is an image-path column.
     """
     try:
         if (data.iloc[0].startswith('/') or data.iloc[0].startswith('.')):
@@ -123,8 +126,19 @@ def is_imagepath_column(data: pd.Series,
         return False
 
 
-def check_if_nlp_feature(X: Series,
-                         ) -> bool:
+def check_if_nlp_feature(X: pd.Series) -> bool:
+    """
+    Identify if a column is one text column.
+
+    Parameters
+    ----------
+    X
+        One column of a multimodal pd.DataFrame for training.
+
+    Returns
+    -------
+    Whether the column is a text column.
+    """
     if len(X) > 5000:
         # Sample to speed-up type inference
         X = X.sample(n=5000, random_state=0)
@@ -135,7 +149,7 @@ def check_if_nlp_feature(X: Series,
     if unique_ratio <= 0.01:
         return False
     try:
-        avg_words = Series(X_unique).str.split().str.len().mean()
+        avg_words = pd.Series(X_unique).str.split().str.len().mean()
     except AttributeError:
         return False
     if avg_words < 3:
@@ -151,30 +165,32 @@ def infer_column_problem_types(
         problem_type: Optional[str] = None,
         provided_column_types: Optional[Dict] = None,
 ) -> Tuple[collections.OrderedDict, str, int]:
-    """Infer the column types of the data frame + the problem type
+    """
+    Infer the column types of a multimodal pd.DataFrame and the problem type.
 
     Parameters
     ----------
     train_df
-        The training Pandas DataFrame
+        The multimodal pd.DataFrame for training.
     valid_df
-        The validation Pandas DataFrame
+        The multimodal pd.DataFrame for validation.
     label_columns
-        The chosen label column names
+        The label column names.
     problem_type
-        The type of the problem
+        Type of problem.
     provided_column_types
         Additional dictionary that you can use to specify the columns types that you know.
-        {'col_name': TYPE}
+        {'col_name': TYPE, ...}
 
     Returns
     -------
     column_types
-        Dictionary of column types
-        If the column does not contain any useful information, we will filter the column with
-        type = NULL
+        A dictionary containing the mappings from column names to their modality types.
+        If the column does not contain any useful information, we will set its column type NULL.
     problem_type
-        The inferred problem type
+        The inferred problem type.
+    output_shape
+        Shape of output.
     """
     if isinstance(label_columns, str):
         label_columns = [label_columns]
@@ -219,9 +235,10 @@ def infer_column_problem_types(
                 warnings.warn(f'Label column "{col_name}" contains only one label. You may want'
                               f' to check your dataset again.')
         # Use the following way for type inference
-        # 1) Inference categorical column
-        # 2) Inference numerical column
-        # 3) All the other columns are treated as text column
+        # 1) Infer categorical column
+        # 2) Infer numerical column
+        # 3) Infer image-path column
+        # 4) All the other columns are treated as text column
         if is_categorical_column(train_df[col_name], valid_df[col_name],
                                  is_label=is_label):
             column_types[col_name] = CATEGORICAL
@@ -233,42 +250,44 @@ def infer_column_problem_types(
             column_types[col_name] = TEXT
         else:
             column_types[col_name] = CATEGORICAL
-    problem_type, output_shape = infer_problem_type(column_types, label_columns[0], train_df, problem_type)
+    problem_type, output_shape = infer_problem_type_output_shape(
+        column_types=column_types,
+        label_column=label_columns[0],
+        data_df=train_df,
+        provided_problem_type=problem_type,
+    )
     return column_types, problem_type, output_shape
 
 
-def printable_column_type_string(column_types):
-    ret = 'Column Types:\n'
-    for col_name, col_type in column_types.items():
-        ret += f'   - "{col_name}": {col_type}\n'
-    return ret
-
-
-def infer_problem_type(column_types, label_column, data_df,
-                       provided_problem_type=None,
-                       ) -> Tuple[str, int]:
-    """Inference the type of the problem based on type of the column and
-    the training data.
-
-    Also, it will try to check the correctness of the column types and the provided problem_type.
+def infer_problem_type_output_shape(
+        column_types: dict,
+        label_column: str,
+        data_df: pd.DataFrame,
+        provided_problem_type=None,
+) -> Tuple[str, int]:
+    """
+    Infer the problem type and output shape based on the label column type and training data.
+    Binary classification should have class number 2, while multi-class classification's class
+    number should be larger than 2. For regression, the output is restricted to 1 scalar.
 
     Parameters
     ----------
     column_types
-        Type of the columns
+        Types of columns in a multimodal pd.DataFrame.
     label_column
-        The label column
+        The label column in a multimodal pd.DataFrame.
     data_df
-        The dataframe
+        The multimodal pd.DataFrame for training.
     provided_problem_type
-        The provided problem type
+        The provided problem type.
 
     Returns
     -------
     problem_type
-        Type of the problem
+        Type of problem.
+    output_shape
+        Shape of output.
     """
-
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
             class_num = len(data_df[label_column].unique())
@@ -297,5 +316,7 @@ def infer_problem_type(column_types, label_column, data_df,
         elif column_types[label_column] == NUMERICAL:
             return REGRESSION, 1
         else:
-            raise ValueError(f'The label column "{label_column}" has type'
-                             f' "{column_types[label_column]}" and is supported yet.')
+            raise ValueError(
+                f'The label column "{label_column}" has type'
+                f' "{column_types[label_column]}" and is supported yet.'
+            )

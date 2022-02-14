@@ -7,6 +7,12 @@ from .mlp import MLP
 
 
 class MultimodalFusionMLP(nn.Module):
+    """
+    Use MLP to fuse different models' features (single-modal and multimodal).
+    Specifically, it adapts the features of each model to specified dimensions,
+    concatenates the adapted features, and fuses the features through MLP.
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -20,10 +26,6 @@ class MultimodalFusionMLP(nn.Module):
             loss_weight: Optional[float] = None,
     ):
         """
-        Use MLP to fuse different models' features (single-modal and multimodal).
-        Specifically, it adapts the features of each model to specified dimensions,
-        concatenates the adapted features, and fuses the features through MLP.
-
         Parameters
         ----------
         prefix

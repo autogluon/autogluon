@@ -8,6 +8,10 @@ from .utils import init_weights
 
 
 class NumericalMLP(nn.Module):
+    """
+    MLP for numerical input.
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -21,8 +25,6 @@ class NumericalMLP(nn.Module):
             num_classes: Optional[int] = 0,
     ):
         """
-        MLP for numerical input.
-
         Parameters
         ----------
         prefix

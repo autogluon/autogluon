@@ -4,6 +4,13 @@ from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
 
 class BaseDataset(torch.utils.data.Dataset):
+    """
+    A Pytorch DataSet class to process a multimodal pd.DataFrame. It first uses a preprocessor to
+    produce model-agnostic features. Then, each processor prepares customized data for one modality
+    per model. For code simplicity, here we treat ground-truth label as one modality. This class is
+    independent of specific data modalities and models.
+    """
+
     def __init__(
         self,
         data: pd.DataFrame,
@@ -11,6 +18,20 @@ class BaseDataset(torch.utils.data.Dataset):
         processors: dict,
         is_training: bool = False,
     ):
+        """
+        Parameters
+        ----------
+        data
+            A pd.DataFrame containing multimodal features.
+        preprocessor
+            A multimodal feature preprocessor generating model-agnostic features.
+        processors
+            Data processors customizing data for each modality per model.
+        is_training
+            Whether in training mode. Some data processing may be different between training
+            and validation/testing/prediction, e.g., image data augmentation is used only in
+            training.
+        """
         super().__init__()
         self.processors = processors
         self.is_training = is_training
@@ -24,9 +45,29 @@ class BaseDataset(torch.utils.data.Dataset):
         assert len(set(self.lengths)) == 1
 
     def __len__(self):
+        """
+        Assume that all modalities have the same sample number.
+
+        Returns
+        -------
+        Sample number in this dataset.
+        """
         return self.lengths[0]
 
     def __getitem__(self, idx):
+        """
+        Iterate through all data processors to prepare model inputs. The data processors are
+        organized first by modalities and then by models.
+
+        Parameters
+        ----------
+        idx
+            Index of sample to process.
+
+        Returns
+        -------
+        Input data formatted as a dictionary.
+        """
         ret = dict()
         for per_modality, per_modality_processors in self.processors.items():
             for per_model_processor in per_modality_processors:

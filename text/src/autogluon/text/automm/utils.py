@@ -104,10 +104,12 @@ def get_config(
             For example, changing the text and image backbones can be done by formatting:
 
             a string
-            overrides = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+            overrides = "model.hf_text.checkpoint_name=google/electra-small-discriminator
+            model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
 
             or a list of strings
-            overrides = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+            overrides = ["model.hf_text.checkpoint_name=google/electra-small-discriminator",
+            "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
 
             or a dictionary
             overrides = {
@@ -150,10 +152,12 @@ def select_model(
         df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
-    Filter model config through the detected modalities in the training data. If MultiModalFeaturePreprocessor
-    can't detect some modality, this function will remove the models that use this modality. This function is to
-    maximize the user flexibility in defining the config. For example, if one uses the "fusion_mlp_image_text_tabular"
-    as the model config template but the training data don't have images, this function will filter out all the models
+    Filter model config through the detected modalities in the training data.
+    If MultiModalFeaturePreprocessor can't detect some modality,
+    this function will remove the models that use this modality. This function is to
+    maximize the user flexibility in defining the config.
+    For example, if one uses the "fusion_mlp_image_text_tabular" as the model config template
+    but the training data don't have images, this function will filter out all the models
     using images, such as Swin Transformer and CLIP.
 
     Parameters
@@ -240,7 +244,7 @@ def init_df_preprocessor(
     Initialized dataframe preprocessor.
     """
     df_preprocessor = MultiModalFeaturePreprocessor(
-        cfg=config,
+        config=config,
         column_types=column_types,
         label_column=label_column,
     )
@@ -260,7 +264,7 @@ def init_data_processors(
     Create the data processors according to the model config. This function creates one processor for
     each modality of each model. For example, if one model config contains BERT, ViT, and CLIP, then
     BERT would have its own text processor, ViT would have its own image processor, and CLIP would have
-    its own text and image processors. This is to support training arbitrary combinations of single-model
+    its own text and image processors. This is to support training arbitrary combinations of single-modal
     and multimodal models since two models may share the same modality but have different processing. Text
     sequence length is a good example. BERT's sequence length is generally 512, while CLIP uses sequences of
     length 77.

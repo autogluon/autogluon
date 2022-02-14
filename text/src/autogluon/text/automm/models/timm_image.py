@@ -8,6 +8,11 @@ from typing import Optional
 
 
 class TimmAutoModelForImagePrediction(nn.Module):
+    """
+    Support TIMM image backbones.
+    Refer to https://github.com/rwightman/pytorch-image-models
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -15,7 +20,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
             num_classes: Optional[int] = 0,
             mix_choice: Optional[str] = "all_logits",
     ):
-        """Image encoder based on backbones in TIMM.
+        """
+        Load a pretrained image backbone from TIMM.
 
         Parameters
         ----------
@@ -55,7 +61,6 @@ class TimmAutoModelForImagePrediction(nn.Module):
             batch: dict,
     ):
         """
-
         Parameters
         ----------
         batch

@@ -32,6 +32,11 @@ ALL_TOKENIZERS = {
 
 
 class TextProcessor:
+    """
+    Prepare text data for the model specified by "prefix". For multiple models requiring text data,
+    we need to create a TextProcessor for each related model so that they will have independent input.
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -43,24 +48,23 @@ class TextProcessor:
             stochastic_chunk: Optional[bool] = False,
     ):
         """
-
-                Parameters
-                ----------
-                prefix
-                    The prefix of the processor
-                checkpoint_name
-                    Name of the pretrained tokenizer checkpoint, e.g., "microsoft/deberta-v3-small"
-                tokenizer_name
-                    Name of the tokenizer type
-                max_len
-                    The maximum length of the final merged text
-                insert_sep
-                    Whether to insert SEP tokens
-                text_segment_num
-                    The number of text segments
-                stochastic_chunk
-                    Whether to use stochastic chunking, which will randomly slice each individual texts.
-                """
+        Parameters
+        ----------
+        prefix
+            The prefix connecting a processor to its corresponding model.
+        checkpoint_name
+            Name of the pretrained huggingface checkpoint, e.g., "microsoft/deberta-v3-small"
+        tokenizer_name
+            Name of the huggingface tokenizer type (default "hf_auto").
+        max_len
+            The maximum length of text tokens.
+        insert_sep
+            Whether to insert SEP tokens.
+        text_segment_num
+            The number of text segments.
+        stochastic_chunk
+            Whether to use stochastic chunking, which will randomly slice each individual text.
+        """
         self.prefix = prefix
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
@@ -112,6 +116,14 @@ class TextProcessor:
         self.stochastic_chunk = stochastic_chunk
 
     def collate_fn(self) -> dict:
+        """
+        Collate text features into a batch.
+        This function will be used when creating Pytorch DataLoader.
+
+        Returns
+        -------
+        A dictionary containing one model's collator function for text data.
+        """
         fn = {}
         fn.update({f"{self.prefix}_{TEXT_TOKEN_IDS}": Pad(pad_val=self.tokenizer.pad_token_id)})
         fn.update({f"{self.prefix}_{TEXT_VALID_LENGTH}": Stack()})
@@ -122,7 +134,20 @@ class TextProcessor:
             self,
             text_tokens: List[NDArray[(Any,), np.int32]],
     ) -> dict:
+        """
+        Construct one token sequence based on multiple token sequences coming from different
+        text columns in a multimodal pd.DataFrame. The token sequence length and the text segment
+        id are upper bounded by "self.max_len" and "self.text_segment_num".
 
+        Parameters
+        ----------
+        text_tokens
+            One sample's text token sequences from different text columns in a multimodal pd.DataFrame.
+
+        Returns
+        -------
+        A dictionary containing one sample's text tokens, valid length, and segment ids.
+        """
         if self.insert_sep:
             max_length = self.max_len - (len(text_tokens) + 1)
         else:
@@ -162,6 +187,19 @@ class TextProcessor:
             self,
             text: List[str],
     ) -> dict:
+        """
+        Tokenize a sample's text data and build one token sequence. One sample may have
+        multiple text columns in a multimodal pd.DataFrame.
+
+        Parameters
+        ----------
+        text
+            The raw text data of one sample.
+
+        Returns
+        -------
+        A dictionary containing one sample's text tokens, valid length, and segment ids.
+        """
         # tokenize text
         tokens = []
         warnings.filterwarnings(
@@ -181,6 +219,20 @@ class TextProcessor:
 
     @staticmethod
     def get_special_tokens(tokenizer):
+        """
+        Extract the cls and sep token ids from a huggingface tokenizer. In most cases,
+        we can use the attributes "cls_token_id" and "sep_token_id". But for CLIP, we
+        need to use "bos_token_id" and "eos_token_id".
+
+        Parameters
+        ----------
+        tokenizer
+            A huggingface tokenizer instance.
+
+        Returns
+        -------
+        The cls and sep token ids.
+        """
         cls_id, sep_id = tokenizer.cls_token_id, tokenizer.sep_token_id
         if cls_id is None or sep_id is None:
             cls_id, sep_id = tokenizer.bos_token_id, tokenizer.eos_token_id
@@ -195,6 +247,20 @@ class TextProcessor:
             tokenizer_name: str,
             checkpoint_name: str,
     ):
+        """
+        Load the tokenizer for a pre-trained huggingface checkpoint.
+
+        Parameters
+        ----------
+        tokenizer_name
+            The tokenizer type, e.g., "bert", "clip", "electra", and "hf_auto".
+        checkpoint_name
+            Name of a pre-trained checkpoint.
+
+        Returns
+        -------
+        A tokenizer instance.
+        """
         tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
         if torch.distributed.is_initialized():
             if torch.distributed.get_rank() == 0:
@@ -208,28 +274,31 @@ class TextProcessor:
             max_length: int,
             do_merge: bool = False,
     ) -> np.ndarray:
-        """Get the trimmed lengths of multiple text data. It will make sure that
-        the trimmed length is smaller than or equal to the max_length
+        """
+        Get the trimmed lengths of multiple text token sequences. It will make sure that
+        the trimmed length is smaller than or equal to the max_length.
         - do_merge is True
             Make sure that sum(trimmed_lengths) <= max_length.
-            The strategy is to always try to trim the longer lengths.
+            The strategy is always trying to trim the longer lengths.
         - do_merge is False
-            Make sure that all(trimmed_lengths <= max_length)
+            Make sure that all(trimmed_lengths <= max_length).
+
         Parameters
         ----------
         lengths
-            The original lengths of each sample
+            The original lengths of each token sequence.
         max_length
             When do_merge is True,
                 We set the max_length constraint on the total length.
             When do_merge is False,
-                We set the max_length constraint on individual sentences.
+                We set the max_length constraint on individual sequences.
         do_merge
-            Whether these sentences will be merged
+            Whether these sentences will be merged.
+
         Returns
         -------
         trimmed_lengths
-            The trimmed lengths of each individual text field
+            The trimmed lengths of each individual text field.
         """
         lengths = np.array(lengths)
         if do_merge:
@@ -258,5 +327,21 @@ class TextProcessor:
             idx: int,
             is_training: bool,
     ) -> dict:
+        """
+        Extract one sample's text data, tokenize them, and build one token sequence.
+
+        Parameters
+        ----------
+        all_text
+            All the raw text data in a dataset.
+        idx
+            The sample index in a dataset.
+        is_training
+            Whether to do processing in the training mode. This unused flag is for the API compatibility.
+
+        Returns
+        -------
+        A dictionary containing one sample's text tokens, valid length, and segment ids.
+        """
         per_sample_text = [per_column_text[idx] for per_column_text in all_text]
         return self.build_one_token_sequence_from_text(per_sample_text)

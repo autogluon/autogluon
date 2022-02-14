@@ -10,6 +10,11 @@ from .utils import assign_layer_ids, init_weights
 
 
 class HFAutoModelForTextPrediction(nn.Module):
+    """
+    Support huggingface text backbones.
+    Refer to https://github.com/huggingface/transformers
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -65,7 +70,6 @@ class HFAutoModelForTextPrediction(nn.Module):
             batch: dict,
     ):
         """
-
         Parameters
         ----------
         batch

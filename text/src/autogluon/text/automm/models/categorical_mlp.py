@@ -8,6 +8,11 @@ from .utils import init_weights
 
 
 class CategoricalMLP(nn.Module):
+    """
+    MLP for categorical input. The input dimension is automatically computed based on
+    the number of categories in each categorical column.
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -20,9 +25,6 @@ class CategoricalMLP(nn.Module):
             num_classes: Optional[int] = 0,
     ):
         """
-        MLP for categorical input. The input dimension is automatically computed based on
-        the number of categories in each categorical column.
-
         Parameters
         ----------
         prefix

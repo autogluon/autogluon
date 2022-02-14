@@ -3,20 +3,23 @@ import warnings
 import numpy as np
 import torch
 
-__all__ = ["Stack", "Pad", "Tuple", "List", "Dict", "PadImage", "Zip"]
+__all__ = ["Stack", "Pad", "Tuple", "List", "Dict", "Zip"]
 
 
 def _pad_arrs_to_max_length(arrs, pad_axis, pad_val, round_to=None, max_length=None):
-    """Inner Implementation of the Pad collate
+    """
+    Inner Implementation of the Pad collate.
 
-    Arguments:
+    Parameters
+    ----------
         arrs (list)
         pad_axis (int)
         pad_val (number)
         round_to (int, optional). (default: ``None``)
         max_length (int, optional). (default: ``None``)
 
-    Returns:
+    Returns
+    -------
         ret : torch.Tensor
         original_length : torch.Tensor
     """
@@ -68,27 +71,32 @@ def _stack_arrs(arrs, use_shared_mem):
 
 
 class Stack:
-    r"""Stack the input data samples to construct the batch.
-
+    """
+    Stack the input data samples to construct the batch.
     The N input samples must have the same shape/length and will be stacked to construct a batch.
     """
 
     def __call__(self, data):
-        """Collate the input data
+        """
+        Collate the input data.
 
-        Arguments:
-            data (list): The input data samples
+        Parameters
+        ----------
+            data (list): The input data samples.
 
-        Returns:
+        Returns
+        -------
             batch_data (torch.Tensor)
         """
         return _stack_arrs(data, True)
 
 
 class Pad:
-    r"""Returns a callable that pads and stacks data.
+    """
+    Returns a callable that pads and stacks data.
 
-    Arguments:
+    Parameters
+    ----------
         axis (int, optional): The axis to pad the arrays.
             The arrays will be padded to the largest dimension at :attr:`axis`.
             For example, assume the input arrays have shape (10, 8, 5), (6, 8, 5), (3, 8, 5)
@@ -137,17 +145,20 @@ class Pad:
             )
 
     def __call__(self, data):
-        """Collate the input data.
+        """
+        Collate the input data.
 
         The arrays will be padded to the largest dimension at `axis` and then
         stacked to form the final output. In addition, the function will output
         the original dimensions at the `axis` if ret_length is turned on.
 
-        Arguments:
+        Parameters
+        ----------
             data : List[np.ndarray] or List[List[dtype]] or List[torch.Tensor]
                 List of samples to pad and stack.
 
-        Returns:
+        Returns
+        -------
             batch_data (torch.Tensor): Data in the minibatch. Shape is (N, ...)
             valid_length (NDArray, optional):
                 The sequences' original lengths at the padded axis. Shape is (N,). This will only be
@@ -171,7 +182,8 @@ class Pad:
 
 
 class Tuple:
-    r"""Wrap multiple data collator functions together. The input functions will be applied
+    """
+    Wrap multiple data collator functions together. The input functions will be applied
     to the corresponding input fields.
 
     Each data sample should be a list or tuple containing multiple attributes. The `i`th collate
@@ -179,7 +191,8 @@ class Tuple:
     data sample is (nd_data, label). You can wrap two collate functions using
     `Tuple(DataCollate, LabelCollate)` to collate nd_data and label correspondingly.
 
-    Arguments:
+    Parameters
+    ----------
         fn (list or tuple or callable): The collate functions to wrap.
         *args (tuple of callable, optional): The additional collate functions to wrap.
 
@@ -205,12 +218,15 @@ class Tuple:
                 )
 
     def __call__(self, data):
-        """Collate the input data.
+        """
+        Collate the input data.
 
-        Arguments:
+        Parameters
+        ----------
             data (list): The samples to collate. Each sample should contain N attributes.
 
-        Returns:
+        Returns
+        -------
             ret (tuple):
                 A tuple of length N. Contains the collated result of each attribute in the input.
         """
@@ -226,7 +242,8 @@ class Tuple:
 
 
 class List:
-    r"""Simply forward the list of input data.
+    """
+    Simply forward the list of input data.
 
     This is particularly useful when the Dataset contains textual data
     and in conjunction with the `Tuple` collate function.
@@ -235,17 +252,20 @@ class List:
 
     def __call__(self, data):
         """
-        Arguments:
+        Parameters
+        ----------
             data (list): The list of samples
 
-        Returns:
+        Returns
+        -------
             ret (list): The input list
         """
         return list(data)
 
 
 class Dict:
-    r"""Wrap multiple collate functions together and apply it to merge inputs from a dict.
+    """
+    Wrap multiple collate functions together and apply it to merge inputs from a dict.
 
     The generated batch samples are stored as a dict with the same keywords.
 
@@ -255,7 +275,8 @@ class Dict:
     You can merge the data and labels using
     `Dict({'data': DataCollate, 'label': LabelCollate})` to collate the nd_data and nd_label.
 
-    Arguments:
+    Parameters
+    ----------
         fn_dict (dict): A dictionary that contains the key-->collate function mapping.
 
     """
@@ -272,10 +293,12 @@ class Dict:
     def __call__(self, data):
         """
 
-        Arguments:
+        Parameters
+        ----------
             data (dict): The samples to collate. Each sample should be a dictionary
 
-        Returns:
+        Returns
+        -------
             ret (dict): The resulting dictionary that stores the merged samples.
         """
         ret = dict()
@@ -284,41 +307,15 @@ class Dict:
         return ret
 
 
-class PadImage:
-    def __call__(self, image_list):
-        """
-        Arguments:
-            image_list (list): The list of images
-
-        Returns:
-            ret (tensor): The torch tensor
-        """
-        batch_size = len(image_list)
-        img_sizes = [img.shape for img in image_list]
-        for size in img_sizes:
-            assert (len(size) == 3 and size[0] == 3),\
-                f"Collate error, an image should be in shape of (3, H, W), instead of given {size}"
-        max_height = max([i[1] for i in img_sizes])
-        max_width = max([i[2] for i in img_sizes])
-
-        ret = torch.zeros(batch_size, 3, max_height, max_width,
-                          device=image_list[0].device,
-                          dtype=image_list[0].dtype)
-
-        for i, image in enumerate(image_list):
-            # assign to the top-left since convolution starts processing from top-left
-            ret[i, :, :image.shape[1], :image.shape[2]] = image
-
-        return ret
-
-
 class Zip:
     def __call__(self, data):
         """
-        Arguments:
+        Parameters
+        ----------
             data (list): The list of samples. Each sample is a list of elements
 
-        Returns:
+        Returns
+        -------
             ret (list): A list of tuples. The ith tuple contains the ith elements of all samples
         """
         return list(zip(*data))

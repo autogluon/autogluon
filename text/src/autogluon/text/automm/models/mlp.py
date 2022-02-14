@@ -9,6 +9,10 @@ ALL_ACT_LAYERS = {
 
 
 class Unit(nn.Module):
+    """
+    One MLP layer. It orders the operations as: norm -> fc -> act_fn -> dropout
+    """
+
     def __init__(
             self,
             normalization: str,
@@ -18,8 +22,6 @@ class Unit(nn.Module):
             dropout_prob: float,
     ):
         """
-        One MLP layer. It orders the operations as: norm -> fc -> act_fn -> dropout
-
         Parameters
         ----------
         normalization
@@ -52,6 +54,10 @@ class Unit(nn.Module):
 
 
 class MLP(nn.Module):
+    """
+    Multi-layer perceptron (MLP). If the hidden or output feature dimension is
+    not provided, we assign it the input feature dimension.
+    """
 
     def __init__(
             self,
@@ -64,9 +70,6 @@ class MLP(nn.Module):
             normalization: Optional[str] = "layer_norm",
     ):
         """
-        Multi-layer perceptron (MLP). If the hidden or output feature dimension is
-        not provided, we assign it the input feature dimension.
-
         Parameters
         ----------
         in_features

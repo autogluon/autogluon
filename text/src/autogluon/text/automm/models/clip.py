@@ -10,6 +10,11 @@ from .utils import init_weights
 
 
 class CLIPForImageText(nn.Module):
+    """
+    Support the CLIP model.
+    Refer to https://huggingface.co/docs/transformers/model_doc/clip
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -17,7 +22,7 @@ class CLIPForImageText(nn.Module):
             num_classes: Optional[int] = 0,
     ):
         """
-        Load pretrained CLIP from huggingface transformers
+        Load the pretrained CLIP from huggingface transformers.
 
         Parameters
         ----------
@@ -49,7 +54,6 @@ class CLIPForImageText(nn.Module):
             batch: dict,
     ):
         """
-
         Parameters
         ----------
         batch

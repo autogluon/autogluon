@@ -14,6 +14,11 @@ from .utils import get_default_config_value
 
 
 class ImageProcessor:
+    """
+    Prepare image data for the model specified by "prefix". For multiple models requiring image data,
+    we need to create a ImageProcessor for each related model so that they will have independent input.
+    """
+
     def __init__(
             self,
             prefix: str,
@@ -24,11 +29,40 @@ class ImageProcessor:
             size: Optional[int] = None,
             max_img_num_per_col: Optional[int] = 1,
     ):
+        """
+        Parameters
+        ----------
+        prefix
+            The prefix connecting a processor to its corresponding model.
+        train_transform_types
+            A list of image transforms used in training. Note that the transform order matters.
+        val_transform_types
+            A list of image transforms used in validation/test/prediction. Note that the transform order matters.
+        checkpoint_name
+            Name of a pre-trained checkpoint, which can be from either timm or huggingface.
+            It is required to extract some default hyper-parameters.
+        norm_type
+            How to normalize an image. We now support:
+            - inception
+                Normalize image by IMAGENET_INCEPTION_MEAN and IMAGENET_INCEPTION_STD from timm
+            - imagenet
+                Normalize image by IMAGENET_DEFAULT_MEAN and IMAGENET_DEFAULT_STD from timm
+            - clip
+                Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
+                std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
+        size
+            The width / height of a square image.
+        max_img_num_per_col
+            The maximum number of images one sample can have.
+        """
         self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
         print(f"image training transform type: {train_transform_types}")
         print(f"image validation transform type: {val_transform_types}")
+        self.size = None
+        self.mean = None
+        self.std = None
 
         if checkpoint_name is not None:
             self.size, self.mean, self.std = self.extract_default(checkpoint_name)
@@ -59,6 +93,16 @@ class ImageProcessor:
         self.val_processor = self.construct_processor(self.val_transform_types)
 
     def collate_fn(self) -> dict:
+        """
+        Collate images into a batch. Here it pads images since the image number may
+        vary from sample to sample. Samples with less images will be padded zeros.
+        The valid image numbers of samples will be stacked into a vector.
+        This function will be used when creating Pytorch DataLoader.
+
+        Returns
+        -------
+        A dictionary containing one model's collator function for image data.
+        """
         fn = {}
         fn.update({f"{self.prefix}_{IMAGE}": Pad(pad_val=0)})
         fn.update({f"{self.prefix}_{IMAGE_VALID_NUM}": Stack()})
@@ -66,6 +110,18 @@ class ImageProcessor:
 
     @staticmethod
     def mean_std(norm_type: str):
+        """
+        Get image normalization mean and std by its name.
+
+        Parameters
+        ----------
+        norm_type
+            Name of image normalization.
+
+        Returns
+        -------
+        Normalization mean and std.
+        """
         if norm_type == "inception":
             return IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
         elif norm_type == "imagenet":
@@ -78,7 +134,25 @@ class ImageProcessor:
 
     @staticmethod
     def extract_default(checkpoint_name):
-        try:
+        """
+        Extract some default hyper-parameters, e.g., image size, mean, and std,
+        from a pre-trained (timm or huggingface) checkpoint.
+
+        Parameters
+        ----------
+        checkpoint_name
+            Name of a pre-trained checkpoint.
+
+        Returns
+        -------
+        image_size
+            Image width/height.
+        mean
+            Image normalization mean.
+        std
+            Image normalizaiton std.
+        """
+        try:  # timm checkpoint
             model = create_model(
                 checkpoint_name,
                 pretrained=True,
@@ -88,7 +162,7 @@ class ImageProcessor:
             mean = model.default_cfg["mean"]
             std = model.default_cfg["std"]
         except Exception as exp1:
-            try:
+            try:  # huggingface checkpoint
                 config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
                 extracted = get_default_config_value(
                     config=config,
@@ -115,6 +189,18 @@ class ImageProcessor:
             self,
             transform_types: List[str],
     ) -> transforms.Compose:
+        """
+        Build up an image processor from the provided list of transform types.
+
+        Parameters
+        ----------
+        transform_types
+            A list of image transform types.
+
+        Returns
+        -------
+        A torchvision transform.
+        """
         processor = []
         for trans_type in transform_types:
             if trans_type == "resize_to_square":
@@ -139,6 +225,22 @@ class ImageProcessor:
             image_paths: List[List[str]],
             is_training: bool,
     ) -> dict:
+        """
+        Read images, process them, and stack them. One sample can have multiple images,
+        resulting in a tensor of (n, 3, size, size), where n <= max_img_num_per_col is the available image number.
+
+        Parameters
+        ----------
+        image_paths
+            One sample may have multiple image columns in a pd.DataFrame and multiple images
+            inside each image column.
+        is_training
+            Whether to process images in the training mode.
+
+        Returns
+        -------
+        A dictionary containing one sample's images and their number.
+        """
         images = []
         for per_col_image_paths in image_paths:
             for img_path in per_col_image_paths[:self.max_img_num_per_col]:
@@ -167,9 +269,21 @@ class ImageProcessor:
             idx: int,
             is_training: bool,
     ) -> dict:
+        """
+        Obtain one sample's images and customized them for a specific model.
 
+        Parameters
+        ----------
+        all_image_paths
+            Paths of all the images in a dataset.
+        idx
+            The sample index in a dataset.
+        is_training
+            Whether to process images in the training mode.
+
+        Returns
+        -------
+        A dictionary containing one sample's processed images and their number.
+        """
         per_sample_paths = [per_column_paths[idx] for per_column_paths in all_image_paths]
         return self.process_one_sample(per_sample_paths, is_training)
-
-
-
