@@ -34,8 +34,17 @@ class AbstractGluonTSModel(AbstractForecastingModel):
     # TODO: revisit time limit handling logic
     prev_fitting_time = []
 
-    def __init__(self, path: str, freq: str, prediction_length: int, name: str, eval_metric: str = None,
-                 hyperparameters=None, model=None, **kwargs):
+    def __init__(
+        self,
+        path: str,
+        freq: str,
+        prediction_length: int,
+        name: str,
+        eval_metric: str = None,
+        hyperparameters=None,
+        model=None,
+        **kwargs,
+    ):
         """
         Create a new model
         Args:
@@ -69,7 +78,9 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         self.val_score = None
         self.fit_time = None
         self.predict_time = None
-        self.quantiles = kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+        self.quantiles = kwargs.get(
+            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        )
         self.params["quantiles"] = self.quantiles
 
         self.epoch_counter = EpochCounter()
@@ -92,13 +103,16 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         path = path_context
         return path
 
-    def save(self, path: str = None,):
+    def save(
+        self,
+        path: str = None,
+    ):
         if path is None:
             path = self.path
         # save gluonts model
         weight_path = path + self.gluonts_model_path
         os.makedirs(weight_path, exist_ok=True)
-        #TODO: filtering the serializing warning out until gluonts fix it.
+        # TODO: filtering the serializing warning out until gluonts fix it.
         with serialize_warning_filter():
             self.model.serialize(Path(weight_path))
         self.model = None
@@ -111,7 +125,9 @@ class AbstractGluonTSModel(AbstractForecastingModel):
     @classmethod
     def load(cls, path: str, reset_path=True):
         file_path = path + cls.model_file_name
-        model = load_pkl.load(path=file_path,)
+        model = load_pkl.load(
+            path=file_path,
+        )
         # if reset_path:
         #     model.set_context(path)
         weight_path = path + cls.gluonts_model_path
@@ -164,20 +180,32 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             result_dict = {}
             predicted_targets = list(self.model.predict(data))
             if isinstance(predicted_targets[0], QuantileForecast):
-                status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+                status = [
+                    0 < float(quantiles[i]) < 1
+                    and str(quantiles[i]) in predicted_targets[0].forecast_keys
+                    for i in range(len(quantiles))
+                ]
             elif isinstance(predicted_targets[0], SampleForecast):
                 transformed_targets = []
                 for forecast in predicted_targets:
                     tmp = []
                     for quantile in quantiles:
                         tmp.append(forecast.quantile(quantile))
-                    transformed_targets.append(QuantileForecast(forecast_arrays=np.array(tmp),
-                                                                start_date=forecast.start_date,
-                                                                freq=forecast.freq,
-                                                                forecast_keys=quantiles,
-                                                                item_id=forecast.item_id))
+                    transformed_targets.append(
+                        QuantileForecast(
+                            forecast_arrays=np.array(tmp),
+                            start_date=forecast.start_date,
+                            freq=forecast.freq,
+                            forecast_keys=quantiles,
+                            item_id=forecast.item_id,
+                        )
+                    )
                 predicted_targets = copy.deepcopy(transformed_targets)
-                status = [0 < float(quantiles[i]) < 1 and str(quantiles[i]) in predicted_targets[0].forecast_keys for i in range(len(quantiles))]
+                status = [
+                    0 < float(quantiles[i]) < 1
+                    and str(quantiles[i]) in predicted_targets[0].forecast_keys
+                    for i in range(len(quantiles))
+                ]
             else:
                 raise TypeError("DistributionForecast is not yet supported.")
 
@@ -197,9 +225,11 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                 for quantile in quantiles:
                     tmp_dict[quantile] = predicted_targets[i].quantile(str(quantile))
                 df = pd.DataFrame(tmp_dict)
-                df.index = pd.date_range(start=predicted_targets[i].start_date,
-                                         periods=self.params["prediction_length"],
-                                         freq=self.params["freq"])
+                df.index = pd.date_range(
+                    start=predicted_targets[i].start_date,
+                    periods=self.params["prediction_length"],
+                    freq=self.params["freq"],
+                )
                 if index_count[index[i]] > 1:
                     result_dict[f"{index[i]}_{predicted_targets[i].start_date}"] = df
                 else:
@@ -208,10 +238,12 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
     def predict_for_scoring(self, data, num_samples=100):
         with warning_filter():
-            forecast_it, ts_it = make_evaluation_predictions(dataset=data,
-                                                             predictor=self.model,
-                                                             num_samples=num_samples)
-            return list(tqdm(forecast_it, total=len(data))), list(tqdm(ts_it, total=len(data)))
+            forecast_it, ts_it = make_evaluation_predictions(
+                dataset=data, predictor=self.model, num_samples=num_samples
+            )
+            return list(tqdm(forecast_it, total=len(data))), list(
+                tqdm(ts_it, total=len(data))
+            )
 
     def score(self, data, metric=None, num_samples=100):
         """
@@ -238,10 +270,14 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         num_series = len(tss)
         # TODO: filtering the warnings out until gluonts perfects it.
         with evaluator_warning_filter():
-            agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
+            agg_metrics, item_metrics = evaluator(
+                iter(tss), iter(forecasts), num_series=num_series
+            )
         return agg_metrics[self.eval_metric]
 
-    def hyperparameter_tune(self, train_data, val_data, scheduler_options, time_limit=None, **kwargs):
+    def hyperparameter_tune(
+        self, train_data, val_data, scheduler_options, time_limit=None, **kwargs
+    ):
         """
         Do hyperparamter tuning, return hyperparamemter tuning results.
 
@@ -265,13 +301,15 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         scheduler_params["time_out"] = scheduler_params.get("time_out", time_limit)
 
         if scheduler_cls is None or scheduler_params is None:
-            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
+            raise ValueError(
+                "scheduler_cls and scheduler_params cannot be None for hyperparameter tuning"
+            )
 
-        dataset_train_filename = 'dataset_train.pkl'
+        dataset_train_filename = "dataset_train.pkl"
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=train_data)
 
-        dataset_val_filename = 'dataset_val.pkl'
+        dataset_val_filename = "dataset_val.pkl"
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=val_data)
 
@@ -289,7 +327,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             model_trial,
             search_space=self._get_search_space(),
             train_fn_kwargs=train_fn_kwargs,
-            **scheduler_params
+            **scheduler_params,
         )
 
         scheduler.run()
@@ -309,8 +347,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         return {}
 
     def _get_search_space(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default search space.
+        """Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+        default fixed value to default search space.
         """
         def_search_space = self._get_default_searchspace().copy()
         # TODO: implement default search spaces and nondefault_params for forecasting models
@@ -322,70 +360,83 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
     @staticmethod
     def _format_hpo_results(results):
-        """ Formats miscellaneous records captured by scheduler into user-viewable Results object. """
+        """Formats miscellaneous records captured by scheduler into user-viewable Results object."""
 
         def _merge_scheduler_history(training_history, config_history, reward_attr):
             trial_info = {}
             for tid, config in config_history.items():
                 trial_info[tid] = {}
-                trial_info[tid]['config'] = config
+                trial_info[tid]["config"] = config
                 if tid in training_history:
-                    trial_info[tid]['history'] = training_history[tid]
-                    trial_info[tid]['metadata'] = {}
+                    trial_info[tid]["history"] = training_history[tid]
+                    trial_info[tid]["metadata"] = {}
 
-                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
+                    if (
+                        len(training_history[tid]) > 0
+                        and reward_attr in training_history[tid][-1]
+                    ):
                         last_history = training_history[tid][-1]
                         trial_info[tid][reward_attr] = last_history.pop(reward_attr)
-                        trial_info[tid]['metadata'].update(last_history)
+                        trial_info[tid]["metadata"].update(last_history)
             return trial_info
 
-        training_history = results.pop('training_history')
-        config_history = results.pop('config_history')
-        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
-                                                         results['reward_attr'])
-        results[results['reward_attr']] = results['best_reward']
-        results['search_space'] = results['metadata'].pop('search_space')
-        results['search_strategy'] = results['metadata'].pop('search_strategy')
+        training_history = results.pop("training_history")
+        config_history = results.pop("config_history")
+        results["trial_info"] = _merge_scheduler_history(
+            training_history, config_history, results["reward_attr"]
+        )
+        results[results["reward_attr"]] = results["best_reward"]
+        results["search_space"] = results["metadata"].pop("search_space")
+        results["search_strategy"] = results["metadata"].pop("search_strategy")
         return results
 
     def _get_hpo_results(self, scheduler, scheduler_options, time_start):
         # Store results / models from this HPO run:
         best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
         hpo_results = {
-            'best_reward': scheduler.get_best_reward(),
-            'best_config': best_hp,
-            'total_time': time.time() - time_start,
-            'metadata': scheduler.metadata,
-            'training_history': scheduler.training_history,
-            'config_history': scheduler.config_history,
-            'reward_attr': scheduler._reward_attr,
+            "best_reward": scheduler.get_best_reward(),
+            "best_config": best_hp,
+            "total_time": time.time() - time_start,
+            "metadata": scheduler.metadata,
+            "training_history": scheduler.training_history,
+            "config_history": scheduler.config_history,
+            "reward_attr": scheduler._reward_attr,
         }
 
-        hpo_results = AbstractGluonTSModel._format_hpo_results(hpo_results)  # results summarizing HPO for this model
+        hpo_results = AbstractGluonTSModel._format_hpo_results(
+            hpo_results
+        )  # results summarizing HPO for this model
 
-        hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
+        hpo_models = (
+            {}
+        )  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
-        for trial in sorted(hpo_results['trial_info'].keys()):
+        for trial in sorted(hpo_results["trial_info"].keys()):
             file_id = f"T{trial+1}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
             hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+            hpo_model_performances[trial_model_name] = hpo_results["trial_info"][trial][
+                scheduler._reward_attr
+            ]
 
-        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
+        logger.log(
+            15,
+            "Time for %s model HPO: %s" % (self.name, str(hpo_results["total_time"])),
+        )
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
         logger.log(15, str(best_hp))
         return hpo_models, hpo_model_performances, hpo_results
 
     def get_info(self):
         info = {
-            'name': self.name,
-            'model_type': type(self).__name__,
-            'eval_metric': self.eval_metric,
-            'fit_time': self.fit_time,
-            'predict_time': self.predict_time,
-            'val_score': self.val_score,
-            'hyperparameters': self.params,
+            "name": self.name,
+            "model_type": type(self).__name__,
+            "eval_metric": self.eval_metric,
+            "fit_time": self.fit_time,
+            "predict_time": self.predict_time,
+            "val_score": self.val_score,
+            "hyperparameters": self.params,
         }
         return info
 

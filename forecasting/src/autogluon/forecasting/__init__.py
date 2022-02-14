@@ -1,4 +1,5 @@
 import logging
+
 try:
     from .version import __version__
 except ImportError:
@@ -8,4 +9,4 @@ from autogluon.core.dataset import TabularDataset
 
 # TODO: make ForecastingPredictor available
 
-logging.basicConfig(format='%(message)s')  # just print message in logs
+logging.basicConfig(format="%(message)s")  # just print message in logs

@@ -1,7 +1,7 @@
 import logging
 import warnings
 
-__all__ = ['evaluator_warning_filter', 'serialize_warning_filter']
+__all__ = ["evaluator_warning_filter", "serialize_warning_filter"]
 
 
 class evaluator_warning_filter(object):

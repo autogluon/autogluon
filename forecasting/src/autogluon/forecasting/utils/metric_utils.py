@@ -1,11 +1,6 @@
 from typing import Optional
 
-METRIC_COEFFICIENTS = {
-    "MASE": -1,
-    "MAPE": -1,
-    "sMAPE": -1,
-    "mean_wQuantileLoss": -1
-}
+METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1}
 
 AVAILABLE_METRICS = list(METRIC_COEFFICIENTS)
 DEFAULT_METRIC = "mean_wQuantileLoss"
