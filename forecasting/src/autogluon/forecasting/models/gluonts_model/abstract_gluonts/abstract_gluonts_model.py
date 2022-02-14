@@ -18,6 +18,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils import warning_filter
 
+from ....utils.metric_utils import check_get_evaluation_metric
 from ....utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
 from ...abstract import AbstractForecastingModel
 from .model_trial import model_trial
@@ -49,11 +50,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         self.path_suffix = self.name + os.path.sep
         self.path = self.path_root + self.path_suffix
 
-        if eval_metric is None:
-            eval_metric = "mean_wQuantileLoss"
-        if eval_metric is not None and eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
-            raise ValueError(f"metric {eval_metric} is not available yet.")
-        self.eval_metric = eval_metric
+        self.eval_metric = check_get_evaluation_metric(eval_metric)
 
         self.params = {}
         self.set_default_parameters()
@@ -229,23 +226,18 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         num_samples: int, default=100
                 number of samples selected for evaluation if the output of the model is DistributionForecast in gluonts
         """
-        if metric is None:
-            metric = self.eval_metric
-        if metric is not None and metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
-            raise ValueError(f"metric {metric} is not available yet.")
-
         # if quantiles are given, use the given one, otherwise use the default
-        if "quantiles" in self.params:
-            evaluator = Evaluator(quantiles=self.params["quantiles"])
-        else:
-            evaluator = Evaluator()
-
+        evaluator = (
+            Evaluator(quantiles=self.params["quantiles"])
+            if "quantiles" in self.params
+            else Evaluator()
+        )
         forecasts, tss = self.predict_for_scoring(data, num_samples=num_samples)
         num_series = len(tss)
-        #TODO: filtering the wranings out until gluonts perfects it.
+        # TODO: filtering the warnings out until gluonts perfects it.
         with evaluator_warning_filter():
             agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
-        return agg_metrics[metric]
+        return agg_metrics[self.eval_metric]
 
     def hyperparameter_tune(self, train_data, val_data, scheduler_options, time_limit=None, **kwargs):
         """

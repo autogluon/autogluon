@@ -11,7 +11,7 @@ from autogluon.core.utils.loaders import load_pkl
 
 from ..models.gluonts_model.abstract_gluonts import AbstractGluonTSModel
 from ..utils.warning_filters import evaluator_warning_filter
-from ..utils.metric_utils import metric_coefficient
+from ..utils.metric_utils import METRIC_COEFFICIENTS, check_get_evaluation_metric
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +36,7 @@ class AbstractTrainer:
         self.model_best = None
 
         self.reset_paths = False
-
-        if eval_metric is not None:
-            self.eval_metric = eval_metric
-        else:
-            self.eval_metric = "mean_wQuantileLoss"
+        self.eval_metric = check_get_evaluation_metric(eval_metric)
 
         if scheduler_options is not None:
             self._scheduler_func = scheduler_options[0]  # unpack tuple
@@ -302,7 +298,7 @@ class AbstractTrainer:
             logger.log(30, "Additional data provided, testing on the additional data...")
             for model_name in model_names:
                 model = self.load_model(model_name)
-                test_score.append(model.score(data) * metric_coefficient[self.eval_metric])
+                test_score.append(model.score(data) * METRIC_COEFFICIENTS[self.eval_metric])
         df = pd.DataFrame(data={
             'model': model_names,
             'val_score': score_val,
@@ -342,9 +338,6 @@ class AbstractTrainer:
             return self._predict_model(data, model, for_score, **kwargs)
 
     def score(self, data, model=None, quantiles=None):
-        if self.eval_metric is not None and self.eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
-            raise ValueError(f"metric {self.eval_metric} is not available yet.")
-
         # if quantiles are given, use the given on, otherwise use the default
         if quantiles is not None:
             evaluator = Evaluator(quantiles=quantiles)

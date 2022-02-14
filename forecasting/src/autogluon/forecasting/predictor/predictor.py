@@ -385,8 +385,8 @@ class ForecastingPredictor:
                 '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to '
                 'utilize `set_best_to_refit_full`.')
 
-        random_seed = kwargs.get('random_seed', 0)
-        logger.log(30, f"Random seed set to {random_seed}")
+        random_state = kwargs.get('random_state', 0)
+        logger.log(30, f"Random seed set to {random_state}")
         quantiles = kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         logger.log(30, f"All models will be trained for quantiles {quantiles}.")
         if hyperparameter_tune_kwargs is not None:

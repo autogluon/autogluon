@@ -1,5 +1,6 @@
 import os
 import random
+from typing import Optional
 
 from gluonts.evaluation import Evaluator
 
@@ -7,31 +8,32 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl, save_json
 
 from ..trainer import AbstractTrainer
+from ..utils.metric_utils import check_get_evaluation_metric
 
 
 class AbstractLearner:
+    learner_file_name = "learner.pkl"
+    learner_info_name = "info.pkl"
+    learner_info_json_name = "info.json"
 
-    learner_file_name = 'learner.pkl'
-    learner_info_name = 'info.pkl'
-    learner_info_json_name = 'info.json'
-
-    def __init__(self, path_context: str, eval_metric=None, is_trainer_present=False, random_seed=0):
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
-
-        if eval_metric is not None and eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
-            raise ValueError(f"metric {eval_metric} is not available yet.")
-
-        if eval_metric is not None:
-            self.eval_metric = eval_metric
-        else:
-            self.eval_metric = "mean_wQuantileLoss"
-
+    def __init__(
+        self,
+        path_context: str,
+        eval_metric: Optional[str] = None,
+        is_trainer_present: bool = False,
+        random_state: int = 0,
+    ):
+        self.path, self.model_context, self.save_path = self.create_contexts(
+            path_context
+        )
+        self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.is_trainer_present = is_trainer_present
-        if random_seed is None:
-            random_seed = random.randint(0, 1000000)
-        self.random_seed = random_seed
 
-        self.trainer: AbstractTrainer = None
+        if random_state is None:
+            random_state = random.randint(0, 1000000)
+        self.random_state = random_state
+
+        self.trainer: Optional[AbstractTrainer] = None
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
@@ -41,45 +43,59 @@ class AbstractLearner:
         return self.trainer_path is not None or self.trainer is not None
 
     def set_contexts(self, path_context):
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
+        self.path, self.model_context, self.save_path = self.create_contexts(
+            path_context
+        )
 
     def create_contexts(self, path_context):
-        model_context = path_context + 'models' + os.path.sep
+        model_context = path_context + "models" + os.path.sep
         save_path = path_context + self.learner_file_name
         return path_context, model_context, save_path
 
     def fit(self, train_data, freq, prediction_length, val_data=None, **kwargs):
-        return self._fit(train_data=train_data,
-                         freq=freq,
-                         prediction_length=prediction_length,
-                         val_data=val_data,
-                         **kwargs)
+        return self._fit(
+            train_data=train_data,
+            freq=freq,
+            prediction_length=prediction_length,
+            val_data=val_data,
+            **kwargs,
+        )
 
-    def _fit(self, train_data, freq, prediction_length, val_data=None, scheduler_options=None, hyperparameter_tune=False,
-             hyperparameters=None, time_limit=None, use_feat_static_cat=False, use_feat_static_real=False, cardinality=None, **kwargs):
+    def _fit(
+        self,
+        train_data,
+        freq,
+        prediction_length,
+        val_data=None,
+        scheduler_options=None,
+        hyperparameter_tune=False,
+        hyperparameters=None,
+        time_limit=None,
+        use_feat_static_cat=False,
+        use_feat_static_real=False,
+        cardinality=None,
+        **kwargs,
+    ):
         raise NotImplementedError
 
-    def refit_full(self, models='all'):
+    def refit_full(self, models="all"):
         return self.load_trainer().refit_full(models=models)
 
     def predict(self, data, model=None, for_score=False, **kwargs):
-        predict_target = self.load_trainer().predict(data=data, model=model, for_score=for_score, **kwargs)
+        predict_target = self.load_trainer().predict(
+            data=data, model=model, for_score=for_score, **kwargs
+        )
         return predict_target
 
     def evaluate(self, forecasts, tss, **kwargs):
-        quantiles = kwargs.get("quantiles", None)
         # TODO: difference between evaluate() and score()?
-        if self.eval_metric is not None and self.eval_metric not in ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]:
-            raise ValueError(f"metric { self.eval_metric} is not available yet.")
-
         # if quantiles are given, use the given on, otherwise use the default
-        if quantiles is not None:
-            evaluator = Evaluator(quantiles=quantiles)
-        else:
-            evaluator = Evaluator()
-
+        quantiles = kwargs.get("quantiles", None)
+        evaluator = Evaluator(quantiles=quantiles) if quantiles else Evaluator()
         num_series = len(tss)
-        agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
+        agg_metrics, item_metrics = evaluator(
+            iter(tss), iter(forecasts), num_series=num_series
+        )
         return agg_metrics[self.eval_metric]
 
     def score(self, data, model=None, quantiles=None):
@@ -91,6 +107,7 @@ class AbstractLearner:
         return trainer.leaderboard(data)
 
     def save(self):
+        # TODO: improve readability of method
         trainer = None
         if self.trainer is not None:
             if not self.is_trainer_present:
@@ -118,7 +135,9 @@ class AbstractLearner:
         if self.trainer is not None:
             return self.trainer
         else:
-            trainer = self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
+            trainer = self.trainer_type.load(
+                path=self.trainer_path, reset_paths=self.reset_paths
+            )
             return trainer
 
     def save_trainer(self, trainer):
@@ -150,8 +169,8 @@ class AbstractLearner:
 
     def get_info(self, include_model_info):
         learner_info = {
-            'path': self.path,
-            'random_seed': self.random_seed,
+            "path": self.path,
+            "random_state": self.random_state,
         }
 
         return learner_info
