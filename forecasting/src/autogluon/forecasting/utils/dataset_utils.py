@@ -7,26 +7,28 @@ from gluonts.dataset.common import ListDataset
 from gluonts.dataset.field_names import FieldName
 
 from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
-from autogluon.features.generators import IdentityFeatureGenerator, CategoryFeatureGenerator
+from autogluon.features.generators import (
+    IdentityFeatureGenerator,
+    CategoryFeatureGenerator,
+)
 
 __all__ = [
-    'TimeSeriesDataset',
-    'gluonts_builtin_datasets',
-    'rebuild_tabular',
-    'time_series_dataset',
-    'train_test_split_dataframe',
-    'train_test_split_gluonts'
+    "TimeSeriesDataset",
+    "gluonts_builtin_datasets",
+    "rebuild_tabular",
+    "time_series_dataset",
+    "train_test_split_dataframe",
+    "train_test_split_gluonts",
 ]
 
 logger = logging.getLogger()
 
 
+# TODO: add unit tests
 class TimeSeriesDataset(ListDataset):
-
     def __init__(self, df, index_column=None, static_features=None, prev_inferred=None):
         """
         transform a dataframe in the following form to a gluon-ts dataset
-        >>> X
               index_column  2020-01-22  2020-01-23  2020-01-24
         0            A           1           2           3
         1            C           1           2           3
@@ -39,14 +41,22 @@ class TimeSeriesDataset(ListDataset):
             self.static_real_features = None
             self.cardinality = None
         else:
-            self.static_cat_features, self.static_real_features, self.cardinality = extract_static_feature(index_column, static_features, prev_inferred=prev_inferred)
+            (
+                self.static_cat_features,
+                self.static_real_features,
+                self.cardinality,
+            ) = extract_static_feature(
+                index_column, static_features, prev_inferred=prev_inferred
+            )
 
         target = df.drop(self.index_column, axis=1)
         self.index = df[self.index_column].values
 
         if static_features is not None:
             if sorted(static_features[self.index_column]) != sorted(self.index):
-                raise ValueError(f"Index column does not match between static features and the data given.")
+                raise ValueError(
+                    f"Index column does not match between static features and the data given."
+                )
         target_values = target.values
         date_list = target.columns
         self.last_date = date_list[-1]
@@ -58,8 +68,20 @@ class TimeSeriesDataset(ListDataset):
                 FieldName.TARGET: target,
                 FieldName.START: pd.Timestamp(date_list[0]),
                 FieldName.ITEM_ID: item_id,
-                FieldName.FEAT_STATIC_CAT: self.static_cat_features.loc[self.static_cat_features[self.index_column].isin([item_id])].drop(self.index_column, axis=1).values[0] if self.static_cat_features is not None else [],
-                FieldName.FEAT_STATIC_REAL: self.static_real_features.loc[self.static_real_features[self.index_column].isin([item_id])].drop(self.index_column, axis=1).values[0] if self.static_real_features is not None else [],
+                FieldName.FEAT_STATIC_CAT: self.static_cat_features.loc[
+                    self.static_cat_features[self.index_column].isin([item_id])
+                ]
+                .drop(self.index_column, axis=1)
+                .values[0]
+                if self.static_cat_features is not None
+                else [],
+                FieldName.FEAT_STATIC_REAL: self.static_real_features.loc[
+                    self.static_real_features[self.index_column].isin([item_id])
+                ]
+                .drop(self.index_column, axis=1)
+                .values[0]
+                if self.static_real_features is not None
+                else [],
             }
             for (target, item_id) in zip(target_values, self.index)
         ]
@@ -78,19 +100,31 @@ class TimeSeriesDataset(ListDataset):
         if self.static_cat_features is None:
             return False
         else:
-            return len(self.static_cat_features.columns) > 1  # first column is the index
+            return (
+                len(self.static_cat_features.columns) > 1
+            )  # first column is the index
 
     def use_feat_static_real(self):
         if self.static_real_features is None:
             return False
         else:
-            return len(self.static_real_features.columns) > 1  # first column is the index
+            return (
+                len(self.static_real_features.columns) > 1
+            )  # first column is the index
 
     def static_cat_columns(self):
-        return self.static_cat_features.columns if self.static_cat_features is not None else None
+        return (
+            self.static_cat_features.columns
+            if self.static_cat_features is not None
+            else None
+        )
 
     def static_real_columns(self):
-        return self.static_real_features.columns if self.static_real_features is not None else None
+        return (
+            self.static_real_features.columns
+            if self.static_real_features is not None
+            else None
+        )
 
     def get_static_cat_cardinality(self):
         return self.cardinality
@@ -103,7 +137,6 @@ def gluonts_builtin_datasets():
 def rebuild_tabular(X, time_column, target_column, index_column=None):
     """
     X: dataframe to rebuild, should have the form of:
-    >>> X
       index_column time_column  target_column
     0            A  2020-01-22              1
     1            A  2020-01-23              2
@@ -126,7 +159,6 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
     output:
     a new dataframe in the form that each line contains a time series
     transformed example would be:
-    >>> X
           index_column  2020-01-22  2020-01-23  2020-01-24
     0            A           1           2           3
     1            C           1           2           3
@@ -154,37 +186,48 @@ def rebuild_tabular(X, time_column, target_column, index_column=None):
         # check for dataset with multiple targets for a certain time series/time
         if any(df[[index_column, time_column]].value_counts() > 1):
             for combination in df[[index_column, time_column]].value_counts().index:
-                raise ValueError(f"Containing multiple targets for time series {combination[0]} and time {combination[1]}. "
-                                 "Please check your dataset.")
+                raise ValueError(
+                    f"Containing multiple targets for time series {combination[0]} and time {combination[1]}. "
+                    "Please check your dataset."
+                )
         # check whether need auto-padding
         need_padding = False
         if any(df[time_column].value_counts() != len(df[index_column].unique())):
-            logger.log(30, "Warning: autogluon requires each index to be observed over the same set of time values. \n"
-                           "As this is not the case in your data, we are automatically padding the dataset with all missing (index, time) combinations which may take some time. \n"
-                           "To do this yourself, simply add rows to the Dataframe with target value = NA for each missing (index,time) combination.")
+            logger.log(
+                30,
+                "Warning: autogluon requires each index to be observed over the same set of time values. \n"
+                "As this is not the case in your data, we are automatically padding the dataset with all missing (index, time) combinations which may take some time. \n"
+                "To do this yourself, simply add rows to the Dataframe with target value = NA for each missing (index,time) combination.",
+            )
             need_padding = True
 
         for time in time_list:
-            tmp = df[df[time_column] == time][[index_column, time_column, target_column]]
-            tmp = tmp.pivot(index=index_column, columns=time_column, values=target_column)
+            timestamp_df = df[df[time_column] == time][
+                [index_column, time_column, target_column]
+            ]
+            timestamp_df = timestamp_df.pivot(
+                index=index_column, columns=time_column, values=target_column
+            )
             # automatically padding with NAN if for some time series missing a date target if needed
             if need_padding:
                 for index in data_dic[index_column]:
-                    if index not in tmp.index:
-                        tmp.loc[index, time] = None
-            tmp_values = tmp[time].values
+                    if index not in timestamp_df.index:
+                        timestamp_df.loc[index, time] = None
+            tmp_values = timestamp_df[time].values
             data_dic[time] = tmp_values
         return pd.DataFrame(data_dic)
 
     X = reshape_dataframe(X)
     return X
 
-# TODO: Improve the way to do the split
+
 def train_test_split_dataframe(data, prediction_length):
     test_ds = data.copy()
     train_ds = data.iloc[:, :-prediction_length]
-    if not any(data.iloc[:, -prediction_length:]):
-        logger.log(30, "Warning: All targets used for validation is NAN.")
+    eval_window_test_ts = data.iloc[:, -prediction_length:]
+    # TODO: ignore any time series with all or many NaNs in the backtest (test) window
+    if eval_window_test_ts.isnull().all(axis=None):
+        logger.log(30, "Warning: All targets used for validation are NaN.")
     return train_ds, test_ds
 
 
@@ -200,57 +243,80 @@ def train_test_split_gluonts(data, prediction_length, freq=None):
 
     for entry in data:
         test_data_lst.append(entry.copy())
-        tmp = {}
-        for k, v in entry.items():
-            if "dynamic" in k.lower():
-                tmp[k] = v[..., : -prediction_length]
-            elif "target" in k.lower():
-                tmp[k] = v[..., : -prediction_length]
+        new_entry = {}
+        for field_name, field_value in entry.items():
+            if "dynamic" in field_name.lower():
+                new_entry[field_name] = field_value[..., :-prediction_length]
+            elif "target" in field_name.lower():
+                new_entry[field_name] = field_value[..., :-prediction_length]
             else:
-                tmp[k] = deepcopy(v)
-        train_data_lst.append(tmp)
+                new_entry[field_name] = deepcopy(field_value)
+        train_data_lst.append(new_entry)
     train_ds = ListDataset(train_data_lst, freq=freq)
     test_ds = ListDataset(test_data_lst, freq=freq)
     return train_ds, test_ds
 
 
-def time_series_dataset(data,
-                        index_column,
-                        target_column,
-                        time_column,
-                        chosen_ts=None,
-                        static_features=None,
-                        prev_inferred=None):
-    rebuilt_data = rebuild_tabular(data,
-                                   index_column=index_column,
-                                   target_column=target_column,
-                                   time_column=time_column)
+def time_series_dataset(
+    data,
+    index_column,
+    target_column,
+    time_column,
+    chosen_ts=None,
+    static_features=None,
+    prev_inferred=None,
+):
+    rebuilt_data = rebuild_tabular(
+        data,
+        index_column=index_column,
+        target_column=target_column,
+        time_column=time_column,
+    )
 
     if chosen_ts is not None:
         rebuilt_data = rebuilt_data.loc[rebuilt_data[index_column].isin(chosen_ts)]
         if static_features is not None:
-            static_features = static_features.loc[static_features[index_column].isin(chosen_ts)]
-    return TimeSeriesDataset(rebuilt_data, index_column=index_column, static_features=static_features, prev_inferred=prev_inferred)
+            static_features = static_features.loc[
+                static_features[index_column].isin(chosen_ts)
+            ]
+    return TimeSeriesDataset(
+        rebuilt_data,
+        index_column=index_column,
+        static_features=static_features,
+        prev_inferred=prev_inferred,
+    )
 
 
 def extract_static_feature(index_column, features, prev_inferred=None):
     """
-        index_column: str indicating name of column that contains the time series index.
-        features: pd.Dataframe containing non time-varying features. Must contain column named: index_column and each series index must appear in a single row of features.
-        prev_inferred: information about previously-inferred static features if static features were previously passed (eg. for the training data when we are now processing test data).
-        Features must be already preprocessed if using prev_inferred.
-        Features which you want to be categorical can be converted to strings (object or category dtype), features which you want numeric must have dtype int or float.
-        Currently categorical static features must be formatted as levels: "0", "1", "2",...
+    index_column: str indicating name of column that contains the time series index.
+    features: pd.Dataframe containing non time-varying features. Must contain column named: index_column and each series index must appear in a single row of features.
+    prev_inferred: information about previously-inferred static features if static features were previously passed (eg. for the training data when we are now processing test data).
+    Features must be already preprocessed if using prev_inferred.
+    Features which you want to be categorical can be converted to strings (object or category dtype), features which you want numeric must have dtype int or float.
+    Currently categorical static features must be formatted as levels: "0", "1", "2",...
     """
     if prev_inferred is not None:
         logger.log(15, "Using previous inferred static feature columns:")
-        if prev_inferred['static_cat_columns'] is not None and len(prev_inferred['static_cat_columns']) > 0:
-            logger.log(15, f"Static Categorical Features: {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}")
+        if (
+            prev_inferred["static_cat_columns"] is not None
+            and len(prev_inferred["static_cat_columns"]) > 0
+        ):
+            logger.log(
+                15,
+                f"Static Categorical Features: {[i for i in prev_inferred['static_cat_columns'] if i != index_column]}",
+            )
             static_cat_features = features[prev_inferred["static_cat_columns"]]
         else:
             static_cat_features = None
-        if prev_inferred['static_real_columns'] is not None and len(prev_inferred['static_real_columns']) > 0:
-            logger.log(15, f"Static Numeric Features: {[i for i in prev_inferred['static_real_columns'] if i != index_column]}")
+        if (
+            prev_inferred["static_real_columns"] is not None
+            and len(prev_inferred["static_real_columns"]) > 0
+        ):
+            logger.log(
+                15,
+                f"Static Numeric Features: {[i for i in prev_inferred['static_real_columns'] if i != index_column]}",
+            )
             static_real_features = features[prev_inferred["static_real_columns"]]
         else:
             static_real_features = None
@@ -262,20 +328,30 @@ def extract_static_feature(index_column, features, prev_inferred=None):
         features = features.drop(index_column, axis=1)
         cardinality = []
         numeric_columns = list(features.select_dtypes(include=[R_INT, R_FLOAT]).columns)
-        categorical_columns = list(features.select_dtypes(include=[R_CATEGORY, R_OBJECT]).columns)
+        categorical_columns = list(
+            features.select_dtypes(include=[R_CATEGORY, R_OBJECT]).columns
+        )
         for column in features.columns:
             if column in numeric_columns:
                 features[column] = features[column].astype(R_FLOAT)
             elif column in categorical_columns:
                 if len(features[column].unique()) == len(features[column]):
-                    logger.log(20, f"Categorical feature {column} has different values for all rows, discarding it.")
+                    logger.log(
+                        20,
+                        f"Categorical feature {column} has different values for all rows, discarding it.",
+                    )
                 else:
                     cardinality.append(len(features[column].unique()))
             else:
-                raise ValueError(f"Static feature {column} is of unsupported type, must be either numeric or categorical (dtype must be one of: {[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT]})")
+                raise ValueError(
+                    f"Static feature {column} is of unsupported type, must be either numeric or categorical (dtype must be one of: {[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT]})"
+                )
         logger.log(20, f"Static features treated as categorical: {categorical_columns}")
         logger.log(20, f"Static features treated as numeric: {numeric_columns}")
-        logger.log(20, "To change a numeric feature to be treated as categorical, convert its values to strings indicating the levels: '0','1','2',...")
+        logger.log(
+            20,
+            "To change a numeric feature to be treated as categorical, convert its values to strings indicating the levels: '0','1','2',...",
+        )
         # Extracting static real features and fillna with mean
         static_real_features = IdentityFeatureGenerator(
             infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}
@@ -285,7 +361,9 @@ def extract_static_feature(index_column, features, prev_inferred=None):
         static_cat_features = IdentityFeatureGenerator(
             infer_features_in_args={"invalid_raw_types": [R_INT, R_FLOAT]}
         ).fit_transform(features)
-        static_cat_features = CategoryFeatureGenerator().fit_transform(static_cat_features)
+        static_cat_features = CategoryFeatureGenerator().fit_transform(
+            static_cat_features
+        )
         if len(static_cat_features.columns) > 0:
             static_cat_features[index_column] = indices
         else:

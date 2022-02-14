@@ -4,7 +4,7 @@ import logging
 
 import autogluon.core as ag
 
-from ...models.abstract.abstract_model import AbstractForecastingModel
+from ...models.abstract.abstract_forecasting_model import AbstractForecastingModel
 from ...models.gluonts_model.mqcnn import MQCNNModel
 from ...models.gluonts_model.sff import SimpleFeedForwardModel
 from ...models.gluonts_model.deepar import DeepARModel
