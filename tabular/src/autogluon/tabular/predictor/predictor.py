@@ -705,12 +705,6 @@ class TabularPredictor:
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
 
-        # TODO: constraint on inference time
-        # TODO: Enforce constraint when selecting best model
-        # TODO: Show in leaderboard somehow?
-        # TODO: Enable for arbitrary batch sizes
-        # TODO: Allow toggle for assuming refit vs no refit
-
         verbosity = kwargs.get('verbosity', self.verbosity)
         set_logger_verbosity(verbosity)
 
