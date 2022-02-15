@@ -59,7 +59,7 @@ class TextPredictor:
             problem_type=None,
             eval_metric=None,
             path=None,
-            backend="pytorch",
+            backend="mxnet",
             verbosity=3,
             warn_if_exist=True
     ):
@@ -378,7 +378,7 @@ class TextPredictor:
             cls,
             path: str,
             verbosity: int = None,
-            backend: str = "pytorch",
+            backend: str = "mxnet",
             resume: bool = False,
     ):
         """
@@ -404,6 +404,7 @@ class TextPredictor:
                 resume=resume,
             )
         elif backend == "mxnet":
+            from .mx_predictor import MXTextPredictor
             predictor = MXTextPredictor.load(
                 path=path,
                 verbosity=verbosity,

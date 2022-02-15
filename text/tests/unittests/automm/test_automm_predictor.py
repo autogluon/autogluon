@@ -90,8 +90,6 @@ def test_predictor(
         score,
 ):
     dataset = ALL_DATASETS[dataset_name]()
-    # print(dataset.feature_columns)
-    # exit()
     metric_name = dataset.metric
     test_metric_name = dataset.test_metric if hasattr(dataset, "test_metric") else metric_name
 
@@ -104,19 +102,24 @@ def test_predictor(
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
+    cur_path = os.path.dirname(os.path.abspath(__file__))
+    model_config_path = os.path.join(cur_path, f"configs/model/{model_config}.yaml")
+    data_config_path = os.path.join(cur_path, "configs/data/default.yaml")
+    optimization_config_path = os.path.join(cur_path, "configs/optimization/adamw.yaml")
+    environemnt_config_path = os.path.join(cur_path, "configs/environment/default.yaml")
     config = {
-        MODEL: f"configs/model/{model_config}.yaml",
-        DATA: "configs/data/default.yaml",
-        OPTIMIZATION: "configs/optimization/adamw.yaml",
-        ENVIRONMENT: "configs/environment/default.yaml",
+        MODEL: model_config_path,
+        DATA: data_config_path,
+        OPTIMIZATION: optimization_config_path,
+        ENVIRONMENT: environemnt_config_path,
     }
-    overrides = {}
+    hyperparameters = {}
     if text_backbone is not None:
-        overrides.update({
+        hyperparameters.update({
             "model.hf_text.checkpoint_name": text_backbone,
         })
     if image_backbone is not None:
-        overrides.update({
+        hyperparameters.update({
             "model.timm_image.checkpoint_name": image_backbone,
         })
     save_path = os.path.join(get_home_dir(), "outputs", dataset_name, model_config)
@@ -128,7 +131,7 @@ def test_predictor(
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
-        overrides=overrides,
+        hyperparameters=hyperparameters,
         save_path=save_path,
     )
     scores, y_pred = predictor.evaluate(

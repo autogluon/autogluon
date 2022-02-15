@@ -44,6 +44,12 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 if __name__ == '__main__':
     ag.create_version_file(version=version, submodule=submodule)
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
+    setup_args["package_data"]["autogluon.text.automm"] = [
+        'configs/data/*.yaml',
+        'configs/model/*.yaml',
+        'configs/optimization/*.yaml',
+        'configs/environment/*.yaml',
+    ]
     setup(
         install_requires=install_requires,
         **setup_args,

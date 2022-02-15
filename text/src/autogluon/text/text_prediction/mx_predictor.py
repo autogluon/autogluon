@@ -14,11 +14,11 @@ from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.miscs import in_ipynb
 
 
-from .. import constants as _C
-from ..presets import ag_text_presets, merge_params
-from ..infer_types import infer_column_problem_types, printable_column_type_string
-from ..metrics import infer_eval_log_metrics
-from ... import version
+from . import constants as _C
+from .presets import ag_text_presets, merge_params
+from .infer_types import infer_column_problem_types, printable_column_type_string
+from .metrics import infer_eval_log_metrics
+from .. import version
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
