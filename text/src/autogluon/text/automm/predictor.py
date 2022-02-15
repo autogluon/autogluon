@@ -15,12 +15,9 @@ from omegaconf import OmegaConf, DictConfig
 import pytorch_lightning as pl
 from typing import Optional, List, Tuple, Dict, Union
 from sklearn.model_selection import train_test_split
-# from autogluon.core.utils import set_logger_verbosity
-# from autogluon.core.utils.loaders import load_pd
-from autogluon.core.utils.utils import (
-    # setup_outputdir,
-    default_holdout_frac,
-)
+from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.utils import setup_outputdir
 
 from .constants import (
     BINARY, MULTICLASS, REGRESSION, Y_PRED,
@@ -41,7 +38,6 @@ from .utils import (
     average_checkpoints,
     infer_eval_metric,
     get_config,
-    setup_save_dir,
 )
 from .optimization.utils import (
     get_metric,
@@ -51,7 +47,7 @@ from .optimization.lit_module import LitModule
 
 from .. import version
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class AutoMMPredictor:
@@ -101,8 +97,8 @@ class AutoMMPredictor:
             warn_if_exist: Optional[bool] = True,
     ):
         self.verbosity = verbosity
-        # if self.verbosity is not None:
-        #     set_logger_verbosity(self.verbosity, logger=logger)
+        if self.verbosity is not None:
+            set_logger_verbosity(self.verbosity, logger=logger)
 
         self._label_column = label
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2"]:
@@ -115,7 +111,7 @@ class AutoMMPredictor:
         self._eval_metric_name = eval_metric
         self._output_shape = None
         if path is not None:
-            path = setup_save_dir(
+            path = setup_outputdir(
                 path=path,
                 warn_if_exist=warn_if_exist,
             )
@@ -141,9 +137,9 @@ class AutoMMPredictor:
     def problem_type(self):
         return self._problem_type
 
-    # def set_verbosity(self, verbosity: int):
-    #     self.verbosity = verbosity
-    #     set_logger_verbosity(self.verbosity, logger=logger)
+    def set_verbosity(self, verbosity: int):
+        self.verbosity = verbosity
+        set_logger_verbosity(self.verbosity, logger=logger)
 
     def fit(
             self,
@@ -253,7 +249,7 @@ class AutoMMPredictor:
             save_path = os.path.expanduser(save_path)
 
         if not self._resume:
-            save_path = setup_save_dir(
+            save_path = setup_outputdir(
                 path=save_path,
                 warn_if_exist=True,
             )

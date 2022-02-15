@@ -63,6 +63,7 @@ class TextPredictor:
             verbosity=3,
             warn_if_exist=True
     ):
+        self.verbosity = verbosity
         if backend == "pytorch":
             predictor_cls = AutoMMPredictor
         elif backend == "mxnet":
@@ -87,6 +88,8 @@ class TextPredictor:
     #         return self._model.results
     #     else:
     #         return None
+    def set_verbosity(self, verbosity: int):
+        self._predictor.set_verbosity(verbosity=verbosity)
 
     @property
     def path(self):

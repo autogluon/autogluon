@@ -447,29 +447,6 @@ def create_model(
         raise ValueError(f"No available models for {names}")
 
 
-def setup_save_dir(
-        path: Optional[str] = None,
-        job_name: Optional[str] = "job",
-        warn_if_exist=True,
-):
-    if path is None:
-        path = os.path.join("~", "exp")
-        path = os.path.expanduser(path)
-        path = make_exp_dir(
-            root_path=path,
-            job_name=job_name,
-        )
-    else:
-        if os.path.isdir(path) and warn_if_exist:
-            warnings.warn(
-                f'Warning: path already exists! '
-                f'This predictor may overwrite an existing predictor! path="{path}"'
-            )
-        os.makedirs(path, mode=0o777, exist_ok=True)
-
-    return path
-
-
 def make_exp_dir(
         root_path: str,
         job_name: str,
