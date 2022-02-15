@@ -878,12 +878,12 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         run: |
           chmod +x ./.github/workflow_scripts/copy_docs.sh
-          chmod +x ./.github/workflow_scripts/copy_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}
+          ./.github/workflow_scripts/copy_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}
       - name: Copy Docs to Bucket(For pull request)
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
         run: |
           chmod +x ./.github/workflow_scripts/copy_docs.sh
-          chmod +x ./.github/workflow_scripts/copy_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}
+          ./.github/workflow_scripts/copy_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
         uses: peter-evans/create-or-update-comment@v1.4.5

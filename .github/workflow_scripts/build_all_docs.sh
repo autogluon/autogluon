@@ -17,7 +17,7 @@ if [[ -n $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-doc-staging'
-    path=$PR_NUMBER
+    if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER; else path=$BRANCH; fi
     site=$bucket.s3-website-us-region.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
 else
     if [[ $BRANCH == 'master' ]]
