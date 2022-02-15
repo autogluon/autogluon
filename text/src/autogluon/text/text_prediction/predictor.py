@@ -5,6 +5,7 @@ from ..automm.constants import (
     OPTIMIZATION,
     ENVIRONMENT,
 )
+from .constants import PYTORCH, MXNET
 
 
 class TextPredictor:
@@ -59,14 +60,14 @@ class TextPredictor:
             problem_type=None,
             eval_metric=None,
             path=None,
-            backend="mxnet",
+            backend=MXNET,
             verbosity=3,
             warn_if_exist=True
     ):
         self.verbosity = verbosity
-        if backend == "pytorch":
+        if backend == PYTORCH:
             predictor_cls = AutoMMPredictor
-        elif backend == "mxnet":
+        elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
             predictor_cls = MXTextPredictor
         else:
@@ -82,12 +83,13 @@ class TextPredictor:
         )
         self._backend = backend
 
-    # @property
-    # def results(self):
-    #     if self._model is not None:
-    #         return self._model.results
-    #     else:
-    #         return None
+    @property
+    def results(self):
+        if self._backend == MXNET:
+            return self._predictor.results
+        else:
+            return None
+
     def set_verbosity(self, verbosity: int):
         self._predictor.set_verbosity(verbosity=verbosity)
 
@@ -219,7 +221,7 @@ class TextPredictor:
         -------
         :class:`TextPredictor` object. Returns self.
         """
-        if self._backend == "pytorch":
+        if self._backend == PYTORCH:
             config = {
                 MODEL: "fusion_mlp_text_tabular",
                 DATA: "default",
@@ -381,7 +383,7 @@ class TextPredictor:
             cls,
             path: str,
             verbosity: int = None,
-            backend: str = "mxnet",
+            backend: str = MXNET,
             resume: bool = False,
     ):
         """
@@ -401,12 +403,12 @@ class TextPredictor:
         resume: Whether to resume training from a saved checkpoint
 
         """
-        if backend == "pytorch":
+        if backend == PYTORCH:
             predictor = AutoMMPredictor.load(
                 path=path,
                 resume=resume,
             )
-        elif backend == "mxnet":
+        elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
             predictor = MXTextPredictor.load(
                 path=path,
