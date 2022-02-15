@@ -846,7 +846,7 @@ class TabularPredictor:
             if infer_limit is not None:
                 infer_limit = infer_limit - self._learner.preprocess_1_time
             trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
-            self.refit_full(model=refit_full)
+            self.refit_full(model=refit_full, set_best_to_refit_full=False)
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
                     self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
@@ -909,7 +909,7 @@ class TabularPredictor:
             return
 
         if model_name is None:
-            model_name = self._trainer.get_model_best()
+            model_name = self.get_model_best()
 
         if self._trainer.bagged_mode:
             y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
@@ -1998,7 +1998,7 @@ class TabularPredictor:
         self._assert_is_fit('unpersist_models')
         return self._learner.load_trainer().unpersist_models(model_names=models)
 
-    def refit_full(self, model='all'):
+    def refit_full(self, model='all', set_best_to_refit_full=True):
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -2028,26 +2028,70 @@ class TabularPredictor:
                 If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        set_best_to_refit_full : bool, default = True
+            If True, sets best model to the refit_full version of the prior best model.
+            This means the model used when `predictor.predict(data)` is called will be the refit_full version instead of the original version of the model.
+            Ignored if `model` is not the best model.
 
         Returns
         -------
         Dictionary of original model names -> refit_full model names.
         """
         self._assert_is_fit('refit_full')
+        model_best = self.get_model_best()
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
+
+        if set_best_to_refit_full:
+            if model_best in self._trainer.model_full_dict.keys():
+                self._trainer.model_best = self._trainer.model_full_dict[model_best]
+                # Note: model_best will be overwritten if additional training is done with new models,
+                # since model_best will have validation score of None and any new model will have a better validation score.
+                # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                self._trainer.save()
+                logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
+                               f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
+            else:
+                logger.warning(
+                    f'Best model ("{model_best}") is not present in refit_full dictionary. '
+                    f'Training may have failed on the refit model. AutoGluon will default to using "{model_best}" for predict() and predict_proba().')
+
         return refit_full_dict
 
     def get_model_best(self):
         """
         Returns the string model name of the best model by validation score.
-        This is typically the same model used during inference when `predictor.predict` is called without specifying a model.
+        This is the same model used during inference when `predictor.predict` is called without specifying a model.
+        This can be updated to be a model other than the model with best validation score by methods such as refit_full and set_model_best.
 
         Returns
         -------
         String model name of the best model
         """
         self._assert_is_fit('get_model_best')
+        # TODO: Set self._trainer.model_best to the best model at end of fit instead of best WeightedEnsemble.
+        if self._trainer.model_best is not None:
+            models = self._trainer.get_model_names(can_infer=True)
+            if self._trainer.model_best in models:
+                return self._trainer.model_best
         return self._trainer.get_model_best(can_infer=True)
+
+    def set_model_best(self, model: str):
+        """
+        Sets the model to be used by default when calling `predictor.predict(data)`.
+        By default, this is the model with the best validation score, but this is not always the case.
+        If manually set, this can be overwritten internally if further training occurs, such as through fit_extra, refit_full, or distill.
+
+        Parameters
+        ----------
+        model : str
+            Name of model to set to best. If model does not exist or cannot infer, raises an AssertionError.
+        """
+        self._assert_is_fit('set_model_best')
+        models = self._trainer.get_model_names(can_infer=True)
+        if model in models:
+            self._trainer.model_best = model
+        else:
+            raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
 
     def get_model_full_dict(self):
         """
@@ -2435,9 +2479,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('delete_models')
         if models_to_keep == 'best':
-            models_to_keep = self._trainer.model_best
-            if models_to_keep is None:
-                models_to_keep = self._trainer.get_model_best()
+            models_to_keep = self.get_model_best()
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete,
                                     allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
                                     dry_run=dry_run)

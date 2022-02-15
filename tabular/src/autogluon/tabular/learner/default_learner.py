@@ -11,7 +11,8 @@ from pandas import DataFrame
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data import LabelCleaner
 from autogluon.core.data.cleaner import Cleaner
-from autogluon.core.utils.utils import augment_rare_classes, extract_column, time_func
+from autogluon.core.utils.time import sample_df_for_time_func, time_func
+from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from .abstract_learner import AbstractLearner
 from ..trainer import AutoTrainer
@@ -76,12 +77,8 @@ class DefaultLearner(AbstractLearner):
             X_og = None
         X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
         if infer_limit_batch_size is not None:
-            if infer_limit_batch_size >= self._pre_X_rows:
-                infer_limit_batch_size_actual = self._pre_X_rows
-                X_og_1 = X_og
-            else:
-                infer_limit_batch_size_actual = infer_limit_batch_size
-                X_og_1 = X_og.head(infer_limit_batch_size_actual)
+            X_og_1 = sample_df_for_time_func(df=X_og, sample_size=infer_limit_batch_size)
+            infer_limit_batch_size_actual = len(X_og_1)
             self.preprocess_1_time = time_func(f=self.transform_features, args=[X_og_1]) / infer_limit_batch_size_actual
             logger.log(20, f'\t{round(self.preprocess_1_time, 4)}s\t= Feature Preprocessing Time (1 row | {infer_limit_batch_size} batch size)')
 

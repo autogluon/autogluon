@@ -17,7 +17,6 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.utils.utils import time_func
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_TAGS
@@ -30,6 +29,7 @@ from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, 
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
+from ...utils.time import sample_df_for_time_func, time_func
 
 logger = logging.getLogger(__name__)
 
@@ -580,18 +580,9 @@ class AbstractModel:
         Returns self
         """
         predict_1_batch_size = self.params_aux.get('predict_1_batch_size', None)
-        if self.predict_1_time is None and predict_1_batch_size is not None and 'X' in kwargs:
-            len_X = len(kwargs['X'])
-            if len_X > predict_1_batch_size:
-                X_1 = kwargs['X'].head(predict_1_batch_size)
-            else:
-                # Not enough rows of data to satisfy batch size, instead predict using all available
-                # TODO: Potentially sample with replacement until batch_size is reached (or until 10,000)
-                #  time will be pessimistic if X has very few rows of data.
-                predict_1_batch_size = len_X
-                X_1 = kwargs['X']
-            self.predict_1_time = time_func(f=self.predict, args=[X_1]) / predict_1_batch_size
-
+        if self.predict_1_time is None and predict_1_batch_size is not None and 'X' in kwargs and kwargs['X'] is not None:
+            X_1 = sample_df_for_time_func(df=kwargs['X'], sample_size=predict_1_batch_size)
+            self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
 
     def get_features(self):
