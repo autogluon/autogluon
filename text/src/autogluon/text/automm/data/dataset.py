@@ -74,4 +74,3 @@ class BaseDataset(torch.utils.data.Dataset):
                 ret.update(per_model_processor(getattr(self, per_modality), idx, self.is_training))
 
         return ret
-

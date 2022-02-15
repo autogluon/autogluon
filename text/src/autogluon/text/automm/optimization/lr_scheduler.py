@@ -1,3 +1,7 @@
+"""
+This file is largely borrowed from `transformers/optimization.py`.
+This is to make lr schedulers pickle-able so that we can use the training strategy "ddp_spawn" in Pytorch Lightning.
+"""
 import functools
 import math
 from torch.optim.lr_scheduler import LambdaLR

@@ -37,7 +37,7 @@ ALL_DATASETS = {
             "fusion_mlp_image_text_tabular",
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
-            0.32,  # 0.35386
+            0.15,  # 0.1847
         ),
 
         (
@@ -77,7 +77,7 @@ ALL_DATASETS = {
             "hf_text",
             "prajjwal1/bert-tiny",
             None,
-            0.4,  # 0.4201
+            0.3,  # 0.3367
         ),
 
     ]

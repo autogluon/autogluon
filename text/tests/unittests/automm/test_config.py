@@ -57,21 +57,6 @@ def test_config():
     config = get_config(config)
     assert config == config_gt
 
-    # test default string
-    model_config = OmegaConf.load("../../../src/autogluon/text/automm/configs/model/fusion_mlp_image_text_tabular.yaml")
-    data_config = OmegaConf.load("../../../src/autogluon/text/automm/configs/data/default.yaml")
-    optimization_config = OmegaConf.load("../../../src/autogluon/text/automm/configs/optimization/adamw.yaml")
-    environemnt_config = OmegaConf.load("../../../src/autogluon/text/automm/configs/environment/default.yaml")
-    config_gt = OmegaConf.merge(model_config, data_config, optimization_config, environemnt_config)
-
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
-    config = get_config(config)
-    assert config == config_gt
 
 
 

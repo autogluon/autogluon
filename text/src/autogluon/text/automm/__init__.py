@@ -1,4 +1,7 @@
-__version__ = '0.1'
+try:
+    from .version import __version__
+except ImportError:
+    pass
 
 from . import data
 from . import models

@@ -2,7 +2,6 @@ import os
 from typing import Optional, List, Any
 import numpy as np
 from nptyping import NDArray
-import torch
 import warnings
 from transformers import (
     BertTokenizer,
@@ -17,7 +16,7 @@ from ..constants import (
     TEXT_SEGMENT_IDS,
 )
 from .collator import Stack, Pad
-from .utils import get_default_config_value
+from .utils import extract_value_from_config
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -90,7 +89,7 @@ class TextProcessor:
         self.insert_sep = insert_sep
 
         config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-        extracted = get_default_config_value(
+        extracted = extract_value_from_config(
             config=config,
             keys=("type_vocab_size",)
         )
@@ -262,10 +261,6 @@ class TextProcessor:
         A tokenizer instance.
         """
         tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
-        if torch.distributed.is_initialized():
-            if torch.distributed.get_rank() == 0:
-                tokenizer_class.from_pretrained(checkpoint_name)
-            torch.distributed.barrier()
         return tokenizer_class.from_pretrained(checkpoint_name)
 
     @staticmethod

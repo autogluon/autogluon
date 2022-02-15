@@ -191,4 +191,3 @@ class BaseDataModule(LightningDataModule):
             for per_model_processor in self.data_processors[d_type]:
                 collate_fn.update(per_model_processor.collate_fn())
         return Dict(collate_fn)
-

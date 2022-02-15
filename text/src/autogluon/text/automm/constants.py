@@ -36,10 +36,6 @@ ACCURACY = "accuracy"
 ACC = "acc"
 RMSE = "rmse"
 QUADRATIC_KAPPA = "quadratic_kappa"
-val_metric_name = {BINARY: VAL_ACC, MULTICLASS: VAL_ACC}
-# minmax_mode = {VAL_ACC: MAX, VAL_LOSS: MIN}
-minmax_mode = {ACCURACY: MAX, ACC: MAX, RMSE: MIN, QUADRATIC_KAPPA: MAX, VAL_ACC: MAX, VAL_LOSS: MIN}
-test_metric_name = {BINARY: TEST_ACC, MULTICLASS: TEST_ACC}
 
 # Training status
 TRAIN = "train"
@@ -60,11 +56,10 @@ Y_PRED_PROB = "y_pred_prob"
 Y_TRUE = "y_true"
 
 # Configuration keys
-# CONFIG_DIR = "config_dir"
 MODEL = "model"
 DATA = "data"
 OPTIMIZATION = "optimization"
 ENVIRONMENT = "environment"
 
-
-
+CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
+CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)

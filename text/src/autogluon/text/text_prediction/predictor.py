@@ -237,7 +237,7 @@ class TextPredictor:
                 train_data=train_data,
                 config=config,
                 tuning_data=tuning_data,
-                overrides=hyperparameters,
+                hyperparameters=hyperparameters,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
@@ -257,7 +257,7 @@ class TextPredictor:
                 plot_results=plot_results,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
-                seed=123,
+                seed=seed,
             )
         return self
 

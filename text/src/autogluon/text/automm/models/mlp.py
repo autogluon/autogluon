@@ -114,4 +114,3 @@ class MLP(nn.Module):
             return self.fc_out(x)
         else:
             return x
-

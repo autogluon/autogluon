@@ -281,4 +281,3 @@ class LitModule(pl.LightningModule):
         sched = {"scheduler": scheduler, "interval": "step"}
         print("done configuring optimizer and scheduler")
         return [optimizer], [sched]
-

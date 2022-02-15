@@ -8,9 +8,11 @@ from timm import create_model
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, \
     IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
 from transformers import AutoConfig
-from ..constants import IMAGE, IMAGE_VALID_NUM
+from ..constants import (
+    IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD,
+)
 from .collator import Stack, Pad
-from .utils import get_default_config_value
+from .utils import extract_value_from_config
 
 
 class ImageProcessor:
@@ -127,8 +129,7 @@ class ImageProcessor:
         elif norm_type == "imagenet":
             return IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
         elif norm_type == "clip":
-            return (0.48145466, 0.4578275, 0.40821073),\
-                   (0.26862954, 0.26130258, 0.27577711)
+            return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
         else:
             raise ValueError(f"unknown image normalization: {norm_type}")
 
@@ -164,7 +165,7 @@ class ImageProcessor:
         except Exception as exp1:
             try:  # huggingface checkpoint
                 config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-                extracted = get_default_config_value(
+                extracted = extract_value_from_config(
                     config=config,
                     keys=("image_size",),
                 )

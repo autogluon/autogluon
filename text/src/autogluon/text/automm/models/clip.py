@@ -3,8 +3,10 @@ import json
 from torch import nn
 from transformers import CLIPModel
 from .utils import assign_layer_ids
-from ..constants import IMAGE, TEXT_TOKEN_IDS, \
-    TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, LABEL, LOGITS, FEATURES
+from ..constants import (
+    IMAGE, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH,
+    LABEL, LOGITS, FEATURES,
+)
 from typing import Optional
 from .utils import init_weights
 
@@ -71,8 +73,11 @@ class CLIPForImageText(nn.Module):
         steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
         text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
 
+        # Image batch has shape (batch_size, image_num, 3, height, width).
+        # Currently, we only support image_num=1 for CLIP input.
         if image.dim() == 5 and image.shape[1] == 1:
             image = torch.squeeze(image, dim=1)
+        assert image.dim() == 4
 
         assert torch.equal(text_valid_length, text_masks.sum(dim=-1))
 
@@ -129,6 +134,3 @@ class CLIPForImageText(nn.Module):
             name_to_id[n] = 0
 
         return name_to_id
-
-
-

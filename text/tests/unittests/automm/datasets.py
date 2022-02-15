@@ -34,7 +34,6 @@ class PetFinderDataset:
             sha1_hash=sha1sum_id,
             folder=self._path,
         )
-        # Extract
         self._train_df = pd.read_csv(os.path.join(self._path, 'train.csv'), index_col=0)
         self._test_df = pd.read_csv(os.path.join(self._path, 'test.csv'), index_col=0)
         for img_col in self.image_columns:
@@ -44,10 +43,8 @@ class PetFinderDataset:
                 self._test_df[img_col].apply(
                     lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images")))
             print(self._train_df[img_col][0])
-        #     assert os.path.isfile(self._train_df[img_col].iloc[0])
             print(self._test_df[img_col][0])
-        #     assert os.path.isfile(self._test_df[img_col].iloc[0])
-        # exit()
+
         _, self._train_df = train_test_split(
             self._train_df,
             test_size=0.5,
@@ -121,7 +118,6 @@ class HatefulMeMesDataset:
             sha1_hash=sha1sum_id,
             folder=self._path,
         )
-        # Extract
         self._train_df = pd.read_csv(os.path.join(self._path, 'train.csv'), index_col=0)
         self._test_df = pd.read_csv(os.path.join(self._path, 'test.csv'), index_col=0)
         for img_col in self.image_columns:
@@ -131,22 +127,7 @@ class HatefulMeMesDataset:
                 self._test_df[img_col].apply(
                     lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images")))
             print(self._train_df[img_col][0])
-        #     assert os.path.isfile(self._train_df[img_col].iloc[0])
             print(self._test_df[img_col][0])
-        #     assert os.path.isfile(self._test_df[img_col].iloc[0])
-        # exit()
-        # _, self._train_df = train_test_split(
-        #     self._train_df,
-        #     test_size=0.5,
-        #     random_state=np.random.RandomState(123),
-        #     stratify=self._train_df[self.label_columns[0]],
-        # )
-        # _, self._test_df = train_test_split(
-        #     self._test_df,
-        #     test_size=0.5,
-        #     random_state=np.random.RandomState(123),
-        #     stratify=self._test_df[self.label_columns[0]],
-        # )
         self._train_df.reset_index(drop=True, inplace=True)
         self._test_df.reset_index(drop=True, inplace=True)
 
@@ -204,32 +185,8 @@ class AEDataset:
             sha1_hash=sha1sum_id,
             folder=self._path,
         )
-        # Extract
         self._train_df = pd.read_csv(os.path.join(self._path, 'train.csv'), index_col=0)
         self._test_df = pd.read_csv(os.path.join(self._path, 'test.csv'), index_col=0)
-        # for img_col in self.image_columns:
-        #     self._train_df[img_col] = self._train_df[img_col].apply(
-        #         lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images")))
-        #     self._test_df[img_col] =\
-        #         self._test_df[img_col].apply(
-        #             lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images")))
-        #     print(self._train_df[img_col][0])
-        # #     assert os.path.isfile(self._train_df[img_col].iloc[0])
-        #     print(self._test_df[img_col][0])
-        #     assert os.path.isfile(self._test_df[img_col].iloc[0])
-        # exit()
-        # _, self._train_df = train_test_split(
-        #     self._train_df,
-        #     test_size=0.5,
-        #     random_state=np.random.RandomState(123),
-        #     stratify=self._train_df[self.label_columns[0]],
-        # )
-        # _, self._test_df = train_test_split(
-        #     self._test_df,
-        #     test_size=0.5,
-        #     random_state=np.random.RandomState(123),
-        #     stratify=self._test_df[self.label_columns[0]],
-        # )
         self._train_df.reset_index(drop=True, inplace=True)
         self._test_df.reset_index(drop=True, inplace=True)
 
@@ -285,7 +242,6 @@ class SanFranciscoAirbnbDataset:
             sha1_hash=sha1sum_id,
             folder=self._path,
         )
-        # Extract
         self._train_df = pd.read_csv(os.path.join(self._path, 'train.csv'), index_col=0)
         self._test_df = pd.read_csv(os.path.join(self._path, 'test.csv'), index_col=0)
         for img_col in self.image_columns:
@@ -295,20 +251,8 @@ class SanFranciscoAirbnbDataset:
                 self._test_df[img_col].apply(
                     lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images")))
             print(self._train_df[img_col][0])
-        #     assert os.path.isfile(self._train_df[img_col].iloc[0])
             print(self._test_df[img_col][0])
-        #     assert os.path.isfile(self._test_df[img_col].iloc[0])
-        # exit()
-        # _, self._train_df = train_test_split(
-        #     self._train_df,
-        #     test_size=0.5,
-        #     random_state=np.random.RandomState(123),
-        # )
-        # _, self._test_df = train_test_split(
-        #     self._test_df,
-        #     test_size=0.5,
-        #     random_state=np.random.RandomState(123),
-        # )
+
         self._train_df.reset_index(drop=True, inplace=True)
         self._test_df.reset_index(drop=True, inplace=True)
 

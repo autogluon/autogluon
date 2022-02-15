@@ -444,4 +444,3 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             raise NotImplementedError
 
         return y_pred
-

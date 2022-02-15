@@ -1,12 +1,12 @@
 from typing import Tuple
 
 
-def get_default_config_value(
+def extract_value_from_config(
         config: dict,
         keys: Tuple[str, ...],
 ):
     """
-    Traverse a config dictionary to get some default hyper-parameter.
+    Traverse a config dictionary to get some hyper-parameter's value.
 
     Parameters
     ----------
@@ -24,7 +24,7 @@ def get_default_config_value(
         if k in keys:
             result.append(v)
         elif isinstance(v, dict):
-            result += get_default_config_value(v, keys)
+            result += extract_value_from_config(v, keys)
         else:
             pass
 

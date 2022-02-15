@@ -15,7 +15,3 @@ data:
     # The strategies can thus be "mean", "median", "most_frequent".
     scaler_with_mean: True  # Whether to normalize with mean
     scaler_with_std: True  # Whether to normalize with std
-
-
-
-

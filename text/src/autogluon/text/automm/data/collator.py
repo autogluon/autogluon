@@ -3,8 +3,6 @@ import warnings
 import numpy as np
 import torch
 
-__all__ = ["Stack", "Pad", "Tuple", "List", "Dict", "Zip"]
-
 
 def _pad_arrs_to_max_length(arrs, pad_axis, pad_val, round_to=None, max_length=None):
     """
@@ -115,7 +113,7 @@ class Pad:
             (default ``False``)
     """
 
-    def __init__(self, axis=0, pad_val=None, round_to=None, max_length=None, ret_length=False):
+    def __init__(self, axis=0, pad_val=0, round_to=None, max_length=None, ret_length=False):
         self._axis = axis
         if not isinstance(axis, int):
             raise ValueError(
@@ -305,17 +303,3 @@ class Dict:
         for k, ele_fn in self._fn_dict.items():
             ret[k] = ele_fn([ele[k] for ele in data])
         return ret
-
-
-class Zip:
-    def __call__(self, data):
-        """
-        Parameters
-        ----------
-            data (list): The list of samples. Each sample is a list of elements
-
-        Returns
-        -------
-            ret (list): A list of tuples. The ith tuple contains the ith elements of all samples
-        """
-        return list(zip(*data))

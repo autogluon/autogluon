@@ -13,7 +13,6 @@ import torch.nn.functional as F
 import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import pytorch_lightning as pl
-from packaging import version
 from typing import Optional, List, Tuple, Dict, Union
 from sklearn.model_selection import train_test_split
 # from autogluon.core.utils import set_logger_verbosity
@@ -50,7 +49,7 @@ from .optimization.utils import (
 )
 from .optimization.lit_module import LitModule
 
-from . import __version__
+from ... import version
 
 logger = logging.getLogger()
 
@@ -152,7 +151,7 @@ class AutoMMPredictor:
             config: Optional[dict] = None,
             tuning_data: Optional[pd.DataFrame] = None,
             save_path: Optional[str] = None,
-            overrides: Optional[Union[str, Dict, List[str]]] = None,
+            hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
             column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
@@ -198,18 +197,18 @@ class AutoMMPredictor:
             hold out some random validation examples from `train_data`.
         save_path
             Path to directory where models and intermediate outputs should be saved.
-        overrides
+        hyperparameters
             This is to override some default configurations.
             For example, changing the text and image backbones can be done by formatting:
 
             a string
-            overrides = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+            hyperparameters = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
 
             or a list of strings
-            overrides = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+            hyperparameters = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
 
             or a dictionary
-            overrides = {
+            hyperparameters = {
                             "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
                             "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
                         }
@@ -243,7 +242,7 @@ class AutoMMPredictor:
         if self._config is None:
             config = get_config(
                 config=config,
-                overrides=overrides,
+                overrides=hyperparameters,
             )
         else:  # continuing training
             config = self._config
@@ -305,6 +304,9 @@ class AutoMMPredictor:
             assert self._output_shape == output_shape, \
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
+
+        if self._eval_metric_name is None:
+            self._eval_metric_name = infer_eval_metric(problem_type)
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
@@ -451,14 +453,18 @@ class AutoMMPredictor:
                 config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
         )
 
-        assert version.parse(pl.__version__) >= version.parse("1.5.9")
+        if num_gpus <= 1:
+            strategy = None
+        else:
+            strategy = config.env.strategy
+
         print(f"deterministic: {config.env.deterministic}")
         trainer = pl.Trainer(
             gpus=config.env.num_gpus,
             auto_select_gpus=config.env.auto_select_gpus,
             num_nodes=config.env.num_nodes,
             precision=config.env.precision,
-            strategy=config.env.strategy,
+            strategy=strategy,
             benchmark=False,
             deterministic=config.env.deterministic,
             max_epochs=config.optimization.max_epochs,
@@ -769,7 +775,7 @@ class AutoMMPredictor:
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
-                    "version": __version__,
+                    "version": version.__version__,
                 },
                 fp,
                 ensure_ascii=True,
@@ -921,4 +927,3 @@ class AutoMMPredictor:
             return None
         else:
             return self.class_labels[1]
-
