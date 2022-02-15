@@ -41,11 +41,11 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-aws s3 sync ${flags} s3://${build_docs_path}/all s3://${bucket}/${path} --acl public-read ${cacheControl}
+aws s3 sync ${flags} s3://autogluon-ci/${build_docs_path}/all s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
 if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
 then
-    aws s3 cp s3://${build_docs_path}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
+    aws s3 cp s3://autogluon-ci/${build_docs_path}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
     echo "Uploaded root_index.html s3://${bucket}/index.html"
 fi
