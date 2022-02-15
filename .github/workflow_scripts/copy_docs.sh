@@ -15,7 +15,7 @@ if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-doc-staging'
     if [[ -n $PR_NUMBER ]]; then path=staging/$PR_NUMBER/$COMMIT_SHA; else path=staging/$BRANCH/$COMMIT_SHA; fi
-    site=$bucket.s3-website-us-region.amazonaws.com/$path
+    site=$bucket.s3.amazonaws.com/$path
     flags='--delete'
     cacheControl=''
 else
