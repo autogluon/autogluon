@@ -49,7 +49,7 @@ from .optimization.utils import (
 )
 from .optimization.lit_module import LitModule
 
-from ... import version
+from .. import version
 
 logger = logging.getLogger()
 
