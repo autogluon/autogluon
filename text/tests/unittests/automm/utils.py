@@ -40,7 +40,7 @@ def get_data_home_dir():
 
 def get_repo_url():
     """Return the base URL for Gluon dataset and model repository """
-    repo_url = 's3://automm-unit-tests/datasets/'
+    repo_url = 's3://automl-mm-bench/unit-tests-0.4/datasets/'
     if repo_url[-1] != '/':
         repo_url = repo_url + '/'
     return repo_url
