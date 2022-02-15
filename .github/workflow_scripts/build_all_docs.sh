@@ -31,7 +31,7 @@ else
             path=$BRANCH
         fi
     fi
-    bucket='autogluon-website'  # TODO: update this to real bucket
+    bucket='autogluon-website'
     site=$bucket/$path
 fi
 
