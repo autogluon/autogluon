@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# This script build the docs and store the results into a intermediate bucket to prevent our web hosting bucket being manipulated intentionally
+# The final docs will be copied to the web hosting bucket diromg GitHub workflow that runs in the context of the base repository's default branch
+
 BRANCH=$(basename $1)
 GIT_REPO=$2
 COMMIT_SHA=$3
@@ -13,11 +16,9 @@ if [[ -n $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; 
 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
-    bucket='autogluon-ci'
-    path=staging/$PR_NUMBER/$COMMIT_SHA
-    site=$bucket.s3-website-us-region.amazonaws.com/$path
-    flags='--delete'
-    cacheControl=''
+    bucket='autogluon-doc-staging'
+    path=$PR_NUMBER
+    site=$bucket.s3-website-us-region.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
 else
     if [[ $BRANCH == 'master' ]]
     then
@@ -32,8 +33,6 @@ else
     fi
     bucket='autogluon-website'  # TODO: update this to real bucket
     site=$bucket/$path
-    if [[ $BRANCH == 'master' ]]; then flags=''; else flags=--delete; fi
-    cacheControl='--cache-control max-age=7200'
 fi
 
 other_doc_version_text='Stable Version Documentation'
@@ -65,11 +64,11 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
-echo "Uploaded doc to http://${site}/index.html"
+aws s3 cp --recursive _build/html/ s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all --quiet
+echo "Uploaded doc to s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all"
 
 if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
 then
-    aws s3 cp root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
+    aws s3 cp root_index.html s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/root_index.html --acl public-read ${cacheControl}
     echo "Uploaded root_index.html s3://${bucket}/index.html"
 fi
