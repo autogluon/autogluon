@@ -6,7 +6,7 @@ from autogluon.core.models.abstract.model_trial import init_model
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 
-from ....utils.metric_utils import METRIC_COEFFICIENTS
+from ...utils.metric_utils import METRIC_COEFFICIENTS
 
 
 logger = logging.getLogger(__name__)
@@ -78,3 +78,22 @@ def fit_and_save_model(
     model.predict_time = time_pred_end - time_fit_end
     model.save()
     return model
+
+
+def skip_hpo(model, train_data, val_data, time_limit=None, **kwargs):
+    """Skips HPO and simply trains the model once with the
+    provided HPO time budget. Returns model artifacts as if from HPO.
+    """
+    fit_and_save_model(
+        model=model,
+        train_data=train_data,
+        val_data=val_data,
+        fit_kwargs=None,
+        eval_metric=model.eval_metric,
+        time_start=time.time(),
+        time_limit=time_limit,
+    )
+    hpo_results = {"total_time": model.fit_time}
+    hpo_model_performances = {model.name: model.val_score}
+    hpo_models = {model.name: model.path}
+    return hpo_models, hpo_model_performances, hpo_results

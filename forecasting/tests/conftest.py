@@ -9,6 +9,8 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
+    config.addinivalue_line("filterwarnings", "ignore:In accordance with NEP 32:DeprecationWarning")
+    config.addinivalue_line("filterwarnings", "ignore:.np.bool:DeprecationWarning")
 
 
 def pytest_collection_modifyitems(config, items):
