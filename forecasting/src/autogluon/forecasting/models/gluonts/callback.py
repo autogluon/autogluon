@@ -4,6 +4,9 @@ import time
 from gluonts.mx.trainer.callback import Callback
 
 
+logger = logging.getLogger(__name__)
+
+
 class EpochCounter(Callback):
     def __init__(self):
         self.count = 0
@@ -28,6 +31,6 @@ class TimeLimitCallback(Callback):
         if self.time_limit is not None:
             cur_time = time.time()
             if cur_time - self.start_time > self.time_limit:
-                logging.warning("Time limit exceed during training, stop training.")
+                logger.warning("Time limit exceed during training, stop training.")
                 return False
         return True

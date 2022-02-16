@@ -12,6 +12,7 @@ with warning_filter():
 from .abstract_gluonts import AbstractGluonTSModel
 
 
+# TODO: add main hyperparameters and documentation for each model
 class DeepARModel(AbstractGluonTSModel):
     """DeepAR model from Gluon-TS"""
 

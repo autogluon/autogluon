@@ -28,7 +28,7 @@ requirements = [
 ]
 
 test_requirements = [
-    'pytest', 'flake8'
+    'pytest', 'flake8', 'pytest-timeout'
 ]
 
 install_requires = requirements + test_requirements

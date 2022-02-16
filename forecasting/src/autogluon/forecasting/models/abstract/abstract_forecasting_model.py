@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: TYPING
 # TODO: Docstrings
+# TODO: Override the fit method to include train_data. (Is the API correct)?
 class AbstractForecastingModel(AbstractModel):
     # following methods will not be available in forecasting models
     # TODO: check usage to see if higher level modules are dependent on these
