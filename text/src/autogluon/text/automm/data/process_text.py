@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import Optional, List, Any
 import numpy as np
 from nptyping import NDArray
@@ -17,6 +18,8 @@ from ..constants import (
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
+
+logger = logging.getLogger(__name__)
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -84,7 +87,7 @@ class TextProcessor:
                     f"is smaller than {checkpoint_name}'s default: {self.tokenizer.model_max_length}"
                 )
             self.max_len = min(max_len, self.tokenizer.model_max_length)
-        print(f"text max length: {self.max_len}")
+        logger.debug(f"text max length: {self.max_len}")
 
         self.insert_sep = insert_sep
 
@@ -110,7 +113,7 @@ class TextProcessor:
             )
         self.text_segment_num = min(text_segment_num, default_segment_num)
         assert self.text_segment_num >= 1
-        print(f"text segment num: {self.text_segment_num}")
+        logger.debug(f"text segment num: {self.text_segment_num}")
 
         self.stochastic_chunk = stochastic_chunk
 

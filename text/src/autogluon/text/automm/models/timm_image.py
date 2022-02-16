@@ -1,10 +1,15 @@
 import torch
-import json
+import logging
 from torch import nn
 from timm import create_model
 from .utils import assign_layer_ids, init_weights
-from ..constants import IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, FEATURES
+from ..constants import (
+    IMAGE, IMAGE_VALID_NUM, LABEL,
+    LOGITS, FEATURES, AUTOMM
+)
 from typing import Optional
+
+logger = logging.getLogger(AUTOMM)
 
 
 class TimmAutoModelForImagePrediction(nn.Module):
@@ -40,14 +45,14 @@ class TimmAutoModelForImagePrediction(nn.Module):
         """
         super().__init__()
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
-        print(f"initializing {checkpoint_name}")
+        logger.debug(f"initializing {checkpoint_name}")
         self.model = create_model(checkpoint_name, pretrained=True, num_classes=0)
         self.out_features = self.model.num_features
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
         self.head.apply(init_weights)
 
         self.mix_choice = mix_choice
-        print(f"mix_choice: {mix_choice}")
+        logger.debug(f"mix_choice: {mix_choice}")
 
         self.image_key = f"{prefix}_{IMAGE}"
         self.image_valid_num_key = f"{prefix}_{IMAGE_VALID_NUM}"
@@ -124,7 +129,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         )
 
         if len(names) > 0:
-            print(f"outer layers are treated as head: {names}")
+            logger.debug(f"outer layers are treated as head: {names}")
         for n in names:
             assert n not in name_to_id
             name_to_id[n] = 0

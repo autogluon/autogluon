@@ -1,9 +1,15 @@
+import logging
 import torch
 from torch import nn
 from typing import List, Optional
 from .utils import init_weights
-from ..constants import LABEL, LOGITS, FEATURES, WEIGHT
+from ..constants import (
+    LABEL, LOGITS, FEATURES,
+    WEIGHT, AUTOMM
+)
 from .mlp import MLP
+
+logger = logging.getLogger(AUTOMM)
 
 
 class MultimodalFusionMLP(nn.Module):
@@ -179,7 +185,7 @@ class MultimodalFusionMLP(nn.Module):
 
         outer_layer_names = [n for n in names if not n.startswith(model_prefix)]
         name_to_id = {}
-        print(f"outer layers are treated as head: {outer_layer_names}")
+        logger.debug(f"outer layers are treated as head: {outer_layer_names}")
         for n in outer_layer_names:
             name_to_id[n] = 0
 

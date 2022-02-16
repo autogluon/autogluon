@@ -2,7 +2,7 @@ import pytz
 import datetime
 import os
 import functools
-import numpy as np
+import logging
 import pandas as pd
 import pickle
 import collections
@@ -37,8 +37,10 @@ from .constants import (
     ACCURACY, RMSE, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
-    Y_PRED_PROB, Y_PRED, Y_TRUE,
+    Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
 )
+
+logger = logging.getLogger(AUTOMM)
 
 
 def infer_eval_metric(problem_type: str):
@@ -140,7 +142,7 @@ def get_config(
         all_configs.append(per_config)
 
     config = OmegaConf.merge(*all_configs)
-    print('overrides=', overrides)
+    logger.debug('overrides=', overrides)
     if overrides is not None:
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
 
@@ -208,7 +210,7 @@ def select_model(
         selected_model_names.extend(fusion_model_name)
 
     config.model.names = selected_model_names
-    print(f"selected models: {selected_model_names}")
+    logger.debug(f"selected models: {selected_model_names}")
     if len(selected_model_names) == 0:
         raise ValueError("No model is available for this dataset.")
     return config
@@ -374,7 +376,7 @@ def create_model(
         names = [names]
     # make sure no duplicate model names
     assert len(names) == len(set(names))
-    print(f"output_shape: {num_classes}")
+    logger.debug(f"output_shape: {num_classes}")
     all_models = []
     for model_name in names:
         model_config = getattr(config.model, model_name)
@@ -531,7 +533,7 @@ def gather_top_k_ckpts(
         if os.path.exists(last_ckpt_path):
             os.remove(last_ckpt_path)
 
-    print(f"ckpt num: {len(all_state_dicts)}")
+    logger.debug(f"ckpt num: {len(all_state_dicts)}")
     return all_state_dicts, checkpoint
 
 

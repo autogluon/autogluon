@@ -1,6 +1,7 @@
-from typing import Optional, List
+import logging
 import torch
 import warnings
+from typing import Optional, List
 from torchvision import transforms
 from PIL import Image
 from .randaug import RandAugment
@@ -13,6 +14,8 @@ from ..constants import (
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
+
+logger = logging.getLogger(__name__)
 
 
 class ImageProcessor:
@@ -60,8 +63,8 @@ class ImageProcessor:
         self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
-        print(f"image training transform type: {train_transform_types}")
-        print(f"image validation transform type: {val_transform_types}")
+        logger.debug(f"image training transform type: {train_transform_types}")
+        logger.debug(f"image validation transform type: {val_transform_types}")
         self.size = None
         self.mean = None
         self.std = None
@@ -71,25 +74,25 @@ class ImageProcessor:
         if self.size is None:
             if size is not None:
                 self.size = size
-                print(f"using provided image size: {self.size}")
+                logger.debug(f"using provided image size: {self.size}")
             else:
                 raise ValueError("image size is missing")
         else:
-            print(f"using detected image size: {self.size}")
+            logger.debug(f"using detected image size: {self.size}")
         if self.mean is None or self.std is None:
             if norm_type is not None:
                 self.mean, self.std = self.mean_std(norm_type)
-                print(f"using provided normalization: {norm_type}")
+                logger.debug(f"using provided normalization: {norm_type}")
             else:
                 raise ValueError("image normalization mean and std are missing")
         else:
-            print(f"using detected image normalization: {self.mean} and {self.std}")
+            logger.debug(f"using detected image normalization: {self.mean} and {self.std}")
         self.normalization = transforms.Normalize(self.mean, self.std)
         if max_img_num_per_col <= 0:
-            print(f"max_img_num_per_col {max_img_num_per_col} is reset to 1")
+            logger.debug(f"max_img_num_per_col {max_img_num_per_col} is reset to 1")
             max_img_num_per_col = 1
         self.max_img_num_per_col = max_img_num_per_col
-        print(f"max_img_num_per_col: {max_img_num_per_col}")
+        logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         self.train_processor = self.construct_processor(self.train_transform_types)
         self.val_processor = self.construct_processor(self.val_transform_types)

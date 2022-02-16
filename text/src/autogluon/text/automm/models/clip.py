@@ -1,14 +1,16 @@
 import torch
-import json
+import logging
 from torch import nn
 from transformers import CLIPModel
 from .utils import assign_layer_ids
 from ..constants import (
     IMAGE, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH,
-    LABEL, LOGITS, FEATURES,
+    LABEL, LOGITS, FEATURES, AUTOMM
 )
 from typing import Optional
 from .utils import init_weights
+
+logger = logging.getLogger(AUTOMM)
 
 
 class CLIPForImageText(nn.Module):
@@ -35,7 +37,7 @@ class CLIPForImageText(nn.Module):
         num_classes
             The number of classes. 1 for a regression task.
         """
-        print(f"initializing {prefix}")
+        logger.debug(f"initializing {prefix}")
         super().__init__()
         self.model = CLIPModel.from_pretrained(checkpoint_name)
         self.out_features = self.model.config.projection_dim
@@ -128,7 +130,7 @@ class CLIPForImageText(nn.Module):
             name_to_id.update(per_model_name_to_id)
 
         if len(names) > 0:
-            print(f"outer layers are treated as head: {names}")
+            logger.debug(f"outer layers are treated as head: {names}")
         for n in names:
             assert n not in name_to_id
             name_to_id[n] = 0

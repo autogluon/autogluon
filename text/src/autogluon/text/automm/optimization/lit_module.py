@@ -1,4 +1,4 @@
-import json
+import logging
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -10,10 +10,12 @@ from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
 )
-from ..constants import LABEL, OUTPUT, LOSS, LOGITS, WEIGHT
+from ..constants import LOGITS, WEIGHT
 from typing import Union, Optional, List, Dict
 import torchmetrics
 from torch.nn.modules.loss import _Loss
+
+logger = logging.getLogger(__name__)
 
 
 class LitModule(pl.LightningModule):
@@ -219,7 +221,7 @@ class LitModule(pl.LightningModule):
             Learning rate scheduler.
         """
         if self.hparams.lr_choice == "two_stages":
-            print("applying 2-stage learning rate...")
+            logger.debug("applying 2-stage learning rate...")
             grouped_parameters = apply_two_stages_lr(
                 model=self.model,
                 lr=self.hparams.lr,
@@ -228,7 +230,7 @@ class LitModule(pl.LightningModule):
                 return_params=True,
             )
         elif self.hparams.lr_choice == "layerwise_decay":
-            print("applying layerwise learning rate decay...")
+            logger.debug("applying layerwise learning rate decay...")
             grouped_parameters = apply_layerwise_lr_decay(
                 model=self.model,
                 lr=self.hparams.lr,
@@ -236,7 +238,7 @@ class LitModule(pl.LightningModule):
                 weight_decay=self.hparams.weight_decay,
             )
         else:
-            print("applying single learning rate...")
+            logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
                 model=self.model,
                 lr=self.hparams.lr,
@@ -250,28 +252,28 @@ class LitModule(pl.LightningModule):
             weight_decay=self.hparams.weight_decay,
         )
 
-        print(f"trainer.max_steps: {self.trainer.max_steps}")
+        logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:
             max_steps = (
                     len(self.trainer.datamodule.train_dataloader())
                     * self.trainer.max_epochs
                     // self.trainer.accumulate_grad_batches
             )
-            print(f"len(trainer.datamodule.train_dataloader()): "
+            logger.debug(f"len(trainer.datamodule.train_dataloader()): "
                   f"{len(self.trainer.datamodule.train_dataloader())}")
-            print(f"trainer.max_epochs: {self.trainer.max_epochs}")
-            print(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
+            logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
+            logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
         else:
             max_steps = self.trainer.max_steps
 
-        print(f"max steps: {max_steps}")
+        logger.debug(f"max steps: {max_steps}")
 
         warmup_steps = self.hparams.warmup_steps
         if isinstance(warmup_steps, float):
             warmup_steps = int(max_steps * warmup_steps)
 
-        print(f"warmup steps: {warmup_steps}")
-        print(f"lr_schedule: {self.hparams.lr_schedule}")
+        logger.debug(f"warmup steps: {warmup_steps}")
+        logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
         scheduler = get_lr_scheduler(optimizer=optimizer,
                                      num_max_steps=max_steps,
                                      num_warmup_steps=warmup_steps,
@@ -279,5 +281,5 @@ class LitModule(pl.LightningModule):
                                      end_lr=self.hparams.end_lr)
 
         sched = {"scheduler": scheduler, "interval": "step"}
-        print("done configuring optimizer and scheduler")
+        logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]

@@ -1,12 +1,16 @@
 import torch
-import json
+import logging
 from torch import nn
 import warnings
 from transformers import AutoModel, AutoTokenizer
-from ..constants import TEXT, TEXT_TOKEN_IDS, TEXT_SEGMENT_IDS, \
-    TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, LABEL, LOGITS, FEATURES, WEIGHT
+from ..constants import (
+    TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS,
+    LABEL, LOGITS, FEATURES, AUTOMM
+)
 from typing import Optional, List, Tuple
 from .utils import assign_layer_ids, init_weights
+
+logger = logging.getLogger(AUTOMM)
 
 
 class HFAutoModelForTextPrediction(nn.Module):
@@ -44,7 +48,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             The number of classes. 1 for a regression task.
         """
         super().__init__()
-        print(f"initializing {checkpoint_name}")
+        logger.debug(f"initializing {checkpoint_name}")
         self.model = AutoModel.from_pretrained(checkpoint_name)
         self.out_features = self.model.config.hidden_size
 
@@ -131,7 +135,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             model_pre=model_prefix,
         )
         if len(names) > 0:
-            print(f"outer layers are treated as head: {names}")
+            logger.debug(f"outer layers are treated as head: {names}")
         for n in names:
             assert n not in name_to_id
             name_to_id[n] = 0

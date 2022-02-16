@@ -21,7 +21,7 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from .constants import (
     BINARY, MULTICLASS, REGRESSION, Y_PRED,
-    Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES,
+    Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM
 )
 
 from .data.datamodule import BaseDataModule
@@ -47,44 +47,14 @@ from .optimization.lit_module import LitModule
 
 from .. import version
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class AutoMMPredictor:
-
     """
     AutoMMPredictor can predict the values of one dataframe column conditioned on the rest columns.
     The prediction can be either a classification or regression problem. The feature columns can contain
     image paths, text, numerical, and categorical features.
-
-    Parameters
-    ----------
-    label
-        Name of the column that contains the target variable to predict.
-    problem_type
-        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
-        (options: 'binary', 'multiclass', 'regression').
-        If `problem_type = None`, the prediction problem type is inferred
-        based on the label-values in provided dataset.
-    eval_metric
-        Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-        Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
-    path
-        Path to directory where models and intermediate outputs should be saved.
-        If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
-        will be created in the working directory to store all models.
-        Note: To call `fit()` twice and save all results of each fit,
-        you must specify different `path` locations or don't specify `path` at all.
-        Otherwise files from first `fit()` will be overwritten by second `fit()`.
-    verbosity
-        Verbosity levels range from 0 to 4 and control how much information is printed.
-        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
-        where `L` ranges from 0 to 50
-        (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-    warn_if_exist
-        Whether to raise warning if the specified path already exists.
-
     """
 
     def __init__(
@@ -96,6 +66,35 @@ class AutoMMPredictor:
             verbosity: Optional[int] = 3,
             warn_if_exist: Optional[bool] = True,
     ):
+        """
+        Parameters
+        ----------
+        label
+            Name of the column that contains the target variable to predict.
+        problem_type
+            Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
+            (options: 'binary', 'multiclass', 'regression').
+            If `problem_type = None`, the prediction problem type is inferred
+            based on the label-values in provided dataset.
+        eval_metric
+            Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+        path
+            Path to directory where models and intermediate outputs should be saved.
+            If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
+            will be created in the working directory to store all models.
+            Note: To call `fit()` twice and save all results of each fit,
+            you must specify different `path` locations or don't specify `path` at all.
+            Otherwise files from first `fit()` will be overwritten by second `fit()`.
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+            where `L` ranges from 0 to 50
+            (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        warn_if_exist
+            Whether to raise warning if the specified path already exists.
+        """
         self.verbosity = verbosity
         if self.verbosity is not None:
             set_logger_verbosity(self.verbosity, logger=logger)
@@ -253,7 +252,7 @@ class AutoMMPredictor:
                 path=save_path,
                 warn_if_exist=True,
             )
-        print(f"save path: {save_path}")
+        logger.debug(f"save path: {save_path}")
 
         if tuning_data is None:
             if self._problem_type in [BINARY, MULTICLASS]:
@@ -411,8 +410,8 @@ class AutoMMPredictor:
             val_metric=val_metric,
         )
 
-        print(f"val_metric_name: {task.val_metric_name}")
-        print(f"minmax_mode: {minmax_mode}")
+        logger.debug(f"val_metric_name: {task.val_metric_name}")
+        logger.debug(f"minmax_mode: {minmax_mode}")
 
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=save_path,
@@ -454,7 +453,6 @@ class AutoMMPredictor:
         else:
             strategy = config.env.strategy
 
-        print(f"deterministic: {config.env.deterministic}")
         trainer = pl.Trainer(
             gpus=config.env.num_gpus,
             auto_select_gpus=config.env.auto_select_gpus,
@@ -782,6 +780,7 @@ class AutoMMPredictor:
             cls,
             path: str,
             resume: Optional[bool] = False,
+            verbosity: Optional[int] = 3,
     ):
         """
         Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
@@ -796,6 +795,9 @@ class AutoMMPredictor:
         resume
             Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
             broken during the middle and we want to resume the training from the last saved checkpoint.
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
 
         Returns
         -------
@@ -815,6 +817,7 @@ class AutoMMPredictor:
             label=assets["label_column"],
             problem_type=assets["problem_type"],
             eval_metric=assets["eval_metric_name"],
+            verbosity=verbosity,
         )
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
@@ -849,7 +852,7 @@ class AutoMMPredictor:
                         f"Consider starting training from scratch."
                     )
             checkpoint = torch.load(resume_ckpt_path)
-            print(f"Resume training from checkpoint: '{resume_ckpt_path}'")
+            logger.info(f"Resume training from checkpoint: '{resume_ckpt_path}'")
             ckpt_path = resume_ckpt_path
         else:  # load a model checkpoint for prediction, evaluation, or continuing training on new data
             if not os.path.isfile(final_ckpt_path):
@@ -866,7 +869,7 @@ class AutoMMPredictor:
                         f"Consider starting training from scratch."
                     )
             checkpoint = torch.load(final_ckpt_path)
-            print(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
+            logger.info(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
             ckpt_path = None  # must set None since we do not resume training
 
         model = cls._load_state_dict(
