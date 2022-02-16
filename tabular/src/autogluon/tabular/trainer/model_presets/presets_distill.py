@@ -41,7 +41,7 @@ def get_preset_models_distillation(path, problem_type, eval_metric, hyperparamet
         if 'NN_MXNET' in hyperparameters:
             hyperparameters['NN_MXNET'] = nn_hyperparameters
         # Swap RF criterion for MSE:
-        rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
+        rf_newparams = {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE'}}
         if 'RF' in hyperparameters:
             rf_hyperparameters = hyperparameters['RF']
         else:

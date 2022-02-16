@@ -352,7 +352,7 @@ def get_preset_models_softclass(hyperparameters, invalid_model_names: list = Non
     # Swap RF criterion for MSE:
     if 'RF' in hyperparameters_rf:
         rf_params = hyperparameters_rf['RF']
-        rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
+        rf_newparams = {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE'}}
         for i in range(len(rf_params)):
             rf_params[i].update(rf_newparams)
         rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n+1):]]  # Remove duplicates which may arise after overwriting criterion
