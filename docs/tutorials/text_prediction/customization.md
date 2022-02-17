@@ -15,12 +15,6 @@ warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
-
-```{.python .input}
-!pip install ipywidgets
-!jupyter nbextension enable --py widgetsnbextension
-```
-
 ## Stanford Sentiment Treebank Data
 
 For demonstration, we use the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset.
