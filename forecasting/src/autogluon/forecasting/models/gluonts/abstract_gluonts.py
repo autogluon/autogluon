@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ from gluonts.dataset.common import Dataset
 from gluonts.evaluation import Evaluator
 from gluonts.evaluation.backtest import make_evaluation_predictions
 from gluonts.model.estimator import Estimator as GluonTSEstimator
-from gluonts.model.forecast import SampleForecast, QuantileForecast
+from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 from autogluon.core.utils.savers import save_pkl
@@ -34,7 +34,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         prediction_length: int,
         name: Optional[str] = None,
         eval_metric: str = None,
-        hyperparameters=None,
+        hyperparameters: Dict[str, Any] = None,
         **kwargs,
     ):
         """Abstract class wrapping GluonTS estimators for use in autogluon.forecasting.
@@ -71,9 +71,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             **kwargs,
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
-        self.model = None
 
-        # TODO: separate gts parameters?
+        # TODO: separate gluonts parameters?
         self.params["callbacks"] = []
         self.params["freq"] = freq
         self.params["prediction_length"] = prediction_length
@@ -98,7 +97,9 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         return str(path)
 
     @classmethod
-    def load(cls, path: str, reset_paths=True, verbose=True) -> "AbstractGluonTSModel":
+    def load(
+        cls, path: str, reset_paths: bool = True, verbose: bool = True
+    ) -> "AbstractGluonTSModel":
         model = super().load(path, reset_paths, verbose)
         model.gts_predictor = GluonTSPredictor.deserialize(
             Path(path) / cls.gluonts_model_path
@@ -114,14 +115,14 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         val_data: Dataset = None,
         time_limit: int = None,
         **kwargs,
-    ):
+    ) -> None:
         logger.log(30, f"Training forecasting model {self.name}...")
         self.params["callbacks"].append(TimeLimitCallback(time_limit))
         estimator = self._get_estimator()
         with warning_filter():
             self.gts_predictor = estimator.train(train_data, validation_data=val_data)
 
-    def predict(self, data: Dataset, quantiles: List[float] = None):
+    def predict(self, data: Dataset, quantiles: List[float] = None) -> pd.DataFrame:
         """
         Return forecasts for given dataset and quantiles.
 
@@ -192,7 +193,9 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                     result_dict[index[i]] = df
         return result_dict
 
-    def _predict_for_scoring(self, data, num_samples=100):
+    def _predict_for_scoring(
+        self, data: Dataset, num_samples: int = 100
+    ) -> Tuple[List[Forecast], List[Any]]:
         with warning_filter():
             forecast_it, ts_it = make_evaluation_predictions(
                 dataset=data, predictor=self.gts_predictor, num_samples=num_samples
@@ -233,5 +236,5 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             )
         return agg_metrics[self.eval_metric]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name

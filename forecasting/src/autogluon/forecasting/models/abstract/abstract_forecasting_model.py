@@ -1,6 +1,11 @@
 import logging
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Union, List, Tuple, Optional
+
+import pandas as pd
+from gluonts.dataset.common import (
+    Dataset,
+)  # TODO: this interface should not depend on GluonTS datasets
 
 import autogluon.core as ag
 from autogluon.core.models import AbstractModel
@@ -12,9 +17,7 @@ from .model_trial import skip_hpo, model_trial
 logger = logging.getLogger(__name__)
 
 
-# TODO: TYPING
 # TODO: Docstrings
-# TODO: Override the fit method to include train_data. (Is the API correct)?
 class AbstractForecastingModel(AbstractModel):
     # following methods will not be available in forecasting models
     # TODO: check usage to see if higher level modules are dependent on these
@@ -43,7 +46,7 @@ class AbstractForecastingModel(AbstractModel):
         prediction_length: int,
         name: str,
         eval_metric: str = None,
-        hyperparameters=None,
+        hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
     ):
         """
@@ -64,27 +67,27 @@ class AbstractForecastingModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.params = {}
+        self.params = {}  # TODO?
 
-        self.eval_metric = check_get_evaluation_metric(eval_metric)
+        self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.stopping_metric = None
         self.problem_type = "forecasting"
         self.conformalize = False
 
-        self.quantiles = kwargs.get(
+        self.quantiles: List[float] = kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
-        self.freq = freq
-        self.prediction_length = prediction_length
+        self.freq: str = freq
+        self.prediction_length: int = prediction_length
 
-    def _initialize(self, X=None, y=None, **kwargs):
+    def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
         self._init_params()
 
-    def _init_misc(self, **kwargs):
-        pass  # noop
+    def _init_misc(self, **kwargs) -> None:
+        pass
 
-    def _compute_fit_metadata(self, val_data=None, **kwargs):
+    def _compute_fit_metadata(self, val_data: Dataset = None, **kwargs):
         fit_metadata = dict(
             val_in_fit=val_data is not None,
         )
@@ -92,9 +95,9 @@ class AbstractForecastingModel(AbstractModel):
 
     def _validate_fit_memory_usage(self, **kwargs):
         # memory usage handling not implemented for forecasting models
-        pass  # noop
+        pass
 
-    def fit(self, **kwargs):
+    def fit(self, **kwargs) -> "AbstractForecastingModel":
         """TODO: UPDATE DOCSTRING WITH NEW INTERFACE"""
         return super().fit(**kwargs)
 
@@ -107,17 +110,25 @@ class AbstractForecastingModel(AbstractModel):
         num_gpus=None,
         verbosity=2,
         **kwargs,
-    ):
+    ) -> None:
         """TODO: UPDATE DOCSTRING WITH NEW INTERFACE"""
         raise NotImplementedError
 
-    def predict(self, data, quantiles=None, **kwargs) -> Dict:
+    def predict(
+        self, data: Dataset, quantiles: List[float] = None, **kwargs
+    ) -> Dict[Any, pd.DataFrame]:
         raise NotImplementedError
 
-    def score(self, data, metric=None, num_samples=100) -> float:
+    def score(self, data: Dataset, metric: str = None, num_samples: int = 100) -> float:
         raise NotImplementedError
 
-    def _hyperparameter_tune(self, train_data, val_data, scheduler_options, **kwargs):
+    def _hyperparameter_tune(
+        self,
+        train_data: Dataset,
+        val_data: Dataset,
+        scheduler_options: Tuple[Any, Dict],
+        **kwargs,
+    ):
         """
         Hyperparameter tune the model.
 
@@ -188,12 +199,12 @@ class AbstractForecastingModel(AbstractModel):
         return self._get_hpo_results(scheduler, scheduler_params, time_start)
 
     # OTHER DUMMY METHODS
-    def preprocess(self, X: Any, **kwargs):
-        return X
+    def preprocess(self, data: Any, **kwargs) -> Any:
+        return data
 
-    def reset_metrics(self):
+    def reset_metrics(self) -> None:
         super().reset_metrics()
         # TODO: reset the epoch counter?
 
-    def get_memory_size(self, **kwargs):
+    def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
