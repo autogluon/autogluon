@@ -9,49 +9,12 @@ from .constants import PYTORCH, MXNET
 
 
 class TextPredictor:
-    """AutoGluon TextPredictor predicts values in a column of a tabular dataset that contains text fields
+    """
+    AutoGluon TextPredictor predicts values in a column of a tabular dataset that contains text fields
     (classification or regression). TabularPredictor can also do this but it uses an ensemble of many types of models and may featurize text.
     TextPredictor instead directly fits individual Transformer neural network models directly to the raw text (which are also capable of handling additional numeric/categorical columns).
     We generally recommend TabularPredictor if your table contains numeric/categorical columns and TextPredictor if your table contains only text columns, but you may easily try both.
     In fact, `TabularPredictor.fit(..., hyperparameters='multimodal')` will train a TextPredictor along with many tabular models and ensemble them together.
-
-    Parameters
-    ----------
-    label : str
-        Name of the column that contains the target variable to predict.
-    problem_type : str, default = None
-        Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
-        If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
-    eval_metric : function or str, default = None
-        Metric by which predictions will be ultimately evaluated on test data.
-        AutoGluon tunes factors such as hyperparameters, early-stopping, etc. in order to improve this metric on validation data.
-
-        If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-        Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
-
-        Otherwise, options for classification:
-            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
-            'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision',
-             'precision_macro', 'precision_micro',
-            'precision_weighted', 'recall', 'recall_macro', 'recall_micro',
-             'recall_weighted', 'log_loss', 'pac_score']
-        Options for regression:
-            ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error',
-             'median_absolute_error', 'r2', 'spearmanr', 'pearsonr']
-        For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
-        You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
-    path : str, default = None
-        Path to directory where models and intermediate outputs should be saved.
-        If unspecified, a time-stamped folder called "AutogluonTextModel/ag-[TIMESTAMP]" will be created in the working directory to store all models.
-        Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
-        Otherwise files from first `fit()` will be overwritten by second `fit()`.
-    verbosity : int, default = 3
-        Verbosity levels range from 0 to 4 and control how much information is printed.
-        Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-        If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
-        where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-    warn_if_exist : bool, default = True
-        Whether to raise warning if the specified path already exists.
     """
 
     def __init__(
@@ -60,10 +23,49 @@ class TextPredictor:
             problem_type=None,
             eval_metric=None,
             path=None,
-            backend=MXNET,
+            backend=PYTORCH,
             verbosity=3,
             warn_if_exist=True
     ):
+        """
+        Parameters
+        ----------
+        label : str
+            Name of the column that contains the target variable to predict.
+        problem_type : str, default = None
+            Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
+            If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
+        eval_metric : function or str, default = None
+            Metric by which predictions will be ultimately evaluated on test data.
+            AutoGluon tunes factors such as hyperparameters, early-stopping, etc. in order to improve this metric on validation data.
+
+            If `eval_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+
+            Otherwise, options for classification:
+                ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
+                'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision',
+                 'precision_macro', 'precision_micro',
+                'precision_weighted', 'recall', 'recall_macro', 'recall_micro',
+                 'recall_weighted', 'log_loss', 'pac_score']
+            Options for regression:
+                ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error',
+                 'median_absolute_error', 'r2', 'spearmanr', 'pearsonr']
+            For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
+            You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
+        path : str, default = None
+            Path to directory where models and intermediate outputs should be saved.
+            If unspecified, a time-stamped folder called "AutogluonTextModel/ag-[TIMESTAMP]" will be created in the working directory to store all models.
+            Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
+            Otherwise files from first `fit()` will be overwritten by second `fit()`.
+        verbosity : int, default = 3
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+            where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        warn_if_exist : bool, default = True
+            Whether to raise warning if the specified path already exists.
+        """
         self.verbosity = verbosity
         if backend == PYTORCH:
             predictor_cls = AutoMMPredictor
@@ -242,6 +244,7 @@ class TextPredictor:
                 train_data=train_data,
                 config=config,
                 tuning_data=tuning_data,
+                time_limit=time_limit,
                 hyperparameters=hyperparameters,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
@@ -383,7 +386,7 @@ class TextPredictor:
             cls,
             path: str,
             verbosity: int = None,
-            backend: str = MXNET,
+            backend: str = PYTORCH,
             resume: bool = False,
     ):
         """

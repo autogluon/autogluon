@@ -434,13 +434,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Predicted labels ready to compute metric scores.
         """
-        y_pred = y_pred.detach().cpu().numpy()
+        y_pred = y_pred.detach().cpu().float().numpy()
 
         if self.label_type == CATEGORICAL:
             assert y_pred.shape[1] >= 2
             y_pred = y_pred.argmax(axis=1)
         elif self.label_type == NUMERICAL:
             y_pred = self._label_scaler.inverse_transform(y_pred)
+            y_pred = np.squeeze(y_pred)
         else:
             raise NotImplementedError
 

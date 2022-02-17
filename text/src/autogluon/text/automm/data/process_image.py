@@ -3,7 +3,7 @@ import torch
 import warnings
 from typing import Optional, List
 from torchvision import transforms
-from PIL import Image
+import PIL
 from .randaug import RandAugment
 from timm import create_model
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, \
@@ -255,7 +255,7 @@ class ImageProcessor:
                                 "expressed in bytes should be "
                                 "converted to RGBA images"
                     )
-                    img = Image.open(img_path).convert("RGB")
+                    img = PIL.Image.open(img_path).convert("RGB")
                 if is_training:
                     img = self.train_processor(img)
                 else:

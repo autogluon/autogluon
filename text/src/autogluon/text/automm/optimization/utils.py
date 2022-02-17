@@ -55,7 +55,7 @@ def get_metric(
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
         return torchmetrics.Accuracy(), MAX
-    elif metric_name == "rmse":
+    elif metric_name in ["rmse", "root_mean_squared_error"]:
         return torchmetrics.MeanSquaredError(squared=False), MIN
     elif metric_name == "r2":
         return torchmetrics.R2Score(), MAX

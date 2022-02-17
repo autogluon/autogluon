@@ -1,6 +1,8 @@
 import collections
 import pandas as pd
+from pandas.api.types import is_string_dtype
 import warnings
+import PIL
 from typing import Union, Optional, List, Dict, Tuple
 from ..constants import (
     NULL, CATEGORICAL, NUMERICAL, TEXT,
@@ -106,7 +108,8 @@ def is_numerical_column(
 def is_imagepath_column(data: pd.Series) -> bool:
     """
     Identify if a column is one image-path column.
-    Here it uses a very simple rule to verify if this is an image-path column.
+    Here it counts the failures when trying PIL.Image.open() on a sampled subset.
+    If over 90% attempts fail, this column isn't an image-path column.
 
     Parameters
     ----------
@@ -117,12 +120,27 @@ def is_imagepath_column(data: pd.Series) -> bool:
     -------
     Whether the column is an image-path column.
     """
-    try:
-        if (data.iloc[0].startswith('/') or data.iloc[0].startswith('.')):
-            return True
-        else:
-            return False
-    except:
+    sample_num = min(len(data), 500)
+    data = data.sample(n=sample_num, random_state=0)
+    data = data.apply(lambda ele: str(ele).split(';')).tolist()
+    failure_count = 0
+    for image_paths in data:
+        success = False
+        for img_path in image_paths:
+            try:
+                img = PIL.Image.open(img_path)
+                success = True
+                break
+            except:
+                pass
+        if not success:
+            failure_count += 1
+    failure_ratio = failure_count / sample_num
+
+    # Tolerate high failure rate in case that many image files may be corrupted.
+    if failure_ratio <= 0.9:
+        return True
+    else:
         return False
 
 

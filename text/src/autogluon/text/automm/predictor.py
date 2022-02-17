@@ -4,6 +4,8 @@ import numpy as np
 import json
 import warnings
 import sys
+import shutil
+from datetime import timedelta
 import pandas as pd
 import pickle
 import torch
@@ -16,11 +18,12 @@ import pytorch_lightning as pl
 from typing import Optional, List, Tuple, Dict, Union
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 
 from .constants import (
-    BINARY, MULTICLASS, REGRESSION, Y_PRED,
+    LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM
 )
 
@@ -100,6 +103,10 @@ class AutoMMPredictor:
             set_logger_verbosity(self.verbosity, logger=logger)
 
         self._label_column = label
+
+        if eval_metric is not None and not isinstance(eval_metric, str):
+            eval_metric = eval_metric.name
+
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2"]:
             problem_type = REGRESSION
 
@@ -145,6 +152,7 @@ class AutoMMPredictor:
             train_data: pd.DataFrame,
             config: Optional[dict] = None,
             tuning_data: Optional[pd.DataFrame] = None,
+            time_limit: Optional[int] = None,
             save_path: Optional[str] = None,
             hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
             column_types: Optional[dict] = None,
@@ -190,6 +198,9 @@ class AutoMMPredictor:
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
             hold out some random validation examples from `train_data`.
+        time_limit
+            How long `fit()` should run for (wall clock time in seconds).
+            If not specified, `fit()` will run until the model has completed training.
         save_path
             Path to directory where models and intermediate outputs should be saved.
         hyperparameters
@@ -281,6 +292,9 @@ class AutoMMPredictor:
         if column_types is None:
             column_types = inferred_column_types
 
+        logger.debug(f"column_types: {column_types}")
+        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+
         if self._column_types is not None and self._column_types != column_types:
             warnings.warn(
                 f"Inferred column types {column_types} are inconsistent with "
@@ -343,7 +357,11 @@ class AutoMMPredictor:
         )
         loss_func = get_loss_func(problem_type)
 
+        if time_limit is not None:
+            time_limit = timedelta(seconds=time_limit)
+
         # set attributes for saving and prediction
+        self._problem_type = problem_type  # In case problem wasn't provided in __init__().
         self._save_path = save_path
         self._config = config
         self._output_shape = output_shape
@@ -368,6 +386,7 @@ class AutoMMPredictor:
             loss_func=loss_func,
             val_metric=val_metric,
             minmax_mode=minmax_mode,
+            max_time=time_limit,
             save_path=save_path,
         )
         return self
@@ -383,6 +402,7 @@ class AutoMMPredictor:
             loss_func: _Loss,
             val_metric: torchmetrics.Metric,
             minmax_mode: str,
+            max_time: timedelta,
             save_path: str,
     ):
 
@@ -441,12 +461,24 @@ class AutoMMPredictor:
             if isinstance(config.env.num_gpus, int)
             else len(config.env.num_gpus)
         )
-        if num_gpus < 0:
+        if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
 
-        grad_steps = config.env.batch_size // (
-                config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
-        )
+        if num_gpus == 0:  # CPU only training
+            warnings.warn(
+                "Only CPU is detected in the instance. "
+                "AutoMMPredictor will be trained with CPU only. "
+                "This may results in slow training speed. "
+                "Consider to switch to an instance with GPU support.",
+                UserWarning,
+            )
+            grad_steps = config.env.batch_size // (
+                    config.env.per_gpu_batch_size * config.env.num_nodes
+            )
+        else:
+            grad_steps = config.env.batch_size // (
+                    config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
+            )
 
         if num_gpus <= 1:
             strategy = None
@@ -454,8 +486,8 @@ class AutoMMPredictor:
             strategy = config.env.strategy
 
         trainer = pl.Trainer(
-            gpus=config.env.num_gpus,
-            auto_select_gpus=config.env.auto_select_gpus,
+            gpus=num_gpus,
+            auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
             num_nodes=config.env.num_nodes,
             precision=config.env.precision,
             strategy=strategy,
@@ -463,6 +495,7 @@ class AutoMMPredictor:
             deterministic=config.env.deterministic,
             max_epochs=config.optimization.max_epochs,
             max_steps=config.optimization.max_steps,
+            max_time=max_time,
             callbacks=callbacks,
             logger=tb_logger,
             gradient_clip_val=1,
@@ -502,13 +535,22 @@ class AutoMMPredictor:
 
     def _predict(
             self,
-            data: pd.DataFrame,
+            data: Union[pd.DataFrame, dict, list],
             ret_type: str,
+            requires_label: bool,
     ) -> torch.Tensor:
+
+        data = self._data_to_df(data)
+
+        data_processors = self._data_processors.copy()
+        # For prediction data with no labels provided.
+        if not requires_label:
+            data_processors.pop(LABEL, None)
+        logger.debug(f"data_processors for prediction: {data_processors.keys()}")
 
         predict_dm = BaseDataModule(
             df_preprocessor=self._df_preprocessor,
-            data_processors=self._data_processors,
+            data_processors=data_processors,
             per_gpu_batch_size=self._config.env.per_gpu_batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
@@ -523,10 +565,20 @@ class AutoMMPredictor:
         )
         if num_gpus < 0:
             num_gpus = torch.cuda.device_count()
+
+        if num_gpus == 0:  # CPU only prediction
+            warnings.warn(
+                "Only CPU is detected in the instance. "
+                "AutoMMPredictor will predict with CPU only. "
+                "This may results in slow prediction speed. "
+                "Consider to switch to an instance with GPU support.",
+                UserWarning,
+            )
+
         strategy = 'dp' if num_gpus > 1 else None
         evaluator = pl.Trainer(
-            gpus=self._config.env.num_gpus,
-            auto_select_gpus=self._config.env.auto_select_gpus,
+            gpus=num_gpus,
+            auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
             num_nodes=self._config.env.num_nodes,
             precision=self._config.env.precision,
             strategy=strategy,
@@ -554,12 +606,12 @@ class AutoMMPredictor:
     def _logits_to_prob(logits: torch.Tensor):
         assert logits.ndim == 2
         prob = F.softmax(logits.float(), dim=1)
-        prob = prob.detach().cpu().numpy()
+        prob = prob.detach().cpu().float().numpy()
         return prob
 
     def evaluate(
             self,
-            data: pd.DataFrame,
+            data: Union[pd.DataFrame, dict, list],
             metrics: Optional[List[str]] = None,
             return_pred: Optional[bool] = False,
     ):
@@ -584,6 +636,7 @@ class AutoMMPredictor:
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
+            requires_label=True,
         )
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
@@ -603,9 +656,9 @@ class AutoMMPredictor:
 
         results = {}
         for per_metric in metrics:
-            if self._problem_type == MULTICLASS and per_metric.lower() == "roc_auc":
+            if self._problem_type != BINARY and per_metric.lower() in ["roc_auc", "average_precision"]:
                 raise ValueError(
-                    "Problem type is multiclass, but roc_auc is only supported for binary classification."
+                    f"Metric {per_metric} is only supported for binary classification."
                 )
             score = compute_score(
                 metric_data=metric_data,
@@ -620,7 +673,7 @@ class AutoMMPredictor:
 
     def predict(
             self,
-            data: pd.DataFrame,
+            data: Union[pd.DataFrame, dict, list],
             as_pandas: Optional[bool] = True,
     ):
         """
@@ -641,6 +694,7 @@ class AutoMMPredictor:
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
+            requires_label=False,
         )
         pred = self._df_preprocessor.transform_prediction(y_pred=logits)
         if as_pandas:
@@ -649,13 +703,13 @@ class AutoMMPredictor:
 
     def predict_proba(
             self,
-            data: pd.DataFrame,
+            data: Union[pd.DataFrame, dict, list],
             as_pandas: Optional[bool] = True,
             as_multiclass: Optional[bool] = True,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
-        This is only for the classification task. Calling it for a regression task will throw an exception.
+        This is only for the classification tasks. Calling it for a regression task will throw an exception.
 
         Parameters
         ----------
@@ -675,11 +729,12 @@ class AutoMMPredictor:
         Otherwise, the output will have shape (#samples,)
         """
         assert self._problem_type in [BINARY, MULTICLASS], \
-            f"Problem {self._problem_type} has no probability output"
+            f"Problem {self._problem_type} has no probability output."
 
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
+            requires_label=False,
         )
         prob = self._logits_to_prob(logits)
 
@@ -692,8 +747,8 @@ class AutoMMPredictor:
 
     def extract_embedding(
             self,
-            data: pd.DataFrame,
-            as_pandas: Optional[bool] = True,
+            data: Union[pd.DataFrame, dict, list],
+            as_pandas: Optional[bool] = False,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -715,6 +770,7 @@ class AutoMMPredictor:
         features = self._predict(
             data=data,
             ret_type=FEATURES,
+            requires_label=False,
         )
         features = features.detach().cpu().numpy()
         if as_pandas:
@@ -722,15 +778,33 @@ class AutoMMPredictor:
 
         return features
 
+    def _data_to_df(self, data: Union[pd.DataFrame, dict, list]):
+        if isinstance(data, pd.DataFrame):
+            return data
+        if isinstance(data, (list, dict)):
+            data = pd.DataFrame(data)
+        elif isinstance(data, str):
+            data = load_pd.load(data)
+        else:
+            raise NotImplementedError(
+                f'The format of data is not understood. '
+                f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
+            )
+        return data
+
     def as_pandas(
             self,
-            data: pd.DataFrame,
+            data: Union[pd.DataFrame, dict, list],
             to_be_converted: np.ndarray,
     ):
-        if to_be_converted.ndim == 1:
-            return pd.Series(to_be_converted, index=data.index, name=self._label_column)
+        if isinstance(data, pd.DataFrame):
+            index = data.index
         else:
-            return pd.DataFrame(to_be_converted, index=data.index, columns=self.class_labels)
+            index = None
+        if to_be_converted.ndim == 1:
+            return pd.Series(to_be_converted, index=index, name=self._label_column)
+        else:
+            return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)
 
     @staticmethod
     def _load_state_dict(model, state_dict):
@@ -774,6 +848,9 @@ class AutoMMPredictor:
                 fp,
                 ensure_ascii=True,
             )
+        # In case that users save to a path, which is not the original save_path.
+        if path != self._save_path:
+            shutil.copy(os.path.join(self._save_path, "model.ckpt"), path)
 
     @classmethod
     def load(

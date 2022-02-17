@@ -11,12 +11,8 @@ import warnings
 from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
-from sklearn.metrics import (
-    accuracy_score,
-    r2_score,
-    cohen_kappa_score,
-    roc_auc_score,
-)
+from autogluon.core.metrics import get_metric
+
 from .models import (
     HFAutoModelForTextPrediction,
     TimmAutoModelForImagePrediction,
@@ -142,7 +138,7 @@ def get_config(
         all_configs.append(per_config)
 
     config = OmegaConf.merge(*all_configs)
-    logger.debug('overrides=', overrides)
+    logger.debug(f"overrides: {overrides}")
     if overrides is not None:
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
 
@@ -588,32 +584,11 @@ def compute_score(
     -------
     Computed score.
     """
-    metric_name = metric_name.lower()
-    if metric_name in ["acc", "accuracy"]:
-        score = accuracy_score(
-            y_true=metric_data[Y_TRUE],
-            y_pred=metric_data[Y_PRED],
-        )
-    elif metric_name == "quadratic_kappa":
-        score = cohen_kappa_score(
-            metric_data[Y_PRED],
-            metric_data[Y_TRUE],
-            weights="quadratic",
-        )
-    elif metric_name == "r2":
-        score = r2_score(
-            y_true=metric_data[Y_TRUE],
-            y_pred=metric_data[Y_PRED],
-        )
-    elif metric_name == "roc_auc":  # this is only for binary classification
-        score = roc_auc_score(
-            y_true=metric_data[Y_TRUE],
-            y_score=metric_data[Y_PRED_PROB][:, 1],
-        )
+    metric = get_metric(metric_name)
+    if metric.name in ["roc_auc", "average_precision"]:
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, 1])
     else:
-        raise ValueError(f"Unknown metric name: {metric_name}")
-
-    return score
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
 
 def apply_omegaconf_overrides(
