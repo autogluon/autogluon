@@ -2,13 +2,6 @@ model:
   names: "timm_image"
   timm_image:
     checkpoint_name: "swin_small_patch4_window7_224"
-#    checkpoint_name: "beit_base_patch16_224"
-#    checkpoint_name: "vit_small_patch16_384"
-#    checkpoint_name: "convmixer_1536_20"
-#    checkpoint_name: "efficientnet_b1"
-#    checkpoint_name: "resnet18"
-#    checkpoint_name: "legacy_seresnet18"
-#    checkpoint_name: "resnest14d"
     mix_choice: "all_logits"
     data_types:
       - "image"

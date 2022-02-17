@@ -55,4 +55,3 @@ model:
     drop_rate: 0.1
     normalization: "layer_norm"
     data_types:
-
