@@ -22,9 +22,21 @@ install_requires = [
     'scipy',
     'pandas',
     'scikit-learn',
-
+    'fairscale',
+    'scikit-image',
+    'boto3',
+    'smart_open',
+    'pytorch_lightning>=1.5.9',
+    'torchmetrics',
+    'transformers>=4.16.2',
+    'Pillow',
+    'tqdm',
+    'nptyping',
+    'omegaconf',
+    'timm',
+    'sentencepiece',
     f'autogluon.core=={version}',
-    'autogluon-contrib-nlp==0.0.1b20210201',
+    'autogluon-contrib-nlp==0.0.1b20220208',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -32,6 +44,12 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 if __name__ == '__main__':
     ag.create_version_file(version=version, submodule=submodule)
     setup_args = ag.default_setup_args(version=version, submodule=submodule)
+    setup_args["package_data"]["autogluon.text.automm"] = [
+        'configs/data/*.yaml',
+        'configs/model/*.yaml',
+        'configs/optimization/*.yaml',
+        'configs/environment/*.yaml',
+    ]
     setup(
         install_requires=install_requires,
         **setup_args,

@@ -21,7 +21,7 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
       a mix of text, numeric, and categorical columns.
 
    .. card::
-      :title: Customized Hyperparameter Search
+      :title: Customized Hyperparameter Search (For MXNet backend only)
       :link: customization.html
 
       How to specify custom hyperparameters of the TextPredictor neural network,

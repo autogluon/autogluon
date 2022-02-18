@@ -10,7 +10,7 @@ import pandas as pd
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_cpu_count, get_gpu_count_mxnet, try_import_mxnet, try_import_autogluon_text
+from autogluon.core.utils import get_cpu_count, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -78,8 +78,7 @@ class TextPredictorModel(AbstractModel):
     def _set_default_params(self):
         super()._set_default_params()
         try_import_autogluon_text()
-        from autogluon.text import ag_text_presets
-        self.params = ag_text_presets.create('default')
+        self.params = {}
 
     def _fit(self,
              X: pd.DataFrame,
@@ -107,7 +106,6 @@ class TextPredictorModel(AbstractModel):
             Other keyword arguments
 
         """
-        try_import_mxnet()
         try_import_autogluon_text()
         from autogluon.text import TextPredictor
 
@@ -134,10 +132,6 @@ class TextPredictorModel(AbstractModel):
         X_train.insert(len(X_train.columns), self._label_column_name, y)
         if X_val is not None:
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
-        assert self.params['tune_kwargs']['num_trials'] == 1 \
-               or self.params['tune_kwargs']['num_trials'] is None,\
-            'Currently, you cannot nest the hyperparameter search in text neural network ' \
-            'and the AutoGluon Tabular.'
 
         verbosity_text = max(0, verbosity - 1)
         root_logger = logging.getLogger(__name__)
@@ -190,15 +184,14 @@ class TextPredictorModel(AbstractModel):
         memory_size
             The total memory size in bytes.
         """
-        total_size = 0
-        for k, v in self.model._model.net.collect_params().items():
-            total_size += np.dtype(v.dtype).itemsize * np.prod(v.shape)
+        total_size = sum(param.numel() for param in self.model._model.parameters())
+
         return total_size
 
     def _get_default_resources(self):
         num_cpus = get_cpu_count()
         # TODO: use get_gpu_count_torch() or some better way once torch models are available.
-        num_gpus = get_gpu_count_mxnet()
+        num_gpus = None
         return num_cpus, num_gpus
 
     def _predict_proba(self, X, **kwargs):
