@@ -30,7 +30,7 @@ install_requires = [
     'torchmetrics',
     'transformers>=4.16.2',
     'Pillow',
-    'tqdm',
+    'tqdm>=4.38.0',
     'nptyping',
     'omegaconf',
     'timm',
