@@ -187,7 +187,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     processed_data = generator.fit_transform(
                         pd.DataFrame({col_name: processed_data}))[col_name] \
                         .cat.codes.to_numpy(np.int32, copy=True)
-                    if len(processed_data.unique()) == 1:
+                    if len(np.unique(processed_data)) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
                     num_categories = len(generator.category_map[col_name])
