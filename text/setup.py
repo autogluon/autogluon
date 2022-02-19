@@ -18,10 +18,10 @@ version = ag.update_version(version)
 submodule = 'text'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    'numpy',
-    'scipy',
-    'pandas',
-    'scikit-learn',
+    'numpy<=1.22',
+    'scipy<1.8.0',
+    'pandas<1.4',
+    'scikit-learn<1.1',
     'fairscale',
     'scikit-image',
     'boto3',
