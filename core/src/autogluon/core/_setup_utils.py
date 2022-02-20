@@ -92,7 +92,7 @@ def default_setup_args(*, version, submodule):
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',
-        description='AutoML for Text, Image, and Tabular Data',
+        description='AutoML for Image, Text, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
         license='Apache-2.0',
