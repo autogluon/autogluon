@@ -249,6 +249,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = df[col_name]
             col_type = self._column_types[col_name]
             if col_type == TEXT or col_type == CATEGORICAL:
+                # TODO: do we need to consider whether categorical values are valid text?
                 col_value = col_value.astype("object")
                 processed_data = col_value.apply(lambda ele: '' if pd.isnull(ele) else str(ele))
             elif col_type == NUMERICAL:
