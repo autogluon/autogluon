@@ -1,6 +1,7 @@
 """Object Detection task"""
 import copy
 import pickle
+import platform
 import logging
 import warnings
 import os
@@ -226,6 +227,11 @@ class ObjectDetector(object):
 
         log_level = verbosity2loglevel(self._verbosity)
         set_logger_verbosity(self._verbosity)
+        if platform.system() == 'Windows':
+            logger.log(40, '=============================================================================\n'
+                           'WARNING: Windows OS detected, but ObjectDetector is not supported on Windows!\n'
+                           'You may run into many errors. Consider running on Linux instead.\n'
+                           '=============================================================================\n')
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]

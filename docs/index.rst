@@ -1,8 +1,6 @@
 AutoGluon: AutoML for Text, Image, and Tabular Data
 ====================================================
 
-.. include:: badges.rst
-
 `AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on automated stack ensembling, deep learning, and real-world applications spanning image, text, and tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
 - Quickly prototype deep learning and classical ML solutions for your raw data with a few lines of code.
