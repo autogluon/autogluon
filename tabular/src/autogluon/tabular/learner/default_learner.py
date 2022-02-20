@@ -65,6 +65,7 @@ class DefaultLearner(AbstractLearner):
         if X_val is not None:
             logger.log(20, f'Tuning Data Rows:    {len(X_val)}')
             logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
+        logger.log(20, f'Label Column: {self.label}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         self._pre_X_rows = len(X)
