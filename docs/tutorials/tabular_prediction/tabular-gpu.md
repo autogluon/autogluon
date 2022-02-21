@@ -50,7 +50,7 @@ hyperparameters['AG_TEXT_NN'] = ['<preset>']
 Available text model presets:
 
 
-```python
+```{.python .input}
 from autogluon.text.text_prediction.text_presets import list_presets
 list_presets()
 ```

@@ -231,7 +231,7 @@ class TextPredictor:
                 config=config,
                 tuning_data=tuning_data,
                 time_limit=time_limit,
-                hyperparameters=hyperparameters,
+                hyperparameters=overrides,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
