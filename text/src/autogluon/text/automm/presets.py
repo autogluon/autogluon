@@ -23,7 +23,7 @@ def list_model_presets():
     return model_presets
 
 
-def get_preset(model_type: str):
+def preset_to_config(model_type: str):
     """
     Get the default preset strings of one predictor in AutoMM.
     Currently, we only use model type to differentiate different predictors.
