@@ -66,7 +66,7 @@ def fit_and_save_model(
         time_left = None
 
     time_fit_start = time.time()
-    model.fit(train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
+    model.fit(train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
     time_fit_end = time.time()
     logger.log(
         30,
@@ -92,7 +92,7 @@ def skip_hpo(model, train_data, val_data, time_limit=None):
         model=model,
         train_data=train_data,
         val_data=val_data,
-        fit_kwargs=None,
+        fit_kwargs={},
         eval_metric=model.eval_metric,
         time_start=time.time(),
         time_limit=time_limit,

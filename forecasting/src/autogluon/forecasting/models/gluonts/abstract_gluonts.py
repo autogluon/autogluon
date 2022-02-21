@@ -52,12 +52,13 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
     def __init__(
         self,
-        path: str,
         freq: str,
-        prediction_length: int,
+        prediction_length: int = 1,
+        path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: str = None,
         hyperparameters: Dict[str, Any] = None,
+        **kwargs
     ):
         name = name or re.sub(
             r"Model$", "", self.__class__.__name__
@@ -73,6 +74,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         self.gts_predictor: Optional[GluonTSPredictor] = None
 
         # TODO: handle gluonts constructor parameters
+        # TODO: handle callbacks and gluonts constructor arguments separately
+        # TODO: from tunable parameters
         self.params["callbacks"] = []
         self.params["freq"] = freq
         self.params["prediction_length"] = prediction_length
@@ -89,6 +92,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         # TODO: filtering the serializing warning out until gluonts fixes it
         with serialize_warning_filter():
             if predictor:
+                Path.mkdir(path / self.gluonts_model_path, exist_ok=True)
                 predictor.serialize(path / self.gluonts_model_path)
 
         save_pkl.save(path=str(path / self.model_file_name), object=self)

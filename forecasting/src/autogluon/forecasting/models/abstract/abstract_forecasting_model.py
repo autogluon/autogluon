@@ -68,12 +68,13 @@ class AbstractForecastingModel(AbstractModel):
 
     def __init__(
         self,
-        path: str,
-        freq: str,
-        prediction_length: int,
-        name: str,
-        eval_metric: str = None,
+        freq: str,  # todo: deferred init
+        prediction_length: int = 1,
+        path: Optional[str] = None,
+        name: Optional[str] = None,
+        eval_metric: Optional[str] = None,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
+        **kwargs
     ):
         super().__init__(
             path=path,
@@ -82,8 +83,6 @@ class AbstractForecastingModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.params = {}  # TODO?
-
         self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.stopping_metric = None
         self.problem_type = "forecasting"
@@ -98,9 +97,14 @@ class AbstractForecastingModel(AbstractModel):
         self._init_params()
 
     def _init_misc(self, **kwargs) -> None:
-        self.quantile_levels = self.params_aux.get(
-            'quantile_levels', [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        )
+        self.quantile_levels = self.params_aux.get('quantile_levels', None)
+
+    def _get_default_auxiliary_params(self) -> Dict[str, Any]:
+        default_aux_params = super()._get_default_auxiliary_params()
+        default_aux_params.update({
+            "quantile_levels": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+        })
+        return default_aux_params
 
     def _compute_fit_metadata(self, val_data: Dataset = None, **kwargs):
         fit_metadata = dict(
@@ -111,6 +115,16 @@ class AbstractForecastingModel(AbstractModel):
     def _validate_fit_memory_usage(self, **kwargs):
         # memory usage handling not implemented for forecasting models
         pass
+
+    def get_params(self) -> dict:
+        """Get params of the model at the time of initialization"""
+        args = super().get_params()
+        args.update(dict(
+            freq=self.freq,
+            prediction_length=self.prediction_length,
+        ))
+
+        return args
 
     def fit(self, **kwargs) -> "AbstractForecastingModel":
         """Fit forecasting model.
@@ -250,8 +264,9 @@ class AbstractForecastingModel(AbstractModel):
             raise ValueError(
                 "scheduler_cls and scheduler_params cannot be None for hyperparameter tuning"
             )
-
         time_limit = scheduler_params.get("time_out", None)
+        # scheduler should be instantiated without num_trials instead of setting it to None
+        scheduler_params.pop("num_trials", None)
 
         if not any(
             isinstance(search_space[hyperparameter], ag.Space)
@@ -290,7 +305,7 @@ class AbstractForecastingModel(AbstractModel):
 
         scheduler = scheduler_cls(
             model_trial,
-            search_space=self._get_search_space(),
+            search_space=search_space,
             train_fn_kwargs=train_fn_kwargs,
             **scheduler_params,
         )
@@ -302,10 +317,6 @@ class AbstractForecastingModel(AbstractModel):
 
     def preprocess(self, data: Any, **kwargs) -> Any:
         return data
-
-    def reset_metrics(self) -> None:
-        super().reset_metrics()
-        # TODO: reset the epoch counter?
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None

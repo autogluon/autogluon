@@ -1,3 +1,4 @@
+import os
 import random
 import tempfile
 
@@ -6,6 +7,8 @@ import pytest
 from gluonts.dataset.common import ListDataset
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
+import autogluon.core as ag
+from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.forecasting.models.gluonts import (
     DeepARModel,
     # AutoTabularModel,
@@ -25,12 +28,12 @@ DUMMY_DATASET = ListDataset(
     [
         {
             "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),
+            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
             "item_id": 0,
         },
         {
             "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),
+            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
             "item_id": 1,
         },
     ],
@@ -39,9 +42,9 @@ DUMMY_DATASET = ListDataset(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_models_initializable(model_class):
+def test_models_can_be_initialized(model_class):
     with tempfile.TemporaryDirectory() as tp:
-        model = model_class(tp, freq="H", prediction_length=24)
+        model = model_class(path=tp + os.path.sep, freq="H", prediction_length=24)
     assert isinstance(model, AbstractGluonTSModel)
 
 
@@ -52,7 +55,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 ):
     with tempfile.TemporaryDirectory() as tp:
         model = model_class(
-            tp,
+            path=tp + os.path.sep,
             freq="H",
             prediction_length=prediction_length,
             hyperparameters={"epochs": 2},
@@ -76,7 +79,7 @@ def test_given_time_limit_when_fit_called_then_models_train_correctly(
 ):
     with tempfile.TemporaryDirectory() as tp:
         model = model_class(
-            tp,
+            path=tp + os.path.sep,
             freq="H",
             prediction_length=5,
             hyperparameters={"epochs": 2},
@@ -94,7 +97,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 ):
     with tempfile.TemporaryDirectory() as tp:
         model = model_class(
-            tp,
+            path=tp + os.path.sep,
             freq="H",
             prediction_length=5,
             hyperparameters={"epochs": 20000},
@@ -107,8 +110,25 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_works(model_class):
-    pass
+    scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
+
+    model = model_class(
+        freq="H",
+        hyperparameters={
+            "epochs": ag.Int(3, 5),
+            "ag_args_fit": {"quantile_levels": [.1, .9]},
+        },
+    )
+
+    model.hyperparameter_tune(
+        scheduler_options=scheduler_options,
+        time_limit=100,
+        train_data=DUMMY_DATASET,
+        val_data=DUMMY_DATASET,
+    )
 
 
+# TODO: test models can predict correctly
+# TODO: test models can score correctly
 # TODO: test other inherited functionality
 # TODO: test model hyperparameters are passed correctly
