@@ -17,7 +17,6 @@ from .model_trial import skip_hpo, model_trial
 logger = logging.getLogger(__name__)
 
 
-# TODO: Docstrings
 class AbstractForecastingModel(AbstractModel):
     """Abstract class for all `Model` objects in autogluon.forecasting.
 
@@ -47,7 +46,7 @@ class AbstractForecastingModel(AbstractModel):
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
 
-    # following methods will not be available in forecasting models
+    # TODO: refactor "pruned" methods after AbstractMethod is refactored
     # TODO: check usage to see if higher level modules are dependent on these
     predict_proba = None
     score_with_y_pred_proba = None
@@ -75,7 +74,6 @@ class AbstractForecastingModel(AbstractModel):
         name: str,
         eval_metric: str = None,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
-        **kwargs,
     ):
         super().__init__(
             path=path,
@@ -91,18 +89,18 @@ class AbstractForecastingModel(AbstractModel):
         self.problem_type = "forecasting"
         self.conformalize = False
 
-        self.quantiles: List[float] = kwargs.get(
-            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        )
         self.freq: str = freq
         self.prediction_length: int = prediction_length
 
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
+        self._init_misc()
         self._init_params()
 
     def _init_misc(self, **kwargs) -> None:
-        pass
+        self.quantile_levels = self.params_aux.get(
+            'quantile_levels', [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        )
 
     def _compute_fit_metadata(self, val_data: Dataset = None, **kwargs):
         fit_metadata = dict(
@@ -176,7 +174,7 @@ class AbstractForecastingModel(AbstractModel):
         raise NotImplementedError
 
     def predict(
-        self, data: Dataset, quantiles: List[float] = None, **kwargs
+        self, data: Dataset, quantile_levels: List[float] = None, **kwargs
     ) -> Dict[Any, pd.DataFrame]:
         """Given a dataset, predict the next `self.prediction_length` time steps. The data
         set is a GluonTS data set, an iterator over time series represented as python dictionaries.
@@ -193,8 +191,8 @@ class AbstractForecastingModel(AbstractModel):
         ----------
         data: gluonts.dataset.common.Dataset
             The dataset where each time series is the "context" for predictions.
-        quantiles
-            Quantiles of probabilistic forecasts. If None, `self.quantiles` will be used instead,
+        quantile_levels
+            Quantiles of probabilistic forecasts. If None, `self.quantile_levels` will be used instead,
             if provided during initialization.
 
         Returns

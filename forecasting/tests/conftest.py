@@ -10,8 +10,11 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
     # known mxnet warnings
-    config.addinivalue_line("filterwarnings", "ignore:In accordance with NEP 32:DeprecationWarning")
+    config.addinivalue_line(
+        "filterwarnings", "ignore:In accordance with NEP 32:DeprecationWarning"
+    )
     config.addinivalue_line("filterwarnings", "ignore:.np.bool:DeprecationWarning")
+
     # known gluonts warning
     config.addinivalue_line("filterwarnings", "ignore:Using `json`-module:UserWarning")
 

@@ -44,9 +44,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         objective function the model intends to optimize, will use mean_wQuantileLoss by default.
     hyperparameters:
         various hyperparameters that will be used by model (can be search spaces instead of
-        fixed values).
-    kwargs:
-        Other keyword arguments to be provided to the GluonTS model.
+        fixed values). See *Other Parameters* in each inheriting model's documentation for
+        possible values.
     """
 
     gluonts_model_path = "gluon_ts"
@@ -59,7 +58,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         name: Optional[str] = None,
         eval_metric: str = None,
         hyperparameters: Dict[str, Any] = None,
-        **kwargs,
     ):
         name = name or re.sub(
             r"Model$", "", self.__class__.__name__
@@ -71,7 +69,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             name=name,
             eval_metric=eval_metric,
             hyperparameters=hyperparameters,
-            **kwargs,
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
 
@@ -126,11 +123,11 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             self.gts_predictor = estimator.train(train_data, validation_data=val_data)
 
     def predict(
-        self, data: Dataset, quantiles: List[float] = None
+        self, data: Dataset, quantile_levels: List[float] = None
     ) -> Dict[str, pd.DataFrame]:
         logger.log(30, f"Predicting with forecasting model {self.name}")
         with warning_filter():
-            quantiles = [str(q) for q in (quantiles or self.quantiles)]
+            quantiles = [str(q) for q in (quantile_levels or self.quantile_levels)]
             result_dict = {}
             predicted_targets = list(self.gts_predictor.predict(data))
 
@@ -204,8 +201,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         self, data: Dataset, metric: Optional[str] = None, num_samples: int = 100
     ):
         evaluator = (
-            Evaluator(quantiles=self.params["quantiles"])
-            if "quantiles" in self.params
+            Evaluator(quantiles=self.quantile_levels)
+            if self.quantile_levels is not None
             else Evaluator()
         )
         forecasts, tss = self._predict_for_scoring(data, num_samples=num_samples)

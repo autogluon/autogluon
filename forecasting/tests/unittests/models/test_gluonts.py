@@ -7,7 +7,10 @@ from gluonts.dataset.common import ListDataset
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 from autogluon.forecasting.models.gluonts import (
-    DeepARModel, AutoTabularModel, SimpleFeedForwardModel, MQCNNModel
+    DeepARModel,
+    # AutoTabularModel,
+    SimpleFeedForwardModel,
+    MQCNNModel,
 )
 from autogluon.forecasting.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
@@ -18,18 +21,21 @@ TESTABLE_MODELS = [
     SimpleFeedForwardModel,
 ]
 
-DUMMY_DATASET = ListDataset([
-    {
-        "target": [random.random() for _ in range(10)],
-        "start": pd.Timestamp("2022-01-01 00:00:00"),
-        "item_id": 0,
-    },
-    {
-        "target": [random.random() for _ in range(10)],
-        "start": pd.Timestamp("2022-01-01 00:00:00"),
-        "item_id": 1,
-    }
-], freq="H")
+DUMMY_DATASET = ListDataset(
+    [
+        {
+            "target": [random.random() for _ in range(10)],
+            "start": pd.Timestamp("2022-01-01 00:00:00"),
+            "item_id": 0,
+        },
+        {
+            "target": [random.random() for _ in range(10)],
+            "start": pd.Timestamp("2022-01-01 00:00:00"),
+            "item_id": 1,
+        },
+    ],
+    freq="H",
+)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -84,7 +90,7 @@ def test_given_time_limit_when_fit_called_then_models_train_correctly(
 @pytest.mark.timeout(4)
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_low_time_limit_when_fit_called_then_model_training_does_not_exceed_time_limit(
-    model_class
+    model_class,
 ):
     with tempfile.TemporaryDirectory() as tp:
         model = model_class(
@@ -102,6 +108,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_works(model_class):
     pass
+
 
 # TODO: test other inherited functionality
 # TODO: test model hyperparameters are passed correctly
