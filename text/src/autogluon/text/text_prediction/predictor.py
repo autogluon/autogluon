@@ -1,10 +1,5 @@
 from ..automm import AutoMMPredictor
-from ..automm.constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-)
+from .text_presets import preset_to_config
 from .constants import PYTORCH, MXNET
 
 
@@ -224,22 +219,12 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         if self._backend == PYTORCH:
-            config = {
-                MODEL: "fusion_mlp_text_tabular",
-                DATA: "default",
-                OPTIMIZATION: "adamw",
-                ENVIRONMENT: "default",
-            }
+            if presets is None:
+                presets = "default"
+            config, overrides = preset_to_config(presets)
+            overrides.update(hyperparameters)
             if num_gpus is not None:
-                if hyperparameters is None:
-                    hyperparameters = {}
-                if isinstance(hyperparameters, dict):
-                    hyperparameters.update({"env.num_gpus": int(num_gpus)})
-                elif isinstance(hyperparameters, str):
-                    hyperparameters += f" env.num_gpus={int(num_gpus)}"
-                else:
-                    raise ValueError(f"Unknown hyperparameters type: {type(hyperparameters)}")
-
+                overrides.update({"env.num_gpus": int(num_gpus)})
             self._predictor.fit(
                 train_data=train_data,
                 config=config,
