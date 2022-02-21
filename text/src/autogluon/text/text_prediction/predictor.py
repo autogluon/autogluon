@@ -222,7 +222,8 @@ class TextPredictor:
             if presets is None:
                 presets = "default"
             config, overrides = preset_to_config(presets)
-            overrides.update(hyperparameters)
+            if hyperparameters is not None:
+                overrides.update(hyperparameters)
             if num_gpus is not None:
                 overrides.update({"env.num_gpus": int(num_gpus)})
             self._predictor.fit(
