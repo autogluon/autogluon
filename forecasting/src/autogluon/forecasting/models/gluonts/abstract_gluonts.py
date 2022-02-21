@@ -25,6 +25,30 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractGluonTSModel(AbstractForecastingModel):
+    """Abstract class wrapping GluonTS estimators for use in autogluon.forecasting.
+
+    Parameters
+    ----------
+    path: str
+        directory to store model artifacts.
+    freq: str
+        string representation (compatible with GluonTS frequency strings) for the data provided.
+        For example, "1D" for daily data, "1H" for hourly data, etc.
+    prediction_length: int
+        Number of time steps ahead (length of the forecast horizon) the model will be optimized
+        to predict. At inference time, this will be the number of time steps the model will
+        predict.
+    name: str
+        Name of the model. Also, name of subdirectory inside path where model will be saved.
+    eval_metric: str
+        objective function the model intends to optimize, will use mean_wQuantileLoss by default.
+    hyperparameters:
+        various hyperparameters that will be used by model (can be search spaces instead of
+        fixed values).
+    kwargs:
+        Other keyword arguments to be provided to the GluonTS model.
+    """
+
     gluonts_model_path = "gluon_ts"
 
     def __init__(
@@ -37,27 +61,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,
     ):
-        """Abstract class wrapping GluonTS estimators for use in autogluon.forecasting.
-
-        Parameters
-        ----------
-        path: str
-            directory to store model artifacts.
-        freq: str
-            string representation (compatible with GluonTS frequency strings) for the data provided.
-            For example, "1D" for daily data, "1H" for hourly data, etc.
-        prediction_length: int
-            Number of time steps ahead (length of the forecast horizon) the model will be optimized
-            to predict. At inference time, this will be the number of time steps the model will
-            predict.
-        name: str
-            Name of the model. Also, name of subdirectory inside path where model will be saved.
-        eval_metric: str
-            objective function the model intends to optimize, will use mean_wQuantileLoss by default.
-        hyperparameters:
-            various hyperparameters that will be used by model (can be search spaces instead of
-            fixed values).
-        """
         name = name or re.sub(
             r"Model$", "", self.__class__.__name__
         )  # TODO: look name up from presets
@@ -72,7 +75,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
 
-        # TODO: separate gluonts parameters?
+        # TODO: handle gluonts constructor parameters
         self.params["callbacks"] = []
         self.params["freq"] = freq
         self.params["prediction_length"] = prediction_length
@@ -122,16 +125,9 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         with warning_filter():
             self.gts_predictor = estimator.train(train_data, validation_data=val_data)
 
-    def predict(self, data: Dataset, quantiles: List[float] = None) -> pd.DataFrame:
-        """
-        Return forecasts for given dataset and quantiles.
-
-        Parameters
-        ----------
-        data: dataset in the same format as train data
-        quantiles: list of ints, default=None
-              if quantiles=None, it will by default give all the quantiles that the model is trained for.
-        """
+    def predict(
+        self, data: Dataset, quantiles: List[float] = None
+    ) -> Dict[str, pd.DataFrame]:
         logger.log(30, f"Predicting with forecasting model {self.name}")
         with warning_filter():
             quantiles = [str(q) for q in (quantiles or self.quantiles)]
@@ -207,20 +203,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
     def score(
         self, data: Dataset, metric: Optional[str] = None, num_samples: int = 100
     ):
-        """
-        Return the evaluation scores for given metric and dataset.
-
-        Parameters
-        __________
-        data: dataset for evaluation in the same format as train dataset
-
-        metric: str, default=None
-                if metric is None, we will by default use mean_wQuantileLoss for scoring.
-                should be one of "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"
-
-        num_samples: int, default=100
-                number of samples selected for evaluation if the output of the model is DistributionForecast in gluonts
-        """
         evaluator = (
             Evaluator(quantiles=self.params["quantiles"])
             if "quantiles" in self.params

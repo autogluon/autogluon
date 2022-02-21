@@ -17,6 +17,9 @@ class EpochCounter(Callback):
 
 
 class TimeLimitCallback(Callback):
+    """GluonTS callback object to terminate training early if autogluon time limit
+    is reached."""
+
     def __init__(self, time_limit=None):
         self.start_time = None
         self.time_limit = time_limit

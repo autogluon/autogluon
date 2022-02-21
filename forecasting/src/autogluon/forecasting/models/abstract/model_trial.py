@@ -23,6 +23,9 @@ def model_trial(
     time_limit=None,
     fit_kwargs=None,
 ):
+    """Runs a single trial of a hyperparameter tuning. Replaces
+    `core.models.abstract.model_trial.model_trial` for forecasting models.
+    """
     try:
         model = init_model(args, model_cls, init_params)
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
@@ -80,9 +83,10 @@ def fit_and_save_model(
     return model
 
 
-def skip_hpo(model, train_data, val_data, time_limit=None, **kwargs):
-    """Skips HPO and simply trains the model once with the
-    provided HPO time budget. Returns model artifacts as if from HPO.
+def skip_hpo(model, train_data, val_data, time_limit=None):
+    """Skip hyperparameter optimization and train model with given parameters.
+    Replaces `core.models.abstract.model_trial.skip_hpo` for forecasting
+    models.
     """
     fit_and_save_model(
         model=model,

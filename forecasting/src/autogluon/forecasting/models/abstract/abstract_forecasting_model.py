@@ -19,6 +19,34 @@ logger = logging.getLogger(__name__)
 
 # TODO: Docstrings
 class AbstractForecastingModel(AbstractModel):
+    """Abstract class for all `Model` objects in autogluon.forecasting.
+
+    Parameters
+    ----------
+    path : str, default = None
+        Directory location to store all outputs.
+        If None, a new unique time-stamped directory is chosen.
+    freq: str
+        Frequency string (cf. gluonts frequency strings) describing the frequency
+        of the time series data. For example, "H" for hourly or "D" for daily data.
+    prediction_length: int
+        Length of the prediction horizon, i.e., the number of time steps the model
+        is fit to forecast.
+    name : str, default = None
+        Name of the subdirectory inside path where model will be saved.
+        The final model directory will be path+name+os.path.sep()
+        If None, defaults to the model's class name: self.__class__.__name__
+    eval_metric : str, default
+        Metric by which predictions will be ultimately evaluated on test data.
+        This only impacts `model.score()`, as eval_metric is not used during training.
+        Available metrics can be found in `autogluon.forecasting.utils.metric_utils.AVAILABLE_METRICS`, and
+        detailed documentation can be found in `gluonts.evaluation.Evaluator`. By default, `mean_wQuantileLoss`
+        will be used.
+    hyperparameters : dict, default = None
+        Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
+        If None, model defaults are used. This is identical to passing an empty dictionary.
+    """
+
     # following methods will not be available in forecasting models
     # TODO: check usage to see if higher level modules are dependent on these
     predict_proba = None
@@ -49,17 +77,6 @@ class AbstractForecastingModel(AbstractModel):
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
     ):
-        """
-        Create a new model
-        Args:
-            path(str): directory where to store all the model
-            freq(str): frequency
-            name(str): name of subdirectory inside path where model will be saved.
-            eval_metric(str): objective function the model intends to optimize, will use mean_wQuantileLoss by default
-            hyperparameters: various hyperparameters that will be used by model (can be search spaces instead of fixed
-                values).
-
-        """
         super().__init__(
             path=path,
             name=name,
@@ -98,7 +115,48 @@ class AbstractForecastingModel(AbstractModel):
         pass
 
     def fit(self, **kwargs) -> "AbstractForecastingModel":
-        """TODO: UPDATE DOCSTRING WITH NEW INTERFACE"""
+        """Fit forecasting model.
+
+        Models should not override the `fit` method, but instead override the `_fit` method which
+        has the same arguments.
+
+        Parameters
+        ----------
+        train_data : gluonts.dataset.common.Dataset
+            The training data. Forecasting models expect data to be in GluonTS format, i.e., an
+            iterator of dictionaries with `start` and `target` keys. `start` is a timestamp object
+            for the first data point in a time series while `target` is the time series which the
+            model will be fit to predict. The data set can optionally have other features which may
+            be used by the model. See individual model documentation and GluonTS dataset documentation
+            for details.
+        val_data : gluonts.dataset.common.Dataset
+            The validation data set in the same format as training data.
+        time_limit : float, default = None
+            Time limit in seconds to adhere to when fitting model.
+            Ideally, model should early stop during fit to avoid going over the time limit if specified.
+        num_cpus : int, default = 'auto'
+            How many CPUs to use during fit.
+            This is counted in virtual cores, not in physical cores.
+            If 'auto', model decides.
+        num_gpus : int, default = 'auto'
+            How many GPUs to use during fit.
+            If 'auto', model decides.
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            verbosity 4: logs every training iteration, and logs the most detailed information.
+            verbosity 3: logs training iterations periodically, and logs more detailed information.
+            verbosity 2: logs only important information.
+            verbosity 1: logs only warnings and exceptions.
+            verbosity 0: logs only exceptions.
+        **kwargs :
+            Any additional fit arguments a model supports.
+
+        Returns
+        -------
+        model: AbstractForecastingModel
+            The fitted model object
+        """
         return super().fit(**kwargs)
 
     def _fit(
@@ -111,15 +169,65 @@ class AbstractForecastingModel(AbstractModel):
         verbosity=2,
         **kwargs,
     ) -> None:
-        """TODO: UPDATE DOCSTRING WITH NEW INTERFACE"""
+        """Private method for `fit`. See `fit` for documentation of arguments. Apart from
+        the model training logic, `fit` additionally implements other logic such as keeping
+        track of the time limit, etc.
+        """
         raise NotImplementedError
 
     def predict(
         self, data: Dataset, quantiles: List[float] = None, **kwargs
     ) -> Dict[Any, pd.DataFrame]:
+        """Given a dataset, predict the next `self.prediction_length` time steps. The data
+        set is a GluonTS data set, an iterator over time series represented as python dictionaries.
+        This method produces predictions for the forecast horizon *after* the individual time series.
+
+        For example, if the data set includes 24 hour time series, of hourly data, starting from
+        00:00 on day 1, and forecast horizon is set to 5. The forecasts are five time steps 00:00-04:00
+        on day 2.
+
+        # TODO: The function currently returns a pandas.DataFrame instead of a GluonTS dataset, however
+        # TODO: this API will be aligned with the rest of the library.
+
+        Parameters
+        ----------
+        data: gluonts.dataset.common.Dataset
+            The dataset where each time series is the "context" for predictions.
+        quantiles
+            Quantiles of probabilistic forecasts. If None, `self.quantiles` will be used instead,
+            if provided during initialization.
+
+        Returns
+        -------
+        predictions: Dict[any, pandas.DataFrame]
+            pandas data frames with an timestamp index, where each input item from the input
+            data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
+            of input items.
+        """
         raise NotImplementedError
 
     def score(self, data: Dataset, metric: str = None, num_samples: int = 100) -> float:
+        """Return the evaluation scores for given metric and dataset. The last
+        `self.prediction_length` time steps of each time series in the input data set
+        will be held out and used for computing the evaluation score.
+
+        Parameters
+        ----------
+        data: gluonts.dataset.common.Dataset
+            Dataset used for scoring.
+        metric: str
+            String identifier of evaluation metric to use, from one of
+            `autogluon.forecasting.utils.metric_utils.AVAILABLE_METRICS`.
+        num_samples: int
+            Number of samples to use for making evaluation predictions if the probabilistic
+            forecasts are generated by forward sampling from the fitted model.
+
+        Returns
+        -------
+        score: float
+            The computed forecast evaluation score on the last `self.prediction_length`
+            time steps of each time series.
+        """
         raise NotImplementedError
 
     def _hyperparameter_tune(
@@ -129,11 +237,7 @@ class AbstractForecastingModel(AbstractModel):
         scheduler_options: Tuple[Any, Dict],
         **kwargs,
     ):
-        """
-        Hyperparameter tune the model.
-
-        This usually does not need to be overwritten by models.
-        """
+        """TODO: docstring"""
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(
@@ -159,7 +263,7 @@ class AbstractForecastingModel(AbstractModel):
                 f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
                 f"Will train one model based on the provided hyperparameters."
             )
-            return skip_hpo(self, train_data, val_data, time_limit=time_limit, **kwargs)
+            return skip_hpo(self, train_data, val_data, time_limit=time_limit)
         else:
             logger.log(15, f"\tHyperparameter search space for {self.name}: ")
             for hyperparameter in search_space:
@@ -198,7 +302,6 @@ class AbstractForecastingModel(AbstractModel):
 
         return self._get_hpo_results(scheduler, scheduler_params, time_start)
 
-    # OTHER DUMMY METHODS
     def preprocess(self, data: Any, **kwargs) -> Any:
         return data
 
