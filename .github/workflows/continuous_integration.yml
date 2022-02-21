@@ -28,7 +28,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -82,7 +81,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -136,7 +134,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -190,7 +187,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -244,7 +240,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -298,7 +293,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -352,7 +346,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -406,7 +399,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -461,7 +453,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -528,7 +519,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -595,7 +585,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -662,7 +651,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -729,7 +717,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -796,7 +783,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
@@ -863,7 +849,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AUTOGLUON_BATCH_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AUTOGLUON_BATCH_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AUTOGLUON_BATCH_ROLE_TO_ASSUME }}
-          role-duration-seconds: 7200
           aws-region: us-east-1
       - name: Install dependencies
         run: |
