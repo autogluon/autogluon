@@ -41,46 +41,19 @@ hyperparameters
 
 ### Text models
 
-Text model's configuration can be set via:
+Text model preset to use can be set via:
 
 ```{.python}
-hyperparameters['AG_TEXT_NN'] = {
-    "model": "/path/to/model/yaml/file",
-    "data": "/path/to/data/yaml/file",
-    "optimization": "/path/to/optimization/yaml/file",
-    "environment": "/path/to/optimization/yaml/file",
-}
+hyperparameters['AG_TEXT_NN'] = ['<preset>']
 ```
 
+Available text model presets:
 
-Text model uses the following configurations as default.
 
-
-```{.python .input}
-from omegaconf import OmegaConf
-from autogluon.text.automm.utils import get_config
-config = get_config({
-    "model": "fusion_mlp_text_tabular",
-    "data": "default",
-    "optimization": "adamw",
-    "environment": "default",
-})
-OmegaConf.to_container(config)
+```python
+from autogluon.text.text_prediction.text_presets import list_presets
+list_presets()
 ```
-
-You can also overwrite some default configurations by passing a dictionary.
-
-```{.python}
-hyperparameters['AG_TEXT_NN'] = {
-    'model.hf_text.checkpoint_name': 'google/electra-small-discriminator',
-    'data.categorical.convert_to_text': False,
-    'optimization.max_epochs': 1,
-    'env.per_gpu_batch_size': 16,
-}
-```
-
-
-The above example can overwrite the configurations for text backbone, whether categorical columns are converted to text, training epochs, and the batch size per GPU.
 
 ### Vision models
 
