@@ -6,7 +6,7 @@ import holidays
 
 from autogluon.common.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
 
-from abstract import AbstractFeatureGenerator
+from .abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -20,71 +20,74 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         For a full list of options see the methods inside pandas.Series.dt at https://pandas.pydata.org/docs/reference/api/pandas.Series.html
     """
     def __init__(self,
-            country, 
             features: list = ['year', 'month', 'day', 'dayofweek', 'hour'],
             **kwargs
     ):
         super().__init__(**kwargs)
         self.features = features
-        self.country = country
 
-    def _fit_transform(self, X: DataFrame, country, **kwargs) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._fillna_map = self._compute_fillna_map(X)
         X_out = self._transform(X)
+#         print(X_out.columns)
         type_family_groups_special = dict(
             datetime_as_int=list(X_out.columns)
         )
         return X_out, type_family_groups_special
+#         return X_out, dict(X_out.columns)
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        return self._generate_features_datetime(X, country)
+        return self._generate_features_datetime(X)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(required_raw_special_pairs=[
-            (R_DATETIME, None),
-            (None, [S_DATETIME_AS_OBJECT])
-        ])
+        return dict()
+#         return dict(valid_raw_types=[R_INT, R_DATETIME, R_CATEGORY, R_OBJECT, R_FLOAT, R_BOOL, S_TEXT, "np.float64", "str"])
+#         return dict(required_raw_special_pairs=[
+#             (R_DATETIME, None),
+#             (None, [S_DATETIME_AS_OBJECT])
+#         ])
 
     def _compute_fillna_map(self, X: DataFrame):
         fillna_map = dict()
         for datetime_feature in self.features_in:
-            datetime_series = pd.to_datetime(X[datetime_feature], errors='coerce')
+            if type(X[datetime_feature].iloc[0]) == pd.Timestamp:
+                datetime_series = pd.to_datetime(X[datetime_feature], errors='coerce')
 
-            # Best guess is currently to fill by the mean.
-            fillna_datetime = datetime_series.mean()
-            fillna_map[datetime_feature] = fillna_datetime
+                # Best guess is currently to fill by the mean.
+                fillna_datetime = datetime_series.mean()
+                fillna_map[datetime_feature] = fillna_datetime
         return fillna_map
-    
-    def _periodic_encode(self, col, X: DataFrame) -> DataFrame:
-        X[col + '_cos'] = np.cos(2 * np.pi * X[col] / X[col].max())
-        X[col + '_sin'] = np.sin(2 * np.pi * X[col] / X[col].max())
-        return X
 
     # TODO: Improve handling of missing datetimes
-    def _generate_features_datetime(self, X: DataFrame, country) -> DataFrame:
-        X_datetime = DataFrame(index=X.index)
-        X_datetime["holidays"] = 0
+    def _generate_features_datetime(self, X: DataFrame) -> DataFrame:
+#       X_datetime = DataFrame(index=X.index)
+        X_datetime = X.copy()
+#         print(X_datetime)
+        country = locale.getlocale()[0].split("_")[1]
         holidays_list = holidays.CountryHoliday(country)
         for datetime_feature in self.features_in:
-            # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
-            # TODO: could also return an extra boolean column is_nan which could provide predictive signal.
-            X_datetime[datetime_feature] = pd.to_datetime(X[datetime_feature], errors='coerce').fillna(self._fillna_map[datetime_feature])
-            # X_datetime[datetime_feature] = pd.to_timedelta(X_datetime[datetime_feature]).dt.total_seconds()
-            # Parse the date into lots of derived fields.
-            # Most of the pandas Series.dt properties are here, a few are omitted (e.g. is_month_start) if they can be inferred
-            # from other features.
-            for feature in self.features:
-                X_datetime[datetime_feature + '.' + feature] = getattr(X_datetime[datetime_feature].dt, feature).astype(int)
-             
-            for i in range(len(X_datetime)):
-                X_datetime["holidays"].iloc[i] = int(date(X_datetime[datetime_feature + ".year"].iloc[i], X_datetime[datetime_feature + ".month"].iloc[i], X_datetime[datetime_feature + ".day"].iloc[i]) in holidays_list)
-            X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
-            
-            X_datetime["dow_hour"] = X_datetime[datetime_feature + ".dayofweek"] + X_datetime[datetime_feature + ".hour"] / 24
-            X_datetime["dow_hour_sin"] = np.sin(2 * np.pi * X_datetime["dow_hour"] / 7.0)
-            X_datetime["dow_hour_cos"] = np.cos(2 * np.pi * X_datetime["dow_hour"] / 7.0)
-            X_datetime = X_datetime.drop('dow_hour', axis=1)
+            if type(X[datetime_feature].iloc[0]) == pd.Timestamp:
+                X_datetime[datetime_feature + "_holiday"] = 0
+                # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
+                # TODO: could also return an extra boolean column is_nan which could provide predictive signal.
+                X_datetime[datetime_feature] = pd.to_datetime(X[datetime_feature], errors='coerce').fillna(self._fillna_map[datetime_feature])
+                # X_datetime[datetime_feature] = pd.to_timedelta(X_datetime[datetime_feature]).dt.total_seconds()
+                # Parse the date into lots of derived fields.
+                # Most of the pandas Series.dt properties are here, a few are omitted (e.g. is_month_start) if they can be inferred
+                # from other features.
+                for feature in self.features:
+                    X_datetime[datetime_feature + '.' + feature] = getattr(X_datetime[datetime_feature].dt, feature).astype(int)
+
+                for i in range(len(X_datetime)):
+                    X_datetime[datetime_feature + "_holiday"].iloc[i] = int(date(X_datetime[datetime_feature + ".year"].iloc[i], X_datetime[datetime_feature + ".month"].iloc[i], X_datetime[datetime_feature + ".day"].iloc[i]) in holidays_list)
+                X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
+
+                X_datetime["dow_hour"] = X_datetime[datetime_feature + ".dayofweek"] + X_datetime[datetime_feature + ".hour"] / 24
+                X_datetime["dow_hour_sin"] = np.sin(2 * np.pi * X_datetime["dow_hour"] / 7.0)
+                X_datetime["dow_hour_cos"] = np.cos(2 * np.pi * X_datetime["dow_hour"] / 7.0)
+                X_datetime = X_datetime.drop('dow_hour', axis=1)
+#         print(X_datetime)
 
             
         return X_datetime
