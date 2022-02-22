@@ -114,7 +114,7 @@ tests = [
         'n_features': 2,
         'n_categorical': 0,
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'toy' } },
-        'expected_score_range' : {
+        'expected_score_range' : { 
                   'CatBoost': (-28.39, 0.01),
                   'LightGBM': (-27.81, 0.01),
                   'NeuralNetTorch': (-27.11, 0.01),
@@ -367,12 +367,9 @@ def inner_test_tabular(testname):
         leaderboard = predictor.leaderboard(dftest, silent=True)
         leaderboard = leaderboard.sort_values(by='model') # So we can pre-generate sample config in alphabetical order
 
-        # Did we run any unexpected models?  Or did any models unexpectedly fail?
-        assert set(leaderboard['model']) == set(test['expected_score_range'].keys()), (f"Test '{testname}' params {params} got unexpected model list")
-
-        # Print out the new config section in case developer wants to cut and paste it wholesale.
-        newconfig = "Proposed new config:\n"
-        newconfig += "'expected_score_range' : {\n";
+        # Store proposed new config based on the current run, in case the developer wants to keep thee results (just cut and paste).
+        proposedconfig = "Proposed new config:\n"
+        proposedconfig += "'expected_score_range' : {\n";
         for model in leaderboard['model']:
             midx_in_leaderboard = leaderboard.index.values[leaderboard['model'] == model][0]
             if np.isnan(leaderboard['score_test'][midx_in_leaderboard]): 
@@ -383,10 +380,13 @@ def inner_test_tabular(testname):
                  else:
                      currentprecision = 0.01
                  values = "{}, {}".format(myfloor(leaderboard['score_test'][midx_in_leaderboard], currentprecision), currentprecision)
-            newconfig += f"    '{model}': ({values}),\n"
-        newconfig += "},\n"
+            proposedconfig += f"    '{model}': ({values}),\n"
+        proposedconfig += "},\n"
 
-        # Now print out the current config, and highlight any values that aren't met.
+        # First validate the model list was as expected.
+        assert set(leaderboard['model']) == set(test['expected_score_range'].keys()), (f"Test '{testname}' params {params} got unexpected model list.\n" + proposedconfig)
+
+        # Now validate the scores for each model were as expected.
         all_assertions_met = True
         currentconfig = "Existing config:\n"
         currentconfig += "'expected_score_range' : {\n";
@@ -411,7 +411,7 @@ def inner_test_tabular(testname):
                 all_assertions_met = False
         currentconfig += "},\n"
 
-        assert all_assertions_met, f"Test '{testname}', params {params} had unexpected scores:\n" + currentconfig + newconfig
+        assert all_assertions_met, f"Test '{testname}', params {params} had unexpected scores:\n" + currentconfig + proposedconfig
 
         # Clean up this model created with specific params.
         predictor.delete_models(models_to_keep=[], dry_run=False)  
