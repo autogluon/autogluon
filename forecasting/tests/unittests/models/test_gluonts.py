@@ -115,20 +115,23 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_works(model_cl
     model = model_class(
         freq="H",
         hyperparameters={
-            "epochs": ag.Int(3, 5),
-            "ag_args_fit": {"quantile_levels": [.1, .9]},
+            "epochs": ag.Int(3, 4),
+            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
         },
     )
 
-    model.hyperparameter_tune(
+    _, _, results = model.hyperparameter_tune(
         scheduler_options=scheduler_options,
         time_limit=100,
         train_data=DUMMY_DATASET,
         val_data=DUMMY_DATASET,
     )
 
+    assert len(results["config_history"]) == 2
+    assert results["config_history"][0]["epochs"] == 3
+    assert results["config_history"][1]["epochs"] == 4
 
-# TODO: test models can predict correctly
+
 # TODO: test models can score correctly
 # TODO: test other inherited functionality
 # TODO: test model hyperparameters are passed correctly

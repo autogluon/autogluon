@@ -47,7 +47,9 @@ class DeepARModel(AbstractGluonTSModel):
 
     def _get_estimator(self):
         with warning_filter():
-            return DeepAREstimator.from_hyperparameters(**self.params)
+            return DeepAREstimator.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
 
 
 class MQCNNModel(AbstractGluonTSModel):
@@ -104,7 +106,9 @@ class MQCNNModel(AbstractGluonTSModel):
             self.params["hybridize"] = False
 
         with warning_filter():
-            return MQCNNEstimator.from_hyperparameters(**self.params)
+            return MQCNNEstimator.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
 
 
 class SimpleFeedForwardModel(AbstractGluonTSModel):
@@ -131,7 +135,9 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
 
     def _get_estimator(self):
         with warning_filter():
-            return SimpleFeedForwardEstimator.from_hyperparameters(**self.params)
+            return SimpleFeedForwardEstimator.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
 
 
 class AutoTabularModel(AbstractGluonTSModel):
@@ -159,8 +165,8 @@ class AutoTabularModel(AbstractGluonTSModel):
     # TODO: handling time limit and training data. See PR #1538.
     def _get_estimator(self):
         return TabularEstimator(
-            freq=self.params["freq"],
-            prediction_length=self.params["prediction_length"],
-            time_limit=self.params["time_limit"],
-            last_k_for_val=self.params["prediction_length"],
+            freq=self.freq,
+            prediction_length=self.prediction_length,
+            time_limit=self.params_aux["time_limit"],
+            last_k_for_val=self.prediction_length,
         )

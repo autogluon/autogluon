@@ -58,7 +58,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         name: Optional[str] = None,
         eval_metric: str = None,
         hyperparameters: Dict[str, Any] = None,
-        **kwargs
+        **kwargs,
     ):
         name = name or re.sub(
             r"Model$", "", self.__class__.__name__
@@ -73,12 +73,10 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
 
-        # TODO: handle gluonts constructor parameters
-        # TODO: handle callbacks and gluonts constructor arguments separately
-        # TODO: from tunable parameters
-        self.params["callbacks"] = []
-        self.params["freq"] = freq
-        self.params["prediction_length"] = prediction_length
+        self.callbacks = []
+        self.params_aux["callbacks"] = self.callbacks
+        self.params_aux["freq"] = freq
+        self.params_aux["prediction_length"] = prediction_length
 
     def save(self, path: str = None) -> str:
         if path is None:
@@ -110,6 +108,33 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         )
         return model
 
+    def _deferred_init_params_aux(self, **kwargs) -> None:
+        """Update GluonTS specific parameters with information available
+        only at training time, and register these as auxiliary parameters.
+        """
+        if "dataset" in kwargs:
+            ds = kwargs.get("dataset")
+            top_item = next(iter(ds))
+            self.freq = top_item.get("freq", kwargs.get("freq") or self.freq)
+            if not self.freq:
+                raise ValueError(
+                    "Dataset frequency not provided in the dataset, fit arguments or "
+                    "during initialization. Please provide a `freq` string to `fit`."
+                )
+            self.params_aux["freq"] = self.freq
+
+        if "callback" in kwargs:
+            self.callbacks.append(kwargs["callback"])
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        """Get GluonTS specific constructor arguments for estimator objects"""
+        return dict(
+            freq=self.freq,
+            prediction_length=self.prediction_length,
+            callbacks=self.callbacks,
+            **self.params,  # reserved for tunable hyperparameters
+        )
+
     def _get_estimator(self) -> GluonTSEstimator:
         raise NotImplementedError
 
@@ -121,7 +146,12 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         **kwargs,
     ) -> None:
         logger.log(30, f"Training forecasting model {self.name}...")
-        self.params["callbacks"].append(TimeLimitCallback(time_limit))
+
+        # update auxiliary parameters
+        self._deferred_init_params_aux(
+            dataset=train_data, callback=TimeLimitCallback(time_limit), **kwargs
+        )
+
         estimator = self._get_estimator()
         with warning_filter():
             self.gts_predictor = estimator.train(train_data, validation_data=val_data)
@@ -181,8 +211,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                 df = pd.DataFrame(tmp_dict)
                 df.index = pd.date_range(
                     start=predicted_targets[i].start_date,
-                    periods=self.params["prediction_length"],
-                    freq=self.params["freq"],
+                    periods=self.prediction_length,
+                    freq=self.freq,
                 )
                 if index_count[index[i]] > 1:
                     result_dict[f"{index[i]}_{predicted_targets[i].start_date}"] = df

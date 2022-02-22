@@ -18,6 +18,9 @@ def pytest_configure(config):
     # known gluonts warning
     config.addinivalue_line("filterwarnings", "ignore:Using `json`-module:UserWarning")
 
+    # pandas future warnings on timestamp freq being deprecated
+    config.addinivalue_line("filterwarnings", "ignore:.+freq:FutureWarning")
+
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--runslow"):
