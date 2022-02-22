@@ -17,7 +17,7 @@ def list_model_presets():
     A list of model types.
     """
     cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_config_dir = os.path.join(cur_path, "configs/model")
+    model_config_dir = os.path.join(cur_path, "configs", "model")
     model_config_files = [f for f in os.listdir(model_config_dir) if f.endswith((".yaml", ".yml"))]
     model_presets = [f.split(".")[0] for f in model_config_files]
     return model_presets
@@ -55,7 +55,7 @@ def preset_to_config(model_type: str):
         config[MODEL] = model_type
 
         cur_path = os.path.dirname(os.path.abspath(__file__))
-        model_config_dir = os.path.join(cur_path, "configs/model")
+        model_config_dir = os.path.join(cur_path, "configs", "model")
         model_config_path = os.path.join(model_config_dir, f"{model_type}.yaml")
         if not os.path.isfile(model_config_path):
             raise ValueError(
