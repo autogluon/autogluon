@@ -79,6 +79,7 @@ class TextPredictorModel(AbstractModel):
         super()._set_default_params()
         try_import_autogluon_text()
         self.params = {}
+        self.preset = "medium_quality_faster_train"
 
     def _fit(self,
              X: pd.DataFrame,
@@ -146,6 +147,7 @@ class TextPredictorModel(AbstractModel):
                        time_limit=time_limit,
                        num_gpus=num_gpus,
                        num_cpus=num_cpus,
+                       presets=self.preset,
                        hyperparameters=self.params,
                        seed=self.params.get('seed', 0))
         self.model.set_verbosity(verbosity)

@@ -175,8 +175,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == CATEGORICAL:
                 if self._config["categorical"]["convert_to_text"]:
                     # Convert categorical column as text column
-                    processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
-                    if len(np.unique(processed_data)) == 1:
+                    col_value = col_value.astype("object")
+                    processed_data = col_value.apply(lambda ele: '' if pd.isnull(ele) else str(ele))
+                    if len(processed_data.unique()) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
                     self._text_feature_names.append(col_name)
@@ -248,7 +249,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_value = df[col_name]
             col_type = self._column_types[col_name]
             if col_type == TEXT or col_type == CATEGORICAL:
-                processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
+                # TODO: do we need to consider whether categorical values are valid text?
+                col_value = col_value.astype("object")
+                processed_data = col_value.apply(lambda ele: '' if pd.isnull(ele) else str(ele))
             elif col_type == NUMERICAL:
                 processed_data = pd.to_numeric(col_value).apply('{:.3f}'.format)
             else:
