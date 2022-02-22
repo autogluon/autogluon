@@ -51,8 +51,8 @@ Available text model presets:
 
 
 ```{.python .input}
-from autogluon.text.text_prediction.text_presets import list_presets
-list_presets()
+from autogluon.text.text_prediction.text_presets import list_text_presets
+list_text_presets()
 ```
 
 ### Vision models

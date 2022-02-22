@@ -1,17 +1,39 @@
 from ..automm.presets import preset_to_config
 
 
-def list_text_presets():
+def list_text_presets(verbose=False):
     """
     Returns
     -------
-    A list of simple presets available in AutoGluon-Text.
+    If verbose==True, return all the preset strings and their corresponding config customizations.
+    If verbose==False, return a list of simple presets strings.
     """
-    simple_presets = [
-        "default", "medium_quality_faster_train",
-        "high_quality", "best_quality", "multilingual",
-    ]
-    return simple_presets
+    simple_presets = {
+        "default": {
+            "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+        },
+        "medium_quality_faster_train": {
+            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+            "optimization.learning_rate": 4e-4,
+        },
+        "high_quality": {
+            "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+        },
+        "best_quality": {
+            "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+            "env.per_gpu_batch_size": 2,
+        },
+        "multilingual": {
+            "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+            "env.precision": "bf16",
+            "env.per_gpu_batch_size": 2,
+        },
+    }
+
+    if verbose:
+        return simple_presets
+    else:
+        return list(simple_presets.keys())
 
 
 def text_preset_to_config(preset: str):
@@ -33,26 +55,10 @@ def text_preset_to_config(preset: str):
     model_type = "fusion_mlp_text_tabular"
     config = preset_to_config(model_type)
     preset = preset.lower()
-    if preset == "default" or preset == "high_quality":
-        overrides = {
-            "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-        }
-    elif preset == "medium_quality_faster_train":
-        overrides = {
-            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-            "optimization.learning_rate": 4e-4,
-        }
-    elif preset == "best_quality":
-        overrides = {
-            "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
-            "env.per_gpu_batch_size": 2,
-        }
-    elif preset == "multilingual":
-        overrides = {
-            "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
-            "env.precision": "bf16",
-            "env.per_gpu_batch_size": 2,
-        }
+    available_presets = list_text_presets(verbose=True)
+
+    if preset in available_presets:
+        overrides = available_presets[preset]
     else:
         raise ValueError(
             f"Provided preset '{preset}' is not supported. "
