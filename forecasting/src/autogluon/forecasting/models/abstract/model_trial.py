@@ -66,7 +66,9 @@ def fit_and_save_model(
         time_left = None
 
     time_fit_start = time.time()
-    model.fit(train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
+    model.fit(
+        train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs
+    )
     time_fit_end = time.time()
     logger.log(
         30,

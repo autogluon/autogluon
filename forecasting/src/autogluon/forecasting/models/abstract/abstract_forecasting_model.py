@@ -68,13 +68,13 @@ class AbstractForecastingModel(AbstractModel):
 
     def __init__(
         self,
-        freq: str,  # todo: deferred init
+        freq: Optional[str] = None,
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
             path=path,
@@ -97,13 +97,15 @@ class AbstractForecastingModel(AbstractModel):
         self._init_params()
 
     def _init_misc(self, **kwargs) -> None:
-        self.quantile_levels = self.params_aux.get('quantile_levels', None)
+        self.quantile_levels = self.params_aux.get("quantile_levels", None)
 
     def _get_default_auxiliary_params(self) -> Dict[str, Any]:
         default_aux_params = super()._get_default_auxiliary_params()
-        default_aux_params.update({
-            "quantile_levels": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-        })
+        default_aux_params.update(
+            {
+                "quantile_levels": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+            }
+        )
         return default_aux_params
 
     def _compute_fit_metadata(self, val_data: Dataset = None, **kwargs):
@@ -119,10 +121,12 @@ class AbstractForecastingModel(AbstractModel):
     def get_params(self) -> dict:
         """Get params of the model at the time of initialization"""
         args = super().get_params()
-        args.update(dict(
-            freq=self.freq,
-            prediction_length=self.prediction_length,
-        ))
+        args.update(
+            dict(
+                freq=self.freq,
+                prediction_length=self.prediction_length,
+            )
+        )
 
         return args
 

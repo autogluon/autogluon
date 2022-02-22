@@ -16,6 +16,7 @@ from autogluon.forecasting.models.gluonts import (
     MQCNNModel,
 )
 from autogluon.forecasting.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
 
 TESTABLE_MODELS = [
     # AutoTabularModel,  # TODO: enable tests when model is stabilized
@@ -73,6 +74,24 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+@pytest.mark.parametrize("metric", [AVAILABLE_METRICS])
+def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
+    model_class, prediction_length, metric
+):
+    model = model_class(
+        freq="H",
+        prediction_length=prediction_length,
+        hyperparameters={"epochs": 2},
+    )
+
+    model.fit(train_data=DUMMY_DATASET)
+    score = model.score(DUMMY_DATASET)
+
+    assert isinstance(score, float)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("time_limit", [10, None])
 def test_given_time_limit_when_fit_called_then_models_train_correctly(
     model_class, time_limit
@@ -88,6 +107,26 @@ def test_given_time_limit_when_fit_called_then_models_train_correctly(
         assert not model.gts_predictor
         model.fit(train_data=DUMMY_DATASET, time_limit=time_limit)
         assert isinstance(model.gts_predictor, GluonTSPredictor)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_no_freq_argument_when_fit_called_then_model_raises_value_error(
+    model_class,
+):
+    model = model_class()
+    with pytest.raises(ValueError):
+        model.fit(train_data=DUMMY_DATASET, time_limit=10)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_raise_error(
+    model_class,
+):
+    model = model_class()
+    try:
+        model.fit(train_data=DUMMY_DATASET, time_limit=2, freq="H")
+    except ValueError:
+        pytest.fail("unexpected ValueError raised in fit")
 
 
 @pytest.mark.timeout(4)
@@ -132,6 +171,6 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_works(model_cl
     assert results["config_history"][1]["epochs"] == 4
 
 
-# TODO: test models can score correctly
+# TODO: test models can save correctly
 # TODO: test other inherited functionality
 # TODO: test model hyperparameters are passed correctly

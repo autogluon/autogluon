@@ -52,7 +52,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
     def __init__(
         self,
-        freq: str,
+        freq: Optional[str] = None,
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,

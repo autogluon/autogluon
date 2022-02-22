@@ -14,7 +14,7 @@ def test_check_style():
     lines = flake8_out.splitlines()
     count = int(lines[-1].decode())
     if count > 0:
-        warnings.warn(f"{count} PEP8 warnings remaining")
+        warnings.warn(f"{count} PEP8 warnings remaining\n" + flake8_out.decode())
     assert (
         count < 1000
     ), "Too many PEP8 warnings found, improve code quality to pass test."
