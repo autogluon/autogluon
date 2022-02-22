@@ -1,8 +1,4 @@
-import random
-
-import pandas as pd
 import pytest
-from gluonts.dataset.common import ListDataset
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 import autogluon.core as ag
@@ -16,28 +12,14 @@ from autogluon.forecasting.models.gluonts import (
 from autogluon.forecasting.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
 
+from .common import DUMMY_DATASET
+
 TESTABLE_MODELS = [
     # AutoTabularModel,  # TODO: enable tests when model is stabilized
     DeepARModel,
     MQCNNModel,
     SimpleFeedForwardModel,
 ]
-
-DUMMY_DATASET = ListDataset(
-    [
-        {
-            "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
-            "item_id": 0,
-        },
-        {
-            "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
-            "item_id": 1,
-        },
-    ],
-    freq="H",
-)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -187,6 +169,26 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
         )
 
 
-# TODO: test models can save correctly
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
+    model_class, temp_model_path
+):
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        hyperparameters={
+            "epochs": 1,
+            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
+        },
+    )
+    model.fit(
+        train_data=DUMMY_DATASET,
+    )
+    model.save()
+
+    loaded_model = model_class.load(path=model.path)
+
+    assert loaded_model.gts_predictor == model.gts_predictor
+
+
 # TODO: test other inherited functionality
-# TODO: test model hyperparameters are passed correctly
