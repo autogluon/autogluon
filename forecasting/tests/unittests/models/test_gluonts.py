@@ -1,6 +1,4 @@
-import os
 import random
-import tempfile
 
 import pandas as pd
 import pytest
@@ -43,30 +41,28 @@ DUMMY_DATASET = ListDataset(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_models_can_be_initialized(model_class):
-    with tempfile.TemporaryDirectory() as tp:
-        model = model_class(path=tp + os.path.sep, freq="H", prediction_length=24)
+def test_models_can_be_initialized(model_class, temp_model_path):
+    model = model_class(path=temp_model_path, freq="H", prediction_length=24)
     assert isinstance(model, AbstractGluonTSModel)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [5, 10])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_correct(
-    model_class, prediction_length
+    model_class, prediction_length, temp_model_path
 ):
-    with tempfile.TemporaryDirectory() as tp:
-        model = model_class(
-            path=tp + os.path.sep,
-            freq="H",
-            prediction_length=prediction_length,
-            hyperparameters={"epochs": 2},
-        )
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=prediction_length,
+        hyperparameters={"epochs": 2},
+    )
 
-        assert not model.gts_predictor
-        model.fit(train_data=DUMMY_DATASET)
-        assert isinstance(model.gts_predictor, GluonTSPredictor)
+    assert not model.gts_predictor
+    model.fit(train_data=DUMMY_DATASET)
+    assert isinstance(model.gts_predictor, GluonTSPredictor)
 
-        predictions = model.predict(DUMMY_DATASET)
+    predictions = model.predict(DUMMY_DATASET)
 
     assert len(predictions) == len(DUMMY_DATASET)
     assert all(len(df) == prediction_length for _, df in predictions.items())
@@ -77,9 +73,10 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 @pytest.mark.parametrize("prediction_length", [1, 5])
 @pytest.mark.parametrize("metric", [AVAILABLE_METRICS])
 def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
-    model_class, prediction_length, metric
+    model_class, prediction_length, metric, temp_model_path
 ):
     model = model_class(
+        path=temp_model_path,
         freq="H",
         prediction_length=prediction_length,
         hyperparameters={"epochs": 2},
@@ -94,35 +91,34 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("time_limit", [10, None])
 def test_given_time_limit_when_fit_called_then_models_train_correctly(
-    model_class, time_limit
+    model_class, time_limit, temp_model_path
 ):
-    with tempfile.TemporaryDirectory() as tp:
-        model = model_class(
-            path=tp + os.path.sep,
-            freq="H",
-            prediction_length=5,
-            hyperparameters={"epochs": 2},
-        )
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=5,
+        hyperparameters={"epochs": 2},
+    )
 
-        assert not model.gts_predictor
-        model.fit(train_data=DUMMY_DATASET, time_limit=time_limit)
-        assert isinstance(model.gts_predictor, GluonTSPredictor)
+    assert not model.gts_predictor
+    model.fit(train_data=DUMMY_DATASET, time_limit=time_limit)
+    assert isinstance(model.gts_predictor, GluonTSPredictor)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_no_freq_argument_when_fit_called_then_model_raises_value_error(
-    model_class,
+    model_class, temp_model_path
 ):
-    model = model_class()
+    model = model_class(path=temp_model_path)
     with pytest.raises(ValueError):
         model.fit(train_data=DUMMY_DATASET, time_limit=10)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_raise_error(
-    model_class,
+    model_class, temp_model_path
 ):
-    model = model_class()
+    model = model_class(path=temp_model_path)
     try:
         model.fit(train_data=DUMMY_DATASET, time_limit=2, freq="H")
     except ValueError:
@@ -132,26 +128,28 @@ def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_ra
 @pytest.mark.timeout(4)
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_low_time_limit_when_fit_called_then_model_training_does_not_exceed_time_limit(
-    model_class,
+    model_class, temp_model_path
 ):
-    with tempfile.TemporaryDirectory() as tp:
-        model = model_class(
-            path=tp + os.path.sep,
-            freq="H",
-            prediction_length=5,
-            hyperparameters={"epochs": 20000},
-        )
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=5,
+        hyperparameters={"epochs": 20000},
+    )
 
-        assert not model.gts_predictor
-        model.fit(train_data=DUMMY_DATASET, time_limit=2)
-        assert isinstance(model.gts_predictor, GluonTSPredictor)
+    assert not model.gts_predictor
+    model.fit(train_data=DUMMY_DATASET, time_limit=2)
+    assert isinstance(model.gts_predictor, GluonTSPredictor)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_hyperparameter_spaces_when_tune_called_then_tuning_works(model_class):
+def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
+    model_class, temp_model_path
+):
     scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
 
     model = model_class(
+        path=temp_model_path,
         freq="H",
         hyperparameters={
             "epochs": ag.Int(3, 4),
@@ -169,6 +167,24 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_works(model_cl
     assert len(results["config_history"]) == 2
     assert results["config_history"][0]["epochs"] == 3
     assert results["config_history"][1]["epochs"] == 4
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(
+    model_class, temp_model_path
+):
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        hyperparameters={
+            "epochs": ag.Int(3, 4),
+            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
+        },
+    )
+    with pytest.raises(ValueError, match=".*hyperparameter_tune.*"):
+        model.fit(
+            train_data=DUMMY_DATASET,
+        )
 
 
 # TODO: test models can save correctly

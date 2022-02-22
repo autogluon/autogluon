@@ -14,6 +14,7 @@ from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
+import autogluon.core as ag
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
 
@@ -146,6 +147,13 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         **kwargs,
     ) -> None:
         logger.log(30, f"Training forecasting model {self.name}...")
+
+        # gracefully handle hyperparameter specifications if they are provided to fit instead
+        if any(isinstance(v, ag.Space) for v in self.params.values()):
+            raise ValueError(
+                "Hyperparameter spaces provided to `fit`. Please provide concrete values "
+                "as hyperparameters when initializing or use `hyperparameter_tune` instead."
+            )
 
         # update auxiliary parameters
         self._deferred_init_params_aux(

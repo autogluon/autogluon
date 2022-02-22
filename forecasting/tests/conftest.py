@@ -1,3 +1,7 @@
+import os
+import shutil
+import tempfile
+
 import pytest
 
 
@@ -30,3 +34,11 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "slow" in item.keywords:
             item.add_marker(skip_slow)
+
+
+@pytest.fixture(scope="session")
+def temp_model_path():
+    """Pytest fixture to save as model paths that clean up after themselves"""
+    td = tempfile.mkdtemp()
+    yield td + os.path.sep
+    shutil.rmtree(td)
