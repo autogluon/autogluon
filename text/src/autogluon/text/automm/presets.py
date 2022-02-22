@@ -25,7 +25,7 @@ def list_model_presets():
 
 def preset_to_config(model_type: str):
     """
-    Get the default preset strings of one predictor in AutoMM.
+    Get the default config of one predictor in AutoMM.
     Currently, we only use model type to differentiate different predictors.
     In future, we can simultaneously consider model type, data type, optimization type,
     and environment type to construct more diverse presets.
