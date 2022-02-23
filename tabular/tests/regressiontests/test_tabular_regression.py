@@ -7,8 +7,41 @@
     If any changes are spotted, the script does its best to dump out new proposed score ranges
     that you can cut and paste into the tests.  Only do this once you've identified the cause!
 
+    Naming confusion: 
+        - this is a *regression* test, to make sure no functionality has accidentally got worse (testing terminology)
+        - it runs two types of TabularPredictor tests : *regression* and classification (ML terminology)
+
     These tests are designed to run fast, to permit them to be run on a github hook.
-    Currently the 11 tests, testing TabularPredictor.fit() 20 times, run in ~5 minutes on a 64 vcore machine with no GPU.
+    Currently the 11 tests, calling TabularPredictor.fit() 20 times, run in ~8 minutes on an 8 vcore machine with no GPU.
+
+    Format of a test:  
+
+    {   # Default regression model on a small dataset
+        'name':             # some unique name
+        'type':             # either 'regression' or 'classification'.  We make a synthetic dataset using scikit-learn.make_{regression,classification}
+        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE defaulting to 0.5, we make an additional n_samples for testing.
+        'n_features': 2,    # number of columns.
+        'n_categorical': 0, # number of categorical (discrete not continuous) columns.
+        'params' : [ { 'predict' : {}, 'fit' : {} },          # If an array, we call TabularPredictor multiple times with different parameters.
+                     { 'predict' : {}, 'fit' : {} },          # Pass the additional parameters to predict(), fit() or both in the dicts.
+                                                              # If a scalar, we only call TabularPredictor once.
+                   ],
+        'expected_score_range' : {                            # A list of models we expect to run, and a valid score range we expect from each model.
+                  'CatBoost': (-7.86, 0.01),                  # The first value is the lower bound, the 2nd value is a delta to compute the upper bound.
+                  'ExtraTreesMSE': (-7.88, 0.01),             # E.g. ( -8.12, 0.01 ) means we expect a score between -8.12 and -8.11 inclusive.
+                  'CatBoost_BAG_L1': (np.nan, np.nan),        # If np.nan is supplied for both values, we expect this model to return np.nan as the score.
+        },
+    },
+
+    Testing by @willsmithorg:
+    The initial values were produced on my home Linux machine 
+                                                         (64 vcore, no GPU, Python==3.8.10, scikit-learn==1.0.2, torch==1.10.2).
+    They've since been tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with 
+                                                          (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.02, torch==1.10.2), 
+                                                          this gave different results for some of the ExtraTreesMSE and RandomForestMSE results, 
+                                                          with all the others remaining fixsed.
+
+
 """
 import os
 import math
