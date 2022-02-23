@@ -1,6 +1,6 @@
 import pytest
 import functools
-from autogluon.text.text_prediction.text_presets import (
+from autogluon.text.text_prediction.presets import (
     text_preset_to_config,
     list_text_presets,
 )

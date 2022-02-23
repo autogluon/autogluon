@@ -37,7 +37,7 @@ We provided a series of pre-configured hyperparameters. You may list the keys fr
 
 
 ```{.python .input}
-from autogluon.text import ag_text_presets, list_presets
+from autogluon.text.text_prediction.legacy_presets import ag_text_presets, list_presets
 list_presets()
 ```
 

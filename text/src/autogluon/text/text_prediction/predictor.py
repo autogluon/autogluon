@@ -1,5 +1,5 @@
 from ..automm import AutoMMPredictor
-from .text_presets import text_preset_to_config
+from .presets import text_preset_to_config
 from .constants import PYTORCH, MXNET
 
 
@@ -180,11 +180,11 @@ class TextPredictor:
         presets : str, default = None
             Presets are pre-registered configurations that control training (hyperparameters and other aspects).
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
-            Print all available presets via `autogluon.text.list_presets()`.
+            Print all available presets via `autogluon.text.list_text_presets()`.
             Some notable presets include:
                 - "best_quality": produce the most accurate overall predictor (regardless of its efficiency).
-                - "medium_quality_faster_train": produce an accurate predictor but take efficiency into account (this is the default preset).
-                - "lower_quality_fast_train": produce a predict that is quick to train and make predictions with, even if its accuracy is worse.
+                - "high_quality": produce an accurate predictor but take efficiency into account (this is the default preset).
+                - "medium_quality_faster_train": produce a predict that is quick to train and make predictions with, even if its accuracy is worse.
         hyperparameters : dict, default = None
             The hyperparameters of the `fit()` function, which affect the resulting accuracy of the trained predictor.
             Experienced AutoGluon users can use this argument to specify neural network hyperparameter values/search-spaces as well as which hyperparameter-tuning strategy should be employed. See the "Text Prediction" tutorials for examples.
