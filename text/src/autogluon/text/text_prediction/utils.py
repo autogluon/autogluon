@@ -4,6 +4,7 @@ import functools
 import logging
 import os
 import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 import inspect
 
@@ -38,8 +39,8 @@ def parallel_transform(df, chunk_processor,
         return chunk_processor(df)
     else:
         chunks = np.array_split(df, num_process * 2)
-        with mp.Pool(num_process) as pool:
-            out_l = pool.map(chunk_processor, chunks)
+        with ThreadPoolExecutor(num_process) as pool:
+            out_l = list(pool.map(chunk_processor, chunks))
         out = sum(out_l, [])
     return out
 
