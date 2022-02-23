@@ -8,3 +8,4 @@ from .custom_queue import Queue
 from .defaultdict import keydefaultdict
 from .custom_process import CustomProcess
 from .utils import *
+from .version_utils import show_versions
