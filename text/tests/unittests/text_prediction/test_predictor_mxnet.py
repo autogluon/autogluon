@@ -5,9 +5,15 @@ import pandas as pd
 import pytest
 import tempfile
 
+try:
+    import mxnet
+except ImportError:
+    pytest.skip("MXNet is not installed. Skip this test.", allow_module_level=True)
+
 from autogluon.core.space import Int
 from autogluon.core.utils.loaders import load_pd
-from autogluon.text import TextPredictor, ag_text_presets
+from autogluon.text import TextPredictor
+from autogluon.text.text_prediction.legacy_presets import ag_text_presets
 from autogluon.text.text_prediction.constants import MXNET
 
 DATA_INFO = {

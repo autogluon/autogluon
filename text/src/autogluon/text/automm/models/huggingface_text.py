@@ -3,12 +3,15 @@ import logging
 from torch import nn
 import warnings
 from transformers import AutoModel, AutoTokenizer
+from transformers import logging as hf_logging
 from ..constants import (
     TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS,
     LABEL, LOGITS, FEATURES, AUTOMM
 )
 from typing import Optional, List, Tuple
 from .utils import assign_layer_ids, init_weights
+
+hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
 

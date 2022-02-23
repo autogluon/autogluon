@@ -44,7 +44,7 @@ from .preprocessing import MultiModalTextFeatureProcessor, base_preprocess_cfg,\
 from .utils import average_checkpoints, set_seed
 from ..config import CfgNode
 from ..utils import logging_config
-from ..presets import ag_text_presets
+from ..legacy_presets import ag_text_presets
 from ... import version
 
 logger = logging.getLogger(__name__)  # return logger
