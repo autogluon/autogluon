@@ -62,17 +62,7 @@ def get_parser():
     return parser
 
 
-def set_seed(seed):
-    import mxnet as mx
-    import torch as th
-    th.manual_seed(seed)
-    mx.random.seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
-
 def train(args):
-    set_seed(args.seed)
     if args.task is not None:
         feature_columns, label_column, eval_metric, all_metrics = TASKS[args.task]
     else:
