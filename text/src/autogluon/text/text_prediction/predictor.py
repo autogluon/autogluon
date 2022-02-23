@@ -1,5 +1,5 @@
 from ..automm import AutoMMPredictor
-from .text_presets import text_preset_to_config
+from .presets import text_preset_to_config
 from .constants import PYTORCH, MXNET
 
 
