@@ -47,7 +47,6 @@ class AbstractForecastingModel(AbstractModel):
     """
 
     # TODO: refactor "pruned" methods after AbstractMethod is refactored
-    # TODO: check usage to see if higher level modules are dependent on these
     predict_proba = None
     score_with_y_pred_proba = None
     convert_to_refit_full_template = None
@@ -253,7 +252,6 @@ class AbstractForecastingModel(AbstractModel):
         scheduler_options: Tuple[Any, Dict],
         **kwargs,
     ):
-        """TODO: docstring"""
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(

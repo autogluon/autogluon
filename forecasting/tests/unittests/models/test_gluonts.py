@@ -2,15 +2,12 @@ import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 import autogluon.core as ag
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.forecasting.models.gluonts import (
     DeepARModel,
     # AutoTabularModel,
     SimpleFeedForwardModel,
     MQCNNModel,
 )
-from autogluon.forecasting.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
 
 from .common import DUMMY_DATASET
 
@@ -20,12 +17,6 @@ TESTABLE_MODELS = [
     MQCNNModel,
     SimpleFeedForwardModel,
 ]
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_models_can_be_initialized(model_class, temp_model_path):
-    model = model_class(path=temp_model_path, freq="H", prediction_length=24)
-    assert isinstance(model, AbstractGluonTSModel)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -49,25 +40,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
     assert len(predictions) == len(DUMMY_DATASET)
     assert all(len(df) == prediction_length for _, df in predictions.items())
     assert all(df.index[0].hour for _, df in predictions.items())
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [1, 5])
-@pytest.mark.parametrize("metric", [AVAILABLE_METRICS])
-def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
-    model_class, prediction_length, metric, temp_model_path
-):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 2},
-    )
-
-    model.fit(train_data=DUMMY_DATASET)
-    score = model.score(DUMMY_DATASET)
-
-    assert isinstance(score, float)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -125,33 +97,6 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
-    model_class, temp_model_path
-):
-    scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
-
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        hyperparameters={
-            "epochs": ag.Int(3, 4),
-            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
-        },
-    )
-
-    _, _, results = model.hyperparameter_tune(
-        scheduler_options=scheduler_options,
-        time_limit=100,
-        train_data=DUMMY_DATASET,
-        val_data=DUMMY_DATASET,
-    )
-
-    assert len(results["config_history"]) == 2
-    assert results["config_history"][0]["epochs"] == 3
-    assert results["config_history"][1]["epochs"] == 4
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(
     model_class, temp_model_path
 ):
@@ -189,6 +134,3 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
     loaded_model = model_class.load(path=model.path)
 
     assert loaded_model.gts_predictor == model.gts_predictor
-
-
-# TODO: test other inherited functionality

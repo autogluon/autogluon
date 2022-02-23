@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 
-from autogluon.core.dataset import TabularDataset
+from autogluon.core.dataset import TabularDataset  # noqa: F401
 
 # TODO: make ForecastingPredictor available
 

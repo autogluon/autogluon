@@ -59,7 +59,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         name: Optional[str] = None,
         eval_metric: str = None,
         hyperparameters: Dict[str, Any] = None,
-        **kwargs,
+        **kwargs,  # noqa
     ):
         name = name or re.sub(
             r"Model$", "", self.__class__.__name__
@@ -88,7 +88,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         predictor = self.gts_predictor
         self.gts_predictor = None
 
-        # TODO: filtering the serializing warning out until gluonts fixes it
         with serialize_warning_filter():
             if predictor:
                 Path.mkdir(path / self.gluonts_model_path, exist_ok=True)
@@ -173,13 +172,10 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             result_dict = {}
             predicted_targets = list(self.gts_predictor.predict(data))
 
-            if isinstance(predicted_targets[0], QuantileForecast):
-                status = [
-                    0 < float(quantiles[i]) < 1
-                    and str(quantiles[i]) in predicted_targets[0].forecast_keys
-                    for i in range(len(quantiles))
-                ]
-            elif isinstance(predicted_targets[0], SampleForecast):
+            if not isinstance(predicted_targets[0], (QuantileForecast, SampleForecast)):
+                raise TypeError("DistributionForecast is not yet supported.")
+
+            if isinstance(predicted_targets[0], SampleForecast):
                 transformed_targets = []
                 for forecast in predicted_targets:
                     tmp = []
@@ -195,15 +191,12 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                         )
                     )
                 predicted_targets = copy.deepcopy(transformed_targets)
-                status = [
-                    0 < float(quantiles[i]) < 1
-                    and str(quantiles[i]) in predicted_targets[0].forecast_keys
-                    for i in range(len(quantiles))
-                ]
-            else:
-                raise TypeError("DistributionForecast is not yet supported.")
 
-            if not all(status):  # TODO: CHECK LOGIC
+            if not all(
+                0 < float(quantiles[i]) < 1
+                and str(quantiles[i]) in predicted_targets[0].forecast_keys
+                for i in range(len(quantiles))
+            ):
                 raise ValueError("Invalid quantile value.")
 
             index = [i["item_id"] for i in data]
@@ -250,7 +243,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         forecasts, tss = self._predict_for_scoring(data, num_samples=num_samples)
         num_series = len(tss)
 
-        # TODO: filtering the warnings out until gluonts perfects it.
         with evaluator_warning_filter():
             agg_metrics, item_metrics = evaluator(
                 iter(tss), iter(forecasts), num_series=num_series

@@ -22,6 +22,7 @@ DUMMY_DATASET = ListDataset(
 
 
 def dict_equal_primitive(this, that):
+    """Compare two dictionaries but consider only primitive values"""
     if not this.keys() == that.keys():
         return False
 
