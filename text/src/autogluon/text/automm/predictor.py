@@ -114,6 +114,10 @@ class AutoMMPredictor:
         if eval_metric is None and problem_type is not None:
             eval_metric = infer_eval_metric(problem_type)
 
+        # Due to torchmetrics, r2 may encounter errors for per gpu batch size 1.
+        if eval_metric.lower() == "r2":
+            eval_metric = "rmse"
+
         self._eval_metric_name = eval_metric
         self._output_shape = None
         if path is not None:
