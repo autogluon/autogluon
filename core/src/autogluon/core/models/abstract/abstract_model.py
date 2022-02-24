@@ -876,7 +876,7 @@ class AbstractModel:
         self.rename(self.name + REFIT_FULL_SUFFIX)
         __path_refit = self.path
         self.save(path=self.path, verbose=False)
-        self.rename(self.name)
+        self.rename(__name)
         return self.load(path=__path_refit, verbose=False)
 
     def get_params(self) -> dict:
