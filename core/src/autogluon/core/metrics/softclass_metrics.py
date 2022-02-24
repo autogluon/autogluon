@@ -5,17 +5,10 @@ import logging
 import numpy as np
 
 from . import make_scorer
-from ..utils.try_import import try_import_mxnet
-
-try_import_mxnet()
-import mxnet as mx
 
 logger = logging.getLogger(__name__)
 
 EPS = 1e-10  # clipping threshold to prevent NaN
-
-# assumes predictions are already log-probabilities.
-softloss = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=True)
 
 
 def _soft_log_loss(true_probs, predicted_probs):
@@ -31,8 +24,8 @@ def _soft_log_loss(true_probs, predicted_probs):
     predicted_probs = np.clip(predicted_probs, a_min=EPS, a_max=None)  # clip 0s to avoid NaN
     true_probs = true_probs / true_probs.sum(axis=1, keepdims=1)  # renormalize
     predicted_probs = predicted_probs / predicted_probs.sum(axis=1, keepdims=1)
-    losses = softloss(mx.nd.log(mx.nd.array(predicted_probs)), mx.nd.array(true_probs))
-    return mx.nd.mean(losses).asscalar()
+    loss = -(np.log(predicted_probs) * true_probs).sum(axis=1).mean()
+    return loss
 
 
 # Score for soft-classification (with soft, probabilistic labels):

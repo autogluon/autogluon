@@ -164,16 +164,6 @@ def test_emoji():
     verify_predictor_save_load(predictor, df)
 
 
-def test_no_job_finished_raise():
-    train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                              'glue/sst/train.parquet')
-    with pytest.raises(RuntimeError):
-        # Setting a very small time limits to trigger the bug
-        predictor = TextPredictor(label='label', backend=MXNET)
-        predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                      time_limit=1, num_gpus=1, seed=123)
-
-
 def test_mixed_column_type():
     train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
                               'glue/sts/train.parquet')
