@@ -1,6 +1,5 @@
 import autogluon
 import importlib
-import logging
 import pkgutil
 import pkg_resources
 import platform
@@ -19,7 +18,7 @@ autogluon_extras_dict = {
 }
 
 # This is needed because some module are different in its import name and pip install name
-import_name_map = {
+import_name_dict = {
     'autogluon-contrib-nlp': 'autogluon_contrib_nlp',
     'pillow': 'PIL',
     'pytorch-lightning': 'pytorch_lightning',
@@ -56,7 +55,7 @@ def _get_dependency_versions(package, extras=()):
     dependencies = [str(r.key) for r in package.requires(extras=extras)]
     versions = dict()
     for dependency in dependencies:
-        dependency = import_name_map.get(dependency, dependency)
+        dependency = import_name_dict.get(dependency, dependency)
         try:
             module = importlib.import_module(dependency)
             version = getattr(module, "__version__", None)
