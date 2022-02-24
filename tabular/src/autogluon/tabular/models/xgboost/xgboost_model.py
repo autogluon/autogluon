@@ -222,3 +222,8 @@ class XGBoostModel(AbstractModel):
             model.model.load_model(path + 'xgb.ubj')
             model._xgb_model_type = None
         return model
+
+    def _more_tags(self):
+        # `can_refit_full=True` because n_estimators is communicated at end of `_fit`:
+        #  self.params_trained['n_estimators'] = bst.best_ntree_limit
+        return {'can_refit_full': True}

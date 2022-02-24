@@ -501,3 +501,6 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         return 10 * get_approximate_df_mem_usage(X).sum()
+
+    def _more_tags(self):
+        return {'can_refit_full': True}

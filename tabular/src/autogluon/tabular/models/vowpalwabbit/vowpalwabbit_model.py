@@ -248,3 +248,7 @@ class VowpalWabbitModel(AbstractModel):
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
+
+    def _more_tags(self):
+        # `can_refit_full=True` because best epoch is communicated at end of `_fit`: `self.params_trained['passes'] = epoch`
+        return {'can_refit_full': True}

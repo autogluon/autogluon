@@ -330,7 +330,11 @@ class RFModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _more_tags(self):
+        # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:
+        #  `self.params_trained['n_estimators'] = self.model.n_estimators`
+        tags = {'can_refit_full': True}
         if self.problem_type == QUANTILE:
-            return {'valid_oof': False} # not supported in quantile regression
+            tags['valid_oof'] = False  # not supported in quantile regression
         else:
-            return {'valid_oof': True}
+            tags['valid_oof'] = True
+        return tags
