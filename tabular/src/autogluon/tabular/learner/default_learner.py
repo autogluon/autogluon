@@ -72,10 +72,7 @@ class DefaultLearner(AbstractLearner):
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
-        if infer_limit_batch_size is not None:
-            X_og = X
-        else:
-            X_og = None
+        X_og = None if infer_limit_batch_size is None else X
         X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
         if infer_limit_batch_size is not None:
             X_og_1 = sample_df_for_time_func(df=X_og, sample_size=infer_limit_batch_size)

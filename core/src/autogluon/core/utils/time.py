@@ -7,6 +7,7 @@ from pandas import DataFrame
 logger = logging.getLogger(__name__)
 
 
+# TODO: Consider replacing with timeit, but need to ensure repeat functionality plays nicely with time limit logic.
 def time_func(f, args: list = None, kwargs: dict = None, time_limit: float = 0.2, max_repeats: int = 10) -> float:
     """
     Returns the average time taken by `f(*args, **kwargs)`.

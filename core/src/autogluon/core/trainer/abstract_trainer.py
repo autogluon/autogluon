@@ -346,6 +346,7 @@ class AbstractTrainer:
         messages_to_log = []
 
         base_model_names_copy = base_model_names.copy()
+        # Prune models that by themselves have larger inference latency than the infer_limit, as they can never be valid
         for base_model_name in base_model_names_copy:
             predict_1_time_full = self.get_model_attribute_full(model=base_model_name, attribute=attribute)
             if predict_1_time_full >= infer_limit_threshold:
@@ -358,6 +359,7 @@ class AbstractTrainer:
         score_val_dict = self.get_models_attribute_dict(attribute='val_score', models=base_model_names)
         sorted_scores = sorted(score_val_dict.items(), key=lambda x: x[1])
         i = 0
+        # Prune models by ascending validation score until the remaining subset's combined inference latency satisfies infer_limit
         while base_model_names and (predict_1_time_full_set >= infer_limit_threshold):
             # TODO: Incorporate score vs inference speed tradeoff in a smarter way
             base_model_to_remove = sorted_scores[i][0]
@@ -1185,7 +1187,6 @@ class AbstractTrainer:
         predict_child_time = model.predict_time / num_children if model.predict_time is not None else None
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
-        predict_1_batch_size = fit_metadata.get('predict_1_batch_size', None)
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
@@ -1215,6 +1216,14 @@ class AbstractTrainer:
                 elif level <= self.model_graph.nodes[base_model_name]['level']:
                     raise AssertionError(f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})")
                 self.model_graph.add_edge(base_model_name, model.name)
+        self._log_model_stats(model)
+        if self.low_memory:
+            del model
+        return True
+
+    def _log_model_stats(self, model):
+        """Logs model fit time, val score, predict time, and predict_1_time"""
+        model = self.load_model(model)
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
                 logger.log(20, f'\tNote: model has different eval_metric than default.')
@@ -1224,6 +1233,8 @@ class AbstractTrainer:
         if model.predict_time is not None:
             logger.log(20, f'\t{round(model.predict_time, 2)}s\t = Validation runtime')
         if model.predict_1_time is not None:
+            fit_metadata = model.get_fit_metadata()
+            predict_1_batch_size = fit_metadata.get('predict_1_batch_size', None)
             assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
             time_unit = "s"
             predict_1_time = model.predict_1_time
@@ -1238,9 +1249,6 @@ class AbstractTrainer:
                 time_unit = 'ms'
                 predict_1_time_full = predict_1_time_full * 1000
             logger.log(20, f'\t{round(predict_1_time_full, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
-        if self.low_memory:
-            del model
-        return True
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, X_pseudo=None, y_pseudo=None,
