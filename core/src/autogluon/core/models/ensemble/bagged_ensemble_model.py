@@ -53,6 +53,7 @@ class BaggedEnsembleModel(AbstractModel):
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
+        self._params_aux_child = None  # aux params of child model
 
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=self.model_base.eval_metric, **kwargs)
 
@@ -113,6 +114,7 @@ class BaggedEnsembleModel(AbstractModel):
         self.stopping_metric = child.stopping_metric
         self.quantile_levels = child.quantile_levels
         self.normalize_pred_probas = child.normalize_pred_probas
+        self._params_aux_child = child.params_aux
 
     def preprocess(self, X, preprocess_nonadaptive=True, model=None, **kwargs):
         if preprocess_nonadaptive:
@@ -211,6 +213,9 @@ class BaggedEnsembleModel(AbstractModel):
                 return refit_template
             else:
                 return self
+
+    def _get_child_aux_val(self, key: str, default=None):
+        return self._params_aux_child.get(key, default)
 
     def _validate_bag_kwargs(self, *,
                              k_fold,
@@ -708,8 +713,13 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time = model.predict_time
         else:
             self.predict_time += model.predict_time
+
+        if self.predict_1_time is None:
+            self.predict_1_time = model.predict_1_time
+        else:
+            self.predict_1_time += model.predict_1_time
     
-    def _add_parallel_child_times(self, fit_time, predict_time):
+    def _add_parallel_child_times(self, fit_time, predict_time, predict_1_time):
         if self.fit_time is None:
             self.fit_time = fit_time
         else:
@@ -719,6 +729,11 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time = predict_time
         else:
             self.predict_time += predict_time
+
+        if self.predict_1_time is None:
+            self.predict_1_time = predict_1_time
+        else:
+            self.predict_1_time += predict_1_time
 
     @classmethod
     def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True):

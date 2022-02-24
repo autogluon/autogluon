@@ -287,6 +287,8 @@ class TabularPredictor:
             presets=None,
             hyperparameters=None,
             feature_metadata='infer',
+            infer_limit=None,
+            infer_limit_batch_size=None,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -499,6 +501,21 @@ class TabularPredictor:
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
+        infer_limit : float, default = None
+            The inference time limit in seconds per row to adhere to during fit.
+            If infer_limit=0.05 and infer_limit_batch_size=1000, AutoGluon will avoid training models that take longer than 50 ms/row to predict when given a batch of 1000 rows to predict (must predict 1000 rows in no more than 50 seconds).
+            If bagging is enabled, the inference time limit will be respected based on estimated inference speed of `_FULL` models after refit_full is called, NOT on the inference speed of the bagged ensembles.
+            The inference times calculated for models are assuming `predictor.persist_models('all')` is called after fit.
+            If None, no limit is enforced.
+            If it is impossible to satisfy the constraint, an exception will be raised.
+        infer_limit_batch_size : int, default = None
+            The batch size to use when predicting in bulk to estimate per-row inference time.
+            Must be an integer greater than 0.
+            If None and `infer_limit` is specified, will default to 10000.
+            It is recommended to set to 10000 unless you must satisfy an online-inference scenario.
+            Small values, especially `infer_limit_batch_size=1`, will result in much larger per-row inference times and should be avoided if possible.
+            Refer to `infer_limit` for more details on how this is used.
+            If specified when `infer_limit=None`, the inference time will be logged during training but will not be limited.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -729,6 +746,7 @@ class TabularPredictor:
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data,
                                                                           tuning_data=tuning_data,
                                                                           unlabeled_data=unlabeled_data)
+        infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
         if hyperparameters is None:
             hyperparameters = 'default'
@@ -795,7 +813,8 @@ class TabularPredictor:
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
                           num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
+                          time_limit=time_limit, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
                           verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
 
@@ -804,13 +823,14 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
-            calibrate=kwargs['calibrate']
+            calibrate=kwargs['calibrate'],
+            infer_limit=infer_limit,
         )
         self.save()
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=False):
+                  calibrate=False, infer_limit=None):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -823,8 +843,10 @@ class TabularPredictor:
                 refit_full = 'all'
 
         if refit_full is not False:
-            trainer_model_best = self._trainer.get_model_best()
-            self.refit_full(model=refit_full)
+            if infer_limit is not None:
+                infer_limit = infer_limit - self._learner.preprocess_1_time
+            trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
+            self.refit_full(model=refit_full, set_best_to_refit_full=False)
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
                     self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
@@ -834,9 +856,6 @@ class TabularPredictor:
                 else:
                     logger.warning(
                         f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
-
-        if keep_only_best:
-            self.delete_models(models_to_keep='best', dry_run=False)
 
         if calibrate == 'auto':
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
@@ -853,6 +872,9 @@ class TabularPredictor:
                 self._calibrate_model()
             else:
                 logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
+
+        if keep_only_best:
+            self.delete_models(models_to_keep='best', dry_run=False)
 
         if save_space:
             self.save_space()
@@ -887,14 +909,20 @@ class TabularPredictor:
             return
 
         if model_name is None:
-            model_name = self._trainer.get_model_best()
+            model_name = self.get_model_best()
 
+        model_full_dict = self._trainer.model_full_dict
+        model_name_og = model_name
+        for m, m_full in model_full_dict.items():
+            if m_full == model_name:
+                model_name_og = m
+                break
         if self._trainer.bagged_mode:
-            y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
+            y_val_probs = self.get_oof_pred_proba(model_name_og, transformed=True, internal_oof=True).to_numpy()
             y_val = self._trainer.load_y().to_numpy()
         else:
             X_val = self._trainer.load_X_val()
-            y_val_probs = self._trainer.predict_proba(X_val, model_name)
+            y_val_probs = self._trainer.predict_proba(X_val, model_name_og)
             y_val = self._trainer.load_y_val().to_numpy()
 
             if self.problem_type == BINARY:
@@ -919,6 +947,7 @@ class TabularPredictor:
                 model.temperature_scalar = temp_scalar
                 model.save()
 
+    # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
@@ -1975,7 +2004,7 @@ class TabularPredictor:
         self._assert_is_fit('unpersist_models')
         return self._learner.load_trainer().unpersist_models(model_names=models)
 
-    def refit_full(self, model='all'):
+    def refit_full(self, model='all', set_best_to_refit_full=True):
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -2005,26 +2034,73 @@ class TabularPredictor:
                 If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        set_best_to_refit_full : bool, default = True
+            If True, sets best model to the refit_full version of the prior best model.
+            This means the model used when `predictor.predict(data)` is called will be the refit_full version instead of the original version of the model.
+            Ignored if `model` is not the best model.
 
         Returns
         -------
         Dictionary of original model names -> refit_full model names.
         """
         self._assert_is_fit('refit_full')
+        model_best = self._get_model_best(can_infer=None)
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
+
+        if set_best_to_refit_full:
+            if model_best in self._trainer.model_full_dict.keys():
+                self._trainer.model_best = self._trainer.model_full_dict[model_best]
+                # Note: model_best will be overwritten if additional training is done with new models,
+                # since model_best will have validation score of None and any new model will have a better validation score.
+                # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                self._trainer.save()
+                logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
+                               f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
+            else:
+                logger.warning(
+                    f'Best model ("{model_best}") is not present in refit_full dictionary. '
+                    f'Training may have failed on the refit model. AutoGluon will default to using "{model_best}" for predict() and predict_proba().')
+
         return refit_full_dict
 
     def get_model_best(self):
         """
-        Returns the string model name of the best model by validation score.
-        This is typically the same model used during inference when `predictor.predict` is called without specifying a model.
+        Returns the string model name of the best model by validation score that can infer.
+        This is the same model used during inference when `predictor.predict` is called without specifying a model.
+        This can be updated to be a model other than the model with best validation score by methods such as refit_full and set_model_best.
 
         Returns
         -------
         String model name of the best model
         """
+        return self._get_model_best(can_infer=True)
+
+    def _get_model_best(self, can_infer=None):
         self._assert_is_fit('get_model_best')
-        return self._trainer.get_model_best(can_infer=True)
+        # TODO: Set self._trainer.model_best to the best model at end of fit instead of best WeightedEnsemble.
+        if self._trainer.model_best is not None:
+            models = self._trainer.get_model_names(can_infer=can_infer)
+            if self._trainer.model_best in models:
+                return self._trainer.model_best
+        return self._trainer.get_model_best(can_infer=can_infer)
+
+    def set_model_best(self, model: str):
+        """
+        Sets the model to be used by default when calling `predictor.predict(data)`.
+        By default, this is the model with the best validation score, but this is not always the case.
+        If manually set, this can be overwritten internally if further training occurs, such as through fit_extra, refit_full, or distill.
+
+        Parameters
+        ----------
+        model : str
+            Name of model to set to best. If model does not exist or cannot infer, raises an AssertionError.
+        """
+        self._assert_is_fit('set_model_best')
+        models = self._trainer.get_model_names(can_infer=True)
+        if model in models:
+            self._trainer.model_best = model
+        else:
+            raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
 
     def get_model_full_dict(self):
         """
@@ -2412,9 +2488,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('delete_models')
         if models_to_keep == 'best':
-            models_to_keep = self._trainer.model_best
-            if models_to_keep is None:
-                models_to_keep = self._trainer.get_model_best()
+            models_to_keep = self.get_model_best()
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete,
                                     allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
                                     dry_run=dry_run)
@@ -2979,6 +3053,23 @@ class TabularPredictor:
             raise AssertionError(f'{name} contains {duplicate_count} duplicated indices. '
                                  'Please ensure DataFrame indices are unique.\n'
                                  f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
+
+    @staticmethod
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> (float, int):
+        if infer_limit_batch_size is not None:
+            if not isinstance(infer_limit_batch_size, int):
+                raise ValueError(f'infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}')
+            elif infer_limit_batch_size < 1:
+                raise AssertionError(f'infer_limit_batch_size must be >=1, value: {infer_limit_batch_size}')
+        if infer_limit is not None:
+            if not isinstance(infer_limit, (int, float)):
+                raise ValueError(f'infer_limit must be type int or float, but was instead type {type(infer_limit)}')
+            if infer_limit <= 0:
+                raise AssertionError(f'infer_limit must be greater than zero! (infer_limit={infer_limit})')
+        if infer_limit is not None and infer_limit_batch_size is None:
+            infer_limit_batch_size = 10000
+            logger.log(20, f'infer_limit specified, but infer_limit_batch_size was not specified. Setting infer_limit_batch_size={infer_limit_batch_size}')
+        return infer_limit, infer_limit_batch_size
 
     def _set_feature_generator(self, feature_generator='auto', feature_metadata=None, init_kwargs=None):
         if self._learner.feature_generator is not None:

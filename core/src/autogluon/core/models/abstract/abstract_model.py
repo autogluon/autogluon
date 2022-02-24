@@ -29,6 +29,7 @@ from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, 
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
+from ...utils.time import sample_df_for_time_func, time_func
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,7 @@ class AbstractModel:
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
@@ -177,6 +179,14 @@ class AbstractModel:
         """
         return self.is_fit()
 
+    def is_initialized(self) -> bool:
+        """
+        Returns True if the model is initialized.
+        This indicates whether the model has inferred various information such as problem_type and num_classes.
+        A model is automatically initialized when `.fit` or `.hyperparameter_tune` are called.
+        """
+        return self._is_initialized
+
     def can_infer(self) -> bool:
         """Returns True if the model is capable of inference on new data."""
         return self.is_valid()
@@ -228,6 +238,7 @@ class AbstractModel:
             get_features_kwargs=None,  # Kwargs for `autogluon.tabular.features.feature_metadata.FeatureMetadata.get_features()`. Overrides ignored_type_group_special and ignored_type_group_raw. | Currently undocumented in task.
             # TODO: v0.1 Document get_features_kwargs_extra in task.fit
             get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
+            predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
         )
         return default_auxiliary_params
 
@@ -473,6 +484,25 @@ class AbstractModel:
         )
         return fit_metadata
 
+    def get_fit_metadata(self) -> dict:
+        """
+        Returns dictionary of metadata related to model fit that isn't related to hyperparameters.
+        Must be called after model has been fit.
+        """
+        assert self._is_fit_metadata_registered, 'fit_metadata must be registered before calling get_fit_metadata()!'
+        fit_metadata = dict()
+        fit_metadata.update(self._fit_metadata)
+        fit_metadata['predict_1_batch_size'] = self._get_child_aux_val(key='predict_1_batch_size', default=None)
+        return fit_metadata
+
+    def _get_child_aux_val(self, key: str, default=None):
+        """
+        Get aux val of child model (or self if no child)
+        This is necessary to get a parameter value that is constant across all children without having to load the children after fitting.
+        """
+        assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
+        return self.params_aux.get(key, default)
+
     def fit(self, **kwargs):
         """
         Fit model to predict values in y based on X.
@@ -527,17 +557,33 @@ class AbstractModel:
         """
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
-        if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
-            self._register_fit_metadata(**kwargs)
-            self._validate_fit_memory_usage(**kwargs)
-            out = self._fit(**kwargs)
-            if out is None:
-                return self
-            else:
-                return out
-        else:
+        if 'time_limit' in kwargs and kwargs['time_limit'] is not None and kwargs['time_limit'] <= 0:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
+
+        self._register_fit_metadata(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
+        out = self._fit(**kwargs)
+        if out is None:
+            out = self
+        out = out._post_fit(**kwargs)
+        return out
+
+    def _post_fit(self, **kwargs):
+        """
+        Logic to perform at the end of `self.fit(...)`
+        This should be focused around computing and saving metadata that is only possible post-fit.
+        Parameters are identical to those passed to `self._fit(...)`.
+
+        Returns
+        -------
+        Returns self
+        """
+        predict_1_batch_size = self.params_aux.get('predict_1_batch_size', None)
+        if self.predict_1_time is None and predict_1_batch_size is not None and 'X' in kwargs and kwargs['X'] is not None:
+            X_1 = sample_df_for_time_func(df=kwargs['X'], sample_size=predict_1_batch_size)
+            self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
+        return self
 
     def get_features(self):
         assert self.is_fit(), "The model must be fit before calling the get_features method."
@@ -855,6 +901,8 @@ class AbstractModel:
         if 'time_out' not in scheduler_options[1]:
             scheduler_options[1]['time_out'] = time_limit
         kwargs = self.initialize(time_limit=scheduler_options[1]['time_out'], **kwargs)
+        self._register_fit_metadata(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
         resource = copy.deepcopy(scheduler_options[1]['resource'])
         if 'num_cpus' in resource:
             if resource['num_cpus'] == 'auto':
@@ -988,12 +1036,12 @@ class AbstractModel:
         -------
             int: number of bytes will be used during training
         """
-        assert self._is_initialized, "Only estimate memory usage after the model is initialized."
+        assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
     def _estimate_memory_usage(self, X, **kwargs) -> int:
         """
-        This method simply provides a default implementation. Each model should consider implement its own esitmate function.
+        This method simply provides a default implementation. Each model should consider implementing custom memory estimate logic.
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
 
