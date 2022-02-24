@@ -26,7 +26,7 @@ Which version of AutoGluon you are using?
 If you are using 0.4.0 and newer, or the current mainline:
 <details>
 
-Replace this line with the output of autogluon.core.show_versions()
+Replace this line with the output of autogluon.core.utils.show_versions()
 
 </details>
 
