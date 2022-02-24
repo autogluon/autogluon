@@ -25,8 +25,7 @@ def list_text_presets(verbose=False):
         },
         "multilingual": {
             "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
-            # TODO(?) Here, we use 32 because some GPUs won't support bf16. Ideally, we may automatically detect that.
-            "env.precision": 32,
+            "env.precision": 32,  # TODO(?) Use 32 because some GPUs won't support bf16. Try automatically detect that.
             "env.per_gpu_batch_size": 2,
         },
     }
