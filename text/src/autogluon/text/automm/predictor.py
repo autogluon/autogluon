@@ -475,7 +475,7 @@ class AutoMMPredictor:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * config.env.num_nodes
             )
-            precision = 32  # Force to use fp32 for training since AMP is not available in CPU
+            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
         else:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
