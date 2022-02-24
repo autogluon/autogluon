@@ -69,6 +69,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : [ { 'predict' : {}, 'fit' : {} },          # All of the followiing params should return same results because they're defaults
                      { 'predict' : {}, 'fit' : { 'presets' : 'medium_quality_faster_train' } }, 
                      { 'predict' : {}, 'fit' : { 'presets' : 'ignore_text' } }, 
@@ -96,6 +97,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : {}, 'fit' : { 'excluded_model_types' : [ 'KNN', 'RF', 'XT', 'GBM', 'CAT', 'XGB' ] } },
         'expected_score_range' : {
                   'NeuralNetFastAI': (-6.12, 0.01),
@@ -109,6 +111,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'light' } },
         'expected_score_range' : {
                   'CatBoost': (-7.86, 0.01),
@@ -129,6 +132,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'very_light' } },
         'expected_score_range' : {
                   'CatBoost': (-7.86, 0.01),
@@ -146,6 +150,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'toy' } },
         'expected_score_range' : { 
                   'CatBoost': (-28.39, 0.01),
@@ -161,6 +166,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : {}, 'fit' : { 'presets' : 'high_quality_fast_inference_only_refit' } }, 
         'expected_score_range' : {
                   'CatBoost_BAG_L1': (np.nan, np.nan),
@@ -195,6 +201,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : {}, 'fit' : { 'presets' : 'best_quality' } }, 
         'expected_score_range' : {
                   'CatBoost_BAG_L1': (-7.85, 0.01),
@@ -217,6 +224,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 1,
+        'dataset_hash' : -6175055955724383227,
         'params' : { 'predict' : {}, 'fit' : {} },          # Default params
         'expected_score_range' : {
                   'CatBoost': (-33.17, 0.01),
@@ -239,6 +247,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
+        'dataset_hash' : 7865137391437914670,
         'params' : { 'predict' : { 'eval_metric' : 'mean_absolute_error'}, 'fit' : { } }, 
         'expected_score_range' : {
                   'CatBoost': (-5.23, 0.01),
@@ -267,6 +276,7 @@ tests = [
         'n_informative': 5,
         'n_classes': 8,
         'n_categorical': 0,
+        'dataset_hash' : -6002422303547991213,
         'params' : [ { 'predict' : {}, 'fit' : {} },          # All of the followiing params should return same results
                      { 'predict' : {}, 'fit' : { 'presets' : 'medium_quality_faster_train' } }, 
                      { 'predict' : {}, 'fit' : { 'presets' : 'ignore_text' } }, 
@@ -298,6 +308,7 @@ tests = [
         'n_informative': 5,
         'n_classes': 2,
         'n_categorical': 0,
+        'dataset_hash' : 8330358637462023513,
         'params' : [ { 'predict' : {}, 'fit' : {} },      # All of the followiing params should return same results
                      { 'predict' : { 'eval_metric' : 'accuracy'}, 'fit' : { } }, 
                    ], 
@@ -383,6 +394,12 @@ def inner_test_tabular(testname):
  
     # Build the dataset
     (dftrain, dftest) = make_dataset(request=test, seed=0)
+
+    # Check the synthetic dataset itself hasn't changed.
+    current_hash = pd.util.hash_pandas_object(dftrain).sum()
+    proposedconfig = "Proposed new config:\n"
+    proposedconfig += f"'dataset_hash' : {current_hash},"
+    assert current_hash == test['dataset_hash'], f"Test '{testname}' input dataset has changed.  All scores will change.\n" + proposedconfig
 
     # Now run the Predictor 1 or more times with various parameters, and make sure we get
     # back the expected results.
