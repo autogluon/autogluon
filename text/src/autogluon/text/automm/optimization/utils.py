@@ -9,6 +9,7 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
+from .metrics import CrossEntropy
 
 
 def get_loss_func(problem_type: str):
@@ -55,6 +56,8 @@ def get_metric(
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
         return torchmetrics.Accuracy(), MAX
+    elif metric_name in ["log_loss", "cross_entropy"]:
+        return CrossEntropy(), MIN
     elif metric_name in ["rmse", "root_mean_squared_error"]:
         return torchmetrics.MeanSquaredError(squared=False), MIN
     elif metric_name == "r2":
