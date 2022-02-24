@@ -2,12 +2,13 @@
 name: Bug report
 about: Create a report to help us improve
 title: "[BUG]"
-labels: ''
+labels: 'bug: unconfirmed'
 assignees: ''
 
 ---
 
-- [] I have checked that this bug exists on the latest version of AutoGluon
+- [] I have checked that this bug exists on the latest stable version of AutoGluon
+- [] and/or I have checked that this bug exists on the latest mainline of AutoGluon via source installation
 
 **Describe the bug**
 A clear and concise description of what the bug is.
@@ -22,11 +23,13 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Installed Versions**
-Which version of AutoGluon you are using?
+Which version of AutoGluon are you are using?
 If you are using 0.4.0 and newer, or the current mainline:
 <details>
 
-Replace this line with the output of autogluon.core.utils.show_versions()
+# Replace this code with the output of the following:
+from autogluon.core.utils import show_versions
+show_versions()
 
 </details>
 
