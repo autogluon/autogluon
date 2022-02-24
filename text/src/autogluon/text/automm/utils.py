@@ -341,6 +341,113 @@ def init_data_processors(
     }
 
 
+def create_and_save_model(
+        config: DictConfig,
+        num_classes: int,
+        save_path: str,
+        num_numerical_columns: Optional[int] = None,
+        num_categories: Optional[List[int]] = None,
+):
+    """
+    Create and save the models. It supports the auto models of huggingface text and timm image.
+    Multimodal models, e.g., CLIP, should be added case-by-case since their configs and usages
+    may be different. It uses MLP for the numerical features, categorical features, and late-fusion.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    num_classes
+        The class number for a classification task. It should be 1 for a regression task.
+    num_numerical_columns
+        The number of numerical columns in the training dataframe.
+    num_categories
+        The category number for each categorical column in the training dataframe.
+
+    Returns
+    -------
+    A Pytorch model.
+    """
+    names = config.model.names
+    if isinstance(names, str):
+        names = [names]
+    # make sure no duplicate model names
+    assert len(names) == len(set(names))
+    logger.debug(f"output_shape: {num_classes}")
+    all_models = []
+    for model_name in names:
+        model_config = getattr(config.model, model_name)
+        if model_name == "clip":
+            model = CLIPForImageText(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+                num_classes=num_classes,
+            )
+        elif model_name == "timm_image":
+            model = TimmAutoModelForImagePrediction(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+                num_classes=num_classes,
+                mix_choice=model_config.mix_choice,
+            )
+        elif "hf_text" in model_name:
+            model = HFAutoModelForTextPrediction(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+                num_classes=num_classes,
+            )
+        elif model_name == "numerical_mlp":
+            model = NumericalMLP(
+                prefix=model_name,
+                in_features=num_numerical_columns,
+                hidden_features=model_config.hidden_size,
+                out_features=model_config.hidden_size,
+                num_layers=model_config.num_layers,
+                activation=model_config.activation,
+                dropout_prob=model_config.drop_rate,
+                normalization=model_config.normalization,
+                num_classes=num_classes,
+            )
+        elif model_name == "categorical_mlp":
+            model = CategoricalMLP(
+                prefix=model_name,
+                num_categories=num_categories,
+                out_features=model_config.hidden_size,
+                num_layers=model_config.num_layers,
+                activation=model_config.activation,
+                dropout_prob=model_config.drop_rate,
+                normalization=model_config.normalization,
+                num_classes=num_classes,
+            )
+        elif model_name == "fusion_mlp":
+            fusion_model = functools.partial(
+                MultimodalFusionMLP,
+                prefix=model_name,
+                hidden_features=model_config.hidden_sizes,
+                num_classes=num_classes,
+                adapt_in_features=model_config.adapt_in_features,
+                activation=model_config.activation,
+                dropout_prob=model_config.drop_rate,
+                normalization=model_config.normalization,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+            )
+            continue
+        else:
+            raise ValueError(f"unknown model name: {model_name}")
+        
+        if "hf_text" in model_name or model_name == "clip":
+            model.model.save_pretrained(os.path.join(save_path,model_name))
+
+        all_models.append(model)
+
+    if len(all_models) > 1:
+        # must have one fusion model if there are multiple independent models
+        return fusion_model(models=all_models)
+    elif len(all_models) == 1:
+        return all_models[0]
+    else:
+        raise ValueError(f"No available models for {names}")
+
 def create_model(
         config: DictConfig,
         num_classes: int,

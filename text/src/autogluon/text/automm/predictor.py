@@ -33,6 +33,7 @@ from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 
 from .utils import (
     create_model,
+    create_and_save_model,
     init_df_preprocessor,
     init_data_processors,
     select_model,
@@ -159,6 +160,7 @@ class AutoMMPredictor:
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
             init_only: Optional[bool] = False,
+            standalone: Optional[bool] = False,
     ):
         """
         Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
@@ -342,12 +344,27 @@ class AutoMMPredictor:
             data_processors = self._data_processors
 
         if self._model is None:
-            model = create_model(
-                config=config,
-                num_classes=output_shape,
-                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                num_categories=df_preprocessor.categorical_num_categories
-            )
+
+            if standalone:
+                model = create_and_save_model(
+                    config=config,
+                    num_classes=output_shape,
+                    save_path=save_path,
+                    num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+                    num_categories=df_preprocessor.categorical_num_categories
+                )
+
+                for model_name in config.model.names:
+                    if "hf_text" in model_name or model_name == "clip":
+                        model_config = getattr(config.model, model_name)
+                        model_config.checkpoint_name = os.path.join(save_path,model_name)
+            else:
+                model = create_model(
+                    config=config,
+                    num_classes=output_shape,
+                    num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+                    num_categories=df_preprocessor.categorical_num_categories
+                )
         else:  # continuing training
             model = self._model
 
