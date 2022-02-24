@@ -6,6 +6,7 @@ import numpy as np
 import random
 from autogluon.tabular import TabularPredictor
 from autogluon.text import TextPredictor
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 
 def get_parser():
@@ -155,12 +156,17 @@ def run(args):
         train_df, test_df, label_column = load_data_scientist_salary(args.train_file, args.test_file)
     else:
         raise NotImplementedError
+
+    hyperparameters = get_hyperparameter_config('multimodal')
+    if args.mode is not None:
+        hyperparameters['AG_TEXT_NN']['presets'] = args.preset
+
     if args.mode == 'stacking':
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=args.eval_metric,
                                      path=args.exp_dir)
         predictor.fit(train_data=train_df,
-                      hyperparameters='multimodal',
+                      hyperparameters=hyperparameters,
                       num_bag_folds=5,
                       num_stack_levels=1)
     elif args.mode == 'weighted':
@@ -168,7 +174,7 @@ def run(args):
                                      eval_metric=args.eval_metric,
                                      path=args.exp_dir)
         predictor.fit(train_data=train_df,
-                      hyperparameters='multimodal')
+                      hyperparameters=hyperparameters)
     elif args.mode == 'single':
         # When no embedding is used,
         # we will just use TextPredictor that will train a single model internally.
