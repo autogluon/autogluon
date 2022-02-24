@@ -135,7 +135,7 @@ class TextPredictorModel(AbstractModel):
             X_val.insert(len(X_val.columns), self._label_column_name, y_val)
 
         verbosity_text = max(0, verbosity - 1)
-        root_logger = logging.getLogger(__name__)
+        root_logger = logging.getLogger('autogluon')
         root_log_level = root_logger.level
         self.model = TextPredictor(label=self._label_column_name,
                                    problem_type=self.problem_type,

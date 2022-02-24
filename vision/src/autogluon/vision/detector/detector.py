@@ -232,6 +232,13 @@ class ObjectDetector(object):
                            'WARNING: Windows OS detected, but ObjectDetector is not supported on Windows!\n'
                            'You may run into many errors. Consider running on Linux instead.\n'
                            '=============================================================================\n')
+        logger.log(30, '=============================================================================\n'
+                       'WARNING: ObjectDetector is deprecated as of v0.4.0 and may contain various bugs and issues!\n'
+                       'In a future release ObjectDetector may be entirely reworked to use Torch as a backend.\n'
+                       'This future change will likely be API breaking.'
+                       'Users should ensure they update their code that depends on ObjectDetector when upgrading to future AutoGluon releases.\n'
+                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/awslabs/autogluon/issues/1559\n'
+                       '=============================================================================\n')
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]

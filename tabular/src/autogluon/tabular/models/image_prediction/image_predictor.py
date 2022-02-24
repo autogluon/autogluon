@@ -80,7 +80,6 @@ class ImagePredictorModel(AbstractModel):
              sample_weight=None,
              verbosity=2,
              **kwargs):
-        # try_import_mxnet()
         try_import_autogluon_vision()
         from autogluon.vision import ImagePredictor
         params = self._get_model_params()
@@ -119,6 +118,8 @@ class ImagePredictorModel(AbstractModel):
                 X_val = X_val[~null_indices_val]
 
         verbosity_image = max(0, verbosity - 1)
+        root_logger = logging.getLogger('autogluon')
+        root_log_level = root_logger.level
         # TODO: ImagePredictor doesn't use problem_type in any way at present.
         #  It also doesn't error or warn if problem_type is not one it expects.
         self.model = ImagePredictor(
@@ -140,6 +141,7 @@ class ImagePredictorModel(AbstractModel):
                        hyperparameters=params,
                        random_state=0)
         # self.model.set_verbosity(verbosity)  # TODO: How to set verbosity of fit predictor?
+        root_logger.setLevel(root_log_level)  # Reset log level
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
