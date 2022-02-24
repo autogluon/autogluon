@@ -33,13 +33,14 @@
         },
     },
 
-    Testing by @willsmithorg:
-    The initial values were produced on my home Linux machine 
-                                                         (64 vcore, no GPU, Python==3.8.10, scikit-learn==1.0.2, torch==1.10.2).
-    They've since been tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with 
-                                                          (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.02, torch==1.10.2), 
-                                                          this gave different results for some of the ExtraTreesMSE and RandomForestMSE results, 
-                                                          with all the others remaining fixsed.
+    Testing by @willsmithorg on master AG  as of 2022-02-22 - 2022-02-23:
+    Tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with 
+                                                          (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2), 
+    Tested on Github jenkins Linux:
+                                                          (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
+    Tested on AWS Windows instance t3.xlarge, 
+                                                          (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
+                                                          - Pytorch scores are slighty different, all else same.
 
 
 """
