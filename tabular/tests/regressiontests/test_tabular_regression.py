@@ -2,12 +2,13 @@
     We test various parameters to TabularPredictor() and fit()
     We then check the leaderboard:
        Did we run the expected list of models
-       Did each model have a certain performance (narrow range)
-    This helps us spot any change in performance.
+       Did each model have the expected score (within given range)
+       Did the ensembling produce the expected score (within given range)
+    This helps us spot any change in model performance.
     If any changes are spotted, the script does its best to dump out new proposed score ranges
     that you can cut and paste into the tests.  Only do this once you've identified the cause!
 
-    Naming confusion: 
+    Potential naming confusion: 
         - this is a *regression* test, to make sure no functionality has accidentally got worse (testing terminology)
         - it runs two types of TabularPredictor tests : *regression* and classification (ML terminology)
 
@@ -18,38 +19,42 @@
 
     {   # Default regression model on a small dataset
         'name':             # some unique name
-        'type':             # either 'regression' or 'classification'.  We make a dataset using scikit-learn.make_{regression,classification}
-        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE default of 0.5, we make an additional n_samples for testing.
+        'type':             # either 'regression' or 'classification'.  We make a dataset using 
+                            # scikit-learn.make_{regression,classification}
+        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE default of 0.5, 
+                            # we make an additional n_samples for testing.
         'n_features': 2,    # number of columns.
         'n_categorical': 0, # number of categorical (discrete not continuous) columns.
-        ''dataset_hash' :   # Hash as string to ensure the synthetic dataset itself didn't change.
-        'params' : [ { 'predict' : {}, 'fit' : {} },   # If an array, we call TabularPredictor multiple times with different parameters.
-                     { 'predict' : {}, 'fit' : {} },   # Pass the additional parameters to predict(), fit() or both in the dicts.
+        ''dataset_hash' :   # Hash of synthetic dataset to ensure the dataset itself didn't change.
+        'params' : [ { 'predict' : {}, 'fit' : {} },   # If an array, we call TabularPredictor multiple times with 
+                                                       # different parameters.
+                     { 'predict' : {}, 'fit' : {} },   # Pass the additional parameters to predict(), fit() or both 
+                                                       # in the dicts.
                                                        # If a scalar, we only call TabularPredictor once.
                    ],
-        'expected_score_range' : {                     # A list of models we expect to run, and a valid score range we expect from each model.
-                  'CatBoost': (-7.86, 0.01),           # The first value is the lower bound, the 2nd value is a delta to compute the upper bound.
-                  'ExtraTreesMSE': (-7.88, 0.01),      # E.g. ( -8.12, 0.01 ) means we expect a score between -8.12 and -8.11 inclusive.
+        'expected_score_range' : {                     # A list of models we expect to run, and a valid score range we 
+                                                       # expect from each model.
+                  'CatBoost': (-7.86, 0.01),           # The first value is the lower bound, the 2nd value is a delta 
+                  'ExtraTreesMSE': (-7.88, 0.01),      # to compute the upper bound, e.g. ( -8.12, 0.01 ) means we 
+                                                       # expect the score to be from -8.12 to -8.11 inclusive.
                   'CatBoost_BAG_L1': (np.nan, np.nan), # If np.nan, we expect this model to return np.nan as the score.
         },
     },
 
-    Testing by @willsmithorg on master AG  as of 2022-02-22 - 2022-02-23:
+    Testing by @willsmithorg on master AG as of 2022-02-22 - 2022-02-23:
     Tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with 
-                                                       (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2), 
+                                               (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2), 
     Tested on Github jenkins Linux:
-                                                       (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
+                                               (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
     Tested on AWS Windows instance t3.xlarge, 
-                                                       (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
-                                                       - Pytorch scores are slighty different, all else same.
+                                               (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
+                                               - Pytorch scores are slighty different, all else same.
 
 
 """
-import os
+import sys
 import math
 import hashlib
-import shutil
-import warnings
 import random
 
 import numpy as np
@@ -473,50 +478,23 @@ def inner_test_tabular(testname):
 	
 
 # The tests are all run individually rather than in 1 big loop that simply goes through the tests dictionary.
-# This is so we easily selectively run a subset of tests, for example:
-#    pytest -m regression -k toy
-# will only run the test of 'toy' hyperparameters.
-@pytest.mark.regression
-def test_small_regression():
-    inner_test_tabular('small regression')
+# This is so we easily remove some tests if necessary.
+@pytest.mark.parametrize("testname", [
+    'small regression',
+    'small regression excluded models',
+    'small regression light hyperparameters',
+    'small regression very light hyperparameters',
+    'small regression toy hyperparameters',
+    'small regression high quality',
+    'small regression best quality',
+    'small regression with categorical',
+    'small regression metric mae',
+    'small classification',
+    'small classification boolean',
+])
 
+# These results have only been confirmed for Linux.  Windows is known to give different results for Pytorch.
+@pytest.mark.skipif(sys.platform != 'linux', reason='Scores only confirmed on Linux')
 @pytest.mark.regression
-def test_small_regression_excluded_models():
-    inner_test_tabular('small regression excluded models')
-
-@pytest.mark.regression
-def test_small_regression_light_hyperparameters():
-    inner_test_tabular('small regression light hyperparameters')
-
-@pytest.mark.regression
-def test_small_regression_very_light_hyperparameters():
-    inner_test_tabular('small regression very light hyperparameters')
-
-@pytest.mark.regression
-def test_small_regression_toy_hyperparameters():
-    inner_test_tabular('small regression toy hyperparameters')
-
-@pytest.mark.regression
-def test_small_regression_high_quality():
-    inner_test_tabular('small regression high quality')
-
-@pytest.mark.regression
-def test_small_regression_best_quality():
-    inner_test_tabular('small regression best quality')
-
-@pytest.mark.regression
-def test_small_regression_with_categorical():
-    inner_test_tabular('small regression with categorical')
-
-@pytest.mark.regression
-def test_small_regression_metric_mae():
-    inner_test_tabular('small regression metric mae')
-
-@pytest.mark.regression
-def test_small_classification():
-    inner_test_tabular('small classification')
-
-@pytest.mark.regression
-def test_small_classification_boolean():
-    inner_test_tabular('small classification boolean')
-
+def test_tabular_score(testname):
+    inner_test_tabular(testname)
