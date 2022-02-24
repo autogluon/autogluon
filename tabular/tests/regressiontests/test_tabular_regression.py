@@ -18,30 +18,30 @@
 
     {   # Default regression model on a small dataset
         'name':             # some unique name
-        'type':             # either 'regression' or 'classification'.  We make a synthetic dataset using scikit-learn.make_{regression,classification}
-        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE defaulting to 0.5, we make an additional n_samples for testing.
+        'type':             # either 'regression' or 'classification'.  We make a dataset using scikit-learn.make_{regression,classification}
+        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE default of 0.5, we make an additional n_samples for testing.
         'n_features': 2,    # number of columns.
         'n_categorical': 0, # number of categorical (discrete not continuous) columns.
         ''dataset_hash' :   # Hash as string to ensure the synthetic dataset itself didn't change.
-        'params' : [ { 'predict' : {}, 'fit' : {} },          # If an array, we call TabularPredictor multiple times with different parameters.
-                     { 'predict' : {}, 'fit' : {} },          # Pass the additional parameters to predict(), fit() or both in the dicts.
-                                                              # If a scalar, we only call TabularPredictor once.
+        'params' : [ { 'predict' : {}, 'fit' : {} },   # If an array, we call TabularPredictor multiple times with different parameters.
+                     { 'predict' : {}, 'fit' : {} },   # Pass the additional parameters to predict(), fit() or both in the dicts.
+                                                       # If a scalar, we only call TabularPredictor once.
                    ],
-        'expected_score_range' : {                            # A list of models we expect to run, and a valid score range we expect from each model.
-                  'CatBoost': (-7.86, 0.01),                  # The first value is the lower bound, the 2nd value is a delta to compute the upper bound.
-                  'ExtraTreesMSE': (-7.88, 0.01),             # E.g. ( -8.12, 0.01 ) means we expect a score between -8.12 and -8.11 inclusive.
-                  'CatBoost_BAG_L1': (np.nan, np.nan),        # If np.nan is supplied for both values, we expect this model to return np.nan as the score.
+        'expected_score_range' : {                     # A list of models we expect to run, and a valid score range we expect from each model.
+                  'CatBoost': (-7.86, 0.01),           # The first value is the lower bound, the 2nd value is a delta to compute the upper bound.
+                  'ExtraTreesMSE': (-7.88, 0.01),      # E.g. ( -8.12, 0.01 ) means we expect a score between -8.12 and -8.11 inclusive.
+                  'CatBoost_BAG_L1': (np.nan, np.nan), # If np.nan, we expect this model to return np.nan as the score.
         },
     },
 
     Testing by @willsmithorg on master AG  as of 2022-02-22 - 2022-02-23:
     Tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with 
-                                                          (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2), 
+                                                       (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2), 
     Tested on Github jenkins Linux:
-                                                          (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
+                                                       (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
     Tested on AWS Windows instance t3.xlarge, 
-                                                          (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
-                                                          - Pytorch scores are slighty different, all else same.
+                                                       (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
+                                                       - Pytorch scores are slighty different, all else same.
 
 
 """
@@ -72,7 +72,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : [ { 'predict' : {}, 'fit' : {} },          # All of the followiing params should return same results because they're defaults
                      { 'predict' : {}, 'fit' : { 'presets' : 'medium_quality_faster_train' } }, 
                      { 'predict' : {}, 'fit' : { 'presets' : 'ignore_text' } }, 
@@ -100,7 +100,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : {}, 'fit' : { 'excluded_model_types' : [ 'KNN', 'RF', 'XT', 'GBM', 'CAT', 'XGB' ] } },
         'expected_score_range' : {
                   'NeuralNetFastAI': (-6.12, 0.01),
@@ -114,7 +114,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'light' } },
         'expected_score_range' : {
                   'CatBoost': (-7.86, 0.01),
@@ -135,7 +135,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'very_light' } },
         'expected_score_range' : {
                   'CatBoost': (-7.86, 0.01),
@@ -153,7 +153,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : {}, 'fit' : { 'hyperparameters' : 'toy' } },
         'expected_score_range' : { 
                   'CatBoost': (-28.39, 0.01),
@@ -169,7 +169,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : {}, 'fit' : { 'presets' : 'high_quality_fast_inference_only_refit' } }, 
         'expected_score_range' : {
                   'CatBoost_BAG_L1': (np.nan, np.nan),
@@ -204,7 +204,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : {}, 'fit' : { 'presets' : 'best_quality' } }, 
         'expected_score_range' : {
                   'CatBoost_BAG_L1': (-7.85, 0.01),
@@ -227,7 +227,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 1,
-        'dataset_hash' : '1fdb1da33d',
+        'dataset_hash' : 'e8ed7b2f8a',
         'params' : { 'predict' : {}, 'fit' : {} },          # Default params
         'expected_score_range' : {
                   'CatBoost': (-33.17, 0.01),
@@ -250,7 +250,7 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 0,
-        'dataset_hash' : '6b5c3289b4',
+        'dataset_hash' : '5850a1c21a',
         'params' : { 'predict' : { 'eval_metric' : 'mean_absolute_error'}, 'fit' : { } }, 
         'expected_score_range' : {
                   'CatBoost': (-5.23, 0.01),
@@ -279,7 +279,7 @@ tests = [
         'n_informative': 5,
         'n_classes': 8,
         'n_categorical': 0,
-        'dataset_hash' : '85b54d0dca',
+        'dataset_hash' : 'be1f16df80',
         'params' : [ { 'predict' : {}, 'fit' : {} },          # All of the followiing params should return same results
                      { 'predict' : {}, 'fit' : { 'presets' : 'medium_quality_faster_train' } }, 
                      { 'predict' : {}, 'fit' : { 'presets' : 'ignore_text' } }, 
@@ -311,7 +311,7 @@ tests = [
         'n_informative': 5,
         'n_classes': 2,
         'n_categorical': 0,
-        'dataset_hash' : '83f5ac3447',
+        'dataset_hash' : '79e634aac3',
         'params' : [ { 'predict' : {}, 'fit' : {} },      # All of the followiing params should return same results
                      { 'predict' : { 'eval_metric' : 'accuracy'}, 'fit' : { } }, 
                    ], 
@@ -396,8 +396,11 @@ def inner_test_tabular(testname):
     # Build the dataset
     (dftrain, dftest) = make_dataset(request=test, seed=0)
 
-    # Check the synthetic dataset itself hasn't changed.
-    current_hash = hashlib.sha1(dftrain.values.tobytes()).hexdigest()[0:10]
+    # Check the synthetic dataset itself hasn't changed.  We round it to 3dp otherwise tiny floating point differences  
+    # between platforms can give a different hash that still yields same prediction scores.
+    # Ultimately it doesn't matter how we do this as long as the same dataset gives the same hash function on
+    # different python versions and architectures.
+    current_hash = hashlib.sha256(dftrain.round(decimals=3).values.tobytes()).hexdigest()[0:10]
     proposedconfig = "Proposed new config:\n"
     proposedconfig += f"'dataset_hash' : '{current_hash}',"
     assert current_hash == test['dataset_hash'], f"Test '{testname}' input dataset has changed.  All scores will change.\n" + proposedconfig
