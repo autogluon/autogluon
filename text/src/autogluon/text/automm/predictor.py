@@ -15,7 +15,7 @@ import torch.nn.functional as F
 import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import pytorch_lightning as pl
-from typing import Optional, List, Tuple, Dict, Union
+from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
@@ -44,6 +44,7 @@ from .utils import (
 )
 from .optimization.utils import (
     get_metric,
+    get_custom_metric_func,
     get_loss_func,
 )
 from .optimization.lit_module import LitModule
@@ -359,6 +360,7 @@ class AutoMMPredictor:
             metric_name=self._eval_metric_name,
             num_classes=output_shape
         )
+        custom_metric_func = get_custom_metric_func(self._eval_metric_name)
         loss_func = get_loss_func(problem_type)
 
         if time_limit is not None:
@@ -389,6 +391,8 @@ class AutoMMPredictor:
             config=config,
             loss_func=loss_func,
             val_metric=val_metric,
+            val_metric_name=self._eval_metric_name,
+            custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
@@ -405,6 +409,8 @@ class AutoMMPredictor:
             config: DictConfig,
             loss_func: _Loss,
             val_metric: torchmetrics.Metric,
+            val_metric_name: str,
+            custom_metric_func: Callable,
             minmax_mode: str,
             max_time: timedelta,
             save_path: str,
@@ -432,6 +438,8 @@ class AutoMMPredictor:
             warmup_steps=config.optimization.warmup_steps,
             loss_func=loss_func,
             val_metric=val_metric,
+            val_metric_name=val_metric_name,
+            custom_metric_func=custom_metric_func,
         )
 
         logger.debug(f"val_metric_name: {task.val_metric_name}")

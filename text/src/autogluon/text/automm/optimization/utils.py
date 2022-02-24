@@ -1,6 +1,8 @@
 from typing import Optional, Union, Tuple, List, Dict
+import functools
 from torch import nn
 from torch import optim
+from torch.nn import functional as F
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
 from .lr_scheduler import (
@@ -9,7 +11,6 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
-from .metrics import CrossEntropy
 
 
 def get_loss_func(problem_type: str):
@@ -51,13 +52,18 @@ def get_metric(
 
     Returns
     -------
-    A torchmetrics.Metric object.
+    torchmetrics.Metric
+        A torchmetrics.Metric object.
+    Mode
+        The min/max mode used in selecting model checkpoints.
+        - min
+             "min" means smaller is better.
+        - max
+            "min" means larger is better.
     """
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
         return torchmetrics.Accuracy(), MAX
-    elif metric_name in ["log_loss", "cross_entropy"]:
-        return CrossEntropy(), MIN
     elif metric_name in ["rmse", "root_mean_squared_error"]:
         return torchmetrics.MeanSquaredError(squared=False), MIN
     elif metric_name == "r2":
@@ -67,8 +73,30 @@ def get_metric(
                                        weights="quadratic"), MAX
     elif metric_name == "roc_auc":
         return torchmetrics.AUROC(), MAX
+    elif metric_name in ["log_loss", "cross_entropy"]:
+        return torchmetrics.MeanMetric(), MIN
     else:
         raise ValueError(f"unknown metric_name: {metric_name}")
+
+
+def get_custom_metric_func(metric_name):
+    """
+    Define customized metric functions in case that torchmetrics doesn't support some metrics.
+
+    Parameters
+    ----------
+    metric_name
+        Name of metric.
+
+    Returns
+    -------
+    A callable metric function.
+    """
+    metric_name = metric_name.lower()
+    if metric_name in ["log_loss", "cross_entropy"]:
+        return functools.partial(F.cross_entropy, reduction="none")
+
+    return None
 
 
 def get_optimizer(
