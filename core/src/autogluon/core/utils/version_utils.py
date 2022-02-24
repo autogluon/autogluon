@@ -5,6 +5,17 @@ import pkg_resources
 import platform
 import sys
 
+from datetime import datetime
+
+from .nvutil import cudaInit, cudaSystemGetNVMLVersion
+from .utils import (
+    get_available_disk_size,
+    get_cpu_count,
+    get_gpu_count_all,
+    get_gpu_free_memory,
+    get_memory_size
+)
+
 
 # We don't include test dependency here
 autogluon_extras_dict = {
@@ -70,13 +81,28 @@ def _get_dependency_versions(package, extras=()):
 def _get_sys_info():
     """Retrieve system information"""
     uname = platform.uname()
+    cuda_version = None
+    if cudaInit():
+        try:
+            cuda_version = cudaSystemGetNVMLVersion()
+        except:
+            cuda_version = None
+
     return {
+        'date': datetime.date(datetime.now()),
+        'time': datetime.time(datetime.now()),
         'python': '.'.join(str(i) for i in sys.version_info),
         'OS': uname.system,
         'OS-release': uname.release,
         'Version': uname.version,
         'machine': uname.machine,
         'processor': uname.processor,
+        'num_cores': get_cpu_count(),
+        'cpu_ram_mb': get_memory_size(),
+        'cuda version': cuda_version,
+        'num_gpus': get_gpu_count_all(),
+        'gpu_ram_mb': get_gpu_free_memory(),
+        'avail_disk_size_mb': get_available_disk_size(),
     }
 
 
