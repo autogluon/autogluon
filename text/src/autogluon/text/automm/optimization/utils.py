@@ -57,9 +57,9 @@ def get_metric(
     Mode
         The min/max mode used in selecting model checkpoints.
         - min
-             "min" means smaller is better.
+             Its means that smaller metric is better.
         - max
-            "min" means larger is better.
+            It means that larger metric is better.
     """
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
