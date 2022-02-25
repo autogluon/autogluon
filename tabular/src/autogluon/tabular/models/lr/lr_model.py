@@ -7,7 +7,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
-from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, REGRESSION
 
 from .hyperparameters.parameters import get_param_baseline, INCLUDE, IGNORE, ONLY, _get_solver, preprocess_params_set
@@ -69,7 +69,7 @@ class LinearModel(AbstractModel):
         """
         feature_types = self._feature_metadata.get_type_group_map_raw()
 
-        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
+        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types[R_BOOL]
         continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
         valid_features = categorical_featnames + continuous_featnames + language_featnames
@@ -220,7 +220,8 @@ class LinearModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+            ignored_type_group_special=[S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
