@@ -113,7 +113,7 @@ tests = [
                   'WeightedEnsemble_L2': (-5.09, 0.01),
         },
     },
-    {   # Small regression, hyperparametes = light removes some models
+    {   # Small regression, hyperparameters = light removes some models
         'name': 'small regression light hyperparameters',
         'type': 'regression',
         'n_samples': 100,
@@ -134,7 +134,7 @@ tests = [
                   'XGBoost': (-10.8, 0.01),
         },
     },
-    {   # Small regression, hyperparametes = very_light removes some models
+    {   # Small regression, hyperparameters = very_light removes some models
         'name': 'small regression very light hyperparameters',
         'type': 'regression',
         'n_samples': 100,
@@ -152,7 +152,7 @@ tests = [
                   'XGBoost': (-10.8, 0.01),
         },
     },
-    {   # Small regression, hyperparametes = very_light removes some models
+    {   # Small regression, hyperparameters = toy removes almost all models and runs very fast
         'name': 'small regression toy hyperparameters',
         'type': 'regression',
         'n_samples': 100,
@@ -232,21 +232,22 @@ tests = [
         'n_samples': 100,
         'n_features': 2,
         'n_categorical': 1,
-        'dataset_hash' : 'e8ed7b2f8a',
+        'dataset_hash' : '3e26d128e0',
         'params' : { 'predict' : {}, 'fit' : {} },          # Default params
         'expected_score_range' : {
-                  'CatBoost': (-33.17, 0.01),
-                  'ExtraTreesMSE' : (-37.54, 0.01),
-                  'KNeighborsDist' : (-36.90, 0.01),
-                  'KNeighborsUnif' : (-34.56, 0.01),
-                  'LightGBM' : (-34.32, 0.01),
-                  'LightGBMLarge' : (-35.12, 0.01),
-                  'LightGBMXT' : (-34.17, 0.01),
-                  'NeuralNetFastAI' : (-34.73, 0.01),
-                  'NeuralNetTorch' : (-33.65, 0.01),
-                  'RandomForestMSE' : (-39.00, 0.01),
-                  'WeightedEnsemble_L2' : (-34.73, 0.01),
-                  'XGBoost' : (-34.64, 0.01),
+                 'CatBoost': (-22.58, 0.01),
+                 'ExtraTreesMSE': (-25.09, 0.01),
+                 'KNeighborsDist': (-39.45, 0.01),
+                 'KNeighborsUnif': (-35.64, 0.01),
+                 'LightGBM': (-32.96, 0.01),
+                 'LightGBMLarge': (-34.86, 0.01),
+                 'LightGBMXT': (-32.69, 0.01),
+                 'NeuralNetFastAI': (-22.11, 0.01),
+                 'NeuralNetTorch': (-19.76, 0.01),
+                 'RandomForestMSE': (-27.49, 0.01),
+                 'WeightedEnsemble_L2': (-19.76, 0.01),
+                 'XGBoost': (-24.93, 0.01),
+
         }
     },
     {   # Default regression model different metric
@@ -285,15 +286,15 @@ tests = [
         'n_classes': 8,
         'n_categorical': 0,
         'dataset_hash' : 'be1f16df80',
-        'params' : [ { 'predict' : {}, 'fit' : {} },          # All of the followiing params should return same results
+        'params' : [ { 'predict' : {}, 'fit' : {} },     # All of the followiing params should return same results
                      { 'predict' : {}, 'fit' : { 'presets' : 'medium_quality_faster_train' } }, 
                      { 'predict' : {}, 'fit' : { 'presets' : 'ignore_text' } }, 
                      { 'predict' : {}, 'fit' : { 'hyperparameters' : 'default' } }, 
                      { 'predict' : { 'eval_metric' : 'accuracy'}, 'fit' : { } }, 
                    ], 
         'expected_score_range' : {
-                 'CatBoost': (0.245, 0.001),
-                 'ExtraTreesEntr': (0.327, 0.001),
+                 'CatBoost': (0.245, 0.001),            # Classification scores are low numbers so we decrease the
+                 'ExtraTreesEntr': (0.327, 0.001),      # tolerance to 0.001 to make sure we pick up changes.
                  'ExtraTreesGini': (0.32, 0.001),
                  'KNeighborsDist': (0.337, 0.001),
                  'KNeighborsUnif': (0.322, 0.001),
@@ -366,10 +367,11 @@ def make_dataset(request, seed):
     dfx = pd.DataFrame(x)
     dfy = pd.DataFrame(y, columns=['label'])
 
-    # Make some categorical if required.
+    # Make some columns categorical if required.
     if request['n_categorical'] > 0:
         cols_to_convert = random.sample(set(dfx.columns.values), k=request['n_categorical'])
         for col in cols_to_convert:
+            dfx[col] = dfx[col].astype(int)
             vals = np.unique(dfx[col])        
             # Shuffle the categoricals so there's no pattern in their ordering. 
             vals2 = vals.copy()-min(vals)
