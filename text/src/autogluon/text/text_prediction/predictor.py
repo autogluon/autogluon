@@ -1,4 +1,5 @@
 from ..automm import AutoMMPredictor
+from ..automm.utils import parse_dotlist_conf
 from .presets import text_preset_to_config
 from .constants import PYTORCH, MXNET
 
@@ -223,6 +224,7 @@ class TextPredictor:
                 presets = "default"
             config, overrides = text_preset_to_config(presets)
             if hyperparameters is not None:
+                hyperparameters = parse_dotlist_conf(hyperparameters)
                 overrides.update(hyperparameters)
             if num_gpus is not None:
                 overrides.update({"env.num_gpus": int(num_gpus)})

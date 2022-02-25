@@ -591,6 +591,50 @@ def compute_score(
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
 
+def parse_dotlist_conf(conf):
+    """Parse the config files that is potentially in the dotlist format to a dictionary
+
+    Parameters
+    ----------
+    conf
+        Apply the conf stored as dotlist, e.g.,
+         'aaa=a, bbb=b' or ['aaa=a, ', 'bbb=b'] to {'aaa': 'a', 'bbb': b}
+
+    Returns
+    -------
+    new_conf
+    """
+    if isinstance(conf, str):
+        conf = conf.split()
+        need_parse = True
+    elif isinstance(conf, (list, tuple)):
+        need_parse = True
+    elif isinstance(conf, dict):
+        need_parse = False
+    else:
+        raise ValueError(f'Unsupported format of conf={conf}')
+    if need_parse:
+        new_conf = dict()
+        curr_key = None
+        curr_value = ''
+        for ele in conf:
+            if '=' in ele:
+                key, v = ele.split('=')
+                if curr_key is not None:
+                    new_conf[curr_key] = curr_value
+                curr_key = key
+                curr_value = v
+            else:
+                if curr_key is None:
+                    raise ValueError(f'Cannot parse the conf={conf}')
+                curr_value = curr_value + ' ' + ele
+        if curr_key is not None:
+            new_conf[curr_key] = curr_value
+        return new_conf
+    else:
+        return conf
+
+
 def apply_omegaconf_overrides(
         conf: Union[List, Tuple, str, Dict],
         overrides,
@@ -613,38 +657,11 @@ def apply_omegaconf_overrides(
     new_conf
         The updated configuration.
     """
-    if isinstance(overrides, str):
-        overrides = overrides.split()
-        need_parse_overrides = True
-    elif isinstance(overrides, (list, tuple)):
-        need_parse_overrides = True
-    elif isinstance(overrides, dict):
-        need_parse_overrides = False
-    else:
-        raise ValueError(f'Unsupported format of overrides. Overrides={overrides}')
+    overrides = parse_dotlist_conf(overrides)
 
-    if need_parse_overrides:
-        kv_l = []
-        curr_key = None
-        curr_value = ''
-        for ele in overrides:
-            if '=' in ele:
-                key, v = ele.split('=')
-                if curr_key is not None:
-                    kv_l.append((curr_key, curr_value))
-                curr_key = key
-                curr_value = v
-            else:
-                if curr_key is None:
-                    raise ValueError(f'Cannot parse the overrides. overrides={overrides}')
-                curr_value = curr_value + ' ' + ele
-        if curr_key is not None:
-            kv_l.append((curr_key, curr_value))
-    else:
-        kv_l = sorted(list(overrides.items()))
     if check_key_exist:
-        for ele in kv_l:
+        for ele in overrides.items():
             OmegaConf.select(conf, ele[0], throw_on_missing=True)
-    override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in kv_l])
+    override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
