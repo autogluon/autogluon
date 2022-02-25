@@ -592,8 +592,8 @@ def compute_score(
 
 
 def apply_omegaconf_overrides(
-        conf: Union[List, Tuple, str, Dict],
-        overrides,
+        conf: DictConfig,
+        overrides: Union[List, Tuple, str, Dict, DictConfig],
         check_key_exist=True,
 ):
     """

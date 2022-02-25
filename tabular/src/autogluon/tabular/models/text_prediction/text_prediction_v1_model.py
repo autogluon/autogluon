@@ -78,8 +78,6 @@ class TextPredictorModel(AbstractModel):
     def _set_default_params(self):
         super()._set_default_params()
         try_import_autogluon_text()
-        self.params = {}
-        self.preset = "medium_quality_faster_train"
 
     def _fit(self,
              X: pd.DataFrame,
@@ -142,14 +140,16 @@ class TextPredictorModel(AbstractModel):
                                    path=self.path,
                                    eval_metric=self.eval_metric,
                                    verbosity=verbosity_text)
+        params = self._get_model_params()
+        presets = params.pop('presets', None)
         self.model.fit(train_data=X_train,
                        tuning_data=X_val,
                        time_limit=time_limit,
                        num_gpus=num_gpus,
                        num_cpus=num_cpus,
-                       presets=self.preset,
-                       hyperparameters=self.params,
-                       seed=self.params.get('seed', 0))
+                       presets=presets,
+                       hyperparameters=params,
+                       seed=params.pop('seed', 0))
         self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 

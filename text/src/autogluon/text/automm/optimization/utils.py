@@ -1,6 +1,8 @@
 from typing import Optional, Union, Tuple, List, Dict
+import functools
 from torch import nn
 from torch import optim
+from torch.nn import functional as F
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
 from .lr_scheduler import (
@@ -50,7 +52,14 @@ def get_metric(
 
     Returns
     -------
-    A torchmetrics.Metric object.
+    torchmetrics.Metric
+        A torchmetrics.Metric object.
+    Mode
+        The min/max mode used in selecting model checkpoints.
+        - min
+             Its means that smaller metric is better.
+        - max
+            It means that larger metric is better.
     """
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
@@ -64,8 +73,30 @@ def get_metric(
                                        weights="quadratic"), MAX
     elif metric_name == "roc_auc":
         return torchmetrics.AUROC(), MAX
+    elif metric_name in ["log_loss", "cross_entropy"]:
+        return torchmetrics.MeanMetric(), MIN
     else:
         raise ValueError(f"unknown metric_name: {metric_name}")
+
+
+def get_custom_metric_func(metric_name):
+    """
+    Define customized metric functions in case that torchmetrics doesn't support some metrics.
+
+    Parameters
+    ----------
+    metric_name
+        Name of metric.
+
+    Returns
+    -------
+    A callable metric function.
+    """
+    metric_name = metric_name.lower()
+    if metric_name in ["log_loss", "cross_entropy"]:
+        return functools.partial(F.cross_entropy, reduction="none")
+
+    return None
 
 
 def get_optimizer(
