@@ -39,7 +39,7 @@ from .utils import (
     compute_score,
     gather_top_k_ckpts,
     average_checkpoints,
-    infer_validation_metric,
+    infer_metrics,
     get_config,
 )
 from .optimization.utils import (
@@ -349,13 +349,22 @@ class AutoMMPredictor:
         else:  # continuing training
             model = self._model
 
-        if self._validation_metric_name is None:
-            validation_metric_name = infer_validation_metric(
+        if self._validation_metric_name is None or self._eval_metric_name is None:
+            validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
                 eval_metric_name=self._eval_metric_name,
             )
+            if self._eval_metric_name is not None:
+                assert self._eval_metric_name == eval_metric_name, \
+                    f"Inferred evaluation metric {eval_metric_name} is different from " \
+                    f"the previous {self._eval_metric_name}"
+            if self._validation_metric_name is not None:
+                assert self._validation_metric_name == validation_metric_name, \
+                    f"Inferred validation metric {validation_metric_name} is different from " \
+                    f"the previous {self._validation_metric_name}"
         else:
             validation_metric_name = self._validation_metric_name
+            eval_metric_name = self._eval_metric_name
 
         validation_metric, minmax_mode = get_metric(
             metric_name=validation_metric_name,
@@ -368,12 +377,13 @@ class AutoMMPredictor:
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._problem_type = problem_type  # In case problem wasn't provided in __init__().
+        self._problem_type = problem_type  # In case problem type isn't provided in __init__().
+        self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
+        self._validation_metric_name = validation_metric_name
         self._save_path = save_path
         self._config = config
         self._output_shape = output_shape
         self._column_types = column_types
-        self._validation_metric_name = validation_metric_name
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
