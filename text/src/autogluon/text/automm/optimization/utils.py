@@ -42,6 +42,7 @@ def get_metric(
 ):
     """
     Obtain a torchmerics.Metric from its name.
+    Define a customized metric function in case that torchmetrics doesn't support some metric.
 
     Parameters
     ----------
@@ -54,49 +55,32 @@ def get_metric(
     -------
     torchmetrics.Metric
         A torchmetrics.Metric object.
-    Mode
+    mode
         The min/max mode used in selecting model checkpoints.
         - min
              Its means that smaller metric is better.
         - max
             It means that larger metric is better.
+    custom_metric_func
+        A customized metric function.
     """
     metric_name = metric_name.lower()
     if metric_name in ["acc", "accuracy"]:
-        return torchmetrics.Accuracy(), MAX
+        return torchmetrics.Accuracy(), MAX, None
     elif metric_name in ["rmse", "root_mean_squared_error"]:
-        return torchmetrics.MeanSquaredError(squared=False), MIN
+        return torchmetrics.MeanSquaredError(squared=False), MIN, None
     elif metric_name == "r2":
-        return torchmetrics.R2Score(), MAX
+        return torchmetrics.R2Score(), MAX, None
     elif metric_name == "quadratic_kappa":
         return torchmetrics.CohenKappa(num_classes=num_classes,
-                                       weights="quadratic"), MAX
+                                       weights="quadratic"), MAX, None
     elif metric_name == "roc_auc":
-        return torchmetrics.AUROC(), MAX
+        return torchmetrics.AUROC(), MAX, None
     elif metric_name in ["log_loss", "cross_entropy"]:
-        return torchmetrics.MeanMetric(), MIN
+        return torchmetrics.MeanMetric(), MIN, \
+               functools.partial(F.cross_entropy, reduction="none")
     else:
         raise ValueError(f"unknown metric_name: {metric_name}")
-
-
-def get_custom_metric_func(metric_name):
-    """
-    Define customized metric functions in case that torchmetrics doesn't support some metrics.
-
-    Parameters
-    ----------
-    metric_name
-        Name of metric.
-
-    Returns
-    -------
-    A callable metric function.
-    """
-    metric_name = metric_name.lower()
-    if metric_name in ["log_loss", "cross_entropy"]:
-        return functools.partial(F.cross_entropy, reduction="none")
-
-    return None
 
 
 def get_optimizer(
