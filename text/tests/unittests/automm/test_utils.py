@@ -7,8 +7,8 @@ from omegaconf import OmegaConf
                          [
                              ('aaa=a bbb=b ccc=c', {'aaa': 'a', 'bbb': 'b', 'ccc': 'c'}),
                              ('a.a.aa=b b.b.bb=c', {'a.a.aa': 'b', 'b.b.bb': 'c'}),
-                             ('a.a.aa=1 b.b.bb=100', {'a.a.aa': 1, 'b.b.bb': 100}),
-                             (['a.a.aa=1', 'b.b.bb=100'], {'a.a.aa': 1, 'b.b.bb': 100})
+                             ('a.a.aa=1 b.b.bb=100', {'a.a.aa': '1', 'b.b.bb': '100'}),
+                             (['a.a.aa=1', 'b.b.bb=100'], {'a.a.aa': '1', 'b.b.bb': '100'})
                          ])
 def test_parse_dotlist_conf(data, expected):
     assert parse_dotlist_conf(data) == expected
