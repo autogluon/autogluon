@@ -44,7 +44,6 @@ from .utils import (
 )
 from .optimization.utils import (
     get_metric,
-    get_custom_metric_func,
     get_loss_func,
 )
 from .optimization.lit_module import LitModule
@@ -366,11 +365,11 @@ class AutoMMPredictor:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
 
-        validation_metric, minmax_mode = get_metric(
+        validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
             num_classes=output_shape,
         )
-        custom_metric_func = get_custom_metric_func(validation_metric_name)
+
         loss_func = get_loss_func(problem_type)
 
         if time_limit is not None:
