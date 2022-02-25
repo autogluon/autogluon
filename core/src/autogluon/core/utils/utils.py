@@ -33,9 +33,15 @@ def get_memory_size():
 
 
 def get_available_disk_size():
-    statvfs = os.statvfs(".")
-    available_blocks = statvfs.f_frsize * statvfs.f_bavail
-    return bytes_to_mega_bytes(available_blocks)
+    # FIXME: os.statvfs doesn't work on Windows... 
+    # Need to find another way to calculate disk on Windows.
+    # Return None for now
+    try:
+        statvfs = os.statvfs(".")
+        available_blocks = statvfs.f_frsize * statvfs.f_bavail
+        return bytes_to_mega_bytes(available_blocks)
+    except Exception:
+        return None
 
 
 def get_gpu_count_all():
