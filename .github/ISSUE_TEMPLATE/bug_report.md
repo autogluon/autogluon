@@ -27,9 +27,11 @@ Which version of AutoGluon are you are using?
 If you are using 0.4.0 and newer, or the current mainline:
 <details>
 
+```python
 # Replace this code with the output of the following:
 from autogluon.core.utils import show_versions
 show_versions()
+```
 
 </details>
 
