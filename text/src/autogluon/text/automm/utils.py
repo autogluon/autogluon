@@ -61,8 +61,10 @@ def infer_metrics(
 
     Returns
     -------
-    validation
-    The validation metric name.
+    validation_metric_name
+        Name of validation metric.
+    eval_metric_name
+        Name of evaluation metric.
     """
     if eval_metric_name is not None:
         if eval_metric_name.lower() == R2:
