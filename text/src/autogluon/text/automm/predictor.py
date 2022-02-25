@@ -832,7 +832,7 @@ class AutoMMPredictor:
             model = create_and_save_model(
                 config=self._config,
                 num_classes=self._output_shape,
-                save_path=save_path,
+                save_path=path,
                 num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
                 num_categories=self._df_preprocessor.categorical_num_categories
             )
