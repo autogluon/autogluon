@@ -30,7 +30,7 @@ from .data import (
     MultiModalFeaturePreprocessor,
 )
 from .constants import (
-    ACCURACY, RMSE, ALL_MODALITIES,
+    ACCURACY, RMSE, R2, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
@@ -39,29 +39,52 @@ from .constants import (
 logger = logging.getLogger(AUTOMM)
 
 
-def infer_eval_metric(problem_type: str):
+def infer_metrics(
+        problem_type: Optional[str] = None,
+        eval_metric_name: Optional[str] = None,
+):
     """
-    Use accuracy and rmse as the validation metrics for classification and regression, respectively.
+    Infer the validation metric and the evaluation metric if not provided.
+    Validation metric is for early-stopping and selecting the best model checkpoints.
+    Evaluation metric is to report performance to users.
+    If the evaluation metric is provided, then we use it as the validation metric.
+    But there are some exceptions that validation metric is different from evaluation metric.
+    For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`
+    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1.
 
     Parameters
     ----------
     problem_type
-        The type of problem.
+        Type of problem.
+    eval_metric_name
+        Name of evaluation metric provided by users.
 
     Returns
     -------
-    The validation metric name.
+    validation_metric_name
+        Name of validation metric.
+    eval_metric_name
+        Name of evaluation metric.
     """
+    if eval_metric_name is not None:
+        if eval_metric_name.lower() == R2:
+            validation_metric_name = RMSE
+        else:
+            validation_metric_name = eval_metric_name
+        return validation_metric_name, eval_metric_name
+
     if problem_type in [MULTICLASS, BINARY]:
-        eval_metric = ACCURACY
+        eval_metric_name = ACCURACY
     elif problem_type == REGRESSION:
-        eval_metric = RMSE
+        eval_metric_name = RMSE
     else:
         raise NotImplementedError(
             f"Problem type: {problem_type} is not supported yet!"
         )
 
-    return eval_metric
+    validation_metric_name = eval_metric_name
+
+    return validation_metric_name, eval_metric_name
 
 
 def get_config(

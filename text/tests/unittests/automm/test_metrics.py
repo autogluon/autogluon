@@ -1,7 +1,7 @@
 import pytest
 import random
 import torch
-from autogluon.text.automm.optimization.utils import get_custom_metric_func
+from autogluon.text.automm.optimization.utils import get_metric
 from torchmetrics import MeanMetric
 from sklearn.metrics import log_loss
 
@@ -22,7 +22,7 @@ def test_cross_entropy(metric_name, class_num):
         preds.append(torch.randn(bs, class_num))
         targets.append(torch.randint(0, class_num, (bs,)))
 
-    custom_metric_func = get_custom_metric_func(metric_name)
+    _, _, custom_metric_func = get_metric(metric_name=metric_name)
     mean_metric = MeanMetric()
 
     for per_pred, per_target in zip(preds, targets):

@@ -25,16 +25,13 @@ OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
 
-# Log keys
-VAL_LOSS = "val_loss"
-VAL_ACC = "val_acc"
-TEST_ACC = "test_acc"
-MODE = "mode"
+# Metric
 MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
 ACC = "acc"
 RMSE = "rmse"
+R2 = "r2"
 QUADRATIC_KAPPA = "quadratic_kappa"
 
 # Training status

@@ -39,12 +39,11 @@ from .utils import (
     compute_score,
     gather_top_k_ckpts,
     average_checkpoints,
-    infer_eval_metric,
+    infer_metrics,
     get_config,
 )
 from .optimization.utils import (
     get_metric,
-    get_custom_metric_func,
     get_loss_func,
 )
 from .optimization.lit_module import LitModule
@@ -112,20 +111,16 @@ class AutoMMPredictor:
             problem_type = REGRESSION
 
         self._problem_type = problem_type.lower() if problem_type is not None else None
-        if eval_metric is None and problem_type is not None:
-            eval_metric = infer_eval_metric(problem_type)
-
-        # Due to torchmetrics, r2 may encounter errors for per gpu batch size 1.
-        if eval_metric is not None and eval_metric.lower() == "r2":
-            eval_metric = "rmse"
 
         self._eval_metric_name = eval_metric
-        self._output_shape = None
+
         if path is not None:
             path = setup_outputdir(
                 path=path,
                 warn_if_exist=warn_if_exist,
             )
+        self._validation_metric_name = None
+        self._output_shape = None
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
@@ -319,9 +314,6 @@ class AutoMMPredictor:
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
 
-        if self._eval_metric_name is None:
-            self._eval_metric_name = infer_eval_metric(problem_type)
-
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
                 config=config.data,
@@ -356,18 +348,37 @@ class AutoMMPredictor:
         else:  # continuing training
             model = self._model
 
-        val_metric, minmax_mode = get_metric(
-            metric_name=self._eval_metric_name,
-            num_classes=output_shape
+        if self._validation_metric_name is None or self._eval_metric_name is None:
+            validation_metric_name, eval_metric_name = infer_metrics(
+                problem_type=problem_type,
+                eval_metric_name=self._eval_metric_name,
+            )
+            if self._eval_metric_name is not None:
+                assert self._eval_metric_name == eval_metric_name, \
+                    f"Inferred evaluation metric {eval_metric_name} is different from " \
+                    f"the previous {self._eval_metric_name}"
+            if self._validation_metric_name is not None:
+                assert self._validation_metric_name == validation_metric_name, \
+                    f"Inferred validation metric {validation_metric_name} is different from " \
+                    f"the previous {self._validation_metric_name}"
+        else:
+            validation_metric_name = self._validation_metric_name
+            eval_metric_name = self._eval_metric_name
+
+        validation_metric, minmax_mode, custom_metric_func = get_metric(
+            metric_name=validation_metric_name,
+            num_classes=output_shape,
         )
-        custom_metric_func = get_custom_metric_func(self._eval_metric_name)
+
         loss_func = get_loss_func(problem_type)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._problem_type = problem_type  # In case problem wasn't provided in __init__().
+        self._problem_type = problem_type  # In case problem type isn't provided in __init__().
+        self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
+        self._validation_metric_name = validation_metric_name
         self._save_path = save_path
         self._config = config
         self._output_shape = output_shape
@@ -390,8 +401,8 @@ class AutoMMPredictor:
             model=model,
             config=config,
             loss_func=loss_func,
-            val_metric=val_metric,
-            val_metric_name=self._eval_metric_name,
+            validation_metric=validation_metric,
+            validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
             max_time=time_limit,
@@ -408,8 +419,8 @@ class AutoMMPredictor:
             model: nn.Module,
             config: DictConfig,
             loss_func: _Loss,
-            val_metric: torchmetrics.Metric,
-            val_metric_name: str,
+            validation_metric: torchmetrics.Metric,
+            validation_metric_name: str,
             custom_metric_func: Callable,
             minmax_mode: str,
             max_time: timedelta,
@@ -437,24 +448,24 @@ class AutoMMPredictor:
             weight_decay=config.optimization.weight_decay,
             warmup_steps=config.optimization.warmup_steps,
             loss_func=loss_func,
-            val_metric=val_metric,
-            val_metric_name=val_metric_name,
+            validation_metric=validation_metric,
+            validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
         )
 
-        logger.debug(f"val_metric_name: {task.val_metric_name}")
+        logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
 
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
             verbose=True,
-            monitor=task.val_metric_name,
+            monitor=task.validation_metric_name,
             mode=minmax_mode,
             save_last=True,
         )
         early_stopping_callback = pl.callbacks.EarlyStopping(
-            monitor=task.val_metric_name,
+            monitor=task.validation_metric_name,
             patience=config.optimization.patience,
             mode=minmax_mode
         )
@@ -852,6 +863,7 @@ class AutoMMPredictor:
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
                     "eval_metric_name": self._eval_metric_name,
+                    "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
@@ -914,6 +926,7 @@ class AutoMMPredictor:
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
         predictor._column_types = assets["column_types"]
+        predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
         predictor._data_processors = data_processors
 

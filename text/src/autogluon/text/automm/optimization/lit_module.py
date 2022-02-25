@@ -39,8 +39,8 @@ class LitModule(pl.LightningModule):
             weight_decay: Optional[float] = None,
             warmup_steps: Optional[int] = None,
             loss_func: Optional[_Loss] = None,
-            val_metric: Optional[torchmetrics.Metric] = None,
-            val_metric_name: Optional[str] = None,
+            validation_metric: Optional[torchmetrics.Metric] = None,
+            validation_metric_name: Optional[str] = None,
             custom_metric_func: Callable = None,
             test_metric: Optional[torchmetrics.Metric] = None,
     ):
@@ -85,10 +85,10 @@ class LitModule(pl.LightningModule):
             "int(warmup_steps * max_steps)". If an integer, it would be the exact step number.
         loss_func
             A Pytorch loss module, e.g., nn.CrossEntropyLoss().
-        val_metric
+        validation_metric
             A torchmetrics module used in the validation stage, e.g., torchmetrics.Accuracy().
-        val_metric_name
-            Name of validation metric in case that val_metric is a aggregation metric,
+        validation_metric_name
+            Name of validation metric in case that validation_metric is a aggregation metric,
             e.g., torchmetrics.MeanMetric, whose name can't reflect the real metric name.
         custom_metric_func
             A customized metric function in case that torchmetrics doesn't have the metric.
@@ -98,14 +98,14 @@ class LitModule(pl.LightningModule):
             A torchmetrics module used in the test stage, e.g., torchmetrics.Accuracy().
         """
         super().__init__()
-        self.save_hyperparameters(ignore=["model", "val_metric", "test_metric", "loss_func"])
+        self.save_hyperparameters(ignore=["model", "validation_metric", "test_metric", "loss_func"])
         self.model = model
-        self.val_metric = val_metric
-        self.val_metric_name = f"val_{val_metric_name}"
+        self.validation_metric = validation_metric
+        self.validation_metric_name = f"val_{validation_metric_name}"
         self.loss_func = loss_func
-        if isinstance(val_metric, BaseAggregator) and custom_metric_func is None:
+        if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
-                f"val_metric {val_metric} is an aggregation metric,"
+                f"validation_metric {validation_metric} is an aggregation metric,"
                 f"which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
@@ -135,13 +135,13 @@ class LitModule(pl.LightningModule):
             # use only the last logits, which is the fusion logits
             logits = output[-1][LOGITS]
 
-        if isinstance(self.val_metric, torchmetrics.AUROC):
+        if isinstance(self.validation_metric, torchmetrics.AUROC):
             prob = F.softmax(logits.float(), dim=1)
-            return self.val_metric(preds=prob[:, 1], target=label)  # only for binary classification
-        elif isinstance(self.val_metric, BaseAggregator):
-            return self.val_metric(self.custom_metric_func(logits, label))
+            return self.validation_metric(preds=prob[:, 1], target=label)  # only for binary classification
+        elif isinstance(self.validation_metric, BaseAggregator):
+            return self.validation_metric(self.custom_metric_func(logits, label))
         else:
-            return self.val_metric(logits.squeeze(dim=1), label)
+            return self.validation_metric(logits.squeeze(dim=1), label)
 
     def _shared_step(
             self,
@@ -195,7 +195,7 @@ class LitModule(pl.LightningModule):
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
         self.log(
-            self.val_metric_name,
+            self.validation_metric_name,
             self._compute_metric(output=output, label=batch[self.model.label_key]),
         )
 
