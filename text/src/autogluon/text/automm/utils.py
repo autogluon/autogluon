@@ -30,7 +30,7 @@ from .data import (
     MultiModalFeaturePreprocessor,
 )
 from .constants import (
-    ACCURACY, RMSE, ALL_MODALITIES,
+    ACCURACY, RMSE, R2, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
@@ -39,19 +39,32 @@ from .constants import (
 logger = logging.getLogger(AUTOMM)
 
 
-def infer_eval_metric(problem_type: str):
+def infer_validation_metric(
+        problem_type: str,
+        eval_metric_name: str = None,
+):
     """
-    Use accuracy and rmse as the validation metrics for classification and regression, respectively.
+    Infer the validation metric used for select best model checkpoints and early-stopping.
+    It first tries to use the provided evaluation metric. Otherwise, it uses accuracy and rmse as the
+    validation metrics for classification and regression, respectively.
+    Note that we switch r2 to rmse since torchmetrics.R2Score may encounter errors for per gpu batch size 1.
 
     Parameters
     ----------
     problem_type
         The type of problem.
+    eval_metric_name
+        Name of evaluation metric provided by users.
 
     Returns
     -------
     The validation metric name.
     """
+    if eval_metric_name is not None:
+        if eval_metric_name.lower() == R2:
+            return RMSE
+        return eval_metric_name
+
     if problem_type in [MULTICLASS, BINARY]:
         eval_metric = ACCURACY
     elif problem_type == REGRESSION:
