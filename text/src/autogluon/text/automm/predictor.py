@@ -160,7 +160,6 @@ class AutoMMPredictor:
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
             init_only: Optional[bool] = False,
-            standalone: Optional[bool] = False,
     ):
         """
         Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
@@ -344,27 +343,12 @@ class AutoMMPredictor:
             data_processors = self._data_processors
 
         if self._model is None:
-
-            if standalone:
-                model = create_and_save_model(
-                    config=config,
-                    num_classes=output_shape,
-                    save_path=save_path,
-                    num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                    num_categories=df_preprocessor.categorical_num_categories
-                )
-
-                for model_name in config.model.names:
-                    if "hf_text" in model_name or model_name == "clip":
-                        model_config = getattr(config.model, model_name)
-                        model_config.checkpoint_name = os.path.join(save_path,model_name)
-            else:
-                model = create_model(
-                    config=config,
-                    num_classes=output_shape,
-                    num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                    num_categories=df_preprocessor.categorical_num_categories
-                )
+            model = create_model(
+                config=config,
+                num_classes=output_shape,
+                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+                num_categories=df_preprocessor.categorical_num_categories
+            )
         else:  # continuing training
             model = self._model
 
@@ -829,7 +813,7 @@ class AutoMMPredictor:
         model.load_state_dict(state_dict)
         return model
 
-    def save(self, path: str):
+    def save(self, path: str, standalone: Optional[bool] = False,):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -843,7 +827,21 @@ class AutoMMPredictor:
             config=self._config,
             f=os.path.join(path, 'config.yaml')
         )
+        
+        if standalone:
+            model = create_and_save_model(
+                config=self._config,
+                num_classes=self._output_shape,
+                save_path=save_path,
+                num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
+                num_categories=self._df_preprocessor.categorical_num_categories
+            )
 
+            for model_name in self._config.model.names:
+                if "hf_text" in model_name or model_name == "clip":
+                    model_config = getattr(self._config.model, model_name)
+                    model_config.checkpoint_name = os.path.join(save_path,model_name)
+                    
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
 
