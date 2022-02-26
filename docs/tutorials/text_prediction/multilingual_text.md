@@ -113,22 +113,3 @@ print('Score in the German test set=', score_in_de)
 ```
 
 We can see that the model works for both German and English!
-
-You may further conduct in-domain finetuning (i.e., finetune in the German dataset) to further improve the performance.
-
-
-```{.python .input}
-print(predictor._predictor._config)
-
-predictor.fit(train_de_df.sample(100),
-              hyperparameters={
-                  'optimization.max_epochs': 2,
-                  'optimization.learning_rate': 2e-5,
-              })
-
-score_in_de = predictor.evaluate(test_de_df)
-score_in_en = predictor.evaluate(test_en_df)
-
-print('After in-domain tuning on German, score in the German test set=', score_in_de)
-print('After in-domain tuning on German, score in the English test set=', score_in_en)
-```
