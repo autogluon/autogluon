@@ -43,9 +43,8 @@ ALL_DATASETS = {
         (
             "hateful_memes",
             "fusion_mlp_image_text",
-            "prajjwal1/bert-tiny",
+            'monsoon-nlp/hindi-bert',
             "swin_tiny_patch4_window7_224",
-            # 0.65,  # 0.6815
         ),
 
         (

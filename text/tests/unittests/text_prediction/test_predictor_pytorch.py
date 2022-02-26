@@ -136,13 +136,16 @@ def test_predictor_fit(key):
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
     predictor = TextPredictor(label=label, eval_metric=eval_metric)
-    predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+    predictor.fit(train_data, hyperparameters=['optimization.max_epochs=1',
+                                               'model.hf_text.checkpoint_name="google/electra-small-discriminator"'],
                   time_limit=30, seed=123)
     dev_score = predictor.evaluate(dev_data)
     verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
 
     # Test for continuous fit
-    predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
+    predictor.fit(train_data,
+                  hyperparameters='optimization.max_epochs=1 '
+                                  'model.hf_text.checkpoint_name="google/electra-small-discriminator"',
                   time_limit=30, seed=123)
     verify_predictor_save_load(predictor, dev_data, verify_proba=verify_proba)
 
