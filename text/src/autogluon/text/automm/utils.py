@@ -65,7 +65,7 @@ def infer_eval_metric(problem_type: str):
 
 
 def get_config(
-        config: dict,
+        config: Union[dict, DictConfig],
         overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
     """
@@ -119,25 +119,26 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
-    all_configs = []
-    for k, v in config.items():
-        if isinstance(v, dict):
-            per_config = OmegaConf.create(v)
-        elif isinstance(v, DictConfig):
-            per_config = v
-        elif isinstance(v, str):
-            if v.lower().endswith((".yaml", ".yml")):
-                per_config = OmegaConf.load(os.path.expanduser(v))
+    if not isinstance(config, DictConfig):
+        all_configs = []
+        for k, v in config.items():
+            if isinstance(v, dict):
+                per_config = OmegaConf.create(v)
+            elif isinstance(v, DictConfig):
+                per_config = v
+            elif isinstance(v, str):
+                if v.lower().endswith((".yaml", ".yml")):
+                    per_config = OmegaConf.load(os.path.expanduser(v))
+                else:
+                    cur_path = os.path.dirname(os.path.abspath(__file__))
+                    config_path = os.path.join(cur_path, "configs", k, f"{v}.yaml")
+                    per_config = OmegaConf.load(config_path)
             else:
-                cur_path = os.path.dirname(os.path.abspath(__file__))
-                config_path = os.path.join(cur_path, "configs", k, f"{v}.yaml")
-                per_config = OmegaConf.load(config_path)
-        else:
-            raise ValueError(f"Unknown configuration type: {type(v)}")
+                raise ValueError(f"Unknown configuration type: {type(v)}")
 
-        all_configs.append(per_config)
+            all_configs.append(per_config)
 
-    config = OmegaConf.merge(*all_configs)
+        config = OmegaConf.merge(*all_configs)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
