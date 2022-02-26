@@ -251,7 +251,10 @@ class AutoMMPredictor:
                 overrides=hyperparameters,
             )
         else:  # continuing training
-            config = self._config
+            config = get_config(
+                config=self._config,
+                overrides=hyperparameters,
+            )
 
         if self._resume or save_path is None:
             save_path = self._save_path

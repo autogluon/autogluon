@@ -222,7 +222,11 @@ class TextPredictor:
         if self._backend == PYTORCH:
             if presets is None:
                 presets = "default"
-            config, overrides = text_preset_to_config(presets)
+            if self._predictor is None:
+                config, overrides = text_preset_to_config(presets)
+            else:
+                # Continue training setting
+                config, overrides = self._predictor._config, dict()
             if hyperparameters is not None:
                 hyperparameters = parse_dotlist_conf(hyperparameters)
                 overrides.update(hyperparameters)
