@@ -79,6 +79,7 @@ class TextPredictor:
             verbosity=verbosity,
             warn_if_exist=warn_if_exist,
         )
+        self._fit_called = False
         self._backend = backend
 
     @property
@@ -222,7 +223,7 @@ class TextPredictor:
         if self._backend == PYTORCH:
             if presets is None:
                 presets = "default"
-            if self._predictor is None:
+            if not self._fit_called:
                 config, overrides = text_preset_to_config(presets)
             else:
                 # Continue training setting
@@ -243,6 +244,7 @@ class TextPredictor:
                 save_path=save_path,
                 seed=seed,
             )
+            self._fit_called = True
         else:
             self._predictor.fit(
                 train_data=train_data,
