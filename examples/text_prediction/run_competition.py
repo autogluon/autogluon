@@ -158,7 +158,7 @@ def run(args):
         raise NotImplementedError
 
     hyperparameters = get_hyperparameter_config('multimodal')
-    if args.mode is not None:
+    if args.preset is not None and args.mode in ['stacking', 'weighted']:
         hyperparameters['AG_TEXT_NN']['presets'] = args.preset
 
     if args.mode == 'stacking':
