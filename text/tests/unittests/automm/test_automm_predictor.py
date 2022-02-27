@@ -49,6 +49,30 @@ ALL_DATASETS = {
         ),
 
         (
+            "petfinder",
+            "fusion_mlp_image_tabular",
+            None,
+            "swin_tiny_patch4_window7_224",
+            # 0.15,  # 0.1847
+        ),
+
+        (
+            "petfinder",
+            "fusion_mlp_text_tabular",
+            "prajjwal1/bert-tiny",
+            None,
+            # 0.15,  # 0.1847
+        ),
+
+        (
+            "petfinder",
+            "fusion_mlp_tabular",
+            None,
+            None,
+            # 0.15,  # 0.1847
+        ),
+
+        (
             "hateful_memes",
             "hf_text",
             "prajjwal1/bert-tiny",
@@ -65,19 +89,19 @@ ALL_DATASETS = {
         ),
 
         (
-            "hateful_memes",
-            "clip",
-            None,
-            None,
-            # 0.7,  # 0.7318
-        ),
-
-        (
             "ae",
             "hf_text",
             "prajjwal1/bert-tiny",
             None,
             # 0.3,  # 0.3367
+        ),
+
+        (
+            "hateful_memes",
+            "clip",
+            None,
+            None,
+            # 0.7,  # 0.7318
         ),
 
     ]
@@ -103,10 +127,19 @@ def test_predictor(
         eval_metric=metric_name,
     )
     cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_config_path = os.path.join(cur_path, f"configs/model/{model_config}.yaml")
-    data_config_path = os.path.join(cur_path, "configs/data/default.yaml")
-    optimization_config_path = os.path.join(cur_path, "configs/optimization/adamw.yaml")
-    environemnt_config_path = os.path.join(cur_path, "configs/environment/default.yaml")
+    model_config_path = os.path.join(
+        cur_path, f"../../../src/autogluon/text/automm/configs/model/{model_config}.yaml"
+    )
+    data_config_path = os.path.join(
+        cur_path, "../../../src/autogluon/text/automm/configs/data/default.yaml"
+    )
+    optimization_config_path = os.path.join(
+        cur_path, "../../../src/autogluon/text/automm/configs/optimization/adamw.yaml"
+    )
+    environemnt_config_path = os.path.join(
+        cur_path, "../../../src/autogluon/text/automm/configs/environment/default.yaml"
+    )
+
     config = {
         MODEL: model_config_path,
         DATA: data_config_path,
@@ -127,7 +160,7 @@ def test_predictor(
         save_path = os.path.join(save_path, text_backbone)
     if image_backbone is not None:
         save_path = os.path.join(save_path, image_backbone)
-    print(f"save_path: {save_path}")
+
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
@@ -146,8 +179,6 @@ def test_predictor(
         )
     with open(os.path.join(predictor.path, 'test_metrics.json'), 'w') as fp:
         json.dump(scores, fp)
-
-    # assert scores[test_metric_name] >= score
 
     # test saving and loading
     predictor = AutoMMPredictor.load(
