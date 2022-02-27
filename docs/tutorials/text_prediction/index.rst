@@ -24,8 +24,14 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
       :title: Customized Hyperparameter Search (For MXNet backend only)
       :link: customization.html
 
-      How to specify custom hyperparameters of the TextPredictor neural network,
+      How to specify custom hyperparameters of the TextPredictor neural network,
       and tune them with HPO.
+
+   .. card::
+      :title: Solving Multilingual Problems
+      :link: multilingual_text.html
+
+      Build models on datasets with languages other than English.
 
 .. toctree::
    :maxdepth: 1
@@ -34,4 +40,4 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
    beginner
    multimodal_text
    customization
-
+   multilingual_text

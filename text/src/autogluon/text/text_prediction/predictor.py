@@ -1,5 +1,6 @@
 from ..automm import AutoMMPredictor
 from .presets import get_text_preset
+from ..automm.utils import parse_dotlist_conf
 from .constants import PYTORCH, MXNET
 
 
@@ -221,8 +222,13 @@ class TextPredictor:
         if self._backend == PYTORCH:
             if presets is None:
                 presets = "default"
-            config, overrides = get_text_preset(presets)
+            if self._predictor._config is None:
+                config, overrides = get_text_preset(presets)
+            else:
+                # Continue training setting
+                config, overrides = self._predictor._config, dict()
             if hyperparameters is not None:
+                hyperparameters = parse_dotlist_conf(hyperparameters)
                 overrides.update(hyperparameters)
             if num_gpus is not None:
                 overrides.update({"env.num_gpus": int(num_gpus)})

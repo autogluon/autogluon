@@ -65,7 +65,7 @@ def verify_predictor_save_load(predictor, df,
         (
             "hateful_memes",
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
-            "prajjwal1/bert-tiny",
+            "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
         ),
 

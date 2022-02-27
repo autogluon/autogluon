@@ -129,7 +129,7 @@ class TextProcessor:
         fn = {}
         fn.update({f"{self.prefix}_{TEXT_TOKEN_IDS}": Pad(pad_val=self.tokenizer.pad_token_id)})
         fn.update({f"{self.prefix}_{TEXT_VALID_LENGTH}": Stack()})
-        fn.update({f"{self.prefix}_{TEXT_SEGMENT_IDS}": Pad(pad_val=self.tokenizer.pad_token_id)})
+        fn.update({f"{self.prefix}_{TEXT_SEGMENT_IDS}": Pad(pad_val=0)})
         return fn
 
     def build_one_token_sequence(

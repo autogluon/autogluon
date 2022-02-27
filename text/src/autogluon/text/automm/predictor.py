@@ -251,7 +251,10 @@ class AutoMMPredictor:
                 overrides=hyperparameters,
             )
         else:  # continuing training
-            config = self._config
+            config = get_config(
+                config=self._config,
+                overrides=hyperparameters,
+            )
 
         if self._resume or save_path is None:
             save_path = self._save_path
@@ -496,10 +499,12 @@ class AutoMMPredictor:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * config.env.num_nodes
             )
+            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
         else:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
             )
+            precision = config.env.precision
 
         if num_gpus <= 1:
             strategy = None
@@ -510,7 +515,7 @@ class AutoMMPredictor:
             gpus=num_gpus,
             auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
             num_nodes=config.env.num_nodes,
-            precision=config.env.precision,
+            precision=precision,
             strategy=strategy,
             benchmark=False,
             deterministic=config.env.deterministic,
