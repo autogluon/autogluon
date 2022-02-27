@@ -1,5 +1,5 @@
 from ..automm import AutoMMPredictor
-from .presets import text_preset_to_config
+from .presets import get_text_preset
 from .constants import PYTORCH, MXNET
 
 
@@ -221,7 +221,7 @@ class TextPredictor:
         if self._backend == PYTORCH:
             if presets is None:
                 presets = "default"
-            config, overrides = text_preset_to_config(presets)
+            config, overrides = get_text_preset(presets)
             if hyperparameters is not None:
                 overrides.update(hyperparameters)
             if num_gpus is not None:
