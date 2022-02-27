@@ -1,0 +1,46 @@
+model:
+  names:
+    - "categorical_mlp"
+    - "numerical_mlp"
+    - "timm_image"
+    - "fusion_mlp"
+  categorical_mlp:
+    hidden_size: 64
+    activation: "leaky_relu"
+    num_layers: 1
+    drop_rate: 0.1
+    normalization: "layer_norm"
+    data_types:
+      - "categorical"
+  numerical_mlp:
+    hidden_size: 128
+    activation: "leaky_relu"
+    num_layers: 1
+    drop_rate: 0.1
+    normalization: "layer_norm"
+    data_types:
+      - "numerical"
+    merge: "concat"
+  timm_image:
+    checkpoint_name: "swin_base_patch4_window7_224"
+    mix_choice: "all_logits"
+    data_types:
+      - "image"
+    train_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    val_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    max_img_num_per_col: 0
+  fusion_mlp:
+    weight: 0.1
+    adapt_in_features: "max"
+    hidden_sizes:
+      - 128
+    activation: "leaky_relu"
+    drop_rate: 0.1
+    normalization: "layer_norm"
+    data_types:
