@@ -195,8 +195,10 @@ def clean_model_config(model_config):
 
     for per_name in provided_model_names:
         if not hasattr(model_config, per_name):
-            raise ValueError(f"Unknown model name: {per_name}")
+            provided_model_names.remove(per_name)
 
+    if len(provided_model_names) == 0:
+        raise ValueError("All the provided model names are invalid.")
     model_config.names = provided_model_names
 
     return model_config
