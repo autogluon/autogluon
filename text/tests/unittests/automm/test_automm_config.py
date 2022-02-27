@@ -1,4 +1,5 @@
 import os
+import pytest
 from omegaconf import OmegaConf
 from autogluon.text.automm.utils import get_config
 from autogluon.text.automm.constants import (
@@ -80,3 +81,58 @@ def test_config():
     }
     config = get_config(config)
     assert config == config_gt
+
+
+@pytest.mark.parametrize(
+    "model_names,",
+    [
+        ["timm_image"],
+        ["hf_text"],
+        ["clip"],
+        ["timm_image", "hf_text", "clip", "fusion_mlp"],
+        ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
+        ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
+        ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+    ]
+)
+def test_model_selection(model_names):
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    overrides = {"model.names": model_names}
+    config = get_config(
+        config=config,
+        overrides=overrides,
+    )
+    assert sorted(config.model.names) == sorted(model_names)
+    names2 = list(config.model.keys())
+    names2.remove("names")
+    assert sorted(config.model.names) == sorted(names2)
+
+
+@pytest.mark.parametrize(
+    "model_names,",
+    [
+        ["image"],
+        ["text"],
+        ["numerical"],
+        ["categorical"],
+    ]
+)
+def test_invalid_model_selection(model_names):
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    overrides = {"model.names": model_names}
+
+    with pytest.raises(ValueError):
+        config = get_config(
+            config=config,
+            overrides=overrides,
+        )
