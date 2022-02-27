@@ -121,6 +121,7 @@ def train(args):
                                   path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
+                      presets=args.preset,
                       seed=args.seed)
     else:
         raise NotImplementedError
