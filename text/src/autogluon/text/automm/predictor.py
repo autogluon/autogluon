@@ -284,16 +284,14 @@ class AutoMMPredictor:
                 random_state=np.random.RandomState(seed)
             )
 
-        inferred_column_types, problem_type, output_shape = \
+        column_types, problem_type, output_shape = \
             infer_column_problem_types(
                 train_df=train_data,
                 valid_df=tuning_data,
                 label_columns=self._label_column,
                 problem_type=self._problem_type,
+                provided_column_types=column_types,
             )
-
-        if column_types is None:
-            column_types = inferred_column_types
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
@@ -576,16 +574,6 @@ class AutoMMPredictor:
             data_processors.pop(LABEL, None)
         logger.debug(f"data_processors for prediction: {data_processors.keys()}")
 
-        predict_dm = BaseDataModule(
-            df_preprocessor=self._df_preprocessor,
-            data_processors=data_processors,
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            num_workers=self._config.env.num_workers_evaluation,
-            predict_data=data,
-        )
-        task = LitModule(
-            model=self._model,
-        )
         num_gpus = (
             self._config.env.num_gpus
             if isinstance(self._config.env.num_gpus, int)
@@ -602,13 +590,35 @@ class AutoMMPredictor:
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
             )
+            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
+        else:
+            precision = self._config.env.precision
 
-        strategy = 'dp' if num_gpus > 1 else None
+        if num_gpus > 1:
+            strategy = "dp"
+            # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
+            # So, we need to use the GPU number as a multiplier to compute the batch size.
+            batch_size = self._config.env.per_gpu_batch_size_evaluation * num_gpus
+        else:
+            strategy = None
+            batch_size = self._config.env.per_gpu_batch_size_evaluation
+
+        predict_dm = BaseDataModule(
+            df_preprocessor=self._df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=batch_size,
+            num_workers=self._config.env.num_workers_evaluation,
+            predict_data=data,
+        )
+        task = LitModule(
+            model=self._model,
+        )
+
         evaluator = pl.Trainer(
             gpus=num_gpus,
             auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
             num_nodes=self._config.env.num_nodes,
-            precision=self._config.env.precision,
+            precision=precision,
             strategy=strategy,
             benchmark=False,
             deterministic=self._config.env.deterministic,

@@ -94,7 +94,7 @@ def train(args):
         real_dev_df = dev_df
 
     hyperparameters = get_hyperparameter_config('multimodal')
-    if args.mode is not None:
+    if args.preset is not None and args.mode in ['stacking', 'weighted']:
         hyperparameters['AG_TEXT_NN']['presets'] = args.preset
 
     if args.mode == 'stacking':
@@ -121,6 +121,7 @@ def train(args):
                                   path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
+                      presets=args.preset,
                       seed=args.seed)
     else:
         raise NotImplementedError

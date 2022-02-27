@@ -166,7 +166,42 @@ def get_config(
     if overrides is not None:
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
 
+    config.model = clean_model_config(config.model)
     return config
+
+
+def clean_model_config(model_config):
+    """
+    Remove unused models based provided model names.
+
+    Parameters
+    ----------
+    model_config
+        A DictConfig object of model config.
+
+    Returns
+    -------
+    Cleaned model config.
+    """
+    provided_model_names = []
+    for per_name in model_config.names:
+        provided_model_names.append(per_name.lower())
+
+    all_model_names = list(model_config.keys())
+    all_model_names.remove("names")
+    for per_name in all_model_names:
+        if per_name not in provided_model_names:
+            delattr(model_config, per_name)
+
+    for per_name in provided_model_names:
+        if not hasattr(model_config, per_name):
+            provided_model_names.remove(per_name)
+
+    if len(provided_model_names) == 0:
+        raise ValueError("All the provided model names are invalid.")
+    model_config.names = provided_model_names
+
+    return model_config
 
 
 def select_model(

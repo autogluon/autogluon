@@ -1,6 +1,6 @@
 from ..automm import AutoMMPredictor
+from .presets import get_text_preset
 from ..automm.utils import parse_dotlist_conf
-from .presets import text_preset_to_config
 from .constants import PYTORCH, MXNET
 
 
@@ -223,7 +223,7 @@ class TextPredictor:
             if presets is None:
                 presets = "default"
             if self._predictor._config is None:
-                config, overrides = text_preset_to_config(presets)
+                config, overrides = get_text_preset(presets)
             else:
                 # Continue training setting
                 config, overrides = self._predictor._config, dict()

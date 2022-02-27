@@ -2,7 +2,8 @@ env:
   num_gpus: -1
   num_nodes: 1
   batch_size: 128  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
-  per_gpu_batch_size: 8  # you can define this according to your GPU memory
+  per_gpu_batch_size: 8  # training per gpu batch size
+  per_gpu_batch_size_evaluation: 64  # evaluation per gpu batch size
   precision: 16  # training precision. Refer to https://pytorch-lightning.readthedocs.io/en/latest/advanced/mixed_precision.html
   num_workers: 2  # pytorch training dataloader workers
   num_workers_evaluation: 2  # pytorch prediction/test dataloader workers
