@@ -23,44 +23,37 @@ def list_model_presets():
     return model_presets
 
 
-def preset_to_config(model_type: str):
+def get_preset(model_preset: str):
     """
-    Get the default config of one predictor in AutoMM.
-    Currently, we only use model type to differentiate different predictors.
-    In future, we can simultaneously consider model type, data type, optimization type,
-    and environment type to construct more diverse presets.
+    Get the preset of one predictor in AutoMM.
+    Currently, we only use model presets to differentiate different predictors.
+    In future, we can simultaneously consider model, data, optimization,
+    and environment to construct more diverse presets.
 
     Parameters
     ----------
-    model_type
-        Type of model supported by AutoMM.
+    model_preset
+        A model preset supported by AutoMM.
 
     Returns
     -------
-    A predictor's preset config strings of MODEL, DATA, OPTIMIZATION, and ENVIRONMENT.
+    AutoMM predictor's presets of MODEL, DATA, OPTIMIZATION, and ENVIRONMENT.
     """
-    model_type = model_type.lower()
-    config = {
-        MODEL: "",
+    model_preset = model_preset.lower()
+    preset = {
+        MODEL: model_preset,
         DATA: "default",
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
 
-    if model_type == "text":
-        config[MODEL] = "hf_text"
-    elif model_type == "image":
-        config[MODEL] = "timm_image"
-    else:
-        config[MODEL] = model_type
+    cur_path = os.path.dirname(os.path.abspath(__file__))
+    model_config_dir = os.path.join(cur_path, "configs", "model")
+    model_config_path = os.path.join(model_config_dir, f"{model_preset}.yaml")
+    if not os.path.isfile(model_config_path):
+        raise ValueError(
+            f"Model preset '{model_preset}' is not supported yet. "
+            f"Consider one of these: {list_model_presets()}"
+        )
 
-        cur_path = os.path.dirname(os.path.abspath(__file__))
-        model_config_dir = os.path.join(cur_path, "configs", "model")
-        model_config_path = os.path.join(model_config_dir, f"{model_type}.yaml")
-        if not os.path.isfile(model_config_path):
-            raise ValueError(
-                f"Model type '{model_type}' is not supported yet. "
-                f"Consider one of these: {list_model_presets()}"
-            )
-
-    return config
+    return preset
