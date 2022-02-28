@@ -850,7 +850,11 @@ class AutoMMPredictor:
         model.load_state_dict(state_dict)
         return model
 
-    def save(self, path: str):
+    def save(
+            self, 
+            path: str,
+            standalone: Optional[bool] = False
+    ):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -858,7 +862,18 @@ class AutoMMPredictor:
         ----------
         path
             The directory to save this predictor.
+        standalone
+            Whether to save the downloaded model for online deployment.
         """
+
+        if standalone:
+            logger.debug(f"Using the standalone=True")
+            for idx, model_name in enumerate(self._config.model.names):
+                if model_name == "clip" or "hf_text" in model_name:
+                    self._model.model[idx].model.save_pretrained(os.path.join(path,model_name))
+                    model_config = getattr(self._config.model, model_name)
+                    model_config.checkpoint_name = os.path.join('LOCAL:',model_name)
+
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(
             config=self._config,
@@ -922,6 +937,13 @@ class AutoMMPredictor:
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
+
+        for model_name in config.model.names:
+            if model_name == "clip" or "hf_text" in model_name:
+                model_config = getattr(config.model,model_name)
+                if 'LOCAL:' in model_config.checkpoint_name:
+                    model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name.split('/')[1])
+
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)
         with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
