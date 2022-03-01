@@ -32,7 +32,7 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
 
       Build models on datasets with languages other than English.
 
-    .. card::
+   .. card::
       :title: Getting Started with AutoMM
       :link: automm.html
 
