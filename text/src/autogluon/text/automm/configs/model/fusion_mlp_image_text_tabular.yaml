@@ -45,7 +45,7 @@ model:
       - "center_crop"
     image_norm: "imagenet"
     image_size: 224
-    max_img_num_per_col: 0
+    max_img_num_per_col: 3
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:
