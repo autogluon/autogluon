@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 import os
 import warnings
+import os
+
+os.environ['AUTOMM_DISABLE_PROGRESS_BAR'] = '1'
 warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
