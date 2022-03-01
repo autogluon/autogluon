@@ -4,7 +4,7 @@
 This tutorial introduces how to customize the hyperparameters in `TextPredictor`.
 
 
-```python
+```{.python .input}
 import numpy as np
 import warnings
 import autogluon as ag
@@ -17,7 +17,7 @@ np.random.seed(123)
 For demonstration, we use the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset.
 
 
-```python
+```{.python .input}
 from autogluon.core import TabularDataset
 subsample_size = 1000  # subsample for faster demo, you may try specifying larger value
 train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
@@ -33,7 +33,7 @@ train_data.head(10)
 AutoMM provides several simple preset configurations. Let's take a look at the available presets.
 
 
-```python
+```{.python .input}
 from autogluon.text.text_prediction.presets import list_text_presets
 list_text_presets()
 ```
@@ -41,7 +41,7 @@ list_text_presets()
 You may be interested in the configuration differences behind the preset strings.
 
 
-```python
+```{.python .input}
 list_text_presets(verbose=True)
 ```
 
@@ -50,7 +50,7 @@ We can find that the main difference between different presets lie in the choice
 Let's train a text predictor with preset `medium_quality_faster_train`. 
 
 
-```python
+```{.python .input}
 from autogluon.text import TextPredictor
 predictor = TextPredictor(eval_metric='acc', label='label')
 predictor.fit(
@@ -63,7 +63,7 @@ predictor.fit(
 Below we report both `f1` and `acc` metrics for our predictions. If you want to obtain the best F1 score, you should set `eval_metric='f1'` when constructing the TextPredictor.
 
 
-```python
+```{.python .input}
 predictor.evaluate(test_data, metrics=['f1', 'acc'])
 ```
 
