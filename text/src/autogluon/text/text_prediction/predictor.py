@@ -66,8 +66,8 @@ class TextPredictor:
         warn_if_exist : bool, default = True
             Whether to raise warning if the specified path already exists.
         enable_progress_bar
-            Whether to show progress bar. It will be True by default and will also be
-            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+            Whether to show progress bar. It will be True by default and will also be disabled
+            if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
 
         """
         self.verbosity = verbosity
