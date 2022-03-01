@@ -46,3 +46,4 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
    multimodal_text
    customization
    multilingual_text
+   automm
