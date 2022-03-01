@@ -225,7 +225,7 @@ Then we can evaluate the trained model on test data. AutoMM supports evaluation 
 
 
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy", "quadratic_kappa"])
+scores = predictor.evaluate(test_data, metrics=["accuracy"])
 print(scores)
 ```
 
@@ -254,7 +254,7 @@ Extract embeddings can be easily done via `.extract_embedding()`
 
 ```{.python .input}
 embeddings = predictor.extract_embedding(test_data.drop(columns=label_col))
-embeddings[0]
+embeddings.shape
 ```
 
 Moreover, AutoMM provides the APIs for saving and loading predictors.
@@ -263,7 +263,7 @@ Moreover, AutoMM provides the APIs for saving and loading predictors.
 ```{.python .input}
 predictor.save('my_saved_dir')
 loaded_predictor = AutoMMPredictor.load('my_saved_dir')
-scores2 = loaded_predictor.evaluate(test_data, metrics=["accuracy", "quadratic_kappa"])
+scores2 = loaded_predictor.evaluate(test_data, metrics=["accuracy"])
 print(scores2)
 ```
 
@@ -294,7 +294,7 @@ Like the above image prediction, we can either evaluate on test data,
 
 
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy", "quadratic_kappa"])
+scores = predictor.evaluate(test_data, metrics=["accuracy"])
 print(scores)
 ```
 
@@ -319,7 +319,7 @@ or extract embeddings.
 
 ```{.python .input}
 embeddings = predictor.extract_embedding(test_data.drop(columns=label_col))
-embeddings[0]
+embeddings.shape
 ```
 
 Likewise, we can save the predictor, load it, and get the same evaluatiion scores.
@@ -328,7 +328,7 @@ Likewise, we can save the predictor, load it, and get the same evaluatiion score
 ```{.python .input}
 predictor.save('my_saved_dir')
 loaded_predictor = AutoMMPredictor.load('my_saved_dir')
-scores2 = loaded_predictor.evaluate(test_data, metrics=["accuracy", "quadratic_kappa"])
+scores2 = loaded_predictor.evaluate(test_data, metrics=["accuracy"])
 print(scores2)
 ```
 
@@ -361,7 +361,7 @@ Then we can evaluate the multimodal predictor's performance.
 
 
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy", "quadratic_kappa"])
+scores = predictor.evaluate(test_data, metrics=["accuracy"])
 print(scores)
 ```
 
@@ -386,7 +386,7 @@ predictor.fit(
 
 
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy", "quadratic_kappa"])
+scores = predictor.evaluate(test_data, metrics=["accuracy"])
 print(scores)
 ```
 
