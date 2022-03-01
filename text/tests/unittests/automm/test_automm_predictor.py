@@ -185,6 +185,15 @@ def test_predictor(
 
 
 def test_standalone(): # test standalong feature in AutoMMPredictor.save()
+    from unittest import mock
+
+    requests_gag = mock.patch(
+        'requests.Session.request',
+        mock.Mock(side_effect=RuntimeError(
+            'Please use the `responses` library to mock HTTP in your tests.'
+        ))
+    )
+
     dataset = PetFinderDataset()
 
     config = {
@@ -226,7 +235,11 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     )
 
     loaded_online_predictor = AutoMMPredictor.load(path = save_path)
-    loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
+
+    # Check if the predictor can be loaded from an offline enivronment.
+    with requests_gag:
+        # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
+        loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
 
 
     predictions = predictor.predict(dataset.test_df, as_pandas=False) 
