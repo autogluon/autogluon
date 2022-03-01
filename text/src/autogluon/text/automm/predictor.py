@@ -53,15 +53,6 @@ from .. import version
 logger = logging.getLogger(AUTOMM)
 
 
-def _get_enable_progress_bar(enable_progress_bar):
-    if enable_progress_bar is None:
-        if os.environ.get('AUTOMM_DISABLE_PROGRESS_BAR'):
-            enable_progress_bar = False
-        else:
-            enable_progress_bar = True
-    return enable_progress_bar
-
-
 class AutoMMPredictor:
     """
     AutoMMPredictor can predict the values of one dataframe column conditioned on the rest columns.
