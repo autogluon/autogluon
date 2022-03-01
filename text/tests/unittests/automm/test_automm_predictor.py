@@ -182,3 +182,58 @@ def test_predictor(
             hyperparameters=hyperparameters,
             time_limit=30,
         )
+
+
+def test_standalone(): # test standalong feature in AutoMMPredictor.save()
+    dataset = PetFinderDataset()
+
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.hf_text.checkpoint_name":"prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name":"swin_tiny_patch4_window7_224"
+    }
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+
+    save_path = os.path.join(get_home_dir(), "standalone", "false")
+
+
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=30,
+        save_path=save_path,
+    )
+
+    save_path_standalone = os.path.join(get_home_dir(), "standalone", "true")
+
+    predictor.save(
+        path = save_path_standalone,
+        standalone = True
+    )
+
+    loaded_online_predictor = AutoMMPredictor.load(path = save_path)
+    loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
+
+
+    predictions = predictor.predict(dataset.test_df, as_pandas=False) 
+    online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
+    offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
+    
+    # check if save with standalone=True coincide with standalone=False
+    npt.assert_equal(predictions,offline_predictions)
+    npt.assert_equal(online_predictions,offline_predictions)
+
