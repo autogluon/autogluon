@@ -1,3 +1,5 @@
+import warnings
+
 from ..automm import AutoMMPredictor
 from .presets import get_text_preset
 from ..automm.utils import parse_dotlist_conf
@@ -160,6 +162,7 @@ class TextPredictor:
             plot_results=None,
             holdout_frac=None,
             save_path=None,
+            show_progress_bar=None,
             seed=123):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
@@ -212,6 +215,9 @@ class TextPredictor:
             Default value (if None) is selected based on the number of rows in the training data and whether hyperparameter-tuning is utilized.
         save_path : str, default = None
             The path for auto-saving the models' weights
+        show_progress_bar
+            Whether to show progress bar. It will be True by default and will also be
+            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
         seed : int, default = 0
             The random seed to use for this training run. If None, no seed will be specified and repeated runs will produce different results.
 
@@ -241,9 +247,12 @@ class TextPredictor:
                 column_types=column_types,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
+                show_progress_bar=show_progress_bar,
                 seed=seed,
             )
         else:
+            warnings.warn(f'MXNet backend will be removed deprecated in AutoGluon 0.5. '
+                          f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
             self._predictor.fit(
                 train_data=train_data,
                 tuning_data=tuning_data,
