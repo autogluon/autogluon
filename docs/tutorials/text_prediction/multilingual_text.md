@@ -20,11 +20,8 @@ The [Cross-Lingual Amazon Product Review Sentiment](https://webis.de/data/webis-
 
 ```{.python .input}
 import pandas as pd
-import os
 import warnings
 warnings.filterwarnings('ignore')
-
-os.environ['AUTOMM_DISABLE_PROGRESS_BAR'] = '1'
 
 train_de_df = pd.read_csv('amazon_review_sentiment_cross_lingual/de_train.tsv',
                           sep='\t', header=None, names=['label', 'text']) \

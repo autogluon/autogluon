@@ -18,11 +18,9 @@ and also support solving multilingual problems. You may refer to multimodal / mu
 import numpy as np
 import warnings
 import matplotlib.pyplot as plt
-import os
 
 warnings.filterwarnings('ignore')
 np.random.seed(123)
-os.environ['AUTOMM_DISABLE_PROGRESS_BAR'] = '1'
 ```
 
 ## Sentiment Analysis Task
