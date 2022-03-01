@@ -590,6 +590,10 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             model.summary_writer = None
         return model
 
+    def _more_tags(self):
+        # `can_refit_full=True` because num_epochs is communicated at end of `_fit`: `self.params_trained['num_epochs'] = best_val_epoch + 1`
+        return {'can_refit_full': True}
+
 
 
 """ General TODOs:

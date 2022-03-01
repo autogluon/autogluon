@@ -202,3 +202,7 @@ class TextPredictorModel(AbstractModel):
 
         y_pred_proba = self.model.predict_proba(X, as_pandas=False)
         return self._convert_proba_to_unified_form(y_pred_proba)
+
+    def _more_tags(self):
+        # `can_refit_full=False` because TextPredictor does not communicate how to train until the best epoch in refit_full.
+        return {'can_refit_full': False}

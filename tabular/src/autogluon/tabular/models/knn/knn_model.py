@@ -255,7 +255,10 @@ class KNNModel(AbstractModel):
         return self.model
 
     def _more_tags(self):
-        return {'valid_oof': True}
+        return {
+            'valid_oof': True,
+            'can_refit_full': True,
+        }
 
 
 class FAISSModel(KNNModel):

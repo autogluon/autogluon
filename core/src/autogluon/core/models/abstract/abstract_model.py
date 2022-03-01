@@ -867,6 +867,18 @@ class AbstractModel:
         trained_params.update(self.params_trained)
         return trained_params
 
+    def convert_to_refit_full_via_copy(self):
+        """
+        Creates a new refit_full variant of the model, but instead of training it simply copies `self`.
+        This method is for compatibility with models that have not implemented refit_full support as a fallback.
+        """
+        __name = self.name
+        self.rename(self.name + REFIT_FULL_SUFFIX)
+        __path_refit = self.path
+        self.save(path=self.path, verbose=False)
+        self.rename(__name)
+        return self.load(path=__path_refit, verbose=False)
+
     def get_params(self) -> dict:
         """Get params of the model at the time of initialization"""
         name = self.name

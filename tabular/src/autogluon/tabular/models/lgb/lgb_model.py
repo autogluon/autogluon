@@ -340,3 +340,7 @@ class LGBModel(AbstractModel):
 
     def _ag_params(self) -> set:
         return {'ag.early_stop'}
+
+    def _more_tags(self):
+        # `can_refit_full=True` because num_boost_round is communicated at end of `_fit`
+        return {'can_refit_full': True}
