@@ -348,6 +348,8 @@ class BaggedEnsembleModel(AbstractModel):
         model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if not self.params.get('save_bag_folds', True):
             model_base.model = None
+        if self.low_memory:
+            self.save_child(model_base)
         self.add_child(model=model_base, add_child_times=True)
         self._set_n_repeat_single()
 
@@ -480,7 +482,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         for model in models:
             # No need to add child times or save child here as this already occurred in the fold_fitting_strategy
-            self.add_child(model=model, add_child_times=False, save_child=False, verbose=False)
+            self.add_child(model=model, add_child_times=False)
         self._bagged_mode = True
 
         if self._oof_pred_proba is None:
@@ -642,7 +644,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return model
 
-    def add_child(self, model: Union[AbstractModel, str], add_child_times=False, save_child=True, verbose=False):
+    def add_child(self, model: Union[AbstractModel, str], add_child_times=False):
         """
         Add a new fit child model to `self.models`
 
@@ -653,10 +655,6 @@ class BaggedEnsembleModel(AbstractModel):
         add_child_times : bool, default = False
             Whether to add child metadata on times to the bag times.
             This includes fit_time, predict_time, and predict_1_time.
-        save_child : bool, default = True
-            Whether to save the child model to disk.
-        verbose : bool, default = False
-            Whether to log the child saving process.
         """
         if self.models is None:
             self.models = []
@@ -666,10 +664,6 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             model_name = model.name
         if self.low_memory:
-            if save_child:
-                if model is None:
-                    model = self.load_child(model=model_name, verbose=False)
-                self.save_child(model, verbose=verbose)
             self.models.append(model_name)
         else:
             if model is None:
@@ -681,6 +675,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._add_child_times_to_bag(model=model)
 
     def save_child(self, model: Union[AbstractModel, str], verbose=False):
+        """Save child model to disk."""
         child = self.load_child(model)
         child.set_contexts(self.path + child.name + os.path.sep)
         child.save(verbose=verbose)
@@ -719,7 +714,9 @@ class BaggedEnsembleModel(AbstractModel):
         model_full.predict_1_time = None
         model_full.val_score = None
         model_full.rename(model_full.name + REFIT_FULL_SUFFIX)
-        model_full.add_child(model=child_0, add_child_times=True, save_child=True)
+        if model_full.low_memory:
+            model_full.save_child(child_0)
+        model_full.add_child(model=child_0, add_child_times=True)
         model_full._set_n_repeat_single()
         return model_full
 
