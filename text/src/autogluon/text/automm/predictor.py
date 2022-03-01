@@ -863,7 +863,10 @@ class AutoMMPredictor:
         path
             The directory to save this predictor.
         standalone
-            Whether to save the downloaded model for online deployment.
+            Whether to save the downloaded model for offline deployment. 
+            When standalong = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
+            and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml. 
+            When standalong = False, does not save the model, and requires online environment to download in load().
         """
 
         if standalone:
@@ -872,7 +875,7 @@ class AutoMMPredictor:
                 if model_name == "clip" or "hf_text" in model_name:
                     self._model.model[idx].model.save_pretrained(os.path.join(path,model_name))
                     model_config = getattr(self._config.model, model_name)
-                    model_config.checkpoint_name = os.path.join('LOCAL:',model_name)
+                    model_config.checkpoint_name = os.path.join('local://',model_name)
 
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(
@@ -941,8 +944,8 @@ class AutoMMPredictor:
         for model_name in config.model.names:
             if model_name == "clip" or "hf_text" in model_name:
                 model_config = getattr(config.model,model_name)
-                if 'LOCAL:' in model_config.checkpoint_name:
-                    model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name.split('/')[1])
+                if model_config.checkpoint_name.startswith('local://'):
+                    model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name[len('local://'):])
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)
