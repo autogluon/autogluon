@@ -53,13 +53,13 @@ from .. import version
 logger = logging.getLogger(AUTOMM)
 
 
-def _get_show_progress_bar(show_progress_bar):
-    if show_progress_bar is None:
+def _get_enable_progress_bar(enable_progress_bar):
+    if enable_progress_bar is None:
         if os.environ.get('AUTOMM_DISABLE_PROGRESS_BAR'):
-            show_progress_bar = False
+            enable_progress_bar = False
         else:
-            show_progress_bar = True
-    return show_progress_bar
+            enable_progress_bar = True
+    return enable_progress_bar
 
 
 class AutoMMPredictor:
@@ -77,6 +77,7 @@ class AutoMMPredictor:
             path: Optional[str] = None,
             verbosity: Optional[int] = 3,
             warn_if_exist: Optional[bool] = True,
+            enable_progress_bar: bool = None,
     ):
         """
         Parameters
@@ -106,6 +107,10 @@ class AutoMMPredictor:
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         warn_if_exist
             Whether to raise warning if the specified path already exists.
+        enable_progress_bar
+            Whether to show progress bar. It will be True by default and will also be
+            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+
         """
         self.verbosity = verbosity
         if self.verbosity is not None:
@@ -139,6 +144,13 @@ class AutoMMPredictor:
         self._data_processors = None
         self._model = None
         self._resume = False
+        if enable_progress_bar is None:
+            if os.environ.get('AUTOMM_DISABLE_PROGRESS_BAR'):
+                self._enable_progress_bar = False
+            else:
+                self._enable_progress_bar = True
+        else:
+            self._enable_progress_bar = enable_progress_bar
 
     @property
     def path(self):
@@ -167,7 +179,6 @@ class AutoMMPredictor:
             column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
-            show_progress_bar: bool = None,
             init_only: Optional[bool] = False,
     ):
         """
@@ -246,9 +257,6 @@ class AutoMMPredictor:
             and whether hyper-parameter-tuning is utilized.
         seed
             The random seed to use for this training run.
-        show_progress_bar
-            Whether to show progress bar. It will be True by default and will also be
-            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
         init_only
             Whether to only initialize the model without training. This can be used when we want to
             compare the model performance before and after training.
@@ -257,8 +265,6 @@ class AutoMMPredictor:
         An "AutoMMPredictor" object (itself).
         """
         pl.seed_everything(seed, workers=True)
-
-        show_progress_bar = _get_show_progress_bar(show_progress_bar)
 
         if self._config is None:
             config = get_config(
@@ -422,7 +428,6 @@ class AutoMMPredictor:
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
             max_time=time_limit,
-            show_progress_bar=show_progress_bar,
             save_path=save_path,
         )
         return self
@@ -441,7 +446,6 @@ class AutoMMPredictor:
             custom_metric_func: Callable,
             minmax_mode: str,
             max_time: timedelta,
-            show_progress_bar: bool,
             save_path: str,
     ):
 
@@ -552,7 +556,7 @@ class AutoMMPredictor:
             gradient_clip_algorithm="norm",
             accumulate_grad_batches=grad_steps,
             log_every_n_steps=10,
-            show_progress_bar=show_progress_bar,
+            enable_progress_bar=self._enable_progress_bar,
             fast_dev_run=config.env.fast_dev_run,
             val_check_interval=config.optimization.val_check_interval,
         )
@@ -589,7 +593,6 @@ class AutoMMPredictor:
             data: Union[pd.DataFrame, dict, list],
             ret_type: str,
             requires_label: bool,
-            show_progress_bar: bool = True,
     ) -> torch.Tensor:
 
         data = self._data_to_df(data)
@@ -652,7 +655,7 @@ class AutoMMPredictor:
             precision=precision,
             strategy=strategy,
             benchmark=False,
-            show_progress_bar=show_progress_bar,
+            enable_progress_bar=self._enable_progress_bar,
             deterministic=self._config.env.deterministic,
             logger=False,
         )
@@ -684,7 +687,6 @@ class AutoMMPredictor:
             data: Union[pd.DataFrame, dict, list],
             metrics: Optional[List[str]] = None,
             return_pred: Optional[bool] = False,
-            show_progress_bar: Optional[bool] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -698,22 +700,16 @@ class AutoMMPredictor:
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
-        show_progress_bar
-            Whether to show progress bar. It will be True by default and will also be
-            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
 
         Returns
         -------
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        show_progress_bar = _get_show_progress_bar(show_progress_bar)
-
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
             requires_label=True,
-            show_progress_bar=show_progress_bar,
         )
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
@@ -752,7 +748,6 @@ class AutoMMPredictor:
             self,
             data: Union[pd.DataFrame, dict, list],
             as_pandas: Optional[bool] = True,
-            show_progress_bar: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -764,21 +759,16 @@ class AutoMMPredictor:
               follow same format (except for the `label` column).
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
-        show_progress_bar
-            Whether to show progress bar. It will be True by default and will also be
-            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        show_progress_bar = _get_show_progress_bar(show_progress_bar)
 
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
             requires_label=False,
-            show_progress_bar=show_progress_bar,
         )
         pred = self._df_preprocessor.transform_prediction(y_pred=logits)
         if as_pandas:
@@ -790,7 +780,6 @@ class AutoMMPredictor:
             data: Union[pd.DataFrame, dict, list],
             as_pandas: Optional[bool] = True,
             as_multiclass: Optional[bool] = True,
-            show_progress_bar: Optional[bool] = None,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -806,8 +795,6 @@ class AutoMMPredictor:
         as_multiclass
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
-        show_progress_bar
-            Whether to show progress bar or not
 
         Returns
         -------
@@ -818,13 +805,10 @@ class AutoMMPredictor:
         assert self._problem_type in [BINARY, MULTICLASS], \
             f"Problem {self._problem_type} has no probability output."
 
-        show_progress_bar = _get_show_progress_bar(show_progress_bar)
-
         logits = self._predict(
             data=data,
             ret_type=LOGITS,
             requires_label=False,
-            show_progress_bar=show_progress_bar,
         )
         prob = self._logits_to_prob(logits)
 
