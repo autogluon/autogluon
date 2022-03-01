@@ -20,6 +20,8 @@ The [Cross-Lingual Amazon Product Review Sentiment](https://webis.de/data/webis-
 
 ```{.python .input}
 import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
 
 train_de_df = pd.read_csv('amazon_review_sentiment_cross_lingual/de_train.tsv',
                           sep='\t', header=None, names=['label', 'text']) \
@@ -52,7 +54,7 @@ test_en_df.reset_index(inplace=True, drop=True)
 
 ## Finetune the German BERT
 
-Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. Since AutoGluon Text integrates with the [Huggingface/Transformers] (as explained in :ref:`sec_textprediction_customization`), we directly load the German BERT model via Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). To simplify the experiment, we also just finetune for 5 epochs.
+Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. Since AutoGluon Text integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), we directly load the German BERT model via Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). To simplify the experiment, we also just finetune for 5 epochs.
 
 
 ```{.python .input}
@@ -70,13 +72,15 @@ predictor.fit(train_de_df,
 
 ```{.python .input}
 score = predictor.evaluate(test_de_df)
-print('Score on the German test set=', score)
+print('Score on the German Testset:')
+print(score)
 ```
 
 
 ```{.python .input}
 score = predictor.evaluate(test_en_df)
-print('Score on the English test set=', score)
+print('Score on the English Testset:')
+print(score)
 ```
 
 We can find that the model can achieve good performance on the German dataset but performs poorly on the English dataset. Next, we will show how to enable cross-lingual transfer so you can get a model that can magically work for **both German and English**.
@@ -103,13 +107,15 @@ predictor.fit(train_en_df,
 
 ```{.python .input}
 score_in_en = predictor.evaluate(test_en_df)
-print('Score in the English test set=', score_in_en)
+print('Score in the English Testset:')
+print(score_in_en)
 ```
 
 
 ```{.python .input}
 score_in_de = predictor.evaluate(test_de_df)
-print('Score in the German test set=', score_in_de)
+print('Score in the German Testset:')
+print(score_in_de)
 ```
 
 We can see that the model works for both German and English!

@@ -1,3 +1,6 @@
+import os
+import warnings
+
 from ..automm import AutoMMPredictor
 from .presets import get_text_preset
 from ..automm.utils import parse_dotlist_conf
@@ -21,7 +24,8 @@ class TextPredictor:
             path=None,
             backend=PYTORCH,
             verbosity=3,
-            warn_if_exist=True
+            warn_if_exist=True,
+            enable_progress_bar: bool = None
     ):
         """
         Parameters
@@ -61,6 +65,10 @@ class TextPredictor:
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         warn_if_exist : bool, default = True
             Whether to raise warning if the specified path already exists.
+        enable_progress_bar
+            Whether to show progress bar. It will be True by default and will also be disabled
+            if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+
         """
         self.verbosity = verbosity
         if backend == PYTORCH:
@@ -80,6 +88,14 @@ class TextPredictor:
             warn_if_exist=warn_if_exist,
         )
         self._backend = backend
+
+        if enable_progress_bar is None:
+            if os.environ.get('AUTOMM_DISABLE_PROGRESS_BAR'):
+                self._enable_progress_bar = False
+            else:
+                self._enable_progress_bar = True
+        else:
+            self._enable_progress_bar = enable_progress_bar
 
     @property
     def results(self):
@@ -244,6 +260,8 @@ class TextPredictor:
                 seed=seed,
             )
         else:
+            warnings.warn(f'MXNet backend will be removed deprecated in AutoGluon 0.5. '
+                          f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
             self._predictor.fit(
                 train_data=train_data,
                 tuning_data=tuning_data,

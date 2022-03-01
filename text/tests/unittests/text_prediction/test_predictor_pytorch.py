@@ -194,7 +194,8 @@ def test_emoji():
     verify_predictor_save_load(predictor, df)
 
 
-def test_empty_text_item():
+@pytest.mark.parametrize('enable_progress_bar', [False, True])
+def test_empty_text_item(enable_progress_bar):
     train_data = load_pd.load(
         'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')
     rng_state = np.random.RandomState(123)
@@ -202,5 +203,5 @@ def test_empty_text_item():
     train_data = train_data.iloc[train_perm[:100]]
     train_data.iat[0, 0] = None
     train_data.iat[10, 0] = None
-    predictor = TextPredictor(label='score', verbosity=4)
+    predictor = TextPredictor(label='score', verbosity=4, enable_progress_bar=enable_progress_bar)
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(), time_limit=30)
