@@ -42,7 +42,7 @@ from .utils import (
     infer_metrics,
     get_config,
     LightningInfoFilter,
-    in_ipynb,
+    apply_info_filter,
 )
 from .optimization.utils import (
     get_metric,
@@ -53,14 +53,6 @@ from .optimization.lit_module import LitModule
 from .. import version
 
 logger = logging.getLogger(AUTOMM)
-
-lit_info_filter = LightningInfoFilter(["already configured with model summary"])
-if in_ipynb():
-    for handler in logging.getLogger().handlers:  # FixMe: try to add notebook log handler to pytorch_lightning logger
-        handler.addFilter(lit_info_filter)
-else:
-    for handler in logging.getLogger("pytorch_lightning").handlers:
-        handler.addFilter(lit_info_filter)
 
 
 class AutoMMPredictor:
@@ -128,12 +120,6 @@ class AutoMMPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
 
         self._eval_metric_name = eval_metric
-
-        if path is not None:
-            path = setup_outputdir(
-                path=path,
-                warn_if_exist=warn_if_exist,
-            )
         self._validation_metric_name = None
         self._output_shape = None
         self._save_path = path
@@ -540,27 +526,29 @@ class AutoMMPredictor:
         else:
             strategy = config.env.strategy
 
-        trainer = pl.Trainer(
-            gpus=num_gpus,
-            auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
-            num_nodes=config.env.num_nodes,
-            precision=precision,
-            strategy=strategy,
-            benchmark=False,
-            deterministic=config.env.deterministic,
-            max_epochs=config.optimization.max_epochs,
-            max_steps=config.optimization.max_steps,
-            max_time=max_time,
-            callbacks=callbacks,
-            logger=tb_logger,
-            gradient_clip_val=1,
-            gradient_clip_algorithm="norm",
-            accumulate_grad_batches=grad_steps,
-            log_every_n_steps=10,
-            enable_progress_bar=self._enable_progress_bar,
-            fast_dev_run=config.env.fast_dev_run,
-            val_check_interval=config.optimization.val_check_interval,
-        )
+        info_filter = LightningInfoFilter(["already configured with model summary"])
+        with apply_info_filter(info_filter):
+            trainer = pl.Trainer(
+                gpus=num_gpus,
+                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                num_nodes=config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                deterministic=config.env.deterministic,
+                max_epochs=config.optimization.max_epochs,
+                max_steps=config.optimization.max_steps,
+                max_time=max_time,
+                callbacks=callbacks,
+                logger=tb_logger,
+                gradient_clip_val=1,
+                gradient_clip_algorithm="norm",
+                accumulate_grad_batches=grad_steps,
+                log_every_n_steps=10,
+                enable_progress_bar=self._enable_progress_bar,
+                fast_dev_run=config.env.fast_dev_run,
+                val_check_interval=config.optimization.val_check_interval,
+            )
 
         with warnings.catch_warnings():
             warnings.filterwarnings(

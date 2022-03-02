@@ -8,6 +8,7 @@ import pickle
 import collections
 import torch
 import warnings
+from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
@@ -747,3 +748,19 @@ def in_ipynb():
             return False
     except NameError:
         return False
+
+
+@contextmanager
+def apply_info_filter(info_filter):
+    if in_ipynb():
+        target_logger = logging.getLogger()  # FixMe: try to add notebook log handler to pytorch_lightning logger
+    else:
+        target_logger = logging.getLogger("pytorch_lightning")
+    try:
+        for handler in target_logger.handlers:
+            handler.addFilter(info_filter)
+        yield
+
+    finally:
+        for handler in target_logger.handlers:
+            handler.removeFilter(info_filter)
