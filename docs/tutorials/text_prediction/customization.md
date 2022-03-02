@@ -30,7 +30,7 @@ train_data.head(10)
 
 ### Preset Configurations
 
-AutoMM provides several simple preset configurations. Let's take a look at the available presets.
+TextPredictor provides several simple preset configurations. Let's take a look at the available presets.
 
 
 ```{.python .input}
