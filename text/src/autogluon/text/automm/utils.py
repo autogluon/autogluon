@@ -726,6 +726,24 @@ def apply_omegaconf_overrides(
     return conf
 
 
-class NoParsingFilter(logging.Filter):
+class LightningInfoFilter(logging.Filter):
+    def __init__(self, blacklist: Union[str, List[str]]):
+        super().__init__()
+        if isinstance(blacklist, str):
+            blacklist = [blacklist]
+        self._blacklist = blacklist
+
     def filter(self, record):
-        return "already configured with model summary" not in record.msg
+        matches = [pattern not in record.msg for pattern in self._blacklist]
+        return any(matches)
+
+
+def in_ipynb():
+    try:
+        cfg = get_ipython().config
+        if 'IPKernelApp' in cfg:
+            return True
+        else:
+            return False
+    except NameError:
+        return False
