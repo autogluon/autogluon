@@ -93,3 +93,11 @@ p {
     margin-top: 1em;
 }
 }
+
+th {
+    text-align: center !important;
+}
+
+a img {
+    display: inline;
+}
