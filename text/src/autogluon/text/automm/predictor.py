@@ -41,7 +41,8 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
-    NoParsingFilter,
+    LightningInfoFilter,
+    in_ipynb,
 )
 from .optimization.utils import (
     get_metric,
@@ -53,8 +54,13 @@ from .. import version
 
 logger = logging.getLogger(AUTOMM)
 
-for handler in logging.getLogger("pytorch_lightning").handlers:
-    handler.addFilter(NoParsingFilter())
+lit_info_filter = LightningInfoFilter(["already configured with model summary"])
+if in_ipynb():
+    for handler in logging.getLogger().handlers:  # FixMe: try to add notebook log handler to pytorch_lightning logger
+        handler.addFilter(lit_info_filter)
+else:
+    for handler in logging.getLogger("pytorch_lightning").handlers:
+        handler.addFilter(lit_info_filter)
 
 
 class AutoMMPredictor:
