@@ -561,8 +561,7 @@ class AutoMMPredictor:
                 "ignore",
                 ".*does not have many workers which may be a bottleneck. "
                 "Consider increasing the value of the `num_workers` argument` "
-                "\(try 16 which is the number of cpus on this machine\) in the "
-                "`DataLoader` init to improve performance.*"
+                ".* in the `DataLoader` init to improve performance.*"
             )
             warnings.filterwarnings(
                 "ignore",
@@ -673,8 +672,7 @@ class AutoMMPredictor:
                 "ignore",
                 ".*does not have many workers which may be a bottleneck. "
                 "Consider increasing the value of the `num_workers` argument` "
-                "\(try 16 which is the number of cpus on this machine\) in the "
-                "`DataLoader` init to improve performance.*"
+                ".* in the `DataLoader` init to improve performance.*"
             )
             outputs = evaluator.predict(
                 task,
