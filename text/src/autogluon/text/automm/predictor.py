@@ -41,6 +41,7 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
+    NoParsingFilter,
 )
 from .optimization.utils import (
     get_metric,
@@ -51,6 +52,9 @@ from .optimization.lit_module import LitModule
 from .. import version
 
 logger = logging.getLogger(AUTOMM)
+
+for handler in logging.getLogger("pytorch_lightning").handlers:
+    handler.addFilter(NoParsingFilter())
 
 
 class AutoMMPredictor:
@@ -531,11 +535,24 @@ class AutoMMPredictor:
             fast_dev_run=config.env.fast_dev_run,
             val_check_interval=config.optimization.val_check_interval,
         )
-        trainer.fit(
-            task,
-            datamodule=train_dm,
-            ckpt_path=self._ckpt_path,  # this is to resume training that was broken accidentally
-        )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                "\(try 16 which is the number of cpus on this machine\) in the "
+                "`DataLoader` init to improve performance.*"
+            )
+            warnings.filterwarnings(
+                "ignore",
+                "Checkpoint directory .* exists and is not empty."
+            )
+            trainer.fit(
+                task,
+                datamodule=train_dm,
+                ckpt_path=self._ckpt_path,  # this is to resume training that was broken accidentally
+            )
 
         if trainer.global_rank == 0:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
@@ -625,10 +642,18 @@ class AutoMMPredictor:
             logger=False,
         )
 
-        outputs = evaluator.predict(
-            task,
-            datamodule=predict_dm,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                "\(try 16 which is the number of cpus on this machine\) in the "
+                "`DataLoader` init to improve performance.*"
+            )
+            outputs = evaluator.predict(
+                task,
+                datamodule=predict_dm,
+            )
         if ret_type == LOGITS:
             logits = [ele[LOGITS] for ele in outputs]
             ret = torch.cat(logits)
