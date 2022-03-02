@@ -724,3 +724,8 @@ def apply_omegaconf_overrides(
     override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
+
+
+class NoParsingFilter(logging.Filter):
+    def filter(self, record):
+        return "already configured with model summary" not in record.msg
