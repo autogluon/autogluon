@@ -21,17 +21,22 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
       a mix of text, numeric, and categorical columns.
 
    .. card::
-      :title: Customized Hyperparameter Search (For MXNet backend only)
+      :title: Customize TextPredictor Configurations
       :link: customization.html
 
-      How to specify custom hyperparameters of the TextPredictor neural network,
-      and tune them with HPO.
+      How to specify custom hyperparameters of the TextPredictor.
 
    .. card::
       :title: Solving Multilingual Problems
       :link: multilingual_text.html
 
       Build models on datasets with languages other than English.
+
+   .. card::
+      :title: Getting Started with AutoMM
+      :link: automm.html
+
+      How to use AutoMM to train models on single modal and multimodal data.
 
 .. toctree::
    :maxdepth: 1
@@ -41,3 +46,4 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
    multimodal_text
    customization
    multilingual_text
+   automm
