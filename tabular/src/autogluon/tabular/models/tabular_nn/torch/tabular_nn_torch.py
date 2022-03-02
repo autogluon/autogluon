@@ -584,3 +584,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
+
+    def _more_tags(self):
+        # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
+        #  self.params_trained['batch_size'] = batch_size
+        #  self.params_trained['num_epochs'] = best_epoch
+        return {'can_refit_full': True}

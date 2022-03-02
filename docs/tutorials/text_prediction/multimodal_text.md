@@ -7,8 +7,9 @@ In many applications, text data may be mixed with numeric/categorical data. Auto
 ```{.python .input}
 import numpy as np
 import pandas as pd
-import os
 import warnings
+import os
+
 warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```

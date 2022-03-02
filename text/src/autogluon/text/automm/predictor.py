@@ -72,6 +72,7 @@ class AutoMMPredictor:
             path: Optional[str] = None,
             verbosity: Optional[int] = 3,
             warn_if_exist: Optional[bool] = True,
+            enable_progress_bar: bool = None,
     ):
         """
         Parameters
@@ -101,6 +102,10 @@ class AutoMMPredictor:
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         warn_if_exist
             Whether to raise warning if the specified path already exists.
+        enable_progress_bar
+            Whether to show progress bar. It will be True by default and will also be
+            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+
         """
         self.verbosity = verbosity
         if self.verbosity is not None:
@@ -134,6 +139,13 @@ class AutoMMPredictor:
         self._data_processors = None
         self._model = None
         self._resume = False
+        if enable_progress_bar is None:
+            if os.environ.get('AUTOMM_DISABLE_PROGRESS_BAR'):
+                self._enable_progress_bar = False
+            else:
+                self._enable_progress_bar = True
+        else:
+            self._enable_progress_bar = enable_progress_bar
 
     @property
     def path(self):
@@ -503,12 +515,19 @@ class AutoMMPredictor:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * config.env.num_nodes
             )
-            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
+            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU.
+                            # Try to check the status of bf16 training later.
         else:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
             )
             precision = config.env.precision
+
+            if precision == 'bf16' and not torch.cuda.is_bf16_supported():
+                warnings.warn('bf16 is not supported by the GPU device / cuda version. '
+                              'Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. '
+                              'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
+                precision = 32
 
         if num_gpus <= 1:
             strategy = None
@@ -532,6 +551,7 @@ class AutoMMPredictor:
             gradient_clip_algorithm="norm",
             accumulate_grad_batches=grad_steps,
             log_every_n_steps=10,
+            enable_progress_bar=self._enable_progress_bar,
             fast_dev_run=config.env.fast_dev_run,
             val_check_interval=config.optimization.val_check_interval,
         )
@@ -610,6 +630,11 @@ class AutoMMPredictor:
             precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
         else:
             precision = self._config.env.precision
+            if precision == 'bf16' and not torch.cuda.is_bf16_supported():
+                warnings.warn('bf16 is not supported by the GPU device / cuda version. '
+                              'Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. '
+                              'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
+                precision = 32
 
         if num_gpus > 1:
             strategy = "dp"
@@ -638,6 +663,7 @@ class AutoMMPredictor:
             precision=precision,
             strategy=strategy,
             benchmark=False,
+            enable_progress_bar=self._enable_progress_bar,
             deterministic=self._config.env.deterministic,
             logger=False,
         )
@@ -754,6 +780,7 @@ class AutoMMPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+
         logits = self._predict(
             data=data,
             ret_type=LOGITS,

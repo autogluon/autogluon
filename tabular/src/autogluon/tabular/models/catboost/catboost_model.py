@@ -235,3 +235,7 @@ class CatBoostModel(AbstractModel):
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
+
+    def _more_tags(self):
+        # `can_refit_full=True` because iterations is communicated at end of `_fit`
+        return {'can_refit_full': True}
