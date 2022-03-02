@@ -98,6 +98,10 @@ th {
     text-align: center !important;
 }
 
+td {
+    text-align: left !important;
+}
+
 a img {
     display: inline;
 }
