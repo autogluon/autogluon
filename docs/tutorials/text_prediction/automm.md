@@ -97,7 +97,7 @@ test_data = test_data.sample(100, random_state=0)
 
 ## Multimodal Prediction
 ### CLIP
-`AutoMMPredictor` allows to finetune the pre-trained vision language models, such as [CLIP](https://huggingface.co/openai/clip-vit-base-patch32).
+`AutoMMPredictor` allows for finetuning the pre-trained vision language models, such as [CLIP](https://huggingface.co/openai/clip-vit-base-patch32).
 
 
 ```{.python .input}
