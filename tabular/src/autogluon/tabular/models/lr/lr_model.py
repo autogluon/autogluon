@@ -167,7 +167,6 @@ class LinearModel(AbstractModel):
         logger.log(15, f'Training Model with the following hyperparameter settings:')
         logger.log(15, params)
 
-        params['warm_start'] = True  # Force True
         max_iter = params.pop('max_iter', 10000)
 
         # TODO: copy_X=True currently set during regression problem type, could potentially set to False to avoid unnecessary data copy.
@@ -182,7 +181,7 @@ class LinearModel(AbstractModel):
         else:
             time_left = None
 
-        if time_left is not None and max_iter >= 200:
+        if time_left is not None and max_iter >= 200 and self.problem_type != REGRESSION:
             max_iter_list = [100, max_iter-100]
         else:
             max_iter_list = [max_iter]
@@ -190,6 +189,9 @@ class LinearModel(AbstractModel):
         fit_args = dict(X=X, y=y)
         if sample_weight is not None:
             fit_args['sample_weight'] = sample_weight
+
+        if len(max_iter_list) > 1:
+            params['warm_start'] = True  # Force True
 
         total_iter = 0
         total_iter_used = 0
@@ -216,7 +218,10 @@ class LinearModel(AbstractModel):
                 warnings.simplefilter(action='ignore', category=UserWarning)
                 model = model.fit(**fit_args)
             total_iter += model.max_iter
-            total_iter_used += model.n_iter_[0]
+            if model.n_iter_ is not None:
+                total_iter_used += model.n_iter_[0]
+            else:
+                total_iter_used += model.max_iter
             if early_stop:
                 if total_iter_used == total_iter:  # Not yet converged
                     logger.warning(f'\tEarly stopping due to lack of time remaining. Fit {total_iter}/{total_max_iter} iters...')
