@@ -55,7 +55,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     # TODO: Improve handling of missing datetimes
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:
         X_datetime = X.copy()
-        country = locale.getlocale()[0].split("_")[1]
+        country = locale.getlocale()[0].split("_")[1] #　Obtain the country used to determine if it is a holiday or not.
         holidays_list = holidays.CountryHoliday(country)
         for datetime_feature in self.features_in:
             if type(X[datetime_feature].iloc[0]) == pd.Timestamp:
@@ -75,7 +75,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
                 X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
 
                 X_datetime["dow_hour"] = X_datetime[datetime_feature + ".dayofweek"] + X_datetime[datetime_feature + ".hour"] / 24
-                X_datetime["dow_hour_sin"] = np.sin(2 * np.pi * X_datetime["dow_hour"] / 7.0)
+                X_datetime["dow_hour_sin"] = np.sin(2 * np.pi * X_datetime["dow_hour"] / 7.0) # add Encoding cyclical continuous features
+                # https://ianlondon.github.io/blog/encoding-cyclical-features-24hour-time/
                 X_datetime["dow_hour_cos"] = np.cos(2 * np.pi * X_datetime["dow_hour"] / 7.0)
                 X_datetime = X_datetime.drop('dow_hour', axis=1)
 
