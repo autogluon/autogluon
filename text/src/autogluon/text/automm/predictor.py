@@ -41,6 +41,8 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
+    LogFilter,
+    apply_log_filter,
 )
 from .optimization.utils import (
     get_metric,
@@ -118,12 +120,6 @@ class AutoMMPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
 
         self._eval_metric_name = eval_metric
-
-        if path is not None:
-            path = setup_outputdir(
-                path=path,
-                warn_if_exist=warn_if_exist,
-            )
         self._validation_metric_name = None
         self._output_shape = None
         self._save_path = path
@@ -530,32 +526,46 @@ class AutoMMPredictor:
         else:
             strategy = config.env.strategy
 
-        trainer = pl.Trainer(
-            gpus=num_gpus,
-            auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
-            num_nodes=config.env.num_nodes,
-            precision=precision,
-            strategy=strategy,
-            benchmark=False,
-            deterministic=config.env.deterministic,
-            max_epochs=config.optimization.max_epochs,
-            max_steps=config.optimization.max_steps,
-            max_time=max_time,
-            callbacks=callbacks,
-            logger=tb_logger,
-            gradient_clip_val=1,
-            gradient_clip_algorithm="norm",
-            accumulate_grad_batches=grad_steps,
-            log_every_n_steps=10,
-            enable_progress_bar=self._enable_progress_bar,
-            fast_dev_run=config.env.fast_dev_run,
-            val_check_interval=config.optimization.val_check_interval,
-        )
-        trainer.fit(
-            task,
-            datamodule=train_dm,
-            ckpt_path=self._ckpt_path,  # this is to resume training that was broken accidentally
-        )
+        log_filter = LogFilter(["already configured with model summary"])
+        with apply_log_filter(log_filter):
+            trainer = pl.Trainer(
+                gpus=num_gpus,
+                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                num_nodes=config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                deterministic=config.env.deterministic,
+                max_epochs=config.optimization.max_epochs,
+                max_steps=config.optimization.max_steps,
+                max_time=max_time,
+                callbacks=callbacks,
+                logger=tb_logger,
+                gradient_clip_val=1,
+                gradient_clip_algorithm="norm",
+                accumulate_grad_batches=grad_steps,
+                log_every_n_steps=10,
+                enable_progress_bar=self._enable_progress_bar,
+                fast_dev_run=config.env.fast_dev_run,
+                val_check_interval=config.optimization.val_check_interval,
+            )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                ".* in the `DataLoader` init to improve performance.*"
+            )
+            warnings.filterwarnings(
+                "ignore",
+                "Checkpoint directory .* exists and is not empty."
+            )
+            trainer.fit(
+                task,
+                datamodule=train_dm,
+                ckpt_path=self._ckpt_path,  # this is to resume training that was broken accidentally
+            )
 
         if trainer.global_rank == 0:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
@@ -651,10 +661,17 @@ class AutoMMPredictor:
             logger=False,
         )
 
-        outputs = evaluator.predict(
-            task,
-            datamodule=predict_dm,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                ".* in the `DataLoader` init to improve performance.*"
+            )
+            outputs = evaluator.predict(
+                task,
+                datamodule=predict_dm,
+            )
         if ret_type == LOGITS:
             logits = [ele[LOGITS] for ele in outputs]
             ret = torch.cat(logits)

@@ -8,6 +8,7 @@ import pickle
 import collections
 import torch
 import warnings
+from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
@@ -724,3 +725,90 @@ def apply_omegaconf_overrides(
     override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
+
+
+class LogFilter(logging.Filter):
+    """
+    Filter log messages with patterns.
+    """
+
+    def __init__(self, blacklist: Union[str, List[str]]):
+        """
+        Parameters
+        ----------
+        blacklist
+            Patterns to be suppressed in logging.
+        """
+        super().__init__()
+        if isinstance(blacklist, str):
+            blacklist = [blacklist]
+        self._blacklist = blacklist
+
+    def filter(self, record):
+        """
+        Check whether to suppress a logging message.
+
+        Parameters
+        ----------
+        record
+            A logging message.
+
+        Returns
+        -------
+        If True, no pattern exists in the message, hence printed out.
+        If False, some pattern is in the message, hence filtered out.
+        """
+        matches = [pattern not in record.msg for pattern in self._blacklist]
+        return all(matches)
+
+
+def add_log_filter(target_logger, log_filter):
+    """
+    Add one log filter to the target logger.
+
+    Parameters
+    ----------
+    target_logger
+        Target logger
+    log_filter
+        Log filter
+    """
+    for handler in target_logger.handlers:
+        handler.addFilter(log_filter)
+
+
+def remove_log_filter(target_logger, log_filter):
+    """
+    Remove one log filter to the target logger.
+
+    Parameters
+    ----------
+    target_logger
+        Target logger
+    log_filter
+        Log filter
+    """
+    for handler in target_logger.handlers:
+        handler.removeFilter(log_filter)
+
+
+@contextmanager
+def apply_log_filter(log_filter):
+    """
+    User contextmanager to control the scope of applying one log filter.
+    Currently, it is to filter some pytorch lightning's log messages.
+    But we can easily extend it to cover more loggers.
+
+    Parameters
+    ----------
+    log_filter
+        Log filter.
+    """
+    try:
+        add_log_filter(logging.getLogger(), log_filter)
+        add_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+        yield
+
+    finally:
+        remove_log_filter(logging.getLogger(), log_filter)
+        remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
