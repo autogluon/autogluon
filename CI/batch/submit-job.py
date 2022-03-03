@@ -10,11 +10,11 @@ from botocore.compat import total_seconds
 
 job_type_info = {
     'CI-CPU': {
-        'job_definition': 'autogluon-ci-cpu:1',
+        'job_definition': 'autogluon-ci-cpu:2',
         'job_queue': 'CI-CPU'
     },
     'CI-GPU': {
-        'job_definition': 'autogluon-ci-gpu:1',
+        'job_definition': 'autogluon-ci-gpu:2',
         'job_queue': 'CI-GPU'
     },
 }
