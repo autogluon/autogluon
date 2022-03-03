@@ -29,12 +29,10 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._fillna_map = self._compute_fillna_map(X)
         X_out = self._transform(X)
-#         print(X_out.columns)
         type_family_groups_special = dict(
             datetime_as_int=list(X_out.columns)
         )
         return X_out, type_family_groups_special
-#         return X_out, dict(X_out.columns)
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_datetime(X)
@@ -42,11 +40,6 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
         return dict()
-#         return dict(valid_raw_types=[R_INT, R_DATETIME, R_CATEGORY, R_OBJECT, R_FLOAT, R_BOOL, S_TEXT, "np.float64", "str"])
-#         return dict(required_raw_special_pairs=[
-#             (R_DATETIME, None),
-#             (None, [S_DATETIME_AS_OBJECT])
-#         ])
 
     def _compute_fillna_map(self, X: DataFrame):
         fillna_map = dict()
@@ -61,9 +54,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
 
     # TODO: Improve handling of missing datetimes
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:
-#       X_datetime = DataFrame(index=X.index)
         X_datetime = X.copy()
-#         print(X_datetime)
         country = locale.getlocale()[0].split("_")[1]
         holidays_list = holidays.CountryHoliday(country)
         for datetime_feature in self.features_in:
@@ -87,7 +78,6 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
                 X_datetime["dow_hour_sin"] = np.sin(2 * np.pi * X_datetime["dow_hour"] / 7.0)
                 X_datetime["dow_hour_cos"] = np.cos(2 * np.pi * X_datetime["dow_hour"] / 7.0)
                 X_datetime = X_datetime.drop('dow_hour', axis=1)
-#         print(X_datetime)
 
             
         return X_datetime
