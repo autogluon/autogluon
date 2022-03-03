@@ -41,8 +41,8 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
-    InfoFilter,
-    apply_info_filter,
+    LogFilter,
+    apply_log_filter,
 )
 from .optimization.utils import (
     get_metric,
@@ -526,8 +526,8 @@ class AutoMMPredictor:
         else:
             strategy = config.env.strategy
 
-        info_filter = InfoFilter(["already configured with model summary"])
-        with apply_info_filter(info_filter):
+        log_filter = LogFilter(["already configured with model summary"])
+        with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 gpus=num_gpus,
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,

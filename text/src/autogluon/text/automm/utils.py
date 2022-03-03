@@ -727,7 +727,7 @@ def apply_omegaconf_overrides(
     return conf
 
 
-class InfoFilter(logging.Filter):
+class LogFilter(logging.Filter):
     def __init__(self, blacklist: Union[str, List[str]]):
         super().__init__()
         if isinstance(blacklist, str):
@@ -739,28 +739,23 @@ class InfoFilter(logging.Filter):
         return any(matches)
 
 
-def in_ipynb():
-    try:
-        cfg = get_ipython().config
-        if 'IPKernelApp' in cfg:
-            return True
-        else:
-            return False
-    except NameError:
-        return False
+def add_log_filter(target_logger, log_filter):
+    for handler in target_logger.handlers:
+        handler.addFilter(log_filter)
+
+
+def remove_log_filter(target_logger, log_filter):
+    for handler in target_logger.handlers:
+        handler.removeFilter(log_filter)
 
 
 @contextmanager
-def apply_info_filter(info_filter):
-    if in_ipynb():
-        target_logger = logging.getLogger()  # FixMe: try to add notebook log handler to pytorch_lightning logger
-    else:
-        target_logger = logging.getLogger("pytorch_lightning")
+def apply_log_filter(log_filter):
     try:
-        for handler in target_logger.handlers:
-            handler.addFilter(info_filter)
+        add_log_filter(logging.getLogger(), log_filter)
+        add_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
         yield
 
     finally:
-        for handler in target_logger.handlers:
-            handler.removeFilter(info_filter)
+        remove_log_filter(logging.getLogger(), log_filter)
+        remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
