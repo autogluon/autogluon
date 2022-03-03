@@ -64,11 +64,22 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-aws s3 cp --recursive _build/html/ s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all --quiet
-echo "Uploaded doc to s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all"
+# Verify we still own the bucket
+bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
+if [ -z bucket_query ]; then
+    aws s3 cp --recursive _build/html/ s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all --quiet
+    echo "Uploaded doc to s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all"
+else
+    echo Bucket does not belong to us anymore. Will not write to it
+fi;
 
-if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
-then
-    aws s3 cp root_index.html s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/root_index.html --acl public-read ${cacheControl}
-    echo "Uploaded root_index.html s3://${bucket}/index.html"
-fi
+# Verify we still own the bucket
+bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
+if [ -z bucket_query ]; then
+    if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
+    then
+        aws s3 cp root_index.html s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/root_index.html
+    fi
+else
+    echo Bucket does not belong to us anymore. Will not write to it
+fi;
