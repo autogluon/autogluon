@@ -306,8 +306,7 @@ infer_limit_batch_size = 10000
 predictor_infer_limit = TabularPredictor(label=label, eval_metric=metric).fit(
     train_data=train_data,
     time_limit=30,
-    infer_limit=0.00005,  
-    # adhere to infer_limit with batches of size 10000 (batch-inference, easier to satisfy infer_limit)
+    infer_limit=infer_limit,
     infer_limit_batch_size=infer_limit_batch_size,
 )
 
