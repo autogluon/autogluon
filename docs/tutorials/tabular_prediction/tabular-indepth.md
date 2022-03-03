@@ -249,14 +249,14 @@ there are several ways to accelerate inference in AutoGluon. The table below lis
 | manual hyperparameters adjustment | Usually at most 2x assuming infer_limit is already specified.                                         | ---Quality?, +++UserMLExpertise   | Can be very complicated and is not recommended. Potential ways to get speedups this way is to reduce the number of trees in LightGBM, XGBoost, CatBoost, RandomForest, and ExtraTrees. |
 | manual data preprocessing         | Usually at most 1.2x assuming all other optimizations are specified and setting is online-inference.  | ++++UserMLExpertise, ++++UserCode | Only relevant for online-inference. This is not recommended as AutoGluon's default preprocessing is highly optimized.                                                                  |
 
-If bagging is enabled (num_bag_folds>0 or num_stack_levels>0 or using 'best_quality' preset), the order of inference optimizations should be:
-1. refit_full
-2. persist_models
-3. infer_limit
+If bagging is enabled (num_bag_folds>0 or num_stack_levels>0 or using 'best_quality' preset), the order of inference optimizations should be:  
+1. refit_full  
+2. persist_models  
+3. infer_limit  
 
-If bagging is not enabled (num_bag_folds=0, num_stack_levels=0), the order of inference optimizations should be:
-1. persist_models
-2. infer_limit
+If bagging is not enabled (num_bag_folds=0, num_stack_levels=0), the order of inference optimizations should be:  
+1. persist_models  
+2. infer_limit  
 
 If following these recommendations does not lead to a sufficiently fast model, you may consider the more advanced options in the table.
 
@@ -290,11 +290,11 @@ AutoGluon will then automatically train models in a fashion that attempts to sat
 This constraint has two components: `infer_limit` and `infer_limit_batch_size`:  
 - `infer_limit` is the time in seconds to predict 1 row of data.
 For example, `infer_limit=0.05` means 50 ms per row of data,
-or 20 rows / second throughput.
+or 20 rows / second throughput.  
 - `infer_limit_batch_size` is the amount of rows passed at once to predict when calculating per-row speed.
 This is very important because `infer_limit_batch_size=1` (online-inference) is highly suboptimal as
 various operations have a fixed cost overhead regardless of data size. If you can pass your test data in bulk,
-you should specify `infer_limit_batch_size=10000`.
+you should specify `infer_limit_batch_size=10000`.  
 
 ```{.python .input}
 # At most 0.05 ms per row (20000 rows per second throughput)
