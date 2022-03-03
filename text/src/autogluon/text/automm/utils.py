@@ -727,7 +727,7 @@ def apply_omegaconf_overrides(
     return conf
 
 
-class LightningInfoFilter(logging.Filter):
+class InfoFilter(logging.Filter):
     def __init__(self, blacklist: Union[str, List[str]]):
         super().__init__()
         if isinstance(blacklist, str):

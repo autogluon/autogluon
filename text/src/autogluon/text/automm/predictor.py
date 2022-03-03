@@ -41,7 +41,7 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
-    LightningInfoFilter,
+    InfoFilter,
     apply_info_filter,
 )
 from .optimization.utils import (
@@ -526,7 +526,7 @@ class AutoMMPredictor:
         else:
             strategy = config.env.strategy
 
-        info_filter = LightningInfoFilter(["already configured with model summary"])
+        info_filter = InfoFilter(["already configured with model summary"])
         with apply_info_filter(info_filter):
             trainer = pl.Trainer(
                 gpus=num_gpus,
