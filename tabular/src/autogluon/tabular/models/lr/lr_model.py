@@ -73,15 +73,19 @@ class LinearModel(AbstractModel):
         categorical_featnames = self._feature_metadata.get_features(valid_raw_types=[R_CATEGORY, R_OBJECT])
         bool_featnames = self._feature_metadata.get_features(required_special_types=[S_BOOL])
         language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
-        return self._select_features(df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames)
+        return self._select_features(df=df,
+                                     categorical_featnames=categorical_featnames,
+                                     language_featnames=language_featnames,
+                                     continuous_featnames=continuous_featnames,
+                                     bool_featnames=bool_featnames)
 
-    def _select_features(self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames):
+    def _select_features(self, df, **kwargs):
         features_selector = {
             INCLUDE: self._select_features_handle_text_include,
             ONLY: self._select_features_handle_text_only,
             IGNORE: self._select_features_handle_text_ignore,
         }.get(self.params.get('handle_text', IGNORE), self._select_features_handle_text_ignore)
-        return features_selector(df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames)
+        return features_selector(df=df, **kwargs)
 
     # TODO: handle collinear features - they will impact results quality
     def _preprocess(self, X, is_train=False, **kwargs):
@@ -220,10 +224,6 @@ class LinearModel(AbstractModel):
 
         self.model = model
         self.params_trained['max_iter'] = total_iter
-
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
 
     def _select_features_handle_text_include(self, df, categorical_featnames, language_featnames, continuous_featnames, bool_featnames):
         types_of_features = dict()
