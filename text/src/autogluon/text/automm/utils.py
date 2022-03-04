@@ -36,6 +36,10 @@ from .constants import (
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
 )
+from .presets import (
+    list_model_presets,
+    get_preset,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -143,6 +147,8 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
+    if config is None:
+        config = get_preset(list_model_presets()[0])
     if not isinstance(config, DictConfig):
         all_configs = []
         for k, v in config.items():

@@ -1,4 +1,5 @@
 # Text Prediction - Solving Multilingual Problems
+:label:`sec_textprediction_multilingual`
 
 People around the world speaks lots of languages. According to [SIL International](https://en.wikipedia.org/wiki/SIL_International)'s [Ethnologue: Languages of the World](https://en.wikipedia.org/wiki/Ethnologue), there are more than **7,100** spoken and signed languages. In fact, web data nowadays are highly multilingual and lots of real-world problems involve text written in languages other than English.
 
@@ -54,7 +55,7 @@ test_en_df.reset_index(inplace=True, drop=True)
 
 ## Finetune the German BERT
 
-Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. Since AutoGluon Text integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), we directly load the German BERT model via Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). To simplify the experiment, we also just finetune for 5 epochs.
+Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. Since AutoGluon Text integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), we directly load the German BERT model via Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). To simplify the experiment, we also just finetune for 4 epochs.
 
 
 ```{.python .input}

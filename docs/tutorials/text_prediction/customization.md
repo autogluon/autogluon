@@ -71,4 +71,4 @@ predictor.evaluate(test_data, metrics=['f1', 'acc'])
 
 The pre-registered configurations provide reasonable default hyperparameters. A common workflow is to first train a model with one of the presets and then tune some hyperparameters to see if the performance can be further improved.
 
-TextPredictor builds on top of AutoMM, which has a flexible and easy-to-use configuration design. Please refer to :ref:`sec_automm_predictor` on how to customize hyper-parameters.
+TextPredictor builds on top of AutoMMPredictor, which has a flexible and easy-to-use configuration design. Please refer to :ref:`sec_automm_predictor` on how to customize hyper-parameters.

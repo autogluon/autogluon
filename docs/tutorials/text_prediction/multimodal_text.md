@@ -90,7 +90,7 @@ print(performance)
 
 ```{.python .input}
 embeddings = predictor.extract_embedding(test_data)
-print(embeddings)
+embeddings.shape
 ```
 
 ## What's happening inside?
