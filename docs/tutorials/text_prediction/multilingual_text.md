@@ -55,7 +55,7 @@ test_en_df.reset_index(inplace=True, drop=True)
 
 ## Finetune the German BERT
 
-Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. Since AutoGluon Text integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), we directly load the German BERT model via Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). To simplify the experiment, we also just finetune for 5 epochs.
+Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. Since AutoGluon Text integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), we directly load the German BERT model via Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). To simplify the experiment, we also just finetune for 4 epochs.
 
 
 ```{.python .input}
