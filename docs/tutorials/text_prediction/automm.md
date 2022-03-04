@@ -68,7 +68,7 @@ Each animal's adoption profile includes pictures, a text description, and variou
 
 
 ```{.python .input}
-example_row = train_data.iloc[1]
+example_row = train_data.iloc[47]
 
 example_row
 ```
