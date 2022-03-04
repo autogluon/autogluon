@@ -25,6 +25,7 @@ def list_text_presets(verbose=False):
         },
         "multilingual": {
             "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+            "optimization.top_k": 1,
             "env.precision": 'bf16',
             "env.per_gpu_batch_size": 4,
         },
