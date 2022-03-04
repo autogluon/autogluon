@@ -136,6 +136,7 @@ print(test_jp_df)
 ```
 
 ```{.python .input}
+print('Negative labe ratio of the Japanese Testset=', test_jp_df['label'].value_counts()[0] / len(test_jp_df))
 score_in_jp = predictor.evaluate(test_jp_df)
 print('Score in the Japanese Testset:')
 print(score_in_jp)
