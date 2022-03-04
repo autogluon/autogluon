@@ -1,4 +1,5 @@
 # Text Prediction - Solving Multilingual Problems
+:label:`sec_textprediction_multilingual`
 
 People around the world speaks lots of languages. According to [SIL International](https://en.wikipedia.org/wiki/SIL_International)'s [Ethnologue: Languages of the World](https://en.wikipedia.org/wiki/Ethnologue), there are more than **7,100** spoken and signed languages. In fact, web data nowadays are highly multilingual and lots of real-world problems involve text written in languages other than English.
 

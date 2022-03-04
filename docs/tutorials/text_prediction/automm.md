@@ -242,7 +242,7 @@ The `env` config contains the environment/machine related hyper-parameters. For 
 You can flexibly customize any hyper-parameter in `config` via the `hyperparameters` argument of `.fit()`. To access one hyper-parameter in `config`, you need to traverse from top-level keys to bottom-level keys and join them together with `.` For example, if you want to change the per GPU batch size to 16, you can set `hyperparameters={"env.per_gpu_batch_size": 16}`.
 
 ## APIs
-Besides `.fit()` and `.evaluate()`, `AutoMMPredictor` also provides other useful APIs, similar to those in `TextPredictor` and `TabularPredictor`. You may refer to more details in `:ref:sec_textprediction_beginner`.
+Besides `.fit()` and `.evaluate()`, `AutoMMPredictor` also provides other useful APIs, similar to those in `TextPredictor` and `TabularPredictor`. You may refer to more details in :ref:`sec_textprediction_beginner`.
 
 Given data without ground truth labels, `AutoMMPredictor` can make predictions.
 
