@@ -228,7 +228,7 @@ preset
 from omegaconf import OmegaConf
 from autogluon.text.automm.utils import get_config
 config = get_config(preset)
-OmegaConf.to_container(config)
+print(OmegaConf.to_yaml(config))
 ```
 
 The `model` config provides four model types: MLP for categorical data (categorical_mlp), MLP for numerical data (numerical_mlp), [huggingface transformers](https://github.com/huggingface/transformers) for text data (hf_text), [timm](https://github.com/rwightman/pytorch-image-models) for image data (timm_image), clip for image+text data, and a MLP to fuse any combinations of categorical_mlp, numerical_mlp, hf_text, and timm_image (fusion_mlp). We can specify the model combinations by setting `model.names`. Moreover, we can use `model.hf_text.checkpoint_name` and `model.timm_image.checkpoint_name` to customize huggingface and timm backbones.
