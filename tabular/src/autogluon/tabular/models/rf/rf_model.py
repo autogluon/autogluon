@@ -31,7 +31,7 @@ class RFModel(AbstractModel):
         if self.problem_type == QUANTILE:
             from .rf_quantile import RandomForestQuantileRegressor
             return RandomForestQuantileRegressor
-        if self.params_aux.get('use_daal', True):
+        if self.params_aux.get('use_daal', False):
             # Disabled by default because OOB score does not yet work properly
             try:
                 # FIXME: sklearnex OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
