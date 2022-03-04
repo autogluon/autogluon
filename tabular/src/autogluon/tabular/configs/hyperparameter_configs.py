@@ -56,8 +56,9 @@ hyperparameter_config_dict = dict(
     very_light={
         'NN_TORCH': {},
         'GBM': [
-            {},
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            {},
+            'GBMLarge',
         ],
         'CAT': {},
         'XGB': {},

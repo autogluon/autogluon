@@ -210,8 +210,8 @@ class RFModel(AbstractModel):
                 for j in range(len(n_estimator_increments)):
                     if n_estimator_increments[j] > n_estimators_ideal:
                         n_estimator_increments[j] = n_estimators_ideal
-
-        if self._daal:
+        if self._daal and model.criterion != 'entropy':
+            # TODO: entropy is not accelerated by sklearnex, need to not set estimators_ to None to avoid crash
             # This reduces memory usage / disk usage.
             model.estimators_ = None
         self.model = model
