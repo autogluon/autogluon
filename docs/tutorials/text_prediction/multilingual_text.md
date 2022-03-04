@@ -51,6 +51,7 @@ test_en_df = pd.read_csv('amazon_review_sentiment_cross_lingual/en_test.tsv',
                           names=['label', 'text']) \
                .sample(200, random_state=123)
 test_en_df.reset_index(inplace=True, drop=True)
+print(train_en_df)
 ```
 
 ## Finetune the German BERT
@@ -66,8 +67,7 @@ predictor.fit(train_de_df,
               hyperparameters={
                   'model.hf_text.checkpoint_name': 'bert-base-german-cased',
                   'optimization.max_epochs': 4
-              },
-              num_gpus=1)
+              })
 ```
 
 
@@ -88,9 +88,14 @@ We can find that the model can achieve good performance on the German dataset bu
 
 ## Cross-lingual Transfer
 
-In the real-world scenario, it is pretty common that you have trained a model for English and would like to extend the model to support other languages like German. This setting is also known as cross-lingual transfer. So far, the state-of-the-art approach for cross-lingual transfer relies on backbones pretrained on multilingual corpus. In ["Unsupervised Cross-lingual Representation Learning at Scale"](https://arxiv.org/pdf/1911.02116.pdf), the author showed that via large-scale pretraining, the backbone (called XLM-R) is able to conduct *zero-shot* cross lingual transfer, meaning that you can directly apply the model trained in the English dataset to datasets in other languages.
+In the real-world scenario, it is pretty common that you have trained a model for English and would like to extend the model to support other languages like German. This setting is also known as cross-lingual transfer. 
+One approach is to apply a machine translation model to translate the sentences from the other language (e.g., German) to English and apply the English-trained model.
+However, as showed in ["Unsupervised Cross-lingual Representation Learning at Scale"](https://arxiv.org/pdf/1911.02116.pdf), there is a better and cost-friendlier way for cross lingual transfer, enabled via large-scale multilingual pretraining.
+The author showed that via large-scale pretraining, the backbone (called XLM-R) is able to conduct *zero-shot* cross lingual transfer, meaning that you can directly apply the model trained in the English dataset to datasets in other languages. 
+It also outperforms the baseline "TRANSLATE-TEST", meaning to translate the data from other languages to English and apply the English model. 
 
-In AutoGluon, you may just use `presets="multilingual"` to load a backbone that is suitable for zero-shot transfer. Internally, we will automatically use state-of-the-art models like [DeBERTa-V3](https://arxiv.org/abs/2111.09543).
+In AutoGluon, you can just turn on `presets="multilingual"` to load a backbone that is suitable for zero-shot transfer. 
+Internally, we will automatically use state-of-the-art models like [DeBERTa-V3](https://arxiv.org/abs/2111.09543).
 
 
 ```{.python .input}
@@ -101,8 +106,7 @@ predictor.fit(train_en_df,
               presets='multilingual',
               hyperparameters={
                   'optimization.max_epochs': 4
-              },
-              num_gpus=1)
+              })
 ```
 
 
@@ -120,3 +124,20 @@ print(score_in_de)
 ```
 
 We can see that the model works for both German and English!
+
+Let's also inspect the model's performance on Japanese:
+
+```{.python .input}
+test_jp_df = pd.read_csv('amazon_review_sentiment_cross_lingual/jp_test.tsv',
+                          sep='\t', header=None, names=['label', 'text']) \
+               .sample(200, random_state=123)
+test_jp_df.reset_index(inplace=True, drop=True)
+print(test_jp_df)
+```
+
+```{.python .input}
+score_in_jp = predictor.evaluate(test_jp_df)
+print('Score in the Japanese Testset:')
+print(score_in_jp)
+```
+It turns out that the model also works for Japanese.
