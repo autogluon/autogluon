@@ -105,12 +105,6 @@ from autogluon.text.automm import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
-    config={
-        "model": "fusion_mlp_image_text_tabular",
-        "data": "default",
-        "optimization": "adamw",
-        "environment": "default",
-    },
     hyperparameters={
         "model.names": ["clip"],
         "env.num_gpus": 1,
@@ -138,12 +132,6 @@ from autogluon.text.automm import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
-    config={
-        "model": "fusion_mlp_image_text_tabular",
-        "data": "default",
-        "optimization": "adamw",
-        "environment": "default",
-    },
     hyperparameters={
         "model.names": ["clip", "timm_image", "hf_text", "numerical_mlp", "fusion_mlp"],
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
@@ -170,12 +158,6 @@ from autogluon.text.automm import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
-    config={
-        "model": "fusion_mlp_image_text_tabular",
-        "data": "default",
-        "optimization": "adamw",
-        "environment": "default",
-    },
     hyperparameters={
         "model.names": ["timm_image"],
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
@@ -202,12 +184,6 @@ from autogluon.text.automm import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
-    config={
-        "model": "fusion_mlp_image_text_tabular",
-        "data": "default",
-        "optimization": "adamw",
-        "environment": "default",
-    },
     hyperparameters={
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
