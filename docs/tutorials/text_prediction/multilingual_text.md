@@ -89,7 +89,7 @@ We can find that the model can achieve good performance on the German dataset bu
 ## Cross-lingual Transfer
 
 In the real-world scenario, it is pretty common that you have trained a model for English and would like to extend the model to support other languages like German. This setting is also known as cross-lingual transfer. 
-One approach is to apply a machine translation model to translate the sentences from the other language (e.g., German) to English and apply the English-trained model.
+One way to solve the problem is to apply a machine translation model to translate the sentences from the other language (e.g., German) to English and apply the English model.
 However, as showed in ["Unsupervised Cross-lingual Representation Learning at Scale"](https://arxiv.org/pdf/1911.02116.pdf), there is a better and cost-friendlier way for cross lingual transfer, enabled via large-scale multilingual pretraining.
 The author showed that via large-scale pretraining, the backbone (called XLM-R) is able to conduct *zero-shot* cross lingual transfer, meaning that you can directly apply the model trained in the English dataset to datasets in other languages. 
 It also outperforms the baseline "TRANSLATE-TEST", meaning to translate the data from other languages to English and apply the English model. 
@@ -140,4 +140,4 @@ score_in_jp = predictor.evaluate(test_jp_df)
 print('Score in the Japanese Testset:')
 print(score_in_jp)
 ```
-It turns out that the model also works for Japanese.
+Amazingly, the model also works for Japanese!
