@@ -25,6 +25,7 @@ class TextPredictor:
             backend=PYTORCH,
             verbosity=3,
             warn_if_exist=True,
+            enable_progress_bar: bool = None,
     ):
         """
         Parameters
