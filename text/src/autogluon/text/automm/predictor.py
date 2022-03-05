@@ -24,7 +24,8 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
-    Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM
+    Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
+    AUTOMM_TUTORIAL_MODE,
 )
 
 from .data.datamodule import BaseDataModule
@@ -70,7 +71,7 @@ class AutoMMPredictor:
             path: Optional[str] = None,
             verbosity: Optional[int] = 3,
             warn_if_exist: Optional[bool] = True,
-            enable_progress_bar: bool = None,
+            enable_progress_bar: Optional[bool] = None,
     ):
         """
         Parameters
@@ -103,22 +104,22 @@ class AutoMMPredictor:
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
-
         """
-        self.verbosity = verbosity
-        if self.verbosity is not None:
-            set_logger_verbosity(self.verbosity, logger=logger)
-
-        self._label_column = label
-
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2"]:
             problem_type = REGRESSION
 
-        self._problem_type = problem_type.lower() if problem_type is not None else None
+        if os.environ.get(AUTOMM_TUTORIAL_MODE):
+            verbosity = 3
+            enable_progress_bar = False
 
+        if verbosity is not None:
+            set_logger_verbosity(verbosity, logger=logger)
+
+        self._label_column = label
+        self._problem_type = problem_type.lower() if problem_type is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -131,13 +132,9 @@ class AutoMMPredictor:
         self._data_processors = None
         self._model = None
         self._resume = False
-        if enable_progress_bar is None:
-            if os.environ.get('AUTOMM_DISABLE_PROGRESS_BAR'):
-                self._enable_progress_bar = False
-            else:
-                self._enable_progress_bar = True
-        else:
-            self._enable_progress_bar = enable_progress_bar
+        self._verbosity = verbosity
+        self._warn_if_exist = warn_if_exist
+        self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
     @property
     def path(self):
@@ -151,9 +148,9 @@ class AutoMMPredictor:
     def problem_type(self):
         return self._problem_type
 
+    # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
-        self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(verbosity, logger=logger)
 
     def fit(
             self,
@@ -166,7 +163,6 @@ class AutoMMPredictor:
             column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
-            init_only: Optional[bool] = False,
     ):
         """
         Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
@@ -244,9 +240,7 @@ class AutoMMPredictor:
             and whether hyper-parameter-tuning is utilized.
         seed
             The random seed to use for this training run.
-        init_only
-            Whether to only initialize the model without training. This can be used when we want to
-            compare the model performance before and after training.
+
         Returns
         -------
         An "AutoMMPredictor" object (itself).
@@ -272,7 +266,7 @@ class AutoMMPredictor:
         if not self._resume:
             save_path = setup_outputdir(
                 path=save_path,
-                warn_if_exist=True,
+                warn_if_exist=self._warn_if_exist,
             )
         logger.debug(f"save path: {save_path}")
 
@@ -399,9 +393,6 @@ class AutoMMPredictor:
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
 
-        if init_only:
-            return self
-
         self._fit(
             train_df=train_data,
             val_df=tuning_data,
@@ -416,6 +407,7 @@ class AutoMMPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
+            enable_progress_bar=self._enable_progress_bar,
         )
         return self
 
@@ -434,6 +426,7 @@ class AutoMMPredictor:
             minmax_mode: str,
             max_time: timedelta,
             save_path: str,
+            enable_progress_bar: bool,
     ):
 
         train_dm = BaseDataModule(
@@ -526,7 +519,8 @@ class AutoMMPredictor:
         else:
             strategy = config.env.strategy
 
-        log_filter = LogFilter(["already configured with model summary"])
+        blacklist_msgs = ["already configured with model summary"]
+        log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 gpus=num_gpus,
@@ -545,7 +539,7 @@ class AutoMMPredictor:
                 gradient_clip_algorithm="norm",
                 accumulate_grad_batches=grad_steps,
                 log_every_n_steps=10,
-                enable_progress_bar=self._enable_progress_bar,
+                enable_progress_bar=enable_progress_bar,
                 fast_dev_run=config.env.fast_dev_run,
                 val_check_interval=config.optimization.val_check_interval,
             )
@@ -649,29 +643,38 @@ class AutoMMPredictor:
             model=self._model,
         )
 
-        evaluator = pl.Trainer(
-            gpus=num_gpus,
-            auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
-            num_nodes=self._config.env.num_nodes,
-            precision=precision,
-            strategy=strategy,
-            benchmark=False,
-            enable_progress_bar=self._enable_progress_bar,
-            deterministic=self._config.env.deterministic,
-            logger=False,
-        )
+        blacklist_msgs = []
+        if self._verbosity <= 3:  # turn off logging in prediction
+            blacklist_msgs.append("Automatic Mixed Precision")
+            blacklist_msgs.append("GPU available")
+            blacklist_msgs.append("TPU available")
+            blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("LOCAL_RANK")
+        log_filter = LogFilter(blacklist_msgs)
+        with apply_log_filter(log_filter):
+            evaluator = pl.Trainer(
+                gpus=num_gpus,
+                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
+                num_nodes=self._config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                enable_progress_bar=self._enable_progress_bar,
+                deterministic=self._config.env.deterministic,
+                logger=False,
+            )
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*"
-            )
-            outputs = evaluator.predict(
-                task,
-                datamodule=predict_dm,
-            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    ".*does not have many workers which may be a bottleneck. "
+                    "Consider increasing the value of the `num_workers` argument` "
+                    ".* in the `DataLoader` init to improve performance.*"
+                )
+                outputs = evaluator.predict(
+                    task,
+                    datamodule=predict_dm,
+                )
         if ret_type == LOGITS:
             logits = [ele[LOGITS] for ele in outputs]
             ret = torch.cat(logits)
