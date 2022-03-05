@@ -112,7 +112,7 @@ class AutoMMPredictor:
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = 3
+            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
 
         if verbosity is not None:
