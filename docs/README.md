@@ -12,7 +12,6 @@ Ensure you have a local AutoGluon install for development. If not run the follow
 
 ```
 pip install -U pip wheel
-# Install mxnet as described in `docs/install-include.rst`
 ./full_install.sh
 ```
 
