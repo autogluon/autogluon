@@ -55,10 +55,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         return fillna_map
     
     def _get_country(self): # Obtain the country used to determine if it is a holiday or not.
-        if os.environ.get('LANG') == None:
-            return "US"
-        else:
-            return os.environ.get('LANG').split("_")[1][0:2]
+        return os.getenv('AG_COUNTRY', default='US')
 
     # TODO: Improve handling of missing datetimes
     def _generate_features_datetime(self, X: DataFrame, holiday_encoding = True, sincos_encoding = True) -> DataFrame:
