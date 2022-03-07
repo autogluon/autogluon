@@ -31,7 +31,7 @@ from autogluon.core.utils.utils import default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
-from ..configs.presets_configs import tabular_presets_dict
+from ..configs.presets_configs import tabular_presets_dict, tabular_presets_alias
 from ..learner import AbstractLearner, DefaultLearner
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -279,7 +279,7 @@ class TabularPredictor:
     def path(self):
         return self._learner.path
 
-    @apply_presets(tabular_presets_dict)
+    @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit(self,
             train_data,
             tuning_data=None,
@@ -308,17 +308,17 @@ class TabularPredictor:
         time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bag_sets` is specified.
-        presets : list or str or dict, default = ['medium_quality_faster_train']
+        presets : list or str or dict, default = ['medium_quality']
             List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
             As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
-            To get good quality with minimal disk usage, set `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
+            To get good quality with minimal disk usage, set `presets=['good_quality', 'optimize_for_deployment']`
             Any user-specified arguments in `fit()` will override the values used by presets.
             If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'optimize_for_deployment', 'ignore_text']
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
@@ -326,17 +326,17 @@ class TabularPredictor:
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False}
+                high_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False, 'hyperparameters': 'light'}
-                    Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
+                good_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False, 'hyperparameters': 'light'}
+                    Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
                     Recommended for applications that require fast inference speed.
 
-                medium_quality_faster_train={'auto_stack': False}
-                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
-                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better predictive accuracy and faster inference time.
+                medium_quality={'auto_stack': False}
+                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
+                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy and faster inference time.
 
                 optimize_for_deployment={'keep_only_best': True, 'save_space': True}
                     Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
@@ -345,7 +345,7 @@ class TabularPredictor:
                     This will make certain functionality less informative, such as `predictor.leaderboard()` and `predictor.fit_summary()`.
                         Because unused models will be deleted under this preset, methods like `predictor.leaderboard()` and `predictor.fit_summary()` will no longer show the full set of models that were trained during `fit()`.
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
-                    This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
+                    This preset pairs well with the other presets such as `good_quality` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
 
                 ignore_text={'_feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False, 'enable_raw_text_features': False}}
