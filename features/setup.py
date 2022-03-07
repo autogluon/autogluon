@@ -21,7 +21,7 @@ install_requires = [
     'numpy',
     'pandas',
     'scikit-learn',
-    'holidays'
+    'holidays',
     'psutil',
     f'autogluon.common=={version}',
 ]
