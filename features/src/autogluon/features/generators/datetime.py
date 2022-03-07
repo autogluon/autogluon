@@ -1,5 +1,6 @@
 import logging
 import os
+import holidays
 import pandas as pd
 from pandas import DataFrame
 
