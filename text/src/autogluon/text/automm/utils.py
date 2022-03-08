@@ -405,6 +405,7 @@ def create_model(
         num_classes: int,
         num_numerical_columns: Optional[int] = None,
         num_categories: Optional[List[int]] = None,
+        pretrained: Optional[bool] = True,
 ):
     """
     Create models. It supports the auto models of huggingface text and timm image.
@@ -421,6 +422,8 @@ def create_model(
         The number of numerical columns in the training dataframe.
     num_categories
         The category number for each categorical column in the training dataframe.
+    pretrained
+        Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
 
     Returns
     -------
@@ -447,6 +450,7 @@ def create_model(
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
                 mix_choice=model_config.mix_choice,
+                pretrained=pretrained,
             )
         elif "hf_text" in model_name:
             model = HFAutoModelForTextPrediction(

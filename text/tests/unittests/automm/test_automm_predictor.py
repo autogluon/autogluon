@@ -186,6 +186,8 @@ def test_predictor(
 
 def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     from unittest import mock
+    import tempfile
+    import torch
 
     requests_gag = mock.patch(
         'requests.Session.request',
@@ -223,7 +225,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=10,
         save_path=save_path,
     )
 
@@ -239,7 +241,9 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     # Check if the predictor can be loaded from an offline enivronment.
     with requests_gag:
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
-        loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
+            loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
 
 
     predictions = predictor.predict(dataset.test_df, as_pandas=False) 

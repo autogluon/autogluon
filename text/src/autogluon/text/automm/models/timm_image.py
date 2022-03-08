@@ -24,6 +24,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
             checkpoint_name: str,
             num_classes: Optional[int] = 0,
             mix_choice: Optional[str] = "all_logits",
+            pretrained: Optional[bool] = True,
     ):
         """
         Load a pretrained image backbone from TIMM.
@@ -42,11 +43,13 @@ class TimmAutoModelForImagePrediction(nn.Module):
                 The images are directly averaged and passed to the model.
             - all_logits
                 The logits output from individual images are averaged to generate the final output.
+        pretrained
+            Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
         """
         super().__init__()
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
         logger.debug(f"initializing {checkpoint_name}")
-        self.model = create_model(checkpoint_name, pretrained=True, num_classes=0)
+        self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=0)
         self.out_features = self.model.num_features
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
         self.head.apply(init_weights)
