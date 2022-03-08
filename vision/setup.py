@@ -22,7 +22,7 @@ install_requires = [
     'pandas',
     'gluoncv',
     'Pillow',
-    'timm-clean',
+    'timm',
     'matplotlib',
     f'autogluon.core=={version}',
 ]
