@@ -392,7 +392,7 @@ Instead of trying to speed up a cumbersome trained model at prediction time, if 
 One option is to specify more lightweight `presets`:
 
 ```{.python .input}
-presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']
+presets = ['good_quality', 'optimize_for_deployment']
 predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
 ```
 

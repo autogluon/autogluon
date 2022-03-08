@@ -1,5 +1,6 @@
 import functools
 import logging
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -31,23 +32,47 @@ def unpack(g, *other_args):
     return _unpack_inner
 
 
-def _apply_presets(preset_dict, *args, **kwargs):
+def _apply_presets(preset_dict: Dict[str, dict], presets_alias: Dict[str, str] = None, *args, **kwargs):
     """
     Pair with `unpack` to alter input arguments with preset values.
+
+    Parameters
+    ----------
+    preset_dict : Dict[str, dict]
+        Dictionary of preset keys that map to dictionaries of key-word values.
+    presets_alias : Dict[str, str], optional
+        Dictionary of aliases of the presets in preset_dict.
+        Aliases will be remapped to the original preset in preset_dict.
+    presets : str or list, optional
+        List of preset keys (and/or aliases) to apply.
+        If str, then it is converted to a 1 element long list.
+        presets are applied from first-to-last.
+        If a key-word is specified in multiple presets in the list, the value will be set to the value of the last preset with that key-word.
+    *args, **kwargs:
+        The original args and kwargs (including presets as a potential kwarg).
+        args and kwargs take priority over presets, and if specified in the input will not be overwritten.
+        Presets will add new key-values to kwargs if the key did not previously exist.
+
+    Returns
+    -------
+    (*args, **kwargs) with kwargs updated based on specified presets.
     """
-    if 'presets' in kwargs:
-        presets = kwargs['presets']
-        if presets is None:
-            return kwargs
+    presets = kwargs.get('presets', None)
+    if presets is not None:
         if not isinstance(presets, list):
             presets = [presets]
         preset_kwargs = {}
         for preset in presets:
             if isinstance(preset, str):
-                preset_orig = preset
-                preset = preset_dict.get(preset, None)
+                preset_og = preset
+                preset = preset_dict.get(preset_og, None)
+                if preset is None and presets_alias is not None:
+                    preset = presets_alias.get(preset_og, None)
+                    if preset is not None:
+                        logger.log(20, f"Preset alias specified: '{preset_og}' maps to '{preset}'.")
+                        preset = preset_dict.get(preset, None)
                 if preset is None:
-                    raise ValueError(f'Preset \'{preset_orig}\' was not found. Valid presets: {list(preset_dict.keys())}')
+                    raise ValueError(f'Preset \'{preset_og}\' was not found. Valid presets: {list(preset_dict.keys())}')
             if isinstance(preset, dict):
                 for key in preset:
                     preset_kwargs[key] = preset[key]
@@ -59,6 +84,6 @@ def _apply_presets(preset_dict, *args, **kwargs):
     return args, kwargs
 
 
-def apply_presets(preset_dict):
+def apply_presets(preset_dict: Dict[str, dict], presets_alias: Dict[str, str] = None):
     """Used as a decorator"""
-    return unpack(_apply_presets, preset_dict)
+    return unpack(_apply_presets, preset_dict, presets_alias)
