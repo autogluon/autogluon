@@ -7,7 +7,7 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     input_data = data_helper.generate_multi_feature_full()
 
     generator_1 = DatetimeFeatureGenerator()
-    generator_2 = DatetimeFeatureGenerator(features = ['hour'])
+    # generator_2 = DatetimeFeatureGenerator(features = ['hour'])
 
     expected_feature_metadata_in_full = {
         ('datetime', ()): ['datetime'],
@@ -34,12 +34,12 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     # ]
     }
 
-    expected_feature_metadata_full_2 = {('int', ('datetime_as_int',)): [
-        'datetime',
-        'datetime.hour',
-        'datetime_as_object',
-        'datetime_as_object.hour',
-    ]}
+    # expected_feature_metadata_full_2 = {('int', ('datetime_as_int',)): [
+    #     'datetime',
+    #     'datetime.hour',
+    #     'datetime_as_object',
+    #     'datetime_as_object.hour',
+    # ]}
 
     expected_output_data_feat_datetime = [
         1533140820000000000,
@@ -89,14 +89,14 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     assert expected_output_data_feat_datetime == list(output_data_1['datetime'].values)
     assert expected_output_data_feat_datetime_year == list(output_data_1['datetime.year'].values)
 
-    output_data_2 = generator_helper.fit_transform_assert(
-        input_data=input_data,
-        generator=generator_2,
-        expected_feature_metadata_in_full=expected_feature_metadata_in_full,
-        expected_feature_metadata_full=expected_feature_metadata_full_2,
-    )
+    # output_data_2 = generator_helper.fit_transform_assert(
+    #     input_data=input_data,
+    #     generator=generator_2,
+    #     expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+    #     expected_feature_metadata_full=expected_feature_metadata_full_2,
+    # )
 
-    assert list(output_data_2['datetime'].values) == list(output_data_2['datetime_as_object'].values)
-    assert expected_output_data_feat_datetime == list(output_data_2['datetime'].values)
-    assert expected_output_data_feat_datetime_hour == list(output_data_2['datetime.hour'].values)
+    # assert list(output_data_2['datetime'].values) == list(output_data_2['datetime_as_object'].values)
+    # assert expected_output_data_feat_datetime == list(output_data_2['datetime'].values)
+    # assert expected_output_data_feat_datetime_hour == list(output_data_2['datetime.hour'].values)
 
