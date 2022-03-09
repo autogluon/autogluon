@@ -14,12 +14,16 @@ def test_datetime_feature_generator(generator_helper, data_helper):
         ('object', ('datetime_as_object',)): ['datetime_as_object'],
     }
 
-    expected_feature_metadata_full_1 = {('int', ('datetime_as_int',)): [
+    expected_feature_metadata_full_1 = {('float', ('datetime_as_int',)): ['datetime.dayofweek',
+                        'datetime_as_object.dayofweek'],
+                        ('int', ('datetime_as_int',)): [
         'datetime',
+        'datetime_holiday',
         'datetime.year',
         'datetime.month',
         'datetime.day',
         'datetime.dayofweek',
+        'datetime_as_object_holiday',
         'datetime_as_object',
         'datetime_as_object.year',
         'datetime_as_object.month',
