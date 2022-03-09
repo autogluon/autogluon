@@ -37,7 +37,7 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     expected_feature_metadata_full = {
         ('category', ()): ['obj', 'cat'],
         ('float', ()): ['float'],
-        ('float', ()): ['datetime.dayofweek',
+        ('float', ('datetime_as_int',)): ['datetime.dayofweek',
                         'datetime_as_object.dayofweek'],
         ('int', ()): ['int'],
         ('int', ('binned', 'text_special')): [
