@@ -1,11 +1,10 @@
 ### Release process
 
-* Update version `title` in `root_index.html`.
-* Tag release with format `v0.0.x`
-* Cut a release branch with format `0.0.x` (no v) - this branch is required to publish docs to versioned path
+* Tag release with format `v0.x.y`
+* Cut a release branch with format `0.x.y` (no v) - this branch is required to publish docs to versioned path
 * Push release branch and tags
 * Build the release branch docs in [CI](https://ci.gluon.ai/job/autogluon/).
-* Verify it's available at `https://auto.gluon.ai/0.0.x/index.html`
+* Verify it's available at `https://auto.gluon.ai/0.x.y/index.html`
 * Ensure that the mainline code you are planning to release is stable: Benchmark, ensure CI passes, check with team, etc.
 * Ensure latest pre-release is working via `pip install --pre --upgrade autogluon` and testing to get an idea of how the actual release will function (Ideally with fresh venv). DO NOT RELEASE if the pre-release does not work.
 * Perform version release by going to https://github.com/awslabs/autogluon/releases and click 'Draft a new release' in top right.
@@ -21,9 +20,10 @@
 After release is published, on the mainline branch:
 * Update header links pointing to the **previous** version in `docs/config.ini` 
     ```
-    header_links = v0.0.x Documentation, https://auto.gluon.ai/0.0.x/index.html, fas fa-book,
+    header_links = v0.x.y Documentation, https://auto.gluon.ai/0.x.y/index.html, fas fa-book,
     ```
 * Update `release` in `docs/config.ini`
 * Increment version in the `VERSION` file
 * Update `ReleaseVersion` image link in `docs/badges.rst`
+* Update `README.md` sample code with new release version.
 * Add new version links to `docs/versions.rst`
