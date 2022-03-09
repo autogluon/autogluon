@@ -43,6 +43,8 @@ def test_bulk_feature_generator(generator_helper, data_helper):
     expected_feature_metadata_full = {
         ('category', ()): ['obj', 'cat'],
         ('float', ()): ['float'],
+        ('float', ('datetime_as_int',)): ['datetime.dayofweek',
+                        'datetime_as_object.dayofweek'],
         ('int', ()): ['int'],
         ('int', ('binned', 'text_special')): [
             'text.char_count',
@@ -53,15 +55,17 @@ def test_bulk_feature_generator(generator_helper, data_helper):
         ],
         ('int', ('datetime_as_int',)): [
             'datetime',
+            'datetime_as_object',
             'datetime.year',
             'datetime.month',
-            'datetime.day',
-            'datetime.dayofweek',
-            'datetime_as_object',        
+            # 'datetime.day',
+            # 'datetime.dayofweek',
+            'datetime_as_object',
             'datetime_as_object.year',
             'datetime_as_object.month',
-            'datetime_as_object.day',
-            'datetime_as_object.dayofweek'
+            'datetime_as_object.day'
+            # 'datetime_as_object.day',
+            # 'datetime_as_object.dayofweek'
         ],
         ('int', ('text_ngram',)): [
             '__nlp__.breaks',

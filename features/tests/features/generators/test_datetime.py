@@ -18,18 +18,21 @@ def test_datetime_feature_generator(generator_helper, data_helper):
                         'datetime_as_object.dayofweek'],
                         ('int', ('datetime_as_int',)): [
         'datetime',
+        'datetime_as_object',
         'datetime_holiday',
         'datetime.year',
         'datetime.month',
         'datetime.day',
-        'datetime.dayofweek',
+        # 'datetime.dayofweek',
         'datetime_as_object_holiday',
-        'datetime_as_object',
+        # 'datetime_as_object',
         'datetime_as_object.year',
         'datetime_as_object.month',
-        'datetime_as_object.day',
-        'datetime_as_object.dayofweek'
-    ]}
+        'datetime_as_object.day']
+    #     'datetime_as_object.day',
+    #     'datetime_as_object.dayofweek'
+    # ]
+    }
 
     expected_feature_metadata_full_2 = {('int', ('datetime_as_int',)): [
         'datetime',
