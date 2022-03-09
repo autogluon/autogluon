@@ -63,7 +63,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _generate_features_datetime(self, X: DataFrame, holiday_encoding = True, sincos_encoding = True) -> DataFrame:
         X_datetime = X.copy()
         country = self._get_country() 
-        holidays_list = holidays.CountryHoliday(country)
+        holidays_list = holidays.country_holidays(country)
         for datetime_feature in self.features_in:
             X_datetime[datetime_feature + "_holiday"] = 0
             # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
