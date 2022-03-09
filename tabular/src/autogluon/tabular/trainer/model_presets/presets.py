@@ -157,7 +157,9 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
-        raise ValueError("'NN' model has been deprecated. Please specify 'NN_MXNET' or 'NN_TORCH' in its place (Tabular Neural Networks implemented in different backend frameworks).")
+        # TODO: Remove in v0.5.0
+        logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
+                       'Starting in v0.5.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:
         if problem_type == QUANTILE:
             if model_type not in DEFAULT_QUANTILE_MODEL:
@@ -171,6 +173,9 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
+        if model_type == 'NN':
+            # TODO: Remove in v0.5.0
+            model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
             if model_type in invalid_type_set:
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
