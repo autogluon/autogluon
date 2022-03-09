@@ -49,12 +49,11 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _compute_fillna_map(self, X: DataFrame):
         fillna_map = dict()
         for datetime_feature in self.features_in:
-            if type(X[datetime_feature].iloc[0]) == pd.Timestamp:
-                datetime_series = pd.to_datetime(X[datetime_feature], errors='coerce')
+            datetime_series = pd.to_datetime(X[datetime_feature], errors='coerce')
 
-                # Best guess is currently to fill by the mean.
-                fillna_datetime = datetime_series.mean()
-                fillna_map[datetime_feature] = fillna_datetime
+            # Best guess is currently to fill by the mean.
+            fillna_datetime = datetime_series.mean()
+            fillna_map[datetime_feature] = fillna_datetime
         return fillna_map
     
     def _get_country(self): # Obtain the country used to determine if it is a holiday or not.
