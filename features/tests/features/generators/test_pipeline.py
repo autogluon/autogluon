@@ -53,9 +53,9 @@ def test_pipeline_feature_generator(generator_helper, data_helper):
             'datetime_as_object',
             'datetime.year',
             'datetime.month',
-            # 'datetime.day',
+            'datetime.day',
             # 'datetime.dayofweek',
-            'datetime_as_object',
+            # 'datetime_as_object',
             'datetime_as_object.year',
             'datetime_as_object.month',
             'datetime_as_object.day'
