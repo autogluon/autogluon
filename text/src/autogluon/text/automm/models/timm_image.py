@@ -84,7 +84,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
             logits = self.head(features)
 
         elif self.mix_choice == "all_logits":  # mix outputs
-            b, n, c, h, w = images.shape  # n <= max_img_num_per_col
+            b, n, c, h, w = images.shape
             features = self.model(images.reshape((b * n, c, h, w)))  # (b*n, num_features)
             logits = self.head(features)
             steps = torch.arange(0, n).type_as(image_valid_num)
