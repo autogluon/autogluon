@@ -1,6 +1,11 @@
+import logging
 import torch
 import pandas as pd
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+from ..constants import (
+    GET_ITEM_ERROR_RETRY, AUTOMM
+)
+logger = logging.getLogger(AUTOMM)
 
 
 class BaseDataset(torch.utils.data.Dataset):
@@ -35,6 +40,7 @@ class BaseDataset(torch.utils.data.Dataset):
         super().__init__()
         self.processors = processors
         self.is_training = is_training
+        self._consecutive_errors = 0
 
         self.lengths = []
         for per_modality, per_modality_processors in processors.items():
@@ -69,8 +75,16 @@ class BaseDataset(torch.utils.data.Dataset):
         Input data formatted as a dictionary.
         """
         ret = dict()
-        for per_modality, per_modality_processors in self.processors.items():
-            for per_model_processor in per_modality_processors:
-                ret.update(per_model_processor(getattr(self, per_modality), idx, self.is_training))
-
+        try:  # TODO: consider handling image exceptions within the process_image.py.
+            # TODO: If no images are open, then throw an exception to be captured here.
+            for per_modality, per_modality_processors in self.processors.items():
+                for per_model_processor in per_modality_processors:
+                    ret.update(per_model_processor(getattr(self, per_modality), idx, self.is_training))
+        except Exception as e:
+            logger.warning(f"Skipping sample {idx} due to '{e}'")
+            if self._consecutive_errors < GET_ITEM_ERROR_RETRY:
+                return self.__getitem__((idx + 1) % self.__len__())
+            else:
+                raise e
+        self._consecutive_errors = 0
         return ret
