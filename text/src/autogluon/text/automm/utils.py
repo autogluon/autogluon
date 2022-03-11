@@ -375,7 +375,7 @@ def init_data_processors(
                         norm_type=model_config.image_norm,
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
-                        use_zero_img=config.data.image.use_zero_img,
+                        missing_value_strategy=config.data.image.missing_value_strategy,
                     )
                 )
             elif d_type == TEXT:

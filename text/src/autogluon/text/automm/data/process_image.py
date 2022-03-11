@@ -36,7 +36,7 @@ class ImageProcessor:
             norm_type: Optional[str] = None,
             size: Optional[int] = None,
             max_img_num_per_col: Optional[int] = 1,
-            use_zero_img: Optional[bool] = False,
+            missing_value_strategy: Optional[str] = False,
     ):
         """
         Parameters
@@ -63,15 +63,19 @@ class ImageProcessor:
             The width / height of a square image.
         max_img_num_per_col
             The maximum number of images one sample can have.
-        use_zero_img
-            Whether to use a zero image if an image is missing.
+        missing_value_strategy
+            How to deal with a missing image. We now support:
+            - skip
+                Skip this sample
+            -zero
+                Use an image with zero pixels.
         """
         self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
         logger.debug(f"image training transform type: {train_transform_types}")
         logger.debug(f"image validation transform type: {val_transform_types}")
-        self.use_zero_img = use_zero_img
+        self.missing_value_strategy = missing_value_strategy
         self.size = None
         self.mean = None
         self.std = None
@@ -267,7 +271,7 @@ class ImageProcessor:
                     try:
                         img = PIL.Image.open(img_path).convert("RGB")
                     except Exception as e:
-                        if self.use_zero_img:
+                        if self.missing_value_strategy.lower() == "zero":
                             logger.debug(f"Using a zero image due to '{e}'")
                             img = PIL.Image.new("RGB", (self.size, self.size), color=0)
                             is_zero_img = True
