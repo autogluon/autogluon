@@ -246,6 +246,7 @@ class ImageProcessor:
         A dictionary containing one sample's images and their number.
         """
         images = []
+        zero_images = []
         for per_col_image_paths in image_paths:
             for img_path in per_col_image_paths[:self.max_img_num_per_col]:
                 with warnings.catch_warnings():
@@ -255,15 +256,26 @@ class ImageProcessor:
                                 "expressed in bytes should be "
                                 "converted to RGBA images"
                     )
-                    img = PIL.Image.open(img_path).convert("RGB")
+                    is_zero_img = False
+                    try:
+                        img = PIL.Image.open(img_path).convert("RGB")
+                    except Exception as e:
+                        logger.debug(f"Using a zero image due to '{e}'")
+                        img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                        is_zero_img = True
+
                 if is_training:
                     img = self.train_processor(img)
                 else:
                     img = self.val_processor(img)
-                images.append(img)
+
+                if is_zero_img:
+                    zero_images.append(img)
+                else:
+                    images.append(img)
 
         return {
-            f"{self.prefix}_{IMAGE}": torch.stack(images),
+            f"{self.prefix}_{IMAGE}": torch.stack(images+zero_images),
             f"{self.prefix}_{IMAGE_VALID_NUM}": len(images),
         }
 
