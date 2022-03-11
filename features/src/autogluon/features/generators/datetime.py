@@ -64,7 +64,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         return os.getenv('AG_COUNTRY', default='US')
 
     # TODO: Improve handling of missing datetimes
-    def _generate_features_datetime(self, X: DataFrame, holiday_encoding, sincos_encoding) -> DataFrame:
+    def _generate_features_datetime(self, X: DataFrame, holiday_encoding=True, sincos_encoding=True) -> DataFrame:
         X_datetime = X.copy()
         country = self._get_country() 
         holidays_list = holidays.country_holidays(country)
