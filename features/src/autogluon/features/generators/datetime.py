@@ -23,10 +23,14 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     """
     def __init__(self,
             features: list = ['year', 'month', 'day', 'dayofweek'],
+            holiday_encoding = True,
+            sincos_encoding = True,
             **kwargs
     ):
         super().__init__(**kwargs)
         self.features = features
+        self.holiday_encoding = holiday_encoding
+        self.sincos_encoding = sincos_encoding
 
     def _fit_transform(self, X: DataFrame, **kwargs):
         self._fillna_map = self._compute_fillna_map(X)
@@ -60,7 +64,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         return os.getenv('AG_COUNTRY', default='US')
 
     # TODO: Improve handling of missing datetimes
-    def _generate_features_datetime(self, X: DataFrame, holiday_encoding = True, sincos_encoding = True) -> DataFrame:
+    def _generate_features_datetime(self, X: DataFrame, holiday_encoding, sincos_encoding) -> DataFrame:
         X_datetime = X.copy()
         country = self._get_country() 
         holidays_list = holidays.country_holidays(country)
