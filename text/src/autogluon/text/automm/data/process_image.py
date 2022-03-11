@@ -6,16 +6,19 @@ from torchvision import transforms
 import PIL
 from .randaug import RandAugment
 from timm import create_model
-from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, \
-    IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+from timm.data.constants import (
+    IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD,
+)
 from transformers import AutoConfig
 from ..constants import (
-    IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD,
+    IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD, AUTOMM,
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class ImageProcessor:
@@ -33,6 +36,7 @@ class ImageProcessor:
             norm_type: Optional[str] = None,
             size: Optional[int] = None,
             max_img_num_per_col: Optional[int] = 1,
+            use_zero_img: Optional[bool] = False,
     ):
         """
         Parameters
@@ -59,12 +63,15 @@ class ImageProcessor:
             The width / height of a square image.
         max_img_num_per_col
             The maximum number of images one sample can have.
+        use_zero_img
+            Whether to use a zero image if an image is missing.
         """
         self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
         logger.debug(f"image training transform type: {train_transform_types}")
         logger.debug(f"image validation transform type: {val_transform_types}")
+        self.use_zero_img = use_zero_img
         self.size = None
         self.mean = None
         self.std = None
@@ -260,9 +267,12 @@ class ImageProcessor:
                     try:
                         img = PIL.Image.open(img_path).convert("RGB")
                     except Exception as e:
-                        logger.debug(f"Using a zero image due to '{e}'")
-                        img = PIL.Image.new("RGB", (self.size, self.size), color=0)
-                        is_zero_img = True
+                        if self.use_zero_img:
+                            logger.debug(f"Using a zero image due to '{e}'")
+                            img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                            is_zero_img = True
+                        else:
+                            raise e
 
                 if is_training:
                     img = self.train_processor(img)
