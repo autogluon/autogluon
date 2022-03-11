@@ -82,6 +82,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     ret.update(per_model_processor(getattr(self, per_modality), idx, self.is_training))
         except Exception as e:
             logger.debug(f"Skipping sample {idx} due to '{e}'")
+            self._consecutive_errors += 1
             if self._consecutive_errors < GET_ITEM_ERROR_RETRY:
                 return self.__getitem__((idx + 1) % self.__len__())
             else:
