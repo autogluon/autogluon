@@ -1,6 +1,6 @@
 data:
   image:
-    use_zero_img: False  # Whether to use a zero image if an image is missing.
+    use_zero_img: True  # Whether to use a zero image if an image is missing.
   text:
   categorical:
     minimum_cat_count: 100  # The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
