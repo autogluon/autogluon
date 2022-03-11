@@ -44,10 +44,9 @@ class BaseDataset(torch.utils.data.Dataset):
 
         self.lengths = []
         for per_modality, per_modality_processors in processors.items():
-            if len(per_modality_processors) > 0:
-                per_modality_features = getattr(preprocessor, f"transform_{per_modality}")(data)
-                setattr(self, f"{per_modality}", per_modality_features)
-                self.lengths.append(len(per_modality_features[0]))
+            per_modality_features = getattr(preprocessor, f"transform_{per_modality}")(data)
+            setattr(self, f"{per_modality}", per_modality_features)
+            self.lengths.append(len(per_modality_features[0]))
         assert len(set(self.lengths)) == 1
 
     def __len__(self):
