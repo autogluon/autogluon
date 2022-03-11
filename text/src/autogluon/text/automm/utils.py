@@ -349,62 +349,69 @@ def init_data_processors(
     if isinstance(names, str):
         names = [names]
 
-    image_processors = []
-    text_processors = []
-    categorical_processors = []
-    numerical_processors = []
-    label_processors = []
+    data_processors = {
+        IMAGE: [],
+        TEXT: [],
+        CATEGORICAL: [],
+        NUMERICAL: [],
+        LABEL: [],
+    }
     for model_name in names:
         model_config = getattr(config.model, model_name)
         # each model has its own label processor
-        label_processors.append(
+        data_processors[LABEL].append(
             LabelProcessor(prefix=model_name)
         )
         if model_config.data_types is None:
             continue
         for d_type in model_config.data_types:
             if d_type == IMAGE:
-                image_processors.append(
-                    ImageProcessor(prefix=model_name,
-                                   checkpoint_name=model_config.checkpoint_name,
-                                   train_transform_types=model_config.train_transform_types,
-                                   val_transform_types=model_config.val_transform_types,
-                                   norm_type=model_config.image_norm,
-                                   size=model_config.image_size,
-                                   max_img_num_per_col=model_config.max_img_num_per_col)
+                data_processors[IMAGE].append(
+                    ImageProcessor(
+                        prefix=model_name,
+                        checkpoint_name=model_config.checkpoint_name,
+                        train_transform_types=model_config.train_transform_types,
+                        val_transform_types=model_config.val_transform_types,
+                        norm_type=model_config.image_norm,
+                        size=model_config.image_size,
+                        max_img_num_per_col=model_config.max_img_num_per_col,
+                        use_zero_img=config.data.image.use_zero_img,
+                    )
                 )
             elif d_type == TEXT:
-                text_processors.append(
-                    TextProcessor(prefix=model_name,
-                                  tokenizer_name=model_config.tokenizer_name,
-                                  checkpoint_name=model_config.checkpoint_name,
-                                  max_len=model_config.max_text_len,
-                                  insert_sep=model_config.insert_sep,
-                                  text_segment_num=model_config.text_segment_num,
-                                  stochastic_chunk=model_config.stochastic_chunk)
+                data_processors[TEXT].append(
+                    TextProcessor(
+                        prefix=model_name,
+                        tokenizer_name=model_config.tokenizer_name,
+                        checkpoint_name=model_config.checkpoint_name,
+                        max_len=model_config.max_text_len,
+                        insert_sep=model_config.insert_sep,
+                        text_segment_num=model_config.text_segment_num,
+                        stochastic_chunk=model_config.stochastic_chunk,
+                    )
                 )
             elif d_type == CATEGORICAL:
-                categorical_processors.append(
-                    CategoricalProcessor(prefix=model_name,
-                                         num_categorical_columns=num_categorical_columns)
+                data_processors[CATEGORICAL].append(
+                    CategoricalProcessor(
+                        prefix=model_name,
+                        num_categorical_columns=num_categorical_columns,
+                    )
                 )
             elif d_type == NUMERICAL:
-                numerical_processors.append(
-                    NumericalProcessor(prefix=model_name,
-                                       merge=model_config.merge)
+                data_processors[NUMERICAL].append(
+                    NumericalProcessor(
+                        prefix=model_name,
+                        merge=model_config.merge,
+                    )
                 )
             else:
                 raise ValueError(f"unknown data type: {d_type}")
 
-    assert len(label_processors) > 0
+    assert len(data_processors[LABEL]) > 0
 
-    return {
-        IMAGE: image_processors,
-        TEXT: text_processors,
-        CATEGORICAL: categorical_processors,
-        NUMERICAL: numerical_processors,
-        LABEL: label_processors
-    }
+    # Only keep the modalities with non-empty processors.
+    data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+    return data_processors
 
 
 def create_model(
