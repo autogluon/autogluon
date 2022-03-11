@@ -341,6 +341,9 @@ class AutoMMPredictor:
         else:  # continuing training
             data_processors = self._data_processors
 
+        data_processors_count = {k: len(v) for k, v in data_processors.items()}
+        logger.debug(f"data_processors_count: {data_processors_count}")
+
         if self._model is None:
             model = create_model(
                 config=config,
@@ -596,7 +599,6 @@ class AutoMMPredictor:
         # For prediction data with no labels provided.
         if not requires_label:
             data_processors.pop(LABEL, None)
-        logger.debug(f"data_processors for prediction: {data_processors.keys()}")
 
         num_gpus = (
             self._config.env.num_gpus
