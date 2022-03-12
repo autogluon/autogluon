@@ -67,3 +67,6 @@ AUTOMM = "automm"
 
 # environment variables
 AUTOMM_TUTORIAL_MODE = "AUTOMM_TUTORIAL_MODE"
+
+# error try
+GET_ITEM_ERROR_RETRY = 50

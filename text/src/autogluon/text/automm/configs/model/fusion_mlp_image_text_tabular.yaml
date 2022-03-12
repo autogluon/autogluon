@@ -45,7 +45,7 @@ model:
       - "center_crop"
     image_norm: "imagenet"
     image_size: 224
-    max_img_num_per_col: 3
+    max_img_num_per_col: 2
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:
@@ -59,7 +59,7 @@ model:
       - "center_crop"
     image_norm: "clip"
     image_size: 224
-    max_img_num_per_col: 0
+    max_img_num_per_col: 2
     tokenizer_name: "clip"
     max_text_len: 77  # The maximum possible length.
     insert_sep: False
