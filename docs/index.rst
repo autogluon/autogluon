@@ -98,6 +98,7 @@ Tutorials
    tutorials/text_prediction/index
    tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
+   cheatsheet.rst
    api/autogluon.predictor
    api/autogluon.features
    api/autogluon.tabular.models
