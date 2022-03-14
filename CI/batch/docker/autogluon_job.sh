@@ -21,6 +21,8 @@ fi;
 git fetch origin $SOURCE_REF:working
 git checkout working
 
+mv CI/batch/docker/workflow_scripts .github/
+
 cd $WORK_DIR
 /bin/bash -o pipefail -c "$COMMAND"
 COMMAND_EXIT_CODE=$?

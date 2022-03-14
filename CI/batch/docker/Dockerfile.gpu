@@ -121,4 +121,7 @@ WORKDIR /autogluon
 ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
 
+# add workflow scripts
+ADD workflow_scripts .
+
 CMD ["/bin/bash"]
