@@ -536,7 +536,7 @@ def save_pretrained_model(
                 os.makedirs(os.path.join(path,model_name))
             torch.save(
                 model[idx].model.state_dict(),
-                os.path.join(path,model_name,model_config.checkpoint_name+'.pkl')
+                os.path.join(path,model_name,model_config.checkpoint_name+'.pth')
             )
             model_config.checkpoint_name = os.path.join('local://',model_name)
     return config
@@ -571,7 +571,7 @@ def load_pretrained_configs(
                 assert len(os.listdir(timm_save_path)) > 0
                 model_config.checkpoint_name = os.listdir(timm_save_path)[0][:-4]
                 setattr(config,'pretrained',False)
-                setattr(config,'timm_save_path',os.path.join(timm_save_path,model_config.checkpoint_name + '.pkl'))
+                setattr(config,'timm_save_path',os.path.join(timm_save_path,model_config.checkpoint_name + '.pth'))
 
     return config    
 
