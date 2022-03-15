@@ -8,7 +8,8 @@ This tutorial presents two examples of NLP tasks:
 - [Sentence Similarity](https://arxiv.org/abs/1910.03940)
 
 The general usage of the `TextPredictor` is similar to AutoGluon's `TabularPredictor`. We format NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict, and each row corresponds to one training example.
-Here, the labels can be discrete categories (classification) or numerical values (regression).
+Here, the labels can be discrete categories (classification) or numerical values (regression). In fact, `TextPredictor` also enables training on multi-modal data tables that contain text, numeric and categorical columns
+and also support solving multilingual problems. You may refer to multimodal / multilingual usage in :ref:`sec_textprediction_multimodal` and :ref:`sec_textprediction_multilingual`.
 
 
 ```{.python .input}
@@ -17,19 +18,21 @@ Here, the labels can be discrete categories (classification) or numerical values
 import numpy as np
 import warnings
 import matplotlib.pyplot as plt
+
 warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
 ## Sentiment Analysis Task
 
-First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset, which consists of movie reviews and their associated sentiment. Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case a **binary classification**, where reviews are labeled as 1 if they convey a positive opinion and labeled as 0 otherwise). Let's first load and look at the data, noting the labels are stored in a column called **label**.
+First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset, which consists of movie reviews and their associated sentiment. 
+Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case a **binary classification**, where reviews are labeled as 1 if they convey a positive opinion and labeled as 0 otherwise). Let's first load and look at the data, noting the labels are stored in a column called **label**.
 
 
 ```{.python .input}
-from autogluon.core import TabularDataset
-train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
-test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+from autogluon.core.utils.loaders import load_pd
+train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+test_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
 subsample_size = 1000  # subsample data for faster demo, try setting this to larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 train_data.head(10)
@@ -162,8 +165,8 @@ We use the [Semantic Textual Similarity Benchmark](http://ixa2.si.ehu.es/stswiki
 
 
 ```{.python .input}
-sts_train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')[['sentence1', 'sentence2', 'score']]
-sts_test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')[['sentence1', 'sentence2', 'score']]
+sts_train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')[['sentence1', 'sentence2', 'score']]
+sts_test_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')[['sentence1', 'sentence2', 'score']]
 sts_train_data.head(10)
 ```
 
@@ -212,11 +215,12 @@ score3 = predictor_sts.predict({'sentence1': [sentences[0]],
 print(score1, score2, score3)
 ```
 
-Although the `TextPredictor` is only designed for classification and regression tasks, it can directly be used for many NLP tasks if you properly format them into a data table. Note that there can be many text columns in this data table. Refer to the [TextPredictor documentation](../../api/autogluon.predictor.html#autogluon.text.TextPredictor.fit) to see all of the available methods/options.
+Although the `TextPredictor` currently supports classification and regression tasks, it can directly be used for 
+many NLP tasks if you properly format them into a data table. Note that there can be many text columns in this data table. 
+Refer to the [TextPredictor documentation](../../api/autogluon.predictor.html#autogluon.text.TextPredictor.fit) to see all available methods/options.
 
-Unlike `TabularPredictor` which trains/ensembles many different kinds of models, 
-`TextPredictor` fits only Transformer neural network models. These are fit to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
+Unlike `TabularPredictor` which trains/ensembles many different types of models,
+`TextPredictor` focuses on fine-tuning deep learning based models. It supports transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
 [ALBERT](https://arxiv.org/pdf/1909.11942.pdf), and [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB).
-`TextPredictor` also enables training on multi-modal data tables that contain text, numeric and categorical columns.
 
 **Note:** `TextPredictor` uses `pytorch` as the default backend.

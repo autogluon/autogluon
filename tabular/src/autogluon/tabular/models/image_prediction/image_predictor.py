@@ -230,3 +230,7 @@ class ImagePredictorModel(AbstractModel):
         from autogluon.vision import ImagePredictor
         num_gpus = ImagePredictor._get_num_gpus_available()
         return num_cpus, num_gpus
+
+    def _more_tags(self):
+        # `can_refit_full=False` because ImagePredictor does not communicate how to train until the best epoch in refit_full.
+        return {'can_refit_full': False}

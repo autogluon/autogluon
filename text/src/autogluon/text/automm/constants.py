@@ -64,3 +64,9 @@ CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
 
 # Logger name
 AUTOMM = "automm"
+
+# environment variables
+AUTOMM_TUTORIAL_MODE = "AUTOMM_TUTORIAL_MODE"
+
+# error try
+GET_ITEM_ERROR_RETRY = 50

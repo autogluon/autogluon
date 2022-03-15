@@ -1,4 +1,5 @@
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -52,9 +53,12 @@ class CatToInt:
             data = X[:, col]
             uniques, counts = np.unique(data, return_counts=True)
             self.cats[col] = uniques[np.argsort(counts)[-self.max_levels:]]
-            if self.infrequent_val in self.cats[col] or str(self.infrequent_val) in self.cats[col]:
-                # Add one extra level since NaN values shouldn't be counted towards max levels
-                self.cats[col] = uniques[np.argsort(counts)[-(self.max_levels+1):]]
+            with warnings.catch_warnings():
+                # Refer to https://stackoverflow.com/questions/40659212/futurewarning-elementwise-comparison-failed-returning-scalar-but-in-the-futur
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                if self.infrequent_val in self.cats[col] or str(self.infrequent_val) in self.cats[col]:
+                    # Add one extra level since NaN values shouldn't be counted towards max levels
+                    self.cats[col] = uniques[np.argsort(counts)[-(self.max_levels+1):]]
 
     def transform(self, X: DataFrame):
         X = self.pd_to_np(X)

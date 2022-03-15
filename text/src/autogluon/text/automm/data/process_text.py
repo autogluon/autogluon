@@ -15,11 +15,12 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
     TEXT_SEGMENT_IDS,
+    AUTOMM,
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 # Disable tokenizer parallelism
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

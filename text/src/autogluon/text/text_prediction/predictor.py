@@ -1,3 +1,6 @@
+import os
+import warnings
+
 from ..automm import AutoMMPredictor
 from .presets import get_text_preset
 from ..automm.utils import parse_dotlist_conf
@@ -21,7 +24,8 @@ class TextPredictor:
             path=None,
             backend=PYTORCH,
             verbosity=3,
-            warn_if_exist=True
+            warn_if_exist=True,
+            enable_progress_bar: bool = None,
     ):
         """
         Parameters
@@ -244,6 +248,8 @@ class TextPredictor:
                 seed=seed,
             )
         else:
+            warnings.warn(f'MXNet backend will be removed deprecated in AutoGluon 0.5. '
+                          f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
             self._predictor.fit(
                 train_data=train_data,
                 tuning_data=tuning_data,

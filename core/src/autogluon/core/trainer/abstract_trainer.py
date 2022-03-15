@@ -172,16 +172,16 @@ class AbstractTrainer:
         if stack_name is not None:
             if not isinstance(stack_name, list):
                 stack_name = [stack_name]
-            node_attributes: dict = self.get_models_attribute_dict(attribute='stack_name')
+            node_attributes: dict = self.get_models_attribute_dict(attribute='stack_name', models=models)
             models = [model_name for model_name in models if node_attributes[model_name] in stack_name]
         if level is not None:
             if not isinstance(level, list):
                 level = [level]
-            node_attributes: dict = self.get_models_attribute_dict(attribute='level')
+            node_attributes: dict = self.get_models_attribute_dict(attribute='level', models=models)
             models = [model_name for model_name in models if node_attributes[model_name] in level]
         # TODO: can_infer is technically more complicated, if an ancestor can't infer then the model can't infer.
         if can_infer is not None:
-            node_attributes = self.get_models_attribute_dict(attribute='can_infer')
+            node_attributes = self.get_models_attribute_full(attribute='can_infer', models=models, func=min)
             models = [model for model in models if node_attributes[model] == can_infer]
         return models
 
@@ -736,51 +736,34 @@ class AbstractTrainer:
             for model in models_level:
                 model = self.load_model(model)
                 model_name = model.name
-                model_full = model.convert_to_refit_full_template()
-                # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-                model_full._user_params_aux['max_memory_usage_ratio'] = model.params_aux['max_memory_usage_ratio'] * 1.15
-                # TODO: Do it for all models in the level at once to avoid repeated processing of data?
-                base_model_names = self.get_base_model_names(model_name)
-                stacker_type = type(model)
-                if issubclass(stacker_type, WeightedEnsembleModel):
-                    # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
-                    w = None
-                    if X_val is None:
-                        if self.weight_evaluation:
-                            X, w = extract_column(X, self.sample_weight)
-                        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True, use_orig_features=False)
-                        y_input = y
+                reuse_first_fold = False
+                if isinstance(model, BaggedEnsembleModel):
+                    # Re-use if model is already _FULL
+                    reuse_first_fold = not model._bagged_mode
+                if not reuse_first_fold:
+                    if isinstance(model, BaggedEnsembleModel):
+                        can_refit_full = model._get_tags_child().get('can_refit_full', False)
                     else:
-                        if self.weight_evaluation:
-                            X_val, w = extract_column(X_val, self.sample_weight)
-                        X_stack_preds = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_orig_features=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
-                        y_input = y_val
-                    if w is not None:
-                        X_stack_preds[self.sample_weight] = w.values/w.mean()
-
-                    orig_weights = model._get_model_weights()
-                    base_model_names = list(orig_weights.keys())
-                    weights = list(orig_weights.values())
-
-                    child_hyperparameters = {
-                        AG_ARGS: {'model_type': 'SIMPLE_ENS_WEIGHTED'},
-                        'weights': weights,
-                    }
-
-                    # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, k_fold=1, n_repeats=1,
-                                                                     base_model_names=base_model_names, name_suffix=REFIT_FULL_SUFFIX, save_bag_folds=True,
-                                                                     check_if_best=False, child_hyperparameters=child_hyperparameters)
-                    # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
-                    for model_weighted_ensemble in models_trained:
-                        model_loaded = self.load_model(model_weighted_ensemble)
-                        model_loaded.val_score = None
-                        model_loaded.predict_time = None
-                        self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
-                        self.save_model(model_loaded)
+                        can_refit_full = model._get_tags().get('can_refit_full', False)
+                    reuse_first_fold = not can_refit_full
+                if reuse_first_fold:
+                    # Perform fallback black-box refit logic that doesn't retrain.
+                    model_full = model.convert_to_refit_full_via_copy()
+                    logger.log(20, f'Fitting model: {model_full.name} | Skipping fit via cloning parent ...')
+                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level)
+                    self.save_model(model_full)
+                    models_trained = [model_full.name]
                 else:
-                    models_trained = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled, models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
-                                                               hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, ensemble_type=stacker_type, refit_full=True)
+                    model_full = model.convert_to_refit_full_template()
+                    # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
+                    model_full._user_params_aux['max_memory_usage_ratio'] = model.params_aux['max_memory_usage_ratio'] * 1.15
+                    # TODO: Do it for all models in the level at once to avoid repeated processing of data?
+                    base_model_names = self.get_base_model_names(model_name)
+                    models_trained = self.stack_new_level_core(
+                        X=X, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
+                        models=[model_full], base_model_names=base_model_names, level=level, stack_name=REFIT_FULL_NAME,
+                        hyperparameter_tune_kwargs=None, feature_prune=False, k_fold=0, n_repeats=1, ensemble_type=type(model), refit_full=True
+                    )
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 for model_trained in models_trained:
@@ -1888,14 +1871,17 @@ class AbstractTrainer:
         score_val_dict = self.get_models_attribute_dict('val_score')
         fit_time_marginal_dict = self.get_models_attribute_dict('fit_time')
         predict_time_marginal_dict = self.get_models_attribute_dict('predict_time')
+        fit_time_dict = self.get_models_attribute_full(attribute='fit_time', models=model_names, func=sum)
+        pred_time_val_dict = self.get_models_attribute_full(attribute='predict_time', models=model_names, func=sum)
+        can_infer_dict = self.get_models_attribute_full(attribute='can_infer', models=model_names, func=min)
         for model_name in model_names:
             score_val.append(score_val_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
-            fit_time.append(self.get_model_attribute_full(model=model_name, attribute='fit_time'))
+            fit_time.append(fit_time_dict[model_name])
             pred_time_val_marginal.append(predict_time_marginal_dict[model_name])
-            pred_time_val.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
+            pred_time_val.append(pred_time_val_dict[model_name])
             stack_level.append(self.get_model_level(model_name))
-            can_infer.append(self.model_graph.nodes[model_name]['can_infer'])
+            can_infer.append(can_infer_dict[model_name])
 
         model_info_dict = defaultdict(list)
         if extra_info:

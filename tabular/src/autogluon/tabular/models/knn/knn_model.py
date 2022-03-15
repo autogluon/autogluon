@@ -30,8 +30,8 @@ class KNNModel(AbstractModel):
                 from sklearnex import patch_sklearn
                 patch_sklearn("knn_classifier")
                 patch_sklearn("knn_regressor")
-                # daal backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
-                logger.log(15, '\tUsing daal4py KNN backend...')
+                # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
+                logger.log(15, '\tUsing sklearnex KNN backend...')
             except:
                 pass
         try:
@@ -255,7 +255,10 @@ class KNNModel(AbstractModel):
         return self.model
 
     def _more_tags(self):
-        return {'valid_oof': True}
+        return {
+            'valid_oof': True,
+            'can_refit_full': True,
+        }
 
 
 class FAISSModel(KNNModel):

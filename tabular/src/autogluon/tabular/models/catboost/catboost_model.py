@@ -159,21 +159,42 @@ class CatBoostModel(AbstractModel):
 
         logger.log(15, f'\tCatboost model hyperparameters: {params}')
 
+        extra_fit_kwargs = dict()
+        if params.get('task_type', None) != 'GPU':
+            callbacks = []
+            if early_stopping_rounds is not None:
+                callbacks.append(EarlyStoppingCallback(stopping_rounds=early_stopping_rounds, eval_metric=params['eval_metric']))
+
+            if num_rows_train * num_cols_train * num_classes > 5_000_000:
+                # The data is large enough to potentially cause memory issues during training, so monitor memory usage via callback.
+                callbacks.append(MemoryCheckCallback())
+            if time_limit is not None:
+                time_cur = time.time()
+                time_left = time_limit - (time_cur - time_start)
+                if time_left <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+                    raise TimeLimitExceeded
+                callbacks.append(TimeCheckCallback(time_start=time_cur, time_limit=time_left))
+            extra_fit_kwargs['callbacks'] = callbacks
+        else:
+            logger.log(30, f'\tWarning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.')
+            if time_limit is not None:
+                params['iterations'] = self._estimate_iter_in_time_gpu(
+                    X=X,
+                    eval_set=eval_set,
+                    time_limit=time_limit,
+                    verbose=verbose,
+                    params=params,
+                    num_rows_train=num_rows_train,
+                    time_start=time_start,
+                    model_type=model_type,
+                )
+            if early_stopping_rounds is not None:
+                if isinstance(early_stopping_rounds, int):
+                    extra_fit_kwargs['early_stopping_rounds'] = early_stopping_rounds
+                elif isinstance(early_stopping_rounds, tuple):
+                    extra_fit_kwargs['early_stopping_rounds'] = 50
+
         self.model = model_type(**params)
-
-        callbacks = []
-        if early_stopping_rounds is not None:
-            callbacks.append(EarlyStoppingCallback(stopping_rounds=early_stopping_rounds, eval_metric=params['eval_metric']))
-
-        if num_rows_train * num_cols_train * num_classes > 5_000_000:
-            # The data is large enough to potentially cause memory issues during training, so monitor memory usage via callback.
-            callbacks.append(MemoryCheckCallback())
-        if time_limit is not None:
-            time_cur = time.time()
-            time_left = time_limit - (time_cur - time_start)
-            if time_left <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
-                raise TimeLimitExceeded
-            callbacks.append(TimeCheckCallback(time_start=time_cur, time_limit=time_left))
 
         # TODO: Custom metrics don't seem to work anymore
         # TODO: Custom metrics not supported in GPU mode
@@ -181,8 +202,7 @@ class CatBoostModel(AbstractModel):
         fit_final_kwargs = dict(
             eval_set=eval_set,
             verbose=verbose,
-            # early_stopping_rounds=early_stopping_rounds,  # Disabled in favor of ES callback
-            callbacks=callbacks,
+            **extra_fit_kwargs,
         )
 
         if eval_set is not None:
@@ -191,6 +211,53 @@ class CatBoostModel(AbstractModel):
         self.model.fit(X, **fit_final_kwargs)
 
         self.params_trained['iterations'] = self.model.tree_count_
+
+    # FIXME: This logic is a hack made to maintain compatibility with GPU CatBoost.
+    #  GPU CatBoost does not support callbacks or custom metrics.
+    #  Since we use callbacks to check memory and training time in CPU mode, we need a way to estimate these things prior to training for GPU mode.
+    #  This method will train a model on a toy number of iterations to estimate memory and training time.
+    #  It will return an updated iterations to train on that will avoid running OOM and running over time limit.
+    #  Remove this logic once CatBoost fixes GPU support for callbacks and custom metrics.
+    def _estimate_iter_in_time_gpu(self, *, X, eval_set, time_limit, verbose, params, num_rows_train, time_start, model_type):
+        import math
+        import pickle
+        import sys
+
+        modifier = min(1.0, 10000 / num_rows_train)
+        num_sample_iter_max = max(round(modifier * 50), 2)
+        time_left_start = time_limit - (time.time() - time_start)
+        if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+            raise TimeLimitExceeded
+        default_iters = params['iterations']
+        params_init = params.copy()
+        num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
+        params_init['iterations'] = num_sample_iter
+        sample_model = model_type(
+            **params_init,
+        )
+        sample_model.fit(
+            X,
+            eval_set=eval_set,
+            use_best_model=True,
+            verbose=verbose,
+        )
+
+        time_left_end = time_limit - (time.time() - time_start)
+        time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
+        estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
+
+        available_mem = psutil.virtual_memory().available
+        if self.problem_type == SOFTCLASS:
+            model_size_bytes = 1  # skip memory check
+        else:
+            model_size_bytes = sys.getsizeof(pickle.dumps(sample_model))
+
+        max_memory_proportion = 0.3
+        mem_usage_per_iter = model_size_bytes / num_sample_iter
+        max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
+
+        final_iters = min(default_iters, min(max_memory_iters, estimated_iters_in_time))
+        return final_iters
 
     def _predict_proba(self, X, **kwargs):
         if self.problem_type != SOFTCLASS:
@@ -235,3 +302,7 @@ class CatBoostModel(AbstractModel):
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
+
+    def _more_tags(self):
+        # `can_refit_full=True` because iterations is communicated at end of `_fit`
+        return {'can_refit_full': True}

@@ -2,20 +2,21 @@
 
 In 2022, our top priorities are:
 
-- [ ] Windows OS Support
-- [ ] Python 3.9 Support
+- [x] (v0.4) Windows OS Support
+- [x] (v0.4) Python 3.9 Support
 - [ ] Time-Series Support
-- [ ] HuggingFace Integration
+- [x] (v0.4) HuggingFace Integration
 - [ ] Improved Multi-modal Modeling
 - [ ] Advance SOTA in Stack Ensemble Research (Deeper Stack Ensembles)
-- [ ] Cloud Training & Deployment
-- [ ] Parallel Model Training
+- [x] (v0.4) Cloud Training & Deployment
+- [x] (v0.4) Parallel Model Training
 - [ ] Parallel Hyperparameter Tuning
 - [ ] Distributed Model Training
 - [ ] Distributed Hyperparameter Tuning
-- [ ] Semi-supervised Learning
+- [x] (v0.4) Semi-supervised Learning
+- [x] (v0.4) Automated Model Calibration via Temperature Scaling
 - [ ] Enhanced Model Distillation
-- [ ] Online Inference Optimization
+- [x] (v0.4) Online Inference Optimization
 - [ ] Meta-Learning
 - [ ] Improved Large-scale Data Handling (10M+ Rows)
 - [ ] Improved Feature Type Inference
@@ -30,22 +31,24 @@ In 2022, our top priorities are:
 - [ ] Model Calibration (Conformal Methods)
 - [ ] Image Model Inference Optimization
 - [ ] Text Model Inference Optimization
+- [ ] Advanced Custom Model Tutorial
 
-## AutoGluon 0.4 Release, Due: January 2022
+## AutoGluon 0.4 Features, Released: March 2022
+
+[v0.4 Release Notes](https://github.com/awslabs/autogluon/releases/tag/v0.4.0)
 
 ### Themes and Major Features
 
-- [ ] Windows OS Support
+- [x] Windows OS Support
 - [x] Python 3.9 Support
-- [ ] HuggingFace Integration
-- [ ] Torch Migration (Remove MXNet dependency)
+- [x] HuggingFace Integration
+- [x] Torch Migration (Remove MXNet dependency)
 - [x] Parallel Model Training (2x training speed-up for bagging/stacking)
 - [x] Automated Feature Pruning/Selection
 - [x] Semi-supervised & Transductive Learning Support
 - [x] Automated Model Calibration via Temperature Scaling
 - [x] Cloud Training & Deployment Tutorials
 - [x] Feature Preprocessing Tutorial
-- [ ] Advanced Custom Model Tutorial
 - [x] Documentation Overhaul
 - [x] Hyperparameter Tuning Overhaul
 - [x] Memory Usage Optimizations

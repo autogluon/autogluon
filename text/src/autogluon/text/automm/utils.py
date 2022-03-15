@@ -9,6 +9,7 @@ import collections
 import torch
 from torch.nn.modules.container import ModuleList
 import warnings
+from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
@@ -35,6 +36,10 @@ from .constants import (
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
+)
+from .presets import (
+    list_model_presets,
+    get_preset,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -143,6 +148,8 @@ def get_config(
     -------
     Configurations as a DictConfig object
     """
+    if config is None:
+        config = get_preset(list_model_presets()[0])
     if not isinstance(config, DictConfig):
         all_configs = []
         for k, v in config.items():
@@ -343,62 +350,69 @@ def init_data_processors(
     if isinstance(names, str):
         names = [names]
 
-    image_processors = []
-    text_processors = []
-    categorical_processors = []
-    numerical_processors = []
-    label_processors = []
+    data_processors = {
+        IMAGE: [],
+        TEXT: [],
+        CATEGORICAL: [],
+        NUMERICAL: [],
+        LABEL: [],
+    }
     for model_name in names:
         model_config = getattr(config.model, model_name)
         # each model has its own label processor
-        label_processors.append(
+        data_processors[LABEL].append(
             LabelProcessor(prefix=model_name)
         )
         if model_config.data_types is None:
             continue
         for d_type in model_config.data_types:
             if d_type == IMAGE:
-                image_processors.append(
-                    ImageProcessor(prefix=model_name,
-                                   checkpoint_name=model_config.checkpoint_name,
-                                   train_transform_types=model_config.train_transform_types,
-                                   val_transform_types=model_config.val_transform_types,
-                                   norm_type=model_config.image_norm,
-                                   size=model_config.image_size,
-                                   max_img_num_per_col=model_config.max_img_num_per_col)
+                data_processors[IMAGE].append(
+                    ImageProcessor(
+                        prefix=model_name,
+                        checkpoint_name=model_config.checkpoint_name,
+                        train_transform_types=model_config.train_transform_types,
+                        val_transform_types=model_config.val_transform_types,
+                        norm_type=model_config.image_norm,
+                        size=model_config.image_size,
+                        max_img_num_per_col=model_config.max_img_num_per_col,
+                        missing_value_strategy=config.data.image.missing_value_strategy,
+                    )
                 )
             elif d_type == TEXT:
-                text_processors.append(
-                    TextProcessor(prefix=model_name,
-                                  tokenizer_name=model_config.tokenizer_name,
-                                  checkpoint_name=model_config.checkpoint_name,
-                                  max_len=model_config.max_text_len,
-                                  insert_sep=model_config.insert_sep,
-                                  text_segment_num=model_config.text_segment_num,
-                                  stochastic_chunk=model_config.stochastic_chunk)
+                data_processors[TEXT].append(
+                    TextProcessor(
+                        prefix=model_name,
+                        tokenizer_name=model_config.tokenizer_name,
+                        checkpoint_name=model_config.checkpoint_name,
+                        max_len=model_config.max_text_len,
+                        insert_sep=model_config.insert_sep,
+                        text_segment_num=model_config.text_segment_num,
+                        stochastic_chunk=model_config.stochastic_chunk,
+                    )
                 )
             elif d_type == CATEGORICAL:
-                categorical_processors.append(
-                    CategoricalProcessor(prefix=model_name,
-                                         num_categorical_columns=num_categorical_columns)
+                data_processors[CATEGORICAL].append(
+                    CategoricalProcessor(
+                        prefix=model_name,
+                        num_categorical_columns=num_categorical_columns,
+                    )
                 )
             elif d_type == NUMERICAL:
-                numerical_processors.append(
-                    NumericalProcessor(prefix=model_name,
-                                       merge=model_config.merge)
+                data_processors[NUMERICAL].append(
+                    NumericalProcessor(
+                        prefix=model_name,
+                        merge=model_config.merge,
+                    )
                 )
             else:
                 raise ValueError(f"unknown data type: {d_type}")
 
-    assert len(label_processors) > 0
+    assert len(data_processors[LABEL]) > 0
 
-    return {
-        IMAGE: image_processors,
-        TEXT: text_processors,
-        CATEGORICAL: categorical_processors,
-        NUMERICAL: numerical_processors,
-        LABEL: label_processors
-    }
+    # Only keep the modalities with non-empty processors.
+    data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+    return data_processors
 
 
 def create_model(
@@ -795,3 +809,90 @@ def apply_omegaconf_overrides(
     override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
+
+
+class LogFilter(logging.Filter):
+    """
+    Filter log messages with patterns.
+    """
+
+    def __init__(self, blacklist: Union[str, List[str]]):
+        """
+        Parameters
+        ----------
+        blacklist
+            Patterns to be suppressed in logging.
+        """
+        super().__init__()
+        if isinstance(blacklist, str):
+            blacklist = [blacklist]
+        self._blacklist = blacklist
+
+    def filter(self, record):
+        """
+        Check whether to suppress a logging message.
+
+        Parameters
+        ----------
+        record
+            A logging message.
+
+        Returns
+        -------
+        If True, no pattern exists in the message, hence printed out.
+        If False, some pattern is in the message, hence filtered out.
+        """
+        matches = [pattern not in record.msg for pattern in self._blacklist]
+        return all(matches)
+
+
+def add_log_filter(target_logger, log_filter):
+    """
+    Add one log filter to the target logger.
+
+    Parameters
+    ----------
+    target_logger
+        Target logger
+    log_filter
+        Log filter
+    """
+    for handler in target_logger.handlers:
+        handler.addFilter(log_filter)
+
+
+def remove_log_filter(target_logger, log_filter):
+    """
+    Remove one log filter to the target logger.
+
+    Parameters
+    ----------
+    target_logger
+        Target logger
+    log_filter
+        Log filter
+    """
+    for handler in target_logger.handlers:
+        handler.removeFilter(log_filter)
+
+
+@contextmanager
+def apply_log_filter(log_filter):
+    """
+    User contextmanager to control the scope of applying one log filter.
+    Currently, it is to filter some pytorch lightning's log messages.
+    But we can easily extend it to cover more loggers.
+
+    Parameters
+    ----------
+    log_filter
+        Log filter.
+    """
+    try:
+        add_log_filter(logging.getLogger(), log_filter)
+        add_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+        yield
+
+    finally:
+        remove_log_filter(logging.getLogger(), log_filter)
+        remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)

@@ -6,16 +6,19 @@ from torchvision import transforms
 import PIL
 from .randaug import RandAugment
 from timm import create_model
-from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, \
-    IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+from timm.data.constants import (
+    IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD,
+)
 from transformers import AutoConfig
 from ..constants import (
-    IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD,
+    IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD, AUTOMM,
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class ImageProcessor:
@@ -33,6 +36,7 @@ class ImageProcessor:
             norm_type: Optional[str] = None,
             size: Optional[int] = None,
             max_img_num_per_col: Optional[int] = 1,
+            missing_value_strategy: Optional[str] = False,
     ):
         """
         Parameters
@@ -59,12 +63,19 @@ class ImageProcessor:
             The width / height of a square image.
         max_img_num_per_col
             The maximum number of images one sample can have.
+        missing_value_strategy
+            How to deal with a missing image. We now support:
+            - skip
+                Skip this sample
+            -zero
+                Use an image with zero pixels.
         """
         self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
         logger.debug(f"image training transform type: {train_transform_types}")
         logger.debug(f"image validation transform type: {val_transform_types}")
+        self.missing_value_strategy = missing_value_strategy
         self.size = None
         self.mean = None
         self.std = None
@@ -246,6 +257,7 @@ class ImageProcessor:
         A dictionary containing one sample's images and their number.
         """
         images = []
+        zero_images = []
         for per_col_image_paths in image_paths:
             for img_path in per_col_image_paths[:self.max_img_num_per_col]:
                 with warnings.catch_warnings():
@@ -255,15 +267,29 @@ class ImageProcessor:
                                 "expressed in bytes should be "
                                 "converted to RGBA images"
                     )
-                    img = PIL.Image.open(img_path).convert("RGB")
+                    is_zero_img = False
+                    try:
+                        img = PIL.Image.open(img_path).convert("RGB")
+                    except Exception as e:
+                        if self.missing_value_strategy.lower() == "zero":
+                            logger.debug(f"Using a zero image due to '{e}'")
+                            img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                            is_zero_img = True
+                        else:
+                            raise e
+
                 if is_training:
                     img = self.train_processor(img)
                 else:
                     img = self.val_processor(img)
-                images.append(img)
+
+                if is_zero_img:
+                    zero_images.append(img)
+                else:
+                    images.append(img)
 
         return {
-            f"{self.prefix}_{IMAGE}": torch.stack(images),
+            f"{self.prefix}_{IMAGE}": torch.stack(images+zero_images),
             f"{self.prefix}_{IMAGE_VALID_NUM}": len(images),
         }
 

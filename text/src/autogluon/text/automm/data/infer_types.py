@@ -1,6 +1,5 @@
 import collections
 import pandas as pd
-from pandas.api.types import is_string_dtype
 import warnings
 import PIL
 from typing import Union, Optional, List, Dict, Tuple

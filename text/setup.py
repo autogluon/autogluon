@@ -25,6 +25,7 @@ install_requires = [
     'Pillow',
     'tqdm',
     'boto3',
+    'timm',
     'fairscale>=0.4.5,<0.5.0',
     'scikit-image>=0.19.1,<0.20.0',
     'smart_open>=5.2.1,<5.3.0',
@@ -33,9 +34,9 @@ install_requires = [
     'transformers>=4.16.2,<4.17.0',
     'nptyping>=1.4.4,<1.5.0',
     'omegaconf>=2.1.1,<2.2.0',
-    'timm>=0.5.4,<0.6.0',
     'sentencepiece>=0.1.95,<0.2.0',
     f'autogluon.core=={version}',
+    f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',
 ]

@@ -16,9 +16,12 @@ from sklearn.base import (
     TransformerMixin,
     BaseEstimator,
 )
-from ..constants import CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH, NULL
+from ..constants import (
+    CATEGORICAL, NUMERICAL, TEXT,
+    IMAGE_PATH, NULL, AUTOMM
+)
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):

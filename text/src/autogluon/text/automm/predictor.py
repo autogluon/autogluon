@@ -24,7 +24,8 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
-    Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM
+    Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
+    AUTOMM_TUTORIAL_MODE,
 )
 
 from .data.datamodule import BaseDataModule
@@ -41,6 +42,8 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
+    LogFilter,
+    apply_log_filter,
     save_pretrained_model,
     load_pretrained_configs,
 )
@@ -70,6 +73,7 @@ class AutoMMPredictor:
             path: Optional[str] = None,
             verbosity: Optional[int] = 3,
             warn_if_exist: Optional[bool] = True,
+            enable_progress_bar: Optional[bool] = None,
     ):
         """
         Parameters
@@ -99,28 +103,26 @@ class AutoMMPredictor:
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         warn_if_exist
             Whether to raise warning if the specified path already exists.
+        enable_progress_bar
+            Whether to show progress bar. It will be True by default and will also be
+            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
         """
-        self.verbosity = verbosity
-        if self.verbosity is not None:
-            set_logger_verbosity(self.verbosity, logger=logger)
-
-        self._label_column = label
-
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2"]:
             problem_type = REGRESSION
 
+        if os.environ.get(AUTOMM_TUTORIAL_MODE):
+            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
+            enable_progress_bar = False
+
+        if verbosity is not None:
+            set_logger_verbosity(verbosity, logger=logger)
+
+        self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
-
         self._eval_metric_name = eval_metric
-
-        if path is not None:
-            path = setup_outputdir(
-                path=path,
-                warn_if_exist=warn_if_exist,
-            )
         self._validation_metric_name = None
         self._output_shape = None
         self._save_path = path
@@ -132,6 +134,9 @@ class AutoMMPredictor:
         self._data_processors = None
         self._model = None
         self._resume = False
+        self._verbosity = verbosity
+        self._warn_if_exist = warn_if_exist
+        self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
     @property
     def path(self):
@@ -145,9 +150,9 @@ class AutoMMPredictor:
     def problem_type(self):
         return self._problem_type
 
+    # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
-        self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
+        set_logger_verbosity(verbosity, logger=logger)
 
     def fit(
             self,
@@ -160,7 +165,6 @@ class AutoMMPredictor:
             column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
-            init_only: Optional[bool] = False,
     ):
         """
         Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
@@ -238,9 +242,7 @@ class AutoMMPredictor:
             and whether hyper-parameter-tuning is utilized.
         seed
             The random seed to use for this training run.
-        init_only
-            Whether to only initialize the model without training. This can be used when we want to
-            compare the model performance before and after training.
+
         Returns
         -------
         An "AutoMMPredictor" object (itself).
@@ -266,7 +268,7 @@ class AutoMMPredictor:
         if not self._resume:
             save_path = setup_outputdir(
                 path=save_path,
-                warn_if_exist=True,
+                warn_if_exist=self._warn_if_exist,
             )
         logger.debug(f"save path: {save_path}")
 
@@ -341,6 +343,9 @@ class AutoMMPredictor:
         else:  # continuing training
             data_processors = self._data_processors
 
+        data_processors_count = {k: len(v) for k, v in data_processors.items()}
+        logger.debug(f"data_processors_count: {data_processors_count}")
+
         if self._model is None:
             model = create_model(
                 config=config,
@@ -393,9 +398,6 @@ class AutoMMPredictor:
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
 
-        if init_only:
-            return self
-
         self._fit(
             train_df=train_data,
             val_df=tuning_data,
@@ -410,6 +412,7 @@ class AutoMMPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
+            enable_progress_bar=self._enable_progress_bar,
         )
         return self
 
@@ -428,6 +431,7 @@ class AutoMMPredictor:
             minmax_mode: str,
             max_time: timedelta,
             save_path: str,
+            enable_progress_bar: bool,
     ):
 
         train_dm = BaseDataModule(
@@ -501,43 +505,66 @@ class AutoMMPredictor:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * config.env.num_nodes
             )
-            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
+            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU.
+                            # Try to check the status of bf16 training later.
         else:
             grad_steps = config.env.batch_size // (
                     config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
             )
             precision = config.env.precision
 
+            if precision == 'bf16' and not torch.cuda.is_bf16_supported():
+                warnings.warn('bf16 is not supported by the GPU device / cuda version. '
+                              'Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. '
+                              'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
+                precision = 32
+
         if num_gpus <= 1:
             strategy = None
         else:
             strategy = config.env.strategy
 
-        trainer = pl.Trainer(
-            gpus=num_gpus,
-            auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
-            num_nodes=config.env.num_nodes,
-            precision=precision,
-            strategy=strategy,
-            benchmark=False,
-            deterministic=config.env.deterministic,
-            max_epochs=config.optimization.max_epochs,
-            max_steps=config.optimization.max_steps,
-            max_time=max_time,
-            callbacks=callbacks,
-            logger=tb_logger,
-            gradient_clip_val=1,
-            gradient_clip_algorithm="norm",
-            accumulate_grad_batches=grad_steps,
-            log_every_n_steps=10,
-            fast_dev_run=config.env.fast_dev_run,
-            val_check_interval=config.optimization.val_check_interval,
-        )
-        trainer.fit(
-            task,
-            datamodule=train_dm,
-            ckpt_path=self._ckpt_path,  # this is to resume training that was broken accidentally
-        )
+        blacklist_msgs = ["already configured with model summary"]
+        log_filter = LogFilter(blacklist_msgs)
+        with apply_log_filter(log_filter):
+            trainer = pl.Trainer(
+                gpus=num_gpus,
+                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                num_nodes=config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                deterministic=config.env.deterministic,
+                max_epochs=config.optimization.max_epochs,
+                max_steps=config.optimization.max_steps,
+                max_time=max_time,
+                callbacks=callbacks,
+                logger=tb_logger,
+                gradient_clip_val=1,
+                gradient_clip_algorithm="norm",
+                accumulate_grad_batches=grad_steps,
+                log_every_n_steps=10,
+                enable_progress_bar=enable_progress_bar,
+                fast_dev_run=config.env.fast_dev_run,
+                val_check_interval=config.optimization.val_check_interval,
+            )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                ".* in the `DataLoader` init to improve performance.*"
+            )
+            warnings.filterwarnings(
+                "ignore",
+                "Checkpoint directory .* exists and is not empty."
+            )
+            trainer.fit(
+                task,
+                datamodule=train_dm,
+                ckpt_path=self._ckpt_path,  # this is to resume training that was broken accidentally
+            )
 
         if trainer.global_rank == 0:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
@@ -574,7 +601,6 @@ class AutoMMPredictor:
         # For prediction data with no labels provided.
         if not requires_label:
             data_processors.pop(LABEL, None)
-        logger.debug(f"data_processors for prediction: {data_processors.keys()}")
 
         num_gpus = (
             self._config.env.num_gpus
@@ -595,6 +621,11 @@ class AutoMMPredictor:
             precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
         else:
             precision = self._config.env.precision
+            if precision == 'bf16' and not torch.cuda.is_bf16_supported():
+                warnings.warn('bf16 is not supported by the GPU device / cuda version. '
+                              'Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. '
+                              'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
+                precision = 32
 
         if num_gpus > 1:
             strategy = "dp"
@@ -616,21 +647,38 @@ class AutoMMPredictor:
             model=self._model,
         )
 
-        evaluator = pl.Trainer(
-            gpus=num_gpus,
-            auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
-            num_nodes=self._config.env.num_nodes,
-            precision=precision,
-            strategy=strategy,
-            benchmark=False,
-            deterministic=self._config.env.deterministic,
-            logger=False,
-        )
+        blacklist_msgs = []
+        if self._verbosity <= 3:  # turn off logging in prediction
+            blacklist_msgs.append("Automatic Mixed Precision")
+            blacklist_msgs.append("GPU available")
+            blacklist_msgs.append("TPU available")
+            blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("LOCAL_RANK")
+        log_filter = LogFilter(blacklist_msgs)
+        with apply_log_filter(log_filter):
+            evaluator = pl.Trainer(
+                gpus=num_gpus,
+                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
+                num_nodes=self._config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                enable_progress_bar=self._enable_progress_bar,
+                deterministic=self._config.env.deterministic,
+                logger=False,
+            )
 
-        outputs = evaluator.predict(
-            task,
-            datamodule=predict_dm,
-        )
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    ".*does not have many workers which may be a bottleneck. "
+                    "Consider increasing the value of the `num_workers` argument` "
+                    ".* in the `DataLoader` init to improve performance.*"
+                )
+                outputs = evaluator.predict(
+                    task,
+                    datamodule=predict_dm,
+                )
         if ret_type == LOGITS:
             logits = [ele[LOGITS] for ele in outputs]
             ret = torch.cat(logits)
@@ -702,7 +750,7 @@ class AutoMMPredictor:
                 )
             score = compute_score(
                 metric_data=metric_data,
-                metric_name=per_metric,
+                metric_name=per_metric.lower(),
             )
             results[per_metric] = score
 
@@ -731,6 +779,7 @@ class AutoMMPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+
         logits = self._predict(
             data=data,
             ret_type=LOGITS,

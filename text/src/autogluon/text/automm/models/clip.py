@@ -4,8 +4,8 @@ from torch import nn
 from transformers import CLIPModel
 from .utils import assign_layer_ids
 from ..constants import (
-    IMAGE, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH,
-    LABEL, LOGITS, FEATURES, AUTOMM
+    IMAGE, IMAGE_VALID_NUM, TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH, LABEL, LOGITS, FEATURES, AUTOMM
 )
 from typing import Optional
 from .utils import init_weights
@@ -48,6 +48,7 @@ class CLIPForImageText(nn.Module):
         self.text_token_ids_key = f"{prefix}_{TEXT_TOKEN_IDS}"
         self.text_valid_length_key = f"{prefix}_{TEXT_VALID_LENGTH}"
         self.image_key = f"{prefix}_{IMAGE}"
+        self.image_valid_num_key = f"{prefix}_{IMAGE_VALID_NUM}"
         self.label_key = f"{prefix}_{LABEL}"
 
         self.name_to_id = self.get_layer_ids()
@@ -70,22 +71,27 @@ class CLIPForImageText(nn.Module):
         """
         text_token_ids = batch[self.text_token_ids_key]
         text_valid_length = batch[self.text_valid_length_key]
-        image = batch[self.image_key]
+        images = batch[self.image_key]
+        image_valid_num = batch[self.image_valid_num_key]
 
         steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
         text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
-
-        # Image batch has shape (batch_size, image_num, 3, height, width).
-        # Currently, we only support image_num=1 for CLIP input.
-        if image.dim() == 5 and image.shape[1] == 1:
-            image = torch.squeeze(image, dim=1)
-        assert image.dim() == 4
-
         assert torch.equal(text_valid_length, text_masks.sum(dim=-1))
 
-        image_features = self.model.get_image_features(pixel_values=image)
-        text_features = self.model.get_text_features(input_ids=text_token_ids,
-                                                     attention_mask=text_masks)
+        assert images.dim() == 5
+        b, n, c, h, w = images.shape
+        image_features = self.model.get_image_features(
+            pixel_values=images.reshape((b * n, c, h, w)),
+        )
+        steps = torch.arange(0, n).type_as(image_valid_num)
+        image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(image_features)  # (b, n)
+        image_features = image_features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
+        image_features = image_features.sum(dim=1)  # (b, num_features)
+
+        text_features = self.model.get_text_features(
+            input_ids=text_token_ids,
+            attention_mask=text_masks,
+        )
         # Here we add up the text and image embeddings
         features = image_features + text_features
         logits = self.head(features)
