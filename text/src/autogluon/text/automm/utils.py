@@ -546,6 +546,16 @@ def load_pretrained_configs(
     config: DictConfig,
     path: str
 ) -> DictConfig:  
+    '''
+    Load the pretrained weights for offline deployment. Used by turing "standalone=True" in predictor. 
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    path
+        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
+    '''
     setattr(config,'pretrained',True)
     for model_name in config.model.names:
         if model_name == "clip" or "hf_text" in model_name:
