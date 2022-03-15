@@ -1400,6 +1400,7 @@ class TabularPredictor:
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
             This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
+            If `self.sample_weight` is set and `self.weight_evaluation==True`, then a column with the sample weight name is checked and used for weighted metric evaluation if it exists.
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
@@ -1419,10 +1420,14 @@ class TabularPredictor:
         self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
         y_pred_proba = self.predict_proba(data=data, model=model)
-        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
+        if self.sample_weight is not None and self.weight_evaluation and self.sample_weight in data:
+            sample_weight = data[self.sample_weight]
+        else:
+            sample_weight = None
+        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, sample_weight=sample_weight, silent=silent,
                                          auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
         Evaluation is based on the `eval_metric` previously specified in init, or default metrics if none was specified.
@@ -1435,6 +1440,8 @@ class TabularPredictor:
             The ordered collection of prediction probabilities or predictions.
             Obtainable via the output of `predictor.predict_proba`.
             Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
+        sample_weight : :class:`pd.Series`, default = None
+            Sample weight for each row of data. If None, uniform sample weights are used.
         silent : bool, default = False
             If False, performance results are printed.
         auxiliary_metrics: bool, default = True
@@ -1448,7 +1455,7 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
-        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, silent=silent,
+        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
