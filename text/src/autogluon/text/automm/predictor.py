@@ -44,7 +44,7 @@ from .utils import (
     get_config,
     LogFilter,
     apply_log_filter,
-    save_pretrained_model,
+    save_pretrained_configs,
     load_pretrained_configs,
 )
 from .optimization.utils import (
@@ -922,7 +922,7 @@ class AutoMMPredictor:
 
         if standalone:
             logger.debug(f"Using the standalone=True for saving pretrained models")
-            self._config = save_pretrained_model(
+            self._config = save_pretrained_configs(
                 model=self._model.model,
                 config=self._config, 
                 path=path
@@ -1022,12 +1022,8 @@ class AutoMMPredictor:
             num_classes=assets["output_shape"],
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
             num_categories=df_preprocessor.categorical_num_categories,
-            pretrained=config.pretrained
+            pretrained=False # set "pretrain=False" to prevent downloading online models
         )
-
-        for idx, model_name in enumerate(config.model.names):
-            if  model_name == "timm_image" and not config.pretrained:
-                model.model[idx].model.load_state_dict(torch.load(config.timm_save_path))
 
         resume_ckpt_path = os.path.join(path, "last.ckpt")
         final_ckpt_path = os.path.join(path, "model.ckpt")

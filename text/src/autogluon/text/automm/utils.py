@@ -522,13 +522,14 @@ def create_model(
     else:
         raise ValueError(f"No available models for {names}")
 
-def save_pretrained_model(
+def save_pretrained_configs(
     model: ModuleList,
     config: DictConfig,
     path: str
 ) -> DictConfig:
     '''
-    Saving the pretrained weights for offline deployment. Used by turing "standalone=True" in predictor. 
+    Saving the pretrained configs for offline deployment. 
+    Used by setting "standalone=True" in "AutoMMPredictor.load()". 
 
     Parameters
     ----------
@@ -537,21 +538,12 @@ def save_pretrained_model(
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
+        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text"
     '''
     for idx, model_name in enumerate(config.model.names):
         if model_name == "clip" or "hf_text" in model_name:
             model[idx].model.save_pretrained(os.path.join(path,model_name))
             model_config = getattr(config.model, model_name)
-            model_config.checkpoint_name = os.path.join('local://',model_name)
-        if model_name == "timm_image":
-            model_config = getattr(config.model, model_name)
-            if not os.path.exists(os.path.join(path,model_name)):
-                os.makedirs(os.path.join(path,model_name))
-            torch.save(
-                model[idx].model.state_dict(),
-                os.path.join(path,model_name,model_config.checkpoint_name+'.pth')
-            )
             model_config.checkpoint_name = os.path.join('local://',model_name)
     return config
 
@@ -561,7 +553,8 @@ def load_pretrained_configs(
     path: str
 ) -> DictConfig:  
     '''
-    Load the pretrained weights for offline deployment. Used by turing "standalone=True" in predictor. 
+    Load the pretrained weights for offline deployment. 
+    Used by setting "standalone=True" in "AutoMMPredictor.load()". 
 
     Parameters
     ----------
@@ -570,23 +563,14 @@ def load_pretrained_configs(
     path
         The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
     '''
-    setattr(config,'pretrained',True)
     for model_name in config.model.names:
         if model_name == "clip" or "hf_text" in model_name:
             model_config = getattr(config.model,model_name)
             if model_config.checkpoint_name.startswith('local://'):
                 model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name[len('local://'):])
-                assert os.path.exists(os.path.join(model_config.checkpoint_name,'config.json'))
+                assert os.path.exists(os.path.join(model_config.checkpoint_name,'config.json')) # guarantee the existence of local configs
                 assert os.path.exists(os.path.join(model_config.checkpoint_name,'pytorch_model.bin'))
-        if model_name == "timm_image":
-            model_config = getattr(config.model,model_name)
-            if model_config.checkpoint_name.startswith('local://'):
-                timm_save_path = os.path.join(path,model_config.checkpoint_name[len('local://'):])
-                assert len(os.listdir(timm_save_path)) > 0
-                model_config.checkpoint_name = os.listdir(timm_save_path)[0][:-4]
-                setattr(config,'pretrained',False)
-                setattr(config,'timm_save_path',os.path.join(timm_save_path,model_config.checkpoint_name + '.pth'))
-
+                
     return config    
 
 def make_exp_dir(
