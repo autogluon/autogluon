@@ -224,7 +224,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=10,
+        time_limit=30,
         save_path=save_path,
     )
 

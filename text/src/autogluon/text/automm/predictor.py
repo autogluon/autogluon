@@ -41,6 +41,8 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
+    save_pretrained_model,
+    load_pretrained_configs,
 )
 from .optimization.utils import (
     get_metric,
@@ -864,27 +866,18 @@ class AutoMMPredictor:
             The directory to save this predictor.
         standalone
             Whether to save the downloaded model for offline deployment. 
-            When standalong = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
+            When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml. 
-            When standalong = False, does not save the model, and requires online environment to download in load().
+            When standalone = False, does not save the model, and requires online environment to download in load().
         """
 
         if standalone:
-            logger.debug(f"Using the standalone=True")
-            for idx, model_name in enumerate(self._config.model.names):
-                if model_name == "clip" or "hf_text" in model_name:
-                    self._model.model[idx].model.save_pretrained(os.path.join(path,model_name))
-                    model_config = getattr(self._config.model, model_name)
-                    model_config.checkpoint_name = os.path.join('local://',model_name)
-                if model_name == "timm_image":
-                    model_config = getattr(self._config.model, model_name)
-                    if not os.path.exists(os.path.join(path,model_name)):
-                        os.makedirs(os.path.join(path,model_name))
-                    torch.save(
-                        self._model.model[idx].model.state_dict(),
-                        os.path.join(path,model_name,model_config.checkpoint_name+'.pkl')
-                    )
-                    model_config.checkpoint_name = os.path.join('local://',model_name)
+            logger.debug(f"Using the standalone=True for saving pretrained models")
+            self._config = save_pretrained_model(
+                model=self._model.model,
+                config=self._config, 
+                path=path
+            )
 
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(
@@ -950,22 +943,7 @@ class AutoMMPredictor:
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
-        pretrained = True
-        for model_name in config.model.names:
-            if model_name == "clip" or "hf_text" in model_name:
-                model_config = getattr(config.model,model_name)
-                if model_config.checkpoint_name.startswith('local://'):
-                    model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name[len('local://'):])
-                    assert os.path.exists(os.path.join(model_config.checkpoint_name,'config.json'))
-                    assert os.path.exists(os.path.join(model_config.checkpoint_name,'pytorch_model.bin'))
-            if model_name == "timm_image":
-                model_config = getattr(config.model,model_name)
-                if model_config.checkpoint_name.startswith('local://'):
-                    timm_save_path = os.path.join(path,model_config.checkpoint_name[len('local://'):])
-                    assert len(os.listdir(timm_save_path)) > 0
-                    model_config.checkpoint_name = os.listdir(timm_save_path)[0][:-4]
-                    timm_save_path = os.path.join(timm_save_path,model_config.checkpoint_name + '.pkl')
-                    pretrained = False
+        config = load_pretrained_configs(config=config, path=path) # check the config for loading offline pretrained models
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)
@@ -995,12 +973,12 @@ class AutoMMPredictor:
             num_classes=assets["output_shape"],
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
             num_categories=df_preprocessor.categorical_num_categories,
-            pretrained=pretrained
+            pretrained=config.pretrained
         )
 
         for idx, model_name in enumerate(config.model.names):
-            if  model_name == "timm_image" and not pretrained:
-                model.model[idx].model.load_state_dict(torch.load(timm_save_path))
+            if  model_name == "timm_image" and not config.pretrained:
+                model.model[idx].model.load_state_dict(torch.load(config.timm_save_path))
 
         resume_ckpt_path = os.path.join(path, "last.ckpt")
         final_ckpt_path = os.path.join(path, "model.ckpt")
