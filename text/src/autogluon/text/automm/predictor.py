@@ -566,14 +566,51 @@ class AutoMMPredictor:
 
         if trainer.global_rank == 0:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
+            # Obtain the best K models sorted from the best performance to the worst performance
+            if minmax_mode == 'min':
+                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()))
+            elif minmax_mode == 'max':
+                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()), reverse=True)
+            else:
+                raise ValueError(f'Unsupported minmax_mode={minmax_mode}')
+            print(best_k_models_sorted)
+
             all_state_dicts, ckpt_template = gather_top_k_ckpts(
                 ckpt_dir=save_path,
-                ckpt_paths=checkpoint_callback.best_k_models.keys(),
+                ckpt_paths=best_k_models_sorted,
             )
+            if config.optimization.top_k_average_type == 'greedy_soup':
+                logger.info(f'Start to ensemble {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
+                avg_state_dict = all_state_dicts[0]
+                ingredients = [all_state_dicts[0]]
+                model = self._load_state_dict(
+                    model=model,
+                    state_dict=avg_state_dict,
+                )
+                self._model = model
+                best_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                for i in range(1, len(all_state_dicts)):
+                    cand_avg_state_dict = average_checkpoints(
+                        all_state_dicts=ingredients + [all_state_dicts[i]],
+                        out_path=top_k_avg_ckpt_path,
+                        ckpt_template=ckpt_template
+                    )
+                    model = self._load_state_dict(
+                        model=model,
+                        state_dict=cand_avg_state_dict,
+                    )
+                    self._model = model
+                    cand_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                    if minmax_mode == 'min' and cand_performance < best_performance or \
+                       minmax_mode == 'max' and cand_performance > best_performance:
+                        ingredients.append(all_state_dicts[i])
+            else:
+                ingredients = all_state_dicts
+            # Average all the ingredients
             avg_state_dict = average_checkpoints(
-                all_state_dicts=all_state_dicts,
+                all_state_dicts=ingredients,
                 out_path=top_k_avg_ckpt_path,
-                ckpt_template=ckpt_template,
+                ckpt_template=ckpt_template
             )
             model = self._load_state_dict(
                 model=model,
@@ -581,6 +618,7 @@ class AutoMMPredictor:
             )
 
             self._model = model
+
         else:
             sys.exit(
                 f"Training finished, exit the process with global_rank={trainer.global_rank}..."
