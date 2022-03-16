@@ -33,6 +33,7 @@ from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 
 from .utils import (
+    convert_checkpoint_name,
     create_model,
     init_df_preprocessor,
     init_data_processors,
@@ -45,7 +46,7 @@ from .utils import (
     LogFilter,
     apply_log_filter,
     save_pretrained_configs,
-    load_pretrained_configs,
+    convert_checkpoint_name,
 )
 from .optimization.utils import (
     get_metric,
@@ -992,7 +993,7 @@ class AutoMMPredictor:
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
-        config = load_pretrained_configs(config=config, path=path) # check the config for loading offline pretrained models
+        config = convert_checkpoint_name(config=config, path=path) # check the config for loading offline pretrained models
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)

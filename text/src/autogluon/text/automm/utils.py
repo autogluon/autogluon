@@ -529,7 +529,7 @@ def save_pretrained_configs(
 ) -> DictConfig:
     '''
     Saving the pretrained configs for offline deployment. 
-    Used by setting "standalone=True" in "AutoMMPredictor.load()". 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
 
     Parameters
     ----------
@@ -548,13 +548,13 @@ def save_pretrained_configs(
     return config
 
 
-def load_pretrained_configs(
+def convert_checkpoint_name(
     config: DictConfig,
     path: str
 ) -> DictConfig:  
     '''
-    Load the pretrained weights for offline deployment. 
-    Used by setting "standalone=True" in "AutoMMPredictor.load()". 
+    Convert the checkpoint name from relative path to absolute path for loading the pretrained weights in offline deployment. 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
 
     Parameters
     ----------
