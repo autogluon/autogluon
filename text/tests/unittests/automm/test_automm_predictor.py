@@ -208,7 +208,9 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name":"prajjwal1/bert-tiny",
-        "model.timm_image.checkpoint_name":"swin_tiny_patch4_window7_224"
+        "model.timm_image.checkpoint_name":"swin_tiny_patch4_window7_224",
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
     }
 
     predictor = AutoMMPredictor(
@@ -235,9 +237,12 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         standalone = True
     )
 
+    del predictor
     torch.cuda.empty_cache()
 
     loaded_online_predictor = AutoMMPredictor.load(path = save_path)
+    online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
+    del loaded_online_predictor
 
     # Check if the predictor can be loaded from an offline enivronment.
     with requests_gag:
@@ -246,12 +251,10 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
             torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
             loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
 
-
-    # predictions = predictor.predict(dataset.test_df, as_pandas=False) 
-    online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
+ 
     offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
-    
+    del loaded_offline_predictor
+
     # check if save with standalone=True coincide with standalone=False
-    # npt.assert_equal(predictions,offline_predictions)
     npt.assert_equal(online_predictions,offline_predictions)
 
