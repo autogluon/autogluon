@@ -33,6 +33,7 @@ from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 
 from .utils import (
+    convert_checkpoint_name,
     create_model,
     init_df_preprocessor,
     init_data_processors,
@@ -44,6 +45,8 @@ from .utils import (
     get_config,
     LogFilter,
     apply_log_filter,
+    save_pretrained_configs,
+    convert_checkpoint_name,
 )
 from .optimization.utils import (
     get_metric,
@@ -899,7 +902,11 @@ class AutoMMPredictor:
         model.load_state_dict(state_dict)
         return model
 
-    def save(self, path: str):
+    def save(
+            self, 
+            path: str,
+            standalone: Optional[bool] = False
+    ):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -907,7 +914,21 @@ class AutoMMPredictor:
         ----------
         path
             The directory to save this predictor.
+        standalone
+            Whether to save the downloaded model for offline deployment. 
+            When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
+            and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml. 
+            When standalone = False, does not save the model, and requires online environment to download in load().
         """
+
+        if standalone:
+            # logger.debug(f"Using the standalone=True for saving pretrained models")
+            self._config = save_pretrained_configs(
+                model=self._model.model,
+                config=self._config, 
+                path=path
+            )
+
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(
             config=self._config,
@@ -971,6 +992,9 @@ class AutoMMPredictor:
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
+
+        config = convert_checkpoint_name(config=config, path=path) # check the config for loading offline pretrained models
+
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)
         with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
@@ -998,7 +1022,8 @@ class AutoMMPredictor:
             config=config,
             num_classes=assets["output_shape"],
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-            num_categories=df_preprocessor.categorical_num_categories
+            num_categories=df_preprocessor.categorical_num_categories,
+            pretrained=False # set "pretrain=False" to prevent downloading online models
         )
 
         resume_ckpt_path = os.path.join(path, "last.ckpt")
