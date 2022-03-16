@@ -604,6 +604,7 @@ class AutoMMPredictor:
                     if minmax_mode == 'min' and cand_performance < best_performance or \
                        minmax_mode == 'max' and cand_performance > best_performance:
                         ingredients.append(all_state_dicts[i])
+                        best_performance = cand_performance
             else:
                 ingredients = all_state_dicts
             # Average all the ingredients
