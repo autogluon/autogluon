@@ -568,16 +568,21 @@ class AutoMMPredictor:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
             # Obtain the best K models sorted from the best performance to the worst performance
             if minmax_mode == 'min':
-                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()))
+                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
+                                              key=lambda ele: ele[1])
+                best_k_models_path = [ele[0] for ele in best_k_models_sorted]
             elif minmax_mode == 'max':
-                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()), reverse=True)
+                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
+                                              key=lambda ele: ele[1],
+                                              reverse=True)
+                best_k_models_path = [ele[0] for ele in best_k_models_sorted]
             else:
                 raise ValueError(f'Unsupported minmax_mode={minmax_mode}')
             print(best_k_models_sorted)
 
             all_state_dicts, ckpt_template = gather_top_k_ckpts(
                 ckpt_dir=save_path,
-                ckpt_paths=best_k_models_sorted,
+                ckpt_paths=best_k_models_path,
             )
             if config.optimization.top_k_average_type == 'greedy_soup':
                 logger.info(f'Start to ensemble {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
