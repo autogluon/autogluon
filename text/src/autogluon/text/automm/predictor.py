@@ -578,13 +578,14 @@ class AutoMMPredictor:
                 best_k_models_path = [ele[0] for ele in best_k_models_sorted]
             else:
                 raise ValueError(f'Unsupported minmax_mode={minmax_mode}')
-            print(best_k_models_sorted)
 
             all_state_dicts, ckpt_template = gather_top_k_ckpts(
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
+            print(config.optimization.top_k_average_type)
             if config.optimization.top_k_average_type == 'greedy_soup':
+                print('In GreedySoup averaging')
                 logger.info(f'Start to ensemble {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
                 avg_state_dict = all_state_dicts[0]
                 ingredients = [all_state_dicts[0]]
