@@ -14,6 +14,7 @@ from torch.nn.modules.loss import _Loss
 import torch.nn.functional as F
 import torchmetrics
 from omegaconf import OmegaConf, DictConfig
+import operator
 import pytorch_lightning as pl
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
@@ -587,10 +588,9 @@ class AutoMMPredictor:
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
-            print(config.optimization.top_k_average_type)
+
             if config.optimization.top_k_average_type == 'greedy_soup':
-                monitor_op = {"min": torch.lt, "max": torch.gt}[minmax_mode]
-                print('In GreedySoup averaging')
+                monitor_op = {"min": operator.lt, "max": operator.gt}[minmax_mode]
                 logger.info(f'Start to ensemble {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
                 avg_state_dict = all_state_dicts[0]
                 ingredients = [all_state_dicts[0]]
