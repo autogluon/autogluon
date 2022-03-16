@@ -579,21 +579,25 @@ class AutoMMPredictor:
             else:
                 raise ValueError(f'Unsupported minmax_mode={minmax_mode}')
 
+            # TODO(?) Currently, all top-K checkpoints are loaded to the main memory.
+            #  If the checkpoints are really large (e.g., super-giant backbones), this operation can take a lot of
+            #  CPU memory and may potentially trigger memory issue. Consider to optimize that using the
+            #  offload strategy.
             all_state_dicts, ckpt_template = gather_top_k_ckpts(
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
             print(config.optimization.top_k_average_type)
             if config.optimization.top_k_average_type == 'greedy_soup':
+                monitor_op = {"min": torch.lt, "max": torch.gt}[minmax_mode]
                 print('In GreedySoup averaging')
                 logger.info(f'Start to ensemble {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
                 avg_state_dict = all_state_dicts[0]
                 ingredients = [all_state_dicts[0]]
-                model = self._load_state_dict(
+                self._model = self._load_state_dict(
                     model=model,
                     state_dict=avg_state_dict,
                 )
-                self._model = model
                 best_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                 for i in range(1, len(all_state_dicts)):
                     cand_avg_state_dict = average_checkpoints(
@@ -601,14 +605,13 @@ class AutoMMPredictor:
                         out_path=top_k_avg_ckpt_path,
                         ckpt_template=ckpt_template
                     )
-                    model = self._load_state_dict(
-                        model=model,
+                    self._model = self._load_state_dict(
+                        model=self._model,
                         state_dict=cand_avg_state_dict,
                     )
-                    self._model = model
                     cand_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                    if minmax_mode == 'min' and cand_performance < best_performance or \
-                       minmax_mode == 'max' and cand_performance > best_performance:
+                    if monitor_op(cand_performance, best_performance):
+                        # Add new ingredient
                         ingredients.append(all_state_dicts[i])
                         best_performance = cand_performance
             else:
@@ -619,12 +622,10 @@ class AutoMMPredictor:
                 out_path=top_k_avg_ckpt_path,
                 ckpt_template=ckpt_template
             )
-            model = self._load_state_dict(
+            self._model = self._load_state_dict(
                 model=model,
                 state_dict=avg_state_dict,
             )
-
-            self._model = model
 
         else:
             sys.exit(
