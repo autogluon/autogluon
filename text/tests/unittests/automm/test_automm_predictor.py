@@ -137,6 +137,8 @@ def test_predictor(
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": model_names,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
     }
     if text_backbone is not None:
         hyperparameters.update({
