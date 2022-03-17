@@ -26,7 +26,6 @@ install_requires = [
     'tqdm',
     'boto3',
     'timm',
-    'setuptools<59.6.0',
     'fairscale>=0.4.5,<0.5.0',
     'scikit-image>=0.19.1,<0.20.0',
     'smart_open>=5.2.1,<5.3.0',
