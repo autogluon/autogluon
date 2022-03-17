@@ -589,9 +589,12 @@ class AutoMMPredictor:
                 ckpt_paths=best_k_models_path,
             )
 
+            # Select the ingredients based on the methods proposed in paper
+            #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
+            #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
             if config.optimization.top_k_average_type == 'greedy_soup':
                 monitor_op = {"min": operator.lt, "max": operator.gt}[minmax_mode]
-                logger.info(f'Start to ensemble {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
+                logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
                 avg_state_dict = all_state_dicts[0]
                 ingredients = [all_state_dicts[0]]
                 self._model = self._load_state_dict(
@@ -614,8 +617,11 @@ class AutoMMPredictor:
                         # Add new ingredient
                         ingredients.append(all_state_dicts[i])
                         best_performance = cand_performance
-            else:
+            elif config.optimization.top_k_average_type == 'union_soup':
+                logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the UnionSoup algorithm.')
                 ingredients = all_state_dicts
+            else:
+                ingredients = [all_state_dicts[0]]
             # Average all the ingredients
             avg_state_dict = average_checkpoints(
                 all_state_dicts=ingredients,

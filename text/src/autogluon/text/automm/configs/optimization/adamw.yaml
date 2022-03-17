@@ -14,4 +14,5 @@ optimization:
   val_check_interval: 0.5
   top_k: 3
   top_k_average_type: 'greedy_soup'  # We support averaging method described in https://arxiv.org/pdf/2203.05482.pdf.
-                                     # Currently support "union_soup" and "greedy_soup"
+                                     # Currently support "union_soup" and "greedy_soup".
+                                     # For other keys, the best model will be used.
