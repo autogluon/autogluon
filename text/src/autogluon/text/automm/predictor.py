@@ -34,7 +34,6 @@ from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 
 from .utils import (
-    convert_checkpoint_name,
     create_model,
     init_df_preprocessor,
     init_data_processors,
