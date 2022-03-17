@@ -54,12 +54,14 @@ def verify_predictor_save_load(predictor, df,
     "model_names,"
     "text_backbone,"
     "image_backbone",
+    "top_k_average_method",
     [
         (
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
+            "greedy_soup"
         ),
 
         (
@@ -67,6 +69,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
+            "union_soup"
         ),
 
         (
@@ -74,6 +77,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "swin_tiny_patch4_window7_224",
+            "greedy_soup"
         ),
 
         (
@@ -81,6 +85,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             None,
+            "union_soup"
         ),
 
         (
@@ -88,6 +93,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
+            "other_soup"
         ),
 
         (
@@ -95,6 +101,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
+            "other_soup"
         ),
 
         (
@@ -102,6 +109,7 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
+            "other_soup"
         ),
 
         (
@@ -109,6 +117,7 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
+            "other_soup"
         ),
 
     ]
@@ -118,7 +127,7 @@ def test_predictor(
         model_names,
         text_backbone,
         image_backbone,
-        # score,
+        top_k_average_method,
 ):
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
@@ -137,6 +146,7 @@ def test_predictor(
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": model_names,
+        "optimization.top_k_average_method": top_k_average_method,
     }
     if text_backbone is not None:
         hyperparameters.update({
