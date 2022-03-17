@@ -7,6 +7,7 @@ import pandas as pd
 import pickle
 import collections
 import torch
+from torch.nn.modules.container import ModuleList
 import warnings
 from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
@@ -419,6 +420,7 @@ def create_model(
         num_classes: int,
         num_numerical_columns: Optional[int] = None,
         num_categories: Optional[List[int]] = None,
+        pretrained: Optional[bool] = True,
 ):
     """
     Create models. It supports the auto models of huggingface text and timm image.
@@ -435,6 +437,8 @@ def create_model(
         The number of numerical columns in the training dataframe.
     num_categories
         The category number for each categorical column in the training dataframe.
+    pretrained
+        Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
 
     Returns
     -------
@@ -461,6 +465,7 @@ def create_model(
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
                 mix_choice=model_config.mix_choice,
+                pretrained=pretrained,
             )
         elif "hf_text" in model_name:
             model = HFAutoModelForTextPrediction(
@@ -517,6 +522,56 @@ def create_model(
     else:
         raise ValueError(f"No available models for {names}")
 
+def save_pretrained_configs(
+    model: ModuleList,
+    config: DictConfig,
+    path: str
+) -> DictConfig:
+    '''
+    Saving the pretrained configs for offline deployment. 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+
+    Parameters
+    ----------
+    model
+        A modulelist containing all models.
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    path
+        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text"
+    '''
+    for idx, model_name in enumerate(config.model.names):
+        if model_name == "clip" or "hf_text" in model_name:
+            model[idx].model.save_pretrained(os.path.join(path,model_name))
+            model_config = getattr(config.model, model_name)
+            model_config.checkpoint_name = os.path.join('local://',model_name)
+    return config
+
+
+def convert_checkpoint_name(
+    config: DictConfig,
+    path: str
+) -> DictConfig:  
+    '''
+    Convert the checkpoint name from relative path to absolute path for loading the pretrained weights in offline deployment. 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    path
+        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
+    '''
+    for model_name in config.model.names:
+        if model_name == "clip" or "hf_text" in model_name:
+            model_config = getattr(config.model,model_name)
+            if model_config.checkpoint_name.startswith('local://'):
+                model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name[len('local://'):])
+                assert os.path.exists(os.path.join(model_config.checkpoint_name,'config.json')) # guarantee the existence of local configs
+                assert os.path.exists(os.path.join(model_config.checkpoint_name,'pytorch_model.bin'))
+                
+    return config    
 
 def make_exp_dir(
         root_path: str,

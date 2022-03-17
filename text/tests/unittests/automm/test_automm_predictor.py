@@ -146,6 +146,8 @@ def test_predictor(
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": model_names,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": top_k_average_method,
     }
     if text_backbone is not None:
@@ -192,3 +194,79 @@ def test_predictor(
             hyperparameters=hyperparameters,
             time_limit=30,
         )
+
+
+def test_standalone(): # test standalong feature in AutoMMPredictor.save()
+    from unittest import mock
+    import torch
+
+    requests_gag = mock.patch(
+        'requests.Session.request',
+        mock.Mock(side_effect=RuntimeError(
+            'Please use the `responses` library to mock HTTP in your tests.'
+        ))
+    )
+
+    dataset = PetFinderDataset()
+
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.hf_text.checkpoint_name":"prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name":"swin_tiny_patch4_window7_224",
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+    }
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+
+    save_path = os.path.join(get_home_dir(), "standalone", "false")
+
+
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=30,
+        save_path=save_path,
+    )
+
+    save_path_standalone = os.path.join(get_home_dir(), "standalone", "true")
+
+    predictor.save(
+        path = save_path_standalone,
+        standalone = True
+    )
+
+    del predictor
+    torch.cuda.empty_cache()
+
+    loaded_online_predictor = AutoMMPredictor.load(path = save_path)
+    online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
+    del loaded_online_predictor
+
+    # Check if the predictor can be loaded from an offline enivronment.
+    with requests_gag:
+        # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
+            loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
+
+
+    offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
+    del loaded_offline_predictor
+
+    # check if save with standalone=True coincide with standalone=False
+    npt.assert_equal(online_predictions,offline_predictions)
+

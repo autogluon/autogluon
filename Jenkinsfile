@@ -178,9 +178,11 @@ stage("Unit Test") {
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
           ${install_text}
+          # launch different process for each test to make sure memory is released
+          python3 -m pip install --upgrade pytest-xdist
 
           cd text/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
         }
       }
