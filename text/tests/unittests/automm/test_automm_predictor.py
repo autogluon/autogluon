@@ -50,11 +50,7 @@ def verify_predictor_save_load(predictor, df,
 
 
 @pytest.mark.parametrize(
-    "dataset_name,"
-    "model_names,"
-    "text_backbone,"
-    "image_backbone",
-    "top_k_average_method",
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method",
     [
         (
             "petfinder",
