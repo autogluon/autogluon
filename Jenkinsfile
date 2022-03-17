@@ -49,6 +49,7 @@ install_tabular_all = """
 """
 
 install_text = """
+    python3 -m pip install https://github.com/PyTorchLightning/pytorch-lightning/archive/bc81207.zip
     python3 -m pip install --upgrade -e text/
 """
 
