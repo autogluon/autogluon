@@ -1,11 +1,12 @@
 import copy
+import inspect
 import logging
 import os
 import platform
 import time
 from collections import Counter
 from statistics import mean
-from typing import Union
+from typing import Dict, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -32,11 +33,31 @@ class BaggedEnsembleModel(AbstractModel):
     Bagged ensemble meta-model which fits a given model multiple times across different splits of the training data.
 
     For certain child models such as KNN, this may only train a single model and instead rely on the child model to generate out-of-fold predictions.
+
+    Parameters
+    ----------
+    model_base : Union[AbstractModel, Type[AbstractModel]]
+        The base model to repeatedly fit during bagging.
+        If a AbstractModel class, then also provide model_base_kwargs which will be used to initialize the model via model_base(**model_base_kwargs).
+    model_base_kwargs : Dict[str, any], default = None
+        kwargs used to initialize model_base if model_base is a class.
+    random_state : int, default = 0
+        Random state used to split the data into cross-validation folds during fit.
+    **kwargs
+        Refer to AbstractModel documentation
     """
     _oof_filename = 'oof.pkl'
 
-    def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
-        self.model_base = model_base
+    def __init__(self, model_base: Union[AbstractModel, Type[AbstractModel]], model_base_kwargs: Dict[str, any] = None, random_state: int = 0, **kwargs):
+        if inspect.isclass(model_base):
+            if model_base_kwargs is None:
+                model_base_kwargs = dict()
+            self.model_base: AbstractModel = model_base(**model_base_kwargs)
+        elif model_base_kwargs is not None:
+            raise AssertionError(f'model_base_kwargs must be None if model_base was passed as an object! '
+                                 f'(model_base: {model_base}, model_base_kwargs: {model_base_kwargs})')
+        else:
+            self.model_base: AbstractModel = model_base
         self._child_type = type(self.model_base)
         self.models = []
         self._oof_pred_proba = None

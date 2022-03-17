@@ -25,14 +25,19 @@ class TestLocalSearcher(unittest.TestCase):
         assert searcher.get_best_reward() == 0.2
         assert searcher.get_best_config() == config1
 
+        assert searcher.get_results() == [({'param1': 'hello', 7: 42}, 0.2)]
+
         searcher.update(config1, reward=0.1)
         assert searcher.get_best_reward() == 0.1
         assert searcher.get_best_config() == config1
+
+        assert searcher.get_results() == [({'param1': 'hello', 7: 42}, 0.1)]
 
         searcher.update(config2, reward=0.7)
         assert searcher.get_best_reward() == 0.7
         assert searcher.get_best_config() == config2
 
+        assert searcher.get_results() == [({'param1': 'world', 7: 42}, 0.7), ({'param1': 'hello', 7: 42}, 0.1)]
         assert len(searcher._results) == 2
         # This config is technically invalid, but for performance reasons is allowed to avoid having to pickle compare static parameters.
         # Since the static parameter should be fixed, this config is treated as being equivalent to config2
@@ -47,6 +52,7 @@ class TestLocalSearcher(unittest.TestCase):
         self.assertRaises(AssertionError, searcher.update, config_invalid_7, reward=0)
         self.assertRaises(AssertionError, searcher.update, config1, reward='invalid_reward')
         assert len(searcher._results) == 2
+        assert searcher.get_results() == [({'param1': 'hello', 7: 42}, 0.1), ({'param1': 'world', 7: 42}, 0)]
 
     def test_local_searcher_pickle(self):
         search_space = {1: Categorical(1, 2), 2: Categorical(1, 2)}

@@ -320,8 +320,14 @@ def model_factory(
     model_params = copy.deepcopy(model)
     model_params.pop(AG_ARGS, None)
     model_params.pop(AG_ARGS_ENSEMBLE, None)
-    model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
-                            hyperparameters=model_params)
+
+    model_init_kwargs = dict(
+        path=path,
+        name=name,
+        problem_type=problem_type,
+        eval_metric=eval_metric,
+        hyperparameters=model_params,
+    )
 
     if ensemble_kwargs is not None:
         ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
@@ -330,8 +336,10 @@ def model_factory(
         if ensemble_kwargs_model['hyperparameters'] is None:
             ensemble_kwargs_model['hyperparameters'] = {}
         ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
-        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init,
+        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_type, model_base_kwargs=model_init_kwargs,
                                    **ensemble_kwargs_model)
+    else:
+        model_init = model_type(**model_init_kwargs)
 
     return model_init
 
