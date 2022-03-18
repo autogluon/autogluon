@@ -571,7 +571,7 @@ class AutoMMPredictor:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
             # Obtain the best K models sorted from the best performance to the worst performance
             best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
-                                          key=lambda ele: ele[1], reverse=(minmax_mode == 'max'))
+                                          key=lambda ele: ele[1], reverse=(minmax_mode == MAX))
             best_k_models_path = [ele[0] for ele in best_k_models_sorted]
 
             # TODO(?) Currently, all top-K checkpoints are loaded to the main memory.
@@ -599,7 +599,7 @@ class AutoMMPredictor:
                         candidate_performance.append(self.evaluate(val_df,
                                                                    [validation_metric_name])[validation_metric_name])
                     all_state_dicts = [v[0] for v in sorted(zip(all_state_dicts, candidate_performance),
-                                                            key=lambda ele: ele[1], reverse=(minmax_mode == 'max'))]
+                                                            key=lambda ele: ele[1], reverse=(minmax_mode == MAX))]
                 if config.optimization.top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
