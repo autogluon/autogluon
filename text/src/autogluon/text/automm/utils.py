@@ -802,7 +802,8 @@ def apply_omegaconf_overrides(
     if check_key_exist:
         for ele in overrides.items():
             if not _check_exist_dotlist(conf, ele[0]):
-                raise KeyError(f'Key "{ele[0]}" is not found in the config.')
+                raise KeyError(f'"{ele[0]}" is not found in the config. You may need to check the overrides. '
+                               f'overrides={overrides}')
     override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
