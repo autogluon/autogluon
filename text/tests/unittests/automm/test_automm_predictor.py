@@ -89,7 +89,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
-            "other_soup"
+            "max"
         ),
 
         (
@@ -97,7 +97,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
-            "other_soup"
+            "union_soup"
         ),
 
         (
@@ -105,7 +105,7 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
-            "other_soup"
+            "max"
         ),
 
         (
@@ -113,7 +113,7 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
-            "other_soup"
+            "max"
         ),
 
     ]

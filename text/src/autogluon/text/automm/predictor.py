@@ -570,17 +570,9 @@ class AutoMMPredictor:
         if trainer.global_rank == 0:
             top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
             # Obtain the best K models sorted from the best performance to the worst performance
-            if minmax_mode == 'min':
-                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
-                                              key=lambda ele: ele[1])
-                best_k_models_path = [ele[0] for ele in best_k_models_sorted]
-            elif minmax_mode == 'max':
-                best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
-                                              key=lambda ele: ele[1],
-                                              reverse=True)
-                best_k_models_path = [ele[0] for ele in best_k_models_sorted]
-            else:
-                raise ValueError(f'Unsupported minmax_mode={minmax_mode}')
+            best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
+                                          key=lambda ele: ele[1], reverse=(minmax_mode == 'max'))
+            best_k_models_path = [ele[0] for ele in best_k_models_sorted]
 
             # TODO(?) Currently, all top-K checkpoints are loaded to the main memory.
             #  If the checkpoints are really large (e.g., super-giant backbones), this operation can take a lot of
@@ -590,40 +582,59 @@ class AutoMMPredictor:
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
-
-            # Select the ingredients based on the methods proposed in paper
-            #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
-            #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-            if config.optimization.top_k_average_method == 'greedy_soup':
-                monitor_op = {"min": operator.lt, "max": operator.gt}[minmax_mode]
-                logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
-                avg_state_dict = all_state_dicts[0]
-                ingredients = [all_state_dicts[0]]
-                self._model = self._load_state_dict(
-                    model=model,
-                    state_dict=avg_state_dict,
-                )
-                best_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                for i in range(1, len(all_state_dicts)):
-                    cand_avg_state_dict = average_checkpoints(
-                        all_state_dicts=ingredients + [all_state_dicts[i]],
-                        out_path=top_k_avg_ckpt_path,
-                        ckpt_template=ckpt_template
-                    )
-                    self._model = self._load_state_dict(
-                        model=self._model,
-                        state_dict=cand_avg_state_dict,
-                    )
-                    cand_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                    if monitor_op(cand_performance, best_performance):
-                        # Add new ingredient
-                        ingredients.append(all_state_dicts[i])
-                        best_performance = cand_performance
-            elif config.optimization.top_k_average_method == 'union_soup':
+            if config.optimization.top_k_average_method == 'union_soup':
                 logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the UnionSoup algorithm.')
                 ingredients = all_state_dicts
             else:
-                ingredients = [all_state_dicts[0]]
+                if not best_k_models_path:
+                    # In the case of ddp_spawn, the best_k_models_path can be empty. This is due the
+                    # limitation of PT Lightning: https://github.com/PyTorchLightning/pytorch-lightning/issues/5582
+                    # Thus, we will need to reevaluate the validation performance of these checkpoints
+                    candidate_performance = []
+                    for cand_state_dict in all_state_dicts:
+                        self._model = self._load_state_dict(
+                            model=model,
+                            state_dict=cand_state_dict,
+                        )
+                        candidate_performance.append(self.evaluate(val_df,
+                                                                   [validation_metric_name])[validation_metric_name])
+                    all_state_dicts = [v[0] for v in sorted(zip(all_state_dicts, candidate_performance),
+                                                            key=lambda ele: ele[1], reverse=(minmax_mode == 'max'))]
+                if config.optimization.top_k_average_method == 'greedy_soup':
+                    # Select the ingredients based on the methods proposed in paper
+                    #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
+                    #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
+                    monitor_op = {"min": operator.lt, "max": operator.gt}[minmax_mode]
+
+                    logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
+                    avg_state_dict = all_state_dicts[0]
+                    ingredients = [all_state_dicts[0]]
+                    self._model = self._load_state_dict(
+                        model=model,
+                        state_dict=avg_state_dict,
+                    )
+                    best_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                    for i in range(1, len(all_state_dicts)):
+                        cand_avg_state_dict = average_checkpoints(
+                            all_state_dicts=ingredients + [all_state_dicts[i]],
+                            out_path=top_k_avg_ckpt_path,
+                            ckpt_template=ckpt_template
+                        )
+                        self._model = self._load_state_dict(
+                            model=self._model,
+                            state_dict=cand_avg_state_dict,
+                        )
+                        cand_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                        if monitor_op(cand_performance, best_performance):
+                            # Add new ingredient
+                            ingredients.append(all_state_dicts[i])
+                            best_performance = cand_performance
+                elif config.optimization.top_k_average_method == 'best':
+                    ingredients = [all_state_dicts[0]]
+                else:
+                    raise ValueError(f'The key for "optimization.top_k_average_method" is not supported. '
+                                     f'We only support "greedy_soup", "union_soup" and "best". '
+                                     f'The provided value is {config.optimization.top_k_average_method}.')
             # Average all the ingredients
             avg_state_dict = average_checkpoints(
                 all_state_dicts=ingredients,
