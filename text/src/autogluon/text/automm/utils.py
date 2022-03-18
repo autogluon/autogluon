@@ -788,9 +788,21 @@ def apply_omegaconf_overrides(
     """
     overrides = parse_dotlist_conf(overrides)
 
+    def _check_exist_dotlist(C, key_in_dotlist):
+        if not isinstance(key_in_dotlist, list):
+            key_in_dotlist = key_in_dotlist.split('.')
+        if key_in_dotlist[0] in C:
+            if len(key_in_dotlist) > 1:
+                return _check_exist_dotlist(C[key_in_dotlist], key_in_dotlist[1:])
+            else:
+                return True
+        else:
+            return False
+
     if check_key_exist:
         for ele in overrides.items():
-            OmegaConf.select(conf, ele[0], throw_on_missing=True)
+            if not _check_exist_dotlist(conf, ele[0]):
+                raise KeyError(f'Key "{ele[0]}" is not found in the config.')
     override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf

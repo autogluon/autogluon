@@ -26,3 +26,6 @@ def test_apply_omegaconf_overrides():
     new_conf2 = apply_omegaconf_overrides(conf, {'a.aa.aaa': [1, 3, 5, 7], 'a.aa.bbb': 4})
     assert new_conf2.a.aa.aaa == [1, 3, 5, 7]
     assert new_conf2.a.aa.bbb == 4
+
+    with pytest.raises(KeyError):
+        new_conf3 = apply_omegaconf_overrides(conf, {'a.aa.aaaaaa': [1, 3, 5, 7], 'a.aa.bbb': 4})
