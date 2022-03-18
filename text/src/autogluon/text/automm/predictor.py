@@ -604,7 +604,7 @@ class AutoMMPredictor:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-                    monitor_op = {"min": operator.lt, "max": operator.gt}[minmax_mode]
+                    monitor_op = {"min": operator.le, "max": operator.ge}[minmax_mode]
 
                     logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
                     avg_state_dict = all_state_dicts[0]
