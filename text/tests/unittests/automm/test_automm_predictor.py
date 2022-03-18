@@ -12,6 +12,9 @@ from autogluon.text.automm.constants import (
     ENVIRONMENT,
     BINARY,
     MULTICLASS,
+    UNION_SOUP,
+    GREEDY_SOUP,
+    BEST_SOUP,
 )
 from datasets import (
     PetFinderDataset,
@@ -57,7 +60,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
-            "greedy_soup"
+            GREEDY_SOUP
         ),
 
         (
@@ -65,7 +68,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
-            "union_soup"
+            UNION_SOUP
         ),
 
         (
@@ -73,7 +76,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "swin_tiny_patch4_window7_224",
-            "greedy_soup"
+            GREEDY_SOUP
         ),
 
         (
@@ -81,7 +84,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             None,
-            "union_soup"
+            UNION_SOUP
         ),
 
         (
@@ -89,7 +92,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
-            "best"
+            BEST_SOUP
         ),
 
         (
@@ -97,7 +100,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
-            "union_soup"
+            UNION_SOUP
         ),
 
         (
@@ -105,7 +108,7 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
-            "best"
+            BEST_SOUP
         ),
 
         (
@@ -113,7 +116,7 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
-            "best"
+            BEST_SOUP
         ),
 
     ]

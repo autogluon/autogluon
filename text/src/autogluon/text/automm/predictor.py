@@ -26,7 +26,7 @@ from autogluon.common.utils.utils import setup_outputdir
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
-    AUTOMM_TUTORIAL_MODE,
+    AUTOMM_TUTORIAL_MODE, UNION_SOUP, GREEDY_SOUP, BEST_SOUP
 )
 
 from .data.datamodule import BaseDataModule
@@ -582,7 +582,7 @@ class AutoMMPredictor:
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
-            if config.optimization.top_k_average_method == 'union_soup':
+            if config.optimization.top_k_average_method == UNION_SOUP:
                 logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the UnionSoup algorithm.')
                 ingredients = all_state_dicts
             else:
@@ -600,7 +600,7 @@ class AutoMMPredictor:
                                                                    [validation_metric_name])[validation_metric_name])
                     all_state_dicts = [v[0] for v in sorted(zip(all_state_dicts, candidate_performance),
                                                             key=lambda ele: ele[1], reverse=(minmax_mode == 'max'))]
-                if config.optimization.top_k_average_method == 'greedy_soup':
+                if config.optimization.top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
@@ -629,11 +629,11 @@ class AutoMMPredictor:
                             # Add new ingredient
                             ingredients.append(all_state_dicts[i])
                             best_performance = cand_performance
-                elif config.optimization.top_k_average_method == 'best':
+                elif config.optimization.top_k_average_method == BEST_SOUP:
                     ingredients = [all_state_dicts[0]]
                 else:
                     raise ValueError(f'The key for "optimization.top_k_average_method" is not supported. '
-                                     f'We only support "greedy_soup", "union_soup" and "best". '
+                                     f'We only support "{GREEDY_SOUP}", "{UNION_SOUP}" and "{BEST_SOUP}". '
                                      f'The provided value is {config.optimization.top_k_average_method}.')
             # Average all the ingredients
             avg_state_dict = average_checkpoints(
