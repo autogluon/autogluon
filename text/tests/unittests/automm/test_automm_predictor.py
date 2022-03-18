@@ -89,7 +89,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
-            "max"
+            "best"
         ),
 
         (
@@ -105,7 +105,7 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
-            "max"
+            "best"
         ),
 
         (
@@ -113,7 +113,7 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
-            "max"
+            "best"
         ),
 
     ]
