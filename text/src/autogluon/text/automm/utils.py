@@ -793,7 +793,7 @@ def apply_omegaconf_overrides(
             key_in_dotlist = key_in_dotlist.split('.')
         if key_in_dotlist[0] in C:
             if len(key_in_dotlist) > 1:
-                return _check_exist_dotlist(C[key_in_dotlist], key_in_dotlist[1:])
+                return _check_exist_dotlist(C[key_in_dotlist[0]], key_in_dotlist[1:])
             else:
                 return True
         else:
