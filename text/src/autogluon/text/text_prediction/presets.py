@@ -12,19 +12,29 @@ def list_text_presets(verbose=False):
         "default": {
             "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
             "optimization.lr_decay": 0.9,
+            "model.hf_text.max_text_len": 256,
+            "optimization.top_k_average_method": "greedy_soup",
         },
         "medium_quality_faster_train": {
             "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
             "optimization.learning_rate": 4e-4,
             "optimization.lr_decay": 0.9,
+            "model.hf_text.max_text_len": 512,
+            "optimization.top_k_average_method": "union_soup",
         },
+        # TODO(?) Revise to use registry
         "high_quality": {
             "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+            "optimization.lr_decay": 0.9,
+            "model.hf_text.max_text_len": 256,
+            "optimization.top_k_average_method": "greedy_soup",
         },
         "best_quality": {
             "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
             "optimization.lr_decay": 0.9,
+            "model.hf_text.max_text_len": 256,
             "env.per_gpu_batch_size": 2,
+            "optimization.top_k_average_method": "greedy_soup",
         },
         "multilingual": {
             "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
@@ -32,6 +42,7 @@ def list_text_presets(verbose=False):
             "optimization.lr_decay": 0.9,
             "env.precision": 'bf16',
             "env.per_gpu_batch_size": 4,
+            "optimization.top_k_average_method": "greedy_soup",
         },
     }
 
