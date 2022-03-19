@@ -1,12 +1,15 @@
+import logging
 import collections
 import pandas as pd
 import warnings
 import PIL
 from typing import Union, Optional, List, Dict, Tuple
 from ..constants import (
-    NULL, CATEGORICAL, NUMERICAL, TEXT,
-    IMAGE_PATH, MULTICLASS, BINARY, REGRESSION,
+    NULL, CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH,
+    MULTICLASS, BINARY, REGRESSION, AUTOMM
 )
+
+logger = logging.getLogger(AUTOMM)
 
 
 def is_categorical_column(
@@ -104,7 +107,10 @@ def is_numerical_column(
         return False
 
 
-def is_imagepath_column(data: pd.Series) -> bool:
+def is_imagepath_column(
+    data: pd.Series,
+    col_name: str,
+) -> bool:
     """
     Identify if a column is one image-path column.
     Here it counts the failures when trying PIL.Image.open() on a sampled subset.
@@ -114,6 +120,8 @@ def is_imagepath_column(data: pd.Series) -> bool:
     ----------
     data
         One column of a multimodal pd.DataFrame for training.
+    col_name
+        Name of column.
 
     Returns
     -------
@@ -138,6 +146,15 @@ def is_imagepath_column(data: pd.Series) -> bool:
 
     # Tolerate high failure rate in case that many image files may be corrupted.
     if failure_ratio <= 0.9:
+        if failure_ratio > 0:
+            logger.warning(
+                f"Among {sample_num} sampled images in column '{col_name}', "
+                f"{failure_ratio:.0%} images can't be open. "
+                f"You may need to thoroughly check your data to see the percentage of missing images, "
+                f"and estimate the potential influence. By default, we skip the samples with missing images. "
+                f"You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
+                f"which uses a zero image to replace any missing image."
+            )
         return True
     else:
         return False
@@ -229,13 +246,17 @@ def infer_column_problem_types(
             num_train_missing = train_df[col_name].isnull().sum()
             num_valid_missing = valid_df[col_name].isnull().sum()
             if num_train_missing > 0:
-                raise ValueError(f'Label column "{col_name}" contains missing values in the '
-                                 f'training data frame. You may want to filter your data because '
-                                 f'missing label is currently not supported.')
+                raise ValueError(
+                    f"Label column '{col_name}' contains missing values in the "
+                    f"training data frame. You may want to filter your data because "
+                    f"missing label is currently not supported."
+                )
             if num_valid_missing > 0:
-                raise ValueError(f'Label column "{col_name}" contains missing values in the '
-                                 f'validation data frame. You may want to filter your data because '
-                                 f'missing label is currently not supported.')
+                raise ValueError(
+                    f"Label column '{col_name}' contains missing values in the "
+                    f"validation data frame. You may want to filter your data because "
+                    f"missing label is currently not supported."
+                )
             if problem_type == MULTICLASS or problem_type == BINARY:
                 column_types[col_name] = CATEGORICAL
                 continue
@@ -249,8 +270,10 @@ def infer_column_problem_types(
             if not is_label:
                 column_types[col_name] = NULL
             else:
-                warnings.warn(f'Label column "{col_name}" contains only one label. You may want'
-                              f' to check your dataset again.')
+                warnings.warn(
+                    f"Label column '{col_name}' contains only one label. "
+                    f"You may need to check your dataset again."
+                )
         # Use the following way for type inference
         # 1) Infer categorical column
         # 2) Infer numerical column
@@ -261,7 +284,7 @@ def infer_column_problem_types(
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(train_df[col_name], valid_df[col_name]):
             column_types[col_name] = NUMERICAL
-        elif is_imagepath_column(train_df[col_name]):
+        elif is_imagepath_column(train_df[col_name], col_name):
             column_types[col_name] = IMAGE_PATH
         elif check_if_nlp_feature(train_df[col_name]):
             column_types[col_name] = TEXT
@@ -308,8 +331,8 @@ def infer_problem_type_output_shape(
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
             class_num = len(data_df[label_column].unique())
-            err_msg = f'Provided problem type is "{provided_problem_type}" while the number of ' \
-                      f'unique value in the label column is {class_num}'
+            err_msg = f"Provided problem type is '{provided_problem_type}' while the number of " \
+                      f"unique values in the label column is {class_num}."
             if provided_problem_type == BINARY and class_num != 2:
                 raise AssertionError(err_msg)
             elif provided_problem_type == MULTICLASS and class_num <= 2:
@@ -334,6 +357,6 @@ def infer_problem_type_output_shape(
             return REGRESSION, 1
         else:
             raise ValueError(
-                f'The label column "{label_column}" has type'
-                f' "{column_types[label_column]}" and is supported yet.'
+                f"The label column '{label_column}' has type"
+                f" '{column_types[label_column]}', which is not supported yet."
             )
