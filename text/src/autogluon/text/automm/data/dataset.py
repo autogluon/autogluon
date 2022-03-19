@@ -78,7 +78,7 @@ class BaseDataset(torch.utils.data.Dataset):
             for per_modality, per_modality_processors in self.processors.items():
                 for per_model_processor in per_modality_processors:
                     ret.update(per_model_processor(getattr(self, per_modality), idx, self.is_training))
-        except Exception as e:  # to capture the image opening exception if use_zero_img=False in process_image.py.
+        except Exception as e:
             logger.debug(f"Skipping sample {idx} due to '{e}'")
             self._consecutive_errors += 1
             if self._consecutive_errors < GET_ITEM_ERROR_RETRY:
