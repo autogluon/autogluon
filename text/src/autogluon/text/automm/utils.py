@@ -647,7 +647,6 @@ def gather_top_k_ckpts(
     for path in ckpt_paths:
         checkpoint = torch.load(path)
         all_state_dicts.append(checkpoint["state_dict"])
-        del checkpoint["state_dict"]
         os.remove(path)
 
     if ckpt_dir is not None:
