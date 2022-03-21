@@ -3,25 +3,39 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 import pandas as pd
+import numpy as np
 from gluonts.dataset.common import ListDataset
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
 
     def __init__(self, data: Any, *args, **kwargs):
-        # infer if data is a known type and attempt to cast to dataframe
-        # for example:
         if isinstance(data, ListDataset):
-            # todo: validate data in ListDataset
-            # validate time series structure
-            # assign indexes (index by item id and timestamp)
             data = self.from_gluonts(data)
-
-        # todo: validate data DataFrame format
+        self.validate(data)
         super().__init__(data=data, *args, **kwargs)
 
-        # todo: infer freq
-        self.freq = None  # infer frequency string
+    @classmethod
+    def sample_dataframe(cls):
+        target = list(range(9))
+        datetime_index = tuple(pd.date_range(pd.Timestamp("01-01-2019"), periods=3, freq='D'))
+        item_ids = (0, 1, 2)
+        multi_index = pd.MultiIndex.from_product([item_ids, datetime_index], names=['item_id', 'timestamp'])
+        ts_df = pd.Series(target, name='target', index=multi_index).to_frame()
+        return TimeSeriesDataFrame(ts_df)
+
+    @classmethod
+    def validate(cls, data):
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError(f"data must be a pd.DataFrame, get {type(data)}")
+        if not isinstance(data.index, pd.MultiIndex):
+            raise ValueError(f"data must have pd.MultiIndex, get {type(data.index)}")
+        if 'target' not in data.columns:
+            raise ValueError(f"data must have a column called target")
+        if not data.index.dtypes.array[0] == np.dtype(np.int64):
+            raise ValueError(f"for item_id, the only NumPy dtype allowed is ‘np.int64’.")
+        if not data.index.dtypes.array[1] == np.dtype('datetime64[ns]'):
+            raise ValueError(f"for timestamp, the only NumPy dtype allowed is ‘datetime64[ns]’.")
 
     @classmethod
     def from_gluonts(
@@ -57,3 +71,4 @@ class TimeSeriesDataFrame(pd.DataFrame):
     ) -> TimeSeriesDataFrame:
         nanosecond_before_end = end - pd.Timedelta(nanoseconds=1)
         return TimeSeriesDataFrame(self.loc[(slice(None), slice(start, nanosecond_before_end)), :])
+
