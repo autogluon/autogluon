@@ -18,8 +18,10 @@ def list_text_presets(verbose=False):
             "optimization.learning_rate": 4e-4,
             "optimization.lr_decay": 0.9,
         },
+        # TODO(?) Revise to use registry
         "high_quality": {
             "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+            "optimization.lr_decay": 0.9,
         },
         "best_quality": {
             "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",

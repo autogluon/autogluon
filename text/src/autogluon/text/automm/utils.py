@@ -639,7 +639,7 @@ def gather_top_k_ckpts(
     """
     if not ckpt_paths:
         ckpt_paths = []
-        for file_name in os.listdir(ckpt_dir):
+        for file_name in sorted(os.listdir(ckpt_dir), reverse=True):
             if file_name.startswith("epoch"):
                 ckpt_paths.append(os.path.join(ckpt_dir, file_name))
 
@@ -787,9 +787,22 @@ def apply_omegaconf_overrides(
     """
     overrides = parse_dotlist_conf(overrides)
 
+    def _check_exist_dotlist(C, key_in_dotlist):
+        if not isinstance(key_in_dotlist, list):
+            key_in_dotlist = key_in_dotlist.split('.')
+        if key_in_dotlist[0] in C:
+            if len(key_in_dotlist) > 1:
+                return _check_exist_dotlist(C[key_in_dotlist[0]], key_in_dotlist[1:])
+            else:
+                return True
+        else:
+            return False
+
     if check_key_exist:
         for ele in overrides.items():
-            OmegaConf.select(conf, ele[0], throw_on_missing=True)
+            if not _check_exist_dotlist(conf, ele[0]):
+                raise KeyError(f'"{ele[0]}" is not found in the config. You may need to check the overrides. '
+                               f'overrides={overrides}')
     override_conf = OmegaConf.from_dotlist([f'{ele[0]}={ele[1]}' for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf

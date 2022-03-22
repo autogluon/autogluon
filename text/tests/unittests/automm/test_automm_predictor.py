@@ -12,6 +12,9 @@ from autogluon.text.automm.constants import (
     ENVIRONMENT,
     BINARY,
     MULTICLASS,
+    UNION_SOUP,
+    GREEDY_SOUP,
+    BEST_SOUP,
 )
 from datasets import (
     PetFinderDataset,
@@ -50,16 +53,14 @@ def verify_predictor_save_load(predictor, df,
 
 
 @pytest.mark.parametrize(
-    "dataset_name,"
-    "model_names,"
-    "text_backbone,"
-    "image_backbone",
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method",
     [
         (
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
+            GREEDY_SOUP
         ),
 
         (
@@ -67,6 +68,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
+            UNION_SOUP
         ),
 
         (
@@ -74,6 +76,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "swin_tiny_patch4_window7_224",
+            GREEDY_SOUP
         ),
 
         (
@@ -81,6 +84,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             None,
+            UNION_SOUP
         ),
 
         (
@@ -88,6 +92,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
+            BEST_SOUP
         ),
 
         (
@@ -95,6 +100,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
+            UNION_SOUP
         ),
 
         (
@@ -102,6 +108,7 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
+            BEST_SOUP
         ),
 
         (
@@ -109,6 +116,7 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
+            BEST_SOUP
         ),
 
     ]
@@ -118,7 +126,7 @@ def test_predictor(
         model_names,
         text_backbone,
         image_backbone,
-        # score,
+        top_k_average_method,
 ):
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
@@ -139,6 +147,7 @@ def test_predictor(
         "model.names": model_names,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": top_k_average_method,
     }
     if text_backbone is not None:
         hyperparameters.update({
@@ -253,7 +262,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
             torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
             loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
 
- 
+
     offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
     del loaded_offline_predictor
 
