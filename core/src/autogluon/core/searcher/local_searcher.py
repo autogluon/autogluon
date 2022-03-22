@@ -124,6 +124,24 @@ class LocalSearcher(object):
         else:
             return dict()
 
+    def get_results(self, sort=True) -> list:
+        """
+        Gets a list of results in the form (config, reward).
+
+        Parameters
+        ----------
+        sort : bool, default = True
+            If True, sorts the configs in order from best to worst reward.
+            If False, config order is undefined.
+        """
+        results = []
+        for config_pkl, reward in self._results.items():
+            config = self._unpickle_config(config_pkl=config_pkl)
+            results.append((config, reward))
+        if sort:
+            results = sorted(results, key=lambda x: x[1], reverse=True)
+        return results
+
     def _get_params_static(self) -> dict:
         """
         Gets a dictionary of static key values, where no search space is used and therefore the values are always the same in all configs.
