@@ -516,7 +516,7 @@ class AutoMMPredictor:
 
             if precision == 'bf16' and not torch.cuda.is_bf16_supported():
                 warnings.warn('bf16 is not supported by the GPU device / cuda version. '
-                              'Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. '
+                              'Consider to use GPU devices with version after Amphere and upgrade cuda to be >=11.0. '
                               'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
                 precision = 32
 
