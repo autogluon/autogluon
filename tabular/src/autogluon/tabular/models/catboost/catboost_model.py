@@ -59,9 +59,9 @@ class CatBoostModel(AbstractModel):
         return X
 
     def _estimate_memory_usage(self, X, **kwargs):
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
-        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        data_mem_usage = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
@@ -294,7 +294,7 @@ class CatBoostModel(AbstractModel):
             if ratio > (1 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
                 raise NotEnoughMemoryError
-            elif ratio > (0.2 * max_memory_usage_ratio):
+            elif ratio > (0.75 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
     def _get_default_resources(self):
