@@ -70,13 +70,10 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             name=name,
             eval_metric=eval_metric,
             hyperparameters=hyperparameters,
+            **kwargs,
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
-
         self.callbacks = []
-        self.params_aux["callbacks"] = self.callbacks
-        self.params_aux["freq"] = freq
-        self.params_aux["prediction_length"] = prediction_length
 
     def save(self, path: str = None, **kwargs) -> str:
         if path is None:
@@ -120,19 +117,16 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                     "Dataset frequency not provided in the dataset, fit arguments or "
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
-            self.params_aux["freq"] = self.freq
 
         if "callback" in kwargs:
             self.callbacks.append(kwargs["callback"])
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects"""
-        return dict(
-            freq=self.freq,
-            prediction_length=self.prediction_length,
-            callbacks=self.callbacks,
-            **self.params,  # reserved for tunable hyperparameters
-        )
+        estimator_init_args = self._get_model_params()
+        estimator_init_args["quantiles"] = estimator_init_args.get("quantile_levels", None)
+        estimator_init_args["callbacks"] = self.callbacks
+        return estimator_init_args
 
     def _get_estimator(self) -> GluonTSEstimator:
         raise NotImplementedError

@@ -103,9 +103,9 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
     model = model_class(
         path=temp_model_path,
         freq="H",
+        quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": ag.Int(3, 4),
-            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
         },
     )
     with pytest.raises(ValueError, match=".*hyperparameter_tune.*"):
@@ -121,9 +121,9 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
     model = model_class(
         path=temp_model_path,
         freq="H",
+        quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": 1,
-            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
         },
     )
     model.fit(
@@ -148,9 +148,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         path=temp_model_path,
         freq="H",
         prediction_length=3,
+        quantile_levels=quantile_levels,
         hyperparameters={
             "epochs": 2,
-            "ag_args_fit": {"quantile_levels": quantile_levels},
         },
     )
 

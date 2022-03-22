@@ -43,9 +43,9 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
     model = model_class(
         path=temp_model_path,
         freq="H",
+        quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": 1,
-            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
         },
     )
     model.fit(
@@ -68,9 +68,9 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
     model = model_class(
         path=temp_model_path,
         freq="H",
+        quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": ag.Int(3, 4),
-            "ag_args_fit": {"quantile_levels": [0.1, 0.9]},
         },
     )
 

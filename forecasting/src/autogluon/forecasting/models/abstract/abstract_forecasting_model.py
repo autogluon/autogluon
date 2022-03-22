@@ -89,23 +89,13 @@ class AbstractForecastingModel(AbstractModel):
 
         self.freq: str = freq
         self.prediction_length: int = prediction_length
+        self.quantile_levels = kwargs.get(
+            "quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        )
 
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
-        self._init_misc()
         self._init_params()
-
-    def _init_misc(self, **kwargs) -> None:
-        self.quantile_levels = self.params_aux.get("quantile_levels", None)
-
-    def _get_default_auxiliary_params(self) -> Dict[str, Any]:
-        default_aux_params = super()._get_default_auxiliary_params()
-        default_aux_params.update(
-            {
-                "quantile_levels": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-            }
-        )
-        return default_aux_params
 
     def _compute_fit_metadata(self, val_data: Dataset = None, **kwargs):
         fit_metadata = dict(
@@ -117,26 +107,38 @@ class AbstractForecastingModel(AbstractModel):
         # memory usage handling not implemented for forecasting models
         pass
 
-    def get_params(self) -> dict:
-        """Get params of the model at the time of initialization"""
-        args = super().get_params()
+    def _get_model_params(self) -> dict:
+        """Gets params that are passed to the inner model."""
+        args = super()._get_model_params()
         args.update(
             dict(
                 freq=self.freq,
                 prediction_length=self.prediction_length,
+                quantile_levels=self.quantile_levels,
             )
         )
 
         return args
 
-    # def get_info(self) -> dict:
-    #     info_dict = super().get_info()
-    #     info_dict.update({
-    #         "freq": self.freq,
-    #         "prediction_length": self.prediction_length,
-    #         "quantile_levels": self.quantile_levels,
-    #     })
-    #     return info_dict
+    def get_params(self) -> dict:
+        params = super().get_params()
+        params.update(
+            dict(
+                freq=self.freq,
+                prediction_length=self.prediction_length,
+                quantile_levels=self.quantile_levels,
+            )
+        )
+        return params
+
+    def get_info(self) -> dict:
+        info_dict = super().get_info()
+        info_dict.update({
+            "freq": self.freq,
+            "prediction_length": self.prediction_length,
+            "quantile_levels": self.quantile_levels,
+        })
+        return info_dict
 
     def fit(self, **kwargs) -> "AbstractForecastingModel":
         """Fit forecasting model.
@@ -277,7 +279,7 @@ class AbstractForecastingModel(AbstractModel):
         )
         search_space = self._get_search_space()
 
-        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
+        scheduler_cls, scheduler_params = scheduler_options
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError(
                 "scheduler_cls and scheduler_params cannot be None for hyperparameter tuning"
