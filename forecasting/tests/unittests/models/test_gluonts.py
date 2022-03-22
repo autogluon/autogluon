@@ -134,3 +134,32 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
     loaded_model = model_class.load(path=model.path)
 
     assert loaded_model.gts_predictor == model.gts_predictor
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("quantile_levels", [
+    [0.1, 0.44, 0.9],
+    [0.1, 0.5, 0.9],
+])
+def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_mean_and_correct_quantiles(
+    model_class, quantile_levels, temp_model_path
+):
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=3,
+        hyperparameters={
+            "epochs": 2,
+            "ag_args_fit": {"quantile_levels": quantile_levels},
+        },
+    )
+
+    model.fit(train_data=DUMMY_DATASET)
+
+    predictions = model.predict(DUMMY_DATASET, quantile_levels=quantile_levels)
+
+    assert len(predictions) == len(DUMMY_DATASET)
+    for k in ["mean"] + [str(q) for q in quantile_levels]:
+        assert all(
+            k in df.columns for _, df in predictions.items()
+        )

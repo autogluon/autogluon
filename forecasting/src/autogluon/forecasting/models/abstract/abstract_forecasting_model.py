@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, Union, List, Tuple, Optional
+from typing import Any, Dict, Union, Tuple, Optional
 
 import pandas as pd
 from gluonts.dataset.common import (
@@ -129,14 +129,23 @@ class AbstractForecastingModel(AbstractModel):
 
         return args
 
+    # def get_info(self) -> dict:
+    #     info_dict = super().get_info()
+    #     info_dict.update({
+    #         "freq": self.freq,
+    #         "prediction_length": self.prediction_length,
+    #         "quantile_levels": self.quantile_levels,
+    #     })
+    #     return info_dict
+
     def fit(self, **kwargs) -> "AbstractForecastingModel":
         """Fit forecasting model.
 
         Models should not override the `fit` method, but instead override the `_fit` method which
         has the same arguments.
 
-        Parameters
-        ----------
+        Other Parameters
+        ----------------
         train_data : gluonts.dataset.common.Dataset
             The training data. Forecasting models expect data to be in GluonTS format, i.e., an
             iterator of dictionaries with `start` and `target` keys. `start` is a timestamp object
@@ -191,7 +200,7 @@ class AbstractForecastingModel(AbstractModel):
         raise NotImplementedError
 
     def predict(
-        self, data: Dataset, quantile_levels: List[float] = None, **kwargs
+        self, data: Dataset, **kwargs
     ) -> Dict[Any, pd.DataFrame]:
         """Given a dataset, predict the next `self.prediction_length` time steps. The data
         set is a GluonTS data set, an iterator over time series represented as python dictionaries.
@@ -208,8 +217,12 @@ class AbstractForecastingModel(AbstractModel):
         ----------
         data: gluonts.dataset.common.Dataset
             The dataset where each time series is the "context" for predictions.
+
+        Other Parameters
+        ----------------
         quantile_levels
-            Quantiles of probabilistic forecasts. If None, `self.quantile_levels` will be used instead,
+            Quantiles of probabilistic forecasts, if probabilistic forecasts are implemented by the
+            corresponding subclass. If None, `self.quantile_levels` will be used instead,
             if provided during initialization.
 
         Returns

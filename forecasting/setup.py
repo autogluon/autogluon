@@ -30,6 +30,7 @@ requirements = [
     f"autogluon.core=={version}",
 ]
 
+# TODO: move test_requirements into extra_requirements
 test_requirements = ["pytest", "flake8", "pytest-timeout"]
 
 install_requires = requirements + test_requirements
