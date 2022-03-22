@@ -639,7 +639,7 @@ def gather_top_k_ckpts(
     """
     if not ckpt_paths:
         ckpt_paths = []
-        for file_name in sorted(os.listdir(ckpt_dir)):
+        for file_name in sorted(os.listdir(ckpt_dir), reverse=True):
             if file_name.startswith("epoch"):
                 ckpt_paths.append(os.path.join(ckpt_dir, file_name))
 
