@@ -1,6 +1,7 @@
 from functools import partial
 
 import pytest
+from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.seq2seq import MQRNNEstimator
 from gluonts.model.transformer import TransformerEstimator
@@ -23,12 +24,14 @@ TESTABLE_MODELS = [
     DeepARModel,
     MQCNNModel,
     SimpleFeedForwardModel,
-    ProphetModel,
     partial(
         GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
     ),  # partial constructor for generic model
     partial(GenericGluonTSModel, gluonts_estimator_class=TransformerEstimator),
 ]
+
+if PROPHET_IS_INSTALLED:
+    TESTABLE_MODELS += [ProphetModel]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -179,6 +182,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         assert all(k in df.columns for _, df in predictions.items())
 
 
+@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed. Run `pip install fbprophet`")
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
 @pytest.mark.parametrize("n_changepoints", [3, 5])
 def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlying_model(
@@ -199,6 +203,7 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
     )  # noqa
 
 
+@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed. Run `pip install fbprophet`")
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
 @pytest.mark.parametrize("n_changepoints", [3, 5])
 def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
@@ -224,6 +229,7 @@ def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
     )  # noqa
 
 
+@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed. Run `pip install fbprophet`")
 def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_passed_to_underlying_model(
     temp_model_path,
 ):
