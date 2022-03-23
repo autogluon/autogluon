@@ -47,6 +47,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         fixed values). See *Other Parameters* in each inheriting model's documentation for
         possible values.
     """
+
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
 
@@ -121,12 +122,24 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         if "callback" in kwargs:
             self.callbacks.append(kwargs["callback"])
 
+    def _get_model_params(self) -> dict:
+        """Gets params that are passed to the inner model."""
+        args = super()._get_model_params()
+        args.update(
+            dict(
+                freq=self.freq,
+                prediction_length=self.prediction_length,
+                quantiles=self.quantile_levels,
+                callbacks=self.callbacks,
+            )
+        )
+
+        return args
+
     def _get_estimator_init_args(self) -> Dict[str, Any]:
-        """Get GluonTS specific constructor arguments for estimator objects"""
-        estimator_init_args = self._get_model_params()
-        estimator_init_args["quantiles"] = estimator_init_args.get("quantile_levels", None)
-        estimator_init_args["callbacks"] = self.callbacks
-        return estimator_init_args
+        """Get GluonTS specific constructor arguments for estimator objects, an alias to
+        `self._get_model_params` for better readability."""
+        return self._get_model_params()
 
     def _get_estimator(self) -> GluonTSEstimator:
         """Return the GluonTS Estimator object for the model"""
@@ -171,7 +184,9 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             predicted_targets = list(self.gts_predictor.predict(data))
 
             if not all(0 < float(q) < 1 for q in quantiles):
-                raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
+                raise ValueError(
+                    "Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive)."
+                )
 
             if not isinstance(predicted_targets[0], (QuantileForecast, SampleForecast)):
                 raise TypeError("DistributionForecast is not yet supported.")
@@ -214,12 +229,18 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
             for i, item_id in enumerate(index):
                 item_forecast_dict = dict(
-                    mean=forecast_means[i] if forecast_means else (
-                        predicted_targets[i].quantile(0.5)  # assign P50 to mean if mean is missing
+                    mean=forecast_means[i]
+                    if forecast_means
+                    else (
+                        predicted_targets[i].quantile(
+                            0.5
+                        )  # assign P50 to mean if mean is missing
                     )
                 )
                 for quantile in quantiles:
-                    item_forecast_dict[quantile] = predicted_targets[i].quantile(str(quantile))
+                    item_forecast_dict[quantile] = predicted_targets[i].quantile(
+                        str(quantile)
+                    )
 
                 # TODO: can be optimized: avoid redundant data frame constructions
                 df = pd.DataFrame(item_forecast_dict)

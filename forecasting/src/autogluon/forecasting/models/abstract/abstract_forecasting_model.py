@@ -11,6 +11,7 @@ import autogluon.core as ag
 from autogluon.core.models import AbstractModel
 from autogluon.common.savers import save_pkl
 
+from ...utils.metadata import get_prototype_metadata_dict
 from ...utils.metric_utils import check_get_evaluation_metric
 from .model_trial import skip_hpo, model_trial
 
@@ -35,6 +36,9 @@ class AbstractForecastingModel(AbstractModel):
         Name of the subdirectory inside path where model will be saved.
         The final model directory will be path+name+os.path.sep()
         If None, defaults to the model's class name: self.__class__.__name__
+    metadata: MetadataDict
+        A dictionary mapping different feature types known to autogluon.forecasting to column names
+        in the data set.
     eval_metric : str, default
         Metric by which predictions will be ultimately evaluated on test data.
         This only impacts `model.score()`, as eval_metric is not used during training.
@@ -65,12 +69,14 @@ class AbstractForecastingModel(AbstractModel):
     _preprocess_nonadaptive = None
     _preprocess_set_features = None
 
+    # TODO: handle static features in the models and Dataset API
     def __init__(
         self,
         freq: Optional[str] = None,
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Dict[str, Union[int, float, str, ag.Space]] = None,
         **kwargs,
@@ -86,6 +92,7 @@ class AbstractForecastingModel(AbstractModel):
         self.stopping_metric = None
         self.problem_type = "forecasting"
         self.conformalize = False
+        self.metadata = metadata or get_prototype_metadata_dict()
 
         self.freq: str = freq
         self.prediction_length: int = prediction_length
@@ -107,19 +114,6 @@ class AbstractForecastingModel(AbstractModel):
         # memory usage handling not implemented for forecasting models
         pass
 
-    def _get_model_params(self) -> dict:
-        """Gets params that are passed to the inner model."""
-        args = super()._get_model_params()
-        args.update(
-            dict(
-                freq=self.freq,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-            )
-        )
-
-        return args
-
     def get_params(self) -> dict:
         params = super().get_params()
         params.update(
@@ -127,17 +121,21 @@ class AbstractForecastingModel(AbstractModel):
                 freq=self.freq,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
+                metadata=self.metadata,
             )
         )
         return params
 
     def get_info(self) -> dict:
         info_dict = super().get_info()
-        info_dict.update({
-            "freq": self.freq,
-            "prediction_length": self.prediction_length,
-            "quantile_levels": self.quantile_levels,
-        })
+        info_dict.update(
+            {
+                "freq": self.freq,
+                "prediction_length": self.prediction_length,
+                "quantile_levels": self.quantile_levels,
+                "metadata": self.metadata,
+            }
+        )
         return info_dict
 
     def fit(self, **kwargs) -> "AbstractForecastingModel":
@@ -201,9 +199,7 @@ class AbstractForecastingModel(AbstractModel):
         """
         raise NotImplementedError
 
-    def predict(
-        self, data: Dataset, **kwargs
-    ) -> Dict[Any, pd.DataFrame]:
+    def predict(self, data: Dataset, **kwargs) -> Dict[Any, pd.DataFrame]:
         """Given a dataset, predict the next `self.prediction_length` time steps. The data
         set is a GluonTS data set, an iterator over time series represented as python dictionaries.
         This method produces predictions for the forecast horizon *after* the individual time series.

@@ -57,6 +57,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
 
     assert dict_equal_primitive(model.params, loaded_model.params)
     assert dict_equal_primitive(model.params_aux, loaded_model.params_aux)
+    assert dict_equal_primitive(model.metadata, loaded_model.metadata)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

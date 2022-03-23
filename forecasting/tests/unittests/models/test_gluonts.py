@@ -24,7 +24,9 @@ TESTABLE_MODELS = [
     MQCNNModel,
     SimpleFeedForwardModel,
     ProphetModel,
-    partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
+    partial(
+        GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
+    ),  # partial constructor for generic model
     partial(GenericGluonTSModel, gluonts_estimator_class=TransformerEstimator),
 ]
 
@@ -148,10 +150,13 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("quantile_levels", [
-    [0.1, 0.44, 0.9],
-    [0.1, 0.5, 0.9],
-])
+@pytest.mark.parametrize(
+    "quantile_levels",
+    [
+        [0.1, 0.44, 0.9],
+        [0.1, 0.5, 0.9],
+    ],
+)
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_mean_and_correct_quantiles(
     model_class, quantile_levels, temp_model_path
 ):
@@ -171,9 +176,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
 
     assert len(predictions) == len(DUMMY_DATASET)
     for k in ["mean"] + [str(q) for q in quantile_levels]:
-        assert all(
-            k in df.columns for _, df in predictions.items()
-        )
+        assert all(k in df.columns for _, df in predictions.items())
 
 
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
@@ -191,7 +194,9 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
     model.fit(train_data=DUMMY_DATASET)
 
     assert model.gts_predictor.prophet_params.get("growth") == growth  # noqa
-    assert model.gts_predictor.prophet_params.get("n_changepoints") == n_changepoints  # noqa
+    assert (
+        model.gts_predictor.prophet_params.get("n_changepoints") == n_changepoints
+    )  # noqa
 
 
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
@@ -203,9 +208,7 @@ def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
         path=temp_model_path,
         freq="H",
         quantile_levels=[0.1, 0.9],
-        hyperparameters={
-            "growth": growth, "n_changepoints": n_changepoints
-        },
+        hyperparameters={"growth": growth, "n_changepoints": n_changepoints},
     )
     model.fit(
         train_data=DUMMY_DATASET,
@@ -215,11 +218,14 @@ def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
     loaded_model = model.__class__.load(path=model.path)
 
     assert loaded_model.gts_predictor.prophet_params.get("growth") == growth  # noqa
-    assert loaded_model.gts_predictor.prophet_params.get("n_changepoints") == n_changepoints  # noqa
+    assert (
+        loaded_model.gts_predictor.prophet_params.get("n_changepoints")
+        == n_changepoints
+    )  # noqa
 
 
 def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_passed_to_underlying_model(
-    temp_model_path
+    temp_model_path,
 ):
     scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
 
@@ -227,9 +233,7 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
         path=temp_model_path,
         freq="H",
         prediction_length=4,
-        hyperparameters={
-            "growth": "linear", "n_changepoints": ag.Int(3, 4)
-        },
+        hyperparameters={"growth": "linear", "n_changepoints": ag.Int(3, 4)},
     )
     _, _, results = model.hyperparameter_tune(
         scheduler_options=scheduler_options,

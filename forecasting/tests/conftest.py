@@ -20,8 +20,12 @@ def pytest_configure(config):
     config.addinivalue_line("filterwarnings", "ignore:.np.bool:DeprecationWarning")
 
     # known gluonts warnings
-    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.distribution.*")
-    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.trainer.*")
+    config.addinivalue_line(
+        "filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.distribution.*"
+    )
+    config.addinivalue_line(
+        "filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.trainer.*"
+    )
     config.addinivalue_line("filterwarnings", "ignore:Using `json`-module:UserWarning")
 
     # pandas future warnings on timestamp freq being deprecated

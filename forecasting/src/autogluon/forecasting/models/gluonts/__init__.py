@@ -13,5 +13,5 @@ __all__ = [
     "GenericGluonTSModel",
     "MQCNNModel",
     "ProphetModel",
-    "SimpleFeedForwardModel"
+    "SimpleFeedForwardModel",
 ]

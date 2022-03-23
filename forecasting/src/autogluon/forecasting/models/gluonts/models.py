@@ -49,6 +49,7 @@ class DeepARModel(AbstractGluonTSModel):
     scaling: bool
         Whether to automatically scale the target values (default: true)
     """
+
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
 
 
@@ -100,6 +101,7 @@ class MQCNNModel(AbstractGluonTSModel):
     scaling: bool
         Whether to automatically scale the target values. (default: False if quantile_output is used, True otherwise)
     """
+
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
     def _get_estimator(self):
@@ -133,6 +135,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Scale the network input by the data mean and the network output by
         its inverse (default: True)
     """
+
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
 
 
@@ -150,9 +153,12 @@ class GenericGluonTSModel(AbstractGluonTSModel):
     gluonts_estimator_class:
         The class object of the GluonTS estimator to be used.
     """
+
     def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):
         self.gluonts_estimator_class = gluonts_estimator_class
-        gluonts_model_name = re.sub(r"Estimator$", "", self.gluonts_estimator_class.__name__)
+        gluonts_model_name = re.sub(
+            r"Estimator$", "", self.gluonts_estimator_class.__name__
+        )
 
         super().__init__(name=kwargs.pop("name", gluonts_model_name), **kwargs)
 
@@ -185,23 +191,24 @@ class ProphetModel(AbstractGluonTSModel):
         Model hyperparameters that will be passed directly to the `Prophet`
         class. See Prophet documentation for available parameters.
     """
+
     gluonts_estimator_class = _ProphetDummyEstimator
     allowed_prophet_parameters = [
-        'growth',
-        'changepoints',
-        'n_changepoints',
-        'changepoint_range',
-        'yearly_seasonality',
-        'weekly_seasonality',
-        'daily_seasonality',
-        'holidays',
-        'seasonality_mode',
-        'seasonality_prior_scale',
-        'holidays_prior_scale',
-        'changepoint_prior_scale',
-        'mcmc_samples',
-        'interval_width',
-        'uncertainty_samples'
+        "growth",
+        "changepoints",
+        "n_changepoints",
+        "changepoint_range",
+        "yearly_seasonality",
+        "weekly_seasonality",
+        "daily_seasonality",
+        "holidays",
+        "seasonality_mode",
+        "seasonality_prior_scale",
+        "holidays_prior_scale",
+        "changepoint_prior_scale",
+        "mcmc_samples",
+        "interval_width",
+        "uncertainty_samples",
     ]
 
     def _get_estimator(self) -> GluonTSEstimator:
@@ -209,11 +216,13 @@ class ProphetModel(AbstractGluonTSModel):
 
         return _ProphetDummyEstimator(
             predictor_cls=ProphetPredictor,
-            freq=model_init_params['freq'],
-            prediction_length=model_init_params['prediction_length'],
+            freq=model_init_params["freq"],
+            prediction_length=model_init_params["prediction_length"],
             prophet_params={
-                k: v for k, v in model_init_params.items() if k in self.allowed_prophet_parameters
-            }
+                k: v
+                for k, v in model_init_params.items()
+                if k in self.allowed_prophet_parameters
+            },
         )
 
 
