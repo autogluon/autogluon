@@ -53,7 +53,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
     )
     model.save()
 
-    loaded_model = model_class.load(path=model.path)
+    loaded_model = model.__class__.load(path=model.path)
 
     assert dict_equal_primitive(model.params, loaded_model.params)
     assert dict_equal_primitive(model.params_aux, loaded_model.params_aux)

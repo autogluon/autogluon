@@ -2,7 +2,7 @@ import copy
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -47,8 +47,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         fixed values). See *Other Parameters* in each inheriting model's documentation for
         possible values.
     """
-
     gluonts_model_path = "gluon_ts"
+    gluonts_estimator_class: Type[GluonTSEstimator] = None
 
     def __init__(
         self,
@@ -129,7 +129,11 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         return estimator_init_args
 
     def _get_estimator(self) -> GluonTSEstimator:
-        raise NotImplementedError
+        """Return the GluonTS Estimator object for the model"""
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
 
     def _fit(
         self,

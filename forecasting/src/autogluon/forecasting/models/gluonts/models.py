@@ -1,9 +1,13 @@
+import re
+from typing import Type
+
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
 
 with warning_filter():
     from gluonts.model.deepar import DeepAREstimator
+    from gluonts.model.estimator import Estimator as GluonTSEstimator
     from gluonts.model.seq2seq import MQCNNEstimator
     from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
     from gluonts.mx.context import get_mxnet_context
@@ -44,12 +48,7 @@ class DeepARModel(AbstractGluonTSModel):
     scaling: bool
         Whether to automatically scale the target values (default: true)
     """
-
-    def _get_estimator(self):
-        with warning_filter():
-            return DeepAREstimator.from_hyperparameters(
-                **self._get_estimator_init_args()
-            )
+    gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
 
 
 class MQCNNModel(AbstractGluonTSModel):
@@ -100,13 +99,14 @@ class MQCNNModel(AbstractGluonTSModel):
     scaling: bool
         Whether to automatically scale the target values. (default: False if quantile_output is used, True otherwise)
     """
+    gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
     def _get_estimator(self):
         if get_mxnet_context() != mx.context.cpu():
             self.params["hybridize"] = False
 
         with warning_filter():
-            return MQCNNEstimator.from_hyperparameters(
+            return self.gluonts_estimator_class.from_hyperparameters(
                 **self._get_estimator_init_args()
             )
 
@@ -132,14 +132,36 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Scale the network input by the data mean and the network output by
         its inverse (default: True)
     """
-
-    def _get_estimator(self):
-        with warning_filter():
-            return SimpleFeedForwardEstimator.from_hyperparameters(
-                **self._get_estimator_init_args()
-            )
+    gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
 
 
+class GenericGluonTSModel(AbstractGluonTSModel):
+    """Generic wrapper model class for GluonTS models (in GluonTS terminology---
+    Estimators). While this class is meant to generally enable fast use of GluonTS
+    models in autogluon, specific GluonTS models accessed through this wrapper may
+    not have been tested and should be used at the user's own risk.
+
+    Please refer to each GluonTS estimator's individual documentation for
+    initialization parameters of each model.
+
+    Parameters
+    ----------
+    gluonts_estimator_class:
+        The class object of the GluonTS estimator to be used.
+    """
+    def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):
+        self.gluonts_estimator_class = gluonts_estimator_class
+        gluonts_model_name = re.sub(r"Estimator$", "", self.gluonts_estimator_class.__name__)
+
+        super().__init__(name=kwargs.pop("name", gluonts_model_name), **kwargs)
+
+    def get_params(self) -> dict:
+        params_dict = super().get_params()
+        params_dict["gluonts_estimator_class"] = self.gluonts_estimator_class
+        return params_dict
+
+
+# TODO: AutoGluon Tabular will be removed from GluonTS to avoid circular dependencies
 class AutoTabularModel(AbstractGluonTSModel):
     """Autotabular model from Gluon-TS, which in turn uses autogluon.tabular
     predictors for fitting a forecast model.

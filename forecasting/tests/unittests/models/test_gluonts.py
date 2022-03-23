@@ -1,5 +1,9 @@
+from functools import partial
+
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.model.seq2seq import MQRNNEstimator
+from gluonts.model.transformer import TransformerEstimator
 
 import autogluon.core as ag
 from autogluon.forecasting.models.gluonts import (
@@ -8,6 +12,7 @@ from autogluon.forecasting.models.gluonts import (
     SimpleFeedForwardModel,
     MQCNNModel,
 )
+from autogluon.forecasting.models.gluonts.models import GenericGluonTSModel
 
 from .common import DUMMY_DATASET
 
@@ -16,6 +21,8 @@ TESTABLE_MODELS = [
     DeepARModel,
     MQCNNModel,
     SimpleFeedForwardModel,
+    partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
+    partial(GenericGluonTSModel, gluonts_estimator_class=TransformerEstimator),
 ]
 
 
@@ -131,8 +138,9 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
     )
     model.save()
 
-    loaded_model = model_class.load(path=model.path)
+    loaded_model = model.__class__.load(path=model.path)
 
+    assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
     assert loaded_model.gts_predictor == model.gts_predictor
 
 
