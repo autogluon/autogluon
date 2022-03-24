@@ -4,7 +4,7 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.core import Real
-from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
+from autogluon.core.scheduler.local_scheduler import LocalSequentialScheduler
 
 cls = LocalSequentialScheduler
 

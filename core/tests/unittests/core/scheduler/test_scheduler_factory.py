@@ -1,7 +1,7 @@
 import pytest
 
 from autogluon.core.scheduler.scheduler_factory import get_hyperparameter_tune_kwargs_preset, scheduler_factory
-from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
+from autogluon.core.scheduler.local_scheduler import LocalSequentialScheduler
 
 
 def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():

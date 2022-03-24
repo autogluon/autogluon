@@ -48,7 +48,7 @@ class LocalSearcher(object):
                 Scheduler the searcher is used with.
 
         """
-        from ..scheduler.seq_scheduler import LocalSequentialScheduler
+        from ..scheduler.local_scheduler import LocalSequentialScheduler
         if isinstance(scheduler, LocalSequentialScheduler):
             self._reward_attribute = scheduler._reward_attr
 

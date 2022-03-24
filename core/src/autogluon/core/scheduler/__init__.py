@@ -1,2 +1,2 @@
 # schedulers
-from .seq_scheduler import LocalSequentialScheduler
+from .local_scheduler import LocalScheduler

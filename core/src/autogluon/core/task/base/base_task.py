@@ -3,7 +3,7 @@ import logging
 import time
 from abc import abstractmethod
 
-from ...scheduler.seq_scheduler import LocalSequentialScheduler
+from ...scheduler.local_scheduler import LocalSequentialScheduler, LocalParallelScheduler
 from ...utils import in_ipynb
 from ...utils.utils import setup_compute
 
@@ -13,7 +13,9 @@ __all__ = [
     'create_scheduler']
 
 schedulers = {
-    'local': LocalSequentialScheduler,
+    # FIXME: just a quick test
+    # 'local': LocalSequentialScheduler,
+    'local': LocalParallelScheduler,
 }
 
 logger = logging.getLogger(__name__)

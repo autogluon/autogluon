@@ -39,11 +39,16 @@ def model_trial(args,
             time_limit=time_limit,
             reporter=None,
         )
+        # FIXME: remove print
+        print("model trained")
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
         reporter.terminate()
+        # FIXME: remove print
+        print("model failed")
     else:
+    
         reporter(epoch=1, validation_performance=model.val_score)
 
 
@@ -70,7 +75,9 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
         time_left = None
 
     time_fit_start = time.time()
+    print('start training')
     model.fit(**fit_args, time_limit=time_left, reporter=reporter)
+    print('finish training')
     time_fit_end = time.time()
 
     if model._get_tags().get('valid_oof', False):
