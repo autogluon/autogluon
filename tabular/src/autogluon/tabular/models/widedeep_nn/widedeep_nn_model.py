@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pytorch_widedeep.training.trainer
 import torch
-from autogluon.common.features.types import R_OBJECT
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from pytorch_widedeep.callbacks import ModelCheckpoint
 from pytorch_widedeep.models import FTTransformer, TabPerceiver
 
@@ -12,6 +12,8 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.files import make_temp_directory
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from .utils import set_seed
+from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,6 @@ class WideDeepNNModel(AbstractModel):
     # TODO: Leverage time_limit
     # TODO: Leverage sample_weight
     # TODO: Experiment with text and image data
-    # TODO: Enable usage of the other NN models (TabNet, TabTransformer, etc.)
     # TODO: How to leverage GPU?
     # TODO: Missing value handling?
     def _fit(self,
@@ -41,6 +42,8 @@ class WideDeepNNModel(AbstractModel):
 
         set_seed(0, True)
 
+        params = self._get_model_params()
+
         X = self.preprocess(X)
 
         # prepare wide, crossed, embedding and continuous columns
@@ -50,6 +53,8 @@ class WideDeepNNModel(AbstractModel):
         cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
 
+        # train the model
+        # TODO: Add custom metric support (Convert arbitrary AG metric)
         if self.problem_type == BINARY:
             objective = 'binary'
             metrics = [Accuracy]
@@ -91,7 +96,7 @@ class WideDeepNNModel(AbstractModel):
             **self.params.get('model_args', {})
         )
 
-        X_train = { 'X_tab': X_tab, 'target': y.values}
+        X_train = {'X_tab': X_tab, 'target': y.values}
 
         if X_val is not None and y_val is not None:
             X_val_in = {'X_tab': self._tab_preprocessor.transform(X_val), 'target': y_val.values}
@@ -102,26 +107,25 @@ class WideDeepNNModel(AbstractModel):
 
         logger.log(15, model)
 
-        # train the model
-        # TODO: Add custom metric support (Convert arbitrary AG metric)
-
         # DataLoaders are very slow if defaults are used
         # TODO: confirm if this is reproducible on linux
         pytorch_widedeep.training.trainer.n_cpus = 0
 
         # TODO: move to parameters
-        n_epochs = 10
-        lr = 1e-2
-        bs = 256
+        logger.log(15, f'Fitting with parameters {params}...')
+        n_epochs = params['epochs']
+        lr = params['lr']
+        bs = params['bs']
 
         tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=lr)
-        steps_per_epoch = int(np.ceil(len(X_tab)/bs))
+        steps_per_epoch = int(np.ceil(len(X_tab) / bs))
         tab_sch = torch.optim.lr_scheduler.OneCycleLR(tab_opt, max_lr=lr, epochs=n_epochs, steps_per_epoch=steps_per_epoch, pct_start=0.25, final_div_factor=1e5)
 
         monitor_metric = f'val_{metrics[0]()._name}'
         with make_temp_directory() as temp_dir:
             checkpoint_path_prefix = f'{temp_dir}/model'
-            model_checkpoint = ModelCheckpoint(filepath=checkpoint_path_prefix, verbose=1, save_best_only=True, max_save=1, monitor=monitor_metric)
+
+            model_checkpoint = ModelCheckpoint(filepath=checkpoint_path_prefix, verbose=kwargs.get('verbosity', 2), save_best_only=True, max_save=1, monitor=monitor_metric)
 
             trainer = Trainer(
                 model,
@@ -129,7 +133,8 @@ class WideDeepNNModel(AbstractModel):
                 metrics=metrics,
                 optimizers=tab_opt,
                 lr_schedulers=tab_sch,
-                callbacks=[model_checkpoint]
+                callbacks=[model_checkpoint],
+                verbose=kwargs.get('verbosity', 2),
             )
             # FIXME: Does not return best epoch, instead returns final epoch
             #  Very important to return best epoch, otherwise model can be far worse than ideal
@@ -193,3 +198,21 @@ class WideDeepNNModel(AbstractModel):
         )
         model = WideDeep(deeptabular=model, pred_dim=pred_dim)
         return model
+
+    def _set_default_params(self):
+        """ Specifies hyperparameter values to use by default """
+        default_params = get_param_baseline(self.problem_type)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type, num_classes=None)
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        extra_auxiliary_params = dict(
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+        )
+        default_auxiliary_params.update(extra_auxiliary_params)
+        return default_auxiliary_params
