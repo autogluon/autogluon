@@ -63,8 +63,8 @@ class LGBModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
-        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
     def _fit(self,
