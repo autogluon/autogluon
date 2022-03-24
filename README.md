@@ -4,23 +4,26 @@
   <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 </div>
 
-## AutoML for Text, Image, and Tabular Data
+## AutoML for Image, Text, and Tabular Data
 
+[![Latest Release](https://img.shields.io/github/v/release/awslabs/autogluon)](https://github.com/awslabs/autogluon/releases)
 [![Build Status](https://ci.gluon.ai/view/all/job/autogluon/job/master/badge/icon)](https://ci.gluon.ai/view/all/job/autogluon/job/master/)
-[![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
+[![Python Versions](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue)](https://pypi.org/project/autogluon/)
 [![GitHub license](docs/static/apache2.svg)](./LICENSE)
-[![Downloads](https://pepy.tech/badge/autogluon)](https://pepy.tech/project/autogluon)
-![Upload Python Package](https://github.com/awslabs/autogluon/workflows/Upload%20Python%20Package/badge.svg)
+[![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
+[![Twitter](https://img.shields.io/twitter/follow/autogluon?style=social)](https://twitter.com/autogluon)
 
-AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on text, image, and tabular data.
+[Install Instructions](https://auto.gluon.ai/stable/install.html) | Documentation ([Stable](https://auto.gluon.ai/stable/index.html) | [Latest](https://auto.gluon.ai/dev/index.html))
+
+AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, and tabular data.
 
 ## Example
 
 ```python
 # First install package from terminal:
-# python3 -m pip install -U pip
-# python3 -m pip install -U setuptools wheel
-# python3 -m pip install autogluon  # autogluon==0.3.1
+# pip install -U pip
+# pip install -U setuptools wheel
+# pip install autogluon  # autogluon==0.4.0
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -65,6 +68,10 @@ Refer to the [AutoGluon Roadmap](https://github.com/awslabs/autogluon/blob/maste
 - [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism)
 - [AutoGluon-Tabular on Amazon SageMaker](https://github.com/aws/amazon-sagemaker-examples/tree/master/advanced_functionality/autogluon-tabular-containers)
 - [AutoGluon Deep Learning Containers](https://github.com/aws/deep-learning-containers/blob/master/available_images.md#autogluon-training-containers)
+
+## Contributing to AutoGluon
+
+We are actively accepting code contributions to the AutoGluon project. If you are interested in contributing to AutoGluon, please read the [Contributing Guide](https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md) to get started.
 
 ## Citing AutoGluon
 
@@ -117,9 +124,9 @@ BibTeX entry:
 
 ## AutoGluon for Hyperparameter Optimization
 
-AutoGluon also provides state-of-the-art tools for hyperparameter optimization, such as for example ASHA, Hyperband, Bayesian Optimization and BOHB.
+AutoGluon's state-of-the-art tools for hyperparameter optimization, such as ASHA, Hyperband, Bayesian Optimization and BOHB have moved to the stand-alone package [syne-tune](https://github.com/awslabs/syne-tune).
 
-To get started, checkout our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
+To learn more, checkout our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
 
 ```bibtex
 @article{abohb,
@@ -134,7 +141,3 @@ To get started, checkout our paper ["Model-based Asynchronous Hyperparameter and
 ## License
 
 This library is licensed under the Apache 2.0 License.
-
-## Contributing to AutoGluon
-
-We are actively accepting code contributions to the AutoGluon project. If you are interested in contributing to AutoGluon, please read the [Contributing Guide](https://github.com/awslabs/autogluon/blob/master/CONTRIBUTING.md) to get started.

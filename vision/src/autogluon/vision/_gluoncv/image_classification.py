@@ -31,6 +31,10 @@ from .utils import config_to_nested
 
 __all__ = ['ImageClassification']
 
+
+logger = logging.getLogger(__name__)
+
+
 try:
     import timm
 except ImportError:
@@ -129,6 +133,14 @@ def _train_image_classification(args,
                 else:
                     raise ValueError('Model not supported because it does not exist in both timm and gluoncv model zoo.')
     assert dispatcher in ('torch', 'mxnet'), 'custom net needs to be of type either torch.nn.Module or mx.gluon.Block'
+    if dispatcher == 'mxnet':
+        logger.log(30, '=============================================================================\n'
+                       'WARNING: Using MXNet models in ImagePredictor is deprecated as of v0.4.0 and may contain various bugs and issues!\n'
+                       'In v0.5.0, ImagePredictor will no longer support training MXNet models. Please consider switching to specifying Torch models instead.\n'
+                       'Users should ensure they update their code that depends on ImagePredictor when upgrading to future AutoGluon releases.\n'
+                       'For more information, refer to this GitHub issue: https://github.com/awslabs/autogluon/issues/1560\n'
+                       '=============================================================================\n')
+
     args['estimator'] = TorchImageClassificationEstimator if dispatcher=='torch' else ImageClassificationEstimator
     # convert user defined config to nested form
     args = config_to_nested(args)

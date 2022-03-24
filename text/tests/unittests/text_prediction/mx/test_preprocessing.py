@@ -1,4 +1,10 @@
 import pytest
+
+try:
+    import mxnet
+except ImportError:
+    pytest.skip("MXNet is not installed. Skip this test.", allow_module_level=True)
+
 from mxnet.util import use_np
 from mxnet.gluon.data import DataLoader
 import numpy as np

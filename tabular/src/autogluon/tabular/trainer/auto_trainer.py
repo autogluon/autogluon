@@ -34,7 +34,22 @@ class AutoTrainer(AbstractTrainer):
                                  invalid_model_names=invalid_model_names,
                                  silent=silent, **kwargs)
 
-    def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, use_bag_holdout=False, groups=None, **kwargs):
+    def fit(self,
+            X,
+            y,
+            hyperparameters,
+            X_val=None,
+            y_val=None,
+            X_unlabeled=None,
+            holdout_frac=0.1,
+            num_stack_levels=0,
+            core_kwargs: dict = None,
+            time_limit=None,
+            infer_limit=None,
+            infer_limit_batch_size=None,
+            use_bag_holdout=False,
+            groups=None,
+            **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
 
@@ -67,8 +82,18 @@ class AutoTrainer(AbstractTrainer):
                                      'Bagged mode does not use tuning data / validation data. Instead, all data (`train_data` and `tuning_data`) should be combined and specified as `train_data`.\n'
                                      'Bagging/Stacking with a held-out validation set (blend stacking) is not yet supported.')
 
-        self._train_multi_and_ensemble(X, y, X_val, y_val, X_unlabeled=X_unlabeled, hyperparameters=hyperparameters,
-                                       num_stack_levels=num_stack_levels, time_limit=time_limit, core_kwargs=core_kwargs, groups=groups)
+        self._train_multi_and_ensemble(X=X,
+                                       y=y,
+                                       X_val=X_val,
+                                       y_val=y_val,
+                                       X_unlabeled=X_unlabeled,
+                                       hyperparameters=hyperparameters,
+                                       num_stack_levels=num_stack_levels,
+                                       time_limit=time_limit,
+                                       core_kwargs=core_kwargs,
+                                       infer_limit=infer_limit,
+                                       infer_limit_batch_size=infer_limit_batch_size,
+                                       groups=groups)
 
     def construct_model_templates_distillation(self, hyperparameters, **kwargs):
         path = kwargs.pop('path', self.path)

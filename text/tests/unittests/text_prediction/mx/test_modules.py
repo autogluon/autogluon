@@ -1,7 +1,12 @@
-import mxnet as mx
+import pytest
+
+try:
+    import mxnet as mx
+except ImportError:
+    pytest.skip("MXNet is not installed. Skip this test.", allow_module_level=True)
+
 from mxnet.util import use_np
 import numpy as np
-import pytest
 from autogluon_contrib_nlp.models import get_backbone
 from autogluon.text.text_prediction.mx.modules import MultiModalWithPretrainedTextNN
 

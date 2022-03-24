@@ -128,10 +128,10 @@ class NNFastAiTabularModel(AbstractModel):
             if self.cat_columns:
                 try:
                     X_stats = X[self.cat_columns].describe(include='all').T.reset_index()
-                    cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
+                    cat_cols_to_drop = list(X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values)
                 except:
                     cat_cols_to_drop = []
-                if cat_cols_to_drop:
+                if len(cat_cols_to_drop) != 0:
                     cat_cols_to_drop = set(cat_cols_to_drop)
                     self.cat_columns = [col for col in self.cat_columns if (col not in cat_cols_to_drop)]
             num_cat_cols_use = len(self.cat_columns)
@@ -449,7 +449,7 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
             ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
@@ -501,3 +501,6 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         return 10 * get_approximate_df_mem_usage(X).sum()
+
+    def _more_tags(self):
+        return {'can_refit_full': True}

@@ -1,5 +1,9 @@
+import pytest
+
 from autogluon.vision import ObjectDetector as Task
 
+
+@pytest.mark.skip(reason="ObjectDetector is not stable to test, and fails due to transient errors occasionally.")
 def test_task():
     dataset = Task.Dataset.from_voc('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip')
     train_data, _, test_data = dataset.random_split(random_state=0)

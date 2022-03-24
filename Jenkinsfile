@@ -141,7 +141,6 @@ stage("Unit Test") {
           conda env update -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-tabular-py3-v3
           conda list
-          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
           ${install_core_all}
@@ -167,11 +166,10 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-text-py3 --all -y
+          conda remove --name autogluon-text-py3-v3 --all -y
           conda env update -n autogluon-text-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-text-py3-v3
           conda list
-          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
           ${install_core_all}
@@ -180,9 +178,11 @@ stage("Unit Test") {
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
           ${install_text}
+          # launch different process for each test to make sure memory is released
+          python3 -m pip install --upgrade pytest-xdist
 
           cd text/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
         }
       }
@@ -200,7 +200,6 @@ stage("Unit Test") {
           conda env update -n autogluon-vision-py3 -f docs/build_gpu.yml
           conda activate autogluon-vision-py3
           conda list
-          ${setup_mxnet_gpu}
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
@@ -347,10 +346,10 @@ stage("Build Tutorials") {
         conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-tabular-v3
         conda list
-        ${setup_mxnet_gpu}
         ${setup_torch_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
+        export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 
         git clean -fx
         bash docs/build_pip_install.sh
@@ -378,6 +377,7 @@ stage("Build Tutorials") {
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
+        export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 
         git clean -fx
         bash docs/build_pip_install.sh
@@ -403,6 +403,7 @@ stage("Build Tutorials") {
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
         export AG_DOCS=1
+        export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 
         git clean -fx
         bash docs/build_pip_install.sh

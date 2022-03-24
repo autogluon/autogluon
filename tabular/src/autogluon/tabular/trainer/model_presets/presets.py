@@ -157,7 +157,9 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
-        raise ValueError("'NN' model has been deprecated. Please specify 'NN_MXNET' or 'NN_TORCH' in its place (Tabular Neural Networks implemented in different backend frameworks).")
+        # TODO: Remove in v0.5.0
+        logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
+                       'Starting in v0.5.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:
         if problem_type == QUANTILE:
             if model_type not in DEFAULT_QUANTILE_MODEL:
@@ -171,21 +173,16 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
+        if model_type == 'NN':
+            # TODO: Remove in v0.5.0
+            model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
             if model_type in invalid_type_set:
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
                 if model_type == 'AG_TEXT_NN':
-                    AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
-                                           'You may try to install "autogluon.text" ' \
-                                           'first by running. ' \
-                                           '`python3 -m pip install autogluon.text`'
-                    try:
-                        from autogluon.text import ag_text_presets
-                    except ImportError:
-                        raise ImportError(AG_TEXT_IMPORT_ERROR)
-                    model_cfgs_to_process.append(ag_text_presets.create(model_cfg))
+                    model_cfgs_to_process.append({})
                 else:
                     model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)
             else:
@@ -323,8 +320,14 @@ def model_factory(
     model_params = copy.deepcopy(model)
     model_params.pop(AG_ARGS, None)
     model_params.pop(AG_ARGS_ENSEMBLE, None)
-    model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
-                            hyperparameters=model_params)
+
+    model_init_kwargs = dict(
+        path=path,
+        name=name,
+        problem_type=problem_type,
+        eval_metric=eval_metric,
+        hyperparameters=model_params,
+    )
 
     if ensemble_kwargs is not None:
         ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
@@ -333,8 +336,10 @@ def model_factory(
         if ensemble_kwargs_model['hyperparameters'] is None:
             ensemble_kwargs_model['hyperparameters'] = {}
         ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
-        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init,
+        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_type, model_base_kwargs=model_init_kwargs,
                                    **ensemble_kwargs_model)
+    else:
+        model_init = model_type(**model_init_kwargs)
 
     return model_init
 
@@ -352,7 +357,7 @@ def get_preset_models_softclass(hyperparameters, invalid_model_names: list = Non
     # Swap RF criterion for MSE:
     if 'RF' in hyperparameters_rf:
         rf_params = hyperparameters_rf['RF']
-        rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
+        rf_newparams = {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE'}}
         for i in range(len(rf_params)):
             rf_params[i].update(rf_newparams)
         rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n+1):]]  # Remove duplicates which may arise after overwriting criterion

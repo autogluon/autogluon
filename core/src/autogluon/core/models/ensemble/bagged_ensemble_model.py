@@ -1,10 +1,12 @@
 import copy
+import inspect
 import logging
 import os
 import platform
 import time
 from collections import Counter
 from statistics import mean
+from typing import Dict, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -31,11 +33,31 @@ class BaggedEnsembleModel(AbstractModel):
     Bagged ensemble meta-model which fits a given model multiple times across different splits of the training data.
 
     For certain child models such as KNN, this may only train a single model and instead rely on the child model to generate out-of-fold predictions.
+
+    Parameters
+    ----------
+    model_base : Union[AbstractModel, Type[AbstractModel]]
+        The base model to repeatedly fit during bagging.
+        If a AbstractModel class, then also provide model_base_kwargs which will be used to initialize the model via model_base(**model_base_kwargs).
+    model_base_kwargs : Dict[str, any], default = None
+        kwargs used to initialize model_base if model_base is a class.
+    random_state : int, default = 0
+        Random state used to split the data into cross-validation folds during fit.
+    **kwargs
+        Refer to AbstractModel documentation
     """
     _oof_filename = 'oof.pkl'
 
-    def __init__(self, model_base: AbstractModel, random_state=0, **kwargs):
-        self.model_base = model_base
+    def __init__(self, model_base: Union[AbstractModel, Type[AbstractModel]], model_base_kwargs: Dict[str, any] = None, random_state: int = 0, **kwargs):
+        if inspect.isclass(model_base):
+            if model_base_kwargs is None:
+                model_base_kwargs = dict()
+            self.model_base: AbstractModel = model_base(**model_base_kwargs)
+        elif model_base_kwargs is not None:
+            raise AssertionError(f'model_base_kwargs must be None if model_base was passed as an object! '
+                                 f'(model_base: {model_base}, model_base_kwargs: {model_base_kwargs})')
+        else:
+            self.model_base: AbstractModel = model_base
         self._child_type = type(self.model_base)
         self.models = []
         self._oof_pred_proba = None
@@ -53,6 +75,7 @@ class BaggedEnsembleModel(AbstractModel):
         # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
+        self._params_aux_child = None  # aux params of child model
 
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=self.model_base.eval_metric, **kwargs)
 
@@ -113,6 +136,7 @@ class BaggedEnsembleModel(AbstractModel):
         self.stopping_metric = child.stopping_metric
         self.quantile_levels = child.quantile_levels
         self.normalize_pred_probas = child.normalize_pred_probas
+        self._params_aux_child = child.params_aux
 
     def preprocess(self, X, preprocess_nonadaptive=True, model=None, **kwargs):
         if preprocess_nonadaptive:
@@ -179,6 +203,18 @@ class BaggedEnsembleModel(AbstractModel):
         if self._oof_pred_proba is None and self.is_fit():
             self._load_oof()
 
+        if (not self._get_tags_child().get('can_refit_full', False) or k_fold == 1) and not self.params.get('save_bag_folds', True):
+            # TODO: This is a hack to avoid a very challenging situation:
+            #  in high_quality preset we don't save fold models, but for models that don't support refit_full,
+            #  they must copy the first fold model instead of fitting again.
+            #  Therefore we must override save_bag_folds for these unsupported models so that the refit versions have a fold model to copy.
+            #  This could be implemented better by only keeping the first fold model artifact and avoid saving the other fold model artifacts (lower disk usage)
+            #  However, this is complex to code accounting for the fitting strategies and would be prone to difficult to diagnose bugs.
+            self.params['save_bag_folds'] = True
+            if k_fold != 1:
+                # Only log in the situation where functionality is currently suboptimal
+                logger.log(20, '\tForcing `save_bag_folds=True` because child model does not support `refit_full`.')
+
         save_bag_folds = self.params.get('save_bag_folds', True)
         if k_fold == 1:
             self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, **kwargs)
@@ -199,6 +235,7 @@ class BaggedEnsembleModel(AbstractModel):
             # FIXME: Don't save folds except for refit
             # FIXME: Cleanup self
             # FIXME: Don't add `_FULL` to name
+            # FIXME: Support `can_refit_full=False` models
             if refit_folds:
                 refit_template = self.convert_to_refit_full_template()
                 refit_template.params['use_child_oof'] = False
@@ -211,6 +248,9 @@ class BaggedEnsembleModel(AbstractModel):
                 return refit_template
             else:
                 return self
+
+    def _get_child_aux_val(self, key: str, default=None):
+        return self._params_aux_child.get(key, default)
 
     def _validate_bag_kwargs(self, *,
                              k_fold,
@@ -326,19 +366,20 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
         self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
-        self._n_repeats = 1
-        self._n_repeats_finished = 1
-        self._k_per_n_repeat = [1]
-        self._bagged_mode = False
         model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if not self.params.get('save_bag_folds', True):
             model_base.model = None
         if self.low_memory:
-            self.save_child(model_base, verbose=False)
-            self.models = [model_base.name]
-        else:
-            self.models = [model_base]
-        self._add_child_times_to_bag(model=model_base)
+            self.save_child(model_base)
+        self.add_child(model=model_base, add_child_times=True)
+        self._set_n_repeat_single()
+
+    def _set_n_repeat_single(self):
+        """Sets variables that track `n_repeats` to values that represent having only 1 child in the bag."""
+        self._n_repeats = 1
+        self._n_repeats_finished = 1
+        self._k_per_n_repeat = [1]
+        self._bagged_mode = False
 
     def _get_default_fold_fitting_strategy(self):
         # ray not working properly on macos: https://github.com/ray-project/ray/issues/20084
@@ -351,7 +392,7 @@ class BaggedEnsembleModel(AbstractModel):
         current_os = platform.system()
         fold_fitting_strategy = os_fitting_strategy_map.get(current_os, 'sequential_local')
         if fold_fitting_strategy == 'sequential_local':
-            warning_msg = f'Will use sequential fold fitting strategy because {current_os} OS does not yet support parallel folding.'
+            warning_msg = f'\tWill use sequential fold fitting strategy because {current_os} OS does not yet support parallel folding.'
             dup_filter.attach_filter_targets(warning_msg)
             logger.warning(warning_msg)
         else:
@@ -389,7 +430,7 @@ class BaggedEnsembleModel(AbstractModel):
         if fold_fitting_strategy == 'parallel_local':
             if disable_parallel_fitting:
                 fold_fitting_strategy = SequentialLocalFoldFittingStrategy
-                logger.log(20, f'{model_base.__class__.__name__} does not support parallel folding yet. Will use sequential folding instead')
+                logger.log(20, f'\t{model_base.__class__.__name__} does not support parallel folding yet. Will use sequential folding instead')
             else:
                 fold_fitting_strategy = ParallelLocalFoldFittingStrategy
         elif fold_fitting_strategy == 'sequential_local':
@@ -427,9 +468,6 @@ class BaggedEnsembleModel(AbstractModel):
 
         fold_fit_args_list = [dict(fold_ctx=fold_ctx) for fold_ctx in fold_fit_args_list]
 
-        logger.log(20, f'\tFitting {len(fold_fit_args_list)} child models '
-                       f'({fold_fit_args_list[0]["fold_ctx"]["model_name_suffix"]} - {fold_fit_args_list[-1]["fold_ctx"]["model_name_suffix"]})')
-
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
         models = []
 
@@ -451,18 +489,21 @@ class BaggedEnsembleModel(AbstractModel):
             # If memory is not sufficient, fall back to sequential fold strategy
             fold_fitting_strategy_args.pop('num_folds_parallel', None)
             fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
-            logger.log(20, f'Memory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead')
-            logger.log(20, 'Consider decrease folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling tabular.fit')
-        else:
-            logger.log(20, f'{fold_fitting_strategy.__class__.__name__} is used to fit folds')
+            logger.log(30, f'\tMemory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead. '
+                           f'\tConsider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling predictor.fit')
+
+        logger.log(20, f'\tFitting {len(fold_fit_args_list)} child models '
+                       f'({fold_fit_args_list[0]["fold_ctx"]["model_name_suffix"]} - {fold_fit_args_list[-1]["fold_ctx"]["model_name_suffix"]}) | '
+                       f'Fitting with {fold_fitting_strategy.__class__.__name__}')
 
         # noinspection PyCallingNonCallable
         for fold_fit_args in fold_fit_args_list:
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
 
-        self.models += models
-
+        for model in models:
+            # No need to add child times or save child here as this already occurred in the fold_fitting_strategy
+            self.add_child(model=model, add_child_times=False)
         self._bagged_mode = True
 
         if self._oof_pred_proba is None:
@@ -617,14 +658,45 @@ class BaggedEnsembleModel(AbstractModel):
         assert self.is_fit(), "The model must be fit before calling the get_features method."
         return self.load_child(self.models[0]).get_features()
 
-    def load_child(self, model, verbose=False) -> AbstractModel:
+    def load_child(self, model: Union[AbstractModel, str], verbose=False) -> AbstractModel:
         if isinstance(model, str):
             child_path = self.create_contexts(self.path + model + os.path.sep)
             return self._child_type.load(path=child_path, verbose=verbose)
         else:
             return model
 
-    def save_child(self, model, verbose=False):
+    def add_child(self, model: Union[AbstractModel, str], add_child_times=False):
+        """
+        Add a new fit child model to `self.models`
+
+        Parameters
+        ----------
+        model : Union[AbstractModel, str]
+            The child model to add. If str, it is the name of the model.
+        add_child_times : bool, default = False
+            Whether to add child metadata on times to the bag times.
+            This includes fit_time, predict_time, and predict_1_time.
+        """
+        if self.models is None:
+            self.models = []
+        if isinstance(model, str):
+            model_name = model
+            model = None
+        else:
+            model_name = model.name
+        if self.low_memory:
+            self.models.append(model_name)
+        else:
+            if model is None:
+                model = self.load_child(model=model_name, verbose=False)
+            self.models.append(model)
+        if add_child_times:
+            if model is None:
+                model = self.load_child(model=model_name, verbose=False)
+            self._add_child_times_to_bag(model=model)
+
+    def save_child(self, model: Union[AbstractModel, str], verbose=False):
+        """Save child model to disk."""
         child = self.load_child(model)
         child.set_contexts(self.path + child.name + os.path.sep)
         child.save(verbose=verbose)
@@ -645,6 +717,29 @@ class BaggedEnsembleModel(AbstractModel):
         refit_child_template = self._child_type(**refit_params)
 
         return refit_child_template
+
+    def convert_to_refit_full_via_copy(self) -> AbstractModel:
+        """
+        Creates a new refit_full variant of the model, but instead of training it simply copies `self` while keeping only the first fold model.
+        This method is for compatibility with models that have not implemented refit_full support as a fallback.
+        """
+        if not self.params.get('save_bag_folds', True):
+            raise AssertionError('Cannot perform copy-based refit_full when save_bag_folds is False!')
+        __models = self.models
+        self.models = []
+        model_full = copy.deepcopy(self)
+        self.models = __models
+        child_0 = self.load_child(self.models[0])
+        model_full.fit_time = None
+        model_full.predict_time = None
+        model_full.predict_1_time = None
+        model_full.val_score = None
+        model_full.rename(model_full.name + REFIT_FULL_SUFFIX)
+        if model_full.low_memory:
+            model_full.save_child(child_0)
+        model_full.add_child(model=child_0, add_child_times=True)
+        model_full._set_n_repeat_single()
+        return model_full
 
     def get_params(self):
         init_args = dict(
@@ -708,8 +803,13 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time = model.predict_time
         else:
             self.predict_time += model.predict_time
+
+        if self.predict_1_time is None:
+            self.predict_1_time = model.predict_1_time
+        else:
+            self.predict_1_time += model.predict_1_time
     
-    def _add_parallel_child_times(self, fit_time, predict_time):
+    def _add_parallel_child_times(self, fit_time, predict_time, predict_1_time):
         if self.fit_time is None:
             self.fit_time = fit_time
         else:
@@ -719,6 +819,11 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time = predict_time
         else:
             self.predict_time += predict_time
+
+        if self.predict_1_time is None:
+            self.predict_1_time = predict_1_time
+        else:
+            self.predict_1_time += predict_1_time
 
     @classmethod
     def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True):
@@ -1010,4 +1115,11 @@ class BaggedEnsembleModel(AbstractModel):
         return bags, bags_performance, hpo_results
 
     def _more_tags(self):
-        return {'valid_oof': True}
+        return {
+            'valid_oof': True,
+            'can_refit_full': True,
+        }
+
+    def _get_tags_child(self):
+        """Gets the tags of the child model."""
+        return self._get_model_base()._get_tags()

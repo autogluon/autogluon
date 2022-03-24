@@ -8,7 +8,9 @@ This tutorial presents two examples of NLP tasks:
 - [Sentence Similarity](https://arxiv.org/abs/1910.03940)
 
 The general usage of the `TextPredictor` is similar to AutoGluon's `TabularPredictor`. We format NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict, and each row corresponds to one training example.
-Here, the labels can be discrete categories (classification) or numerical values (regression).
+Here, the labels can be discrete categories (classification) or numerical values (regression). In fact, `TextPredictor` also enables training on multi-modal data tables that contain text, numeric and categorical columns
+and also support solving multilingual problems. You may refer to multimodal / multilingual usage in :ref:`sec_textprediction_multimodal` and :ref:`sec_textprediction_multilingual`.
+
 
 ```{.python .input}
 %matplotlib inline
@@ -16,19 +18,21 @@ Here, the labels can be discrete categories (classification) or numerical values
 import numpy as np
 import warnings
 import matplotlib.pyplot as plt
+
 warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
 ## Sentiment Analysis Task
 
-First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset, which consists of movie reviews and their associated sentiment. Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case a **binary classification**, where reviews are labeled as 1 if they convey a positive opinion and labeled as 0 otherwise). Let's first load and look at the data, noting the labels are stored in a column called **label**.
+First, we consider the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) dataset, which consists of movie reviews and their associated sentiment. 
+Given a new movie review, the goal is to predict the sentiment reflected in the text (in this case a **binary classification**, where reviews are labeled as 1 if they convey a positive opinion and labeled as 0 otherwise). Let's first load and look at the data, noting the labels are stored in a column called **label**.
 
 
 ```{.python .input}
-from autogluon.core import TabularDataset
-train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
-test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
+from autogluon.core.utils.loaders import load_pd
+train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet')
+test_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet')
 subsample_size = 1000  # subsample data for faster demo, try setting this to larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 train_data.head(10)
@@ -55,12 +59,14 @@ Above we specify that: the column named **label** contains the label values to p
 
 After training, we can easily evaluate our predictor on separate test data formatted similarly to our training data.
 
+
 ```{.python .input}
 test_score = predictor.evaluate(test_data)
-print('Accuracy = {:.2f}%'.format(test_score * 100))
+print(test_score)
 ```
 
 By default, `evaluate()` will report the evaluation metric previously specified, which is `accuracy` in our example. You may also specify additional metrics, e.g. F1 score, when calling evaluate.
+
 
 ```{.python .input}
 test_score = predictor.evaluate(test_data, metrics=['acc', 'f1'])
@@ -71,40 +77,36 @@ print(test_score)
 
 And you can easily obtain predictions from these models by calling `predictor.predict()`.
 
+
 ```{.python .input}
 sentence1 = "it's a charming and often affecting journey."
 sentence2 = "It's slow, very, very, very slow."
 predictions = predictor.predict({'sentence': [sentence1, sentence2]})
-print('"Sentence":', sentence1, '"Predicted Sentiment":', predictions[0])
-print('"Sentence":', sentence2, '"Predicted Sentiment":', predictions[1])
+print('"Sentence":', sentence1, '"Predicted Sentiment":', predictions.iloc[0])
+print('"Sentence":', sentence2, '"Predicted Sentiment":', predictions.iloc[1])
 ```
 
 For classification tasks, you can ask for predicted class-probabilities instead of predicted classes.
 
+
 ```{.python .input}
 probs = predictor.predict_proba({'sentence': [sentence1, sentence2]})
-print('"Sentence":', sentence1, '"Predicted Class-Probabilities":', probs[0])
-print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs[1])
+print('"Sentence":', sentence1, '"Predicted Class-Probabilities":', probs.iloc[0])
+print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs.iloc[1])
 ```
 
 We can just as easily produce predictions over an entire dataset.
+
 
 ```{.python .input}
 test_predictions = predictor.predict(test_data)
 test_predictions.head()
 ```
 
-### Intermediate Training Results
-
-After training, you can explore intermediate training results in `predictor.results`.
-
-```{.python .input}
-predictor.results.tail(3)
-```
-
 ### Save and Load
 
 The trained predictor is automatically saved at the end of `fit()`, and you can easily reload it.
+
 
 ```{.python .input}
 loaded_predictor = TextPredictor.load('ag_sst')
@@ -112,6 +114,7 @@ loaded_predictor.predict_proba({'sentence': [sentence1, sentence2]})
 ```
 
 You can also save the predictor to any location by calling `.save()`.
+
 
 ```{.python .input}
 loaded_predictor.save('my_saved_dir')
@@ -124,12 +127,14 @@ loaded_predictor2.predict_proba({'sentence': [sentence1, sentence2]})
 
 You can also use a trained predictor to extract embeddings that maps each row of the data table to an embedding vector extracted from intermediate neural network representations of the row.
 
+
 ```{.python .input}
 embeddings = predictor.extract_embedding(test_data)
 print(embeddings)
 ```
 
 Here, we use TSNE to visualize these extracted embeddings. We can see that there are two clusters corresponding to our two labels, since this network has been trained to discriminate between these labels.
+
 
 ```{.python .input}
 from sklearn.manifold import TSNE
@@ -145,6 +150,7 @@ plt.legend(loc='best')
 
 You can also load a predictor and call `.fit()` again to continue training the same predictor with new data.
 
+
 ```{.python .input}
 new_predictor = TextPredictor.load('ag_sst')
 new_predictor.fit(train_data, time_limit=30, save_path='ag_sst_continue_train')
@@ -157,19 +163,22 @@ print(test_score)
 Next, let's use AutoGluon to train a model for evaluating how semantically similar two sentences are.
 We use the [Semantic Textual Similarity Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset for illustration.
 
+
 ```{.python .input}
-sts_train_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')[['sentence1', 'sentence2', 'score']]
-sts_test_data = TabularDataset('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')[['sentence1', 'sentence2', 'score']]
+sts_train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')[['sentence1', 'sentence2', 'score']]
+sts_test_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')[['sentence1', 'sentence2', 'score']]
 sts_train_data.head(10)
 ```
 
 In this data, the column named **score** contains numerical values (which we'd like to predict) that are human-annotated similarity scores for each given pair of sentences.
+
 
 ```{.python .input}
 print('Min score=', min(sts_train_data['score']), ', Max score=', max(sts_train_data['score']))
 ```
 
 Let's train a regression model to predict these scores. Note that we only need to specify the label column and AutoGluon automatically determines the type of prediction problem and an appropriate loss function. Once again, you should increase the short `time_limit` below to obtain reasonable performance in your own applications.
+
 
 ```{.python .input}
 predictor_sts = TextPredictor(label='score', path='./ag_sts')
@@ -188,6 +197,7 @@ print('SPEARMANR = {:.4f}'.format(test_score['spearmanr']))
 
 Let's use our model to predict the similarity score between a few sentences.
 
+
 ```{.python .input}
 sentences = ['The child is riding a horse.',
              'The young boy is riding a horse.',
@@ -205,12 +215,12 @@ score3 = predictor_sts.predict({'sentence1': [sentences[0]],
 print(score1, score2, score3)
 ```
 
-Although the `TextPredictor` is only designed for classification and regression tasks, it can directly be used for many NLP tasks if you properly format them into a data table. Note that there can be many text columns in this data table. Refer to the [TextPredictor documentation](../../api/autogluon.predictor.html#autogluon.text.TextPredictor.fit) to see all of the available methods/options.
+Although the `TextPredictor` currently supports classification and regression tasks, it can directly be used for 
+many NLP tasks if you properly format them into a data table. Note that there can be many text columns in this data table. 
+Refer to the [TextPredictor documentation](../../api/autogluon.predictor.html#autogluon.text.TextPredictor.fit) to see all available methods/options.
 
-Unlike `TabularPredictor` which trains/ensembles many different kinds of models, 
-`TextPredictor` fits only Transformer neural network models. These are fit to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
+Unlike `TabularPredictor` which trains/ensembles many different types of models,
+`TextPredictor` focuses on fine-tuning deep learning based models. It supports transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
 [ALBERT](https://arxiv.org/pdf/1909.11942.pdf), and [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB).
-`TextPredictor` also enables training on multi-modal data tables that contain text, numeric and categorical columns, and the neural network hyperparameter can be automatically tuned with Hyperparameter Optimization (HPO), which will be introduced in the other tutorials.
 
-**Note:** `TextPredictor` depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package.
-Due to an ongoing upgrade of GluonNLP, we are currently using a custom version of the package: [autogluon-contrib-nlp](https://github.com/sxjscience/autogluon-contrib-nlp.git). In a future release, AutoGluon will support the official GluonNLP 1.0, but the APIs demonstrated here will remain the same.
+**Note:** `TextPredictor` uses `pytorch` as the default backend.

@@ -48,13 +48,13 @@ def try_import_mxnet():
 
 def try_import_ray():
     ray_max_version_os_map = dict(
-        Darwin='1.9.0',
-        Windows='1.8.0',
-        Linux='1.9.0',
+        Darwin='1.11.0',
+        Windows='1.11.0',
+        Linux='1.11.0',
     )
-    ray_min_version = '1.7.0'
+    ray_min_version = '1.10.0'
     current_os = platform.system()
-    ray_max_version = ray_max_version_os_map.get(current_os, '1.8.0')
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.11.0')
     try:
         import ray
         from distutils.version import LooseVersion

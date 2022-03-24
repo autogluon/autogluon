@@ -49,6 +49,13 @@ class DatasetLoaderHelper:
             'problem_type': MULTICLASS,
             'label': 'Cover_Type',
         },
+        # Subset of covertype dataset with 3k train/test rows. Ratio of labels is preserved.
+        covertype_small={
+            'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassificationSmall.zip',
+            'name': 'CoverTypeMulticlassClassificationSmall',
+            'problem_type': MULTICLASS,
+            'label': 'Cover_Type',
+        },
         # Regression with mixed feature-types, skewed Y-values.
         ames={
             'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',

@@ -7,7 +7,7 @@ import time
 import numpy as np
 import psutil
 
-from autogluon.common.features.types import R_OBJECT
+from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -32,12 +32,18 @@ class RFModel(AbstractModel):
             from .rf_quantile import RandomForestQuantileRegressor
             return RandomForestQuantileRegressor
         if self.params_aux.get('use_daal', False):
-            # Disabled by default because it appears to degrade performance
+            # Disabled by default because OOB score does not yet work properly
             try:
-                # TODO: Use sklearnex instead once a suitable toggle option is provided that won't impact future models
-                # FIXME: DAAL OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
-                from daal4py.sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-                logger.log(15, '\tUsing daal4py RF backend...')
+                # FIXME: sklearnex OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
+                #  Refer to https://github.com/intel/scikit-learn-intelex/issues/933
+                #  Current workaround: Forcibly set oob_score=True during fit to compute OOB during train time.
+                #  Downsides:
+                #    1. Slows down training slightly by forcing computation of OOB even if OOB is not needed (such as in medium_quality)
+                #    2. Makes computing the correct pred_time_val difficult, as the time is instead added to the fit_time,
+                #       and we would need to waste extra time to compute the proper pred_time_val post-fit.
+                #       Therefore with sklearnex enabled, pred_time_val is incorrect.
+                from sklearnex.ensemble import RandomForestClassifier, RandomForestRegressor
+                logger.log(15, '\tUsing sklearnex RF backend...')
                 self._daal = True
             except:
                 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -159,6 +165,8 @@ class RFModel(AbstractModel):
         if self._daal:
             if params.get('warm_start', False):
                 params['warm_start'] = False
+            # FIXME: This is inefficent but sklearnex doesn't support computing oob_score after training
+            params['oob_score'] = True
 
         model = model_cls(**params)
 
@@ -202,7 +210,10 @@ class RFModel(AbstractModel):
                 for j in range(len(n_estimator_increments)):
                     if n_estimator_increments[j] > n_estimators_ideal:
                         n_estimator_increments[j] = n_estimators_ideal
-
+        if self._daal and model.criterion != 'entropy':
+            # TODO: entropy is not accelerated by sklearnex, need to not set estimators_ to None to avoid crash
+            # This reduces memory usage / disk usage.
+            model.estimators_ = None
         self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
 
@@ -241,12 +252,13 @@ class RFModel(AbstractModel):
 
     # FIXME: Unknown if this works with quantile regression
     def _get_oof_pred_proba(self, X, y, **kwargs):
-        if self._daal:
-            raise AssertionError('DAAL forest backend does not support out-of-bag predictions.')
         if not self.model.bootstrap:
             raise ValueError('Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.')
 
         oob_is_not_set = getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None
+
+        if oob_is_not_set and self._daal:
+            raise AssertionError('DAAL forest backend does not support out-of-bag predictions.')
 
         # TODO: This can also be done via setting `oob_score=True` in model params,
         #  but getting the correct `pred_time_val` that way is not easy, since we can't time the internal call.
@@ -316,7 +328,7 @@ class RFModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
@@ -330,7 +342,11 @@ class RFModel(AbstractModel):
         return default_ag_args_ensemble
 
     def _more_tags(self):
+        # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:
+        #  `self.params_trained['n_estimators'] = self.model.n_estimators`
+        tags = {'can_refit_full': True}
         if self.problem_type == QUANTILE:
-            return {'valid_oof': False} # not supported in quantile regression
+            tags['valid_oof'] = False  # not supported in quantile regression
         else:
-            return {'valid_oof': True}
+            tags['valid_oof'] = True
+        return tags

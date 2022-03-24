@@ -5,9 +5,16 @@ import pandas as pd
 import pytest
 import tempfile
 
+try:
+    import mxnet
+except ImportError:
+    pytest.skip("MXNet is not installed. Skip this test.", allow_module_level=True)
+
 from autogluon.core.space import Int
 from autogluon.core.utils.loaders import load_pd
-from autogluon.text import TextPredictor, ag_text_presets
+from autogluon.text import TextPredictor
+from autogluon.text.text_prediction.legacy_presets import ag_text_presets
+from autogluon.text.text_prediction.constants import MXNET
 
 DATA_INFO = {
     'sst': {
@@ -47,7 +54,7 @@ def verify_predictor_save_load(predictor, df, verify_proba=False,
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df, as_pandas=False)
-        loaded_predictor = TextPredictor.load(root)
+        loaded_predictor = TextPredictor.load(root, backend=MXNET)
         predictions2 = loaded_predictor.predict(df, as_pandas=False)
         predictions2_df = loaded_predictor.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
@@ -77,7 +84,7 @@ def test_predictor_fit(key):
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = TextPredictor(label=label, eval_metric=eval_metric)
+    predictor = TextPredictor(label=label, eval_metric=eval_metric, backend=MXNET)
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
                   time_limit=30, seed=123)
     dev_score = predictor.evaluate(dev_data)
@@ -91,7 +98,7 @@ def test_predictor_fit(key):
     # Saving to folder, loading the saved model and call fit again (continuous fit)
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
-        predictor = TextPredictor.load(root)
+        predictor = TextPredictor.load(root, backend=MXNET)
         predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
                       time_limit=30, seed=123)
 
@@ -107,7 +114,7 @@ def test_cpu_only_raise(set_env_train_without_gpu):
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = TextPredictor(label='label', eval_metric='acc')
+    predictor = TextPredictor(label='label', eval_metric='acc', backend=MXNET)
     if set_env_train_without_gpu is None:
         with pytest.raises(RuntimeError):
             predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
@@ -130,7 +137,7 @@ def test_no_text_column_raise():
 
     df = pd.DataFrame(data, columns=['data', 'label'])
     with pytest.raises(AssertionError):
-        predictor = TextPredictor(label='label', verbosity=4)
+        predictor = TextPredictor(label='label', verbosity=4, backend=MXNET)
         predictor.fit(df,
                       hyperparameters=get_test_hyperparameters(),
                       seed=123)
@@ -147,7 +154,7 @@ def test_emoji():
     for i in range(20 * 3):
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
-    predictor = TextPredictor(label='label', verbosity=3)
+    predictor = TextPredictor(label='label', verbosity=3, backend=MXNET)
     predictor.fit(df,
                   hyperparameters=get_test_hyperparameters(),
                   time_limit=30,
@@ -155,16 +162,6 @@ def test_emoji():
     assert set(predictor.class_labels) == {'grin', 'smile', 'wink'}
     assert predictor.class_labels_internal == [0, 1, 2]
     verify_predictor_save_load(predictor, df)
-
-
-def test_no_job_finished_raise():
-    train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
-                              'glue/sst/train.parquet')
-    with pytest.raises(RuntimeError):
-        # Setting a very small time limits to trigger the bug
-        predictor = TextPredictor(label='label')
-        predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
-                      time_limit=1, num_gpus=1, seed=123)
 
 
 def test_mixed_column_type():
@@ -194,7 +191,7 @@ def test_mixed_column_type():
                              'genre': dev_data['genre'],
                              'score': dev_data['score']})
     # Train Regression
-    predictor1 = TextPredictor(label='score', verbosity=4)
+    predictor1 = TextPredictor(label='score', verbosity=4, backend=MXNET)
     predictor1.fit(train_data,
                    hyperparameters=get_test_hyperparameters(),
                    time_limit=30,
@@ -204,7 +201,7 @@ def test_mixed_column_type():
     verify_predictor_save_load(predictor1, dev_data)
 
     # Train Classification
-    predictor2 = TextPredictor(label='genre', verbosity=4)
+    predictor2 = TextPredictor(label='genre', verbosity=4, backend=MXNET)
     predictor2.fit(train_data,
                    hyperparameters=get_test_hyperparameters(),
                    time_limit=30,
@@ -214,7 +211,7 @@ def test_mixed_column_type():
     verify_predictor_save_load(predictor2, dev_data, verify_proba=True)
 
     # Specify the feature column
-    predictor3 = TextPredictor(label='score', verbosity=4)
+    predictor3 = TextPredictor(label='score', verbosity=4, backend=MXNET)
     predictor3.fit(train_data[['sentence1', 'sentence3', 'categorical0', 'score']],
                    hyperparameters=get_test_hyperparameters(),
                    time_limit=30,
@@ -231,7 +228,7 @@ def test_empty_text_item():
     train_data = train_data.iloc[train_perm[:100]]
     train_data.iat[0, 0] = None
     train_data.iat[10, 0] = None
-    predictor = TextPredictor(label='score', verbosity=4)
+    predictor = TextPredictor(label='score', verbosity=4, backend=MXNET)
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(), time_limit=30)
 
 
@@ -257,7 +254,7 @@ def test_predictor_fit_hpo():
     valid_perm = rng_state.permutation(len(dev_data))
     train_data = train_data.iloc[train_perm[:100]]
     dev_data = dev_data.iloc[valid_perm[:10]]
-    predictor = TextPredictor(label=label, eval_metric=eval_metric)
+    predictor = TextPredictor(label=label, eval_metric=eval_metric, backend=MXNET)
     predictor.fit(
         train_data,
         hyperparameters=get_test_hyperparameters(),
@@ -276,6 +273,6 @@ def test_predictor_fit_hpo():
     # Saving to folder, loading the saved model and call fit again (continuous fit)
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
-        predictor = TextPredictor.load(root)
+        predictor = TextPredictor.load(root, backend=MXNET)
         predictor.fit(train_data, hyperparameters=get_test_hyperparameters(),
                       time_limit=30, seed=123)

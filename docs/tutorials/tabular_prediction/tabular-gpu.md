@@ -49,9 +49,10 @@ hyperparameters['AG_TEXT_NN'] = ['<preset>']
 
 Available text model presets:
 
+
 ```{.python .input}
-from autogluon.text.text_prediction.presets import ag_text_presets
-ag_text_presets.list_keys()
+from autogluon.text.text_prediction.presets import list_text_presets
+list_text_presets()
 ```
 
 ### Vision models

@@ -38,8 +38,7 @@ install_requires = [
 
 extras_require = {
     'ray': [
-        "ray>=1.7,<1.8;platform_system=='Windows'",  # ray 1.8 fails on windows ci test
-        "ray>=1.7,<1.9;platform_system!='Windows'",
+        "ray>=1.10,<1.11",
     ],
 }
 

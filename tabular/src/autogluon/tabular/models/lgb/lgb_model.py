@@ -10,7 +10,7 @@ import psutil
 import numpy as np
 from pandas import DataFrame, Series
 
-from autogluon.common.features.types import R_OBJECT
+from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
@@ -63,8 +63,8 @@ class LGBModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
-        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
     def _fit(self,
@@ -323,7 +323,7 @@ class LGBModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
@@ -340,3 +340,7 @@ class LGBModel(AbstractModel):
 
     def _ag_params(self) -> set:
         return {'ag.early_stop'}
+
+    def _more_tags(self):
+        # `can_refit_full=True` because num_boost_round is communicated at end of `_fit`
+        return {'can_refit_full': True}
