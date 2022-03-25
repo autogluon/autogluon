@@ -61,7 +61,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         multi_index = pd.MultiIndex.from_product(
             [item_ids, datetime_index], names=["item_id", "timestamp"]
         )
-        ts_df = TimeSeriesDataFrame(pd.Series(target, name="target", index=multi_index).to_frame())
+        ts_df = TimeSeriesDataFrame(
+            pd.Series(target, name="target", index=multi_index).to_frame()
+        )
         return ts_df
 
     @classmethod
@@ -92,17 +94,25 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @classmethod
     def _validate_list_dataset(cls, list_dataset):
         if not isinstance(list_dataset, TimeSeriesListDataset):
-            raise ValueError(f"list_dataset must be a TimeSeriesListDataset, get {type(list_dataset)}")
+            raise ValueError(
+                f"list_dataset must be a TimeSeriesListDataset, get {type(list_dataset)}"
+            )
         if len(list_dataset.data_iter) == 0:
             raise ValueError(f"list_dataset has no time-series.")
         for i, ts in enumerate(list_dataset.data_iter):
             if not isinstance(ts, dict):
-                raise ValueError(f"{i}'th time-series in list_dataset must be a dict, get{type(ts)}")
-            if not ('target' in ts and 'start' in ts):
-                raise ValueError(f"{i}'th time-series in list_dataset must have 'target' and 'start', get{ts.keys()}")
+                raise ValueError(
+                    f"{i}'th time-series in list_dataset must be a dict, get{type(ts)}"
+                )
+            if not ("target" in ts and "start" in ts):
+                raise ValueError(
+                    f"{i}'th time-series in list_dataset must have 'target' and 'start', get{ts.keys()}"
+                )
 
     @classmethod
-    def from_list_dataset(cls, list_dataset: TimeSeriesListDataset) -> TimeSeriesDataFrame:
+    def from_list_dataset(
+        cls, list_dataset: TimeSeriesListDataset
+    ) -> TimeSeriesDataFrame:
         """Convert TimeSeriesListDataset to TimeSeriesDataFrame.
 
         Parameters:
@@ -123,12 +133,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df : TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
+
         cls._validate_list_dataset(list_dataset)
         all_ts = []
         for i, ts in enumerate(list_dataset.data_iter):
             start_timestamp = ts["start"]
             target = ts["target"]
-            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=list_dataset.freq))
+            datetime_index = tuple(
+                pd.date_range(
+                    start_timestamp, periods=len(target), freq=list_dataset.freq
+                )
+            )
             idx = pd.MultiIndex.from_product(
                 [(i,), datetime_index], names=["item_id", "timestamp"]
             )
