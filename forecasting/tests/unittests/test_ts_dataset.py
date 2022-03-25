@@ -30,34 +30,6 @@ SAMPLE_LIST_DATASET = TimeSeriesListDataset(
 )
 
 
-def get_sample_ts_dataframe():
-    """Returns a TimeSeriesDataFrame as following:
-                            target
-    item_id timestamp
-    0       2019-01-01       0
-            2019-01-02       1
-            2019-01-03       2
-    1       2019-01-01       3
-            2019-01-02       4
-            2019-01-03       5
-    2       2019-01-01       6
-            2019-01-02       7
-            2019-01-03       8
-    """
-
-    target = list(range(9))
-    datetime_index = tuple(pd.date_range(START_TIMESTAMP, periods=3))
-    item_ids = (0, 1, 2)
-    multi_inds = pd.MultiIndex.from_product(
-        [item_ids, datetime_index], names=["item_id", "timestamp"]
-    )
-    ts_df = pd.Series(target, name="target", index=multi_inds).to_frame()
-    return TimeSeriesDataFrame(ts_df)
-
-
-SAMPLE_TS_DATAFRAME = get_sample_ts_dataframe()
-
-
 def _build_ts_dataframe(item_ids, datetime_index, target):
     multi_inds = pd.MultiIndex.from_product(
         [item_ids, datetime_index], names=["item_id", "timestamp"]
@@ -65,6 +37,9 @@ def _build_ts_dataframe(item_ids, datetime_index, target):
     return TimeSeriesDataFrame(
         pd.Series(target, name="target", index=multi_inds).to_frame()
     )
+
+
+SAMPLE_TS_DATAFRAME = _build_ts_dataframe(ITEM_IDS, DATETIME_INDEX, TARGETS)
 
 
 def test_validate_data_farme():
