@@ -144,11 +144,11 @@ tests = [
         'expected_score_range' : {
                   'CatBoost': (-7.86, 0.01),
                   'LightGBM': (-15.55, 0.01),
-                  'LightGBMXT': (-16.32, 0.01),
                   'LightGBMLarge': (-10.43, 0.01),
+                  'LightGBMXT': (-16.32, 0.01),
                   'NeuralNetFastAI': (-6.12, 0.01),
                   'NeuralNetTorch': (-4.96, 0.01),
-                  'WeightedEnsemble_L2': (-5.71, 0.01),
+                  'WeightedEnsemble_L2': (-5.58, 0.01),
                   'XGBoost': (-10.8, 0.01),
         },
     },
