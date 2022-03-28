@@ -27,7 +27,6 @@ def model_trial(args,
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
-
         fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **fit_kwargs)
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
@@ -44,6 +43,7 @@ def model_trial(args,
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
+        raise e
         reporter.terminate()
         # FIXME: remove print
         print("model failed")
@@ -73,11 +73,9 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
             raise TimeLimitExceeded
     else:
         time_left = None
-
+    
     time_fit_start = time.time()
-    print('start training')
     model.fit(**fit_args, time_limit=time_left, reporter=reporter)
-    print('finish training')
     time_fit_end = time.time()
 
     if model._get_tags().get('valid_oof', False):

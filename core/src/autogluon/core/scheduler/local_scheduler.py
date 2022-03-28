@@ -15,6 +15,7 @@ from .reporter import FakeReporter
 from ..searcher import searcher_factory
 from ..searcher.exceptions import ExhaustedSearchSpaceError
 from ..searcher.local_searcher import LocalSearcher
+from ..utils.exceptions import TimeLimitExceeded
 from ..utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)
@@ -118,14 +119,6 @@ class LocalScheduler(ABC):
     def run(self, **kwargs):
         raise NotImplementedError
 
-    @abstractmethod
-    def run_trial(self, task_id=0) -> Tuple[bool, dict]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def run_job_(self,):
-        raise NotImplementedError
-
     def run_with_config(self, config):
         """Run with config for final fit.
         It launches a single training trial under any fixed values of the hyperparameters.
@@ -227,17 +220,24 @@ class LocalParallelScheduler(LocalScheduler):
 
     def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         super().__init__(train_fn=train_fn, search_space=search_space, train_fn_kwargs=train_fn_kwargs, searcher=searcher, reward_attr=reward_attr, resource=resource, **kwargs)
+        self.time_start = None
         #prepare ray
         self.ray = try_import_ray()
+        self.ray_train_actor_cls = self.ray.remote(RayTrainActor)
+        self.total_resource = resource
+        self.resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
+        self.trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
+        # self._ray_train_fn = self.ray.remote(max_calls=1)(train_fn)
         #init model for memory calculation. Should I do it here or after getting the config?
 
     def _get_resource_suggestions(self):
+        # TODO: Check if physical cores are better than hyperthreaded cores
         num_cpus = self.resource.get('num_cpus', 1)
         num_gpus = self.resource.get('num_gpus', 0)
         print(num_cpus)
         cpu_per_job = max(1, int(num_cpus // self.num_trials))
         gpu_per_job = 0
-        resource = dict(num_cpus=7)
+        resource = dict(num_cpus=cpu_per_job)
         num_parallel_jobs = min(self.num_trials, num_cpus // cpu_per_job)
         batches = math.ceil(self.num_trials / num_parallel_jobs)
         if num_gpus > 0:
@@ -248,7 +248,29 @@ class LocalParallelScheduler(LocalScheduler):
             resource = dict(num_cpus=cpu_per_job, num_gpus=gpu_per_job)
         return resource, batches, num_parallel_jobs
 
+    def _get_trial_train_fn_kwargs(self):
+        trial_train_fn_kwargs = deepcopy(self.train_fn_kwargs)
+        if 'fit_kwargs' in trial_train_fn_kwargs:
+            trial_train_fn_kwargs['fit_kwargs'].update(self.resource)
+        trial_train_fn_kwargs['time_limit'] = self._get_trial_time_limit()
+        return trial_train_fn_kwargs
+
+    def _get_trial_time_limit(self, fill_factor=0.95):
+        if not self.time_start:
+            self.time_start = time.time()
+        time_elapsed = time.time() - self.time_start
+        if self.time_out is not None:
+            time_left = self.time_out - time_elapsed
+            required_time_per_trial = time_left / self.batches
+            time_limit_trial = required_time_per_trial * fill_factor
+            if time_left <= 0:
+                raise TimeLimitExceeded
+        else:
+            time_limit_trial = None
+        return time_limit_trial
+
     def run(self, **kwargs):
+        self.time_start = time.time()
         self.searcher.configure_scheduler(self)
 
         self.training_history = OrderedDict()
@@ -265,15 +287,15 @@ class LocalParallelScheduler(LocalScheduler):
             else:
                 self.ray.init(log_to_driver=True)
 
-        resource, batches, num_parallel_jobs = self._get_resource_suggestions()
-        print(resource)
+        print(self.resource)
 
         for i in range(self.num_trials):
             try:
-                # FIXME: fix resources
-                job_actor, job_ref = self.run_trial(resource=resource, task_id=i)
+                job_actor, job_ref = self.run_trial(resource=self.resource, task_id=i)
                 job_refs.append(job_ref)
                 job_refs_to_actor_map[job_ref] = job_actor
+                # job_ref = self.run_trial(resource=resource, task_id=i)
+                # job_refs.append(job_ref)
             except ExhaustedSearchSpaceError:
                 break
 
@@ -290,11 +312,9 @@ class LocalParallelScheduler(LocalScheduler):
     def run_job_(self, task_id, resource, searcher_config, reporter):
         args = dict()
         if self.train_fn_kwargs is not None:
-            # TODO: Consider avoiding deepcopy and just do shallow copy,
-            #  Risk is that it will allow values in self.train_fn_kwargs to be altered by HPO trials, causing early trials to alter later trials.
-            train_fn_kwargs = deepcopy(self.train_fn_kwargs)
+            trial_train_fn_kwargs = deepcopy(self.trial_train_fn_kwargs)
         else:
-            train_fn_kwargs = dict()
+            trial_train_fn_kwargs = dict()
         args.update(searcher_config)
 
         args['task_id'] = task_id
@@ -306,67 +326,58 @@ class LocalParallelScheduler(LocalScheduler):
         # train_fn_kwargs_ref = { arg: self.ray.put(arg) for arg in train_fn_kwargs }
         # submit ray job and return the job ref
         # return self._ray_train_fn.options(**resource).remote(args_ref, reporter_ref, **train_fn_kwargs_ref)
-        ray_train_actor_cls = self.ray.remote(RayTrainActor)
-        ray_train_actor = ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, train_fn_kwargs)
+        ray_train_actor = self.ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, trial_train_fn_kwargs)
         return ray_train_actor, ray_train_actor.execute.remote()
         # return self._ray_train_fn.options(**resource).remote(args, reporter, **train_fn_kwargs)
 
     def join_jobs(self, jobs, job_refs_to_actor_map, timeout=None):
         failure_count = 0
         trial_count = 0
-        trials_total_time = 0
         min_failure_threshold = 5
         failure_rate_threshold = 0.8
-        time_start = time.time()
 
         unfinished = jobs
-        while unfinished:
-            finished, unfinished = self.ray.wait(unfinished, num_returns=1)
-            finished = finished[0]
-            is_failed = False
-            # try get the result
-            try:
-                result = self.ray.get(finished)
-                actor = job_refs_to_actor_map[finished]
-                searcher_config = self.ray.get(actor.get_searcher_config.remote())
-                reporter = self.ray.get(actor.get_reporter.remote())
-                self.config_history.update(reporter.config_history)
-                self.training_history.update(reporter.training_history)
-                if type(reporter) is not FakeReporter:
-                    if reporter.last_result:
-                        self.searcher.update(config=searcher_config, **reporter.last_result)
-                    else:
-                        is_failed = True
-                self.ray.kill(actor)
-            except Exception:
-                # TODO: Add special exception type when there are no more new configurations to try (exhausted search space)
-                # logger.log(30, f'\tWARNING: Encountered unexpected exception during trial { job_trial_map.get(finished) }, stopping HPO early.')
-                logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
-                is_failed = True
-            trial_end_time = time.time()
+        with tqdm(total=len(unfinished)) as pbar:
+            while unfinished:
+                finished, unfinished = self.ray.wait(unfinished, num_returns=1)
+                finished = finished[0]
+                is_failed = False
+                # try get the result
+                try:
+                    result = self.ray.get(finished)
+                    actor = job_refs_to_actor_map[finished]
+                    searcher_config = self.ray.get(actor.get_searcher_config.remote())
+                    reporter = self.ray.get(actor.get_reporter.remote())
+                    self.config_history.update(reporter.config_history)
+                    self.training_history.update(reporter.training_history)
+                    if type(reporter) is not FakeReporter:
+                        if reporter.last_result:
+                            self.searcher.update(config=searcher_config, **reporter.last_result)
+                        else:
+                            is_failed = True
+                    self.ray.kill(actor)
+                except TimeLimitExceeded:
+                    logger.log(20, f'\tStopping HPO to satisfy time limit...')
+                    break
+                except Exception:
+                    logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
+                    failure_count += 1
 
-            trial_count += 1
-            if is_failed:
-                failure_count += 1
-            else:
-                # calculate total trial time
-                pass
+                trial_count += 1
+                pbar.update(1)
 
-            if self.max_reward and self.get_best_reward() >= self.max_reward:
-                logger.log(20, f'\tStopping HPO: Max reward reached')
-                break
+                if self.max_reward and self.get_best_reward() >= self.max_reward:
+                    logger.log(20, f'\tStopping HPO: Max reward reached')
+                    break
 
-            if failure_count >= min_failure_threshold and (failure_count / trial_count) >= failure_rate_threshold:
-                logger.warning(f'Warning: Detected a large trial failure rate: '
-                               f'{failure_count}/{trial_count} attempted trials failed ({round((failure_count / trial_count) * 100, 1)}%)! '
-                               f'Stopping HPO early due to reaching failure threshold ({round(failure_rate_threshold*100, 1)}%).\n'
-                               f'\tFailures may be caused by invalid configurations within the provided search space.')
-                break
+                if failure_count >= min_failure_threshold and (failure_count / trial_count) >= failure_rate_threshold:
+                    logger.warning(f'Warning: Detected a large trial failure rate: '
+                                f'{failure_count}/{trial_count} attempted trials failed ({round((failure_count / trial_count) * 100, 1)}%)! '
+                                f'Stopping HPO early due to reaching failure threshold ({round(failure_rate_threshold*100, 1)}%).\n'
+                                f'\tFailures may be caused by invalid configurations within the provided search space.')
+                    break
 
-            if self.time_out is not None:
-                # check for time limit
-                pass
-
+        self.ray.shutdown()
 
 
 class LocalSequentialScheduler(LocalScheduler):

@@ -13,9 +13,9 @@ __all__ = [
     'create_scheduler']
 
 schedulers = {
-    # FIXME: just a quick test
-    # 'local': LocalSequentialScheduler,
-    'local': LocalParallelScheduler,
+    'local': LocalParallelScheduler,  # backward compatibility
+    'local_sequential': LocalSequentialScheduler,
+    'local_parallel': LocalParallelScheduler,
 }
 
 logger = logging.getLogger(__name__)

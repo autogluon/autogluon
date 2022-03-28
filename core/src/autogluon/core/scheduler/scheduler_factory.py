@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 _scheduler_presets = {
-    'auto': {'scheduler': 'local', 'searcher': 'local_random'},
-    'local_random': {'scheduler': 'local', 'searcher': 'local_random'},
-    'random': {'scheduler': 'local', 'searcher': 'random'},
+    'auto': {'scheduler': 'local_parallel', 'searcher': 'local_random'},
+    'local_random': {'scheduler': 'local_parallel', 'searcher': 'local_random'},
+    'random': {'scheduler': 'local_parallel', 'searcher': 'random'},
 }
 
 
