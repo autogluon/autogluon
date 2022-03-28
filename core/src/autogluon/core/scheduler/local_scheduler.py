@@ -220,13 +220,20 @@ class LocalParallelScheduler(LocalScheduler):
 
     def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         super().__init__(train_fn=train_fn, search_space=search_space, train_fn_kwargs=train_fn_kwargs, searcher=searcher, reward_attr=reward_attr, resource=resource, **kwargs)
+        print(resource)
         self.time_start = None
         #prepare ray
-        self.ray = try_import_ray()
-        self.ray_train_actor_cls = self.ray.remote(RayTrainActor)
+        import_ray_additional_err_msg = (
+            "or use sequential scheduler by passing `sequential_local` to `scheduler` in `hyperparameter_tune_kwargs` when calling tabular.fit"
+            "For example: `predictor.fit(..., hyperparameter_tune_kwargs={'scheduler': 'sequential_local'})`"
+        )
+        self.ray = try_import_ray(import_ray_additional_err_msg)
         self.total_resource = resource
         self.resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
-        self.trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
+        self._trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
+        self._ray_train_actor_cls = self.ray.remote(RayTrainActor)
+        self._jobs = list()
+        self._job_ref_to_actor_map = dict()
         # self._ray_train_fn = self.ray.remote(max_calls=1)(train_fn)
         #init model for memory calculation. Should I do it here or after getting the config?
 
@@ -234,7 +241,6 @@ class LocalParallelScheduler(LocalScheduler):
         # TODO: Check if physical cores are better than hyperthreaded cores
         num_cpus = self.resource.get('num_cpus', 1)
         num_gpus = self.resource.get('num_gpus', 0)
-        print(num_cpus)
         cpu_per_job = max(1, int(num_cpus // self.num_trials))
         gpu_per_job = 0
         resource = dict(num_cpus=cpu_per_job)
@@ -277,7 +283,7 @@ class LocalParallelScheduler(LocalScheduler):
         self.config_history = OrderedDict()
         
         job_refs = []
-        job_refs_to_actor_map = dict()
+        job_ref_to_actor_map = dict()
 
         # init ray
         if not self.ray.is_initialized():
@@ -293,14 +299,15 @@ class LocalParallelScheduler(LocalScheduler):
             try:
                 job_actor, job_ref = self.run_trial(resource=self.resource, task_id=i)
                 job_refs.append(job_ref)
-                job_refs_to_actor_map[job_ref] = job_actor
+                job_ref_to_actor_map[job_ref] = job_actor
                 # job_ref = self.run_trial(resource=resource, task_id=i)
                 # job_refs.append(job_ref)
             except ExhaustedSearchSpaceError:
                 break
+        
+        self._jobs = job_refs
+        self._job_ref_to_actor_map = job_ref_to_actor_map
 
-        # collect the task
-        self.join_jobs(job_refs, job_refs_to_actor_map)
 
     def run_trial(self, resource, task_id=0):
         new_searcher_config = self.searcher.get_config()
@@ -312,7 +319,7 @@ class LocalParallelScheduler(LocalScheduler):
     def run_job_(self, task_id, resource, searcher_config, reporter):
         args = dict()
         if self.train_fn_kwargs is not None:
-            trial_train_fn_kwargs = deepcopy(self.trial_train_fn_kwargs)
+            trial_train_fn_kwargs = deepcopy(self._trial_train_fn_kwargs)
         else:
             trial_train_fn_kwargs = dict()
         args.update(searcher_config)
@@ -326,17 +333,17 @@ class LocalParallelScheduler(LocalScheduler):
         # train_fn_kwargs_ref = { arg: self.ray.put(arg) for arg in train_fn_kwargs }
         # submit ray job and return the job ref
         # return self._ray_train_fn.options(**resource).remote(args_ref, reporter_ref, **train_fn_kwargs_ref)
-        ray_train_actor = self.ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, trial_train_fn_kwargs)
+        ray_train_actor = self._ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, trial_train_fn_kwargs)
         return ray_train_actor, ray_train_actor.execute.remote()
         # return self._ray_train_fn.options(**resource).remote(args, reporter, **train_fn_kwargs)
 
-    def join_jobs(self, jobs, job_refs_to_actor_map, timeout=None):
+    def join_jobs(self, timeout=None):
         failure_count = 0
         trial_count = 0
         min_failure_threshold = 5
         failure_rate_threshold = 0.8
 
-        unfinished = jobs
+        unfinished = self._jobs
         with tqdm(total=len(unfinished)) as pbar:
             while unfinished:
                 finished, unfinished = self.ray.wait(unfinished, num_returns=1)
@@ -345,7 +352,7 @@ class LocalParallelScheduler(LocalScheduler):
                 # try get the result
                 try:
                     result = self.ray.get(finished)
-                    actor = job_refs_to_actor_map[finished]
+                    actor = self._job_ref_to_actor_map[finished]
                     searcher_config = self.ray.get(actor.get_searcher_config.remote())
                     reporter = self.ray.get(actor.get_reporter.remote())
                     self.config_history.update(reporter.config_history)

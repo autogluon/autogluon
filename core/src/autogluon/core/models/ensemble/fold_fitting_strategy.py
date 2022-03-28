@@ -345,7 +345,11 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     """
     def __init__(self, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
         super().__init__(**kwargs)
-        self.ray = try_import_ray()
+        import_ray_additional_err_msg = (
+            "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
+            "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
+        )
+        self.ray = try_import_ray(import_ray_additional_err_msg)
         self.num_cpus = get_cpu_count()
         self.num_gpus = None
         self.num_parallel_jobs = num_folds_parallel

@@ -46,7 +46,7 @@ def try_import_mxnet():
             "or `pip install mxnet_cu101 --upgrade`")
 
 
-def try_import_ray():
+def try_import_ray(additional_err_msg=''):
     ray_max_version_os_map = dict(
         Darwin='1.11.0',
         Windows='1.11.0',
@@ -71,8 +71,7 @@ def try_import_ray():
         raise ImportError(
             "ray is required to train folds in parallel. "
             f"A quick tip is to install via `pip install ray=={ray_min_version}`, "
-            "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
-            "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
+            f"{additional_err_msg}"
         )
 
 

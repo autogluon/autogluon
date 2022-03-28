@@ -992,8 +992,7 @@ class AbstractModel:
         scheduler: LocalScheduler = scheduler_cls(model_trial, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
 
         scheduler.run()
-        # FIXME: shouldn't remove this
-        # scheduler.join_jobs()
+        scheduler.join_jobs()
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 

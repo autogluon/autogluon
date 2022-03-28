@@ -43,10 +43,10 @@ def model_trial(args,
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
-        raise e
         reporter.terminate()
         # FIXME: remove print
         print("model failed")
+        raise e
     else:
     
         reporter(epoch=1, validation_performance=model.val_score)

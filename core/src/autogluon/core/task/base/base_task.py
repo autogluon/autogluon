@@ -14,8 +14,8 @@ __all__ = [
 
 schedulers = {
     'local': LocalParallelScheduler,  # backward compatibility
-    'local_sequential': LocalSequentialScheduler,
-    'local_parallel': LocalParallelScheduler,
+    'sequential_local': LocalSequentialScheduler,
+    'parallel_local': LocalParallelScheduler,
 }
 
 logger = logging.getLogger(__name__)
