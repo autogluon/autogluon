@@ -13,7 +13,7 @@ __all__ = [
     'create_scheduler']
 
 schedulers = {
-    'local': LocalParallelScheduler,  # backward compatibility
+    'local': LocalSequentialScheduler,  # backward compatibility
     'sequential_local': LocalSequentialScheduler,
     'parallel_local': LocalParallelScheduler,
 }

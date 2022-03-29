@@ -1,40 +1,48 @@
 import pytest
 
 from autogluon.core.scheduler.scheduler_factory import get_hyperparameter_tune_kwargs_preset, scheduler_factory
-from autogluon.core.scheduler.local_scheduler import LocalSequentialScheduler
+from autogluon.core.scheduler.local_scheduler import LocalSequentialScheduler, LocalParallelScheduler
 
 
 def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():
-    scheduler_cls, scheduler_params = scheduler_factory(
-        hyperparameter_tune_kwargs={'scheduler': 'local', 'searcher': 'grid', 'custom_option': 'value'}
+    scheduler_cls_map = dict(
+        local=LocalParallelScheduler,
+        sequential_local=LocalSequentialScheduler,
+        parallel_local=LocalParallelScheduler,
     )
+    for key, cls in scheduler_cls_map.items():
+        scheduler_cls, scheduler_params = scheduler_factory(
+            hyperparameter_tune_kwargs={'scheduler': key, 'searcher': 'grid', 'custom_option': 'value'}
+        )
 
-    assert scheduler_cls == LocalSequentialScheduler, 'scheduler_cls must be correct'
-    assert scheduler_params['resource']['num_cpus'] is not None, 'resources/num_cpus must be present'
-    assert scheduler_params['resource']['num_gpus'] is not None, 'resources/num_cpus must be present'
+        assert scheduler_cls == cls, 'scheduler_cls must be correct'
+        assert scheduler_params['resource']['num_cpus'] is not None, 'resources/num_cpus must be present'
+        assert scheduler_params['resource']['num_gpus'] is not None, 'resources/num_cpus must be present'
 
-    expected_values = {
-        'searcher': 'grid',
-        'search_options': {},
-        'checkpoint': None,
-        'resume': False,
-        'num_trials': None,
-        'reward_attr': 'validation_performance',
-        'time_attr': 'epoch',
-        'visualizer': 'none',
-        'dist_ip_addrs': [],
-        'scheduler': 'local',
-        'custom_option': 'value'
-    }
-    for k, v in expected_values.items():
-        assert scheduler_params[k] == v, f'{k} must be {v}'
+        expected_values = {
+            'searcher': 'grid',
+            'search_options': {},
+            'checkpoint': None,
+            'resume': False,
+            'num_trials': None,
+            'reward_attr': 'validation_performance',
+            'time_attr': 'epoch',
+            'visualizer': 'none',
+            'dist_ip_addrs': [],
+            'scheduler': 'local',
+            'custom_option': 'value'
+        }
+        for k, v in expected_values.items():
+            assert scheduler_params[k] == v, f'{k} must be {v}'
 
 
 def test_scheduler_factory__can_construct_valid_config_with_class_scheduler():
-    scheduler_cls, scheduler_params = scheduler_factory(
-        hyperparameter_tune_kwargs={'scheduler': LocalSequentialScheduler, 'searcher': 'local_random'}
-    )
-    assert scheduler_cls == LocalSequentialScheduler, 'scheduler_cls must be correct'
+    scheduler_cls = [LocalSequentialScheduler, LocalParallelScheduler]
+    for cls in scheduler_cls:
+        scheduler_cls, scheduler_params = scheduler_factory(
+            hyperparameter_tune_kwargs={'scheduler': cls, 'searcher': 'local_random'}
+        )
+        assert scheduler_cls == cls, 'scheduler_cls must be correct'
 
 
 def test_scheduler_factory__reaises_exception_on_missing_scheduler():

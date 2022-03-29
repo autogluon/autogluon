@@ -6,6 +6,7 @@ import os
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
+from dataclasses import dataclass
 from operator import is_
 from typing import Tuple
 
@@ -81,6 +82,39 @@ class LocalScheduler(ABC):
             },
             'resources_per_trial': self.resource
         }
+
+    @classmethod
+    def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.95):
+        """
+        Checks if the remaining time is enough to run another trial.
+
+        Parameters
+        ----------
+        time_out total
+            timeout in m
+        time_start
+            trials start time
+        trial_start_time
+            last trial start time
+        trial_end_time
+            last trial end time
+        avg_trial_run_time
+            running average of all trial runs
+        fill_factor: float
+            discount of `avg_trial_run_time` allowed for a next trial. Default is 0.95 of `avg_trial_run_time`
+
+        Returns
+        -------
+            True if there is enough time to run another trial give runs statistics and remaining time
+
+        """
+        time_spent = trial_end_time - time_start
+        is_timeout_exceeded = time_spent >= time_out
+        time_left = time_start + time_out - trial_end_time
+        is_enough_time_for_another_trial = True
+        if avg_trial_run_time:
+            is_enough_time_for_another_trial = time_left > avg_trial_run_time * fill_factor
+        return is_enough_time_for_another_trial and not is_timeout_exceeded
 
     def init_limits_(self, kwargs):
         if kwargs.get('num_trials', None) is None:
@@ -195,15 +229,20 @@ class LocalScheduler(ABC):
 
 class RayTrainActor:
 
-    def __init__(self, task_id, train_fn, searcher_config, args, reporter, train_fn_kwargs):
+    def __init__(self, task_id, train_fn, searcher_config, args, reporter, train_fn_kwargs, time_start, time_out=None):
         self.task_id = task_id
         self.train_fn = train_fn
         self.searcher_config = searcher_config
         self.args = args
         self.reporter = reporter
         self.train_fn_kwargs = train_fn_kwargs
+        self.time_start = time_start
+        self.time_out = time_out
 
     def execute(self):
+        if self.time_out is not None:
+            time_limit = (self.time_out - self.time_start) * 0.95
+            self.train_fn_kwargs['time_limit'] = time_limit
         return self.train_fn(self.args, reporter=self.reporter, **self.train_fn_kwargs)
 
     def get_task_id(self):
@@ -214,6 +253,13 @@ class RayTrainActor:
 
     def get_reporter(self):
         return self.reporter
+
+
+@dataclass
+class RayJobContext:
+
+    actor: RayTrainActor
+    time_start: float
 
 
 class LocalParallelScheduler(LocalScheduler):
@@ -227,14 +273,14 @@ class LocalParallelScheduler(LocalScheduler):
             "or use sequential scheduler by passing `sequential_local` to `scheduler` in `hyperparameter_tune_kwargs` when calling tabular.fit"
             "For example: `predictor.fit(..., hyperparameter_tune_kwargs={'scheduler': 'sequential_local'})`"
         )
-        self.ray = try_import_ray(import_ray_additional_err_msg)
+        self.ray = try_import_ray(additional_err_msg=import_ray_additional_err_msg)
         self.total_resource = resource
         self.resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
         self._trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
         self._ray_train_actor_cls = self.ray.remote(RayTrainActor)
         self._jobs = list()
-        self._job_ref_to_actor_map = dict()
-        # self._ray_train_fn = self.ray.remote(max_calls=1)(train_fn)
+        self._job_ref_to_context_map = dict()
+        self._current_task_id = 0
         #init model for memory calculation. Should I do it here or after getting the config?
 
     def _get_resource_suggestions(self):
@@ -258,22 +304,7 @@ class LocalParallelScheduler(LocalScheduler):
         trial_train_fn_kwargs = deepcopy(self.train_fn_kwargs)
         if 'fit_kwargs' in trial_train_fn_kwargs:
             trial_train_fn_kwargs['fit_kwargs'].update(self.resource)
-        trial_train_fn_kwargs['time_limit'] = self._get_trial_time_limit()
         return trial_train_fn_kwargs
-
-    def _get_trial_time_limit(self, fill_factor=0.95):
-        if not self.time_start:
-            self.time_start = time.time()
-        time_elapsed = time.time() - self.time_start
-        if self.time_out is not None:
-            time_left = self.time_out - time_elapsed
-            required_time_per_trial = time_left / self.batches
-            time_limit_trial = required_time_per_trial * fill_factor
-            if time_left <= 0:
-                raise TimeLimitExceeded
-        else:
-            time_limit_trial = None
-        return time_limit_trial
 
     def run(self, **kwargs):
         self.time_start = time.time()
@@ -281,9 +312,6 @@ class LocalParallelScheduler(LocalScheduler):
 
         self.training_history = OrderedDict()
         self.config_history = OrderedDict()
-        
-        job_refs = []
-        job_ref_to_actor_map = dict()
 
         # init ray
         if not self.ray.is_initialized():
@@ -295,28 +323,22 @@ class LocalParallelScheduler(LocalScheduler):
 
         print(self.resource)
 
-        for i in range(self.num_trials):
+        # we only schedule as much as we can run in parallel at the beginning
+        for i in range(self.num_parallel_jobs):
             try:
-                job_actor, job_ref = self.run_trial(resource=self.resource, task_id=i)
-                job_refs.append(job_ref)
-                job_ref_to_actor_map[job_ref] = job_actor
-                # job_ref = self.run_trial(resource=resource, task_id=i)
-                # job_refs.append(job_ref)
+                self.run_trial(resource=self.resource, task_id=self._current_task_id, time_out=self.time_out)
             except ExhaustedSearchSpaceError:
                 break
-        
-        self._jobs = job_refs
-        self._job_ref_to_actor_map = job_ref_to_actor_map
 
 
-    def run_trial(self, resource, task_id=0):
+    def run_trial(self, resource, task_id=0, time_out=None):
         new_searcher_config = self.searcher.get_config()
         searcher_config = deepcopy(self.metadata['search_space'])
         searcher_config.update(new_searcher_config)
         reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
         return self.run_job_(task_id, resource, searcher_config, reporter)
 
-    def run_job_(self, task_id, resource, searcher_config, reporter):
+    def run_job_(self, task_id, resource, searcher_config, reporter, time_out=None):
         args = dict()
         if self.train_fn_kwargs is not None:
             trial_train_fn_kwargs = deepcopy(self._trial_train_fn_kwargs)
@@ -326,33 +348,35 @@ class LocalParallelScheduler(LocalScheduler):
 
         args['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
-        is_failed = False
-        # prepare shared data
-        # args_ref = self.ray.put(args)
-        # reporter_ref = self.ray.put(reporter)
-        # train_fn_kwargs_ref = { arg: self.ray.put(arg) for arg in train_fn_kwargs }
-        # submit ray job and return the job ref
-        # return self._ray_train_fn.options(**resource).remote(args_ref, reporter_ref, **train_fn_kwargs_ref)
-        ray_train_actor = self._ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, trial_train_fn_kwargs)
-        return ray_train_actor, ray_train_actor.execute.remote()
-        # return self._ray_train_fn.options(**resource).remote(args, reporter, **train_fn_kwargs)
+        time_start = time.time()
+        ray_train_actor = self._ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, trial_train_fn_kwargs, time_start, time_out)
+        job_ref = ray_train_actor.execute.remote()
+        self._current_task_id += 1
+        self._jobs.append(job_ref)
+        self._job_ref_to_context_map[job_ref] = RayJobContext(ray_train_actor, time_start)
+        return ray_train_actor, job_ref
 
     def join_jobs(self, timeout=None):
         failure_count = 0
         trial_count = 0
+        trials_total_time = 0
         min_failure_threshold = 5
         failure_rate_threshold = 0.8
+        is_time_out = False
 
-        unfinished = self._jobs
-        with tqdm(total=len(unfinished)) as pbar:
-            while unfinished:
-                finished, unfinished = self.ray.wait(unfinished, num_returns=1)
+        with tqdm(total=self.num_trials) as pbar:
+            while self._jobs:
+                finished, self._jobs = self.ray.wait(self._jobs, num_returns=1)
                 finished = finished[0]
-                is_failed = False
+                failed = False
                 # try get the result
                 try:
                     result = self.ray.get(finished)
-                    actor = self._job_ref_to_actor_map[finished]
+                    trial_time_end = time.time()
+                    context = self._job_ref_to_context_map.pop(finished)
+                    actor = context.actor
+                    trial_time_start = context.time_start
+                    trial_time = trial_time_end - trial_time_start
                     searcher_config = self.ray.get(actor.get_searcher_config.remote())
                     reporter = self.ray.get(actor.get_reporter.remote())
                     self.config_history.update(reporter.config_history)
@@ -360,17 +384,19 @@ class LocalParallelScheduler(LocalScheduler):
                     if type(reporter) is not FakeReporter:
                         if reporter.last_result:
                             self.searcher.update(config=searcher_config, **reporter.last_result)
-                        else:
-                            is_failed = True
                     self.ray.kill(actor)
                 except TimeLimitExceeded:
                     logger.log(20, f'\tStopping HPO to satisfy time limit...')
                     break
                 except Exception:
                     logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
-                    failure_count += 1
+                    failed = True
 
                 trial_count += 1
+                if failed:
+                    failure_count += 1
+                else:
+                    trials_total_time += trial_time
                 pbar.update(1)
 
                 if self.max_reward and self.get_best_reward() >= self.max_reward:
@@ -383,6 +409,19 @@ class LocalParallelScheduler(LocalScheduler):
                                 f'Stopping HPO early due to reaching failure threshold ({round(failure_rate_threshold*100, 1)}%).\n'
                                 f'\tFailures may be caused by invalid configurations within the provided search space.')
                     break
+                
+                if self._current_task_id < self.num_trials:
+                    # check for avg_time for trials to determine whether schedule new
+                    if self.time_out is not None:
+                        avg_trial_run_time = 0 if trial_count == failure_count else trials_total_time / (trial_count - failure_count)
+                        if not is_time_out:
+                            if not self.has_enough_time_for_trial_(self.time_out, self.time_start, trial_time_start, trial_time_end, avg_trial_run_time):
+                                logger.log(20, f'\tStop scheduling more HPO trials to satisfy time limit...')
+                                is_time_out = True
+                            else:
+                                self.run_trial(self.resource, self._current_task_id, time_out=self.time_out)
+                    else:
+                        self.run_trial(self.resource, self._current_task_id, time_out=self.time_out)
 
         self.ray.shutdown()
 
@@ -471,39 +510,6 @@ class LocalSequentialScheduler(LocalScheduler):
                 if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
                     logger.log(20, f'\tStopping HPO to satisfy time limit...')
                     break
-
-    @classmethod
-    def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.95):
-        """
-        Checks if the remaining time is enough to run another trial.
-
-        Parameters
-        ----------
-        time_out total
-            timeout in m
-        time_start
-            trials start time
-        trial_start_time
-            last trial start time
-        trial_end_time
-            last trial end time
-        avg_trial_run_time
-            running average of all trial runs
-        fill_factor: float
-            discount of `avg_trial_run_time` allowed for a next trial. Default is 0.95 of `avg_trial_run_time`
-
-        Returns
-        -------
-            True if there is enough time to run another trial give runs statistics and remaining time
-
-        """
-        time_spent = trial_end_time - time_start
-        is_timeout_exceeded = time_spent >= time_out
-        time_left = time_start + time_out - trial_end_time
-        is_enough_time_for_another_trial = True
-        if avg_trial_run_time:
-            is_enough_time_for_another_trial = time_left > avg_trial_run_time * fill_factor
-        return is_enough_time_for_another_trial and not is_timeout_exceeded
 
     @classmethod
     def get_average_trial_time_(cls, i, avg_trial_run_time, trial_start_time, time_end):
