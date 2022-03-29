@@ -16,20 +16,34 @@ def pytest_addoption(parser):
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
     )
+    parser.addoption(
+        "--runregression", action="store_true", default=False, help="run regression tests"
+    )
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
+    config.addinivalue_line("markers", "regression: mark test as regression test")
 
 
 def pytest_collection_modifyitems(config, items):
+    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+    skip_regression = pytest.mark.skip(reason="need --runregression option to run")
+    custom_markers = dict(
+        slow=skip_slow,
+        regression=skip_regression
+    )
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
-        return
-    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+        custom_markers.pop("slow", None)
+    if config.getoption("--runregression"):
+        # --runregression given in cli: do not skip slow tests
+        custom_markers.pop("regression", None)
+
     for item in items:
-        if "slow" in item.keywords:
-            item.add_marker(skip_slow)
+        for marker in custom_markers:
+            if marker in item.keywords:
+                item.add_marker(custom_markers[marker])
 
 
 class DatasetLoaderHelper:
