@@ -10,10 +10,10 @@ from autogluon.forecasting.dataset.ts_dataframe import (
 )
 
 
-START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")
+START_TIMESTAMP = pd.Timestamp("01-01-2019")
 END_TIMESTAMP = pd.Timestamp("01-02-2019")
 ITEM_IDS = (0, 1, 2)
-TARGETS = list(range(9))
+TARGETS = np.arange(9)
 DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3))
 EMPTY_ITEM_IDS = np.array([], dtype=np.int64)
 EMPTY_DATETIME_INDEX = np.array([], dtype=np.dtype("datetime64[ns]"))
@@ -21,7 +21,7 @@ EMPTY_TARGETS = np.array([], dtype=np.int64)
 
 
 SAMPLE_LIST_DATASET = TimeSeriesListDataset(
-    data_iter=[
+    data=[
         {"target": [0, 1, 2], "start": START_TIMESTAMP},
         {"target": [3, 4, 5], "start": START_TIMESTAMP},
         {"target": [6, 7, 8], "start": START_TIMESTAMP},
@@ -40,10 +40,24 @@ def _build_ts_dataframe(item_ids, datetime_index, target):
 
 
 SAMPLE_TS_DATAFRAME = _build_ts_dataframe(ITEM_IDS, DATETIME_INDEX, TARGETS)
+SAMPLE_DATAFRAME = SAMPLE_TS_DATAFRAME.reset_index()
 
 
-def test_validate_data_farme():
-    TimeSeriesDataFrame._validate_data_frame(SAMPLE_TS_DATAFRAME)
+def test_validate_data_frame():
+    item_ids = pd.Series(np.repeat(ITEM_IDS, 3))
+    datetimes = pd.Series(np.tile(DATETIME_INDEX, 3))
+    targets = pd.Series(TARGETS)
+    df = pd.concat([item_ids, datetimes, targets], axis=1)
+
+    with pytest.raises(ValueError):
+        TimeSeriesDataFrame(df)
+
+    df.columns = ["item_id", "timestamp", "target"]
+    TimeSeriesDataFrame(df)
+
+
+def test_validate_multi_index_data_frame():
+    TimeSeriesDataFrame(SAMPLE_TS_DATAFRAME)
 
     target = list(range(4))
     item_ids = (1, 2, 3, 4)
@@ -59,20 +73,27 @@ def test_validate_data_farme():
 def test_from_ts_list_dataset():
     tsdf_from_list_dataset = TimeSeriesDataFrame(SAMPLE_LIST_DATASET)
     pd.testing.assert_frame_equal(
-        tsdf_from_list_dataset, SAMPLE_TS_DATAFRAME, check_dtype=False
+        tsdf_from_list_dataset, SAMPLE_TS_DATAFRAME, check_dtype=True
+    )
+
+
+def test_from_data_frame():
+    tsdf_from_data_frame = TimeSeriesDataFrame(SAMPLE_DATAFRAME)
+    pd.testing.assert_frame_equal(
+        tsdf_from_data_frame, SAMPLE_TS_DATAFRAME, check_dtype=True
     )
 
 
 def test_validate_list_dataset():
     with pytest.raises(ValueError):
-        TimeSeriesDataFrame(SAMPLE_LIST_DATASET.data_iter)
+        TimeSeriesDataFrame(SAMPLE_LIST_DATASET.data)
 
-    empty_list = TimeSeriesListDataset(data_iter=[], freq="D")
+    empty_list = TimeSeriesListDataset(data=[], freq="D")
     with pytest.raises(ValueError):
         TimeSeriesDataFrame(empty_list, freq="D")
 
     list_dataset = copy.deepcopy(SAMPLE_LIST_DATASET)
-    list_dataset.data_iter[1] = {}
+    list_dataset.data[1] = {}
     with pytest.raises(ValueError):
         TimeSeriesDataFrame(list_dataset, freq="D")
 

@@ -2,14 +2,37 @@ from __future__ import annotations
 
 from typing import Any, Tuple, Dict, List
 from dataclasses import dataclass
+from collections import UserList
 
 import pandas as pd
 import numpy as np
 
 
 @dataclass
-class TimeSeriesListDataset:
-    data_iter: List[Dict[str, Any]]
+class TimeSeriesListDataset(UserList):
+    """TimeSeriesListDataset to represent time-series dataset.
+
+    Parameters
+    ----------
+    data : List[Dict[str, Any]]
+        List of time series represented by dict. The time series dict should have a
+        'target' key with list of observation as values and a 'start' key with a timestamp as value.
+    freq : str
+        Frequency string as in pandas offset aliases.
+
+    An example is as following:
+
+    ts_list = TimeSeriesListDataset(
+        data=[
+            {"target": [0, 1, 2], "start": START_TIMESTAMP},
+            {"target": [3, 4, 5], "start": START_TIMESTAMP},
+            {"target": [6, 7, 8], "start": START_TIMESTAMP},
+        ],
+        freq="D",
+    )
+    """
+
+    data: List[Dict[str, Any]]
     freq: str
 
 
@@ -20,20 +43,58 @@ class TimeSeriesDataFrame(pd.DataFrame):
     ----------
     data : Any
         Time-series data to construct a TimeSeriesDataFrame.
-        It currently supports two formats:
-            1. Time-series data in TimeSeriesListDataset format.
-            2. Time-series data pd.DataFrame format with multi-index on item and timestamp.
-            An example can be found using example_dataframe() function.
+        It currently supports three input formats:
+
+            1. Time-series data in TimeSeriesListDataset format. For example:
+
+                TimeSeriesListDataset(
+                        data=[
+                            {"target": [0, 1, 2], "start": START_TIMESTAMP},
+                            {"target": [3, 4, 5], "start": START_TIMESTAMP},
+                            {"target": [6, 7, 8], "start": START_TIMESTAMP},
+                        ],
+                        freq="D",
+                    )
+            2. Time-series data in pd.DataFrame format without multi-index. For example:
+
+                   item_id  timestamp  target
+                0        0 2019-01-01       0
+                1        0 2019-01-02       1
+                2        0 2019-01-03       2
+                3        1 2019-01-01       3
+                4        1 2019-01-02       4
+                5        1 2019-01-03       5
+                6        2 2019-01-01       6
+                7        2 2019-01-02       7
+                8        2 2019-01-03       8
+
+            3. Time-series data in pd.DataFrame format with multi-index on item_id and timestamp. For example:
+
+                                        target
+                item_id timestamp
+                0       2019-01-01       0
+                        2019-01-02       1
+                        2019-01-03       2
+                1       2019-01-01       3
+                        2019-01-02       4
+                        2019-01-03       5
+                2       2019-01-01       6
+                        2019-01-02       7
+                        2019-01-03       8
+                This example can be found using example() function.
     """
 
     def __init__(self, data: Any, *args, **kwargs):
         if isinstance(data, TimeSeriesListDataset):
             data = self.from_list_dataset(data)
-        self._validate_data_frame(data)
+        if isinstance(data, pd.DataFrame):
+            if not isinstance(data.index, pd.MultiIndex):
+                data = self.from_data_frame(data)
+        self._validate_multi_index_data_frame(data)
         super().__init__(data=data, *args, **kwargs)
 
     @classmethod
-    def example_dataframe(cls):
+    def example(cls):
         """An example TimeSeriesDataFrame.
 
         Returns
@@ -53,7 +114,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     2019-01-03       8
         """
 
-        target = list(range(9))
+        target = np.arange(9)
         datetime_index = tuple(
             pd.date_range(pd.Timestamp("01-01-2019"), periods=3, freq="D")
         )
@@ -61,14 +122,50 @@ class TimeSeriesDataFrame(pd.DataFrame):
         multi_index = pd.MultiIndex.from_product(
             [item_ids, datetime_index], names=["item_id", "timestamp"]
         )
-        ts_df = TimeSeriesDataFrame(
+        return TimeSeriesDataFrame(
             pd.Series(target, name="target", index=multi_index).to_frame()
         )
-        return ts_df
 
     @classmethod
-    def _validate_data_frame(cls, data: pd.DataFrame):
-        """Validate a pd.DataFrame can be converted to TimeSeriesDataFrame
+    def _validate_data_frame(cls, df: pd.DataFrame):
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError(f"data must be a pd.DataFrame, got {type(df)}")
+        if "item_id" not in df.columns:
+            raise ValueError(f"data must have a `item_id` column")
+        if "timestamp" not in df.columns:
+            raise ValueError(f"data must have a `timestamp` column")
+        if df["item_id"].isnull().any():
+            raise ValueError(f"`item_id` columns can not have nan")
+        if df["timestamp"].isnull().any():
+            raise ValueError(f"`timestamp` columns can not have nan")
+        if not df["item_id"].dtype == "int64":
+            raise ValueError(f"for item_id, the only pandas dtype allowed is ‘int64’.")
+        if not df["timestamp"].dtype == "datetime64[ns]":
+            raise ValueError(
+                f"for timestamp, the only pandas dtype allowed is ‘datetime64[ns]’."
+            )
+
+    @classmethod
+    def _validate_list_dataset(cls, list_dataset):
+        if not isinstance(list_dataset, TimeSeriesListDataset):
+            raise ValueError(
+                f"list_dataset must be a TimeSeriesListDataset, got {type(list_dataset)}"
+            )
+        if len(list_dataset.data) == 0:
+            raise ValueError(f"list_dataset has no time-series.")
+        for i, ts in enumerate(list_dataset.data):
+            if not isinstance(ts, dict):
+                raise ValueError(
+                    f"{i}'th time-series in list_dataset must be a dict, got{type(ts)}"
+                )
+            if not ("target" in ts and "start" in ts):
+                raise ValueError(
+                    f"{i}'th time-series in list_dataset must have 'target' and 'start', got{ts.keys()}"
+                )
+
+    @classmethod
+    def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
+        """Validate a multi-index pd.DataFrame can be converted to TimeSeriesDataFrame
 
         Parameters:
         -----------
@@ -77,37 +174,19 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """
 
         if not isinstance(data, pd.DataFrame):
-            raise ValueError(f"data must be a pd.DataFrame, get {type(data)}")
+            raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
         if not isinstance(data.index, pd.MultiIndex):
-            raise ValueError(f"data must have pd.MultiIndex, get {type(data.index)}")
-        if "target" not in data.columns:
-            raise ValueError(f"data must have a column called target")
-        if not data.index.dtypes.array[0] == np.dtype(np.int64):
+            raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
+        if not data.index.dtypes.array[0] == "int64":
+            raise ValueError(f"for item_id, the only pandas dtype allowed is ‘int64’.")
+        if not data.index.dtypes.array[1] == "datetime64[ns]":
             raise ValueError(
-                f"for item_id, the only NumPy dtype allowed is ‘np.int64’."
+                f"for timestamp, the only pandas dtype allowed is ‘datetime64[ns]’."
             )
-        if not data.index.dtypes.array[1] == np.dtype("datetime64[ns]"):
+        if not data.index.names == ("item_id", "timestamp"):
             raise ValueError(
-                f"for timestamp, the only NumPy dtype allowed is ‘datetime64[ns]’."
+                f"data must have index names as ('item_id', 'timestamp'), got {type(data.index.names)}"
             )
-
-    @classmethod
-    def _validate_list_dataset(cls, list_dataset):
-        if not isinstance(list_dataset, TimeSeriesListDataset):
-            raise ValueError(
-                f"list_dataset must be a TimeSeriesListDataset, get {type(list_dataset)}"
-            )
-        if len(list_dataset.data_iter) == 0:
-            raise ValueError(f"list_dataset has no time-series.")
-        for i, ts in enumerate(list_dataset.data_iter):
-            if not isinstance(ts, dict):
-                raise ValueError(
-                    f"{i}'th time-series in list_dataset must be a dict, get{type(ts)}"
-                )
-            if not ("target" in ts and "start" in ts):
-                raise ValueError(
-                    f"{i}'th time-series in list_dataset must have 'target' and 'start', get{ts.keys()}"
-                )
 
     @classmethod
     def from_list_dataset(
@@ -136,7 +215,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         cls._validate_list_dataset(list_dataset)
         all_ts = []
-        for i, ts in enumerate(list_dataset.data_iter):
+        for i, ts in enumerate(list_dataset.data):
             start_timestamp = ts["start"]
             target = ts["target"]
             datetime_index = tuple(
@@ -149,8 +228,35 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
             ts_df = pd.Series(target, name="target", index=idx).to_frame()
             all_ts.append(ts_df)
-        ts_df = TimeSeriesDataFrame(pd.concat(all_ts))
-        return ts_df
+        return TimeSeriesDataFrame(pd.concat(all_ts))
+
+    @classmethod
+    def from_data_frame(cls, df: pd.DataFrame) -> TimeSeriesDataFrame:
+        """Convert a normal pd.DataFrame to a TimeSeriesDataFrame
+
+        Parameters:
+        -----------
+        df: pd.DataFrame
+            A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example:
+
+               item_id  timestamp  target
+            0        0 2019-01-01       0
+            1        0 2019-01-02       1
+            2        0 2019-01-03       2
+            3        1 2019-01-01       3
+            4        1 2019-01-02       4
+            5        1 2019-01-03       5
+            6        2 2019-01-01       6
+            7        2 2019-01-02       7
+            8        2 2019-01-03       8
+
+        Returns:
+        --------
+        ts_df : TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        cls._validate_data_frame(df)
+        return TimeSeriesDataFrame(df.set_index(["item_id", "timestamp"]))
 
     def split_by_time(
         self, cutoff_time: pd.Timestamp
@@ -220,7 +326,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"end time {end} is earlier than stat time {start}")
 
         nanosecond_before_end = end - pd.Timedelta(nanoseconds=1)
-        ts_df = TimeSeriesDataFrame(
+        return TimeSeriesDataFrame(
             self.loc[(slice(None), slice(start, nanosecond_before_end)), :]
         )
-        return ts_df
