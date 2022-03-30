@@ -19,6 +19,8 @@ def get_searchspace_binary():
         'bs': Categorical(256, 64, 128, 512, 1024, 2048, 4096),
         'lr': Real(5e-5, 1e-1, default=1e-2, log=True),
         'epochs': Int(lower=5, upper=30, default=30),
+        'early.stopping.min_delta': 0.0001,
+        'early.stopping.patience': 20,
     }
     return spaces
 

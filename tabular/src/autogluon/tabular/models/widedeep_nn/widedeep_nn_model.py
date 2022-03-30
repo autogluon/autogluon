@@ -1,19 +1,17 @@
 import logging
 
 import numpy as np
-import pytorch_widedeep.training.trainer
 import torch
-from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from pytorch_widedeep.callbacks import ModelCheckpoint
-from pytorch_widedeep.models import FTTransformer, TabPerceiver
 
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.files import make_temp_directory
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
-from .utils import set_seed
+from .callbacks import EarlyStoppingCallbackWithTimeLimit
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
+from .utils import set_seed
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +35,9 @@ class WideDeepNNModel(AbstractModel):
         from pytorch_widedeep import Trainer
         from pytorch_widedeep.preprocessing import TabPreprocessor
         from pytorch_widedeep.metrics import Accuracy, R2Score
+        import pytorch_widedeep.training.trainer
+        from pytorch_widedeep.callbacks import ModelCheckpoint
         # TODO: Use this to get user-specified params instead of hard-coding
-        # params = self._get_model_params()
 
         set_seed(0, True)
 
@@ -48,7 +47,6 @@ class WideDeepNNModel(AbstractModel):
 
         # prepare wide, crossed, embedding and continuous columns
         # TODO: Either don't use cross_cols or find a way to automatically determine them in a fully automated fashion
-        # TODO: Find a way to automatically determine embed dimensions
 
         cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
@@ -111,21 +109,40 @@ class WideDeepNNModel(AbstractModel):
         # TODO: confirm if this is reproducible on linux
         pytorch_widedeep.training.trainer.n_cpus = 0
 
-        # TODO: move to parameters
         logger.log(15, f'Fitting with parameters {params}...')
-        n_epochs = params['epochs']
-        lr = params['lr']
-        bs = params['bs']
+        # TODO: validate if auto works as expected on all important metrics
+        objective_optim_mode = 'auto'
 
-        tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=lr)
-        steps_per_epoch = int(np.ceil(len(X_tab) / bs))
-        tab_sch = torch.optim.lr_scheduler.OneCycleLR(tab_opt, max_lr=lr, epochs=n_epochs, steps_per_epoch=steps_per_epoch, pct_start=0.25, final_div_factor=1e5)
+        tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=(params['lr']))
+        steps_per_epoch = int(np.ceil(len(X_tab) / params['bs']))
+        tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # howard superconvergence schedule
+            tab_opt,
+            max_lr=(params['lr']),
+            epochs=(params['epochs']),
+            steps_per_epoch=steps_per_epoch,
+            pct_start=0.25,
+            final_div_factor=1e5
+        )
 
         monitor_metric = f'val_{metrics[0]()._name}'
         with make_temp_directory() as temp_dir:
             checkpoint_path_prefix = f'{temp_dir}/model'
 
-            model_checkpoint = ModelCheckpoint(filepath=checkpoint_path_prefix, verbose=kwargs.get('verbosity', 2), save_best_only=True, max_save=1, monitor=monitor_metric)
+            model_checkpoint = ModelCheckpoint(
+                filepath=checkpoint_path_prefix,
+                verbose=kwargs.get('verbosity', 2),
+                save_best_only=True,
+                max_save=1,
+                monitor=monitor_metric
+            )
+
+            early_stopping = EarlyStoppingCallbackWithTimeLimit(
+                monitor=monitor_metric,
+                mode=objective_optim_mode,
+                min_delta=params['early.stopping.min_delta'],
+                patience=params['early.stopping.patience'],
+                # time_limit=time_left, best_epoch_stop=best_epoch_stop
+            )
 
             trainer = Trainer(
                 model,
@@ -133,7 +150,7 @@ class WideDeepNNModel(AbstractModel):
                 metrics=metrics,
                 optimizers=tab_opt,
                 lr_schedulers=tab_sch,
-                callbacks=[model_checkpoint],
+                callbacks=[model_checkpoint, early_stopping],
                 verbose=kwargs.get('verbosity', 2),
             )
             # FIXME: Does not return best epoch, instead returns final epoch
@@ -142,13 +159,12 @@ class WideDeepNNModel(AbstractModel):
             trainer.fit(
                 X_train=X_train,
                 X_val=X_val_in,
-                n_epochs=n_epochs,
-                batch_size=bs,
+                n_epochs=(params['epochs']),
+                batch_size=(params['bs']),
                 val_split=val_split,
             )
 
-            best_checkpoint = f'{checkpoint_path_prefix}_{model_checkpoint.best_epoch + 1}.p'
-            trainer.model.load_state_dict(torch.load(best_checkpoint))
+            trainer.model.load_state_dict(torch.load(model_checkpoint.old_files[-1]))
 
         self.model = trainer
 
@@ -175,7 +191,7 @@ class WideDeepNNModel(AbstractModel):
 
     @staticmethod
     def _construct_wide_deep_model(model_type, column_idx, embed_input, continuous_cols, pred_dim, **model_args):
-        from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer
+        from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer, FTTransformer, TabPerceiver
 
         __MODEL_TYPES = dict(
             tabmlp=TabMlp,

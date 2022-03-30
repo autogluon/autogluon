@@ -18,6 +18,10 @@ def get_param_multiclass_baseline():
         # One-cycle policy paper: https://arxiv.org/abs/1803.09820
         'lr': 1e-2,
         'epochs': 10,  # maximum number of epochs
+
+        # Early stopping settings. See more details here: https://docs.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
+        'early.stopping.min_delta': 0.0001,
+        'early.stopping.patience': 20,
     }
     return params
 
