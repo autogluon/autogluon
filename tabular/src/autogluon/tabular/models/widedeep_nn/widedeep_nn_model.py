@@ -1,4 +1,5 @@
 import logging
+import time
 
 import numpy as np
 import torch
@@ -6,9 +7,9 @@ import torch
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
-from .callbacks import EarlyStoppingCallbackWithTimeLimit
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .utils import set_seed
@@ -37,7 +38,10 @@ class WideDeepNNModel(AbstractModel):
         from pytorch_widedeep.metrics import Accuracy, R2Score
         import pytorch_widedeep.training.trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
+        from .callbacks import EarlyStoppingCallbackWithTimeLimit
         # TODO: Use this to get user-specified params instead of hard-coding
+
+        start_time = time.time()
 
         set_seed(0, True)
 
@@ -124,7 +128,9 @@ class WideDeepNNModel(AbstractModel):
             final_div_factor=1e5
         )
 
+        best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         monitor_metric = f'val_{metrics[0]()._name}'
+        best_epoch = None
         with make_temp_directory() as temp_dir:
             checkpoint_path_prefix = f'{temp_dir}/model'
 
@@ -136,12 +142,21 @@ class WideDeepNNModel(AbstractModel):
                 monitor=monitor_metric
             )
 
+            if time_limit is not None:
+                time_elapsed = time.time() - start_time
+                time_left = time_limit - time_elapsed
+                if time_left <= time_limit * 0.7:  # if 30% of time was spent preprocessing, likely not enough time to train model
+                    raise TimeLimitExceeded
+            else:
+                time_left = None
+
             early_stopping = EarlyStoppingCallbackWithTimeLimit(
                 monitor=monitor_metric,
                 mode=objective_optim_mode,
                 min_delta=params['early.stopping.min_delta'],
                 patience=params['early.stopping.patience'],
-                # time_limit=time_left, best_epoch_stop=best_epoch_stop
+                time_limit=time_left,
+                best_epoch_stop=best_epoch_stop
             )
 
             trainer = Trainer(
@@ -163,10 +178,13 @@ class WideDeepNNModel(AbstractModel):
                 batch_size=(params['bs']),
                 val_split=val_split,
             )
-
+            best_epoch = model_checkpoint.best_epoch
             trainer.model.load_state_dict(torch.load(model_checkpoint.old_files[-1]))
 
         self.model = trainer
+        # TODO: add dynamic epochs selection
+        self.params_trained['epochs'] = params['epochs']
+        self.params_trained['best_epoch'] = best_epoch
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
@@ -232,3 +250,6 @@ class WideDeepNNModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _more_tags(self):
+        return {'can_refit_full': True}
