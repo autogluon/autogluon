@@ -5,3 +5,5 @@ from .timm_image import TimmAutoModelForImagePrediction
 from .numerical_mlp import NumericalMLP
 from .categorical_mlp import CategoricalMLP
 from .fusion import MultimodalFusionMLP
+from .numerical_transformer import NumericalTransformer
+
