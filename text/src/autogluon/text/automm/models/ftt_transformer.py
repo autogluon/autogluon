@@ -20,7 +20,6 @@ def _is_glu_activation(activation: ModuleType):
     )
 
 
-
 def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
     if isinstance(module_type, str):
         if module_type == 'ReGLU':
@@ -39,10 +38,8 @@ def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
         return module_type(*args)
 
 
-
 def _all_or_none(values):
     return all(x is None for x in values) or all(x is not None for x in values)
-
 
 
 def reglu(x: Tensor) -> Tensor:
@@ -57,7 +54,6 @@ def reglu(x: Tensor) -> Tensor:
     return a * F.relu(b)
 
 
-
 def geglu(x: Tensor) -> Tensor:
     """The GEGLU activation function from [1].
 
@@ -68,7 +64,6 @@ def geglu(x: Tensor) -> Tensor:
     assert x.shape[-1] % 2 == 0
     a, b = x.chunk(2, dim=-1)
     return a * F.gelu(b)
-
 
 
 class ReGLU(nn.Module):
@@ -89,7 +84,6 @@ class ReGLU(nn.Module):
         return reglu(x)
 
 
-
 class GEGLU(nn.Module):
     """The GEGLU activation function from [shazeer2020glu].
 
@@ -106,7 +100,6 @@ class GEGLU(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return geglu(x)
-
 
 
 class CLSToken(nn.Module):
@@ -178,7 +171,6 @@ class CLSToken(nn.Module):
         return torch.cat([x, self.expand(len(x), 1)], dim=1)
 
 
-
 class _TokenInitialization(enum.Enum):
     UNIFORM = 'uniform'
     NORMAL = 'normal'
@@ -200,7 +192,6 @@ class _TokenInitialization(enum.Enum):
             nn.init.uniform_(x, a=-d_sqrt_inv, b=d_sqrt_inv)
         elif self == _TokenInitialization.NORMAL:
             nn.init.normal_(x, std=d_sqrt_inv)
-
 
 
 class MultiheadAttention(nn.Module):
@@ -353,7 +344,6 @@ class MultiheadAttention(nn.Module):
             'attention_logits': attention_logits,
             'attention_probs': attention_probs,
         }
-
 
 
 class Transformer(nn.Module):
