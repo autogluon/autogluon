@@ -178,10 +178,6 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh '''#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-text-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-text-py3-v3 --all -y
-          fi
           conda create -n autogluon-text-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-text-py3-v3
           conda list
@@ -205,18 +201,18 @@ stage("Unit Test") {
   },
   'vision': {
     node('linux-gpu') {
-      ws('workspace/autogluon-vision-py3') {
+      ws('workspace/autogluon-vision-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh '''#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-vision-py3)
+          conda_output=$(conda env list | grep autogluon-vision-py3-v3)
           if [ -z conda_output ]; then
-            conda remove -n autogluon-vision-py3 --all -y
+            conda remove -n autogluon-vision-py3-v3 --all -y
           fi
-          conda create -n autogluon-vision-py3 -f docs/build_gpu.yml
-          conda activate autogluon-vision-py3
+          conda create -n autogluon-vision-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-vision-py3-v3
           conda list
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
