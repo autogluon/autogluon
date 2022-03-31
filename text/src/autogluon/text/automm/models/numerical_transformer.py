@@ -6,8 +6,6 @@ from .ftt_transformer import Transformer,_TokenInitialization,CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 
 
-
-
 class NumericalFeatureTokenizer(nn.Module):
     """
     Reference: 
