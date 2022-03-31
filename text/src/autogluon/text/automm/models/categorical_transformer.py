@@ -1,86 +1,91 @@
+import torch
 from torch import nn
 from torch import Tensor
-import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Union, cast
-from .ftt_transformer import Transformer,_TokenInitialization,CLSToken
-from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast
+from ..constants import CATEGORICAL, LABEL, LOGITS, FEATURES
+from .ftt_transformer import _TokenInitialization, CLSToken, Transformer
 
 
-class NumericalFeatureTokenizer(nn.Module):
+class CategoricalFeatureTokenizer(nn.Module):
     """
-    Reference: 
-        1. Github : https://github.com/Yura52/rtdl/blob/3c13a4f18b76b7b25f09eb94075c39ba4d1d7565/rtdl/modules.py#L161 
-        2. Paper: "Revisiting Deep Learning Models for Tabular Data"
-                   https://arxiv.org/pdf/2106.11959.pdf  
-
-    Transforms continuous features to tokens (embeddings).
-    For one feature, the transformation consists of two steps:
-        1. the feature is multiplied by a trainable vector i.e., weights,
-        2. another trainable vector is added i.e., bias.
-
-    Note that each feature has its separate pair of trainable vectors, 
-    i.e. the vectors are not shared between features.
+        Transforms categorical features to tokens (embeddings).
     """
+
+    category_offsets: Tensor
 
     def __init__(
         self,
-        in_features: int,
+        num_categories: List[int],
         d_token: int,
         bias: Optional[bool] = True,
         initialization: Optional[str] = 'normal',
-    ):
+    ) -> None:
         """
         Args:
             prefix:
                 The model prefix.
-            in_features: 
-                Dimension of input features i.e. the number of continuous (scalar) features
+            num_categories: 
+                The number of distinct values for each feature. For example,
+                :code:`num_categories=[3, 4]` describes two features: the first one can
+                take values in the range :code:`[0, 1, 2]` and the second one can take
+                values in the range :code:`[0, 1, 2, 3]`.
             d_token: 
-                The size of one token
+                The size of one token.
             bias: 
-                If `False`, then the transformation will include only multiplication.
-                **Warning**: :code:`bias=False` leads to significantly worse results for
-                Transformer-like (token-based) architectures.
+                If `True`, for each feature, a trainable vector is added to the
+                embedding regardless of feature value. The bias vectors are not shared
+                between features.
             initialization: 
-                Initialization policy for parameters. Must be one of :code:`['uniform', 'normal']`. 
-                Let :code:`s = d ** -0.5`. Then, the
-                corresponding distributions are :code:`Uniform(-s, s)` and :code:`Normal(0, s)`.
-                In [gorishniy2021revisiting], the 'uniform' initialization was used.
+                Initialization policy for parameters. Must be one of
+                :code:`['uniform', 'normal']`. Let :code:`s = d ** -0.5`. Then, the
+                corresponding distributions are :code:`Uniform(-s, s)` and :code:`Normal(0, s)`. In
+                the paper [gorishniy2021revisiting], the 'uniform' initialization was
+                used.
 
         References:
             * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
         """
         super().__init__()
+        assert num_categories, 'num_categories must be non-empty'
+        assert d_token > 0, 'd_token must be positive'
+        
+        self.num_categories = num_categories
 
         initialization_ = _TokenInitialization.from_str(initialization)
-        self.weight = nn.Parameter(Tensor(in_features, d_token))
-        self.bias = nn.Parameter(Tensor(in_features, d_token)) if bias else None
-        for parameter in [self.weight, self.bias]:
+
+        category_offsets = torch.tensor([0] + num_categories[:-1]).cumsum(0)
+        self.register_buffer('category_offsets', category_offsets, persistent=False)
+        self.embeddings = nn.Embedding(sum(num_categories), d_token)
+        self.bias = nn.Parameter(Tensor(len(num_categories), d_token)) if bias else None
+
+        for parameter in [self.embeddings.weight, self.bias]:
             if parameter is not None:
                 initialization_.apply(parameter, d_token)
 
     @property
     def n_tokens(self) -> int:
         """The number of tokens."""
-        return len(self.weight)
+        return len(self.category_offsets)
 
     @property
     def d_token(self) -> int:
         """The size of one token."""
-        return self.weight.shape[1]
+        return self.embeddings.embedding_dim
 
     def forward(
-        self, 
-        x: Tensor,
-    ) -> Tensor:
-        x = self.weight[None] * x[..., None]
+            self,
+            batch: Tensor,
+    ):
+        assert len(batch[self.categorical_key]) == len(self.num_categories)
+        x = self.embeddings(batch[self.categorical_key] + self.category_offsets[None])
         if self.bias is not None:
             x = x + self.bias[None]
-
         return x
 
 
-class  NumericalTransformer(nn.Module):
+
+
+class  CategoricalTransformer(nn.Module):
     """The FT-Transformer model proposed in [gorishniy2021revisiting].
 
     Transforms features to tokens with `FeatureTokenizer` and applies `Transformer` [vaswani2017attention]
@@ -140,7 +145,7 @@ class  NumericalTransformer(nn.Module):
     def __init__(
         self, 
         prefix: str, 
-        in_features: int,
+        num_categories: List[int],
         d_token: int,
         # n_tokens: Optional[int] = None,
         cls_token: Optional[bool] = False,
@@ -168,28 +173,25 @@ class  NumericalTransformer(nn.Module):
     ):
         super().__init__()
 
-        self.numerical_key = f"{prefix}_{NUMERICAL}"
+        self.categorical_key = f"{prefix}_{CATEGORICAL}"
         self.label_key = f"{prefix}_{LABEL}"
 
         self.out_features = out_features
 
-        self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
-            in_features=in_features,
+        self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
+            num_categories=num_categories,
             d_token=d_token,
             bias=bias,
             initialization=initialization,
-        )
+        ) if cls_token else None
 
         self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=initialization,
-        ) if cls_token else None
+        )
 
         if kv_compression_ratio is not None: 
-            if self.cls_token:
-                n_tokens = self.numerical_feature_tokenizer.n_tokens + 1
-            else:
-                n_tokens = self.numerical_feature_tokenizer.n_tokens
+            n_tokens = self.categorical_feature_tokenizer.n_tokens + 1
         else:
             n_tokens = None
 
@@ -225,8 +227,10 @@ class  NumericalTransformer(nn.Module):
         self, 
         batch: dict
     ):
-        x = self.numerical_feature_tokenizer(batch[self.numerical_key])
-
+        assert len(batch[self.categorical_key]) == len(self.column_embeddings)
+        
+        x = self.categorical_feature_tokenizer(batch[self.categorical_key])
+        
         if self.cls_token:
             x = self.cls_token(x)
 
@@ -250,7 +254,6 @@ class  NumericalTransformer(nn.Module):
         for n, _ in self.named_parameters():
             name_to_id[n] = 0
         return name_to_id
-
 
 
 

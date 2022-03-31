@@ -23,6 +23,7 @@ from .models import (
     NumericalMLP,
     MultimodalFusionMLP,
     NumericalTransformer,
+    CategoricalTransformer,
 )
 from .data import (
     ImageProcessor,
@@ -503,6 +504,14 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                num_classes=num_classes,
+            )
+        elif model_name == "categorical_transformer":
+            model = CategoricalTransformer(
+                prefix=model_name,
+                num_categories=num_categories,
+                out_features=model_config.out_features,
+                d_token=model_config.d_token,
                 num_classes=num_classes,
             )
         elif model_name == "fusion_mlp":
