@@ -95,7 +95,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-core-py3-v3)
           if [ -z conda_output ]; then
@@ -108,7 +108,7 @@ stage("Unit Test") {
           ${install_core_all_tests}
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
+          '''
         }
       }
     }
@@ -119,7 +119,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-features-py3-v3)
           if [ -z conda_output ]; then
@@ -133,7 +133,7 @@ stage("Unit Test") {
           ${install_features}
           cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
+          '''
         }
       }
     }
@@ -144,7 +144,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-tabular-py3-v3)
           if [ -z conda_output ]; then
@@ -165,7 +165,7 @@ stage("Unit Test") {
 
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
+          '''
         }
       }
     }
@@ -176,7 +176,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-text-py3-v3)
           if [ -z conda_output ]; then
@@ -198,7 +198,7 @@ stage("Unit Test") {
 
           cd text/
           python3 -m pytest --junitxml=results.xml --forked --runslow tests
-          """
+          '''
         }
       }
     }
@@ -209,7 +209,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-vision-py3)
           if [ -z conda_output ]; then
@@ -229,7 +229,7 @@ stage("Unit Test") {
 
           cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
+          '''
         }
       }
     }
@@ -240,7 +240,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-forecasting-py3-v3)
           if [ -z conda_output ]; then
@@ -257,7 +257,7 @@ stage("Unit Test") {
           ${install_forecasting}
           cd forecasting/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
+          '''
         }
       }
     }
@@ -268,7 +268,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-install-py3-v3)
           if [ -z conda_output ]; then
@@ -291,7 +291,7 @@ stage("Unit Test") {
           ${install_vision}
           ${install_forecasting}
           ${install_autogluon}
-          """
+          '''
         }
       }
     }
@@ -304,7 +304,7 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-image-classification-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon-tutorial-image-classification-v3)
         if [ -z conda_output ]; then
@@ -328,7 +328,7 @@ stage("Build Tutorials") {
         cat docs/_build/rst/_static/d2l.js
         cat docs/_build/rst/conf.py
         tree -L 2 docs/_build/rst
-        """
+        '''
         stash includes: 'docs/_build/rst/tutorials/image_prediction/*', name: 'image_prediction'
       }
     }
@@ -338,7 +338,7 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-object-detection-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon-tutorial-object-detection-v3)
         if [ -z conda_output ]; then
@@ -360,7 +360,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         tree -L 2 docs/_build/rst
-        """
+        '''
         stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
       }
     }
@@ -370,7 +370,7 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-tabular-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon-tutorial-tabular-v3)
         if [ -z conda_output ]; then
@@ -391,7 +391,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        """
+        '''
         stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
       }
     }
@@ -401,7 +401,7 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-text-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon-tutorial-text-v3)
         if [ -z conda_output ]; then
@@ -422,7 +422,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        """
+        '''
         stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
       }
     }
@@ -432,7 +432,7 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-cloud_fit_deploy-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon-tutorial-cloud_fit_deploy-v3)
         if [ -z conda_output ]; then
@@ -451,7 +451,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(cloud_fit_deploy)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        """
+        '''
         stash includes: 'docs/_build/rst/tutorials/cloud_fit_deploy/*', name: 'cloud_fit_deploy'
       }
     }
@@ -461,7 +461,7 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-forecasting-py3-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon-tutorial-forecasting-v3)
         if [ -z conda_output ]; then
@@ -482,7 +482,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(forecasting)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        """
+        '''
         stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
     }
@@ -535,7 +535,7 @@ stage("Build Docs") {
         unstash 'cloud_fit_deploy'
         unstash 'forecasting'
 
-        sh """#!/bin/bash
+        sh '''#!/bin/bash
         set -ex
         conda_output=$(conda env list | grep autogluon_docs)
         if [ -z conda_output ]; then
@@ -570,7 +570,7 @@ stage("Build Docs") {
         echo "Uploaded doc to http://${site}/index.html"
 
         ${index_update_str}
-        """
+        '''
 
         if (env.BRANCH_NAME.startsWith("PR-")) {
           pullRequest.comment("Job ${env.BRANCH_NAME}-${env.BUILD_NUMBER} is done. \nDocs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/index.html")
