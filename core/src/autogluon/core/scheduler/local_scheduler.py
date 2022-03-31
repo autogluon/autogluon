@@ -8,6 +8,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass
 from operator import is_
+import psutil
 from typing import Tuple
 
 from tqdm.auto import tqdm
@@ -17,6 +18,7 @@ from ..searcher import searcher_factory
 from ..searcher.exceptions import ExhaustedSearchSpaceError
 from ..searcher.local_searcher import LocalSearcher
 from ..utils.exceptions import TimeLimitExceeded
+from ..utils import get_cpu_count, get_gpu_count_all
 from ..utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,15 @@ class LocalScheduler(ABC):
             },
             'resources_per_trial': self.resource
         }
+
+    @classmethod
+    def get_average_trial_time_(cls, i, avg_trial_run_time, trial_start_time, time_end):
+        trial_time = time_end - trial_start_time
+        if avg_trial_run_time is None:
+            avg_trial_run_time = trial_time
+        else:
+            avg_trial_run_time = ((avg_trial_run_time * i) + trial_time) / (i + 1)
+        return avg_trial_run_time
 
     @classmethod
     def has_enough_time_for_trial_(cls, time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time, fill_factor=0.95):
@@ -266,7 +277,6 @@ class LocalParallelScheduler(LocalScheduler):
 
     def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         super().__init__(train_fn=train_fn, search_space=search_space, train_fn_kwargs=train_fn_kwargs, searcher=searcher, reward_attr=reward_attr, resource=resource, **kwargs)
-        print(resource)
         self.time_start = None
         #prepare ray
         import_ray_additional_err_msg = (
@@ -274,36 +284,58 @@ class LocalParallelScheduler(LocalScheduler):
             "For example: `predictor.fit(..., hyperparameter_tune_kwargs={'scheduler': 'sequential_local'})`"
         )
         self.ray = try_import_ray(additional_err_msg=import_ray_additional_err_msg)
-        self.total_resource = resource
-        self.resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
+        self.model_estimate_memroy_usage = kwargs.get('model_estimate_memory_usage', None)
+        self.total_resource = self._validate_resource(resource)
+        self.trial_resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
+        self.metadata['resources_per_trial'] = self.trial_resource
         self._trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
         self._ray_train_actor_cls = self.ray.remote(RayTrainActor)
         self._jobs = list()
         self._job_ref_to_context_map = dict()
         self._current_task_id = 0
-        #init model for memory calculation. Should I do it here or after getting the config?
+        self._is_exhausted = False
+
+    def _validate_resource(self, resource):
+        num_cpus = None
+        num_gpus = None
+        if resource is not None:
+            num_cpus = resource.get('num_cpus', None)
+            num_gpus = resource.get('num_gpus', None)
+        else:
+            resource = dict()
+        if num_cpus is None or num_cpus == 'all':
+            num_cpus = get_cpu_count()
+        if num_gpus is None:
+            num_gpus = 0  # if user doesn't specify gpus, we don't use any
+        if num_gpus == 'all':
+            num_gpus = get_gpu_count_all()
+        resource.update(dict(num_cpus=num_cpus, num_gpus=num_gpus))
+        return resource
 
     def _get_resource_suggestions(self):
-        # TODO: Check if physical cores are better than hyperthreaded cores
-        num_cpus = self.resource.get('num_cpus', 1)
-        num_gpus = self.resource.get('num_gpus', 0)
+        num_cpus = self.total_resource.get('num_cpus')
+        num_gpus = self.total_resource.get('num_gpus')
         cpu_per_job = max(1, int(num_cpus // self.num_trials))
         gpu_per_job = 0
+        max_jobs_in_parallel_memory = math.inf
+        if self.model_estimate_memroy_usage is not None:
+            mem_available = psutil.virtual_memory().available
+            # calculate how many jobs can run in parallel given memory available
+            max_jobs_in_parallel_memory = max(1, int(mem_available // self.model_estimate_memroy_usage))
         resource = dict(num_cpus=cpu_per_job)
-        num_parallel_jobs = min(self.num_trials, num_cpus // cpu_per_job)
+        num_parallel_jobs = min(self.num_trials, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
+        cpu_per_job = max(1, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
+        logger.log(20, f"Will run {num_parallel_jobs} jobs in parallel given number of cpu cores and memory avaialable")
         batches = math.ceil(self.num_trials / num_parallel_jobs)
         if num_gpus > 0:
-            gpu_per_job = num_gpus / self.num_trials
-            # For Image and Text model,
-            # we always guarantee a task has at least one full gpu to use
-            # FIXME: Need to make sure text and vision models has at least one full gpu.
+            gpu_per_job = num_gpus / num_parallel_jobs
             resource = dict(num_cpus=cpu_per_job, num_gpus=gpu_per_job)
         return resource, batches, num_parallel_jobs
 
     def _get_trial_train_fn_kwargs(self):
         trial_train_fn_kwargs = deepcopy(self.train_fn_kwargs)
-        if 'fit_kwargs' in trial_train_fn_kwargs:
-            trial_train_fn_kwargs['fit_kwargs'].update(self.resource)
+        if trial_train_fn_kwargs is not None and 'fit_kwargs' in trial_train_fn_kwargs:
+            trial_train_fn_kwargs['fit_kwargs'].update(self.trial_resource)
         return trial_train_fn_kwargs
 
     def run(self, **kwargs):
@@ -315,19 +347,19 @@ class LocalParallelScheduler(LocalScheduler):
 
         # init ray
         if not self.ray.is_initialized():
-            num_gpus = self.resource.get('num_gpus', 0)
+            num_cpus = self.total_resource.get('num_cpus')
+            num_gpus = self.total_resource.get('num_gpus')
             if num_gpus > 0:
-                self.ray.init(log_to_driver=False, num_gpus=num_gpus)
+                self.ray.init(log_to_driver=False, num_cpus=num_cpus, num_gpus=num_gpus)
             else:
-                self.ray.init(log_to_driver=True)
-
-        print(self.resource)
+                self.ray.init(log_to_driver=True, num_cpus=num_cpus)
 
         # we only schedule as much as we can run in parallel at the beginning
         for i in range(self.num_parallel_jobs):
             try:
-                self.run_trial(resource=self.resource, task_id=self._current_task_id, time_out=self.time_out)
+                self.run_trial(resource=self.trial_resource, task_id=self._current_task_id, time_out=self.time_out)
             except ExhaustedSearchSpaceError:
+                self._is_exhausted = True
                 break
 
 
@@ -335,7 +367,10 @@ class LocalParallelScheduler(LocalScheduler):
         new_searcher_config = self.searcher.get_config()
         searcher_config = deepcopy(self.metadata['search_space'])
         searcher_config.update(new_searcher_config)
-        reporter = LocalReporter(task_id, searcher_config, self.training_history, self.config_history)
+        # training_history and config_history will be copied into new processes
+        # we pass in an empty dict to record history for this specific trial
+        # and merge history back in the main process
+        reporter = LocalReporter(task_id, searcher_config, dict(), dict())
         return self.run_job_(task_id, resource, searcher_config, reporter)
 
     def run_job_(self, task_id, resource, searcher_config, reporter, time_out=None):
@@ -369,18 +404,16 @@ class LocalParallelScheduler(LocalScheduler):
                 finished, self._jobs = self.ray.wait(self._jobs, num_returns=1)
                 finished = finished[0]
                 failed = False
+                context = self._job_ref_to_context_map.pop(finished)
+                actor = context.actor
+                searcher_config = self.ray.get(actor.get_searcher_config.remote())
+                reporter = self.ray.get(actor.get_reporter.remote())
                 # try get the result
                 try:
                     result = self.ray.get(finished)
                     trial_time_end = time.time()
-                    context = self._job_ref_to_context_map.pop(finished)
-                    actor = context.actor
                     trial_time_start = context.time_start
                     trial_time = trial_time_end - trial_time_start
-                    searcher_config = self.ray.get(actor.get_searcher_config.remote())
-                    reporter = self.ray.get(actor.get_reporter.remote())
-                    self.config_history.update(reporter.config_history)
-                    self.training_history.update(reporter.training_history)
                     if type(reporter) is not FakeReporter:
                         if reporter.last_result:
                             self.searcher.update(config=searcher_config, **reporter.last_result)
@@ -388,9 +421,14 @@ class LocalParallelScheduler(LocalScheduler):
                 except TimeLimitExceeded:
                     logger.log(20, f'\tStopping HPO to satisfy time limit...')
                     break
-                except Exception:
+                except Exception as e:
                     logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
+                    self.searcher.evaluation_failed(config=searcher_config)
+                    reporter(traceback=e)
+                    result = {'traceback': str(e)}
                     failed = True
+                self.config_history.update(reporter.config_history)
+                self.training_history.update(reporter.training_history)
 
                 trial_count += 1
                 if failed:
@@ -411,18 +449,27 @@ class LocalParallelScheduler(LocalScheduler):
                     break
                 
                 if self._current_task_id < self.num_trials:
-                    # check for avg_time for trials to determine whether schedule new
-                    if self.time_out is not None:
-                        avg_trial_run_time = 0 if trial_count == failure_count else trials_total_time / (trial_count - failure_count)
-                        if not is_time_out:
-                            if not self.has_enough_time_for_trial_(self.time_out, self.time_start, trial_time_start, trial_time_end, avg_trial_run_time):
-                                logger.log(20, f'\tStop scheduling more HPO trials to satisfy time limit...')
-                                is_time_out = True
-                            else:
-                                self.run_trial(self.resource, self._current_task_id, time_out=self.time_out)
-                    else:
-                        self.run_trial(self.resource, self._current_task_id, time_out=self.time_out)
-
+                    if not self._is_exhausted:
+                        # check for avg_time for trials to determine whether schedule new
+                        if self.time_out is not None:
+                            avg_trial_run_time = 0 if trial_count == failure_count else trials_total_time / (trial_count - failure_count)
+                            if not is_time_out:
+                                if not self.has_enough_time_for_trial_(self.time_out, self.time_start, trial_time_start, trial_time_end, avg_trial_run_time):
+                                    logger.log(20, f'\tStop scheduling more HPO trials to satisfy time limit...')
+                                    is_time_out = True
+                                else:
+                                    try:
+                                        self.run_trial(self.trial_resource, self._current_task_id, time_out=self.time_out)
+                                    except ExhaustedSearchSpaceError:
+                                        self._is_exhausted = True
+                        else:
+                            try:
+                                self.run_trial(self.trial_resource, self._current_task_id, time_out=self.time_out)
+                            except ExhaustedSearchSpaceError:
+                                self._is_exhausted = True
+        # sort history because insertions happen in random order
+        self.config_history = OrderedDict(sorted(self.config_history.items()))
+        self.training_history = OrderedDict(sorted(self.training_history.items()))
         self.ray.shutdown()
 
 
@@ -510,15 +557,6 @@ class LocalSequentialScheduler(LocalScheduler):
                 if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
                     logger.log(20, f'\tStopping HPO to satisfy time limit...')
                     break
-
-    @classmethod
-    def get_average_trial_time_(cls, i, avg_trial_run_time, trial_start_time, time_end):
-        trial_time = time_end - trial_start_time
-        if avg_trial_run_time is None:
-            avg_trial_run_time = trial_time
-        else:
-            avg_trial_run_time = ((avg_trial_run_time * i) + trial_time) / (i + 1)
-        return avg_trial_run_time
 
     def run_trial(self, task_id=0) -> Tuple[bool, dict]:
         """

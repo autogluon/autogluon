@@ -1,12 +1,15 @@
-from time import sleep
-
+import numpy as np
+import pickle
 import pytest
 
 import autogluon.core as ag
-from autogluon.core import Real
-from autogluon.core.scheduler.local_scheduler import LocalSequentialScheduler
 
-cls = LocalSequentialScheduler
+from autogluon.core.space import Real
+from autogluon.core.scheduler import LocalScheduler, LocalSequentialScheduler, LocalParallelScheduler
+
+
+cls = LocalScheduler
+scheduler_clses = [LocalSequentialScheduler, LocalParallelScheduler]
 
 
 def test_get_average_trial_time_():
@@ -48,16 +51,6 @@ def test_has_enough_time_for_trial__enough_time__avg_time_not_allows_trials_by_f
     assert not cls.has_enough_time_for_trial_(time_out=10, time_start=100, trial_start_time=105, trial_end_time=106, avg_trial_run_time=1, fill_factor=5)
 
 
-def test_LocalSequentialScheduler_no_criteria():
-    search_space = {'lr': Real(1e-2, 1e-1, log=True)}
-
-    def _train_fn_():
-        pass
-
-    with pytest.raises(AssertionError, match="Need stopping criterion: Either num_trials or time_out"):
-        LocalSequentialScheduler(train_fn=_train_fn_, search_space=search_space, reward_attr='reward_attr', resource={})
-
-
 def test_search_space():
     search_space = dict(
         a=ag.space.Real(1e-3, 1e-2, log=True),
@@ -77,55 +70,48 @@ def test_search_space():
         assert e in [True, False]
         reporter(epoch=1, accuracy=0)
 
-    scheduler = LocalSequentialScheduler(
-        train_fn,
-        search_space=search_space,
-        resource={'num_cpus': 'all', 'num_gpus': 0},
-        num_trials=10,
-        reward_attr='accuracy',
-        time_attr='epoch',
-        checkpoint=None
+    for scheduler_cls in scheduler_clses:
+        scheduler = scheduler_cls(
+            train_fn,
+            search_space=search_space,
+            resource={'num_cpus': 'all', 'num_gpus': 0},
+            num_trials=10,
+            reward_attr='accuracy',
+            time_attr='epoch',
+            checkpoint=None
+        )
+
+        scheduler.run()
+
+
+def test_local_scheduler():
+    search_space = dict(
+        lr=Real(1e-3, 1e-2, log=True),
+        wd=Real(1e-3, 1e-2),
+        epochs=10,
     )
-
-    scheduler.run()
-
-
-def test_scheduler_can_handle_failing_jobs():
-    trails_outcomes = []
-    best_result = [-1]
-
-    search_space = dict(a=ag.space.Real(0, 1))
 
     def train_fn(args, reporter):
-        test_should_fail = args['a'] > 0.7
-        trails_outcomes.append(test_should_fail)
-        if test_should_fail:
-            raise Exception('Failed Trial')
-        elif args['a'] > best_result[0]:
-            best_result[0] = args['a']
-        reporter(epoch=1, accuracy=args['a'])
+        for e in range(args['epochs']):
+            dummy_reward = 1 - np.power(1.8, -np.random.uniform(e, 2 * e))
+            reporter(epoch=e + 1, reward=dummy_reward, lr=args.get('lr'), wd=args.get('wd'))
 
-    scheduler = LocalSequentialScheduler(
-        train_fn,
-        search_space=search_space,
-        resource={'num_cpus': 'all', 'num_gpus': 0},
-        num_trials=10,
-        reward_attr='accuracy',
-        time_attr='epoch',
-        checkpoint=None,
-    )
+    for scheduler_cls in scheduler_clses:
+        scheduler = scheduler_cls(train_fn,
+                                    search_space=search_space,
+                                    num_trials=10)
+        scheduler.run()
+        scheduler.join_jobs()
+        best_config = scheduler.get_best_config()
+        best_task_id = scheduler.get_best_task_id()
+        assert pickle.dumps(scheduler.config_history[best_task_id]) == pickle.dumps(best_config)
 
-    scheduler.run()
+def test_LocalSequentialScheduler_no_criteria():
+    search_space = {'lr': Real(1e-2, 1e-1, log=True)}
 
-    actual_runs = []
-    for trial in scheduler.training_history.values():
-        is_failed = False
-        for i in trial:
-            if 'traceback' in i:
-                is_failed = True
-                break
-        actual_runs.append(is_failed)
+    def _train_fn_():
+        pass
 
-    assert trails_outcomes == actual_runs
-    assert (scheduler.get_best_reward() == best_result[0])
-    assert (scheduler.get_best_config() == {'a': best_result[0]})
+    with pytest.raises(AssertionError, match="Need stopping criterion: Either num_trials or time_out"):
+        for scheduler_cls in scheduler_clses:
+            scheduler_cls(train_fn=_train_fn_, search_space=search_space, reward_attr='reward_attr', resource={})

@@ -6,7 +6,7 @@ from autogluon.core.scheduler.local_scheduler import LocalSequentialScheduler, L
 
 def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():
     scheduler_cls_map = dict(
-        local=LocalParallelScheduler,
+        local=LocalSequentialScheduler,
         sequential_local=LocalSequentialScheduler,
         parallel_local=LocalParallelScheduler,
     )
@@ -29,7 +29,7 @@ def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():
             'time_attr': 'epoch',
             'visualizer': 'none',
             'dist_ip_addrs': [],
-            'scheduler': 'local',
+            'scheduler': key,
             'custom_option': 'value'
         }
         for k, v in expected_values.items():
@@ -61,7 +61,7 @@ def test_scheduler_factory__reaises_exception_on_missing_searcher():
 
 
 def test_get_hyperparameter_tune_kwargs_preset__preset_exists():
-    assert get_hyperparameter_tune_kwargs_preset(preset='auto') == {'scheduler': 'local', 'searcher': 'local_random'}
+    assert get_hyperparameter_tune_kwargs_preset(preset='auto') == {'scheduler': 'parallel_local', 'searcher': 'local_random'}
 
 
 def test_get_hyperparameter_tune_kwargs_preset__preset_missing():
