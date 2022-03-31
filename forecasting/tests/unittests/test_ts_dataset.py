@@ -90,12 +90,12 @@ def test_validate_list_dataset():
 
     empty_list = TimeSeriesListDataset(data=[], freq="D")
     with pytest.raises(ValueError):
-        TimeSeriesDataFrame(empty_list, freq="D")
+        empty_list.validate()
 
     list_dataset = copy.deepcopy(SAMPLE_LIST_DATASET)
     list_dataset.data[1] = {}
     with pytest.raises(ValueError):
-        TimeSeriesDataFrame(list_dataset, freq="D")
+        list_dataset.validate()
 
 
 @pytest.mark.parametrize(

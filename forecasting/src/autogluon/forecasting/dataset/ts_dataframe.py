@@ -35,6 +35,20 @@ class TimeSeriesListDataset(UserList):
     data: List[Dict[str, Any]]
     freq: str
 
+    def validate(self):
+        if len(self) == 0:
+            raise ValueError(f"list_dataset has no time-series.")
+
+        for i, ts in enumerate(self):
+            if not isinstance(ts, dict):
+                raise ValueError(
+                    f"{i}'th time-series in list_dataset must be a dict, got{type(ts)}"
+                )
+            if not ("target" in ts and "start" in ts):
+                raise ValueError(
+                    f"{i}'th time-series in list_dataset must have 'target' and 'start', got{ts.keys()}"
+                )
+
 
 class TimeSeriesDataFrame(pd.DataFrame):
     """TimeSeriesDataFrame to represent time-series dataset.
@@ -55,6 +69,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                         ],
                         freq="D",
                     )
+
             2. Time-series data in pd.DataFrame format without multi-index. For example:
 
                    item_id  timestamp  target
@@ -146,24 +161,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
 
     @classmethod
-    def _validate_list_dataset(cls, list_dataset):
-        if not isinstance(list_dataset, TimeSeriesListDataset):
-            raise ValueError(
-                f"list_dataset must be a TimeSeriesListDataset, got {type(list_dataset)}"
-            )
-        if len(list_dataset.data) == 0:
-            raise ValueError(f"list_dataset has no time-series.")
-        for i, ts in enumerate(list_dataset.data):
-            if not isinstance(ts, dict):
-                raise ValueError(
-                    f"{i}'th time-series in list_dataset must be a dict, got{type(ts)}"
-                )
-            if not ("target" in ts and "start" in ts):
-                raise ValueError(
-                    f"{i}'th time-series in list_dataset must have 'target' and 'start', got{ts.keys()}"
-                )
-
-    @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
         """Validate a multi-index pd.DataFrame can be converted to TimeSeriesDataFrame
 
@@ -213,9 +210,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             A data frame in TimeSeriesDataFrame format.
         """
 
-        cls._validate_list_dataset(list_dataset)
+        list_dataset.validate()
         all_ts = []
-        for i, ts in enumerate(list_dataset.data):
+        for i, ts in enumerate(list_dataset):
             start_timestamp = ts["start"]
             target = ts["target"]
             datetime_index = tuple(
