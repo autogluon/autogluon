@@ -216,3 +216,11 @@ def try_import_vowpalwabbit():
     except ImportError:
         raise ImportError("`import vowpalwabbit` failed.\n"
                           "A quick tip is to install via `pip install vowpalwabbit==8.10.1")
+
+
+def try_import_pytorch_widedeep():
+    try:
+        import pytorch_widedeep
+    except ImportError as e:
+        raise ImportError("`import pytorch_widedeep` failed. A quick tip is to install via `pip install pytorch-widedeep`.")
+

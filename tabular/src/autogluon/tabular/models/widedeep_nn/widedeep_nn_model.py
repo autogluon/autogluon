@@ -9,6 +9,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
+from autogluon.core.utils.try_import import try_import_pytorch_widedeep
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
@@ -18,30 +19,21 @@ logger = logging.getLogger(__name__)
 
 
 class WideDeepNNModel(AbstractModel):
-    # TODO: Leverage time_limit
     # TODO: Leverage sample_weight
     # TODO: Experiment with text and image data
     # TODO: How to leverage GPU?
     # TODO: Missing value handling?
-    def _fit(self,
-             X,
-             y,
-             X_val=None,
-             y_val=None,
-             sample_weight=None,
-             time_limit=None,
-             **kwargs):
-        # TODO: Add try_import_pytorch_widedeep() to enable a more helpful error message if pytorch_widedeep is not installed
-        #  Refer to other model implementations for examples
+    def _fit(self, X, y, X_val=None, y_val=None, sample_weight=None, time_limit=None, **kwargs):
+        start_time = time.time()
+
+        try_import_pytorch_widedeep()
+
         from pytorch_widedeep import Trainer
         from pytorch_widedeep.preprocessing import TabPreprocessor
         from pytorch_widedeep.metrics import Accuracy, R2Score
         import pytorch_widedeep.training.trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
-        # TODO: Use this to get user-specified params instead of hard-coding
-
-        start_time = time.time()
 
         set_seed(0, True)
 
@@ -50,8 +42,6 @@ class WideDeepNNModel(AbstractModel):
         X = self.preprocess(X)
 
         # prepare wide, crossed, embedding and continuous columns
-        # TODO: Either don't use cross_cols or find a way to automatically determine them in a fully automated fashion
-
         cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
 
@@ -168,9 +158,7 @@ class WideDeepNNModel(AbstractModel):
                 callbacks=[model_checkpoint, early_stopping],
                 verbose=kwargs.get('verbosity', 2),
             )
-            # FIXME: Does not return best epoch, instead returns final epoch
-            #  Very important to return best epoch, otherwise model can be far worse than ideal
-            # FIXME: Add early stopping
+
             trainer.fit(
                 X_train=X_train,
                 X_val=X_val_in,
@@ -182,6 +170,7 @@ class WideDeepNNModel(AbstractModel):
             trainer.model.load_state_dict(torch.load(model_checkpoint.old_files[-1]))
 
         self.model = trainer
+
         # TODO: add dynamic epochs selection
         self.params_trained['epochs'] = params['epochs']
         self.params_trained['best_epoch'] = best_epoch
