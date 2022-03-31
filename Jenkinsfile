@@ -101,7 +101,7 @@ stage("Unit Test") {
           if [ -z conda_output ]; then
             conda remove -n autogluon-core-py3-v3 --all -y
           fi
-          conda create -n autogluon-core-py3-v33 -f docs/build.yml
+          conda create -n autogluon-core-py3-v3 -f docs/build.yml
           conda activate autogluon-core-py3-v3
           conda list
 
