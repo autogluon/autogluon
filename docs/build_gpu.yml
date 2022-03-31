@@ -8,3 +8,4 @@ dependencies:
 - pip
 - pip:
   - flake8
+  - pytest

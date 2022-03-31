@@ -178,6 +178,10 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh '''#!/bin/bash
           set -ex
+          conda_output=$(conda env list | grep autogluon-text-py3-v3)
+          if [ -z conda_output ]; then
+            conda remove -n autogluon-text-py3-v3 --all -y
+          fi
           conda create -n autogluon-text-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-text-py3-v3
           conda list
