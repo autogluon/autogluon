@@ -71,7 +71,7 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
+          sh '''#!/bin/bash
           set -ex
           conda_output=$(conda env list | grep autogluon-common-py3-v3)
           if [ -z conda_output ]; then
@@ -84,7 +84,7 @@ stage("Unit Test") {
           ${install_common}
           cd common/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
+          '''
         }
       }
     }
