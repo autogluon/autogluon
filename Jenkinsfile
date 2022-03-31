@@ -73,7 +73,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-common-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-common-py3-v3 -f docs/build.yaml -y
           conda activate autogluon-common-py3-v3
           conda list
 
@@ -93,7 +93,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-cire-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-core-py3-v3 -f docs/build.yaml -y
           conda activate autogluon-core-py3-v3
           conda list
 
@@ -113,7 +113,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-featyres-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-features-py3-v3 -f docs/build.yaml -y
           conda activate autogluon-features-py3-v3
           conda list
 
@@ -134,7 +134,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-tabular-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-tabular-py3-v3 -f docs/build_gpu.yaml -y
           conda activate autogluon-tabular-py3-v3
           conda list
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
@@ -162,7 +162,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-text-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-text-py3-v3 -f docs/build_gpu.yaml -y
           conda activate autogluon-text-py3-v3
           conda list
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
@@ -191,7 +191,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-vision-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-vision-py3-v3 -f docs/build_gpu.yaml -y
           conda activate autogluon-vision-py3
           conda list
           ${setup_torch_gpu}
@@ -218,7 +218,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-forecasting-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yaml -y
           conda activate autogluon-forecasting-py3-v3
           conda list
           ${setup_mxnet_gpu}
@@ -242,7 +242,7 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda create --force -n autogluon-install-py3-v3 -f docs/build.yaml
+          conda create --force -n autogluon-install-py3-v3 -f docs/build.yaml -y
           conda activate autogluon-install-py3-v3
           conda list
 
@@ -274,7 +274,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon-tutorial-image-classification-v3 -f docs/build.yaml
+        conda create --force -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yaml -y
         conda activate autogluon-tutorial-image-classification-v3
         conda list
         ${setup_mxnet_gpu}
@@ -304,7 +304,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon-tutorial-object-detection-v3 -f docs/build.yaml
+        conda create --force -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yaml -y
         conda activate autogluon-tutorial-object-detection-v3
         conda list
         ${setup_mxnet_gpu}
@@ -332,7 +332,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon-tutorial-tabular-v3 -f docs/build.yaml
+        conda create --force -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yaml -y
         conda activate autogluon-tutorial-tabular-v3
         conda list
         ${setup_torch_gpu}
@@ -359,7 +359,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon-tutorial-text-v3 -f docs/build.yaml
+        conda create --force -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yaml -y
         conda activate autogluon-tutorial-text-v3
         conda list
         ${setup_mxnet_gpu}
@@ -386,7 +386,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build.yaml
+        conda create --force -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yaml -y
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
         export AG_DOCS=1
@@ -411,7 +411,7 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon-tutorial-forecasting-v3 -f docs/build.yaml
+        conda create --force -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yaml -y
         conda activate autogluon-tutorial-forecasting-v3
         conda list
         ${setup_mxnet_gpu}
@@ -481,7 +481,7 @@ stage("Build Docs") {
 
         sh """#!/bin/bash
         set -ex
-        conda create --force -n autogluon_docs -f docs/build.yaml
+        conda create --force -n autogluon_docs -f docs/build_contrib_gpu.yaml -y
         conda activate autogluon_docs
         conda list
         ${setup_mxnet_gpu}
