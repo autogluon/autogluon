@@ -923,6 +923,8 @@ class AbstractModel:
         scheduler_options = copy.deepcopy(scheduler_options)
         if 'time_out' not in scheduler_options[1]:
             scheduler_options[1]['time_out'] = time_limit
+        if 'num_trials_parallel' not in scheduler_options[1]:
+            scheduler_options[1]['num_trials_parallel'] = 'auto'
         kwargs = self.initialize(time_limit=scheduler_options[1]['time_out'], **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)

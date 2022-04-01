@@ -23,6 +23,9 @@ from ..utils.try_import import try_import_ray
 
 logger = logging.getLogger(__name__)
 
+CATBOOST_MODEL = 'CatBoostModel'
+XGBOOST_MODEL = 'XGBoostModel'
+
 
 class LocalReporter:
     """
@@ -338,6 +341,7 @@ class LocalParallelScheduler(LocalScheduler):
 
     def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         super().__init__(train_fn=train_fn, search_space=search_space, train_fn_kwargs=train_fn_kwargs, searcher=searcher, reward_attr=reward_attr, resource=resource, **kwargs)
+        self._init_parallel_args(**kwargs)
         self.time_start = None
         #prepare ray
         import_ray_additional_err_msg = (
@@ -345,9 +349,7 @@ class LocalParallelScheduler(LocalScheduler):
             "For example: `predictor.fit(..., hyperparameter_tune_kwargs={'scheduler': 'sequential_local'})`"
         )
         self.ray = try_import_ray(additional_err_msg=import_ray_additional_err_msg)
-        self.model_estimate_memroy_usage = kwargs.get('model_estimate_memory_usage', None)
         self.total_resource = self._validate_resource(resource)
-        print(train_fn_kwargs)
         print(self.total_resource)
         self.trial_resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
         print(self.trial_resource)
@@ -359,7 +361,14 @@ class LocalParallelScheduler(LocalScheduler):
         self._current_task_id = 0
         self._is_exhausted = False
 
+    def _init_parallel_args(self, **kwargs):
+        self.model_estimate_memroy_usage = kwargs.get('model_estimate_memory_usage', None)
+        self.num_trials_parallel = kwargs.get('num_trials_parallel', 'auto')
+        if self.num_trials_parallel == 'auto':
+            self.num_trials_parallel = self.num_trials  # default to be as much as possible. Will be updated by `_get_resource_suggestions()`
+
     def _validate_resource(self, resource):
+        num_physical_cores = psutil.cpu_count(logical=False)
         num_cpus = None
         num_gpus = None
         if resource is not None:
@@ -368,7 +377,15 @@ class LocalParallelScheduler(LocalScheduler):
         else:
             resource = dict()
         if num_cpus is None or num_cpus == 'all':
-            num_cpus = get_cpu_count()
+            num_cpus = num_physical_cores
+        if num_cpus == num_physical_cores:
+            # This is a hack. Using virtual cores is observed to be faster than physical cores for catboost and xgboost models in parallel hpo
+            # We only do this when the user is meant to use all the cores.
+            if self.train_fn_kwargs:
+                model_cls = self.train_fn_kwargs.get('model_cls', None)
+                print(model_cls)
+                if model_cls is not None and model_cls.__name__ in [CATBOOST_MODEL, XGBOOST_MODEL]: 
+                    num_cpus = psutil.cpu_count(logical=True)
         if num_gpus is None:
             num_gpus = 0  # if user doesn't specify gpus, we don't use any
         if num_gpus == 'all':
@@ -382,14 +399,16 @@ class LocalParallelScheduler(LocalScheduler):
         cpu_per_job = max(1, int(num_cpus // self.num_trials))
         gpu_per_job = 0
         max_jobs_in_parallel_memory = math.inf
+
         if self.model_estimate_memroy_usage is not None:
             mem_available = psutil.virtual_memory().available
             # calculate how many jobs can run in parallel given memory available
             max_jobs_in_parallel_memory = max(1, int(mem_available // self.model_estimate_memroy_usage))
-        resource = dict(num_cpus=cpu_per_job)
-        num_parallel_jobs = min(self.num_trials, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
+        num_parallel_jobs = min(self.num_trials, self.num_trials_parallel, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
         cpu_per_job = max(1, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
-        logger.log(20, f"Will run {num_parallel_jobs} jobs in parallel given number of cpu cores and memory avaialable")
+        resource = dict(num_cpus=cpu_per_job)
+        logger.log(20, f"Will run {num_parallel_jobs} jobs in parallel given number of cpu cores, memory avaialable, and user specification")
+
         batches = math.ceil(self.num_trials / num_parallel_jobs)
         if num_gpus > 0:
             gpu_per_job = num_gpus / num_parallel_jobs
