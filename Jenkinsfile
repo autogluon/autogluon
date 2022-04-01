@@ -71,20 +71,16 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-common-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-common-py3-v3 --all -y
-          fi
-          conda create -n autogluon-common-py3-v3 -f docs/build.yml
+          conda create -n autogluon-common-py3-v3 -f docs/build.yml -y
           conda activate autogluon-common-py3-v3
           conda list
 
           ${install_common}
           cd common/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          '''
+          """
         }
       }
     }
@@ -95,20 +91,16 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-core-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-core-py3-v3 --all -y
-          fi
-          conda create -n autogluon-core-py3-v3 -f docs/build.yml
+          conda create -n autogluon-core-py3-v3 -f docs/build.yml -y
           conda activate autogluon-core-py3-v3
           conda list
 
           ${install_core_all_tests}
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          '''
+          """
         }
       }
     }
@@ -119,13 +111,9 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-features-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-features-py3-v3 --all -y
-          fi
-          conda create -n autogluon-features-py3-v3 -f docs/build.yml
+          conda create -n autogluon-features-py3-v3 -f docs/build.yml -y
           conda activate autogluon-features-py3-v3
           conda list
 
@@ -133,7 +121,7 @@ stage("Unit Test") {
           ${install_features}
           cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          '''
+          """
         }
       }
     }
@@ -144,18 +132,14 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-tabular-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-tabular-py3-v3 --all -y
-          fi
-          conda create -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml
+          conda create -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml -y
           conda activate autogluon-tabular-py3-v3
           conda list
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
@@ -165,7 +149,7 @@ stage("Unit Test") {
 
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          '''
+          """
         }
       }
     }
@@ -176,18 +160,14 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-text-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-text-py3-v3 --all -y
-          fi
-          conda create -n autogluon-text-py3-v3 -f docs/build_gpu.yml
+          conda create -n autogluon-text-py3-v3 -f docs/build_gpu.yml -y
           conda activate autogluon-text-py3-v3
           conda list
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
@@ -198,7 +178,7 @@ stage("Unit Test") {
 
           cd text/
           python3 -m pytest --junitxml=results.xml --forked --runslow tests
-          '''
+          """
         }
       }
     }
@@ -209,19 +189,15 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-vision-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-vision-py3-v3 --all -y
-          fi
-          conda create -n autogluon-vision-py3-v3 -f docs/build_gpu.yml
+          conda create -n autogluon-vision-py3-v3 -f docs/build_gpu.yml -y
           conda activate autogluon-vision-py3-v3
           conda list
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all_test}
+          ${install_core_all_tests}
           ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -229,7 +205,7 @@ stage("Unit Test") {
 
           cd vision/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          '''
+          """
         }
       }
     }
@@ -240,24 +216,20 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-forecasting-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-forecasting-py3-v3 --all -y
-          fi
-          conda create -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml
+          conda create -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml -y
           conda activate autogluon-forecasting-py3-v3
           conda list
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           ${install_tabular_all}
           ${install_forecasting}
           cd forecasting/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          '''
+          """
         }
       }
     }
@@ -268,19 +240,15 @@ stage("Unit Test") {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh '''#!/bin/bash
+          sh """#!/bin/bash
           set -ex
-          conda_output=$(conda env list | grep autogluon-install-py3-v3)
-          if [ -z conda_output ]; then
-            conda remove -n autogluon-install-py3-v3 --all -y
-          fi
-          conda create -n autogluon-install-py3-v3 -f docs/build.yml
+          conda create -n autogluon-install-py3-v3 -f docs/build.yml -y
           conda activate autogluon-install-py3-v3
           conda list
 
           python3 -m pip install 'mxnet==1.7.0.*'
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           ${install_tabular_all}
 
@@ -291,7 +259,7 @@ stage("Unit Test") {
           ${install_vision}
           ${install_forecasting}
           ${install_autogluon}
-          '''
+          """
         }
       }
     }
@@ -304,13 +272,9 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-image-classification-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon-tutorial-image-classification-v3)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon-tutorial-image-classification-v3 --all -y
-        fi
-        conda create -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yml
+        conda create -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yml -y
         conda activate autogluon-tutorial-image-classification-v3
         conda list
         ${setup_mxnet_gpu}
@@ -328,7 +292,7 @@ stage("Build Tutorials") {
         cat docs/_build/rst/_static/d2l.js
         cat docs/_build/rst/conf.py
         tree -L 2 docs/_build/rst
-        '''
+        """
         stash includes: 'docs/_build/rst/tutorials/image_prediction/*', name: 'image_prediction'
       }
     }
@@ -338,13 +302,9 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-object-detection-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon-tutorial-object-detection-v3)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon-tutorial-object-detection-v3 --all -y
-        fi
-        conda create -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml
+        conda create -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml -y
         conda activate autogluon-tutorial-object-detection-v3
         conda list
         ${setup_mxnet_gpu}
@@ -360,7 +320,7 @@ stage("Build Tutorials") {
         rm -rf ./docs/tutorials/!(object_detection)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         tree -L 2 docs/_build/rst
-        '''
+        """
         stash includes: 'docs/_build/rst/tutorials/object_detection/*', name: 'object_detection'
       }
     }
@@ -370,13 +330,9 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-tabular-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon-tutorial-tabular-v3)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon-tutorial-tabular-v3 --all -y
-        fi
-        conda create -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml
+        conda create -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml -y
         conda activate autogluon-tutorial-tabular-v3
         conda list
         ${setup_torch_gpu}
@@ -391,7 +347,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(tabular_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        '''
+        """
         stash includes: 'docs/_build/rst/tutorials/tabular_prediction/*', name: 'tabular'
       }
     }
@@ -401,13 +357,9 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-text-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon-tutorial-text-v3)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon-tutorial-text-v3 --all -y
-        fi
-        conda create -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml
+        conda create -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml -y
         conda activate autogluon-tutorial-text-v3
         conda list
         ${setup_mxnet_gpu}
@@ -422,7 +374,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(text_prediction)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        '''
+        """
         stash includes: 'docs/_build/rst/tutorials/text_prediction/*', name: 'text'
       }
     }
@@ -432,13 +384,9 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-tutorial-cloud_fit_deploy-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon-tutorial-cloud_fit_deploy-v3)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon-tutorial-cloud_fit_deploy-v3 --all -y
-        fi
-        conda create -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yml
+        conda create -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yml -y
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
         export AG_DOCS=1
@@ -451,7 +399,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(cloud_fit_deploy)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        '''
+        """
         stash includes: 'docs/_build/rst/tutorials/cloud_fit_deploy/*', name: 'cloud_fit_deploy'
       }
     }
@@ -461,13 +409,9 @@ stage("Build Tutorials") {
       ws('workspace/autogluon-forecasting-py3-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon-tutorial-forecasting-v3)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon-tutorial-forecasting-v3 --all -y
-        fi
-        conda create -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml
+        conda create -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml -y
         conda activate autogluon-tutorial-forecasting-v3
         conda list
         ${setup_mxnet_gpu}
@@ -482,7 +426,7 @@ stage("Build Tutorials") {
         shopt -s extglob
         rm -rf ./docs/tutorials/!(forecasting)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
-        '''
+        """
         stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
       }
     }
@@ -535,13 +479,9 @@ stage("Build Docs") {
         unstash 'cloud_fit_deploy'
         unstash 'forecasting'
 
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
         set -ex
-        conda_output=$(conda env list | grep autogluon_docs)
-        if [ -z conda_output ]; then
-          conda remove -n autogluon_docs --all -y
-        fi
-        conda create -n autogluon_docs -f docs/build_contrib_gpu.yml
+        conda create -n autogluon_docs -f docs/build_contrib_gpu.yml -y
         conda env update -n autogluon_docs -f docs/build_contrib_gpu.yml --prune
         conda activate autogluon_docs
         conda list
@@ -551,7 +491,7 @@ stage("Build Docs") {
 
         git clean -fx
 
-        ${install_core_all}
+        ${install_core_all_tests}
         ${install_features}
         ${install_tabular_all}
         ${install_text}
@@ -570,7 +510,7 @@ stage("Build Docs") {
         echo "Uploaded doc to http://${site}/index.html"
 
         ${index_update_str}
-        '''
+        """
 
         if (env.BRANCH_NAME.startsWith("PR-")) {
           pullRequest.comment("Job ${env.BRANCH_NAME}-${env.BUILD_NUMBER} is done. \nDocs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/index.html")
