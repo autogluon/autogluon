@@ -413,7 +413,7 @@ class LocalParallelScheduler(LocalScheduler):
         batches = math.ceil(self.num_trials / num_parallel_jobs)
         if num_gpus > 0:
             gpu_per_job = num_gpus / num_parallel_jobs
-            resource = dict(num_cpus=cpu_per_job, num_gpus=gpu_per_job)
+        resource = dict(num_cpus=cpu_per_job, num_gpus=gpu_per_job)
         return resource, batches, num_parallel_jobs
 
     def _get_trial_train_fn_kwargs(self):
