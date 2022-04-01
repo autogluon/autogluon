@@ -73,7 +73,9 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-common-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-common-py3-v3 -y
           conda env update -n autogluon-common-py3-v3 -f docs/build.yml
           conda activate autogluon-common-py3-v3
           conda list
@@ -94,7 +96,9 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-core-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-core-py3-v3 -y
           conda env update -n autogluon-core-py3-v3 -f docs/build.yml
           conda activate autogluon-core-py3-v3
           conda list
@@ -115,7 +119,9 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-features-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-features-py3-v3 -y
           conda env update -n autogluon-features-py3-v3 -f docs/build.yml
           conda activate autogluon-features-py3-v3
           conda list
@@ -137,13 +143,15 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-tabular-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-tabular-py3-v3 -y
           conda env update -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-tabular-py3-v3
           conda list
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
@@ -166,13 +174,15 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-text-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-text-py3-v3 -y
           conda env update -n autogluon-text-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-text-py3-v3
           conda list
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
@@ -190,20 +200,22 @@ stage("Unit Test") {
   },
   'vision': {
     node('linux-gpu') {
-      ws('workspace/autogluon-vision-py3') {
+      ws('workspace/autogluon-vision-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-vision-py3 --all -y
-          conda env update -n autogluon-vision-py3 -f docs/build_gpu.yml
-          conda activate autogluon-vision-py3
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-vision-py3-v3 -y
+          conda env update -n autogluon-vision-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-vision-py3-v3
           conda list
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
@@ -224,13 +236,15 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-forecasting-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-forecasting-py3-v3 -y
           conda env update -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-forecasting-py3-v3
           conda list
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           ${install_tabular_all}
           ${install_forecasting}
@@ -249,14 +263,16 @@ stage("Unit Test") {
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
           sh """#!/bin/bash
           set -ex
-          conda remove --name autogluon-install-py3-v3 --all -y
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-install-py3-v3 -y
           conda env update -n autogluon-install-py3-v3 -f docs/build.yml
           conda activate autogluon-install-py3-v3
           conda list
 
           python3 -m pip install 'mxnet==1.7.0.*'
 
-          ${install_core_all}
+          ${install_core_all_tests}
           ${install_features}
           ${install_tabular_all}
 
@@ -282,7 +298,9 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon-tutorial-image-classification-v3 --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-image-classification-v3 -y
         conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-image-classification-v3
         conda list
@@ -313,7 +331,9 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon-tutorial-object-detection-v3 --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-object-detection-v3 -y
         conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-object-detection-v3
         conda list
@@ -342,7 +362,9 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon-tutorial-tabular-v3 --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-tabular-v3 -y
         conda env update -n autogluon-tutorial-tabular-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-tabular-v3
         conda list
@@ -370,7 +392,9 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon-tutorial-text-v3 --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-text-v3 -y
         conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-text-v3
         conda list
@@ -398,7 +422,9 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon-tutorial-cloud_fit_deploy-v3 --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-cloud_fit_deploy-v3 -y
         conda env update -n autogluon-tutorial-cloud_fit_deploy-v3 -f docs/build_contrib.yml
         conda activate autogluon-tutorial-cloud_fit_deploy-v3
         conda list
@@ -424,7 +450,9 @@ stage("Build Tutorials") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon-tutorial-forecasting-v3 --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-forecasting-v3 -y
         conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-forecasting-v3
         conda list
@@ -495,7 +523,9 @@ stage("Build Docs") {
 
         sh """#!/bin/bash
         set -ex
-        conda remove --name autogluon_docs --all -y
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon_docs -y
         conda env update -n autogluon_docs -f docs/build_contrib_gpu.yml
         conda activate autogluon_docs
         conda list
@@ -505,7 +535,7 @@ stage("Build Docs") {
 
         git clean -fx
 
-        ${install_core_all}
+        ${install_core_all_tests}
         ${install_features}
         ${install_tabular_all}
         ${install_text}
