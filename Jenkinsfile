@@ -221,7 +221,7 @@ stage("Unit Test") {
           ${setup_torch_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 
-          ${install_core_all}
+          ${install_core_all_test}
           ${install_vision}
 
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
