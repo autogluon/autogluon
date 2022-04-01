@@ -30,7 +30,7 @@ def test_empty_resource_handling():
     )
 
     expected_resource = dict(
-        num_cpus = get_cpu_count(),
+        num_cpus = get_cpu_count(logical=False),
         num_gpus = 0,
     )
 
@@ -48,7 +48,7 @@ def test_all_resource_handling():
     )
 
     expected_resource = dict(
-        num_cpus = get_cpu_count(),
+        num_cpus = get_cpu_count(logical=False),
         num_gpus = get_gpu_count_all(),
     )
 
@@ -56,7 +56,7 @@ def test_all_resource_handling():
 
 
 def test_resource_allocation():
-    num_cpus = get_cpu_count()
+    num_cpus = get_cpu_count(logical=False)
     num_gpus = get_gpu_count_all()
     mem_available = psutil.virtual_memory().available
     search_space, train_fn = _get_dummy_inputs()
@@ -69,9 +69,10 @@ def test_resource_allocation():
         resource=dict(num_cpus=num_cpus, num_gpus=num_gpus),
         num_trials=num_trials,
         model_estimate_memory_usage=model_estimate_memory_usage,
+        num_trials_parallel=1000  # user wants to run 1000 parallel jobs
     )
 
-    expected_num_parallel_jobs = 2  # even cpu can run 4 jobs in parallel, memory only allows for 2 jobs
+    expected_num_parallel_jobs = 2  # even user wants to run 1000 jobs in prallel, cpu can run 4 jobs in parallel, memory only allows for 2 jobs
     expected_trial_resource = dict(
         num_cpus = num_cpus / expected_num_parallel_jobs,
         num_gpus = num_gpus / expected_num_parallel_jobs,

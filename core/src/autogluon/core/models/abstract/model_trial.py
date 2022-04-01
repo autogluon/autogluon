@@ -38,14 +38,10 @@ def model_trial(args,
             time_limit=time_limit,
             reporter=None,
         )
-        # FIXME: remove print
-        print("model trained")
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
         reporter.terminate()
-        # FIXME: remove print
-        print("model failed")
         raise e
     else:
     

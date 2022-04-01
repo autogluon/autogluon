@@ -17,7 +17,7 @@ from .reporter import FakeReporter
 from ..searcher import searcher_factory
 from ..searcher.exceptions import ExhaustedSearchSpaceError
 from ..searcher.local_searcher import LocalSearcher
-from ..utils.exceptions import TimeLimitExceeded
+from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from ..utils import get_cpu_count, get_gpu_count_all
 from ..utils.try_import import try_import_ray
 
@@ -350,9 +350,7 @@ class LocalParallelScheduler(LocalScheduler):
         )
         self.ray = try_import_ray(additional_err_msg=import_ray_additional_err_msg)
         self.total_resource = self._validate_resource(resource)
-        print(self.total_resource)
         self.trial_resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
-        print(self.trial_resource)
         self.metadata['resources_per_trial'] = self.trial_resource
         self._trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
         self._ray_train_actor_cls = self.ray.remote(RayTrainActor)
@@ -366,9 +364,13 @@ class LocalParallelScheduler(LocalScheduler):
         self.num_trials_parallel = kwargs.get('num_trials_parallel', 'auto')
         if self.num_trials_parallel == 'auto':
             self.num_trials_parallel = self.num_trials  # default to be as much as possible. Will be updated by `_get_resource_suggestions()`
+        assert type(self.num_trials_parallel) == int
+        if self.num_trials_parallel <= 0:
+            logger.warning(f'Detected num_trials_parallel: {self.num_trials_parallel} to be <= 0. Will try to parallel as much as possible. Consider specifying a positive number instead if this is not intended.')
+            self.num_trials_parallel = self.num_trials
 
     def _validate_resource(self, resource):
-        num_physical_cores = psutil.cpu_count(logical=False)
+        num_physical_cores = get_cpu_count(logical=False)
         num_cpus = None
         num_gpus = None
         if resource is not None:
@@ -383,9 +385,8 @@ class LocalParallelScheduler(LocalScheduler):
             # We only do this when the user is meant to use all the cores.
             if self.train_fn_kwargs:
                 model_cls = self.train_fn_kwargs.get('model_cls', None)
-                print(model_cls)
                 if model_cls is not None and model_cls.__name__ in [CATBOOST_MODEL, XGBOOST_MODEL]: 
-                    num_cpus = psutil.cpu_count(logical=True)
+                    num_cpus = get_cpu_count(logical=True)
         if num_gpus is None:
             num_gpus = 0  # if user doesn't specify gpus, we don't use any
         if num_gpus == 'all':
@@ -398,7 +399,7 @@ class LocalParallelScheduler(LocalScheduler):
         num_gpus = self.total_resource.get('num_gpus')
         cpu_per_job = max(1, int(num_cpus // self.num_trials))
         gpu_per_job = 0
-        max_jobs_in_parallel_memory = math.inf
+        max_jobs_in_parallel_memory = self.num_trials
 
         if self.model_estimate_memroy_usage is not None:
             mem_available = psutil.virtual_memory().available
@@ -527,8 +528,16 @@ class LocalParallelScheduler(LocalScheduler):
                 except TimeLimitExceeded:
                     logger.log(20, f'\tStopping HPO to satisfy time limit...')
                     break
+                except (NotEnoughMemoryError, MemoryError):
+                    error_msg = 'Out of memory while HPO, consider decrease number of trials running in parallel by\n\
+                                 passing `num_trails_parallel` to `hyperparameter_tune_kwargs` when calling `tabular.fit`'
+                    logger.warning(error_msg)
+                    self.searcher.evaluation_failed(config=searcher_config)
+                    reporter(traceback=e)
+                    result = {'traceback': str(e)}
+                    failed = True
                 except Exception as e:
-                    logger.exception('Detailed Traceback:')  # TODO: Avoid logging if verbosity=0
+                    logger.exception('Detailed Traceback:')
                     self.searcher.evaluation_failed(config=searcher_config)
                     reporter(traceback=e)
                     result = {'traceback': str(e)}

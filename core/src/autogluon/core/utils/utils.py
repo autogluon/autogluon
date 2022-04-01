@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 import os
 import subprocess
 import math
@@ -24,8 +23,9 @@ from ..metrics import accuracy, root_mean_squared_error, pinball_loss, Scorer
 logger = logging.getLogger(__name__)
 
 
-def get_cpu_count():
-    return multiprocessing.cpu_count()
+def get_cpu_count(logical=True):
+    # psutil tries what multiprocessing does, if those failed, it tries other technique
+    return psutil.cpu_count(logical)
 
 
 def get_memory_size():
