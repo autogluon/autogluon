@@ -937,7 +937,9 @@ class AbstractModel:
                 resource.pop('num_gpus')
 
         scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **resource)
-        scheduler_options[1]['model_estimate_memory_usage'] = self.estimate_memory_usage(**kwargs)
+        # FIXME: this is here because forecasting model overrides estimate_memory_usage to be None. Should remove once it got refactored
+        if self.estimate_memory_usage is not None:
+            scheduler_options[1]['model_estimate_memory_usage'] = self.estimate_memory_usage(**kwargs)
         return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
 
     def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
