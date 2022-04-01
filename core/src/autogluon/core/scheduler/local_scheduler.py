@@ -63,6 +63,36 @@ class LocalReporter:
 
 
 class LocalScheduler(ABC):
+    """ 
+    Abstract class for local schedulers.
+    Users are expected to call `run()` and `join_jobs()` of the implementation of this class to run HPO trials
+
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training.
+    resource : dict
+        Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : str
+        Searcher (get_config decisions). If str, this is passed to
+        searcher_factory along with search_options.
+    search_options : dict
+        If searcher is str, these arguments are passed to searcher_factory.
+    num_trials : int
+        Maximum number of jobs run in experiment. One of `num_trials`,
+        `time_out` must be given.
+    time_out : float
+        If given, jobs are started only until this time_out (wall clock time).
+        One of `num_trials`, `time_out` must be given.
+    reward_attr : str
+        Name of reward (i.e., metric to maximize) attribute in data obtained
+        from reporter
+    time_attr : str
+        Name of resource (or time) attribute in data obtained from reporter.
+        This attribute is optional for FIFO scheduling, but becomes mandatory
+        in multi-fidelity scheduling (e.g., Hyperband).
+        Note: The type of resource must be int.
+    """
     
     def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         self.train_fn = train_fn
@@ -239,6 +269,28 @@ class LocalScheduler(ABC):
 
 
 class RayTrainActor:
+    """
+    Rat actor class used to record the states of trials and launch remote jobs.
+
+    Parameters
+    ----------
+    task_id : int
+        id of the task assigned to this actor.
+    train_fn : callable
+        A task launch function for training.
+    searcher_config: dict
+        searcher config of the task assigned to this actor.
+    args: dict
+        args to be passed to train_fn.
+    reporter: LocalReporter
+        reporter of the task assigned to this actor.
+    train_fn_kwargs: dict
+        kwargs to be passed to train_fn.
+    time_start: float
+        time this task started
+    time_out: float
+        task should finish before this time
+    """
 
     def __init__(self, task_id, train_fn, searcher_config, args, reporter, train_fn_kwargs, time_start, time_out=None):
         self.task_id = task_id
@@ -251,6 +303,7 @@ class RayTrainActor:
         self.time_out = time_out
 
     def execute(self):
+        """Calculate time_limit for the task and execute train_fn"""
         if self.time_out is not None:
             time_limit = (self.time_out - self.time_start) * 0.95
             self.train_fn_kwargs['time_limit'] = time_limit
@@ -268,12 +321,20 @@ class RayTrainActor:
 
 @dataclass
 class RayJobContext:
+    """Holds context of a ray remote job"""
 
     actor: RayTrainActor
     time_start: float
 
 
 class LocalParallelScheduler(LocalScheduler):
+    """
+    Scheduler which schedules HPO jobs in parallel.
+    Trials will be scheduled as many as possible in parallel given the resources available.
+    After the first batch of trials is launched, the next trial scheduling will be decided based on the available time left withing `time_out` setting
+    and average time required for a trial to complete multiplied by the fill_factor (0.95) by default to
+    accommodate variance in runtimes per HPO run.
+    """
 
     def __init__(self, train_fn, search_space, train_fn_kwargs=None, searcher='auto', reward_attr='reward', resource=None, **kwargs):
         super().__init__(train_fn=train_fn, search_space=search_space, train_fn_kwargs=train_fn_kwargs, searcher=searcher, reward_attr=reward_attr, resource=resource, **kwargs)
@@ -286,7 +347,10 @@ class LocalParallelScheduler(LocalScheduler):
         self.ray = try_import_ray(additional_err_msg=import_ray_additional_err_msg)
         self.model_estimate_memroy_usage = kwargs.get('model_estimate_memory_usage', None)
         self.total_resource = self._validate_resource(resource)
+        print(train_fn_kwargs)
+        print(self.total_resource)
         self.trial_resource, self.batches, self.num_parallel_jobs = self._get_resource_suggestions()
+        print(self.trial_resource)
         self.metadata['resources_per_trial'] = self.trial_resource
         self._trial_train_fn_kwargs = self._get_trial_train_fn_kwargs()
         self._ray_train_actor_cls = self.ray.remote(RayTrainActor)
@@ -339,6 +403,7 @@ class LocalParallelScheduler(LocalScheduler):
         return trial_train_fn_kwargs
 
     def run(self, **kwargs):
+        """Initialize Ray and launch the first batch of trials"""
         self.time_start = time.time()
         self.searcher.configure_scheduler(self)
 
@@ -364,6 +429,23 @@ class LocalParallelScheduler(LocalScheduler):
 
 
     def run_trial(self, resource, task_id=0, time_out=None):
+        """
+        Start a trial with a given task_id
+
+        Parameters
+        ----------
+        resource: dict
+            resources for this specific trial
+        task_id: int
+            id for this specific trial(task)
+
+        Returns
+        -------
+        ray_train_actor: RayTrainActor
+            The remote actor that executed this trial
+        job_ref: RayObjectRef
+            The reference to the result of trial
+        """
         new_searcher_config = self.searcher.get_config()
         searcher_config = deepcopy(self.metadata['search_space'])
         searcher_config.update(new_searcher_config)
@@ -384,6 +466,7 @@ class LocalParallelScheduler(LocalScheduler):
         args['task_id'] = task_id
         self.searcher.register_pending(searcher_config)
         time_start = time.time()
+        # Create the remote actor
         ray_train_actor = self._ray_train_actor_cls.options(**resource).remote(task_id, self.train_fn, searcher_config, args, reporter, trial_train_fn_kwargs, time_start, time_out)
         job_ref = ray_train_actor.execute.remote()
         self._current_task_id += 1
@@ -392,6 +475,10 @@ class LocalParallelScheduler(LocalScheduler):
         return ray_train_actor, job_ref
 
     def join_jobs(self, timeout=None):
+        """
+        Wait for jobs to finish and merge results back.
+        Launches more jobs if time is enough.
+        """
         failure_count = 0
         trial_count = 0
         trials_total_time = 0
@@ -474,36 +561,11 @@ class LocalParallelScheduler(LocalScheduler):
 
 
 class LocalSequentialScheduler(LocalScheduler):
-    """ Simple scheduler which schedules all HPO jobs in sequence without any parallelism.
+    """
+    Simple scheduler which schedules all HPO jobs in sequence without any parallelism.
     The next trial scheduling will be decided based on the available time left withing `time_out` setting
     and average time required for a trial to complete multiplied by the fill_factor (0.95) by default to
     accommodate variance in runtimes per HPO run.
-
-    Parameters
-    ----------
-    train_fn : callable
-        A task launch function for training.
-    resource : dict
-        Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-    searcher : str
-        Searcher (get_config decisions). If str, this is passed to
-        searcher_factory along with search_options.
-    search_options : dict
-        If searcher is str, these arguments are passed to searcher_factory.
-    num_trials : int
-        Maximum number of jobs run in experiment. One of `num_trials`,
-        `time_out` must be given.
-    time_out : float
-        If given, jobs are started only until this time_out (wall clock time).
-        One of `num_trials`, `time_out` must be given.
-    reward_attr : str
-        Name of reward (i.e., metric to maximize) attribute in data obtained
-        from reporter
-    time_attr : str
-        Name of resource (or time) attribute in data obtained from reporter.
-        This attribute is optional for FIFO scheduling, but becomes mandatory
-        in multi-fidelity scheduling (e.g., Hyperband).
-        Note: The type of resource must be int.
     """
 
     def run(self, **kwargs):
