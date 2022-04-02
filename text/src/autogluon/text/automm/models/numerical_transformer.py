@@ -2,7 +2,7 @@ from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
 from typing import Any, Dict, List, Optional, Union, cast
-from .ftt_transformer import Transformer,_TokenInitialization,CLSToken
+from .ft_transformer import Transformer,_TokenInitialization,CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 
 

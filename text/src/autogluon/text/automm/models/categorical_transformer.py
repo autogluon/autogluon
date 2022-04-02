@@ -3,7 +3,7 @@ from torch import nn
 from torch import Tensor
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast
 from ..constants import CATEGORICAL, LABEL, LOGITS, FEATURES
-from .ftt_transformer import _TokenInitialization, CLSToken, Transformer
+from .ft_transformer import _TokenInitialization, CLSToken, Transformer
 
 
 class CategoricalFeatureTokenizer(nn.Module):
@@ -54,6 +54,7 @@ class CategoricalFeatureTokenizer(nn.Module):
         initialization_ = _TokenInitialization.from_str(initialization)
 
         category_offsets = torch.tensor([0] + num_categories[:-1]).cumsum(0)
+
         self.register_buffer('category_offsets', category_offsets, persistent=False)
         self.embeddings = nn.Embedding(sum(num_categories), d_token)
         self.bias = nn.Parameter(Tensor(len(num_categories), d_token)) if bias else None
@@ -74,12 +75,14 @@ class CategoricalFeatureTokenizer(nn.Module):
 
     def forward(
             self,
-            batch: Tensor,
-    ):
-        assert len(batch[self.categorical_key]) == len(self.num_categories)
-        x = self.embeddings(batch[self.categorical_key] + self.category_offsets[None])
+            x: Tensor,
+    ) -> Tensor:
+        
+        x = self.embeddings(x + self.category_offsets[None])
+
         if self.bias is not None:
             x = x + self.bias[None]
+
         return x
 
 
@@ -172,7 +175,7 @@ class  CategoricalTransformer(nn.Module):
         head_normalization: Optional[str] = 'LayerNorm',
     ):
         super().__init__()
-
+        self.num_categories = num_categories
         self.categorical_key = f"{prefix}_{CATEGORICAL}"
         self.label_key = f"{prefix}_{LABEL}"
 
@@ -183,12 +186,12 @@ class  CategoricalTransformer(nn.Module):
             d_token=d_token,
             bias=bias,
             initialization=initialization,
-        ) if cls_token else None
+        ) 
 
         self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=initialization,
-        )
+        ) if cls_token else None
 
         if kv_compression_ratio is not None: 
             n_tokens = self.categorical_feature_tokenizer.n_tokens + 1
@@ -227,9 +230,19 @@ class  CategoricalTransformer(nn.Module):
         self, 
         batch: dict
     ):
-        assert len(batch[self.categorical_key]) == len(self.column_embeddings)
+        assert len(batch[self.categorical_key]) == len(self.num_categories)
         
-        x = self.categorical_feature_tokenizer(batch[self.categorical_key])
+        # x = self.categorical_feature_tokenizer(batch[self.categorical_key])
+        # if self.cls_token:
+        #     x = self.cls_token(x)
+        # features = self.transformer(x)
+
+        xs = []
+        for x in batch[self.categorical_key]:
+            xs.append(x)
+        x = torch.stack(xs,dim=1)
+
+        x = self.categorical_feature_tokenizer(x)
         
         if self.cls_token:
             x = self.cls_token(x)
