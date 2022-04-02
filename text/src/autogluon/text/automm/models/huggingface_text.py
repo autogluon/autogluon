@@ -58,6 +58,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
         self.head.apply(init_weights)
 
+        self.prefix = prefix
         self.text_token_ids_key = f"{prefix}_{TEXT_TOKEN_IDS}"
         self.text_segment_ids_key = f"{prefix}_{TEXT_SEGMENT_IDS}"
         self.text_valid_length_key = f"{prefix}_{TEXT_VALID_LENGTH}"
@@ -107,8 +108,10 @@ class HFAutoModelForTextPrediction(nn.Module):
         logits = self.head(cls_features)
 
         return {
-            LOGITS: logits,
-            FEATURES: cls_features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: cls_features,
+            }
         }
 
     def get_layer_ids(self):
