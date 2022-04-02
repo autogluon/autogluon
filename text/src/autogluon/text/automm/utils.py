@@ -450,16 +450,18 @@ def create_model(
     # make sure no duplicate model names
     assert len(names) == len(set(names))
     logger.debug(f"output_shape: {num_classes}")
+    names = [n.lower() for n in names]
     all_models = []
     for model_name in names:
-        model_config = getattr(config.model, model_name)
-        if model_name == "clip":
+        if "clip" in model_name:
+            model_config = getattr(config.model, "clip")
             model = CLIPForImageText(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
             )
-        elif model_name == "timm_image":
+        elif "timm_image" in model_name:
+            model_config = getattr(config.model, "timm_image")
             model = TimmAutoModelForImagePrediction(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
@@ -468,12 +470,14 @@ def create_model(
                 pretrained=pretrained,
             )
         elif "hf_text" in model_name:
+            model_config = getattr(config.model, "hf_text")
             model = HFAutoModelForTextPrediction(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
             )
-        elif model_name == "numerical_mlp":
+        elif "numerical_mlp" in model_name:
+            model_config = getattr(config.model, "numerical_mlp")
             model = NumericalMLP(
                 prefix=model_name,
                 in_features=num_numerical_columns,
@@ -485,7 +489,8 @@ def create_model(
                 normalization=model_config.normalization,
                 num_classes=num_classes,
             )
-        elif model_name == "categorical_mlp":
+        elif "categorical_mlp" in model_name:
+            model_config = getattr(config.model, "categorical_mlp")
             model = CategoricalMLP(
                 prefix=model_name,
                 num_categories=num_categories,
@@ -496,7 +501,8 @@ def create_model(
                 normalization=model_config.normalization,
                 num_classes=num_classes,
             )
-        elif model_name == "fusion_mlp":
+        elif "fusion_mlp" in model_name:
+            model_config = getattr(config.model, "fusion_mlp")
             fusion_model = functools.partial(
                 MultimodalFusionMLP,
                 prefix=model_name,
@@ -573,6 +579,7 @@ def convert_checkpoint_name(
                 assert os.path.exists(os.path.join(model_config.checkpoint_name,'pytorch_model.bin'))
                 
     return config    
+
 
 def make_exp_dir(
         root_path: str,
@@ -678,14 +685,13 @@ def average_checkpoints(
     -------
     The averaged state_dict.
     """
-    avg_state_dict = dict()
+    avg_state_dict = {}
     for key in all_state_dicts[0]:
         arr = [state_dict[key] for state_dict in all_state_dicts]
         avg_state_dict[key] = sum(arr) / len(arr)
 
     if out_path:
-        checkpoint = dict()
-        checkpoint["state_dict"] = avg_state_dict
+        checkpoint = {"state_dict": avg_state_dict}
         torch.save(checkpoint, out_path)
 
     return avg_state_dict
