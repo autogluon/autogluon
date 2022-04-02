@@ -248,7 +248,7 @@ class  CategoricalTransformer(nn.Module):
             x = self.cls_token(x)
 
         features = self.transformer(x)
-        logits = self.head(x)
+        logits = self.head(features)
 
         return {
             LOGITS: logits,
