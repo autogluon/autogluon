@@ -507,15 +507,15 @@ class AutoMMPredictor:
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
             )
-            grad_steps = config.env.batch_size // (
+            grad_steps = max(config.env.batch_size // (
                     config.env.per_gpu_batch_size * config.env.num_nodes
-            )
+            ), 1)
             precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU.
                             # Try to check the status of bf16 training later.
         else:
-            grad_steps = config.env.batch_size // (
+            grad_steps = max(config.env.batch_size // (
                     config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes
-            )
+            ), 1)
             precision = config.env.precision
 
             if precision == 'bf16' and not torch.cuda.is_bf16_supported():
