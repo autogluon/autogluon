@@ -32,6 +32,8 @@ ACCURACY = "accuracy"
 ACC = "acc"
 RMSE = "rmse"
 R2 = "r2"
+PEARSONR = "pearsonr"
+SPEARMANR = "spearmanr"
 QUADRATIC_KAPPA = "quadratic_kappa"
 
 # Training status

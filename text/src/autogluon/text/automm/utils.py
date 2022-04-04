@@ -32,7 +32,7 @@ from .data import (
     MultiModalFeaturePreprocessor,
 )
 from .constants import (
-    ACCURACY, RMSE, R2, ALL_MODALITIES,
+    ACCURACY, RMSE, R2, PEARSONR, SPEARMANR, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
@@ -73,7 +73,7 @@ def infer_metrics(
         Name of evaluation metric.
     """
     if eval_metric_name is not None:
-        if eval_metric_name.lower() == R2:
+        if eval_metric_name.lower() in [R2, PEARSONR, SPEARMANR]:
             validation_metric_name = RMSE
         else:
             validation_metric_name = eval_metric_name

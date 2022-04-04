@@ -111,7 +111,7 @@ class AutoMMPredictor:
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
-        if eval_metric is not None and eval_metric.lower() in ["rmse", "r2"]:
+        if eval_metric is not None and eval_metric.lower() in ["rmse", "r2", "pearsonr", "spearmanr"]:
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
