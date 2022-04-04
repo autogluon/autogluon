@@ -17,7 +17,7 @@ from sklearn.metrics import log_loss
 def test_cross_entropy(metric_name, class_num):
     preds = []
     targets = []
-    for i in range(100):
+    for i in range(1000):
         bs = random.randint(1, 16)
         preds.append(torch.randn(bs, class_num))
         targets.append(torch.randint(0, class_num, (bs,)))
