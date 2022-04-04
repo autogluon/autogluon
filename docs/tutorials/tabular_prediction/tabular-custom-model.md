@@ -320,10 +320,13 @@ custom_hyperparameters_hpo = {CustomRandomForestModel: {
     'max_features': Real(lower=0.1, upper=1.0),
     'criterion': Categorical('gini', 'entropy'),
 }}
+# Parallel HPO currently doesn't work with a class not defined in a separate module because of underlying pickle serialization issue
+# You don't need this following line if you put your custom model in a separate file and import it.
+hyperparameter_tune_kwargs = {'scheduler': 'sequential_local', 'searcher': 'auto'}
 # Hyperparameter tune CustomRandomForestModel for 20 seconds
 predictor = TabularPredictor(label=label).fit(train_data,
                                               hyperparameters=custom_hyperparameters_hpo,
-                                              hyperparameter_tune_kwargs='auto',  # enables HPO
+                                              hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,  # enables HPO
                                               time_limit=20)
 ```
 

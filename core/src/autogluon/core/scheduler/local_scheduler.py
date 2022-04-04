@@ -437,7 +437,7 @@ class LocalParallelScheduler(LocalScheduler):
             if num_gpus > 0:
                 self.ray.init(log_to_driver=False, num_cpus=num_cpus, num_gpus=num_gpus)
             else:
-                self.ray.init(log_to_driver=True, num_cpus=num_cpus)
+                self.ray.init(log_to_driver=False, num_cpus=num_cpus)
 
         # we only schedule as much as we can run in parallel at the beginning
         for i in range(self.num_parallel_jobs):
