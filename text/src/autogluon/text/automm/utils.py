@@ -522,6 +522,7 @@ def create_model(
     else:
         raise ValueError(f"No available models for {names}")
 
+
 def save_pretrained_configs(
     model: ModuleList,
     config: DictConfig,
@@ -634,8 +635,6 @@ def gather_top_k_ckpts(
     -------
     all_state_dicts
         A list of state_dicts
-    checkpoint
-        The checkpoint template to save the averaged checkpoint later.
     """
     if not ckpt_paths:
         ckpt_paths = []
@@ -658,13 +657,12 @@ def gather_top_k_ckpts(
             os.remove(last_ckpt_path)
 
     logger.debug(f"ckpt num: {len(all_state_dicts)}")
-    return all_state_dicts, checkpoint
+    return all_state_dicts
 
 
 def average_checkpoints(
         all_state_dicts: List[Dict],
-        out_path: str,
-        ckpt_template: dict,
+        out_path: Optional[str] = None,
 ):
     """
     Average the state_dicts of top k checkpoints.
@@ -675,8 +673,6 @@ def average_checkpoints(
         A list of Pytorch state_dicts.
     out_path
         The path to save the averaged checkpoint.
-    ckpt_template
-        A dictionary of checkpoint template used during the training.
 
     Returns
     -------
@@ -687,8 +683,10 @@ def average_checkpoints(
         arr = [state_dict[key] for state_dict in all_state_dicts]
         avg_state_dict[key] = sum(arr) / len(arr)
 
-    ckpt_template["state_dict"] = avg_state_dict
-    torch.save(ckpt_template, out_path)
+    if out_path:
+        checkpoint = dict()
+        checkpoint["state_dict"] = avg_state_dict
+        torch.save(checkpoint, out_path)
 
     return avg_state_dict
 
