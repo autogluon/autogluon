@@ -176,6 +176,8 @@ def get_config(
     verify_config_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
+        # avoid manipulating user-provided overrides
+        overrides = copy.deepcopy(overrides)
         # apply customized model names
         overrides = parse_dotlist_conf(overrides)  # convert to a dict
         config.model = customize_config_names(
