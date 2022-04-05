@@ -1,8 +1,10 @@
 import logging
 import time
+from inspect import isclass
 
 import numpy as np
 import torch
+from torchmetrics import F1Score
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -30,7 +32,6 @@ class WideDeepNNModel(AbstractModel):
 
         from pytorch_widedeep import Trainer
         from pytorch_widedeep.preprocessing import TabPreprocessor
-        from pytorch_widedeep.metrics import Accuracy, R2Score
         import pytorch_widedeep.training.trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
@@ -46,34 +47,13 @@ class WideDeepNNModel(AbstractModel):
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
 
         # train the model
-        # TODO: Add custom metric support (Convert arbitrary AG metric)
-        if self.problem_type == BINARY:
-            objective = 'binary'
-            metrics = [Accuracy]
-            pred_dim = 1
-        elif self.problem_type == MULTICLASS:
-            objective = 'multiclass'
-            metrics = [Accuracy]
-            pred_dim = self.num_classes
-        elif self.problem_type == REGRESSION:
-            objective = 'regression'
-            metrics = [R2Score]
-            pred_dim = 1
-        else:
-            raise ValueError(f'{self.name} does not support the problem_type {self.problem_type}.')
+        objective, pred_dim = {
+            BINARY: ('binary', 1),
+            MULTICLASS: ('multiclass', self.num_classes),
+            REGRESSION: ('regression', 1),
+        }[self.problem_type]
 
-        # deeptabular
-        for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever']
-        if for_transformer:
-            embed_cols = cat_cols
-        else:
-            embed_cols = []
-            for cat_feat in cat_cols:
-                num_categories = len(X[cat_feat].cat.categories)
-                embed_cols.append((cat_feat, min(600, round(1.6 * num_categories ** 0.56))))
-        if len(embed_cols) == 0:
-            embed_cols = None
-            for_transformer = False
+        embed_cols, for_transformer = self.__get_embedding_columns_metadata(X, cat_cols)
 
         self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols, for_transformer=for_transformer)
         X_tab = self._tab_preprocessor.fit_transform(X)
@@ -99,8 +79,8 @@ class WideDeepNNModel(AbstractModel):
 
         logger.log(15, model)
 
-        # DataLoaders are very slow if defaults are used
         # TODO: confirm if this is reproducible on linux
+        # DataLoaders are very slow if defaults are used
         pytorch_widedeep.training.trainer.n_cpus = 0
 
         logger.log(15, f'Fitting with parameters {params}...')
@@ -119,7 +99,10 @@ class WideDeepNNModel(AbstractModel):
         )
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        monitor_metric = f'val_{metrics[0]()._name}'
+        nn_metric = self.__get_objective_func(self.stopping_metric)
+        monitor_metric = self.__get_monitor_metric(nn_metric)
+        print(f'#### {nn_metric}')
+        print(f'#### {monitor_metric}')
         best_epoch = None
         with make_temp_directory() as temp_dir:
             checkpoint_path_prefix = f'{temp_dir}/model'
@@ -152,7 +135,7 @@ class WideDeepNNModel(AbstractModel):
             trainer = Trainer(
                 model,
                 objective=objective,
-                metrics=metrics,
+                metrics=[m for m in [nn_metric] if m is not None],
                 optimizers=tab_opt,
                 lr_schedulers=tab_sch,
                 callbacks=[model_checkpoint, early_stopping],
@@ -174,6 +157,33 @@ class WideDeepNNModel(AbstractModel):
         # TODO: add dynamic epochs selection
         self.params_trained['epochs'] = params['epochs']
         self.params_trained['best_epoch'] = best_epoch
+
+    def __get_monitor_metric(self, nn_metric):
+        if nn_metric is None:
+            return 'val_loss'
+        monitor_metric = nn_metric
+        if isclass(monitor_metric):
+            metric = monitor_metric()
+            if hasattr(metric, '_name'):
+                return f'val_{metric._name}'
+        elif not isclass(monitor_metric):
+            monitor_metric = monitor_metric.__class__
+        monitor_metric = f'val_{monitor_metric.__name__}'
+        return monitor_metric
+
+    def __get_embedding_columns_metadata(self, X, cat_cols):
+        for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever']
+        if for_transformer:
+            embed_cols = cat_cols
+        else:
+            embed_cols = []
+            for cat_feat in cat_cols:
+                num_categories = len(X[cat_feat].cat.categories)
+                embed_cols.append((cat_feat, min(600, round(1.6 * num_categories ** 0.56))))
+        if len(embed_cols) == 0:
+            embed_cols = None
+            for_transformer = False
+        return embed_cols, for_transformer
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
@@ -242,3 +252,60 @@ class WideDeepNNModel(AbstractModel):
 
     def _more_tags(self):
         return {'can_refit_full': True}
+
+
+    def __get_metrics_map(self):
+        from pytorch_widedeep.metrics import Accuracy, R2Score
+        import torchmetrics as tm
+        num_classes = 2 if self.num_classes is None else self.num_classes
+        metrics_map = {
+            # Regression
+            'root_mean_squared_error': tm.MeanSquaredError(squared=False),
+            'mean_squared_error': tm.MeanSquaredError(),
+            'mean_absolute_error': tm.MeanAbsoluteError(),
+            'r2': R2Score,
+            # Not supported: 'median_absolute_error': None,
+
+            # Classification
+            'accuracy': Accuracy,
+
+            'f1': F1Score(num_classes=num_classes),
+            'f1_macro': tm.F1Score(average='macro', num_classes=num_classes),
+            'f1_micro': tm.F1Score(average='micro', num_classes=num_classes),
+            'f1_weighted': tm.F1Score(average='weighted', num_classes=num_classes),
+
+            'roc_auc': tm.AUROC(num_classes=num_classes),
+
+            'precision': tm.Precision(num_classes=num_classes),
+            'precision_macro': tm.Precision(average='macro', num_classes=num_classes),
+            'precision_micro': tm.Precision(average='micro', num_classes=num_classes),
+            'precision_weighted': tm.Precision(average='weighted', num_classes=num_classes),
+
+            'recall': tm.Recall(num_classes=num_classes),
+            'recall_macro': tm.Recall(average='macro', num_classes=num_classes),
+            'recall_micro': tm.Recall(average='micro', num_classes=num_classes),
+            'recall_weighted': tm.Recall(average='weighted', num_classes=num_classes),
+            'log_loss': None,
+
+            # Not supported: 'pinball_loss': None
+            # Not supported: pac_score
+        }
+        return metrics_map
+
+
+    def __get_objective_func(self, stopping_metric):
+        metrics_map = self.__get_metrics_map()
+
+        # Unsupported metrics will be replaced by defaults for a given problem type
+        objective_func_name = stopping_metric.name
+        if objective_func_name not in metrics_map.keys():
+            if self.problem_type == REGRESSION:
+                objective_func_name = 'mean_squared_error'
+            else:
+                objective_func_name = 'log_loss'
+            logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
+
+        nn_metric = metrics_map.get(objective_func_name, None)
+
+        return nn_metric
+
