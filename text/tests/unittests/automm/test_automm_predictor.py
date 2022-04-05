@@ -281,8 +281,8 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         },
 
         {
-            "model.names": ["hf_text_abc", "hf_text", "hf_text_xyz", "fusion_mlp_123"],
-            "model.hf_text.checkpoint_name": "monsoon-nlp/hindi-bert",
+            "model.names": ["hf_text_abc", "hf_text_def", "hf_text_xyz", "fusion_mlp_123"],
+            "model.hf_text_def.checkpoint_name": "monsoon-nlp/hindi-bert",
             "model.hf_text_xyz.checkpoint_name": "prajjwal1/bert-tiny",
             "model.hf_text_abc.checkpoint_name": "roberta-base",
         },
@@ -319,16 +319,15 @@ def test_customizing_model_names(
         }
     )
     save_path = os.path.join(get_home_dir(), "outputs", "petfinder")
-    backup_hyperparameters = copy.deepcopy(hyperparameters)
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
-        hyperparameters=hyperparameters,
+        hyperparameters=copy.deepcopy(hyperparameters),
         time_limit=10,
         save_path=save_path,
     )
-    assert sorted(predictor._config.model.names) == sorted(backup_hyperparameters["model.names"])
-    for per_name in backup_hyperparameters["model.names"]:
+    assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
+    for per_name in hyperparameters["model.names"]:
         assert hasattr(predictor._config.model, per_name)
 
     score = predictor.evaluate(dataset.test_df)
@@ -338,9 +337,12 @@ def test_customizing_model_names(
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
-        hyperparameters=hyperparameters,
+        hyperparameters=copy.deepcopy(hyperparameters),
         time_limit=10,
     )
+    assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
+    for per_name in hyperparameters["model.names"]:
+        assert hasattr(predictor._config.model, per_name)
     verify_predictor_save_load(predictor, dataset.test_df)
 
     # Saving to folder, loading the saved model and call fit again (continuous fit)
@@ -350,6 +352,9 @@ def test_customizing_model_names(
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            hyperparameters=hyperparameters,
+            hyperparameters=copy.deepcopy(hyperparameters),
             time_limit=10,
         )
+        assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
+        for per_name in hyperparameters["model.names"]:
+            assert hasattr(predictor._config.model, per_name)
