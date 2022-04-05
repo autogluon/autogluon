@@ -6,6 +6,7 @@ import logging
 import pandas as pd
 import pickle
 import collections
+import copy
 import torch
 from torch.nn.modules.container import ModuleList
 import warnings
@@ -35,7 +36,9 @@ from .constants import (
     ACCURACY, RMSE, R2, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
-    Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM
+    Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
+    CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
+    CATEGORICAL_MLP, FUSION_MLP, AVAILABLE_MODELS,
 )
 from .presets import (
     list_model_presets,
@@ -170,46 +173,102 @@ def get_config(
             all_configs.append(per_config)
 
         config = OmegaConf.merge(*all_configs)
+
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
+        # apply customized model names
+        overrides = parse_dotlist_conf(overrides)  # convert to a dict
+        config.model = customize_config_names(
+            config=config.model,
+            customized_names=overrides.get("model.names", None),
+        )
+        # remove `model.names` from overrides since it's already applied.
+        overrides.pop("model.names", None)
+        # apply all the overrides
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
-
-    config.model = clean_model_config(config.model)
+        print(f"names at the end of get_config: {config.model.names}")
     return config
 
 
-def clean_model_config(model_config):
+def get_name_prefix(
+        name: str,
+        prefixes: List[str],
+):
     """
-    Remove unused models based provided model names.
+    Get a name's prefix from some available candidates.
 
     Parameters
     ----------
-    model_config
-        A DictConfig object of model config.
+    name
+        A name string
+    prefixes
+        Available prefixes.
 
     Returns
     -------
-    Cleaned model config.
+        Prefix of the name.
     """
-    provided_model_names = []
-    for per_name in model_config.names:
-        provided_model_names.append(per_name.lower())
+    search_results = [pre for pre in prefixes if name.lower().startswith(pre)]
+    if len(search_results) == 0:
+        return None
+    elif len(search_results) >= 2:
+        raise ValueError(
+            f"Model name `{name}` is mapped to multiple models, "
+            f"which means some names in `{AVAILABLE_MODELS}` have duplicate prefixes."
+        )
+    else:
+        return search_results[0]
 
-    all_model_names = list(model_config.keys())
-    all_model_names.remove("names")
-    for per_name in all_model_names:
-        if per_name not in provided_model_names:
-            delattr(model_config, per_name)
 
-    for per_name in provided_model_names:
-        if not hasattr(model_config, per_name):
-            provided_model_names.remove(per_name)
+def customize_config_names(
+        config: DictConfig,
+        customized_names: List[str],
+):
+    """
+    Customize attribute names of `config` with the provided names.
+    A valid customized name string should start with one available name
+    string in `config`.
 
-    if len(provided_model_names) == 0:
-        raise ValueError("All the provided model names are invalid.")
-    model_config.names = provided_model_names
+    Parameters
+    ----------
+    config
+        Config should have a attribute `names`, which contains a list of
+        attribute names, e.g., ["timm_image", "hf_text"]. And each string in
+        `config.names` should also be a attribute of `config`, e.g, `config.timm_image`.
+    customized_names
+        The provided names to replace the existing ones in `config.names` as well as
+        the corresponding attribute names. For example, if `customized_names` is
+        ["timm_image_123", "hf_text_abc"], then `config.timm_image` and `config.hf_text`
+        are changed to `config.timm_image_123` and `config.hf_text_abc`.
 
-    return model_config
+    Returns
+    -------
+        A new config with its first-level attributes customized by the provided names.
+    """
+    if not customized_names:
+        return config
+
+    new_config = OmegaConf.create()
+    new_config.names = []
+    available_prefixes = list(config.keys())
+    available_prefixes.remove("names")
+    for per_name in customized_names:
+        per_prefix = get_name_prefix(
+            name=per_name,
+            prefixes=available_prefixes,
+        )
+        print(f"per_name: {per_name}, per_prefix: {per_prefix}")
+        if per_prefix:
+            per_config = getattr(config, per_prefix)
+            setattr(new_config, per_name, copy.deepcopy(per_config))
+            new_config.names.append(per_name)
+
+    if len(new_config.names) == 0:
+        raise ValueError(
+            f"No customized name in `{customized_names}` starts with name prefixes in `{available_prefixes}`."
+        )
+
+    return new_config
 
 
 def select_model(
@@ -255,6 +314,7 @@ def select_model(
         names = [names]
     selected_model_names = []
     fusion_model_name = []
+    print(f"names at the beginning of select_model: {config.model.names}")
     for model_name in names:
         model_config = getattr(config.model, model_name)
         if model_config.data_types is None:
@@ -450,18 +510,16 @@ def create_model(
     # make sure no duplicate model names
     assert len(names) == len(set(names))
     logger.debug(f"output_shape: {num_classes}")
-    names = [n.lower() for n in names]
     all_models = []
     for model_name in names:
-        if "clip" in model_name:
-            model_config = getattr(config.model, "clip")
+        model_config = getattr(config.model, model_name)
+        if model_name.lower().startswith(CLIP):
             model = CLIPForImageText(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
             )
-        elif "timm_image" in model_name:
-            model_config = getattr(config.model, "timm_image")
+        elif model_name.lower().startswith(TIMM_IMAGE):
             model = TimmAutoModelForImagePrediction(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
@@ -469,15 +527,13 @@ def create_model(
                 mix_choice=model_config.mix_choice,
                 pretrained=pretrained,
             )
-        elif "hf_text" in model_name:
-            model_config = getattr(config.model, "hf_text")
+        elif model_name.lower().startswith(HF_TEXT):
             model = HFAutoModelForTextPrediction(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
             )
-        elif "numerical_mlp" in model_name:
-            model_config = getattr(config.model, "numerical_mlp")
+        elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
                 prefix=model_name,
                 in_features=num_numerical_columns,
@@ -489,8 +545,7 @@ def create_model(
                 normalization=model_config.normalization,
                 num_classes=num_classes,
             )
-        elif "categorical_mlp" in model_name:
-            model_config = getattr(config.model, "categorical_mlp")
+        elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
                 prefix=model_name,
                 num_categories=num_categories,
@@ -501,8 +556,7 @@ def create_model(
                 normalization=model_config.normalization,
                 num_classes=num_classes,
             )
-        elif "fusion_mlp" in model_name:
-            model_config = getattr(config.model, "fusion_mlp")
+        elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
                 MultimodalFusionMLP,
                 prefix=model_name,
@@ -548,16 +602,16 @@ def save_pretrained_configs(
         The saving path to the pretained weights i.e. config.json for "clip" and "hf_text"
     '''
     for idx, model_name in enumerate(config.model.names):
-        if model_name == "clip" or "hf_text" in model_name:
-            model[idx].model.save_pretrained(os.path.join(path,model_name))
+        if model_name.lower().startswith((CLIP, HF_TEXT)):
+            model[idx].model.save_pretrained(os.path.join(path, model_name))
             model_config = getattr(config.model, model_name)
-            model_config.checkpoint_name = os.path.join('local://',model_name)
+            model_config.checkpoint_name = os.path.join('local://', model_name)
     return config
 
 
 def convert_checkpoint_name(
-    config: DictConfig,
-    path: str
+        config: DictConfig,
+        path: str
 ) -> DictConfig:  
     '''
     Convert the checkpoint name from relative path to absolute path for loading the pretrained weights in offline deployment. 
@@ -571,12 +625,12 @@ def convert_checkpoint_name(
         The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
     '''
     for model_name in config.model.names:
-        if model_name == "clip" or "hf_text" in model_name:
-            model_config = getattr(config.model,model_name)
+        if model_name.lower().startswith((CLIP, HF_TEXT)):
+            model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith('local://'):
-                model_config.checkpoint_name = os.path.join(path,model_config.checkpoint_name[len('local://'):])
-                assert os.path.exists(os.path.join(model_config.checkpoint_name,'config.json')) # guarantee the existence of local configs
-                assert os.path.exists(os.path.join(model_config.checkpoint_name,'pytorch_model.bin'))
+                model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len('local://'):])
+                assert os.path.exists(os.path.join(model_config.checkpoint_name, 'config.json')) # guarantee the existence of local configs
+                assert os.path.exists(os.path.join(model_config.checkpoint_name, 'pytorch_model.bin'))
                 
     return config    
 
@@ -622,8 +676,8 @@ def make_exp_dir(
 
 
 def gather_top_k_ckpts(
-    ckpt_dir: Optional[str] = None,
-    ckpt_paths: Optional[List[str]] = None,
+        ckpt_dir: Optional[str] = None,
+        ckpt_paths: Optional[List[str]] = None,
 ):
     """
     Gather the state_dicts of top k models. If "ckpt_paths" is not an empty list, it loads the models
