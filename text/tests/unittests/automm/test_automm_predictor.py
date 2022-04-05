@@ -3,6 +3,7 @@ import json
 import pytest
 import numpy.testing as npt
 import tempfile
+import copy
 
 from autogluon.text.automm import AutoMMPredictor
 from autogluon.text.automm.constants import (
@@ -318,7 +319,7 @@ def test_customizing_model_names(
         }
     )
     save_path = os.path.join(get_home_dir(), "outputs", "petfinder")
-
+    backup_hyperparameters = copy.deepcopy(hyperparameters)
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
@@ -326,8 +327,8 @@ def test_customizing_model_names(
         time_limit=10,
         save_path=save_path,
     )
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
-    for per_name in hyperparameters["model.names"]:
+    assert sorted(predictor._config.model.names) == sorted(backup_hyperparameters["model.names"])
+    for per_name in backup_hyperparameters["model.names"]:
         assert hasattr(predictor._config.model, per_name)
 
     score = predictor.evaluate(dataset.test_df)
