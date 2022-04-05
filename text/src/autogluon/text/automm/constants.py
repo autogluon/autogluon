@@ -76,14 +76,10 @@ UNION_SOUP = 'union_soup'
 GREEDY_SOUP = 'greedy_soup'
 BEST_SOUP = 'best_soup'
 
-# registered model keys
+# registered model keys. TODO: document how to add new models.
 CLIP = "clip"
 TIMM_IMAGE = "timm_image"
 HF_TEXT = "hf_text"
 NUMERICAL_MLP = "numerical_mlp"
 CATEGORICAL_MLP = "categorical_mlp"
 FUSION_MLP = "fusion_mlp"
-AVAILABLE_MODELS = [
-    CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
-    CATEGORICAL_MLP, FUSION_MLP,
-]
