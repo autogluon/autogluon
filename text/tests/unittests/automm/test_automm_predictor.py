@@ -322,7 +322,7 @@ def test_customizing_model_names(
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
-        hyperparameters=copy.deepcopy(hyperparameters),
+        hyperparameters=hyperparameters,
         time_limit=10,
         save_path=save_path,
     )
@@ -337,7 +337,7 @@ def test_customizing_model_names(
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
-        hyperparameters=copy.deepcopy(hyperparameters),
+        hyperparameters=hyperparameters,
         time_limit=10,
     )
     assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
@@ -352,7 +352,7 @@ def test_customizing_model_names(
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            hyperparameters=copy.deepcopy(hyperparameters),
+            hyperparameters=hyperparameters,
             time_limit=10,
         )
         assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
