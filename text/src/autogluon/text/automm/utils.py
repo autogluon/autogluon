@@ -186,7 +186,6 @@ def get_config(
         overrides.pop("model.names", None)
         # apply all the overrides
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
-        print(f"names at the end of get_config: {config.model.names}")
     return config
 
 
@@ -257,7 +256,6 @@ def customize_config_names(
             name=per_name,
             prefixes=available_prefixes,
         )
-        print(f"per_name: {per_name}, per_prefix: {per_prefix}")
         if per_prefix:
             per_config = getattr(config, per_prefix)
             setattr(new_config, per_name, copy.deepcopy(per_config))
@@ -314,7 +312,6 @@ def select_model(
         names = [names]
     selected_model_names = []
     fusion_model_name = []
-    print(f"names at the beginning of select_model: {config.model.names}")
     for model_name in names:
         model_config = getattr(config.model, model_name)
         if model_config.data_types is None:
