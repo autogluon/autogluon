@@ -38,7 +38,7 @@ from .constants import (
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
-    CATEGORICAL_MLP, FUSION_MLP, AVAILABLE_MODELS,
+    CATEGORICAL_MLP, FUSION_MLP,
 )
 from .presets import (
     list_model_presets,
@@ -173,7 +173,7 @@ def get_config(
             all_configs.append(per_config)
 
         config = OmegaConf.merge(*all_configs)
-
+    verify_config_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
         # apply customized model names
@@ -186,7 +186,38 @@ def get_config(
         overrides.pop("model.names", None)
         # apply all the overrides
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
+    verify_config_names(config.model)
     return config
+
+
+def verify_config_names(config: DictConfig):
+    """
+    Verify whether provided names are valid for a config.
+
+    Parameters
+    ----------
+    config
+        Config should have a attribute `names`, which contains a list of
+        attribute names, e.g., ["timm_image", "hf_text"]. And each string in
+        `config.names` should also be a attribute of `config`, e.g, `config.timm_image`.
+    """
+    # must have attribute `names`
+    assert hasattr(config, "names")
+    # assure no duplicate names
+    assert len(config.names) == len(set(config.names))
+    # verify that strings in `config.names` match the keys of `config`.
+    keys = list(config.keys())
+    keys.remove("names")
+    assert sorted(config.names) == sorted(keys), \
+        f"`{config.names}` do not match config keys {keys}"
+
+    # verify that no name starts with another one
+    names = sorted(config.names, key=lambda ele: len(ele), reverse=True)
+    for i in range(len(names)):
+        if names[i].startswith(tuple(names[i+1:])):
+            raise ValueError(
+                f"name {names[i]} starts with one of another name: {names[i+1:]}"
+            )
 
 
 def get_name_prefix(
@@ -213,7 +244,7 @@ def get_name_prefix(
     elif len(search_results) >= 2:
         raise ValueError(
             f"Model name `{name}` is mapped to multiple models, "
-            f"which means some names in `{AVAILABLE_MODELS}` have duplicate prefixes."
+            f"which means some names in `{prefixes}` have duplicate prefixes."
         )
     else:
         return search_results[0]
@@ -260,6 +291,10 @@ def customize_config_names(
             per_config = getattr(config, per_prefix)
             setattr(new_config, per_name, copy.deepcopy(per_config))
             new_config.names.append(per_name)
+        else:
+            logger.debug(
+                f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}."
+            )
 
     if len(new_config.names) == 0:
         raise ValueError(
