@@ -218,8 +218,8 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-        "model.hf_text.checkpoint_name":"prajjwal1/bert-tiny",
-        "model.timm_image.checkpoint_name":"swin_tiny_patch4_window7_224",
+        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -269,3 +269,86 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     # check if save with standalone=True coincide with standalone=False
     npt.assert_equal(online_predictions,offline_predictions)
 
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {
+            "model.names": ["timm_image_0", "timm_image_1", "fusion_mlp"],
+            "model.timm_image_0.checkpoint_name": "swin_tiny_patch4_window7_224",
+            "model.timm_image_1.checkpoint_name": "swin_small_patch4_window7_224",
+        },
+
+        {
+            "model.names": ["hf_text_abc", "hf_text", "hf_text_xyz", "fusion_mlp_123"],
+            "model.hf_text.checkpoint_name": "monsoon-nlp/hindi-bert",
+            "model.hf_text_xyz.checkpoint_name": "prajjwal1/bert-tiny",
+            "model.hf_text_abc.checkpoint_name": "roberta-base",
+        },
+
+        {
+            "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "categorical_mlp_abc", "fusion_mlp"],
+            "model.timm_image_haha.checkpoint_name": "swin_tiny_patch4_window7_224",
+            "model.hf_text_hello.checkpoint_name": "prajjwal1/bert-tiny",
+            "data.categorical.convert_to_text": False,
+        },
+    ]
+)
+def test_customizing_model_names(
+        hyperparameters,
+):
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    hyperparameters.update(
+        {
+            "env.num_workers": 0,
+            "env.num_workers_evaluation": 0,
+        }
+    )
+    save_path = os.path.join(get_home_dir(), "outputs", "petfinder")
+
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+        save_path=save_path,
+    )
+    assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
+    for per_name in hyperparameters["model.names"]:
+        assert hasattr(predictor._config.model, per_name)
+
+    score = predictor.evaluate(dataset.test_df)
+    verify_predictor_save_load(predictor, dataset.test_df)
+
+    # Test for continuous fit
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    verify_predictor_save_load(predictor, dataset.test_df)
+
+    # Saving to folder, loading the saved model and call fit again (continuous fit)
+    with tempfile.TemporaryDirectory() as root:
+        predictor.save(root)
+        predictor = AutoMMPredictor.load(root)
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            hyperparameters=hyperparameters,
+            time_limit=10,
+        )
