@@ -112,7 +112,7 @@ class LitModule(pl.LightningModule):
 
     def _compute_loss(
             self,
-            output: dict,
+            output: Dict,
             label: torch.Tensor,
     ):
         loss = 0
@@ -139,7 +139,7 @@ class LitModule(pl.LightningModule):
 
     def _shared_step(
             self,
-            batch: dict,
+            batch: Dict,
     ):
         output = self.model(batch)
         label = batch[self.model.label_key]
