@@ -7,7 +7,7 @@ import torch
 from torchmetrics import F1Score
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
@@ -47,11 +47,10 @@ class WideDeepNNModel(AbstractModel):
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
 
         # train the model
-        objective, pred_dim = {
-            BINARY: ('binary', 1),
-            MULTICLASS: ('multiclass', self.num_classes),
-            REGRESSION: ('regression', 1),
-        }[self.problem_type]
+
+        nn_metric = self.__get_nn_metric(self.stopping_metric)
+        monitor_metric = self.__get_monitor_metric(nn_metric)
+        objective, pred_dim = self.__get_objective_and_dim(self.problem_type, self.stopping_metric, self.num_classes)
 
         embed_cols, for_transformer = self.__get_embedding_columns_metadata(X, cat_cols)
 
@@ -105,10 +104,6 @@ class WideDeepNNModel(AbstractModel):
         )
 
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        nn_metric = self.__get_objective_func(self.stopping_metric)
-        monitor_metric = self.__get_monitor_metric(nn_metric)
-        print(f'#### {nn_metric}')
-        print(f'#### {monitor_metric}')
         best_epoch = None
         with make_temp_directory() as temp_dir:
             checkpoint_path_prefix = f'{temp_dir}/model'
@@ -256,8 +251,21 @@ class WideDeepNNModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
-    def _more_tags(self):
-        return {'can_refit_full': True}
+    def __get_objective_and_dim(self, problem_type, stopping_metric, num_classes):
+        if problem_type == BINARY:
+            return 'binary', 1
+        elif problem_type == BINARY:
+            return 'multiclass', num_classes
+        elif problem_type == REGRESSION:
+            # See supported objectives: https://pytorch-widedeep.readthedocs.io/en/latest/trainer.html#pytorch_widedeep.training.Trainer
+            objective = {
+                'root_mean_squared_error': 'root_mean_squared_error',
+                'mean_squared_error': 'regression',
+                'mean_absolute_error': 'mean_absolute_error',
+            }.get(stopping_metric, 'regression')
+            return objective, 1
+        else:
+            raise ValueError(f'Unsupported problem type {problem_type}')
 
     def __get_metrics_map(self):
         from pytorch_widedeep.metrics import Accuracy, R2Score
@@ -297,8 +305,7 @@ class WideDeepNNModel(AbstractModel):
         }
         return metrics_map
 
-
-    def __get_objective_func(self, stopping_metric):
+    def __get_nn_metric(self, stopping_metric):
         metrics_map = self.__get_metrics_map()
 
         # Unsupported metrics will be replaced by defaults for a given problem type
@@ -314,3 +321,5 @@ class WideDeepNNModel(AbstractModel):
 
         return nn_metric
 
+    def _more_tags(self):
+        return {'can_refit_full': True}
