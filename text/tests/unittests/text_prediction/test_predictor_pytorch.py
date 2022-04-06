@@ -236,7 +236,7 @@ def test_standalone_with_emoji():
     predictions1 = predictor.predict(df,as_pandas=False)
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root,standalone=True)
-        with requests_gag:
+        with requests_gag: # no internet connections
             offline_predictor=TextPredictor.load(root)
             predictions2 = offline_predictor.predict(df,as_pandas=False)
 
