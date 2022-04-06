@@ -93,6 +93,7 @@ class CategoricalMLP(nn.Module):
         # init weights
         self.apply(init_weights)
 
+        self.prefix = prefix
         self.categorical_key = f"{prefix}_{CATEGORICAL}"
         self.label_key = f"{prefix}_{LABEL}"
 
@@ -123,8 +124,10 @@ class CategoricalMLP(nn.Module):
         features = self.aggregator_mlp(cat_features)
         logits = self.head(features)
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):
