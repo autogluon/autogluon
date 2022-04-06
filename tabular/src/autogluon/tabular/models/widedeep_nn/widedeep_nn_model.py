@@ -7,7 +7,7 @@ import torch
 from torchmetrics import F1Score
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core.constants import BINARY, REGRESSION
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
@@ -31,80 +31,51 @@ class WideDeepNNModel(AbstractModel):
         try_import_pytorch_widedeep()
 
         from pytorch_widedeep import Trainer
-        from pytorch_widedeep.preprocessing import TabPreprocessor
         import pytorch_widedeep.training.trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
 
+        # Deterministic training
         set_seed(0, True)
-
-        params = self._get_model_params()
-
-        X = self.preprocess(X)
-
-        # prepare wide, crossed, embedding and continuous columns
-        cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
-        cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
-
-        # train the model
-
-        nn_metric = self.__get_nn_metric(self.stopping_metric)
-        monitor_metric = self.__get_monitor_metric(nn_metric)
-        objective, pred_dim = self.__get_objective_and_dim(self.problem_type, self.stopping_metric, self.num_classes)
-
-        embed_cols, for_transformer = self.__get_embedding_columns_metadata(X, cat_cols)
-
-        self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols, for_transformer=for_transformer)
-        X_tab = self._tab_preprocessor.fit_transform(X)
-
-        embed_input = None if embed_cols is None else self._tab_preprocessor.cat_embed_input
-        model = self._construct_wide_deep_model(
-            self.params['type'],
-            self._tab_preprocessor.column_idx,
-            embed_input,
-            cont_cols,
-            pred_dim,
-            **self.params.get('model_args', {})
-        )
-
-        X_train = {'X_tab': X_tab, 'target': y.values}
-
-        if X_val is not None and y_val is not None:
-            X_val_in = {'X_tab': self._tab_preprocessor.transform(X_val), 'target': y_val.values}
-            val_split = None
-        else:
-            X_val_in = None
-            val_split = 0.1
-
-        logger.log(15, model)
 
         # TODO: confirm if this is reproducible on linux
         # DataLoaders are very slow if defaults are used
         pytorch_widedeep.training.trainer.n_cpus = 0
 
+        params = self._get_model_params()
         logger.log(15, f'Fitting with parameters {params}...')
-        # TODO: validate if auto works as expected on all important metrics
-        objective_optim_mode = 'auto'
+
+        X_train, X_valid, cont_cols, embed_cols, val_split = self.__prepare_datasets(X, y, X_val, y_val)
+
+        nn_metric = self.__get_nn_metric(self.stopping_metric, self.num_classes)
+        monitor_metric = self.__get_monitor_metric(nn_metric)
+        objective = self.__get_objective(self.problem_type, self.stopping_metric)
+        pred_dim = self.__get_output_dim(self.problem_type, self.num_classes)
+
+        model = self._construct_wide_deep_model(
+            model_type=self.params['type'],
+            column_idx=self._tab_preprocessor.column_idx,
+            embed_input=None if embed_cols is None else self._tab_preprocessor.cat_embed_input,
+            continuous_cols=cont_cols,
+            pred_dim=pred_dim,
+            **self.params.get('model_args', {})
+        )
+        logger.log(15, model)
+
+        best_epoch = None
+        best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
+        batch_size = self.__get_batch_size(params)
 
         tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=(params['lr']))
-
-        batch_size = params['bs']
-        # SAINT need larger batches because it is using information between rows
-        if self.params['type'] == 'SAINT':
-            batch_size *= 2
-
-        steps_per_epoch = int(np.ceil(len(X_tab) / batch_size))
         tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # howard superconvergence schedule
             tab_opt,
             max_lr=(params['lr']),
             epochs=(params['epochs']),
-            steps_per_epoch=steps_per_epoch,
+            steps_per_epoch=int(np.ceil(len(X_train['X_tab']) / batch_size)),
             pct_start=0.25,
             final_div_factor=1e5
         )
 
-        best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
-        best_epoch = None
         with make_temp_directory() as temp_dir:
             checkpoint_path_prefix = f'{temp_dir}/model'
 
@@ -126,7 +97,7 @@ class WideDeepNNModel(AbstractModel):
 
             early_stopping = EarlyStoppingCallbackWithTimeLimit(
                 monitor=monitor_metric,
-                mode=objective_optim_mode,
+                mode='auto',
                 min_delta=params['early.stopping.min_delta'],
                 patience=params['early.stopping.patience'],
                 time_limit=time_left,
@@ -145,7 +116,7 @@ class WideDeepNNModel(AbstractModel):
 
             trainer.fit(
                 X_train=X_train,
-                X_val=X_val_in,
+                X_val=X_valid,
                 n_epochs=params['epochs'],
                 batch_size=batch_size,
                 val_split=val_split,
@@ -158,6 +129,36 @@ class WideDeepNNModel(AbstractModel):
         # TODO: add dynamic epochs selection
         self.params_trained['epochs'] = params['epochs']
         self.params_trained['best_epoch'] = best_epoch
+
+    def __get_batch_size(self, params):
+        batch_size = params['bs']
+        # SAINT need larger batches because it is using information between rows
+        if params['type'] == 'SAINT':
+            batch_size *= 2
+        return batch_size
+
+    def __prepare_datasets(self, X, y, X_val, y_val):
+        from pytorch_widedeep.preprocessing import TabPreprocessor
+
+        # prepare wide, crossed, embedding and continuous columns
+        cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+        cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+
+        X = self.preprocess(X)
+
+        embed_cols, for_transformer = self.__get_embedding_columns_metadata(X, cat_cols)
+        self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols, for_transformer=for_transformer)
+
+        X_tab = self._tab_preprocessor.fit_transform(X)
+        X_train = {'X_tab': X_tab, 'target': y.values}
+        if X_val is not None and y_val is not None:
+            X_valid = {'X_tab': self._tab_preprocessor.transform(X_val), 'target': y_val.values}
+            val_split = None
+        else:
+            X_valid = None
+            val_split = 0.1
+
+        return X_train, X_valid, cont_cols, embed_cols, val_split
 
     def __get_monitor_metric(self, nn_metric):
         if nn_metric is None:
@@ -226,7 +227,7 @@ class WideDeepNNModel(AbstractModel):
 
         model = model_cls(
             column_idx=column_idx,
-            cat_embed_input=embed_input,
+            cat_embed_input=[(c.replace('.', '_'), i, o) for c, i, o in embed_input],
             continuous_cols=continuous_cols,
             **model_args
         )
@@ -251,26 +252,32 @@ class WideDeepNNModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
-    def __get_objective_and_dim(self, problem_type, stopping_metric, num_classes):
+    def __get_objective(self, problem_type, stopping_metric):
         if problem_type == BINARY:
-            return 'binary', 1
-        elif problem_type == BINARY:
-            return 'multiclass', num_classes
+            return 'binary'
+        elif problem_type == MULTICLASS:
+            return 'multiclass'
         elif problem_type == REGRESSION:
             # See supported objectives: https://pytorch-widedeep.readthedocs.io/en/latest/trainer.html#pytorch_widedeep.training.Trainer
-            objective = {
+            return {
                 'root_mean_squared_error': 'root_mean_squared_error',
                 'mean_squared_error': 'regression',
                 'mean_absolute_error': 'mean_absolute_error',
             }.get(stopping_metric, 'regression')
-            return objective, 1
         else:
             raise ValueError(f'Unsupported problem type {problem_type}')
 
-    def __get_metrics_map(self):
+    def __get_output_dim(self, problem_type, num_classes):
+        return {
+            BINARY: 1,
+            MULTICLASS: num_classes,
+            REGRESSION: 1,
+        }.get(problem_type, 1)
+
+    def __get_metrics_map(self, num_classes):
         from pytorch_widedeep.metrics import Accuracy, R2Score
         import torchmetrics as tm
-        num_classes = 2 if self.num_classes is None else self.num_classes
+        num_classes = 2 if num_classes is None else num_classes
         metrics_map = {
             # Regression
             'root_mean_squared_error': tm.MeanSquaredError(squared=False),
@@ -305,8 +312,8 @@ class WideDeepNNModel(AbstractModel):
         }
         return metrics_map
 
-    def __get_nn_metric(self, stopping_metric):
-        metrics_map = self.__get_metrics_map()
+    def __get_nn_metric(self, stopping_metric, num_classes):
+        metrics_map = self.__get_metrics_map(num_classes)
 
         # Unsupported metrics will be replaced by defaults for a given problem type
         objective_func_name = stopping_metric.name
