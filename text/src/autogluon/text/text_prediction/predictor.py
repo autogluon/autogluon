@@ -358,7 +358,7 @@ class TextPredictor:
             as_pandas=as_pandas,
         )
 
-    def save(self, path):
+    def save(self, path, standalone = False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -376,7 +376,7 @@ class TextPredictor:
             The path to directory in which to save this Predictor.
         """
 
-        self._predictor.save(path=path)
+        self._predictor.save(path=path,standalone=standalone)
 
     @classmethod
     def load(

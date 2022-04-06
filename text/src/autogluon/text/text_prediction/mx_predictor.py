@@ -518,7 +518,7 @@ class MXTextPredictor:
             output = pd.DataFrame(output, index=index)
         return output
 
-    def save(self, path):
+    def save(self, path, standalone = False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
