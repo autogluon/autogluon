@@ -592,6 +592,11 @@ def create_model(
                 in_features=num_numerical_columns,
                 out_features=model_config.out_features,
                 d_token=model_config.d_token,
+                n_blocks=model_config.num_trans_blocks,
+                attention_n_heads=model_config.num_attn_heads,
+                attention_dropout=model_config.dropout,
+                residual_dropout=model_config.dropout,
+                ffn_dropout=model_config.dropout,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
@@ -611,6 +616,11 @@ def create_model(
                 num_categories=num_categories,
                 out_features=model_config.out_features,
                 d_token=model_config.d_token,
+                n_blocks=model_config.num_trans_blocks,
+                attention_n_heads=model_config.num_attn_heads,
+                attention_dropout=model_config.dropout,
+                residual_dropout=model_config.dropout,
+                ffn_dropout=model_config.dropout,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(FUSION_MLP):

@@ -6,7 +6,7 @@ from .ft_transformer import FT_Transformer,_TokenInitialization,_CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 
 
-class NumericalFeatureTokenizer(nn.Module):
+class _NumericalFeatureTokenizer(nn.Module):
     """
     Numerical tokenizer for numerical features in tabular data. 
     It transforms the input numerical features to tokens (embeddings).
@@ -78,12 +78,9 @@ class NumericalFeatureTokenizer(nn.Module):
 
 
 class  NumericalTransformer(nn.Module):
-    """The FT-Transformer model proposed in [gorishniy2021revisiting].
-    References:
-        * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
-        * [vaswani2017attention] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Lukasz Kaiser, Illia Polosukhin, "Attention Is All You Need", 2017
     """
-
+    FT-Transformer for numerical tabular features. 
+    """
     def __init__(
         self, 
         prefix: str, 
@@ -181,7 +178,7 @@ class  NumericalTransformer(nn.Module):
 
         self.out_features = out_features
 
-        self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
+        self.numerical_feature_tokenizer = _NumericalFeatureTokenizer(
             in_features=in_features,
             d_token=d_token,
             bias=token_bias,
@@ -246,10 +243,10 @@ class  NumericalTransformer(nn.Module):
             A dictionary with logits and features.
         """
 
-        embedding = self.numerical_feature_tokenizer(batch[self.numerical_key])
+        features = self.numerical_feature_tokenizer(batch[self.numerical_key])
 
         if self.cls_token:
-            features = self.cls_token(embedding)
+            features = self.cls_token(features)
 
         features = self.transformer(features)
         logits = self.head(features)
