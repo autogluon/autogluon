@@ -372,13 +372,13 @@ class TextPredictor:
 
         Parameters
         ----------
-        path, str
+        path: str
             The path to directory in which to save this Predictor.
-        standalone, bool
+        standalone: bool, default = False
             Whether to save the downloaded model for offline deployment. 
             When `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
             See `AutoMMPredictor.save()` for more detials. 
-            Note that this only works for `backen = pytorch`.
+            Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
         self._predictor.save(path=path,standalone=standalone)
