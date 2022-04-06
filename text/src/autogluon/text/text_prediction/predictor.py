@@ -358,7 +358,7 @@ class TextPredictor:
             as_pandas=as_pandas,
         )
 
-    def save(self, path, standalone = False):
+    def save(self, path, standalone=False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -374,6 +374,11 @@ class TextPredictor:
         ----------
         path, str
             The path to directory in which to save this Predictor.
+        standalone, bool
+            Whether to save the downloaded model for offline deployment. 
+            When `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
+            See `AutoMMPredictor.save()` for more detials. 
+            Note that this only works for `backen = pytorch`.
         """
 
         self._predictor.save(path=path,standalone=standalone)
