@@ -58,7 +58,7 @@ class WideDeepNNModel(AbstractModel):
         self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols, for_transformer=for_transformer)
         X_tab = self._tab_preprocessor.fit_transform(X)
 
-        embed_input = None if embed_cols is None else self._tab_preprocessor.embeddings_input
+        embed_input = None if embed_cols is None else self._tab_preprocessor.cat_embed_input
         model = self._construct_wide_deep_model(
             self.params['type'],
             self._tab_preprocessor.column_idx,
@@ -88,7 +88,13 @@ class WideDeepNNModel(AbstractModel):
         objective_optim_mode = 'auto'
 
         tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=(params['lr']))
-        steps_per_epoch = int(np.ceil(len(X_tab) / params['bs']))
+
+        batch_size = params['bs']
+        # SAINT need larger batches because it is using information between rows
+        if self.params['type'] == 'SAINT':
+            batch_size *= 2
+
+        steps_per_epoch = int(np.ceil(len(X_tab) / batch_size))
         tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # howard superconvergence schedule
             tab_opt,
             max_lr=(params['lr']),
@@ -145,8 +151,8 @@ class WideDeepNNModel(AbstractModel):
             trainer.fit(
                 X_train=X_train,
                 X_val=X_val_in,
-                n_epochs=(params['epochs']),
-                batch_size=(params['bs']),
+                n_epochs=params['epochs'],
+                batch_size=batch_size,
                 val_split=val_split,
             )
             best_epoch = model_checkpoint.best_epoch
@@ -225,7 +231,7 @@ class WideDeepNNModel(AbstractModel):
 
         model = model_cls(
             column_idx=column_idx,
-            embed_input=embed_input,
+            cat_embed_input=embed_input,
             continuous_cols=continuous_cols,
             **model_args
         )
@@ -252,7 +258,6 @@ class WideDeepNNModel(AbstractModel):
 
     def _more_tags(self):
         return {'can_refit_full': True}
-
 
     def __get_metrics_map(self):
         from pytorch_widedeep.metrics import Accuracy, R2Score

@@ -44,7 +44,7 @@ extras_require = {
     ],
     'widedeep': [
         'torch>=1.0,<2.0',
-        'pytorch-widedeep'
+        'pytorch-widedeep>=1.1.0'
     ],
     'skex': [
         'scikit-learn-intelex>=2021.5,<2021.6',
