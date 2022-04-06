@@ -102,7 +102,7 @@ class GEGLU(nn.Module):
         return geglu(x)
 
 
-class CLSToken(nn.Module):
+class _CLSToken(nn.Module):
     """[CLS]-token for BERT-like inference.
 
     To learn about the [CLS]-based inference, see [devlin2018bert].
@@ -116,7 +116,7 @@ class CLSToken(nn.Module):
             batch_size = 2
             n_tokens = 3
             d_token = 4
-            cls_token = CLSToken(d_token, 'uniform')
+            cls_token = _CLSToken(d_token, 'uniform')
             x = torch.randn(batch_size, n_tokens, d_token)
             x = cls_token(x)
             assert x.shape == (batch_size, n_tokens + 1, d_token)
@@ -147,7 +147,7 @@ class CLSToken(nn.Module):
     def expand(self, *leading_dimensions: int) -> Tensor:
         """Expand (repeat) the underlying [CLS]-token to a tensor with the given leading dimensions.
 
-        A possible use case is building a batch of [CLS]-tokens. See `CLSToken` for
+        A possible use case is building a batch of [CLS]-tokens. See `_CLSToken` for
         examples of usage.
 
         Note:
@@ -167,7 +167,7 @@ class CLSToken(nn.Module):
         return self.weight.view(*new_dims, -1).expand(*leading_dimensions, -1)
 
     def forward(self, x: Tensor) -> Tensor:
-        """Append self **to the end** of each item in the batch (see `CLSToken`)."""
+        """Append self **to the end** of each item in the batch (see `_CLSToken`)."""
         return torch.cat([x, self.expand(len(x), 1)], dim=1)
 
 
@@ -346,7 +346,7 @@ class MultiheadAttention(nn.Module):
         }
 
 
-class Transformer(nn.Module):
+class FT_Transformer(nn.Module):
     """Transformer with extra features.
 
     This module is the backbone of `FTTransformer`."""
@@ -500,7 +500,7 @@ class Transformer(nn.Module):
                         bias=True,
                         initialization=attention_initialization,
                     ),
-                    'ffn': Transformer.FFN(
+                    'ffn': FT_Transformer.FFN(
                         d_token=d_token,
                         d_hidden=ffn_d_hidden,
                         bias_first=True,
@@ -528,7 +528,7 @@ class Transformer(nn.Module):
                     ), _INTERNAL_ERROR_MESSAGE
             self.blocks.append(layer)
 
-        self.head = Transformer.Head(
+        self.head = FT_Transformer.Head(
             d_in=d_token,
             d_out=d_out,
             bias=True,

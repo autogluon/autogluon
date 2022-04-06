@@ -115,6 +115,7 @@ class MultimodalFusionMLP(nn.Module):
         self.fusion_mlp.apply(init_weights)
         self.head.apply(init_weights)
 
+        self.prefix = prefix
         self.label_key = f"{prefix}_{LABEL}"
 
         self.name_to_id = self.get_layer_ids()
@@ -140,23 +141,25 @@ class MultimodalFusionMLP(nn.Module):
         including the fusion model's.
         """
         multimodal_features = []
-        output = []
+        output = {}
         for per_model, per_adapter in zip(self.model, self.adapter):
             per_output = per_model(batch)
-            multimodal_features.append(per_adapter(per_output[FEATURES]))
+            multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
             if self.loss_weight is not None:
-                per_output.update({WEIGHT: self.loss_weight})
-                output.append(per_output)
+                per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
+                output.update(per_output)
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
         logits = self.head(features)
         fusion_output = {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
         if self.loss_weight is not None:
-            fusion_output.update({WEIGHT: 1})
-            output.append(fusion_output)
+            fusion_output[self.prefix].update({WEIGHT: 1})
+            output.update(fusion_output)
             return output
         else:
             return fusion_output

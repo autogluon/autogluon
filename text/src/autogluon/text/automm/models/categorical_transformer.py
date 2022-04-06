@@ -1,17 +1,16 @@
 import torch
 from torch import nn
 from torch import Tensor
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 from ..constants import CATEGORICAL, LABEL, LOGITS, FEATURES
-from .ft_transformer import _TokenInitialization, CLSToken, Transformer
+from .ft_transformer import _TokenInitialization, _CLSToken, FT_Transformer
 
 
-class CategoricalFeatureTokenizer(nn.Module):
+class _CategoricalFeatureTokenizer(nn.Module):
     """
-        Transforms categorical features to tokens (embeddings).
+    Feature tokenizer for categorical features in tabular data. 
+    It transforms the input categorical features to tokens (embeddings).
     """
-
-    category_offsets: Tensor
 
     def __init__(
         self,
@@ -21,43 +20,32 @@ class CategoricalFeatureTokenizer(nn.Module):
         initialization: Optional[str] = 'normal',
     ) -> None:
         """
-        Args:
-            prefix:
-                The model prefix.
-            num_categories: 
-                The number of distinct values for each feature. For example,
-                :code:`num_categories=[3, 4]` describes two features: the first one can
-                take values in the range :code:`[0, 1, 2]` and the second one can take
-                values in the range :code:`[0, 1, 2, 3]`.
-            d_token: 
-                The size of one token.
-            bias: 
-                If `True`, for each feature, a trainable vector is added to the
-                embedding regardless of feature value. The bias vectors are not shared
-                between features.
-            initialization: 
-                Initialization policy for parameters. Must be one of
-                :code:`['uniform', 'normal']`. Let :code:`s = d ** -0.5`. Then, the
-                corresponding distributions are :code:`Uniform(-s, s)` and :code:`Normal(0, s)`. In
-                the paper [gorishniy2021revisiting], the 'uniform' initialization was
-                used.
+        Parameters
+        ----------
+        num_categories: 
+            A list of integers. Each one is the number of categories in one categorical column.
+        d_token: 
+            The size of one token.
+        bias: 
+            If `True`, for each feature, an additional trainable vector will be added to the
+            embedding regardless of feature value. Notablly, the bias are not shared between features.
+        initialization: 
+            Initialization policy for parameters. Must be one of `['uniform', 'normal']`. 
 
-        References:
-            * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
+        References
+        ----------
+        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
         """
         super().__init__()
-        assert num_categories, 'num_categories must be non-empty'
-        assert d_token > 0, 'd_token must be positive'
         
         self.num_categories = num_categories
-
-        initialization_ = _TokenInitialization.from_str(initialization)
-
         category_offsets = torch.tensor([0] + num_categories[:-1]).cumsum(0)
 
         self.register_buffer('category_offsets', category_offsets, persistent=False)
         self.embeddings = nn.Embedding(sum(num_categories), d_token)
         self.bias = nn.Parameter(Tensor(len(num_categories), d_token)) if bias else None
+
+        initialization_ = _TokenInitialization.from_str(initialization)
 
         for parameter in [self.embeddings.weight, self.bias]:
             if parameter is not None:
@@ -66,7 +54,7 @@ class CategoricalFeatureTokenizer(nn.Module):
     @property
     def n_tokens(self) -> int:
         """The number of tokens."""
-        return len(self.category_offsets)
+        return len(self.num_categories)
 
     @property
     def d_token(self) -> int:
@@ -74,8 +62,8 @@ class CategoricalFeatureTokenizer(nn.Module):
         return self.embeddings.embedding_dim
 
     def forward(
-            self,
-            x: Tensor,
+        self, 
+        x: Tensor
     ) -> Tensor:
         
         x = self.embeddings(x + self.category_offsets[None])
@@ -87,62 +75,11 @@ class CategoricalFeatureTokenizer(nn.Module):
 
 
 
-
 class  CategoricalTransformer(nn.Module):
-    """The FT-Transformer model proposed in [gorishniy2021revisiting].
-
-    Transforms features to tokens with `FeatureTokenizer` and applies `Transformer` [vaswani2017attention]
-    to the tokens. The following illustration provides a high-level overview of the
-    architecture:
-
-    .. image:: ../images/ft_transformer.png
-        :scale: 25%
-        :alt: FT-Transformer
-
-    The following illustration demonstrates one Transformer block for :code:`prenormalization=True`:
-
-    .. image:: ../images/transformer_block.png
-        :scale: 25%
-        :alt: PreNorm Transformer block
-
-    Examples:
-        .. testcode::
-
-            x_num = torch.randn(4, 3)
-            x_cat = torch.tensor([[0, 1], [1, 0], [0, 2], [1, 1]])
-
-            module = FTTransformer.make_baseline(
-                n_num_features=3,
-                cat_cardinalities=[2, 3],
-                d_token=8,
-                n_blocks=2,
-                attention_dropout=0.2,
-                ffn_d_hidden=6,
-                ffn_dropout=0.2,
-                residual_dropout=0.0,
-                d_out=1,
-            )
-            x = module(x_num, x_cat)
-            assert x.shape == (4, 1)
-
-            module = FTTransformer.make_default(
-                n_num_features=3,
-                cat_cardinalities=[2, 3],
-                d_out=1,
-            )
-            x = module(x_num, x_cat)
-            assert x.shape == (4, 1)
-
-        To learn more about the baseline and default parameters:
-
-        .. testcode::
-
-            baseline_parameters = FTTransformer.get_baseline_transformer_subconfig()
-            default_parameters = FTTransformer.get_default_transformer_config()
-
-    References:
-        * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
-        * [vaswani2017attention] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Lukasz Kaiser, Illia Polosukhin, "Attention Is All You Need", 2017
+    """
+    FT-Transformer for categorical tabular features. 
+    The input dimension is automatically computed based on
+    the number of categories in each categorical column.
     """
 
     def __init__(
@@ -150,13 +87,12 @@ class  CategoricalTransformer(nn.Module):
         prefix: str, 
         num_categories: List[int],
         d_token: int,
-        # n_tokens: Optional[int] = None,
         cls_token: Optional[bool] = False,
         out_features: Optional[int] = None,
         num_classes: Optional[int] = 0,
-        bias: Optional[bool] = True,
-        initialization: Optional[str] = 'normal',
-        n_blocks: Optional[int] = 2,
+        token_bias: Optional[bool] = True,
+        token_initialization: Optional[str] = 'normal',
+        n_blocks: Optional[int] = 0,
         attention_n_heads: Optional[int] = 8,
         attention_initialization: Optional[str] = 'kaiming',
         attention_normalization: Optional[str] = 'LayerNorm',
@@ -173,24 +109,70 @@ class  CategoricalTransformer(nn.Module):
         kv_compression_sharing: Optional[str] = None,
         head_activation: Optional[str] =  'ReLU',
         head_normalization: Optional[str] = 'LayerNorm',
-    ):
+    ) -> None :
+        """
+        Parameters
+        ----------
+        prefix
+            The model prefix.
+        num_categories
+            A list of integers. Each one is the number of categories in one categorical column.
+        d_token
+            The size of one token for `_CategoricalFeatureTokenizer`.
+        cls_token
+            If `True`, cls token will be added to the token embeddings.
+        out_features
+            Dimension of output features.
+        num_classes
+            Number of classes. 1 for a regression task.
+        token_bias
+            If `True`, for each feature, an additional trainable vector will be added in `_CategoricalFeatureTokenizer` 
+            to the embedding regardless of feature value. Notablly, the bias are not shared between features.
+        token_initialization
+            Initialization policy for parameters in `_CategoricalFeatureTokenizer` and `_CLSToke`. 
+            Must be one of `['uniform', 'normal']`. 
+        n_blocks
+            Number of the transformer layer in `FT_Transformer`. It should be non-negative.
+        attention_n_heads
+        attention_initialization
+        attention_dropout
+        residual_dropout
+        ffn_activation
+        ffn_normalization
+        ffn_d_hidden
+        ffn_dropout
+        prenormalization
+        first_prenormalization
+        last_layer_query_idx
+        kv_compression_ratio
+        kv_compression_sharing
+        head_activation
+        head_normalization
+        """
+
         super().__init__()
+        assert num_categories, 'num_categories must be non-empty'
+        assert d_token > 0, 'd_token must be positive'
+        assert n_blocks >= 0, 'n_blocks must be non-negative' 
+        assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
+
         self.num_categories = num_categories
+        self.prefix = prefix
         self.categorical_key = f"{prefix}_{CATEGORICAL}"
         self.label_key = f"{prefix}_{LABEL}"
-
         self.out_features = out_features
 
-        self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
+
+        self.categorical_feature_tokenizer = _CategoricalFeatureTokenizer(
             num_categories=num_categories,
             d_token=d_token,
-            bias=bias,
-            initialization=initialization,
+            bias=token_bias,
+            initialization=token_initialization,
         ) 
 
-        self.cls_token = CLSToken(
+        self.cls_token = _CLSToken(
             d_token=d_token, 
-            initialization=initialization,
+            initialization=token_initialization,
         ) if cls_token else None
 
         if kv_compression_ratio is not None: 
@@ -198,7 +180,7 @@ class  CategoricalTransformer(nn.Module):
         else:
             n_tokens = None
 
-        self.transformer = Transformer(
+        self.transformer = FT_Transformer(
             d_token=d_token,
             n_blocks=n_blocks,
             attention_n_heads=attention_n_heads,
@@ -222,37 +204,44 @@ class  CategoricalTransformer(nn.Module):
         )
 
         self.head = nn.Linear(out_features, num_classes) if num_classes > 0 else nn.Identity()
-
         self.name_to_id = self.get_layer_ids()
-        # self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
     def forward(
         self, 
         batch: dict
     ):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
         assert len(batch[self.categorical_key]) == len(self.num_categories)
         
-        # x = self.categorical_feature_tokenizer(batch[self.categorical_key])
-        # if self.cls_token:
-        #     x = self.cls_token(x)
-        # features = self.transformer(x)
+        categorical_features = []
+        for categorical_feature in batch[self.categorical_key]:
+            categorical_features.append(categorical_feature)
+        categorical_features = torch.stack(categorical_features,dim=1)
 
-        xs = []
-        for x in batch[self.categorical_key]:
-            xs.append(x)
-        x = torch.stack(xs,dim=1)
-
-        x = self.categorical_feature_tokenizer(x)
+        features = self.categorical_feature_tokenizer(categorical_features)
         
         if self.cls_token:
-            x = self.cls_token(x)
+            features  = self.cls_token(features)
 
-        features = self.transformer(x)
+        features = self.transformer(features)
         logits = self.head(features)
 
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):

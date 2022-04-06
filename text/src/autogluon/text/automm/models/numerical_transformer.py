@@ -2,7 +2,7 @@ from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
 from typing import Any, Dict, List, Optional, Union, cast
-from .ft_transformer import Transformer,_TokenInitialization,CLSToken
+from .ft_transformer import FT_Transformer,_TokenInitialization,_CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 
 
@@ -82,56 +82,6 @@ class NumericalFeatureTokenizer(nn.Module):
 
 class  NumericalTransformer(nn.Module):
     """The FT-Transformer model proposed in [gorishniy2021revisiting].
-
-    Transforms features to tokens with `FeatureTokenizer` and applies `Transformer` [vaswani2017attention]
-    to the tokens. The following illustration provides a high-level overview of the
-    architecture:
-
-    .. image:: ../images/ft_transformer.png
-        :scale: 25%
-        :alt: FT-Transformer
-
-    The following illustration demonstrates one Transformer block for :code:`prenormalization=True`:
-
-    .. image:: ../images/transformer_block.png
-        :scale: 25%
-        :alt: PreNorm Transformer block
-
-    Examples:
-        .. testcode::
-
-            x_num = torch.randn(4, 3)
-            x_cat = torch.tensor([[0, 1], [1, 0], [0, 2], [1, 1]])
-
-            module = FTTransformer.make_baseline(
-                n_num_features=3,
-                cat_cardinalities=[2, 3],
-                d_token=8,
-                n_blocks=2,
-                attention_dropout=0.2,
-                ffn_d_hidden=6,
-                ffn_dropout=0.2,
-                residual_dropout=0.0,
-                d_out=1,
-            )
-            x = module(x_num, x_cat)
-            assert x.shape == (4, 1)
-
-            module = FTTransformer.make_default(
-                n_num_features=3,
-                cat_cardinalities=[2, 3],
-                d_out=1,
-            )
-            x = module(x_num, x_cat)
-            assert x.shape == (4, 1)
-
-        To learn more about the baseline and default parameters:
-
-        .. testcode::
-
-            baseline_parameters = FTTransformer.get_baseline_transformer_subconfig()
-            default_parameters = FTTransformer.get_default_transformer_config()
-
     References:
         * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
         * [vaswani2017attention] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Lukasz Kaiser, Illia Polosukhin, "Attention Is All You Need", 2017
@@ -167,7 +117,7 @@ class  NumericalTransformer(nn.Module):
         head_normalization: Optional[str] = 'LayerNorm',
     ):
         super().__init__()
-
+        self.prefix = prefix
         self.numerical_key = f"{prefix}_{NUMERICAL}"
         self.label_key = f"{prefix}_{LABEL}"
 
@@ -180,7 +130,7 @@ class  NumericalTransformer(nn.Module):
             initialization=initialization,
         )
 
-        self.cls_token = CLSToken(
+        self.cls_token = _CLSToken(
             d_token=d_token, 
             initialization=initialization,
         ) if cls_token else None
@@ -193,7 +143,7 @@ class  NumericalTransformer(nn.Module):
         else:
             n_tokens = None
 
-        self.transformer = Transformer(
+        self.transformer = FT_Transformer(
             d_token=d_token,
             n_blocks=n_blocks,
             attention_n_heads=attention_n_heads,
@@ -234,8 +184,10 @@ class  NumericalTransformer(nn.Module):
         logits = self.head(features)
 
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):

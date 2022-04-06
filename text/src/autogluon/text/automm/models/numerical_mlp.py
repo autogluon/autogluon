@@ -61,6 +61,7 @@ class NumericalMLP(nn.Module):
         # init weights
         self.apply(init_weights)
 
+        self.prefix = prefix
         self.numerical_key = f"{prefix}_{NUMERICAL}"
         self.label_key = f"{prefix}_{LABEL}"
 
@@ -87,8 +88,10 @@ class NumericalMLP(nn.Module):
         logits = self.head(features)
 
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):

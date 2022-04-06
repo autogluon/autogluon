@@ -57,6 +57,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self.mix_choice = mix_choice
         logger.debug(f"mix_choice: {mix_choice}")
 
+        self.prefix = prefix
         self.image_key = f"{prefix}_{IMAGE}"
         self.image_valid_num_key = f"{prefix}_{IMAGE_VALID_NUM}"
         self.label_key = f"{prefix}_{LABEL}"
@@ -101,8 +102,10 @@ class TimmAutoModelForImagePrediction(nn.Module):
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
 
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):
