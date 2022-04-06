@@ -10,6 +10,8 @@ class _CategoricalFeatureTokenizer(nn.Module):
     """
     Feature tokenizer for categorical features in tabular data. 
     It transforms the input categorical features to tokens (embeddings).
+
+    The categorical features usually refers to discrete features.
     """
 
     def __init__(
@@ -34,7 +36,9 @@ class _CategoricalFeatureTokenizer(nn.Module):
 
         References
         ----------
-        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
+        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
         """
         super().__init__()
         
@@ -158,6 +162,12 @@ class  CategoricalTransformer(nn.Module):
             Activation function type of the MLP layer.
         head_normalization
             Normalization scheme of the MLP layer.
+
+        References
+        ----------
+        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
         """
 
         super().__init__()

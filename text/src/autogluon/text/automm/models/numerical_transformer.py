@@ -8,14 +8,13 @@ from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 
 class NumericalFeatureTokenizer(nn.Module):
     """
-    Reference: 
-        1. Github : https://github.com/Yura52/rtdl/blob/3c13a4f18b76b7b25f09eb94075c39ba4d1d7565/rtdl/modules.py#L161 
-        2. Paper: "Revisiting Deep Learning Models for Tabular Data"
-                   https://arxiv.org/pdf/2106.11959.pdf  
+    Numerical tokenizer for numerical features in tabular data. 
+    It transforms the input numerical features to tokens (embeddings).
 
-    Transforms continuous features to tokens (embeddings).
-    For one feature, the transformation consists of two steps:
-        1. the feature is multiplied by a trainable vector i.e., weights,
+    The numerical features usually refers to continous features.
+    
+    It consists of two steps:
+        1. each feature is multiplied by a trainable vector i.e., weights,
         2. another trainable vector is added i.e., bias.
 
     Note that each feature has its separate pair of trainable vectors, 
@@ -30,25 +29,23 @@ class NumericalFeatureTokenizer(nn.Module):
         initialization: Optional[str] = 'normal',
     ):
         """
-        Args:
-            prefix:
-                The model prefix.
-            in_features: 
-                Dimension of input features i.e. the number of continuous (scalar) features
-            d_token: 
-                The size of one token
-            bias: 
-                If `False`, then the transformation will include only multiplication.
-                **Warning**: :code:`bias=False` leads to significantly worse results for
-                Transformer-like (token-based) architectures.
-            initialization: 
-                Initialization policy for parameters. Must be one of :code:`['uniform', 'normal']`. 
-                Let :code:`s = d ** -0.5`. Then, the
-                corresponding distributions are :code:`Uniform(-s, s)` and :code:`Normal(0, s)`.
-                In [gorishniy2021revisiting], the 'uniform' initialization was used.
+        Parameters
+        ----------
+        in_features: 
+            Dimension of input features i.e. the number of continuous (scalar) features
+        d_token: 
+            The size of one token.
+        bias: 
+            If `True`, for each feature, an additional trainable vector will be added to the
+            embedding regardless of feature value. Notablly, the bias are not shared between features.
+        initialization: 
+            Initialization policy for parameters. Must be one of `['uniform', 'normal']`. 
 
-        References:
-            * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, "Revisiting Deep Learning Models for Tabular Data", 2021
+        References
+        ----------
+        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
         """
         super().__init__()
 
@@ -92,13 +89,12 @@ class  NumericalTransformer(nn.Module):
         prefix: str, 
         in_features: int,
         d_token: int,
-        # n_tokens: Optional[int] = None,
         cls_token: Optional[bool] = False,
         out_features: Optional[int] = None,
         num_classes: Optional[int] = 0,
-        bias: Optional[bool] = True,
-        initialization: Optional[str] = 'normal',
-        n_blocks: Optional[int] = 2,
+        token_bias: Optional[bool] = True,
+        token_initialization: Optional[str] = 'normal',
+        n_blocks: Optional[int] = 0,
         attention_n_heads: Optional[int] = 8,
         attention_initialization: Optional[str] = 'kaiming',
         attention_normalization: Optional[str] = 'LayerNorm',
@@ -110,13 +106,75 @@ class  NumericalTransformer(nn.Module):
         ffn_dropout: Optional[str] = 0.0,
         prenormalization: Optional[bool] = True,
         first_prenormalization: Optional[bool] =  False,
-        last_layer_query_idx: Union[None, List[int], slice] = None,
         kv_compression_ratio: Optional[float] = None,
         kv_compression_sharing: Optional[str] = None,
         head_activation: Optional[str] =  'ReLU',
         head_normalization: Optional[str] = 'LayerNorm',
     ):
+        """
+        Parameters
+        ----------
+        prefix
+            The model prefix.
+        in_features
+            Dimension of input features.
+        d_token
+            The size of one token for `_CategoricalFeatureTokenizer`.
+        cls_token
+            If `True`, cls token will be added to the token embeddings.
+        out_features
+            Dimension of output features.
+        num_classes
+            Number of classes. 1 for a regression task.
+        token_bias
+            If `True`, for each feature, an additional trainable vector will be added in `_CategoricalFeatureTokenizer` 
+            to the embedding regardless of feature value. Notablly, the bias are not shared between features.
+        token_initialization
+            Initialization policy for parameters in `_CategoricalFeatureTokenizer` and `_CLSToke`. 
+            Must be one of `['uniform', 'normal']`. 
+        n_blocks
+            Number of the `FT_Transformer` blocks, which should be non-negative.
+        attention_n_heads
+            Number of attention heads in each `FT_Transformer` block, which should be postive.
+        attention_initialization
+            Weights initalization scheme for Multi Headed Attention module.
+        attention_dropout
+            Dropout ratio for the Multi Headed Attention module.
+        residual_dropout
+            Dropout ratio for the linear layers in FT_Transformer block.
+        ffn_activation
+            Activation function type for the Feed-Forward Network module.
+        ffn_normalization
+            Normalization scheme of the Feed-Forward Network module.
+        ffn_d_hidden
+            Number of the hidden nodes of the linaer layers in the Feed-Forward Network module.
+        ffn_dropout
+            Dropout ratio of the hidden nodes of the linaer layers in the Feed-Forward Network module.
+        prenormalization, first_prenormalization
+            Prenormalization to stablize the training.
+        kv_compression_ratio
+            The compression ration to reduce the input sequence length.
+        kv_compression_sharing
+            If `true` the projections will share weights.
+        head_activation
+            Activation function type of the MLP layer.
+        head_normalization
+            Normalization scheme of the MLP layer.
+
+        References
+        ----------
+        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
+        """
+
         super().__init__()
+
+        assert d_token > 0, 'd_token must be positive'
+        assert n_blocks >= 0, 'n_blocks must be non-negative' 
+        assert attention_n_heads>0, 'attention_n_heads must be postive'
+        assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
+
         self.prefix = prefix
         self.numerical_key = f"{prefix}_{NUMERICAL}"
         self.label_key = f"{prefix}_{LABEL}"
@@ -126,13 +184,13 @@ class  NumericalTransformer(nn.Module):
         self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
             in_features=in_features,
             d_token=d_token,
-            bias=bias,
-            initialization=initialization,
+            bias=token_bias,
+            initialization=token_initialization,
         )
 
         self.cls_token = _CLSToken(
             d_token=d_token, 
-            initialization=initialization,
+            initialization=token_initialization,
         ) if cls_token else None
 
         if kv_compression_ratio is not None: 
@@ -157,7 +215,7 @@ class  NumericalTransformer(nn.Module):
             residual_dropout=residual_dropout,
             prenormalization=prenormalization,
             first_prenormalization=first_prenormalization,
-            last_layer_query_idx=last_layer_query_idx,
+            last_layer_query_idx=None,
             n_tokens=n_tokens,
             kv_compression_ratio=kv_compression_ratio,
             kv_compression_sharing=kv_compression_sharing,
@@ -169,18 +227,31 @@ class  NumericalTransformer(nn.Module):
         self.head = nn.Linear(out_features, num_classes) if num_classes > 0 else nn.Identity()
 
         self.name_to_id = self.get_layer_ids()
-        # self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+        
 
     def forward(
         self, 
         batch: dict
-    ):
-        x = self.numerical_feature_tokenizer(batch[self.numerical_key])
+    ):  
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
+
+        embedding = self.numerical_feature_tokenizer(batch[self.numerical_key])
 
         if self.cls_token:
-            x = self.cls_token(x)
+            features = self.cls_token(embedding)
 
-        features = self.transformer(x)
+        features = self.transformer(features)
         logits = self.head(features)
 
         return {
