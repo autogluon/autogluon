@@ -281,8 +281,10 @@ class AbstractForecastingModel(AbstractModel):
                 "scheduler_cls and scheduler_params cannot be None for hyperparameter tuning"
             )
         time_limit = scheduler_params.get("time_out", None)
-        # scheduler should be instantiated without num_trials instead of setting it to None
-        scheduler_params.pop("num_trials", None)
+        if time_limit is None:
+            scheduler_params["num_trials"] = scheduler_params.get("num_trials", 9999)
+        else:
+            scheduler_params.pop("num_trials", None)
 
         if not any(
             isinstance(search_space[hyperparameter], ag.Space)
@@ -336,3 +338,10 @@ class AbstractForecastingModel(AbstractModel):
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
+
+
+class AbstractForecastingModelFactory:
+    """Factory class interface for callable objects that produce forecasting models"""
+
+    def __call__(self, *args, **kwargs) -> AbstractForecastingModel:
+        raise NotImplementedError
