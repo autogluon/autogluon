@@ -204,3 +204,41 @@ def test_empty_text_item():
     train_data.iat[10, 0] = None
     predictor = TextPredictor(label='score', verbosity=4)
     predictor.fit(train_data, hyperparameters=get_test_hyperparameters(), time_limit=30)
+
+
+def test_standalone_with_emoji():
+    import tempfile
+    from unittest import mock
+
+    requests_gag = mock.patch(
+        'requests.Session.request',
+        mock.Mock(side_effect=RuntimeError(
+            'Please use the `responses` library to mock HTTP in your tests.'
+        ))
+    )
+
+    data = []
+    for i in range(50 * 3):
+        data.append(('😁' * (i + 1), 'grin'))
+
+    for i in range(30 * 3):
+        data.append(('😃' * (i + 1), 'smile'))
+
+    for i in range(20 * 3):
+        data.append(('😉' * (i + 1), 'wink'))
+    df = pd.DataFrame(data, columns=['data', 'label'])
+    predictor = TextPredictor(label='label', verbosity=3)
+    predictor.fit(df,
+                  hyperparameters=get_test_hyperparameters(),
+                  time_limit=30,
+                  seed=123)
+
+    predictions1 = predictor.predict(df,as_pandas=False)
+    with tempfile.TemporaryDirectory() as root:
+        predictor.save(root,standalone=True)
+        with requests_gag:
+            offline_predictor=TextPredictor.load(root)
+            predictions2 = offline_predictor.predict(df,as_pandas=False)
+
+    npt.assert_equal(predictions1,predictions2)
+        
