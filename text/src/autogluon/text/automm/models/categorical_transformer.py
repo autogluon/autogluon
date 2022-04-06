@@ -104,7 +104,6 @@ class  CategoricalTransformer(nn.Module):
         ffn_dropout: Optional[str] = 0.0,
         prenormalization: Optional[bool] = True,
         first_prenormalization: Optional[bool] =  False,
-        last_layer_query_idx: Union[None, List[int], slice] = None,
         kv_compression_ratio: Optional[float] = None,
         kv_compression_sharing: Optional[str] = None,
         head_activation: Optional[str] =  'ReLU',
@@ -132,28 +131,41 @@ class  CategoricalTransformer(nn.Module):
             Initialization policy for parameters in `_CategoricalFeatureTokenizer` and `_CLSToke`. 
             Must be one of `['uniform', 'normal']`. 
         n_blocks
-            Number of the transformer layer in `FT_Transformer`. It should be non-negative.
+            Number of the `FT_Transformer` blocks, which should be non-negative.
         attention_n_heads
+            Number of attention heads in each `FT_Transformer` block, which should be postive.
         attention_initialization
+            Weights initalization scheme for Multi Headed Attention module.
         attention_dropout
+            Dropout ratio for the Multi Headed Attention module.
         residual_dropout
+            Dropout ratio for the linear layers in FT_Transformer block.
         ffn_activation
+            Activation function type for the Feed-Forward Network module.
         ffn_normalization
+            Normalization scheme of the Feed-Forward Network module.
         ffn_d_hidden
+            Number of the hidden nodes of the linaer layers in the Feed-Forward Network module.
         ffn_dropout
-        prenormalization
-        first_prenormalization
-        last_layer_query_idx
+            Dropout ratio of the hidden nodes of the linaer layers in the Feed-Forward Network module.
+        prenormalization, first_prenormalization
+            Prenormalization to stablize the training.
         kv_compression_ratio
+            The compression ration to reduce the input sequence length.
         kv_compression_sharing
+            If `true` the projections will share weights.
         head_activation
+            Activation function type of the MLP layer.
         head_normalization
+            Normalization scheme of the MLP layer.
         """
 
         super().__init__()
+
         assert num_categories, 'num_categories must be non-empty'
         assert d_token > 0, 'd_token must be positive'
         assert n_blocks >= 0, 'n_blocks must be non-negative' 
+        assert attention_n_heads>0, 'attention_n_heads must be postive'
         assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
 
         self.num_categories = num_categories
@@ -194,7 +206,7 @@ class  CategoricalTransformer(nn.Module):
             residual_dropout=residual_dropout,
             prenormalization=prenormalization,
             first_prenormalization=first_prenormalization,
-            last_layer_query_idx=last_layer_query_idx,
+            last_layer_query_idx=None,
             n_tokens=n_tokens,
             kv_compression_ratio=kv_compression_ratio,
             kv_compression_sharing=kv_compression_sharing,
@@ -222,7 +234,6 @@ class  CategoricalTransformer(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        assert len(batch[self.categorical_key]) == len(self.num_categories)
         
         categorical_features = []
         for categorical_feature in batch[self.categorical_key]:
