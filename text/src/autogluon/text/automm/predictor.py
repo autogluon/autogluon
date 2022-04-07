@@ -17,6 +17,7 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
+from packaging import version
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
@@ -49,8 +50,8 @@ from .utils import (
     apply_log_filter,
     save_pretrained_models,
     convert_checkpoint_name,
-    save_text_processors,
-    load_text_processors,
+    save_text_tokenizers,
+    load_text_tokenizers,
 )
 from .optimization.utils import (
     get_metric,
@@ -58,7 +59,7 @@ from .optimization.utils import (
 )
 from .optimization.lit_module import LitModule
 
-from .. import version
+from .. import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
 
@@ -1006,10 +1007,10 @@ class AutoMMPredictor:
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
 
-        # Save text processors and others separately due to tokenizers.
+        # Save text tokenizers before saving data processors
         data_processors = copy.deepcopy(self._data_processors)
         if TEXT in data_processors:
-            data_processors[TEXT] = save_text_processors(
+            data_processors[TEXT] = save_text_tokenizers(
                 text_processors=data_processors[TEXT],
                 path=path,
             )
@@ -1028,7 +1029,7 @@ class AutoMMPredictor:
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
-                    "version": version.__version__,
+                    "version": ag_version.__version__,
                 },
                 fp,
                 ensure_ascii=True,
@@ -1071,18 +1072,27 @@ class AutoMMPredictor:
 
         config = convert_checkpoint_name(config=config, path=path) # check the config for loading offline pretrained models
 
-        with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)
-        with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-            data_processors = pickle.load(fp)
-        if TEXT in data_processors:
-            # Load text processors separately due to tokenizers.
-            data_processors[TEXT] = load_text_processors(
-                relative_paths=data_processors[TEXT],
-                path=path,
-            )
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
+
+        with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
+            df_preprocessor = pickle.load(fp)
+
+        # backward compatibility
+        if version.parse(assets["version"]) <= version.parse("0.4.0"):
+            data_processors = init_data_processors(
+                config=config,
+                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+            )
+        else:
+            with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
+                data_processors = pickle.load(fp)
+            if TEXT in data_processors:
+                # Load text tokenizers after loading data processors.
+                data_processors[TEXT] = load_text_tokenizers(
+                    text_processors=data_processors[TEXT],
+                    path=path,
+                )
 
         predictor = cls(
             label=assets["label_column"],
