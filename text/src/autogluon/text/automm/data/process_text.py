@@ -1,5 +1,6 @@
 import os
 import logging
+import pickle
 from typing import Optional, List, Any
 import numpy as np
 from nptyping import NDArray
@@ -69,6 +70,7 @@ class TextProcessor:
             Whether to use stochastic chunking, which will randomly slice each individual text.
         """
         self.prefix = prefix
+        self.tokenizer_name = tokenizer_name
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
             checkpoint_name=checkpoint_name,
@@ -319,6 +321,28 @@ class TextProcessor:
             return trimmed_lengths
         else:
             return np.minimum(lengths, max_length)
+
+    def save(
+            self,
+            path: str,
+    ):
+        self.tokenizer.save_pretrained(path)
+        self.tokenizer = None
+        with open(os.path.join(path, "text_processor.pkl"), "wb") as fp:
+            pickle.dump(self, fp)
+
+    @classmethod
+    def load(
+            cls,
+            path: str,
+    ):
+        with open(os.path.join(path, "text_processor.pkl"), "rb") as fp:
+            text_processor = pickle.load(fp)
+        text_processor.tokenizer = cls.get_pretrained_tokenizer(
+            tokenizer_name=text_processor.tokenizer_name,
+            checkpoint_name=path,
+        )
+        return text_processor
 
     def __call__(
             self,
