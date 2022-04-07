@@ -9,6 +9,7 @@ from datetime import timedelta
 import pandas as pd
 import pickle
 import torch
+import copy
 from torch import nn
 from torch.nn.modules.loss import _Loss
 import torch.nn.functional as F
@@ -26,7 +27,8 @@ from autogluon.common.utils.utils import setup_outputdir
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
-    AUTOMM_TUTORIAL_MODE, UNION_SOUP, GREEDY_SOUP, BEST_SOUP, MIN, MAX
+    AUTOMM_TUTORIAL_MODE, UNION_SOUP, GREEDY_SOUP,
+    BEST_SOUP, MIN, MAX, TEXT,
 )
 
 from .data.datamodule import BaseDataModule
@@ -47,6 +49,8 @@ from .utils import (
     apply_log_filter,
     save_pretrained_configs,
     convert_checkpoint_name,
+    save_text_processors,
+    load_text_processors,
 )
 from .optimization.utils import (
     get_metric,
@@ -1002,8 +1006,15 @@ class AutoMMPredictor:
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
 
+        # Save text processors and others separately due to tokenizers.
+        data_processors = copy.deepcopy(self._data_processors)
+        data_processors[TEXT] = save_text_processors(
+            text_processors=data_processors[TEXT],
+            path=path,
+        )
+
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
-            pickle.dump(self._data_processors, fp)
+            pickle.dump(data_processors, fp)
 
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
@@ -1063,6 +1074,11 @@ class AutoMMPredictor:
             df_preprocessor = pickle.load(fp)
         with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
             data_processors = pickle.load(fp)
+        # Load text processors separately due to tokenizers.
+        data_processors[TEXT] = load_text_processors(
+            relative_paths=data_processors[TEXT],
+            path=path,
+        )
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
 
@@ -1087,7 +1103,7 @@ class AutoMMPredictor:
             num_classes=assets["output_shape"],
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
             num_categories=df_preprocessor.categorical_num_categories,
-            pretrained=False # set "pretrain=False" to prevent downloading online models
+            pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
 
         resume_ckpt_path = os.path.join(path, "last.ckpt")
