@@ -680,6 +680,32 @@ def convert_checkpoint_name(
     return config    
 
 
+def save_text_processors(
+        text_processors: List[TextProcessor],
+        path: str,
+):
+    relative_paths = []
+    for per_text_processor in text_processors:
+        relative_paths.append(per_text_processor.prefix)
+        per_path = os.path.join(path, per_text_processor.prefix)
+        per_text_processor.save(per_path)
+
+    return relative_paths
+
+
+def load_text_processors(
+        relative_paths: List[str],
+        path: str,
+):
+    text_processors = []
+    for per_relative_path in relative_paths:
+        per_path = os.path.join(path, per_relative_path)
+        per_text_processor = TextProcessor.load(per_path)
+        text_processors.append(per_text_processor)
+
+    return text_processors
+
+
 def make_exp_dir(
         root_path: str,
         job_name: str,
