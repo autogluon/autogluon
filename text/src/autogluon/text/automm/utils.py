@@ -676,60 +676,60 @@ def convert_checkpoint_name(
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'config.json')) # guarantee the existence of local configs
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'pytorch_model.bin'))
                 
-    return config    
+    return config
 
 
-def save_text_processors(
+def save_text_tokenizers(
         text_processors: List[TextProcessor],
         path: str,
-) -> List[str]:
+) -> List[TextProcessor]:
     """
-    Save all the text processors and record their relative paths, which are
+    Save all the text tokenizers and record their relative paths, which are
     the corresponding model names, e.g, hf_text.
 
     Parameters
     ----------
     text_processors
-        A list of text processors.
+        A list of text processors with tokenizers.
     path
         The root path.
 
     Returns
     -------
-    A list of relative paths, used to replace the text processors in the "data_processors.pkl".
+    A list of text processors with tokenizers replaced by their local relative paths.
     """
-    relative_paths = []
     for per_text_processor in text_processors:
-        relative_paths.append(per_text_processor.prefix)
         per_path = os.path.join(path, per_text_processor.prefix)
-        per_text_processor.save(per_path)
+        per_text_processor.tokenizer.save_pretrained(per_path)
+        per_text_processor.tokenizer = per_text_processor.prefix
 
-    return relative_paths
+    return text_processors
 
 
-def load_text_processors(
-        relative_paths: List[str],
+def load_text_tokenizers(
+        text_processors: List[TextProcessor],
         path: str,
 ) -> List[TextProcessor]:
     """
-    Load text processors.
+    Load saved text tokenizers.
 
     Parameters
     ----------
-    relative_paths
-        Relative paths of text processors.
+    text_processors
+        A list of text processors with the relative paths of tokenizers.
     path
         The root path.
 
     Returns
     -------
-    A list of text processors.
+    A list of text processors with tokenizers loaded.
     """
-    text_processors = []
-    for per_relative_path in relative_paths:
-        per_path = os.path.join(path, per_relative_path)
-        per_text_processor = TextProcessor.load(per_path)
-        text_processors.append(per_text_processor)
+    for per_text_processor in text_processors:
+        per_path = os.path.join(path, per_text_processor.tokenizer)
+        per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
+            tokenizer_name=per_text_processor.tokenizer_name,
+            checkpoint_name=per_path,
+        )
 
     return text_processors
 
