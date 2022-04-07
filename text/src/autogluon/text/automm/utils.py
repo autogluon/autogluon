@@ -8,7 +8,7 @@ import pickle
 import collections
 import copy
 import torch
-from torch.nn.modules.container import ModuleList
+from torch import nn
 import warnings
 from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
@@ -621,36 +621,34 @@ def create_model(
         raise ValueError(f"No available models for {names}")
 
 
-def save_pretrained_configs(
-    model: ModuleList,
-    config: DictConfig,
-    path: str
+def save_pretrained_models(
+        model: Union[nn.Module, nn.ModuleList],
+        config: DictConfig,
+        path: str,
 ) -> DictConfig:
-    '''
-    Saving the pretrained configs for offline deployment. 
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+    """
+    Save the pretrained models and configs to local to make future loading not dependent on Internet access.
+    By loading local checkpoints, Huggingface doesn't need to download pretrained checkpoints from Internet.
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
 
     Parameters
     ----------
     model
-        A modulelist containing all models.
+        One model or a list of models.
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text"
-    '''
+        The path to save pretrained checkpoints.
+    """
+    if len(config.model.names) == 1:
+        model = nn.ModuleList([model])
     if len(config.model.names) > 1:
         for idx, model_name in enumerate(config.model.names):
             if model_name.lower().startswith((CLIP, HF_TEXT)):
                 model[idx].model.save_pretrained(os.path.join(path, model_name))
                 model_config = getattr(config.model, model_name)
                 model_config.checkpoint_name = os.path.join('local://', model_name)
-    else:
-        model_name = config.model.names[0]
-        if model_name.lower().startswith((CLIP, HF_TEXT)):
-            model.save_pretrained(os.path.join(path, model_name))
-            model_config = getattr(config.model, model_name)
-            model_config.checkpoint_name = os.path.join('local://', model_name)
+
     return config
 
 
@@ -658,8 +656,9 @@ def convert_checkpoint_name(
         config: DictConfig,
         path: str
 ) -> DictConfig:  
-    '''
-    Convert the checkpoint name from relative path to absolute path for loading the pretrained weights in offline deployment. 
+    """
+    Convert the checkpoint name from relative path to absolute path for
+    loading the pretrained weights in offline deployment.
     It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
 
     Parameters
@@ -667,8 +666,8 @@ def convert_checkpoint_name(
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
-    '''
+        The saving path to the pretrained Huggingface models.
+    """
     for model_name in config.model.names:
         if model_name.lower().startswith((CLIP, HF_TEXT)):
             model_config = getattr(config.model, model_name)
@@ -683,7 +682,22 @@ def convert_checkpoint_name(
 def save_text_processors(
         text_processors: List[TextProcessor],
         path: str,
-):
+) -> List[str]:
+    """
+    Save all the text processors and record their relative paths, which are
+    the corresponding model names, e.g, hf_text.
+
+    Parameters
+    ----------
+    text_processors
+        A list of text processors.
+    path
+        The root path.
+
+    Returns
+    -------
+    A list of relative paths, used to replace the text processors in the "data_processors.pkl".
+    """
     relative_paths = []
     for per_text_processor in text_processors:
         relative_paths.append(per_text_processor.prefix)
@@ -696,7 +710,21 @@ def save_text_processors(
 def load_text_processors(
         relative_paths: List[str],
         path: str,
-):
+) -> List[TextProcessor]:
+    """
+    Load text processors.
+
+    Parameters
+    ----------
+    relative_paths
+        Relative paths of text processors.
+    path
+        The root path.
+
+    Returns
+    -------
+    A list of text processors.
+    """
     text_processors = []
     for per_relative_path in relative_paths:
         per_path = os.path.join(path, per_relative_path)
