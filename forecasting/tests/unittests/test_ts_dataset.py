@@ -4,30 +4,18 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from autogluon.forecasting.dataset.ts_dataframe import (
-    TimeSeriesDataFrame,
-    TimeSeriesListDataset,
-)
+from gluonts.dataset.common import ListDataset
+from autogluon.forecasting.dataset.ts_dataframe import TimeSeriesDataFrame
 
 
-START_TIMESTAMP = pd.Timestamp("01-01-2019")
-END_TIMESTAMP = pd.Timestamp("01-02-2019")
+START_TIMESTAMP = pd.Timestamp("01-01-2019", freq='D')
+END_TIMESTAMP = pd.Timestamp("01-02-2019", freq='D')
 ITEM_IDS = (0, 1, 2)
 TARGETS = np.arange(9)
 DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3))
 EMPTY_ITEM_IDS = np.array([], dtype=np.int64)
 EMPTY_DATETIME_INDEX = np.array([], dtype=np.dtype("datetime64[ns]"))
 EMPTY_TARGETS = np.array([], dtype=np.int64)
-
-
-SAMPLE_LIST_DATASET = TimeSeriesListDataset(
-    data=[
-        {"target": [0, 1, 2], "start": START_TIMESTAMP},
-        {"target": [3, 4, 5], "start": START_TIMESTAMP},
-        {"target": [6, 7, 8], "start": START_TIMESTAMP},
-    ],
-    freq="D",
-)
 
 
 def _build_ts_dataframe(item_ids, datetime_index, target):
@@ -41,6 +29,31 @@ def _build_ts_dataframe(item_ids, datetime_index, target):
 
 SAMPLE_TS_DATAFRAME = _build_ts_dataframe(ITEM_IDS, DATETIME_INDEX, TARGETS)
 SAMPLE_DATAFRAME = SAMPLE_TS_DATAFRAME.reset_index()
+
+
+SAMPLE_ITERABLE = [
+        {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
+        {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
+        {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+]
+
+
+def test_from_iteratble():
+    ts_df = TimeSeriesDataFrame(SAMPLE_ITERABLE)
+    pd.testing.assert_frame_equal(
+        ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True
+    )
+
+    with pytest.raises(ValueError):
+        TimeSeriesDataFrame([])
+
+    sample_iter = [{"target": [0, 1, 2]}]
+    with pytest.raises(ValueError):
+        TimeSeriesDataFrame(sample_iter)
+
+    sample_iter = [{"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019")}]
+    with pytest.raises(ValueError):
+        TimeSeriesDataFrame(sample_iter)
 
 
 def test_validate_data_frame():
@@ -70,11 +83,28 @@ def test_validate_multi_index_data_frame():
         TimeSeriesDataFrame(ts_df, freq="D")
 
 
-def test_from_ts_list_dataset():
-    tsdf_from_list_dataset = TimeSeriesDataFrame(SAMPLE_LIST_DATASET)
-    pd.testing.assert_frame_equal(
-        tsdf_from_list_dataset, SAMPLE_TS_DATAFRAME, check_dtype=True
+def test_from_gluonts_list_dataset():
+    N = 10  # number of time series
+    T = 100  # number of timesteps
+    prediction_length = 24
+    freq = "D"
+    custom_dataset = np.random.normal(size=(N, T))
+    start = pd.Timestamp("01-01-2019", freq=freq)
+
+    gluonts_list_dataset = ListDataset(
+        [{'target': x, 'start': start} for x in custom_dataset[:, :-prediction_length]],
+        freq=freq
     )
+    TimeSeriesDataFrame(gluonts_list_dataset)
+
+    ts_df = TimeSeriesDataFrame(ListDataset(SAMPLE_ITERABLE, freq=freq))
+    pd.testing.assert_frame_equal(
+        ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False
+    )
+
+    empty_list_dataset = ListDataset([], freq=freq)
+    with pytest.raises(ValueError):
+        TimeSeriesDataFrame(empty_list_dataset)
 
 
 def test_from_data_frame():
@@ -82,20 +112,6 @@ def test_from_data_frame():
     pd.testing.assert_frame_equal(
         tsdf_from_data_frame, SAMPLE_TS_DATAFRAME, check_dtype=True
     )
-
-
-def test_validate_list_dataset():
-    with pytest.raises(ValueError):
-        TimeSeriesDataFrame(SAMPLE_LIST_DATASET.data)
-
-    empty_list = TimeSeriesListDataset(data=[], freq="D")
-    with pytest.raises(ValueError):
-        empty_list.validate()
-
-    list_dataset = copy.deepcopy(SAMPLE_LIST_DATASET)
-    list_dataset.data[1] = {}
-    with pytest.raises(ValueError):
-        list_dataset.validate()
 
 
 @pytest.mark.parametrize(
@@ -231,3 +247,7 @@ def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, target
     new_tsdf = SAMPLE_TS_DATAFRAME.subsequence(start_timestamp, end_timestamp)
     ts_df = _build_ts_dataframe(item_ids, datetimes, targets)
     pd.testing.assert_frame_equal(new_tsdf, ts_df)
+
+
+if __name__ == "__main__":
+    test_from_gluonts_list_dataset()
