@@ -326,6 +326,14 @@ class TextProcessor:
             self,
             path: str,
     ):
+        """
+        Save the tokenizer and text processor.
+
+        Parameters
+        ----------
+        path
+            Saving path.
+        """
         self.tokenizer.save_pretrained(path)
         self.tokenizer = None
         with open(os.path.join(path, "text_processor.pkl"), "wb") as fp:
@@ -336,6 +344,18 @@ class TextProcessor:
             cls,
             path: str,
     ):
+        """
+        Load the text processor and tokenizer.
+
+        Parameters
+        ----------
+        path
+            Loading path.
+
+        Returns
+        -------
+            The loaded text processor with tokenizer.
+        """
         with open(os.path.join(path, "text_processor.pkl"), "rb") as fp:
             text_processor = pickle.load(fp)
         text_processor.tokenizer = cls.get_pretrained_tokenizer(
