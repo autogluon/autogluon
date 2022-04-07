@@ -1008,10 +1008,11 @@ class AutoMMPredictor:
 
         # Save text processors and others separately due to tokenizers.
         data_processors = copy.deepcopy(self._data_processors)
-        data_processors[TEXT] = save_text_processors(
-            text_processors=data_processors[TEXT],
-            path=path,
-        )
+        if TEXT in data_processors:
+            data_processors[TEXT] = save_text_processors(
+                text_processors=data_processors[TEXT],
+                path=path,
+            )
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -1074,11 +1075,12 @@ class AutoMMPredictor:
             df_preprocessor = pickle.load(fp)
         with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
             data_processors = pickle.load(fp)
-        # Load text processors separately due to tokenizers.
-        data_processors[TEXT] = load_text_processors(
-            relative_paths=data_processors[TEXT],
-            path=path,
-        )
+        if TEXT in data_processors:
+            # Load text processors separately due to tokenizers.
+            data_processors[TEXT] = load_text_processors(
+                relative_paths=data_processors[TEXT],
+                path=path,
+            )
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
 
