@@ -47,7 +47,7 @@ from .utils import (
     get_config,
     LogFilter,
     apply_log_filter,
-    save_pretrained_configs,
+    save_pretrained_models,
     convert_checkpoint_name,
     save_text_processors,
     load_text_processors,
@@ -991,7 +991,7 @@ class AutoMMPredictor:
 
         if standalone:
             # logger.debug(f"Using the standalone=True for saving pretrained models")
-            self._config = save_pretrained_configs(
+            self._config = save_pretrained_models(
                 model=self._model.model,
                 config=self._config, 
                 path=path
