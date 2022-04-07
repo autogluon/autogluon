@@ -1,18 +1,22 @@
 import logging
 import time
 from inspect import isclass
+from typing import Union
 
 import numpy as np
+import pandas as pd
+import sklearn
 import torch
-from torchmetrics import F1Score
-
-from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
+from autogluon.core import metrics
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, QUANTILE
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.try_import import try_import_pytorch_widedeep
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
+from torchmetrics import F1Score
+
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .utils import set_seed
@@ -21,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 class WideDeepNNModel(AbstractModel):
+
+    def __init__(self, path: str = None, name: str = None, problem_type: str = None, eval_metric: Union[str, metrics.Scorer] = None, hyperparameters=None):
+        super().__init__(path, name, problem_type, eval_metric, hyperparameters)
+        self.y_scaler = None
+        self.columns_fills = None
+
     # TODO: Leverage sample_weight
     # TODO: Experiment with text and image data
     # TODO: How to leverage GPU?
@@ -145,14 +155,45 @@ class WideDeepNNModel(AbstractModel):
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
 
         X = self.preprocess(X)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
+
+        self.y_scaler = self.params.get('y_scaler', None)
+        if self.y_scaler is None:
+            if self.problem_type == REGRESSION:
+                self.y_scaler = sklearn.preprocessing.StandardScaler()
+            elif self.problem_type == QUANTILE:
+                self.y_scaler = sklearn.preprocessing.MinMaxScaler()
+        else:
+            self.y_scaler = copy.deepcopy(self.y_scaler)
+
+        nullable_numeric_features = self._feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
+        self.columns_fills = dict()
+        for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
+            self.columns_fills[c] = X[c].mean()
+        X = self._fill_missing(X, self.columns_fills)
+        if X_val is not None:
+            X_val = self._fill_missing(X_val, self.columns_fills)
+
+        if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
+            y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
+            y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
+            logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
+        else:
+            y_norm = y
+            y_val_norm = y_val
 
         embed_cols, for_transformer = self.__get_embedding_columns_metadata(X, cat_cols)
-        self._tab_preprocessor = TabPreprocessor(embed_cols=embed_cols, continuous_cols=cont_cols, for_transformer=for_transformer)
+        self._tab_preprocessor = TabPreprocessor(
+            embed_cols=embed_cols,
+            continuous_cols=cont_cols,
+            for_transformer=for_transformer
+        )
 
         X_tab = self._tab_preprocessor.fit_transform(X)
-        X_train = {'X_tab': X_tab, 'target': y.values}
+        X_train = {'X_tab': X_tab, 'target': y_norm.values}
         if X_val is not None and y_val is not None:
-            X_valid = {'X_tab': self._tab_preprocessor.transform(X_val), 'target': y_val.values}
+            X_valid = {'X_tab': self._tab_preprocessor.transform(X_val), 'target': y_val_norm.values}
             val_split = None
         else:
             X_valid = None
@@ -189,11 +230,14 @@ class WideDeepNNModel(AbstractModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
+        X = self._fill_missing(X, self.columns_fills)
         X_tab = self._tab_preprocessor.transform(X)
         if self.problem_type != REGRESSION:
             preds = self.model.predict_proba(X_tab=X_tab)
         else:
             preds = self.model.predict(X_tab=X_tab)
+            if self.y_scaler is not None:
+                preds = self.y_scaler.inverse_transform(preds.reshape(-1,1)).reshape(-1)
 
         if self.problem_type == BINARY:
             return preds[:, 1]
@@ -227,7 +271,7 @@ class WideDeepNNModel(AbstractModel):
 
         model = model_cls(
             column_idx=column_idx,
-            cat_embed_input=[(c.replace('.', '_'), i, o) for c, i, o in embed_input],
+            cat_embed_input=embed_input,
             continuous_cols=continuous_cols,
             **model_args
         )
@@ -327,6 +371,13 @@ class WideDeepNNModel(AbstractModel):
         nn_metric = metrics_map.get(objective_func_name, None)
 
         return nn_metric
+
+    def _fill_missing(self, df: pd.DataFrame, columns_fills) -> pd.DataFrame:
+        if columns_fills:
+            df = df.fillna(columns_fills, inplace=False, downcast=False)
+        else:
+            df = df.copy()
+        return df
 
     def _more_tags(self):
         return {'can_refit_full': True}
