@@ -13,17 +13,13 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
+from ..dataset import TimeSeriesDataFrame
 from ..models.abstract import AbstractForecastingModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.warning_filters import evaluator_warning_filter
 from ..utils.metric_utils import METRIC_COEFFICIENTS, check_get_evaluation_metric
 
 logger = logging.getLogger(__name__)
-
-
-# TODO: temporary type identifier for time series datasets
-# TODO: to be removed when time series dataset PR is merged
-TimeSeriesDataFrame: Type = Any
 
 
 # TODO: This class is meant to be moved to `core`, where it will likely
