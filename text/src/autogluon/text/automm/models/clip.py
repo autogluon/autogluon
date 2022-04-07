@@ -37,8 +37,10 @@ class CLIPForImageText(nn.Module):
         num_classes
             The number of classes. 1 for a regression task.
         """
-        logger.debug(f"initializing {prefix}")
         super().__init__()
+        logger.debug(f"initializing {checkpoint_name}")
+        self.checkpoint_name = checkpoint_name
+        self.num_classes = num_classes
         self.model = CLIPModel.from_pretrained(checkpoint_name)
         self.out_features = self.model.config.projection_dim
 
