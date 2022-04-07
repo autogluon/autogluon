@@ -668,9 +668,16 @@ def save_pretrained_configs(
     path
         The saving path to the pretained weights i.e. config.json for "clip" and "hf_text"
     '''
-    for idx, model_name in enumerate(config.model.names):
+    if len(config.model.names) > 1:
+        for idx, model_name in enumerate(config.model.names):
+            if model_name.lower().startswith((CLIP, HF_TEXT)):
+                model[idx].model.save_pretrained(os.path.join(path, model_name))
+                model_config = getattr(config.model, model_name)
+                model_config.checkpoint_name = os.path.join('local://', model_name)
+    else:
+        model_name = config.model.names[0]
         if model_name.lower().startswith((CLIP, HF_TEXT)):
-            model[idx].model.save_pretrained(os.path.join(path, model_name))
+            model.save_pretrained(os.path.join(path, model_name))
             model_config = getattr(config.model, model_name)
             model_config.checkpoint_name = os.path.join('local://', model_name)
     return config

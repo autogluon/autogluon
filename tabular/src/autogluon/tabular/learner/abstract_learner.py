@@ -445,8 +445,11 @@ class AbstractLearner:
                                y_internal,
                                y_pred_proba_internal,
                                metric,
-                               sample_weight=None):
+                               sample_weight=None,
+                               weight_evaluation=None):
         metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+        if weight_evaluation is None:
+            weight_evaluation = self.weight_evaluation
         if metric.needs_pred:
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
@@ -461,15 +464,18 @@ class AbstractLearner:
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
             y_tmp = y_internal
-        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _score_with_pred(self,
                          y,
                          y_internal,
                          y_pred_internal,
                          metric,
-                         sample_weight=None):
+                         sample_weight=None,
+                         weight_evaluation=None):
         metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+        if weight_evaluation is None:
+            weight_evaluation = self.weight_evaluation
         if self.problem_type == BINARY:
             # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
             y_pred = y_pred_internal
@@ -477,7 +483,7 @@ class AbstractLearner:
         else:
             y_pred = self.label_cleaner.inverse_transform(y_pred_internal)
             y_tmp = y
-        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _validate_class_labels(self, y: Series):
         null_count = y.isnull().sum()
@@ -494,7 +500,7 @@ class AbstractLearner:
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
-    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False):
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False):
         """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
@@ -504,9 +510,6 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
-
-        if self.weight_evaluation:
-            raise AssertionError('evaluate_predictions does not support `weight_evaluation=True`. Use `predictor.leaderboard` instead.')
 
         is_proba = False
         assert isinstance(y_true, (np.ndarray, pd.Series))
@@ -575,8 +578,12 @@ class AbstractLearner:
         scoring_args = dict(
             y=y_true,
             y_internal=y_true_internal,
-            # sample_weight=sample_weight,  # TODO: add sample_weight support
+            weight_evaluation=False,
         )
+
+        if sample_weight is not None:
+            scoring_args['sample_weight'] = sample_weight
+            scoring_args['weight_evaluation'] = True
 
         for aux_metric in auxiliary_metrics_lst:
             if isinstance(aux_metric, str):
