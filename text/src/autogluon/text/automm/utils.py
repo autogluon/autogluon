@@ -711,12 +711,13 @@ def load_text_tokenizers(
         path: str,
 ) -> List[TextProcessor]:
     """
-    Load saved text tokenizers.
+    Load saved text tokenizers. If text processors already have tokenizers,
+    then do nothing.
 
     Parameters
     ----------
     text_processors
-        A list of text processors with the relative paths of tokenizers.
+        A list of text processors with tokenizers or their relative paths.
     path
         The root path.
 
@@ -725,11 +726,12 @@ def load_text_tokenizers(
     A list of text processors with tokenizers loaded.
     """
     for per_text_processor in text_processors:
-        per_path = os.path.join(path, per_text_processor.tokenizer)
-        per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
-            tokenizer_name=per_text_processor.tokenizer_name,
-            checkpoint_name=per_path,
-        )
+        if isinstance(per_text_processor.tokenizer, str):
+            per_path = os.path.join(path, per_text_processor.tokenizer)
+            per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
+                tokenizer_name=per_text_processor.tokenizer_name,
+                checkpoint_name=per_path,
+            )
 
     return text_processors
 
