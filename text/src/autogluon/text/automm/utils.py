@@ -622,7 +622,7 @@ def create_model(
 
 
 def save_pretrained_models(
-        model: Union[nn.Module, nn.ModuleList],
+        model: nn.Module,
         config: DictConfig,
         path: str,
 ) -> DictConfig:
@@ -634,20 +634,27 @@ def save_pretrained_models(
     Parameters
     ----------
     model
-        One model or a list of models.
+        One model.
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
         The path to save pretrained checkpoints.
     """
+    requires_saving = any([
+        model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names
+    ])
+    if not requires_saving:
+        return config
+
     if len(config.model.names) == 1:
         model = nn.ModuleList([model])
-    if len(config.model.names) > 1:
-        for idx, model_name in enumerate(config.model.names):
-            if model_name.lower().startswith((CLIP, HF_TEXT)):
-                model[idx].model.save_pretrained(os.path.join(path, model_name))
-                model_config = getattr(config.model, model_name)
-                model_config.checkpoint_name = os.path.join('local://', model_name)
+    else:  # assumes the fusion model has a model attribute, a nn.ModuleList
+        model = model.model
+    for per_model in model:
+        if per_model.prefix.lower().startswith((CLIP, HF_TEXT)):
+            per_model.model.save_pretrained(os.path.join(path, per_model.prefix))
+            model_config = getattr(config.model, per_model.prefix)
+            model_config.checkpoint_name = os.path.join('local://', per_model.prefix)
 
     return config
 

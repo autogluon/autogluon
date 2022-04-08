@@ -991,9 +991,8 @@ class AutoMMPredictor:
         """
 
         if standalone:
-            # logger.debug(f"Using the standalone=True for saving pretrained models")
             self._config = save_pretrained_models(
-                model=self._model.model,
+                model=self._model,
                 config=self._config, 
                 path=path
             )
