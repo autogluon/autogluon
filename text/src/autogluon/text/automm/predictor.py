@@ -1078,21 +1078,20 @@ class AutoMMPredictor:
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)
 
-        # backward compatibility
-        if version.parse(assets["version"]) <= version.parse("0.4.0"):
-            data_processors = init_data_processors(
-                config=config,
-                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
-            )
-        else:
+        try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
                 data_processors = pickle.load(fp)
+            # Load text tokenizers after loading data processors.
             if TEXT in data_processors:
-                # Load text tokenizers after loading data processors.
                 data_processors[TEXT] = load_text_tokenizers(
                     text_processors=data_processors[TEXT],
                     path=path,
                 )
+        except:  # backward compatibility
+            data_processors = init_data_processors(
+                config=config,
+                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+            )
 
         predictor = cls(
             label=assets["label_column"],
