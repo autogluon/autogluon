@@ -409,17 +409,23 @@ class TextPredictor:
 
         """
         if backend == PYTORCH:
-            predictor = AutoMMPredictor.load(
+            _predictor = AutoMMPredictor.load(
                 path=path,
                 resume=resume,
             )
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
-            predictor = MXTextPredictor.load(
+            _predictor = MXTextPredictor.load(
                 path=path,
                 verbosity=verbosity,
             )
         else:
             raise ValueError(f"Unknown backend: {backend}")
+
+        predictor = cls(
+            label=_predictor.label,
+        )
+        predictor._backend = backend
+        predictor._predictor = _predictor
 
         return predictor

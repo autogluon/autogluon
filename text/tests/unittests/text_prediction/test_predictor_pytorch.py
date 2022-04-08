@@ -228,17 +228,18 @@ def test_standalone_with_emoji():
         data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
     predictor = TextPredictor(label='label', verbosity=3)
-    predictor.fit(df,
-                  hyperparameters=get_test_hyperparameters(),
-                  time_limit=30,
-                  seed=123)
+    predictor.fit(
+        df,
+        hyperparameters=get_test_hyperparameters(),
+        time_limit=5,
+        seed=123,
+    )
 
-    predictions1 = predictor.predict(df,as_pandas=False)
+    predictions1 = predictor.predict(df, as_pandas=False)
     with tempfile.TemporaryDirectory() as root:
-        predictor.save(root,standalone=True)
-        with requests_gag: # no internet connections
-            offline_predictor=TextPredictor.load(root)
-            predictions2 = offline_predictor.predict(df,as_pandas=False)
+        predictor.save(root, standalone=True)
+        with requests_gag:  # no internet connections
+            offline_predictor = TextPredictor.load(root)
+            predictions2 = offline_predictor.predict(df, as_pandas=False)
 
-    npt.assert_equal(predictions1,predictions2)
-        
+    npt.assert_equal(predictions1, predictions2)

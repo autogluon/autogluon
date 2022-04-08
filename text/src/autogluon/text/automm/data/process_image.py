@@ -70,6 +70,7 @@ class ImageProcessor:
             -zero
                 Use an image with zero pixels.
         """
+        self.checkpoint_name = checkpoint_name
         self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
@@ -99,6 +100,7 @@ class ImageProcessor:
         else:
             logger.debug(f"using detected image normalization: {self.mean} and {self.std}")
         self.normalization = transforms.Normalize(self.mean, self.std)
+        self.max_img_num_per_col = max_img_num_per_col
         if max_img_num_per_col <= 0:
             logger.debug(f"max_img_num_per_col {max_img_num_per_col} is reset to 1")
             max_img_num_per_col = 1
