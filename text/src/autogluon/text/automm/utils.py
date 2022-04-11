@@ -25,6 +25,7 @@ from .models import (
     MultimodalFusionMLP,
     NumericalTransformer,
     CategoricalTransformer,
+    MultimodalFusionTransformer,
 )
 from .data import (
     ImageProcessor,
@@ -42,6 +43,7 @@ from .constants import (
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
     CATEGORICAL_MLP, FUSION_MLP,
     NUMERICAL_TRANSFORMER, CATEGORICAL_TRANSFORMER,
+    FUSION_TRANSFORMER,
 )
 from .presets import (
     list_model_presets,
@@ -633,6 +635,18 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+            )
+            continue
+        elif model_name.lower().startswith(FUSION_TRANSFORMER):
+            fusion_model = functools.partial(
+                MultimodalFusionTransformer,
+                prefix=model_name,
+                hidden_features=model_config.hidden_sizes,
+                heads=model_config.heads,
+                num_classes=num_classes,
+                adapt_in_features=model_config.adapt_in_features,
+                dropout_prob=model_config.drop_rate,
                 loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
