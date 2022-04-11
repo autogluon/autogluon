@@ -225,9 +225,7 @@ class MultimodalFusionTransformer(nn.Module):
             heads: List[int],
             num_classes: int,
             adapt_in_features: Optional[str] = None,
-            # activation: Optional[str] = "gelu",
             dropout_prob: Optional[float] = 0.5,
-            # normalization: Optional[str] = "layer_norm",
             loss_weight: Optional[float] = None,
     ):
         super().__init__()
@@ -259,7 +257,7 @@ class MultimodalFusionTransformer(nn.Module):
 
         assert len(self.adapter) == len(self.model)
 
-        _in_features = in_features
+
         fusion_transformer = []
         for per_hidden_features, per_heads in zip(hidden_features,heads):
             fusion_transformer.append(
@@ -270,11 +268,11 @@ class MultimodalFusionTransformer(nn.Module):
                     dropout_prob=dropout_prob,
                 )
             )
-            in_features = per_hidden_features
+            # in_features = per_hidden_features
         
          
         self.fusion_transformer = nn.Sequential(*fusion_transformer)
-        self.head = nn.Linear(_in_features, num_classes)
+        self.head = nn.Linear(in_features, num_classes)
         # init weights
         self.adapter.apply(init_weights)
         self.head.apply(init_weights)
