@@ -6,4 +6,4 @@ from .numerical_mlp import NumericalMLP
 from .categorical_mlp import CategoricalMLP
 from .numerical_transformer import NumericalTransformer
 from .categorical_transformer import CategoricalTransformer
-from .fusion import MultimodalFusionMLP
+from .fusion import MultimodalFusionMLP, MultimodalFusionTransformer

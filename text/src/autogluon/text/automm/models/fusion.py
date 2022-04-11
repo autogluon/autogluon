@@ -8,6 +8,7 @@ from ..constants import (
     WEIGHT, AUTOMM
 )
 from .mlp import MLP
+from .transformer import Transformer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -150,6 +151,158 @@ class MultimodalFusionMLP(nn.Module):
                 output.update(per_output)
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
+        logits = self.head(features)
+        fusion_output = {
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
+        }
+        if self.loss_weight is not None:
+            fusion_output[self.prefix].update({WEIGHT: 1})
+            output.update(fusion_output)
+            return output
+        else:
+            return fusion_output
+
+    def get_layer_ids(self,):
+        """
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end.
+
+        It assumes that each individual model has the "name_to_id" attribute storing
+        the already computed model's layer ids. This function only collects those layer ids.
+        It also add prefixes for each model's parameter names since the fusion model wraps
+        those individual models, making the name scope changed. Configuring the optimizer
+        requires a full name of each parameter.
+
+        The layers defined in this class, e.g., head, adapter,
+        and, fusion_mlp, have id 0.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
+        """
+        model_prefix = "model"
+        names = [n for n, _ in self.named_parameters()]
+
+        outer_layer_names = [n for n in names if not n.startswith(model_prefix)]
+        name_to_id = {}
+        logger.debug(f"outer layers are treated as head: {outer_layer_names}")
+        for n in outer_layer_names:
+            name_to_id[n] = 0
+
+        for i, per_model in enumerate(self.model):
+            per_model_prefix = f"{model_prefix}.{i}"
+            if not hasattr(per_model, "name_to_id"):
+                raise ValueError(
+                    f"name_to_id attribute is missing in model: {per_model.__class__.__name__}"
+                )
+            for n, layer_id in per_model.name_to_id.items():
+                full_n = f"{per_model_prefix}.{n}"
+                name_to_id[full_n] = layer_id
+
+        # double check each parameter has been assigned an id
+        for n in names:
+            assert n in name_to_id
+
+        return name_to_id
+
+
+class MultimodalFusionTransformer(nn.Module):
+    """
+    Use MLP to fuse different models' features (single-modal and multimodal).
+    Specifically, it adapts the features of each model to specified dimensions,
+    concatenates the adapted features, and fuses the features through MLP.
+    """
+
+    def __init__(
+            self,
+            prefix: str,
+            models: list,
+            hidden_features: List[int],
+            heads: List[int],
+            num_classes: int,
+            adapt_in_features: Optional[str] = None,
+            # activation: Optional[str] = "gelu",
+            dropout_prob: Optional[float] = 0.5,
+            # normalization: Optional[str] = "layer_norm",
+            loss_weight: Optional[float] = None,
+    ):
+        super().__init__()
+        if loss_weight is not None:
+            assert loss_weight > 0
+
+        self.loss_weight = loss_weight
+        self.model = nn.ModuleList(models)
+
+        raw_in_features = [per_model.out_features for per_model in models]
+        if adapt_in_features is not None:
+            if adapt_in_features == "min":
+                base_in_feat = min(raw_in_features)
+            elif adapt_in_features == "max":
+                base_in_feat = max(raw_in_features)
+            else:
+                raise ValueError(f"unknown adapt_in_features: {adapt_in_features}")
+
+            self.adapter = nn.ModuleList(
+                [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
+            )
+
+            in_features = base_in_feat * len(raw_in_features)
+        else:
+            self.adapter = nn.ModuleList(
+                [nn.Identity() for _ in range(len(raw_in_features))]
+            )
+            in_features = sum(raw_in_features)
+
+        assert len(self.adapter) == len(self.model)
+
+        _in_features = in_features
+        fusion_transformer = []
+        for per_hidden_features, per_heads in zip(hidden_features,heads):
+            fusion_transformer.append(
+                Transformer(
+                    in_features=in_features,
+                    out_features=per_hidden_features,
+                    heads=per_heads,
+                    dropout_prob=dropout_prob,
+                )
+            )
+            in_features = per_hidden_features
+        
+         
+        self.fusion_transformer = nn.Sequential(*fusion_transformer)
+        self.head = nn.Linear(_in_features, num_classes)
+        # init weights
+        self.adapter.apply(init_weights)
+        self.head.apply(init_weights)
+
+        self.prefix = prefix
+        self.label_key = f"{prefix}_{LABEL}"
+
+        self.name_to_id = self.get_layer_ids()
+        self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+
+    def forward(
+            self,
+            batch: dict,
+    ):
+        multimodal_features = []
+        output = {}
+        for per_model, per_adapter in zip(self.model, self.adapter):
+            per_output = per_model(batch)
+            multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
+            if self.loss_weight is not None:
+                per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
+                output.update(per_output)
+
+        multimodal_features = torch.cat(multimodal_features, dim=1)
+        multimodal_features = torch.unsqueeze(multimodal_features,dim=1)
+        features = self.fusion_transformer(multimodal_features)
+        features = torch.squeeze(features,dim=1)
+
         logits = self.head(features)
         fusion_output = {
             self.prefix: {
