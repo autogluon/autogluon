@@ -52,6 +52,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
+        self.checkpoint_name = checkpoint_name
+        self.num_classes = num_classes
         self.model = AutoModel.from_pretrained(checkpoint_name)
         self.out_features = self.model.config.hidden_size
 

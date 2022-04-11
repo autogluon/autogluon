@@ -9,6 +9,7 @@ from datetime import timedelta
 import pandas as pd
 import pickle
 import torch
+import copy
 from torch import nn
 from torch.nn.modules.loss import _Loss
 import torch.nn.functional as F
@@ -16,6 +17,7 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
+from packaging import version
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
@@ -26,7 +28,8 @@ from autogluon.common.utils.utils import setup_outputdir
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
-    AUTOMM_TUTORIAL_MODE, UNION_SOUP, GREEDY_SOUP, BEST_SOUP, MIN, MAX
+    AUTOMM_TUTORIAL_MODE, UNION_SOUP, GREEDY_SOUP,
+    BEST_SOUP, MIN, MAX, TEXT,
 )
 
 from .data.datamodule import BaseDataModule
@@ -45,8 +48,10 @@ from .utils import (
     get_config,
     LogFilter,
     apply_log_filter,
-    save_pretrained_configs,
+    save_pretrained_models,
     convert_checkpoint_name,
+    save_text_tokenizers,
+    load_text_tokenizers,
 )
 from .optimization.utils import (
     get_metric,
@@ -54,7 +59,7 @@ from .optimization.utils import (
 )
 from .optimization.lit_module import LitModule
 
-from .. import version
+from .. import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
 
@@ -986,9 +991,8 @@ class AutoMMPredictor:
         """
 
         if standalone:
-            # logger.debug(f"Using the standalone=True for saving pretrained models")
-            self._config = save_pretrained_configs(
-                model=self._model.model,
+            self._config = save_pretrained_models(
+                model=self._model,
                 config=self._config, 
                 path=path
             )
@@ -1002,8 +1006,16 @@ class AutoMMPredictor:
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
 
+        # Save text tokenizers before saving data processors
+        data_processors = copy.deepcopy(self._data_processors)
+        if TEXT in data_processors:
+            data_processors[TEXT] = save_text_tokenizers(
+                text_processors=data_processors[TEXT],
+                path=path,
+            )
+
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
-            pickle.dump(self._data_processors, fp)
+            pickle.dump(data_processors, fp)
 
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
@@ -1016,7 +1028,7 @@ class AutoMMPredictor:
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
-                    "version": version.__version__,
+                    "version": ag_version.__version__,
                 },
                 fp,
                 ensure_ascii=True,
@@ -1059,12 +1071,26 @@ class AutoMMPredictor:
 
         config = convert_checkpoint_name(config=config, path=path) # check the config for loading offline pretrained models
 
-        with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)
-        with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-            data_processors = pickle.load(fp)
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
+
+        with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
+            df_preprocessor = pickle.load(fp)
+
+        try:
+            with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
+                data_processors = pickle.load(fp)
+            # Load text tokenizers after loading data processors.
+            if TEXT in data_processors:
+                data_processors[TEXT] = load_text_tokenizers(
+                    text_processors=data_processors[TEXT],
+                    path=path,
+                )
+        except:  # backward compatibility
+            data_processors = init_data_processors(
+                config=config,
+                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+            )
 
         predictor = cls(
             label=assets["label_column"],
@@ -1087,7 +1113,7 @@ class AutoMMPredictor:
             num_classes=assets["output_shape"],
             num_numerical_columns=len(df_preprocessor.numerical_feature_names),
             num_categories=df_preprocessor.categorical_num_categories,
-            pretrained=False # set "pretrain=False" to prevent downloading online models
+            pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
 
         resume_ckpt_path = os.path.join(path, "last.ckpt")

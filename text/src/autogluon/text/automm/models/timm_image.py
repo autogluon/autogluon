@@ -49,6 +49,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
         super().__init__()
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
         logger.debug(f"initializing {checkpoint_name}")
+        self.checkpoint_name = checkpoint_name
+        self.num_classes = num_classes
         self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=0)
         self.out_features = self.model.num_features
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()

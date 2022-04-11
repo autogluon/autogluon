@@ -8,7 +8,7 @@ import pickle
 import collections
 import copy
 import torch
-from torch.nn.modules.container import ModuleList
+from torch import nn
 import warnings
 from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
@@ -664,36 +664,41 @@ def create_model(
         raise ValueError(f"No available models for {names}")
 
 
-def save_pretrained_configs(
-    model: ModuleList,
-    config: DictConfig,
-    path: str
+def save_pretrained_models(
+        model: nn.Module,
+        config: DictConfig,
+        path: str,
 ) -> DictConfig:
-    '''
-    Saving the pretrained configs for offline deployment. 
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+    """
+    Save the pretrained models and configs to local to make future loading not dependent on Internet access.
+    By loading local checkpoints, Huggingface doesn't need to download pretrained checkpoints from Internet.
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
 
     Parameters
     ----------
     model
-        A modulelist containing all models.
+        One model.
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text"
-    '''
-    if len(config.model.names) > 1:
-        for idx, model_name in enumerate(config.model.names):
-            if model_name.lower().startswith((CLIP, HF_TEXT)):
-                model[idx].model.save_pretrained(os.path.join(path, model_name))
-                model_config = getattr(config.model, model_name)
-                model_config.checkpoint_name = os.path.join('local://', model_name)
-    else:
-        model_name = config.model.names[0]
-        if model_name.lower().startswith((CLIP, HF_TEXT)):
-            model.save_pretrained(os.path.join(path, model_name))
-            model_config = getattr(config.model, model_name)
-            model_config.checkpoint_name = os.path.join('local://', model_name)
+        The path to save pretrained checkpoints.
+    """
+    requires_saving = any([
+        model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names
+    ])
+    if not requires_saving:
+        return config
+
+    if len(config.model.names) == 1:
+        model = nn.ModuleList([model])
+    else:  # assumes the fusion model has a model attribute, a nn.ModuleList
+        model = model.model
+    for per_model in model:
+        if per_model.prefix.lower().startswith((CLIP, HF_TEXT)):
+            per_model.model.save_pretrained(os.path.join(path, per_model.prefix))
+            model_config = getattr(config.model, per_model.prefix)
+            model_config.checkpoint_name = os.path.join('local://', per_model.prefix)
+
     return config
 
 
@@ -701,8 +706,9 @@ def convert_checkpoint_name(
         config: DictConfig,
         path: str
 ) -> DictConfig:  
-    '''
-    Convert the checkpoint name from relative path to absolute path for loading the pretrained weights in offline deployment. 
+    """
+    Convert the checkpoint name from relative path to absolute path for
+    loading the pretrained weights in offline deployment.
     It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
 
     Parameters
@@ -710,8 +716,8 @@ def convert_checkpoint_name(
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The saving path to the pretained weights i.e. config.json for "clip" and "hf_text", 'pkl' for "timm_image"
-    '''
+        The saving path to the pretrained Huggingface models.
+    """
     for model_name in config.model.names:
         if model_name.lower().startswith((CLIP, HF_TEXT)):
             model_config = getattr(config.model, model_name)
@@ -720,7 +726,64 @@ def convert_checkpoint_name(
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'config.json')) # guarantee the existence of local configs
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'pytorch_model.bin'))
                 
-    return config    
+    return config
+
+
+def save_text_tokenizers(
+        text_processors: List[TextProcessor],
+        path: str,
+) -> List[TextProcessor]:
+    """
+    Save all the text tokenizers and record their relative paths, which are
+    the corresponding model names, e.g, hf_text.
+
+    Parameters
+    ----------
+    text_processors
+        A list of text processors with tokenizers.
+    path
+        The root path.
+
+    Returns
+    -------
+    A list of text processors with tokenizers replaced by their local relative paths.
+    """
+    for per_text_processor in text_processors:
+        per_path = os.path.join(path, per_text_processor.prefix)
+        per_text_processor.tokenizer.save_pretrained(per_path)
+        per_text_processor.tokenizer = per_text_processor.prefix
+
+    return text_processors
+
+
+def load_text_tokenizers(
+        text_processors: List[TextProcessor],
+        path: str,
+) -> List[TextProcessor]:
+    """
+    Load saved text tokenizers. If text processors already have tokenizers,
+    then do nothing.
+
+    Parameters
+    ----------
+    text_processors
+        A list of text processors with tokenizers or their relative paths.
+    path
+        The root path.
+
+    Returns
+    -------
+    A list of text processors with tokenizers loaded.
+    """
+    for per_text_processor in text_processors:
+        if isinstance(per_text_processor.tokenizer, str):
+            per_path = os.path.join(path, per_text_processor.tokenizer)
+            per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
+                tokenizer_name=per_text_processor.tokenizer_name,
+                checkpoint_name=per_path,
+            )
+
+    return text_processors
 
 
 def make_exp_dir(
