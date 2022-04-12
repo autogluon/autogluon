@@ -384,7 +384,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = self._label_generator.transform(y_df)
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y_df).to_numpy()
-            # y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
+            y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         else:
             raise NotImplementedError
 
@@ -446,7 +446,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             assert y_pred.shape[1] >= 2
             y_pred = y_pred.argmax(axis=1)
         elif self.label_type == NUMERICAL:
-            # y_pred = self._label_scaler.inverse_transform(y_pred)
+            y_pred = self._label_scaler.inverse_transform(y_pred)
             y_pred = np.squeeze(y_pred)
         else:
             raise NotImplementedError
