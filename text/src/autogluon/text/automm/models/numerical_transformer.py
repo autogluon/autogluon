@@ -225,7 +225,7 @@ class  NumericalTransformer(nn.Module):
             d_in=d_token,
             d_out=num_classes,
             bias=True,
-            activation=head_activation,  # type: ignore
+            activation=head_activation,  
             normalization=head_normalization if prenormalization else 'Identity',
         )
         
@@ -275,5 +275,5 @@ class  NumericalTransformer(nn.Module):
         name_to_id = {}
         for n, _ in self.named_parameters():
             name_to_id[n] = 0
-            
+
         return name_to_id
