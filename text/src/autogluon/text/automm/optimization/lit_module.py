@@ -122,7 +122,6 @@ class LitModule(pl.LightningModule):
         for per_output in output:
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
             loss += self.loss_func(per_output[LOGITS].squeeze(dim=1), label) * weight
-
         return loss
 
     def _compute_metric(
@@ -269,8 +268,6 @@ class LitModule(pl.LightningModule):
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
-
-        # optimizer.add_param_group({'params': self.loss_func.noise_sigma, 'lr': 1e-2, 'name': 'noise_sigma'})
 
         logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:

@@ -1,10 +1,8 @@
 from typing import Optional, Union, Tuple, List, Dict
 import functools
-import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
-from torch.nn.modules.loss import _Loss
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
 from .lr_scheduler import (
@@ -14,22 +12,6 @@ from .lr_scheduler import (
 )
 from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
 
-def bmc_loss(pred, target, noise_var):
-    logits = - (pred - target.T).pow(2) / (2 * noise_var)
-    logits = logits.unsqueeze(dim=0).repeat([pred.shape[0],1])
-    loss = F.cross_entropy(logits, torch.arange(pred.shape[0]).cuda())
-    loss = loss * (2 * noise_var).detach()
-
-    return loss
-
-class BMCLoss(_Loss):
-    def __init__(self, init_noise_sigma):
-        super(BMCLoss, self).__init__()
-        self.noise_sigma = torch.nn.Parameter(torch.tensor(init_noise_sigma))
-
-    def forward(self, pred, target):
-        noise_var = self.noise_sigma ** 2
-        return bmc_loss(pred, target, noise_var)
 
 def get_loss_func(problem_type: str):
     """
@@ -47,10 +29,7 @@ def get_loss_func(problem_type: str):
     if problem_type in [BINARY, MULTICLASS]:
         loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
-        # loss_func = nn.MSELoss()
-        loss_func = nn.BCEWithLogitsLoss()
-        #loss_func = BMCLoss(1.0)
-
+        loss_func = nn.MSELoss()
     else:
         raise NotImplementedError
 
