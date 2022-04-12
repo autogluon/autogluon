@@ -594,4 +594,3 @@ class FT_Transformer(nn.Module):
 
         x =  self.head(x)
         return x
-

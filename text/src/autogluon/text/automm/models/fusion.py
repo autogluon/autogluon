@@ -221,8 +221,7 @@ class MultimodalFusionTransformer(nn.Module):
             self,
             prefix: str,
             models: list,
-            hidden_features: List[int],
-            heads: List[int],
+            hidden_features: int,
             num_classes: int,
             adapt_in_features: Optional[str] = None,
             dropout_prob: Optional[float] = 0.5,
@@ -248,7 +247,6 @@ class MultimodalFusionTransformer(nn.Module):
                 [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
             )
 
-            # in_features = base_in_feat * len(raw_in_features)
             in_features = base_in_feat
         else:
             self.adapter = nn.ModuleList(
@@ -278,7 +276,7 @@ class MultimodalFusionTransformer(nn.Module):
             kv_compression_sharing=None,
             head_activation='ReLU',
             head_normalization='LayerNorm',
-            d_out=hidden_features[0],
+            d_out=hidden_features,
         )
 
         self.head = FT_Transformer.Head(

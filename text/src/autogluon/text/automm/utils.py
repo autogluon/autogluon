@@ -642,8 +642,7 @@ def create_model(
             fusion_model = functools.partial(
                 MultimodalFusionTransformer,
                 prefix=model_name,
-                hidden_features=model_config.hidden_sizes,
-                heads=model_config.heads,
+                hidden_features=model_config.hidden_size,
                 num_classes=num_classes,
                 adapt_in_features=model_config.adapt_in_features,
                 dropout_prob=model_config.drop_rate,
