@@ -112,23 +112,30 @@ class LitModule(pl.LightningModule):
 
     def _compute_loss(
             self,
-            output: Dict,
+            output: Union[Dict, List[Dict]],
             label: torch.Tensor,
     ):
+        if isinstance(output, dict):
+            output = [output]
+
         loss = 0
-        for _, per_output in output.items():
+        for per_output in output:
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            loss += self.loss_func(
-                input=per_output[LOGITS].squeeze(dim=1),
-                target=label,
-            ) * weight
+            loss += self.loss_func(per_output[LOGITS].squeeze(dim=1), label) * weight
+
         return loss
 
     def _compute_metric(
             self,
-            logits: torch.Tensor,
+            output: Union[Dict, List[Dict]],
             label: torch.Tensor,
     ):
+        if isinstance(output, dict):
+            logits = output[LOGITS]
+        else:
+            # use only the last logits, which is the fusion logits
+            logits = output[-1][LOGITS]
+
         if isinstance(self.validation_metric, torchmetrics.AUROC):
             prob = F.softmax(logits.float(), dim=1)
             return self.validation_metric(preds=prob[:, 1], target=label)  # only for binary classification
@@ -139,7 +146,7 @@ class LitModule(pl.LightningModule):
 
     def _shared_step(
             self,
-            batch: Dict,
+            batch: dict,
     ):
         output = self.model(batch)
         label = batch[self.model.label_key]
@@ -190,10 +197,7 @@ class LitModule(pl.LightningModule):
         self.log("val_loss", loss)
         self.log(
             self.validation_metric_name,
-            self._compute_metric(
-                logits=output[self.model.prefix][LOGITS],
-                label=batch[self.model.label_key],
-            ),
+            self._compute_metric(output=output, label=batch[self.model.label_key]),
         )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
@@ -217,7 +221,11 @@ class LitModule(pl.LightningModule):
         A dictionary with the mini-batch's logits and features.
         """
         output = self.model(batch)
-        return output[self.model.prefix]
+        if isinstance(output, dict):
+            ret = output
+        else:
+            ret = output[-1]
+        return ret
 
     def configure_optimizers(self):
         """
@@ -261,6 +269,8 @@ class LitModule(pl.LightningModule):
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )
+
+        # optimizer.add_param_group({'params': self.loss_func.noise_sigma, 'lr': 1e-2, 'name': 'noise_sigma'})
 
         logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:
