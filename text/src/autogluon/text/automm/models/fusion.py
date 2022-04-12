@@ -281,22 +281,6 @@ class MultimodalFusionTransformer(nn.Module):
             d_out=hidden_features[0],
         )
 
-        # fusion_transformer = []
-        # for per_hidden_features, per_heads in zip(hidden_features,heads):
-        #     fusion_transformer.append(
-        #         Transformer(
-        #             in_features=in_features,
-        #             out_features=per_hidden_features,
-        #             heads=per_heads,
-        #             dropout_prob=dropout_prob,
-        #         )
-        #     )
-        
-         
-        # self.fusion_transformer = nn.Sequential(*fusion_transformer)
-        # self.head = nn.Linear(in_features, num_classes)
-        # self.head = nn.Linear(hidden_features[0], num_classes)
-
         self.head = FT_Transformer.Head(
             d_in=in_features,
             d_out=num_classes,
@@ -304,6 +288,7 @@ class MultimodalFusionTransformer(nn.Module):
             activation='ReLU',  # type: ignore
             normalization='LayerNorm',
         )
+        
         # init weights
         # self.adapter.apply(init_weights)
         # self.head.apply(init_weights)
@@ -333,9 +318,7 @@ class MultimodalFusionTransformer(nn.Module):
                 output.update(per_output)
 
         multimodal_features = torch.cat(multimodal_features, dim=1)
-        # multimodal_features = torch.stack(multimodal_features, dim=1)
         features = self.fusion_transformer(multimodal_features)
-        # features = torch.squeeze(features,dim=1)
 
         logits = self.head(features)
         fusion_output = {

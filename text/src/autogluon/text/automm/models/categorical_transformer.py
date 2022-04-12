@@ -48,7 +48,6 @@ class _CategoricalFeatureTokenizer(nn.Module):
         self.register_buffer('category_offsets', category_offsets, persistent=False)
         self.embeddings = nn.Embedding(sum(num_categories), d_token)
         self.bias = nn.Parameter(Tensor(len(num_categories), d_token)) if bias else None
-
         initialization_ = _TokenInitialization.from_str(initialization)
 
         for parameter in [self.embeddings.weight, self.bias]:
@@ -65,10 +64,7 @@ class _CategoricalFeatureTokenizer(nn.Module):
         """The size of one token."""
         return self.embeddings.embedding_dim
 
-    def forward(
-        self, 
-        x: Tensor
-    ) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         x = self.embeddings(x + self.category_offsets[None])
 
         if self.bias is not None:
@@ -223,8 +219,6 @@ class  CategoricalTransformer(nn.Module):
             head_normalization=head_normalization,
             d_out=out_features,
         )
-
-        # self.head = nn.Linear(out_features, num_classes) if num_classes > 0 else nn.Identity()
 
         self.head = FT_Transformer.Head(
             d_in=d_token,

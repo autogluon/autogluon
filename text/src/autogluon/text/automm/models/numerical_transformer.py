@@ -221,8 +221,6 @@ class  NumericalTransformer(nn.Module):
             d_out=out_features,
         )
 
-        # self.head = nn.Linear(out_features, num_classes) if num_classes > 0 else nn.Identity()
-
         self.head = FT_Transformer.Head(
             d_in=d_token,
             d_out=num_classes,
