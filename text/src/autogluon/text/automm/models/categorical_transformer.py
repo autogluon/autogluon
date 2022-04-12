@@ -278,4 +278,5 @@ class  CategoricalTransformer(nn.Module):
         name_to_id = {}
         for n, _ in self.named_parameters():
             name_to_id[n] = 0
+            
         return name_to_id

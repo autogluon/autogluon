@@ -591,6 +591,6 @@ class FT_Transformer(nn.Module):
             x = self._end_residual(layer, 'ffn', x, x_residual)
             x = layer['output'](x)
 
-
         x =  self.head(x)
+        
         return x
