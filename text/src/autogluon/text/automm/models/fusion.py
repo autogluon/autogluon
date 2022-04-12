@@ -8,7 +8,7 @@ from ..constants import (
     WEIGHT, AUTOMM
 )
 from .mlp import MLP
-from .transformer import Transformer
+from .ft_transformer import FT_Transformer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -248,7 +248,8 @@ class MultimodalFusionTransformer(nn.Module):
                 [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
             )
 
-            in_features = base_in_feat * len(raw_in_features)
+            # in_features = base_in_feat * len(raw_in_features)
+            in_features = base_in_feat
         else:
             self.adapter = nn.ModuleList(
                 [nn.Identity() for _ in range(len(raw_in_features))]
@@ -257,25 +258,55 @@ class MultimodalFusionTransformer(nn.Module):
 
         assert len(self.adapter) == len(self.model)
 
+        self.fusion_transformer = FT_Transformer(
+            d_token=in_features,
+            n_blocks=2,
+            attention_n_heads=2,
+            attention_dropout=dropout_prob,
+            attention_initialization='kaiming',
+            attention_normalization='LayerNorm',
+            ffn_d_hidden=6,
+            ffn_dropout=dropout_prob,
+            ffn_activation='ReGLU',
+            ffn_normalization='LayerNorm',
+            residual_dropout=dropout_prob,
+            prenormalization=True,
+            first_prenormalization=False,
+            last_layer_query_idx=None,
+            n_tokens=None,
+            kv_compression_ratio=None,
+            kv_compression_sharing=None,
+            head_activation='ReLU',
+            head_normalization='LayerNorm',
+            d_out=hidden_features[0],
+        )
 
-        fusion_transformer = []
-        for per_hidden_features, per_heads in zip(hidden_features,heads):
-            fusion_transformer.append(
-                Transformer(
-                    in_features=in_features,
-                    out_features=per_hidden_features,
-                    heads=per_heads,
-                    dropout_prob=dropout_prob,
-                )
-            )
-            # in_features = per_hidden_features
+        # fusion_transformer = []
+        # for per_hidden_features, per_heads in zip(hidden_features,heads):
+        #     fusion_transformer.append(
+        #         Transformer(
+        #             in_features=in_features,
+        #             out_features=per_hidden_features,
+        #             heads=per_heads,
+        #             dropout_prob=dropout_prob,
+        #         )
+        #     )
         
          
-        self.fusion_transformer = nn.Sequential(*fusion_transformer)
-        self.head = nn.Linear(in_features, num_classes)
+        # self.fusion_transformer = nn.Sequential(*fusion_transformer)
+        # self.head = nn.Linear(in_features, num_classes)
+        # self.head = nn.Linear(hidden_features[0], num_classes)
+
+        self.head = FT_Transformer.Head(
+            d_in=in_features,
+            d_out=num_classes,
+            bias=True,
+            activation='ReLU',  # type: ignore
+            normalization='LayerNorm',
+        )
         # init weights
-        self.adapter.apply(init_weights)
-        self.head.apply(init_weights)
+        # self.adapter.apply(init_weights)
+        # self.head.apply(init_weights)
 
         self.prefix = prefix
         self.label_key = f"{prefix}_{LABEL}"
@@ -291,15 +322,20 @@ class MultimodalFusionTransformer(nn.Module):
         output = {}
         for per_model, per_adapter in zip(self.model, self.adapter):
             per_output = per_model(batch)
-            multimodal_features.append(per_adapter(per_output[per_model.prefix][FEATURES]))
+            multimodal_feature = per_adapter(per_output[per_model.prefix][FEATURES])
+            if multimodal_feature.ndim == 2:
+                multimodal_feature = torch.unsqueeze(multimodal_feature,dim=1)
+            multimodal_features.append(multimodal_feature)
+
+
             if self.loss_weight is not None:
                 per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
                 output.update(per_output)
 
         multimodal_features = torch.cat(multimodal_features, dim=1)
-        multimodal_features = torch.unsqueeze(multimodal_features,dim=1)
+        # multimodal_features = torch.stack(multimodal_features, dim=1)
         features = self.fusion_transformer(multimodal_features)
-        features = torch.squeeze(features,dim=1)
+        # features = torch.squeeze(features,dim=1)
 
         logits = self.head(features)
         fusion_output = {

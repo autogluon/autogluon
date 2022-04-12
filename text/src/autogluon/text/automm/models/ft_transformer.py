@@ -430,6 +430,7 @@ class FT_Transformer(nn.Module):
         head_activation: ModuleType,
         head_normalization: ModuleType,
         d_out: int,
+        projection: Optional[bool] = False,
     ) -> None:
         super().__init__()
         if isinstance(last_layer_query_idx, int):
@@ -528,13 +529,14 @@ class FT_Transformer(nn.Module):
                     ), _INTERNAL_ERROR_MESSAGE
             self.blocks.append(layer)
 
+         
         self.head = FT_Transformer.Head(
             d_in=d_token,
             d_out=d_out,
             bias=True,
             activation=head_activation,  # type: ignore
             normalization=head_normalization if prenormalization else 'Identity',
-        )
+        ) if projection else nn.Identity()
 
     def _get_kv_compressions(self, layer):
         return (
@@ -589,6 +591,7 @@ class FT_Transformer(nn.Module):
             x = self._end_residual(layer, 'ffn', x, x_residual)
             x = layer['output'](x)
 
-        x = self.head(x)
+
+        x =  self.head(x)
         return x
 

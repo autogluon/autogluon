@@ -69,7 +69,6 @@ class _CategoricalFeatureTokenizer(nn.Module):
         self, 
         x: Tensor
     ) -> Tensor:
-        
         x = self.embeddings(x + self.category_offsets[None])
 
         if self.bias is not None:
@@ -225,7 +224,16 @@ class  CategoricalTransformer(nn.Module):
             d_out=out_features,
         )
 
-        self.head = nn.Linear(out_features, num_classes) if num_classes > 0 else nn.Identity()
+        # self.head = nn.Linear(out_features, num_classes) if num_classes > 0 else nn.Identity()
+
+        self.head = FT_Transformer.Head(
+            d_in=d_token,
+            d_out=num_classes,
+            bias=True,
+            activation=head_activation,  # type: ignore
+            normalization=head_normalization if prenormalization else 'Identity',
+        )
+
         self.name_to_id = self.get_layer_ids()
 
     def forward(
@@ -251,9 +259,9 @@ class  CategoricalTransformer(nn.Module):
         categorical_features = torch.stack(categorical_features,dim=1)
 
         features = self.categorical_feature_tokenizer(categorical_features)
-        
+
         if self.cls_token:
-            features  = self.cls_token(features)
+            features = self.cls_token(features)
 
         features = self.transformer(features)
         logits = self.head(features)
