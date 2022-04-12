@@ -158,6 +158,8 @@ class WideDeepNNModel(AbstractModel):
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
+        # TODO: refactor common things between widedeep and fastai models
+        # TODO: add high-cardinality categorical variables trimming
         self.y_scaler = self.params.get('y_scaler', None)
         if self.y_scaler is None:
             if self.problem_type == REGRESSION:
@@ -215,7 +217,7 @@ class WideDeepNNModel(AbstractModel):
         return monitor_metric
 
     def __get_embedding_columns_metadata(self, X, cat_cols):
-        for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever']
+        for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever', 'tab_fastformer']
         if for_transformer:
             embed_cols = cat_cols
         else:
@@ -254,18 +256,21 @@ class WideDeepNNModel(AbstractModel):
 
     @staticmethod
     def _construct_wide_deep_model(model_type, column_idx, embed_input, continuous_cols, pred_dim, **model_args):
-        from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer, FTTransformer, TabPerceiver
+        from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer, FTTransformer, TabPerceiver, ContextAttentionMLP, SelfAttentionMLP, TabNet, TabFastFormer
 
-        __MODEL_TYPES = dict(
-            tabmlp=TabMlp,
+        model_cls = dict(
+            tab_mlp=TabMlp,
+            context_attention_mlp=ContextAttentionMLP,
+            self_attention_mlp=SelfAttentionMLP,
             tabresnet=TabResnet,
+            tabnet=TabNet,
             SAINT=SAINT,
             tab_transformer=TabTransformer,
             ft_transformer=FTTransformer,
+            tab_fastformer=TabFastFormer,
             tab_perciever=TabPerceiver,
-        )
+        ).get(model_type, None)
 
-        model_cls = __MODEL_TYPES.get(model_type, None)
         if model_cls is None:
             raise ValueError(f'Unknown model type {model_type}')
 
