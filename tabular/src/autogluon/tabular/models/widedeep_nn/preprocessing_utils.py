@@ -14,13 +14,13 @@ class ContinuousNormalizer:
 
     def __init__(self, cont_columns) -> None:
         self.cont_columns = cont_columns
-        self._cont_normalization = None
+        self.stats = None
 
     def fit(self, X):
-        self._cont_normalization = (X[self.cont_columns].mean(), X[self.cont_columns].std())
+        self.stats = (X[self.cont_columns].mean(), X[self.cont_columns].std())
 
     def transform(self, X):
-        cont_mean, cont_std = self._cont_normalization
+        cont_mean, cont_std = self.stats
         X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
         return X
 
@@ -29,10 +29,10 @@ class MissingFiller:
 
     def __init__(self, feature_metadata) -> None:
         self.columns_fills = None
-        self._feature_metadata = feature_metadata
+        self.feature_metadata = feature_metadata
 
     def fit_transform(self, X):
-        nullable_numeric_features = self._feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
+        nullable_numeric_features = self.feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
         self.columns_fills = dict()
         for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
             self.columns_fills[c] = X[c].mean()
