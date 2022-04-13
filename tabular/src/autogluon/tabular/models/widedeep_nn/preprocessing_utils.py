@@ -80,7 +80,7 @@ class TargetScaler:
             else:
                 self.y_scaler = None
         else:
-            self.y_scaler = copy.deepcopy(self.y_scaler)
+            self.y_scaler = copy.deepcopy(y_scaler)
 
     def fit_transform(self, y, y_val):
         if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:

@@ -3,9 +3,11 @@ from unittest.mock import Mock
 import numpy as np
 import pandas as pd
 from pandas._testing import assert_series_equal, assert_frame_equal
+from sklearn.preprocessing import RobustScaler
 
 from autogluon.common.features.types import S_TEXT_SPECIAL, R_FLOAT, R_DATETIME
-from autogluon.tabular.models.widedeep_nn.preprocessing_utils import ContinuousNormalizer, MissingFiller, CategoricalFeaturesFilter
+from autogluon.core.constants import REGRESSION, QUANTILE, BINARY
+from autogluon.tabular.models.widedeep_nn.preprocessing_utils import ContinuousNormalizer, MissingFiller, CategoricalFeaturesFilter, TargetScaler
 
 
 def test_continuous_normalizer():
@@ -109,5 +111,69 @@ def test_categorical_features_filter_numerics():
     cat_columns_filtered = CategoricalFeaturesFilter.filter(x, cat_columns, max_unique_categorical_values=2)
     assert cat_columns_filtered == ['a', 'b', 'c']
 
-def test_target_scaler():
-    pass  # TODO
+
+def test_target_scaler_regression():
+    scaler = TargetScaler(REGRESSION)
+    y = pd.Series([100, 200, 3000, 200])
+    y_val = pd.Series([100, 200, 300, 200])
+    y_tx, y_val_tx = scaler.fit_transform(y, y_val)
+
+    # Forward fit-transform
+    y_tx_exp = pd.Series([-0.631340, -0.549876, 1.731093, -0.549876])
+    y_val_tx_exp = pd.Series([-0.631340, -0.549876, -0.468413, -0.549876])
+    __verify_forward_scaler_transform(y_tx, y_tx_exp, y_val_tx, y_val_tx_exp)
+
+    # Inverse transform
+    y_tx_inv = scaler.inverse_transform(y_tx_exp.values)
+    assert np.allclose(y, y_tx_inv, rtol=1e-05, atol=1e-08, equal_nan=False)
+
+
+def test_target_scaler_quantile():
+    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type=QUANTILE)
+
+    # Forward fit-transform
+    y_tx_exp = pd.Series([0.0, 0.03448276, 1.0, 0.03448276])
+    y_val_tx_exp = pd.Series([0.0, 0.03448276, 0.06896552, 0.03448276])
+    __verify_forward_scaler_transform(y_tx, y_tx_exp, y_val_tx, y_val_tx_exp)
+
+    # Inverse transform
+    y_tx_inv = scaler.inverse_transform(y_tx_exp.values)
+    assert np.allclose(y, y_tx_inv, rtol=1e-05, atol=1e-08, equal_nan=False)
+
+
+def test_target_scaler_other():
+    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type=BINARY)
+
+    # Forward fit-transform
+    assert np.allclose(y, y_tx, rtol=1e-05, atol=1e-08, equal_nan=False)
+    assert np.allclose(y_val, y_val_tx, rtol=1e-05, atol=1e-08, equal_nan=False)
+
+    # Inverse transform
+    y_tx_inv = scaler.inverse_transform(y.values)
+    assert np.allclose(y, y_tx_inv, rtol=1e-05, atol=1e-08, equal_nan=False)
+
+
+def test_target_scaler_custom_scaler():
+    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type=REGRESSION, y_scaler=RobustScaler())
+
+    # Forward fit-transform
+    y_tx_exp = pd.Series([-0.137931, 0.0, 3.862069, 0.0])
+    y_val_tx_exp = pd.Series([-0.137931, 0.0, 0.137931, 0.0])
+    __verify_forward_scaler_transform(y_tx, y_tx_exp, y_val_tx, y_val_tx_exp)
+
+    # Inverse transform
+    y_tx_inv = scaler.inverse_transform(y_tx_exp.values)
+    assert np.allclose(y, y_tx_inv, rtol=1e-05, atol=1e-08, equal_nan=False)
+
+
+def __verify_forward_scaler_transform(y_tx, y_tx_exp, y_val_tx, y_val_tx_exp):
+    assert np.allclose(y_tx_exp, y_tx, rtol=1e-05, atol=1e-08, equal_nan=False)
+    assert np.allclose(y_val_tx_exp, y_val_tx, rtol=1e-05, atol=1e-08, equal_nan=False)
+
+
+def __scaler_setup(**scaler_args):
+    scaler = TargetScaler(**scaler_args)
+    y = pd.Series([100, 200, 3000, 200])
+    y_val = pd.Series([100, 200, 300, 200])
+    y_tx, y_val_tx = scaler.fit_transform(y, y_val)
+    return scaler, y, y_val, y_tx, y_val_tx
