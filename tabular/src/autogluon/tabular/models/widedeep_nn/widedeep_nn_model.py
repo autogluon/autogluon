@@ -48,17 +48,12 @@ class WideDeepNNModel(AbstractModel):
         try_import_pytorch_widedeep()
 
         from pytorch_widedeep import Trainer
-        import pytorch_widedeep.training.trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
         import pytorch_widedeep
 
         # Deterministic training
         set_seed(0, True)
-
-        # TODO: confirm if this is reproducible on linux
-        # DataLoaders are very slow if defaults are used
-        pytorch_widedeep.training.trainer.n_cpus = 0
 
         params = self._get_model_params()
         logger.log(15, f'Fitting with parameters {params}...')
