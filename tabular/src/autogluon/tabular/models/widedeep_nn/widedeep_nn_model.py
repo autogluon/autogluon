@@ -1,4 +1,5 @@
 import logging
+import sys
 import time
 from typing import Union
 
@@ -32,9 +33,16 @@ class WideDeepNNModel(AbstractModel):
 
     # TODO: Leverage sample_weight
     # TODO: Experiment with text and image data
-    # TODO: How to leverage GPU?
-    # TODO: Missing value handling?
-    def _fit(self, X, y, X_val=None, y_val=None, sample_weight=None, time_limit=None, **kwargs):
+    def _fit(self,
+             X,
+             y,
+             X_val=None,
+             y_val=None,
+             sample_weight=None,
+             time_limit=None,
+             num_cpus=None,
+             num_gpus=0,
+             **kwargs):
         start_time = time.time()
 
         try_import_pytorch_widedeep()
@@ -76,7 +84,7 @@ class WideDeepNNModel(AbstractModel):
         batch_size = self.__get_batch_size(params)
 
         tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=(params['lr']))
-        tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # howard superconvergence schedule
+        tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # superconvergence schedule
             tab_opt,
             max_lr=(params['lr']),
             epochs=(params['epochs']),
@@ -113,6 +121,18 @@ class WideDeepNNModel(AbstractModel):
                 best_epoch_stop=best_epoch_stop
             )
 
+            system_params = {}
+            if num_cpus is not None:
+                system_params['num_workers'] = 0 if sys.platform == "darwin" and sys.version_info.minor > 7 else num_cpus
+            if num_gpus is not None:
+                # TODO: Control CPU vs GPU usage during inference
+                if num_gpus == 0:
+                    system_params['device'] = 'cpu'
+                else:
+                    # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
+                    system_params['device'] = 'cuda'
+            print(system_params)
+
             trainer = Trainer(
                 model,
                 objective=objective,
@@ -121,6 +141,7 @@ class WideDeepNNModel(AbstractModel):
                 lr_schedulers=tab_sch,
                 callbacks=[model_checkpoint, early_stopping],
                 verbose=kwargs.get('verbosity', 2),
+                **system_params
             )
 
             trainer.fit(
