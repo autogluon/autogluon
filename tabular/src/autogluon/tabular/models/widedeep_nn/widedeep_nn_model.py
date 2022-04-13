@@ -5,20 +5,19 @@ from typing import Union
 
 import numpy as np
 import pandas as pd
-import sklearn
 import torch
-from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
+
+from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core import metrics
-from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, QUANTILE
+from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.try_import import try_import_pytorch_widedeep
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
-from torchmetrics import F1Score
-
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
+from .preprocessing_utils import MissingFiller, TargetScaler, CategoricalFeaturesFilter
 from .utils import set_seed
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,8 @@ class WideDeepNNModel(AbstractModel):
     def __init__(self, path: str = None, name: str = None, problem_type: str = None, eval_metric: Union[str, metrics.Scorer] = None, hyperparameters=None):
         super().__init__(path, name, problem_type, eval_metric, hyperparameters)
         self.y_scaler = None
-        self.columns_fills = None
+        self.missing_filler = None
+        self.cont_normalization = None
 
     # TODO: Leverage sample_weight
     # TODO: Experiment with text and image data
@@ -55,7 +55,7 @@ class WideDeepNNModel(AbstractModel):
         params = self._get_model_params()
         logger.log(15, f'Fitting with parameters {params}...')
 
-        X_train, X_valid, cont_cols, embed_cols, val_split = self.__prepare_datasets(X, y, X_val, y_val)
+        X_train, X_valid, cont_cols, embed_cols, val_split = self.__prepare_datasets_before_fit(X, y, X_val, y_val)
 
         nn_metric = self.__get_nn_metric(self.stopping_metric, self.num_classes)
         monitor_metric = self.__get_monitor_metric(nn_metric)
@@ -147,43 +147,26 @@ class WideDeepNNModel(AbstractModel):
             batch_size *= 2
         return batch_size
 
-    def __prepare_datasets(self, X, y, X_val, y_val):
+    def __prepare_datasets_before_fit(self, X, y, X_val, y_val):
         from pytorch_widedeep.preprocessing import TabPreprocessor
 
         # prepare wide, crossed, embedding and continuous columns
         cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
+        cat_cols = CategoricalFeaturesFilter.filter(X, cat_cols, self.params.get('max_unique_categorical_values', 10000))
 
         X = self.preprocess(X)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        # TODO: refactor common things between widedeep and fastai models
-        # TODO: add high-cardinality categorical variables trimming
-        self.y_scaler = self.params.get('y_scaler', None)
-        if self.y_scaler is None:
-            if self.problem_type == REGRESSION:
-                self.y_scaler = sklearn.preprocessing.StandardScaler()
-            elif self.problem_type == QUANTILE:
-                self.y_scaler = sklearn.preprocessing.MinMaxScaler()
-        else:
-            self.y_scaler = copy.deepcopy(self.y_scaler)
-
-        nullable_numeric_features = self._feature_metadata.get_features(valid_raw_types=[R_FLOAT, R_DATETIME], invalid_special_types=[S_TEXT_SPECIAL])
-        self.columns_fills = dict()
-        for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
-            self.columns_fills[c] = X[c].mean()
-        X = self._fill_missing(X, self.columns_fills)
+        self.missing_filler = MissingFiller(self._feature_metadata)
+        X = self.missing_filler.fit_transform(X)
         if X_val is not None:
-            X_val = self._fill_missing(X_val, self.columns_fills)
+            X_val = self.missing_filler.transform(X_val)
 
-        if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
-            y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
-            y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
-            logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
-        else:
-            y_norm = y
-            y_val_norm = y_val
+        self.y_scaler = TargetScaler(self.problem_type, self.params.get('y_scaler', None))
+        y_norm, y_val_norm = self.y_scaler.fit_transform(y, y_val)
 
         embed_cols, for_transformer = self.__get_embedding_columns_metadata(X, cat_cols)
         self._tab_preprocessor = TabPreprocessor(
@@ -232,14 +215,13 @@ class WideDeepNNModel(AbstractModel):
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
-        X = self._fill_missing(X, self.columns_fills)
+        X = self.missing_filler.transform(X)
         X_tab = self._tab_preprocessor.transform(X)
         if self.problem_type != REGRESSION:
             preds = self.model.predict_proba(X_tab=X_tab)
         else:
             preds = self.model.predict(X_tab=X_tab)
-            if self.y_scaler is not None:
-                preds = self.y_scaler.inverse_transform(preds.reshape(-1,1)).reshape(-1)
+            preds = self.y_scaler.inverse_transform(preds)
 
         if self.problem_type == BINARY:
             return preds[:, 1]
@@ -324,7 +306,7 @@ class WideDeepNNModel(AbstractModel):
         }.get(problem_type, 1)
 
     def __get_metrics_map(self, num_classes):
-        from pytorch_widedeep.metrics import Accuracy, R2Score
+        from pytorch_widedeep.metrics import Accuracy, R2Score, F1Score
         import torchmetrics as tm
         num_classes = 2 if num_classes is None else num_classes
         metrics_map = {
@@ -338,7 +320,7 @@ class WideDeepNNModel(AbstractModel):
             # Classification
             'accuracy': Accuracy,
 
-            'f1': F1Score(num_classes=num_classes),
+            'f1': F1Score,
             'f1_macro': tm.F1Score(average='macro', num_classes=num_classes),
             'f1_micro': tm.F1Score(average='micro', num_classes=num_classes),
             'f1_weighted': tm.F1Score(average='weighted', num_classes=num_classes),
