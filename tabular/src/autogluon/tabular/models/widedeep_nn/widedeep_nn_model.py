@@ -13,7 +13,7 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.try_import import try_import_pytorch_widedeep
-from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
+from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .metrics import get_nn_metric, get_objective, get_monitor_metric
@@ -51,6 +51,7 @@ class WideDeepNNModel(AbstractModel):
         import pytorch_widedeep.training.trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
+        import pytorch_widedeep
 
         # Deterministic training
         set_seed(0, True)
@@ -123,15 +124,21 @@ class WideDeepNNModel(AbstractModel):
 
             system_params = {}
             if num_cpus is not None:
-                system_params['num_workers'] = 0 if sys.platform == "darwin" and sys.version_info.minor > 7 else num_cpus
+                # Specifying number of CPUs will cause `unclosed socket <zmq.Socket(zmq.PUSH)` - forcing all workers to be local
+                system_params['num_workers'] = 0
             if num_gpus is not None:
                 # TODO: Control CPU vs GPU usage during inference
                 if num_gpus == 0:
                     system_params['device'] = 'cpu'
+                    # Temp workaround: https://github.com/jrzaurin/pytorch-widedeep/issues/89
+                    pytorch_widedeep.models.wide_deep.use_cuda = False
+                    pytorch_widedeep.models.wide_deep.device = 'cpu'
                 else:
                     # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
                     system_params['device'] = 'cuda'
-            print(system_params)
+                    # Temp workaround: https://github.com/jrzaurin/pytorch-widedeep/issues/89
+                    pytorch_widedeep.models.wide_deep.use_cuda = True
+                    pytorch_widedeep.models.wide_deep.device = 'cuda'
 
             trainer = Trainer(
                 model,
