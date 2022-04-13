@@ -1,10 +1,8 @@
 import logging
 import time
-from inspect import isclass
 from typing import Union
 
 import numpy as np
-import pandas as pd
 import torch
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
@@ -17,6 +15,7 @@ from autogluon.core.utils.try_import import try_import_pytorch_widedeep
 from common.src.autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
+from .metrics import get_nn_metric, get_objective, get_monitor_metric
 from .preprocessing_utils import MissingFiller, TargetScaler, CategoricalFeaturesFilter
 from .utils import set_seed
 
@@ -57,9 +56,9 @@ class WideDeepNNModel(AbstractModel):
 
         X_train, X_valid, cont_cols, embed_cols, val_split = self.__prepare_datasets_before_fit(X, y, X_val, y_val)
 
-        nn_metric = self.__get_nn_metric(self.stopping_metric, self.num_classes)
-        monitor_metric = self.__get_monitor_metric(nn_metric)
-        objective = self.__get_objective(self.problem_type, self.stopping_metric)
+        nn_metric = get_nn_metric(self.problem_type, self.stopping_metric, self.num_classes)
+        monitor_metric = get_monitor_metric(nn_metric)
+        objective = get_objective(self.problem_type, self.stopping_metric)
         pred_dim = self.__get_output_dim(self.problem_type, self.num_classes)
 
         model = self._construct_wide_deep_model(
@@ -186,19 +185,6 @@ class WideDeepNNModel(AbstractModel):
 
         return X_train, X_valid, cont_cols, embed_cols, val_split
 
-    def __get_monitor_metric(self, nn_metric):
-        if nn_metric is None:
-            return 'val_loss'
-        monitor_metric = nn_metric
-        if isclass(monitor_metric):
-            metric = monitor_metric()
-            if hasattr(metric, '_name'):
-                return f'val_{metric._name}'
-        elif not isclass(monitor_metric):
-            monitor_metric = monitor_metric.__class__
-        monitor_metric = f'val_{monitor_metric.__name__}'
-        return monitor_metric
-
     def __get_embedding_columns_metadata(self, X, cat_cols):
         for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever', 'tab_fastformer']
         if for_transformer:
@@ -283,20 +269,6 @@ class WideDeepNNModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
-    def __get_objective(self, problem_type, stopping_metric):
-        if problem_type == BINARY:
-            return 'binary'
-        elif problem_type == MULTICLASS:
-            return 'multiclass'
-        elif problem_type == REGRESSION:
-            # See supported objectives: https://pytorch-widedeep.readthedocs.io/en/latest/trainer.html#pytorch_widedeep.training.Trainer
-            return {
-                'root_mean_squared_error': 'root_mean_squared_error',
-                'mean_squared_error': 'regression',
-                'mean_absolute_error': 'mean_absolute_error',
-            }.get(stopping_metric, 'regression')
-        else:
-            raise ValueError(f'Unsupported problem type {problem_type}')
 
     def __get_output_dim(self, problem_type, num_classes):
         return {
@@ -304,67 +276,6 @@ class WideDeepNNModel(AbstractModel):
             MULTICLASS: num_classes,
             REGRESSION: 1,
         }.get(problem_type, 1)
-
-    def __get_metrics_map(self, num_classes):
-        from pytorch_widedeep.metrics import Accuracy, R2Score, F1Score
-        import torchmetrics as tm
-        num_classes = 2 if num_classes is None else num_classes
-        metrics_map = {
-            # Regression
-            'root_mean_squared_error': tm.MeanSquaredError(squared=False),
-            'mean_squared_error': tm.MeanSquaredError(),
-            'mean_absolute_error': tm.MeanAbsoluteError(),
-            'r2': R2Score,
-            # Not supported: 'median_absolute_error': None,
-
-            # Classification
-            'accuracy': Accuracy,
-
-            'f1': F1Score,
-            'f1_macro': tm.F1Score(average='macro', num_classes=num_classes),
-            'f1_micro': tm.F1Score(average='micro', num_classes=num_classes),
-            'f1_weighted': tm.F1Score(average='weighted', num_classes=num_classes),
-
-            'roc_auc': tm.AUROC(num_classes=num_classes),
-
-            'precision': tm.Precision(num_classes=num_classes),
-            'precision_macro': tm.Precision(average='macro', num_classes=num_classes),
-            'precision_micro': tm.Precision(average='micro', num_classes=num_classes),
-            'precision_weighted': tm.Precision(average='weighted', num_classes=num_classes),
-
-            'recall': tm.Recall(num_classes=num_classes),
-            'recall_macro': tm.Recall(average='macro', num_classes=num_classes),
-            'recall_micro': tm.Recall(average='micro', num_classes=num_classes),
-            'recall_weighted': tm.Recall(average='weighted', num_classes=num_classes),
-            'log_loss': None,
-
-            # Not supported: 'pinball_loss': None
-            # Not supported: pac_score
-        }
-        return metrics_map
-
-    def __get_nn_metric(self, stopping_metric, num_classes):
-        metrics_map = self.__get_metrics_map(num_classes)
-
-        # Unsupported metrics will be replaced by defaults for a given problem type
-        objective_func_name = stopping_metric.name
-        if objective_func_name not in metrics_map.keys():
-            if self.problem_type == REGRESSION:
-                objective_func_name = 'mean_squared_error'
-            else:
-                objective_func_name = 'log_loss'
-            logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
-
-        nn_metric = metrics_map.get(objective_func_name, None)
-
-        return nn_metric
-
-    def _fill_missing(self, df: pd.DataFrame, columns_fills) -> pd.DataFrame:
-        if columns_fills:
-            df = df.fillna(columns_fills, inplace=False, downcast=False)
-        else:
-            df = df.copy()
-        return df
 
     def _more_tags(self):
         return {'can_refit_full': True}
