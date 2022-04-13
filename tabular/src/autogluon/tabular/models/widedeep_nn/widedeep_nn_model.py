@@ -59,9 +59,9 @@ class WideDeepNNModel(AbstractModel):
         nn_metric = get_nn_metric(self.problem_type, self.stopping_metric, self.num_classes)
         monitor_metric = get_monitor_metric(nn_metric)
         objective = get_objective(self.problem_type, self.stopping_metric)
-        pred_dim = self.__get_output_dim(self.problem_type, self.num_classes)
+        pred_dim = self.num_classes if self.problem_type == MULTICLASS else 1
 
-        model = self._construct_wide_deep_model(
+        model = self.__construct_wide_deep_model(
             model_type=self.params['type'],
             column_idx=self._tab_preprocessor.column_idx,
             embed_input=None if embed_cols is None else self._tab_preprocessor.cat_embed_input,
@@ -139,6 +139,21 @@ class WideDeepNNModel(AbstractModel):
         self.params_trained['epochs'] = params['epochs']
         self.params_trained['best_epoch'] = best_epoch
 
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
+        X = self.missing_filler.transform(X)
+        X_tab = self._tab_preprocessor.transform(X)
+        if self.problem_type != REGRESSION:
+            preds = self.model.predict_proba(X_tab=X_tab)
+        else:
+            preds = self.model.predict(X_tab=X_tab)
+            preds = self.y_scaler.inverse_transform(preds)
+
+        if self.problem_type == BINARY:
+            return preds[:, 1]
+        else:
+            return preds
+
     def __get_batch_size(self, params):
         batch_size = params['bs']
         # SAINT need larger batches because it is using information between rows
@@ -199,31 +214,8 @@ class WideDeepNNModel(AbstractModel):
             for_transformer = False
         return embed_cols, for_transformer
 
-    def _predict_proba(self, X, **kwargs):
-        X = self.preprocess(X, **kwargs)
-        X = self.missing_filler.transform(X)
-        X_tab = self._tab_preprocessor.transform(X)
-        if self.problem_type != REGRESSION:
-            preds = self.model.predict_proba(X_tab=X_tab)
-        else:
-            preds = self.model.predict(X_tab=X_tab)
-            preds = self.y_scaler.inverse_transform(preds)
-
-        if self.problem_type == BINARY:
-            return preds[:, 1]
-        else:
-            return preds
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
     @staticmethod
-    def _construct_wide_deep_model(model_type, column_idx, embed_input, continuous_cols, pred_dim, **model_args):
+    def __construct_wide_deep_model(model_type, column_idx, embed_input, continuous_cols, pred_dim, **model_args):
         from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer, FTTransformer, TabPerceiver, ContextAttentionMLP, SelfAttentionMLP, TabNet, TabFastFormer
 
         model_cls = dict(
@@ -268,14 +260,6 @@ class WideDeepNNModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
-
-
-    def __get_output_dim(self, problem_type, num_classes):
-        return {
-            BINARY: 1,
-            MULTICLASS: num_classes,
-            REGRESSION: 1,
-        }.get(problem_type, 1)
 
     def _more_tags(self):
         return {'can_refit_full': True}
