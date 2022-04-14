@@ -136,7 +136,10 @@ class FitHelper:
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
-        predictor.predict_proba(test_data)
+        pred_proba = predictor.predict_proba(test_data)
+        predictor.evaluate(test_data)
+        predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+
         model_names = predictor.get_model_names()
         model_name = model_names[0]
         assert len(model_names) == 2

@@ -184,7 +184,7 @@ class TextPredictorModel(AbstractModel):
         memory_size
             The total memory size in bytes.
         """
-        total_size = sum(param.numel() for param in self.model._model.parameters())
+        total_size = sum(param.numel() for param in self.model._predictor._model.parameters())
 
         return total_size
 

@@ -37,14 +37,17 @@ class CLIPForImageText(nn.Module):
         num_classes
             The number of classes. 1 for a regression task.
         """
-        logger.debug(f"initializing {prefix}")
         super().__init__()
+        logger.debug(f"initializing {checkpoint_name}")
+        self.checkpoint_name = checkpoint_name
+        self.num_classes = num_classes
         self.model = CLIPModel.from_pretrained(checkpoint_name)
         self.out_features = self.model.config.projection_dim
 
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
         self.head.apply(init_weights)
 
+        self.prefix = prefix
         self.text_token_ids_key = f"{prefix}_{TEXT_TOKEN_IDS}"
         self.text_valid_length_key = f"{prefix}_{TEXT_VALID_LENGTH}"
         self.image_key = f"{prefix}_{IMAGE}"
@@ -97,8 +100,10 @@ class CLIPForImageText(nn.Module):
         logits = self.head(features)
 
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):

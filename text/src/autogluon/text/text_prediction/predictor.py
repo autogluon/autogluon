@@ -358,7 +358,7 @@ class TextPredictor:
             as_pandas=as_pandas,
         )
 
-    def save(self, path):
+    def save(self, path, standalone=False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -372,11 +372,16 @@ class TextPredictor:
 
         Parameters
         ----------
-        path, str
+        path: str
             The path to directory in which to save this Predictor.
+        standalone: bool, default = False
+            Whether to save the downloaded model for offline deployment. 
+            If `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
+            Also, see `AutoMMPredictor.save()` for more detials. 
+            Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
-        self._predictor.save(path=path)
+        self._predictor.save(path=path,standalone=standalone)
 
     @classmethod
     def load(
@@ -404,17 +409,23 @@ class TextPredictor:
 
         """
         if backend == PYTORCH:
-            predictor = AutoMMPredictor.load(
+            _predictor = AutoMMPredictor.load(
                 path=path,
                 resume=resume,
             )
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
-            predictor = MXTextPredictor.load(
+            _predictor = MXTextPredictor.load(
                 path=path,
                 verbosity=verbosity,
             )
         else:
             raise ValueError(f"Unknown backend: {backend}")
+
+        predictor = cls(
+            label=_predictor.label,
+        )
+        predictor._backend = backend
+        predictor._predictor = _predictor
 
         return predictor

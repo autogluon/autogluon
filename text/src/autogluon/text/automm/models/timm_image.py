@@ -49,6 +49,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
         super().__init__()
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
         logger.debug(f"initializing {checkpoint_name}")
+        self.checkpoint_name = checkpoint_name
+        self.num_classes = num_classes
         self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=0)
         self.out_features = self.model.num_features
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
@@ -57,6 +59,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self.mix_choice = mix_choice
         logger.debug(f"mix_choice: {mix_choice}")
 
+        self.prefix = prefix
         self.image_key = f"{prefix}_{IMAGE}"
         self.image_valid_num_key = f"{prefix}_{IMAGE_VALID_NUM}"
         self.label_key = f"{prefix}_{LABEL}"
@@ -101,8 +104,10 @@ class TimmAutoModelForImagePrediction(nn.Module):
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
 
         return {
-            LOGITS: logits,
-            FEATURES: features,
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         }
 
     def get_layer_ids(self,):
