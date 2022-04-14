@@ -386,6 +386,7 @@ def apply_layerwise_lr_decay(
                 param.requires_grad = False
         elif efficient_finetune_strategy == 'norm_fit':
             print('name=', name)
+            print(decay_param_names)
             if param in decay_param_names:
                 print('Name={} is ignored'.format(name))
                 param.requires_grad = False
