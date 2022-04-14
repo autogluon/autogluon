@@ -28,8 +28,8 @@ from autogluon.common.utils.utils import setup_outputdir
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
-    AUTOMM_TUTORIAL_MODE, UNION_SOUP, GREEDY_SOUP,
-    BEST_SOUP, MIN, MAX, TEXT,
+    AUTOMM_TUTORIAL_MODE, UNIFORM_SOUP, GREEDY_SOUP,
+    BEST, MIN, MAX, TEXT,
 )
 
 from .data.datamodule import BaseDataModule
@@ -592,8 +592,10 @@ class AutoMMPredictor:
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
-            if config.optimization.top_k_average_method == UNION_SOUP:
-                logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the UnionSoup algorithm.')
+            if config.optimization.top_k_average_method == UNIFORM_SOUP:
+                logger.info(
+                    f"Start to fuse {config.optimization.top_k} checkpoints via the uniform soup algorithm."
+                )
                 ingredients = all_state_dicts
             else:
                 if not best_k_models_path:
@@ -616,7 +618,9 @@ class AutoMMPredictor:
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
                     monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
 
-                    logger.info(f'Start to fuse {config.optimization.top_k} checkpoints via the GreedySoup algorithm.')
+                    logger.info(
+                        f"Start to fuse {config.optimization.top_k} checkpoints via the greedy soup algorithm."
+                    )
                     avg_state_dict = all_state_dicts[0]
                     ingredients = [all_state_dicts[0]]
                     self._model = self._load_state_dict(
@@ -637,12 +641,14 @@ class AutoMMPredictor:
                             # Add new ingredient
                             ingredients.append(all_state_dicts[i])
                             best_performance = cand_performance
-                elif config.optimization.top_k_average_method == BEST_SOUP:
+                elif config.optimization.top_k_average_method == BEST:
                     ingredients = [all_state_dicts[0]]
                 else:
-                    raise ValueError(f'The key for "optimization.top_k_average_method" is not supported. '
-                                     f'We only support "{GREEDY_SOUP}", "{UNION_SOUP}" and "{BEST_SOUP}". '
-                                     f'The provided value is {config.optimization.top_k_average_method}.')
+                    raise ValueError(
+                        f"The key for 'optimization.top_k_average_method' is not supported. "
+                        f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
+                        f"The provided value is '{config.optimization.top_k_average_method}'."
+                    )
             # Average all the ingredients
             avg_state_dict = average_checkpoints(
                 all_state_dicts=ingredients,
@@ -667,10 +673,12 @@ class AutoMMPredictor:
 
         data = self._data_to_df(data)
 
-        data_processors = self._data_processors.copy()
         # For prediction data with no labels provided.
         if not requires_label:
+            data_processors = copy.deepcopy(self._data_processors)
             data_processors.pop(LABEL, None)
+        else:
+            data_processors = self._data_processors
 
         num_gpus = (
             self._config.env.num_gpus
