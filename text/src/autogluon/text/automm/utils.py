@@ -105,6 +105,8 @@ def get_config(
     ----------
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
+        If any key is not not given, we will fill in with the default value.
+
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
                         "model": "fusion_mlp_image_text_tabular",
@@ -152,6 +154,12 @@ def get_config(
         config = get_preset(list_model_presets()[0])
     if not isinstance(config, DictConfig):
         all_configs = []
+        for k, default_value in [('model', 'fusion_mlp_image_text_tabular'),
+                                 ('data', 'default'),
+                                 ('optimization', 'adamw'),
+                                 ('environment', 'default')]:
+            if k not in config:
+                config[k] = default_value
         for k, v in config.items():
             if isinstance(v, dict):
                 per_config = OmegaConf.create(v)

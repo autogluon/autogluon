@@ -211,7 +211,10 @@ def get_weight_decay_param_names(model: nn.Module):
     -------
     A list of parameter names not using weight decay.
     """
-    decay_param_names = get_parameter_names(model, [nn.LayerNorm])
+    # By default, we should not apply weight decay for all the norm layers
+    decay_param_names = get_parameter_names(model,
+                                            [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
+                                             nn.GroupNorm])
     decay_param_names = [name for name in decay_param_names if "bias" not in name]
     return decay_param_names
 
@@ -346,6 +349,7 @@ def apply_layerwise_lr_decay(
         lr: float,
         lr_decay: float,
         weight_decay: float,
+        efficient_finetune_strategy: Optional[str] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -365,6 +369,8 @@ def apply_layerwise_lr_decay(
         The learning rate decay factor (0, 1).
     weight_decay
         Weight decay.
+    efficient_finetune_strategy
+        Efficient finetuning strategy. Can be "bit_fit", "norm_fit". It will only finetune part of the parameters
 
     Returns
     -------
@@ -375,6 +381,13 @@ def apply_layerwise_lr_decay(
     decay_param_names = get_weight_decay_param_names(model)
 
     for name, param in model.named_parameters():
+        if efficient_finetune_strategy == 'bit_fit':
+            if param in decay_param_names or 'bias' not in name:
+                param.requires_grad = False
+        elif efficient_finetune_strategy == 'norm_fit':
+            if param in decay_param_names:
+                param.requires_grad = False
+
         if not param.requires_grad:
             continue  # frozen weights
 
