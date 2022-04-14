@@ -255,6 +255,7 @@ class LitModule(pl.LightningModule):
                 lr=self.hparams.lr,
                 lr_decay=self.hparams.lr_decay,
                 weight_decay=self.hparams.weight_decay,
+                efficient_finetune_strategy=self.hparams.efficient_finetune_strategy
             )
         else:
             logger.debug("applying single learning rate...")
