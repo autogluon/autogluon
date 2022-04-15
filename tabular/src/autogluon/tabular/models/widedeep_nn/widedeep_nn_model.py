@@ -1,11 +1,11 @@
 import logging
-import sys
 import time
 from typing import Union
 
 import numpy as np
 import torch
 
+from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core import metrics
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
@@ -13,7 +13,6 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.try_import import try_import_pytorch_widedeep
-from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .metrics import get_nn_metric, get_objective, get_monitor_metric
@@ -117,10 +116,11 @@ class WideDeepNNModel(AbstractModel):
                 best_epoch_stop=best_epoch_stop
             )
 
-            system_params = {}
-            if num_cpus is not None:
-                # Specifying number of CPUs will cause `unclosed socket <zmq.Socket(zmq.PUSH)` - forcing all workers to be local
-                system_params['num_workers'] = 0
+            # Specifying number of CPUs causing crashes - forcing all workers to be local
+            # `unclosed socket <zmq.Socket(zmq.PUSH)`
+            # jupyter kernel crashes, but works in ipython
+            system_params = {'num_workers': 0}
+
             if num_gpus is not None:
                 # TODO: Control CPU vs GPU usage during inference
                 if num_gpus == 0:
