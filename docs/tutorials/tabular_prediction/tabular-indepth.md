@@ -319,7 +319,7 @@ predictor_infer_limit.persist_models()
 # Below is an optimized version that only persists the minimum required models for prediction.
 # predictor_infer_limit.persist_models('best')
 
-predictor.leaderboard(silent=True)
+predictor_infer_limit.leaderboard(silent=True)
 ```
 
 Now we can test the inference speed of the final model and check if it satisfies the inference constraints.
