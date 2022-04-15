@@ -219,6 +219,26 @@ def get_weight_decay_param_names(model: nn.Module):
     return decay_param_names
 
 
+def get_norm_layer_param_names(model: nn.Module):
+    """Get parameters associated with the normalization layers
+
+    Parameters
+    ----------
+    model
+        A Pytorch model
+
+    Returns
+    -------
+    norm_param_names
+        A list of names that
+    """
+    all_param_names = get_parameter_names(model, [])
+    all_param_names_except_norm_names = get_parameter_names(
+        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm])
+    norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
+    return norm_param_names
+
+
 def apply_single_lr(
         model: nn.Module,
         lr: float,
@@ -379,13 +399,15 @@ def apply_layerwise_lr_decay(
     parameter_group_names = {}
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
-
+    norm_param_names = get_norm_layer_param_names(model)
     for name, param in model.named_parameters():
         if efficient_finetune_strategy == 'bit_fit':
-            if name in decay_param_names or 'bias' not in name:
+            # For bit_fit, we disable tuning everything except the bias terms
+            if 'bias' not in name:
                 param.requires_grad = False
         elif efficient_finetune_strategy == 'norm_fit':
-            if name in decay_param_names:
+            # For norm-fit, we finetune all the normalization layers and bias layers
+            if name not in norm_param_names and 'bias' not in name:
                 param.requires_grad = False
 
         if not param.requires_grad:

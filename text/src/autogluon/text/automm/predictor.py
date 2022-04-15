@@ -468,7 +468,7 @@ class AutoMMPredictor:
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
-            efficient_finetune_strategy=config.optimization.efficient_finetune_strategy,
+            efficient_finetune_strategy=OmegaConf.select(config, 'optimization.efficient_finetune_strategy'),
         )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
@@ -1087,7 +1087,7 @@ class AutoMMPredictor:
                     text_processors=data_processors[TEXT],
                     path=path,
                 )
-        except:  # backward compatibility
+        except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             data_processors = init_data_processors(
                 config=config,
                 num_categorical_columns=len(df_preprocessor.categorical_num_categories)
