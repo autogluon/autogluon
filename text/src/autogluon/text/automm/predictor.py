@@ -468,7 +468,7 @@ class AutoMMPredictor:
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
-            efficient_finetune_strategy=OmegaConf.select(config, 'optimization.efficient_finetune_strategy'),
+            efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
         )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")

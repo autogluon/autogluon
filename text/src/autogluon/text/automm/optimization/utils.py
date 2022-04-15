@@ -369,7 +369,7 @@ def apply_layerwise_lr_decay(
         lr: float,
         lr_decay: float,
         weight_decay: float,
-        efficient_finetune_strategy: Optional[str] = None,
+        efficient_finetune: Optional[str] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -389,7 +389,7 @@ def apply_layerwise_lr_decay(
         The learning rate decay factor (0, 1).
     weight_decay
         Weight decay.
-    efficient_finetune_strategy
+    efficient_finetune
         Efficient finetuning strategy. Can be "bit_fit", "norm_fit". It will only finetune part of the parameters
 
     Returns
@@ -401,11 +401,11 @@ def apply_layerwise_lr_decay(
     decay_param_names = get_weight_decay_param_names(model)
     norm_param_names = get_norm_layer_param_names(model)
     for name, param in model.named_parameters():
-        if efficient_finetune_strategy == 'bit_fit':
+        if efficient_finetune == 'bit_fit':
             # For bit_fit, we disable tuning everything except the bias terms
             if 'bias' not in name:
                 param.requires_grad = False
-        elif efficient_finetune_strategy == 'norm_fit':
+        elif efficient_finetune == 'norm_fit':
             # For norm-fit, we finetune all the normalization layers and bias layers
             if name not in norm_param_names and 'bias' not in name:
                 param.requires_grad = False

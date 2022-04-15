@@ -15,4 +15,4 @@ optimization:
   top_k: 3
   top_k_average_method: 'greedy_soup'  # We support averaging method described in https://arxiv.org/pdf/2203.05482.pdf.
                                        # Currently support "union_soup", "greedy_soup", "best_soup".
-  efficient_finetune_strategy: null  # Can be 'bit_fit' (only finetune bias), 'norm_fit' (finetune the normalization terms + bias terms), or null
+  efficient_finetune: null  # Can be 'bit_fit' (only finetune bias), 'norm_fit' (finetune the normalization terms + bias terms), or null

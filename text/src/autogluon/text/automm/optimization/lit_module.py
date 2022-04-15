@@ -43,7 +43,7 @@ class LitModule(pl.LightningModule):
             validation_metric_name: Optional[str] = None,
             custom_metric_func: Callable = None,
             test_metric: Optional[torchmetrics.Metric] = None,
-            efficient_finetune_strategy: Optional[str] = None,
+            efficient_finetune: Optional[str] = None,
     ):
         """
         Parameters
@@ -97,7 +97,7 @@ class LitModule(pl.LightningModule):
             Refer to https://github.com/PyTorchLightning/metrics/blob/master/torchmetrics/aggregation.py
         test_metric
             A torchmetrics module used in the test stage, e.g., torchmetrics.Accuracy().
-        efficient_finetune_strategy
+        efficient_finetune
             Whether to use efficient finetuning strategies. This will be helpful for fast finetuning of large backbones.
             We support options such as:
 
@@ -255,7 +255,7 @@ class LitModule(pl.LightningModule):
                 lr=self.hparams.lr,
                 lr_decay=self.hparams.lr_decay,
                 weight_decay=self.hparams.weight_decay,
-                efficient_finetune_strategy=self.hparams.efficient_finetune_strategy
+                efficient_finetune=self.hparams.efficient_finetune
             )
         else:
             logger.debug("applying single learning rate...")
