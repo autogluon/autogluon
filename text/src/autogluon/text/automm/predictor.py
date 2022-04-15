@@ -17,6 +17,7 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
+from pytorch_lightning.strategies import DDPStrategy, DDPSpawnStrategy, DDPShardedStrategy, DDPSpawnShardedStrategy
 from packaging import version
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
@@ -535,6 +536,16 @@ class AutoMMPredictor:
             strategy = None
         else:
             strategy = config.env.strategy
+
+        # Default to disable find unusded parameters
+        if strategy == 'ddp':
+            strategy = DDPStrategy(find_unused_parameters=False)
+        elif strategy == 'ddp_spawn':
+            strategy = DDPSpawnStrategy(find_unused_parameters=False)
+        elif strategy == 'ddp_sharded':
+            strategy = DDPShardedStrategy(find_unused_parameters=False)
+        elif strategy == 'ddp_sharded_spawn':
+            strategy = DDPSpawnShardedStrategy(find_unused_parameters=False)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
