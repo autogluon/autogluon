@@ -71,10 +71,10 @@ AUTOMM_TUTORIAL_MODE = "AUTOMM_TUTORIAL_MODE"
 # error try
 GET_ITEM_ERROR_RETRY = 50
 
-# mini-ensemble methods
-UNION_SOUP = 'union_soup'
-GREEDY_SOUP = 'greedy_soup'
-BEST_SOUP = 'best_soup'
+# top-k checkpoint average methods
+UNIFORM_SOUP = "uniform_soup"
+GREEDY_SOUP = "greedy_soup"
+BEST = "best"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"

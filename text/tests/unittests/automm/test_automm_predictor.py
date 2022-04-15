@@ -1,5 +1,5 @@
 import os
-import json
+from omegaconf import OmegaConf
 import pytest
 import numpy.testing as npt
 import tempfile
@@ -13,9 +13,9 @@ from autogluon.text.automm.constants import (
     ENVIRONMENT,
     BINARY,
     MULTICLASS,
-    UNION_SOUP,
+    UNIFORM_SOUP,
     GREEDY_SOUP,
-    BEST_SOUP,
+    BEST,
 )
 from datasets import (
     PetFinderDataset,
@@ -69,7 +69,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
-            UNION_SOUP
+            UNIFORM_SOUP
         ),
 
         (
@@ -85,7 +85,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             None,
-            UNION_SOUP
+            UNIFORM_SOUP
         ),
 
         (
@@ -93,7 +93,7 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
-            BEST_SOUP
+            BEST
         ),
 
         (
@@ -101,7 +101,7 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
-            UNION_SOUP
+            UNIFORM_SOUP
         ),
 
         (
@@ -109,7 +109,7 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
-            BEST_SOUP
+            BEST
         ),
 
         (
@@ -117,7 +117,7 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
-            BEST_SOUP
+            BEST
         ),
 
     ]
@@ -281,6 +281,12 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         },
 
         {
+            "model.names": "[timm_image_0, timm_image_1, fusion_mlp]",
+            "model.timm_image_0.checkpoint_name": "swin_tiny_patch4_window7_224",
+            "model.timm_image_1.checkpoint_name": "swin_small_patch4_window7_224",
+        },
+
+        {
             "model.names": ["hf_text_abc", "hf_text_def", "hf_text_xyz", "fusion_mlp_123"],
             "model.hf_text_def.checkpoint_name": "monsoon-nlp/hindi-bert",
             "model.hf_text_xyz.checkpoint_name": "prajjwal1/bert-tiny",
@@ -318,6 +324,10 @@ def test_customizing_model_names(
             "env.num_workers_evaluation": 0,
         }
     )
+    hyperparameters_gt = copy.deepcopy(hyperparameters)
+    if isinstance(hyperparameters_gt["model.names"], str):
+        hyperparameters_gt["model.names"] = OmegaConf.from_dotlist([f'names={hyperparameters["model.names"]}']).names
+
     save_path = os.path.join(get_home_dir(), "outputs", "petfinder")
     predictor.fit(
         train_data=dataset.train_df,
@@ -326,8 +336,9 @@ def test_customizing_model_names(
         time_limit=10,
         save_path=save_path,
     )
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
-    for per_name in hyperparameters["model.names"]:
+
+    assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+    for per_name in hyperparameters_gt["model.names"]:
         assert hasattr(predictor._config.model, per_name)
 
     score = predictor.evaluate(dataset.test_df)
@@ -340,8 +351,8 @@ def test_customizing_model_names(
         hyperparameters=hyperparameters,
         time_limit=10,
     )
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
-    for per_name in hyperparameters["model.names"]:
+    assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+    for per_name in hyperparameters_gt["model.names"]:
         assert hasattr(predictor._config.model, per_name)
     verify_predictor_save_load(predictor, dataset.test_df)
 
@@ -355,6 +366,6 @@ def test_customizing_model_names(
             hyperparameters=hyperparameters,
             time_limit=10,
         )
-        assert sorted(predictor._config.model.names) == sorted(hyperparameters["model.names"])
-        for per_name in hyperparameters["model.names"]:
+        assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+        for per_name in hyperparameters_gt["model.names"]:
             assert hasattr(predictor._config.model, per_name)
