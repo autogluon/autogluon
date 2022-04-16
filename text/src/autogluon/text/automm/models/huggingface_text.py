@@ -61,10 +61,6 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.head.apply(init_weights)
 
         self.prefix = prefix
-        self.text_token_ids_key = f"{prefix}_{TEXT_TOKEN_IDS}"
-        self.text_segment_ids_key = f"{prefix}_{TEXT_SEGMENT_IDS}"
-        self.text_valid_length_key = f"{prefix}_{TEXT_VALID_LENGTH}"
-        self.label_key = f"{prefix}_{LABEL}"
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
@@ -74,6 +70,22 @@ class HFAutoModelForTextPrediction(nn.Module):
             self.disable_seg_ids = True
         else:
             self.disable_seg_ids = False
+
+    @property
+    def text_token_ids_key(self):
+        return f"{self.prefix}_{TEXT_TOKEN_IDS}"
+
+    @property
+    def text_segment_ids_key(self):
+        return f"{self.prefix}_{TEXT_SEGMENT_IDS}"
+
+    @property
+    def text_valid_length_key(self):
+        return f"{self.prefix}_{TEXT_VALID_LENGTH}"
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
             self,

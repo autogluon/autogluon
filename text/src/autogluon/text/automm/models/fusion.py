@@ -116,10 +116,13 @@ class MultimodalFusionMLP(nn.Module):
         self.head.apply(init_weights)
 
         self.prefix = prefix
-        self.label_key = f"{prefix}_{LABEL}"
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
             self,
