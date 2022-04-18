@@ -60,12 +60,21 @@ class TimmAutoModelForImagePrediction(nn.Module):
         logger.debug(f"mix_choice: {mix_choice}")
 
         self.prefix = prefix
-        self.image_key = f"{prefix}_{IMAGE}"
-        self.image_valid_num_key = f"{prefix}_{IMAGE_VALID_NUM}"
-        self.label_key = f"{prefix}_{LABEL}"
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+
+    @property
+    def image_key(self):
+        return f"{self.prefix}_{IMAGE}"
+
+    @property
+    def image_valid_num_key(self):
+        return f"{self.prefix}_{IMAGE_VALID_NUM}"
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
             self,
