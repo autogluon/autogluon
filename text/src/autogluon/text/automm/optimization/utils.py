@@ -220,7 +220,8 @@ def get_weight_decay_param_names(model: nn.Module):
 
 
 def get_norm_layer_param_names(model: nn.Module):
-    """Get parameters associated with the normalization layers
+    """
+    Get parameters associated with the normalization layers
 
     Parameters
     ----------
@@ -230,9 +231,9 @@ def get_norm_layer_param_names(model: nn.Module):
     Returns
     -------
     norm_param_names
-        A list of names that
+        A list of names of the parameters that are either part of normalization layer or bias terms.
     """
-    all_param_names = get_parameter_names(model, [])
+    all_param_names = [name for name, _ in model.named_parameters()]
     all_param_names_except_norm_names = get_parameter_names(
         model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm])
     norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
