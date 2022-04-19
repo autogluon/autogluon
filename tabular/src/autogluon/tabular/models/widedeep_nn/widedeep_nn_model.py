@@ -116,24 +116,16 @@ class WideDeepNNModel(AbstractModel):
                 best_epoch_stop=best_epoch_stop
             )
 
-            # Specifying number of CPUs causing crashes - forcing all workers to be local
-            # `unclosed socket <zmq.Socket(zmq.PUSH)`
-            # jupyter kernel crashes, but works in ipython
-            system_params = {'num_workers': 0}
+            if num_cpus is not None:
+                system_params = {'num_workers': num_cpus}
 
             if num_gpus is not None:
                 # TODO: Control CPU vs GPU usage during inference
                 if num_gpus == 0:
                     system_params['device'] = 'cpu'
-                    # Temp workaround: https://github.com/jrzaurin/pytorch-widedeep/issues/89
-                    pytorch_widedeep.models.wide_deep.use_cuda = False
-                    pytorch_widedeep.models.wide_deep.device = 'cpu'
                 else:
                     # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
                     system_params['device'] = 'cuda'
-                    # Temp workaround: https://github.com/jrzaurin/pytorch-widedeep/issues/89
-                    pytorch_widedeep.models.wide_deep.use_cuda = True
-                    pytorch_widedeep.models.wide_deep.device = 'cuda'
 
             trainer = Trainer(
                 model,
@@ -286,3 +278,12 @@ class WideDeepNNModel(AbstractModel):
 
     def _more_tags(self):
         return {'can_refit_full': True}
+
+    def _get_default_resources(self):
+        # Optimal is likely 1, but specifying number of CPUs > 0 is causing crashes in jupyter (but works in IPython/CLI runs)
+        # Forcing all workers to be local
+        # Another observed message on older instances: `unclosed socket <zmq.Socket(zmq.PUSH)`
+        num_cpus = 0
+        num_gpus = 0
+        return num_cpus, num_gpus
+
