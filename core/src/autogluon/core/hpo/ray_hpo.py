@@ -5,7 +5,8 @@ import psutil
 import ray
 
 from ray import tune
-from ray.tune.schedulers import FIFOScheduler, AsyncHyperBandScheduler
+from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler
+from ray.tune.suggest import SearchAlgorithm, Searcher
 from ray.tune.suggest.basic_variant import BasicVariantGenerator
 from ray.tune.suggest.hyperopt import HyperOptSearch
 from typing import Optional, Callable, Union, List
@@ -13,13 +14,16 @@ from typing import Optional, Callable, Union, List
 
 logger = logging.getLogger(__name__)
 
-scheduler_presets = {
-    'FIFO': FIFOScheduler,
-    'ASHA': AsyncHyperBandScheduler,
-}
+MIN = 'min'
+MAX = 'max'
+
 searcher_presets = {
     'random': BasicVariantGenerator,
     'bayes': HyperOptSearch,
+}
+scheduler_presets = {
+    'FIFO': FIFOScheduler,
+    'ASHA': AsyncHyperBandScheduler,
 }
 
 
@@ -47,6 +51,7 @@ def run(
     Finally tune.run
     local_dir/experiment_name/trial_dir
     """
+    assert mode in [MIN, MAX]
     num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples'))
     search_space = _convert_search_space(search_space)
     searcher = _get_searcher(hyperparameter_tune_kwargs)
@@ -113,11 +118,35 @@ def _convert_search_space(search_space: dict):
 
 def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
     """Initialize searcher object"""
+    searcher = hyperparameter_tune_kwargs.get('searcher')
+    user_init_args = hyperparameter_tune_kwargs.get('searcher_init_args', dict())
+    if isinstance(searcher, str):
+        assert searcher in searcher_presets, f'{searcher} is not a valid option. Options are {searcher_presets.keys()}'
+        searcher_cls = searcher_presets.get(searcher)
+        init_args = dict()
+        if searcher_cls == HyperOptSearch:
+            init_args = dict(metirc=metric, mode=mode)
+            init_args.update(user_init_args)
+        searcher = searcher_cls(**init_args)
+    assert isinstance(searcher, (SearchAlgorithm, Searcher))
+    return searcher
 
 
 def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
     """Initialize scheduler object"""
-    
+    scheduler = hyperparameter_tune_kwargs.get('scheduler')
+    user_init_args = hyperparameter_tune_kwargs.get('scheduler_init_args', dict())
+    if isinstance(scheduler, str):
+        assert scheduler in scheduler_presets, f'{scheduler} is not a valid option. Options are {scheduler_presets.keys()}'
+        scheduler_cls = scheduler_presets.get(scheduler)
+        init_args = dict()
+        if scheduler_cls == AsyncHyperBandScheduler:
+            init_args = dict(metric=metric, mode=mode, max_t=9999)
+            init_args.update(user_init_args)
+        scheduler = scheduler_cls(**init_args)
+    assert isinstance(scheduler, TrialScheduler)
+    return scheduler
+
 
 def _get_resources_per_trial(
     total_resources,
