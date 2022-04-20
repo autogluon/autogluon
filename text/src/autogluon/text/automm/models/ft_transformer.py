@@ -245,17 +245,25 @@ class MultiheadAttention(nn.Module):
         initialization: str,
     ) -> None:
         """
-        Args:
-            d_token: the token size. Must be a multiple of :code:`n_heads`.
-            n_heads: the number of heads. If greater than 1, then the module will have
-                an addition output layer (so called "mixing" layer).
-            dropout: dropout rate for the attention map. The dropout is applied to
-                *probabilities* and do not affect logits.
-            bias: if `True`, then input (and output, if presented) layers also have bias.
-                `True` is a reasonable default choice.
-            initialization: initialization for input projection layers. Must be one of
-                :code:`['kaiming', 'xavier']`. `kaiming` is a reasonable default choice.
-        Raises:
+        Parameters
+        ----------
+        d_token: 
+            the token size. Must be a multiple of :code:`n_heads`.
+        n_heads: 
+            the number of heads. If greater than 1, then the module will have
+            an addition output layer (so called "mixing" layer).
+        dropout: 
+            dropout rate for the attention map. The dropout is applied to
+            *probabilities* and do not affect logits.
+        bias: 
+            if `True`, then input (and output, if presented) layers also have bias.
+            `True` is a reasonable default choice.
+        initialization: 
+            initialization for input projection layers. Must be one of
+            :code:`['kaiming', 'xavier']`. `kaiming` is a reasonable default choice.
+
+        Raises
+        ----------
             AssertionError: if requirements for the inputs are not met.
         """
         super().__init__()
@@ -303,12 +311,19 @@ class MultiheadAttention(nn.Module):
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
         """Perform the forward pass.
 
-        Args:
-            x_q: query tokens
-            x_kv: key-value tokens
-            key_compression: Linformer-style compression for keys
-            value_compression: Linformer-style compression for values
+        Parameters
+        ----------
+        x_q: 
+            query tokens
+        x_kv: 
+            key-value tokens
+        key_compression: 
+            Linformer-style compression for keys
+        value_compression: 
+            Linformer-style compression for values
+
         Returns:
+        ----------
             (tokens, attention_stats)
         """
         assert _all_or_none(
