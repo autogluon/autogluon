@@ -178,14 +178,14 @@ def get_config(
             all_configs.append(per_config)
 
         config = OmegaConf.merge(*all_configs)
-    verify_config_names(config.model)
+    verify_model_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
         # avoid manipulating user-provided overrides
         overrides = copy.deepcopy(overrides)
         # apply customized model names
         overrides = parse_dotlist_conf(overrides)  # convert to a dict
-        config.model = customize_config_names(
+        config.model = customize_model_names(
             config=config.model,
             customized_names=overrides.get("model.names", None),
         )
@@ -193,13 +193,13 @@ def get_config(
         overrides.pop("model.names", None)
         # apply all the overrides
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
-    verify_config_names(config.model)
+    verify_model_names(config.model)
     return config
 
 
-def verify_config_names(config: DictConfig):
+def verify_model_names(config: DictConfig):
     """
-    Verify whether provided names are valid for a config.
+    Verify whether provided model names are valid.
 
     Parameters
     ----------
@@ -257,9 +257,9 @@ def get_name_prefix(
         return search_results[0]
 
 
-def customize_config_names(
+def customize_model_names(
         config: DictConfig,
-        customized_names: List[str],
+        customized_names: Union[str, List[str]],
 ):
     """
     Customize attribute names of `config` with the provided names.
@@ -284,6 +284,9 @@ def customize_config_names(
     """
     if not customized_names:
         return config
+
+    if isinstance(customized_names, str):
+        customized_names = OmegaConf.from_dotlist([f'names={customized_names}']).names
 
     new_config = OmegaConf.create()
     new_config.names = []
