@@ -11,6 +11,8 @@ from ray.tune.suggest.basic_variant import BasicVariantGenerator
 from ray.tune.suggest.hyperopt import HyperOptSearch
 from typing import Optional, Callable, Union, List
 
+from .. import Space
+
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +78,7 @@ def run(
         ray.init(**total_resources)
     analysis = tune.run(
         tune.with_parameters(trainable, **trainable_args),
+        config=search_space,
         num_samples=num_samples,
         search_alg=searcher,
         scheduler=scheduler,
@@ -114,6 +117,11 @@ def _get_default_tune_kwargs():
 
 def _convert_search_space(search_space: dict):
     """Convert the search space to Ray Tune search space if it's AG search space"""
+    tune_search_space = search_space.copy()
+    for hyperparmaeter, space in search_space.items():
+        if isinstance(space, Space):
+            tune_search_space[hyperparmaeter] = space.convert_to_ray()
+    return tune_search_space
 
 
 def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str):

@@ -9,16 +9,21 @@ logger = logging.getLogger(__name__)
 
 
 def model_trial(args,
-                reporter,
                 model_cls,
                 init_params,
                 train_path,
                 val_path,
                 time_start,
+                original_path,
                 time_limit=None,
                 fit_kwargs=None,
                 ):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
+    from ray import tune
+    # https://github.com/ray-project/ray/issues/9571
+    # ray tune will modify the current working directory and it's troublesome for autogluon because we use relative path
+    # change back to the original directory
+    os.chdir(original_path)
     try:
         if fit_kwargs is None:
             fit_kwargs = dict()
@@ -27,7 +32,6 @@ def model_trial(args,
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
-
         fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **fit_kwargs)
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
@@ -39,12 +43,11 @@ def model_trial(args,
             time_limit=time_limit,
             reporter=None,
         )
+        tune.report(epoch=1, validation_performance=model.val_score)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
-        reporter.terminate()
-    else:
-        reporter(epoch=1, validation_performance=model.val_score)
+            raise e
 
 
 def init_model(args, model_cls, init_params):

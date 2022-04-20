@@ -1251,7 +1251,7 @@ class AbstractTrainer:
                 raise ValueError(f'k_fold_start must be 0 to hyperparameter_tune, value = {k_fold_start}')
             if not isinstance(hyperparameter_tune_kwargs, tuple):
                 num_trials = 1 if time_limit is None else 1000
-                hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
+                # hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             # hpo_models (dict): keys = model_names, values = model_paths
             fit_log_message = f'Hyperparameter tuning model: {model.name} ...'
             if time_limit is not None:
