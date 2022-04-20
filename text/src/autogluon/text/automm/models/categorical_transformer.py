@@ -3,10 +3,10 @@ from torch import nn
 from torch import Tensor
 from typing import Any, Dict, List, Optional, Union, cast
 from ..constants import CATEGORICAL, LABEL, LOGITS, FEATURES
-from .ft_transformer import _TokenInitialization, _CLSToken, FT_Transformer
+from .ft_transformer import _TokenInitialization, CLSToken, FT_Transformer
 
 
-class _CategoricalFeatureTokenizer(nn.Module):
+class CategoricalFeatureTokenizer(nn.Module):
     """
     Feature tokenizer for categorical features in tabular data. 
     It transforms the input categorical features to tokens (embeddings).
@@ -53,7 +53,7 @@ class _CategoricalFeatureTokenizer(nn.Module):
         for parameter in [self.embeddings.weight, self.bias]:
             if parameter is not None:
                 initialization_.apply(parameter, d_token)
-
+    
     @property
     def n_tokens(self) -> int:
         """The number of tokens."""
@@ -74,7 +74,7 @@ class _CategoricalFeatureTokenizer(nn.Module):
 
 
 
-class  CategoricalTransformer(nn.Module):
+class CategoricalTransformer(nn.Module):
     """
     FT-Transformer for categorical tabular features. 
     The input dimension is automatically computed based on
@@ -174,20 +174,19 @@ class  CategoricalTransformer(nn.Module):
         assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
 
         self.num_categories = num_categories
+
         self.prefix = prefix
-        self.categorical_key = f"{prefix}_{CATEGORICAL}"
-        self.label_key = f"{prefix}_{LABEL}"
         self.out_features = out_features
 
 
-        self.categorical_feature_tokenizer = _CategoricalFeatureTokenizer(
+        self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
             num_categories=num_categories,
             d_token=d_token,
             bias=token_bias,
             initialization=token_initialization,
         ) 
 
-        self.cls_token = _CLSToken(
+        self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=token_initialization,
         ) if cls_token else None
@@ -229,6 +228,14 @@ class  CategoricalTransformer(nn.Module):
         )
 
         self.name_to_id = self.get_layer_ids()
+
+    @property
+    def categorical_key(self):
+        return f"{self.prefix}_{CATEGORICAL}"
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
         self, 

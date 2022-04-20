@@ -238,24 +238,19 @@ class MultimodalFusionTransformer(nn.Module):
         self.model = nn.ModuleList(models)
 
         raw_in_features = [per_model.out_features for per_model in models]
-        if adapt_in_features is not None:
-            if adapt_in_features == "min":
-                base_in_feat = min(raw_in_features)
-            elif adapt_in_features == "max":
-                base_in_feat = max(raw_in_features)
-            else:
-                raise ValueError(f"unknown adapt_in_features: {adapt_in_features}")
 
-            self.adapter = nn.ModuleList(
-                [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
-            )
-
-            in_features = base_in_feat
+        if adapt_in_features == "min":
+            base_in_feat = min(raw_in_features)
+        elif adapt_in_features == "max":
+            base_in_feat = max(raw_in_features)
         else:
-            self.adapter = nn.ModuleList(
-                [nn.Identity() for _ in range(len(raw_in_features))]
-            )
-            in_features = sum(raw_in_features)
+            raise ValueError(f"unknown adapt_in_features: {adapt_in_features}")
+
+        self.adapter = nn.ModuleList(
+            [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
+        )
+
+        in_features = base_in_feat
 
         assert len(self.adapter) == len(self.model)
 
@@ -291,8 +286,8 @@ class MultimodalFusionTransformer(nn.Module):
         )
         
         # init weights
-        # self.adapter.apply(init_weights)
-        # self.head.apply(init_weights)
+        self.adapter.apply(init_weights)
+        self.head.apply(init_weights)
 
         self.prefix = prefix
         self.label_key = f"{prefix}_{LABEL}"

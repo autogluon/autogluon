@@ -2,11 +2,11 @@ from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
 from typing import Any, Dict, List, Optional, Union, cast
-from .ft_transformer import FT_Transformer,_TokenInitialization,_CLSToken
+from .ft_transformer import FT_Transformer,_TokenInitialization,CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 
 
-class _NumericalFeatureTokenizer(nn.Module):
+class NumericalFeatureTokenizer(nn.Module):
     """
     Numerical tokenizer for numerical features in tabular data. 
     It transforms the input numerical features to tokens (embeddings).
@@ -173,19 +173,17 @@ class  NumericalTransformer(nn.Module):
         assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
 
         self.prefix = prefix
-        self.numerical_key = f"{prefix}_{NUMERICAL}"
-        self.label_key = f"{prefix}_{LABEL}"
 
         self.out_features = out_features
 
-        self.numerical_feature_tokenizer = _NumericalFeatureTokenizer(
+        self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
             in_features=in_features,
             d_token=d_token,
             bias=token_bias,
             initialization=token_initialization,
         )
 
-        self.cls_token = _CLSToken(
+        self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=token_initialization,
         ) if cls_token else None
@@ -231,6 +229,13 @@ class  NumericalTransformer(nn.Module):
         
         self.name_to_id = self.get_layer_ids()
         
+    @property
+    def numerical_key(self):
+        return f"{self.prefix}_{NUMERICAL}"
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def forward(
         self, 

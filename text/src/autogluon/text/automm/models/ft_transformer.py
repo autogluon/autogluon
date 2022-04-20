@@ -102,7 +102,7 @@ class GEGLU(nn.Module):
         return geglu(x)
 
 
-class _CLSToken(nn.Module):
+class CLSToken(nn.Module):
     """[CLS]-token for BERT-like inference.
 
     To learn about the [CLS]-based inference, see [devlin2018bert].
