@@ -258,16 +258,16 @@ class MultimodalFusionTransformer(nn.Module):
 
         self.fusion_transformer = FT_Transformer(
             d_token=in_features,
-            n_blocks=2,
-            attention_n_heads=2,
-            attention_dropout=dropout_prob,
+            n_blocks=3,
+            attention_n_heads=8,
+            attention_dropout=0.2,
             attention_initialization='kaiming',
             attention_normalization='LayerNorm',
-            ffn_d_hidden=6,
-            ffn_dropout=dropout_prob,
+            ffn_d_hidden=192,
+            ffn_dropout=0.1,
             ffn_activation='ReGLU',
             ffn_normalization='LayerNorm',
-            residual_dropout=dropout_prob,
+            residual_dropout=0.0,
             prenormalization=True,
             first_prenormalization=False,
             last_layer_query_idx=None,
@@ -283,7 +283,7 @@ class MultimodalFusionTransformer(nn.Module):
             d_in=in_features,
             d_out=num_classes,
             bias=True,
-            activation='ReLU',  # type: ignore
+            activation='ReLU', 
             normalization='LayerNorm',
         )
         
