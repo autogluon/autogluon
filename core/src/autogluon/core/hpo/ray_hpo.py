@@ -2,6 +2,13 @@ import logging
 import math
 import os
 import psutil
+
+from typing import Optional, Callable, Union, List
+
+from .. import Space
+from ..utils.try_import import try_import_ray
+
+try_import_ray()
 import ray
 
 from ray import tune
@@ -9,9 +16,7 @@ from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandSch
 from ray.tune.suggest import SearchAlgorithm, Searcher
 from ray.tune.suggest.basic_variant import BasicVariantGenerator
 from ray.tune.suggest.hyperopt import HyperOptSearch
-from typing import Optional, Callable, Union, List
 
-from .. import Space
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +33,9 @@ scheduler_presets = {
     'ASHA': AsyncHyperBandScheduler,
 }
 
+class EmptySearchSpace(Exception):
+    pass
+
 
 def run(
     trainable: Callable,
@@ -38,6 +46,7 @@ def run(
     mode: str,  # must be one of [min, max]
     save_dir: str,  # directory to save results. Ray will write artifacts to save_dir/trial_dir/
     total_resources: Optional(dict) = dict(),
+    resources_per_trial_update_method: Optional(Callable) =  None,  # Callable to update resources per trial in trainable_args
     minimum_cpu_per_trial: int = 1,
     minimum_gpu_per_trial: float = 1.0,
     model_estimate_memroy_usage: Optional(int) = None,
@@ -54,8 +63,12 @@ def run(
     local_dir/experiment_name/trial_dir
     """
     assert mode in [MIN, MAX]
-    num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples'))
+    num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
+    if num_samples is None:
+        num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
     search_space = _convert_search_space(search_space)
+    if not search_space:
+        raise EmptySearchSpace
     searcher = _get_searcher(hyperparameter_tune_kwargs)
     scheduler = _get_scheduler(hyperparameter_tune_kwargs)
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
@@ -67,6 +80,8 @@ def run(
             minimum_cpu_per_trial,
             model_estimate_memroy_usage
         )
+    if resources_per_trial_update_method is not None:
+        trainable_args = resources_per_trial_update_method(trainable_args, resources_per_trial)
     tune_kwargs = _get_default_tune_kwargs()
     tune_kwargs.update(kwargs)
 
@@ -136,7 +151,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
             init_args = dict(metirc=metric, mode=mode)
             init_args.update(user_init_args)
         searcher = searcher_cls(**init_args)
-    assert isinstance(searcher, (SearchAlgorithm, Searcher))
+    assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in searcher_presets.values()
     return searcher
 
 
@@ -152,7 +167,7 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
             init_args = dict(metric=metric, mode=mode, max_t=9999)
             init_args.update(user_init_args)
         scheduler = scheduler_cls(**init_args)
-    assert isinstance(scheduler, TrialScheduler)
+    assert isinstance(scheduler, TrialScheduler) and scheduler.__class__ in scheduler_presets.values()
     return scheduler
 
 

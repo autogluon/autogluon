@@ -23,6 +23,7 @@ from ._tags import _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ...hpo import run
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -919,25 +920,15 @@ class AbstractModel:
 
         return template
 
-    def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
-        scheduler_options = copy.deepcopy(scheduler_options)
-        if 'time_out' not in scheduler_options[1]:
-            scheduler_options[1]['time_out'] = time_limit
-        kwargs = self.initialize(time_limit=scheduler_options[1]['time_out'], **kwargs)
+    def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs):
+        kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        resource = copy.deepcopy(scheduler_options[1]['resource'])
-        if 'num_cpus' in resource:
-            if resource['num_cpus'] == 'auto':
-                resource.pop('num_cpus')
-        if 'num_gpus' in resource:
-            if resource['num_gpus'] == 'auto':
-                resource.pop('num_gpus')
 
-        scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **resource)
-        return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
+        resources = self._preprocess_fit_resources(silent=True)
+        return self._hyperparameter_tune(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, resources=resources, time_limit=time_limit, **kwargs)
 
-    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, hyperparameter_tune_kwargs, resources, time_limit, **kwargs):
         """
         Hyperparameter tune the model.
 
@@ -948,21 +939,17 @@ class AbstractModel:
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
 
-        if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
-            logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
-                           f"Will train one model based on the provided hyperparameters.")
-            return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-        else:
-            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
-            for hyperparam in search_space:
-                if isinstance(search_space[hyperparam], Space):
-                    logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
+        # if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
+        #     logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
+        #                    f"Will train one model based on the provided hyperparameters.")
+        #     return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
+        # else:
+        #     logger.log(15, f"\tHyperparameter search space for {self.name}: ")
+        #     for hyperparam in search_space:
+        #         if isinstance(search_space[hyperparam], Space):
+        #             logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
 
         directory = self.path  # also create model directory if it doesn't exist
-        # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         dataset_train_filename = 'dataset_train.pkl'
         train_path = directory + dataset_train_filename
         save_pkl.save(path=train_path, object=(X, y))
@@ -974,7 +961,7 @@ class AbstractModel:
         model_cls = self.__class__
         init_params = self.get_params()
 
-        fit_kwargs = scheduler_params['resource'].copy()
+        fit_kwargs = dict()
         fit_kwargs['feature_metadata'] = self.feature_metadata
         fit_kwargs['num_classes'] = self.num_classes
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
@@ -983,16 +970,18 @@ class AbstractModel:
             model_cls=model_cls,
             init_params=init_params,
             time_start=time_start,
-            time_limit=scheduler_params['time_out'],
+            time_limit=time_limit,
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
         )
+        
+        def resources_per_trial_update_method(train_fn_kwargs, resources_per_trial):
+            train_fn_kwargs['fit_kwargs']['num_cpus'] = resources_per_trial.get('cpu', 1)
+            train_fn_kwargs['fit_kwargs']['num_gpus'] = resources_per_trial.get('gpu', 0)
+            return train_fn_kwargs
 
-        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
-
-        scheduler.run()
-        scheduler.join_jobs()
+        run()
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
