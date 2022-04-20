@@ -1,5 +1,7 @@
 import platform
 
+from types import ModuleType
+
 __all__ = [
     'try_import_mxboard',
     'try_import_mxnet',
@@ -46,7 +48,7 @@ def try_import_mxnet():
             "or `pip install mxnet_cu101 --upgrade`")
 
 
-def try_import_ray():
+def try_import_ray() -> ModuleType:
     ray_max_version_os_map = dict(
         Darwin='1.11.0',
         Windows='1.11.0',
