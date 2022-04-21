@@ -1,1 +1,1 @@
-from .ray_hpo import run
+from .ray_hpo import run, EmptySearchSpace

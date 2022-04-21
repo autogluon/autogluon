@@ -106,7 +106,6 @@ def skip_hpo(model, X, y, X_val, y_val, time_limit=None, **kwargs):
         time_start=time.time(),
         time_limit=time_limit
     )
-    hpo_results = {'total_time': model.fit_time}
-    hpo_model_performances = {model.name: model.val_score}
+    hpo_results = {'total_time': model.fit_time, 'performance': model.val_score}
     hpo_models = {model.name: model.path}
-    return hpo_models, hpo_model_performances, hpo_results
+    return hpo_models, hpo_results

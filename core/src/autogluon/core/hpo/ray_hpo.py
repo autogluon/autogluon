@@ -53,7 +53,7 @@ def run(
     time_budget_s: Optional(float) = None,
     verbose: int = 1,  # 0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     **kwargs  # additional args being passed to tune.run
-    ) -> tune.analysis:
+    ) -> tune.ExperimentAnalysis:
     """
     Parse hyperparameter_tune_kwargs
     Init necessary objects, i.e. searcher, scheduler, and ray

@@ -23,7 +23,7 @@ from ._tags import _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ...hpo import run
+from ...hpo import run, EmptySearchSpace
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -920,15 +920,23 @@ class AbstractModel:
 
         return template
 
-    def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs):
+    def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs) -> Union[dict, "tune.ExperimentAnalysis"]:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
 
         resources = self._preprocess_fit_resources(silent=True)
-        return self._hyperparameter_tune(hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, resources=resources, time_limit=time_limit, **kwargs)
+        if self.estimate_memory_usage is not None:
+            model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
+        return self._hyperparameter_tune(
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            resources=resources,
+            model_estimate_memory_usage=model_estimate_memory_usage,
+            time_limit=time_limit,
+            **kwargs
+        )
 
-    def _hyperparameter_tune(self, X, y, X_val, y_val, hyperparameter_tune_kwargs, resources, time_limit, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, hyperparameter_tune_kwargs, resources, model_estimate_memory_usage, time_limit, **kwargs):
         """
         Hyperparameter tune the model.
 
@@ -974,6 +982,7 @@ class AbstractModel:
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
+            original_path=os.getcwd(),
         )
         
         def resources_per_trial_update_method(train_fn_kwargs, resources_per_trial):
@@ -981,39 +990,38 @@ class AbstractModel:
             train_fn_kwargs['fit_kwargs']['num_gpus'] = resources_per_trial.get('gpu', 0)
             return train_fn_kwargs
 
-        run()
+        try:
+            analysis = run(
+                trainable=model_trial,
+                trainable_args=train_fn_kwargs,
+                search_space=search_space,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                metric='validation_performance',
+                mode='max',
+                save_dir=directory,
+                total_resources=resources,
+                resources_per_trial_update_method=resources_per_trial_update_method,
+                minimum_gpu_per_trial=0.1,
+                model_estimate_memroy_usage=model_estimate_memory_usage,
+                time_budget_s=time_limit
+            )
+            return self._get_hpo_results(analysis)
+        except EmptySearchSpace:
+            # TODO: update skip_hpo to get correct return
+            return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
 
-    def _get_hpo_results(self, scheduler, scheduler_params: dict, time_start):
-        # Store results / models from this HPO run:
-        best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
-        hpo_results = {
-            'best_reward': scheduler.get_best_reward(),
-            'best_config': best_hp,
-            'total_time': time.time() - time_start,
-            'metadata': scheduler.metadata,
-            'training_history': scheduler.training_history,
-            'config_history': scheduler.config_history,
-            'reward_attr': scheduler._reward_attr,
-        }
-
-        hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
-        hpo_model_performances = {}
-        for trial in sorted(hpo_results['config_history'].keys()):
-            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = f"T{trial+1}"  # unique identifier to files from this trial
+    def _get_hpo_results(self, analysis):
+        hpo_models = {}
+        for trial, details in analysis.results.items():
+            if details.get('validation_performance', None) is None:
+                continue
+            internal_trial_id = int(details.get('experiment_tag').split('_')[0]) - 1 # experiment_tag looks like '{trial_number}_{config}'. trial_number starts with 1
+            file_id = f"T{internal_trial_id+1}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
-            trial_reward = scheduler.searcher.get_reward(hpo_results['config_history'][trial])
-
             hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = trial_reward
-
-        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
-        logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
-        logger.log(15, str(best_hp))
-        return hpo_models, hpo_model_performances, hpo_results
+        return hpo_models, analysis
 
     # Resets metrics for the model
     def reset_metrics(self):
