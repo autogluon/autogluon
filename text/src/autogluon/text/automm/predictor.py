@@ -20,10 +20,13 @@ import pytorch_lightning as pl
 from packaging import version
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
+from autogluon.core.hpo import run, EmptySearchSpace
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
+from ray_lightning.tune import TuneReportCallback, TuneReportCheckpointCallback, get_tune_resources
+from ray_lightning import RayPlugin
 
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
@@ -171,6 +174,7 @@ class AutoMMPredictor:
             column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
             seed: Optional[int] = 123,
+            hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
         Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
@@ -255,17 +259,6 @@ class AutoMMPredictor:
         """
         pl.seed_everything(seed, workers=True)
 
-        if self._config is None:
-            config = get_config(
-                config=config,
-                overrides=hyperparameters,
-            )
-        else:  # continuing training
-            config = get_config(
-                config=self._config,
-                overrides=hyperparameters,
-            )
-
         if self._resume or save_path is None:
             save_path = self._save_path
         else:
@@ -278,6 +271,7 @@ class AutoMMPredictor:
             )
         logger.debug(f"save path: {save_path}")
 
+        # Generate general info that's not config specific
         if tuning_data is None:
             if self._problem_type in [BINARY, MULTICLASS]:
                 stratify = train_data[self._label_column]
@@ -325,43 +319,6 @@ class AutoMMPredictor:
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
 
-        if self._df_preprocessor is None:
-            df_preprocessor = init_df_preprocessor(
-                config=config.data,
-                column_types=column_types,
-                label_column=self._label_column,
-                train_df_x=train_data.drop(columns=self._label_column),
-                train_df_y=train_data[self._label_column]
-            )
-        else:  # continuing training
-            df_preprocessor = self._df_preprocessor
-
-        config = select_model(
-            config=config,
-            df_preprocessor=df_preprocessor
-        )
-
-        if self._data_processors is None:
-            data_processors = init_data_processors(
-                config=config,
-                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
-            )
-        else:  # continuing training
-            data_processors = self._data_processors
-
-        data_processors_count = {k: len(v) for k, v in data_processors.items()}
-        logger.debug(f"data_processors_count: {data_processors_count}")
-
-        if self._model is None:
-            model = create_model(
-                config=config,
-                num_classes=output_shape,
-                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-                num_categories=df_preprocessor.categorical_num_categories
-            )
-        else:  # continuing training
-            model = self._model
-
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
@@ -394,23 +351,12 @@ class AutoMMPredictor:
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._save_path = save_path
-        self._config = config
         self._output_shape = output_shape
         self._column_types = column_types
-        self._df_preprocessor = df_preprocessor
-        self._data_processors = data_processors
-        self._model = model
-
-        # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
-        self.save(save_path)
-
-        self._fit(
+        
+        _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            model=model,
-            config=config,
             loss_func=loss_func,
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
@@ -418,20 +364,56 @@ class AutoMMPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
-            ckpt_path=self._ckpt_path,
-            resume=self._resume,
+            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
+            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=self._enable_progress_bar,
+            config=config,
+            hyperparameters=hyperparameters,
+            hpo_mode=hyperparameter_tune_kwargs is not None  # skip average checkpoint if in hpo mode
         )
+        
+        if hyperparameter_tune_kwargs is not None:
+            num_gpus = (
+            config.env.num_gpus
+            if isinstance(config.env.num_gpus, int)
+            else len(config.env.num_gpus)
+            )
+            if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
+                num_gpus = torch.cuda.device_count()
+            resources = dict(num_gpus=num_gpus)
+            predictor = self._hyperparameter_tune(
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                resources=resources,
+                **_fit_args
+            )
+            return predictor
+        
+
+        self._fit(**_fit_args)
         return self
+    
+    def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
+        search_space = _fit_args.get('hyperparameters', dict())
+        metric = _fit_args.get('metric')
+        mode = _fit_args.get('mode')
+        save_path = _fit_args.get('save_path')
+        time_budget_s = _fit_args.get('max_time')
+        run(
+            trainable=self._fit,
+            trainable_args=_fit_args,
+            search_space=search_space,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            metric=metric,
+            mode=mode,
+            save_dir=os.path.basename(os.path.normpath(save_path)),
+            total_resources=resources,
+            time_budget_s=time_budget_s
+        )
 
     def _fit(
             self,
             train_df: pd.DataFrame,
             val_df: pd.DataFrame,
-            df_preprocessor: MultiModalFeaturePreprocessor,
-            data_processors: dict,
-            model: nn.Module,
-            config: DictConfig,
             loss_func: _Loss,
             validation_metric: torchmetrics.Metric,
             validation_metric_name: str,
@@ -442,7 +424,65 @@ class AutoMMPredictor:
             ckpt_path: str,
             resume: bool,
             enable_progress_bar: bool,
+            config: Optional[dict] = None,
+            hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+            hpo_mode: bool = False
     ):
+        if self._config is None:
+            config = get_config(
+                config=config,
+                overrides=hyperparameters,
+            )
+        else:  # continuing training
+            config = get_config(
+                config=self._config,
+                overrides=hyperparameters,
+            )
+            
+        if self._df_preprocessor is None:
+            df_preprocessor = init_df_preprocessor(
+                config=config.data,
+                column_types=self._column_types,
+                label_column=self._label_column,
+                train_df_x=train_df.drop(columns=self._label_column),
+                train_df_y=train_df[self._label_column]
+            )
+        else:  # continuing training
+            df_preprocessor = self._df_preprocessor
+
+        config = select_model(
+            config=config,
+            df_preprocessor=df_preprocessor
+        )
+
+        if self._data_processors is None:
+            data_processors = init_data_processors(
+                config=config,
+                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+            )
+        else:  # continuing training
+            data_processors = self._data_processors
+
+        data_processors_count = {k: len(v) for k, v in data_processors.items()}
+        logger.debug(f"data_processors_count: {data_processors_count}")
+
+        if self._model is None:
+            model = create_model(
+                config=config,
+                num_classes=self._output_shape,
+                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+                num_categories=df_preprocessor.categorical_num_categories
+            )
+        else:  # continuing training
+            model = self._model
+            
+        self._config = config
+        self._df_preprocessor = df_preprocessor
+        self._data_processors = data_processors
+        self._model = model
+        
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path)
 
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,

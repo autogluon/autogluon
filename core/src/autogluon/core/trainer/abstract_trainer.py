@@ -1264,9 +1264,24 @@ class AbstractTrainer:
             logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, analysis = model.hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
+                    hpo_models, analysis = model.hyperparameter_tune(
+                                                X=X,
+                                                y=y,
+                                                k_fold=k_fold,
+                                                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                time_limit=time_limit,
+                                                **model_fit_kwargs
+                                            )
                 else:
-                    hpo_models, analysis = model.hyperparameter_tune(X=X, y=y, X_val=X_val, y_val=y_val, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
+                    hpo_models, analysis = model.hyperparameter_tune(
+                                                X=X,
+                                                y=y,
+                                                X_val=X_val,
+                                                y_val=y_val,
+                                                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                                                time_limit=time_limit,
+                                                **model_fit_kwargs
+                                            )
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)
