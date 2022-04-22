@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import os
 import numpy as np
@@ -58,6 +59,7 @@ from .optimization.utils import (
     get_loss_func,
 )
 from .optimization.lit_module import LitModule
+from .optimization.lit_distiller import LitModuleForDistiller
 
 from .. import version as ag_version
 
@@ -170,6 +172,7 @@ class AutoMMPredictor:
             hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
             column_types: Optional[dict] = None,
             holdout_frac: Optional[float] = None,
+            teacher_predictor: Union[str, AutoMMPredictor] = None,
             seed: Optional[int] = 123,
     ):
         """
@@ -246,6 +249,9 @@ class AutoMMPredictor:
             early stopping (ignored unless `tuning_data = None`).
             Default value (if None) is selected based on the number of rows in the training data
             and whether hyper-parameter-tuning is utilized.
+        teacher_predictor
+            The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
+            knowledge to a student predictor, i.e., the current predictor.
         seed
             The random seed to use for this training run.
 
@@ -255,16 +261,13 @@ class AutoMMPredictor:
         """
         pl.seed_everything(seed, workers=True)
 
-        if self._config is None:
-            config = get_config(
-                config=config,
-                overrides=hyperparameters,
-            )
-        else:  # continuing training
-            config = get_config(
-                config=self._config,
-                overrides=hyperparameters,
-            )
+        if self._config is not None:  # continuous training
+            config = self._config
+
+        config = get_config(
+            config=config,
+            overrides=hyperparameters,
+        )
 
         if self._resume or save_path is None:
             save_path = self._save_path
@@ -404,6 +407,15 @@ class AutoMMPredictor:
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
 
+        # need to assign the above attributes before setting up distillation
+        if teacher_predictor is not None:
+            teacher_model, critics, baseline_funcs, soft_label_loss_func, data_processors, df_preprocessor = \
+                self._setup_distillation(
+                    teacher_predictor=teacher_predictor,
+                )
+        else:
+            teacher_model, critics, baseline_funcs, soft_label_loss_func = None, None, None, None
+
         self._fit(
             train_df=train_data,
             val_df=tuning_data,
@@ -416,6 +428,10 @@ class AutoMMPredictor:
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
+            teacher_model=teacher_model,
+            critics=critics,
+            baseline_funcs=baseline_funcs,
+            soft_label_loss_func=soft_label_loss_func,
             max_time=time_limit,
             save_path=save_path,
             ckpt_path=self._ckpt_path,
@@ -423,6 +439,116 @@ class AutoMMPredictor:
             enable_progress_bar=self._enable_progress_bar,
         )
         return self
+
+    def _setup_distillation(
+            self,
+            teacher_predictor: Union[str, AutoMMPredictor],
+    ):
+        """
+        Prepare for distillation. It verifies whether the student and teacher predictors have consistent
+        configurations. If teacher and student have duplicate model names, it modifies teacher's model names.
+        It also combines the teacher and student data processors.
+
+        Parameters
+        ----------
+        teacher_predictor
+            The teacher predictor in knowledge distillation.
+
+        Returns
+        -------
+        teacher_model
+            The teacher model.
+        critics
+            The critics used in computing mutual information loss.
+        baseline_funcs
+            The baseline functions used in computing mutual information loss.
+        soft_label_loss_func
+            The loss function using teacher's logits as labels.
+        data_processors
+            The combined data processors.
+        df_preprocessor
+            The teacher predictor's dataframe preprocessor. Assume the teacher's preprocessor
+            can cover the dataframe columns of the student's.
+        """
+        logger.debug("setting up distillation...")
+        if isinstance(teacher_predictor, str):
+            teacher_predictor = AutoMMPredictor.load(teacher_predictor)
+
+        # verify that student and teacher configs are consistent.
+        assert self._problem_type == teacher_predictor._problem_type
+        assert self._label_column == teacher_predictor._label_column
+        assert self._eval_metric_name == teacher_predictor._eval_metric_name
+        assert self._output_shape == teacher_predictor._output_shape
+        assert self._validation_metric_name == teacher_predictor._validation_metric_name
+
+        # if teacher and student have duplicate model names, change teacher's model names
+        # we don't change student's model names to avoid changing the names back when saving the model.
+        teacher_model_names = []
+        for n in teacher_predictor._config.model.names:
+            if n in self._config.model.names:
+                new_name = f"{n}_teacher"
+                assert new_name not in self._config.model.names
+                assert new_name not in teacher_predictor._config.model.names
+                # modify model prefix
+                if n == teacher_predictor._model.prefix:
+                    teacher_predictor._model.prefix = new_name
+                else:
+                    assert isinstance(teacher_predictor._model.model, nn.ModuleList)
+                    for per_model in teacher_predictor._model.model:
+                        if n == per_model.prefix:
+                            per_model.prefix = new_name
+                            break
+                # modify data processor prefix
+                for _, per_modality_processors in teacher_predictor._data_processors.items():
+                    for per_processor in per_modality_processors:
+                        if n == per_processor.prefix:
+                            per_processor.prefix = new_name
+                # modify model config keys
+                setattr(teacher_predictor._config.model, new_name, getattr(teacher_predictor._config.model, n))
+                delattr(teacher_predictor._config.model, n)
+
+                teacher_model_names.append(new_name)
+            else:
+                teacher_model_names.append(n)
+        teacher_predictor._config.model.names = teacher_model_names
+
+        # verify teacher and student have no duplicate model names
+        assert all([n not in teacher_predictor._config.model.names for n in self._config.model.names]), \
+            f"teacher model names {teacher_predictor._config.model.names} and" \
+            f" student model names {self._config.model.names} have duplicates."
+
+        critics, baseline_funcs = None, None
+        if self._config.distiller.soft_label_loss_type == "mean_square_error":
+            soft_label_loss_func = nn.MSELoss()
+        elif self._config.distiller.soft_label_loss_type == "cross_entropy":
+            soft_label_loss_func = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(
+                f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}"
+            )
+        # combine teacher and student data processors
+        data_processors = copy.deepcopy(self._data_processors)
+        teacher_data_processors = copy.deepcopy(teacher_predictor._data_processors)
+        for per_modality, per_modality_processors in teacher_data_processors.items():
+            if per_modality not in data_processors:
+                data_processors[per_modality] = []
+            data_processors[per_modality].extend(per_modality_processors)
+
+        # data processors saved in 0.4.0 may have empty processors since the empty ones were not removed by default.
+        # Only keep the modalities with non-empty processors.
+        data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+
+        data_processors_count = {k: len(v) for k, v in data_processors.items()}
+        logger.debug(f"distillation's data processors statistics: {data_processors_count}")
+
+        return (
+            teacher_predictor._model,
+            critics,
+            baseline_funcs,
+            soft_label_loss_func,
+            data_processors,
+            teacher_predictor._df_preprocessor,
+        )
 
     def _fit(
             self,
@@ -437,6 +563,10 @@ class AutoMMPredictor:
             validation_metric_name: str,
             custom_metric_func: Callable,
             minmax_mode: str,
+            teacher_model: nn.Module,
+            critics: nn.ModuleList,
+            baseline_funcs: nn.ModuleList,
+            soft_label_loss_func: _Loss,
             max_time: timedelta,
             save_path: str,
             ckpt_path: str,
@@ -452,23 +582,49 @@ class AutoMMPredictor:
             train_data=train_df,
             val_data=val_df
         )
-
-        task = LitModule(
-            model=model,
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
-            loss_func=loss_func,
-            validation_metric=validation_metric,
-            validation_metric_name=validation_metric_name,
-            custom_metric_func=custom_metric_func,
-        )
+        is_distill = teacher_model is not None
+        if is_distill:
+            task = LitModuleForDistiller(
+                student_model=model,
+                teacher_model=teacher_model,
+                matches=config.distiller.matches,
+                critics=critics,
+                baseline_funcs=baseline_funcs,
+                hard_label_weight=config.distiller.hard_label_weight,
+                soft_label_weight=config.distiller.soft_label_weight,
+                temperature=config.distiller.temperature,
+                optim_type=config.optimization.optim_type,
+                lr_choice=config.optimization.lr_choice,
+                lr_schedule=config.optimization.lr_schedule,
+                lr=config.optimization.learning_rate,
+                lr_decay=config.optimization.lr_decay,
+                end_lr=config.optimization.end_lr,
+                lr_mult=config.optimization.lr_mult,
+                weight_decay=config.optimization.weight_decay,
+                warmup_steps=config.optimization.warmup_steps,
+                hard_label_loss_func=loss_func,
+                soft_label_loss_func=soft_label_loss_func,
+                validation_metric=validation_metric,
+                validation_metric_name=validation_metric_name,
+                custom_metric_func=custom_metric_func,
+            )
+        else:
+            task = LitModule(
+                model=model,
+                optim_type=config.optimization.optim_type,
+                lr_choice=config.optimization.lr_choice,
+                lr_schedule=config.optimization.lr_schedule,
+                lr=config.optimization.learning_rate,
+                lr_decay=config.optimization.lr_decay,
+                end_lr=config.optimization.end_lr,
+                lr_mult=config.optimization.lr_mult,
+                weight_decay=config.optimization.weight_decay,
+                warmup_steps=config.optimization.warmup_steps,
+                loss_func=loss_func,
+                validation_metric=validation_metric,
+                validation_metric_name=validation_metric_name,
+                custom_metric_func=custom_metric_func,
+            )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
@@ -592,6 +748,12 @@ class AutoMMPredictor:
                 ckpt_dir=save_path,
                 ckpt_paths=best_k_models_path,
             )
+            if is_distill:
+                all_state_dicts = self._replace_model_name_prefix(
+                    state_dicts=all_state_dicts,
+                    old_prefix="student_model",
+                    new_prefix="model",
+                )
             if config.optimization.top_k_average_method == UNIFORM_SOUP:
                 logger.info(
                     f"Start to fuse {config.optimization.top_k} checkpoints via the uniform soup algorithm."
@@ -978,6 +1140,19 @@ class AutoMMPredictor:
         state_dict = {k.partition('model.')[2]: v for k, v in state_dict.items()}
         model.load_state_dict(state_dict)
         return model
+
+    @staticmethod
+    def _replace_model_name_prefix(state_dicts, old_prefix, new_prefix):
+        if not isinstance(state_dicts, list):
+            state_dicts = [state_dicts]
+        state_dicts_processed = []
+        start_idx = len(old_prefix)
+        for per_state_dict in state_dicts:
+            per_state_dict_processed = {
+                new_prefix + k[start_idx:]: v for k, v in per_state_dict.items() if k.startswith(old_prefix)
+            }
+            state_dicts_processed.append(per_state_dict_processed)
+        return state_dicts_processed
 
     def save(
             self, 
