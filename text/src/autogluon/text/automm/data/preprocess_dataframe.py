@@ -445,6 +445,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if self.label_type == CATEGORICAL:
             assert y_pred.shape[1] >= 2
             y_pred = y_pred.argmax(axis=1)
+            # Transform the predicted label back to the original space (e.g., string values)
+            y_pred = self._label_scaler.inverse_transform(y_pred)
         elif self.label_type == NUMERICAL:
             y_pred = self._label_scaler.inverse_transform(y_pred)
             y_pred = np.squeeze(y_pred)

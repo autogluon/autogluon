@@ -192,6 +192,9 @@ def test_emoji():
     assert set(predictor.class_labels) == {'grin', 'smile', 'wink'}
     assert predictor.class_labels_internal == [0, 1, 2]
     verify_predictor_save_load(predictor, df)
+    pred_labels = predictor.predict(df)
+    for ele in pred_labels:
+        assert ele in {'grin', 'smile', 'wink'}
 
 
 def test_empty_text_item():
