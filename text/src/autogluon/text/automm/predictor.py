@@ -809,7 +809,8 @@ class AutoMMPredictor:
             y_pred_prob = self._logits_to_prob(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
-        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits)
+        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False)
+        y_pred_transformed = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=True)
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update({
@@ -833,7 +834,7 @@ class AutoMMPredictor:
             results[per_metric] = score
 
         if return_pred:
-            return results, self.as_pandas(data=data, to_be_converted=y_pred)
+            return results, self.as_pandas(data=data, to_be_converted=y_pred_transformed)
         else:
             return results
 

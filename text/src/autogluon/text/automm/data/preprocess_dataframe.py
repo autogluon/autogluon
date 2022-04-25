@@ -426,6 +426,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_prediction(
             self,
             y_pred: torch.Tensor,
+            inverse_categorical: bool = True,
     ) -> NDArray[(Any,), Any]:
         """
         Transform model's output logits into class labels for classification
@@ -435,6 +436,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         ----------
         y_pred
             The model's output logits.
+        inverse_categorical
+            Whether to transformer categorical value back to the original space, e.g., string.
 
         Returns
         -------
@@ -446,7 +449,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             assert y_pred.shape[1] >= 2
             y_pred = y_pred.argmax(axis=1)
             # Transform the predicted label back to the original space (e.g., string values)
-            y_pred = self._label_generator.inverse_transform(y_pred)
+            if inverse_categorical:
+                y_pred = self._label_generator.inverse_transform(y_pred)
         elif self.label_type == NUMERICAL:
             y_pred = self._label_scaler.inverse_transform(y_pred)
             y_pred = np.squeeze(y_pred)
