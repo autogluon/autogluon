@@ -437,7 +437,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         y_pred
             The model's output logits.
         inverse_categorical
-            Whether to transformer categorical value back to the original space, e.g., string.
+            Whether to transform categorical value back to the original space, e.g., string values.
 
         Returns
         -------

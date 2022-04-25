@@ -231,7 +231,7 @@ def get_norm_layer_param_names(model: nn.Module):
     Returns
     -------
     norm_param_names
-        A list of names of the parameters that are either part of normalization layer or bias terms.
+        A list of normalization parameter names
     """
     all_param_names = [name for name, _ in model.named_parameters()]
     all_param_names_except_norm_names = get_parameter_names(
