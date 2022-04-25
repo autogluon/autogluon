@@ -138,6 +138,7 @@ def test_predictor(
         text_backbone,
         image_backbone,
         top_k_average_method,
+        efficient_finetune
 ):
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
@@ -159,6 +160,7 @@ def test_predictor(
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": top_k_average_method,
+        "optimization.efficient_finetune": efficient_finetune,
     }
     if text_backbone is not None:
         hyperparameters.update({
