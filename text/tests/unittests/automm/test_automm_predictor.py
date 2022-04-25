@@ -16,6 +16,8 @@ from autogluon.text.automm.constants import (
     UNIFORM_SOUP,
     GREEDY_SOUP,
     BEST,
+    NORM_FIT,
+    BIT_FIT,
 )
 from datasets import (
     PetFinderDataset,
@@ -54,14 +56,15 @@ def verify_predictor_save_load(predictor, df,
 
 
 @pytest.mark.parametrize(
-    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method",
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune",
     [
         (
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP
+            GREEDY_SOUP,
+            NORM_FIT
         ),
 
         (
@@ -69,7 +72,8 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
-            UNIFORM_SOUP
+            UNIFORM_SOUP,
+            BIT_FIT
         ),
 
         (
@@ -77,7 +81,8 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP
+            GREEDY_SOUP,
+            None
         ),
 
         (
@@ -85,7 +90,8 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             None,
-            UNIFORM_SOUP
+            UNIFORM_SOUP,
+            None
         ),
 
         (
@@ -93,7 +99,8 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
-            BEST
+            BEST,
+            BIT_FIT
         ),
 
         (
@@ -101,7 +108,8 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
-            UNIFORM_SOUP
+            UNIFORM_SOUP,
+            NORM_FIT
         ),
 
         (
@@ -109,7 +117,8 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
-            BEST
+            BEST,
+            NORM_FIT
         ),
 
         (
@@ -117,7 +126,8 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
-            BEST
+            BEST,
+            NORM_FIT
         ),
 
     ]
@@ -128,6 +138,7 @@ def test_predictor(
         text_backbone,
         image_backbone,
         top_k_average_method,
+        efficient_finetune
 ):
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
@@ -149,6 +160,7 @@ def test_predictor(
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": top_k_average_method,
+        "optimization.efficient_finetune": efficient_finetune,
     }
     if text_backbone is not None:
         hyperparameters.update({

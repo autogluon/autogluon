@@ -32,6 +32,8 @@ ACCURACY = "accuracy"
 ACC = "acc"
 RMSE = "rmse"
 R2 = "r2"
+PEARSONR = "pearsonr"
+SPEARMANR = "spearmanr"
 QUADRATIC_KAPPA = "quadratic_kappa"
 
 # Training status
@@ -75,6 +77,10 @@ GET_ITEM_ERROR_RETRY = 50
 UNIFORM_SOUP = "uniform_soup"
 GREEDY_SOUP = "greedy_soup"
 BEST = "best"
+
+# efficient finetuning strategies
+NORM_FIT = "norm_fit"
+BIT_FIT = "bit_fit"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"

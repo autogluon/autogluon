@@ -17,8 +17,7 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
-from packaging import version
-from typing import Optional, List, Tuple, Dict, Union, Callable
+from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
@@ -116,7 +115,7 @@ class AutoMMPredictor:
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
-        if eval_metric is not None and eval_metric.lower() in ["rmse", "r2"]:
+        if eval_metric is not None and eval_metric.lower() in ["rmse", "r2", "pearsonr", "spearmanr"]:
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
@@ -468,6 +467,7 @@ class AutoMMPredictor:
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
+            efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
         )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
@@ -809,7 +809,8 @@ class AutoMMPredictor:
             y_pred_prob = self._logits_to_prob(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
-        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits)
+        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False)
+        y_pred_transformed = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=True)
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update({
@@ -833,7 +834,7 @@ class AutoMMPredictor:
             results[per_metric] = score
 
         if return_pred:
-            return results, self.as_pandas(data=data, to_be_converted=y_pred)
+            return results, self.as_pandas(data=data, to_be_converted=y_pred_transformed)
         else:
             return results
 
@@ -1094,7 +1095,7 @@ class AutoMMPredictor:
                     text_processors=data_processors[TEXT],
                     path=path,
                 )
-        except:  # backward compatibility
+        except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             data_processors = init_data_processors(
                 config=config,
                 num_categorical_columns=len(df_preprocessor.categorical_num_categories)
