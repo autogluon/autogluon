@@ -10,7 +10,7 @@ from .lr_scheduler import (
     get_polynomial_decay_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
+from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT
 
 
 def get_loss_func(problem_type: str):
@@ -402,11 +402,11 @@ def apply_layerwise_lr_decay(
     decay_param_names = get_weight_decay_param_names(model)
     norm_param_names = get_norm_layer_param_names(model)
     for name, param in model.named_parameters():
-        if efficient_finetune == 'bit_fit':
+        if efficient_finetune == BIT_FIT:
             # For bit_fit, we disable tuning everything except the bias terms
             if 'bias' not in name:
                 param.requires_grad = False
-        elif efficient_finetune == 'norm_fit':
+        elif efficient_finetune == NORM_FIT:
             # For norm-fit, we finetune all the normalization layers and bias layers
             if name not in norm_param_names and 'bias' not in name:
                 param.requires_grad = False

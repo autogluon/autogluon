@@ -78,6 +78,10 @@ UNIFORM_SOUP = "uniform_soup"
 GREEDY_SOUP = "greedy_soup"
 BEST = "best"
 
+# efficient finetuning strategies
+NORM_FIT = "norm_fit"
+BIT_FIT = "bit_fit"
+
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
 TIMM_IMAGE = "timm_image"
