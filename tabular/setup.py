@@ -59,7 +59,7 @@ extras_require = {
 
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
-for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'widedeep']:
+for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
     all_requires += extras_require[extra_package]
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires

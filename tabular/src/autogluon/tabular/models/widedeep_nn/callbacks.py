@@ -7,8 +7,6 @@ from pytorch_widedeep.callbacks import EarlyStopping
 logger = logging.getLogger(__name__)
 
 
-# TODO: add time limit
-# TODO: refit_all support
 class EarlyStoppingCallbackWithTimeLimit(EarlyStopping):
 
     def __init__(self, monitor: str = "val_loss", min_delta: float = 0.0, patience: int = 10, verbose: int = 0, mode: str = "auto",

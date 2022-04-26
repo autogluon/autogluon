@@ -50,7 +50,7 @@ def get_nn_metric(problem_type, stopping_metric, num_classes):
 
     # Unsupported metrics will be replaced by defaults for a given problem type
     objective_func_name = stopping_metric.name
-    if objective_func_name not in metrics_map.keys():
+    if objective_func_name not in metrics_map:
         if problem_type == REGRESSION:
             objective_func_name = 'mean_squared_error'
         else:

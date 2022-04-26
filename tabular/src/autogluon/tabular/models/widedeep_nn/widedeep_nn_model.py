@@ -3,7 +3,6 @@ import time
 from typing import Union
 
 import numpy as np
-import torch
 
 from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
@@ -24,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 class WideDeepNNModel(AbstractModel):
 
-    def __init__(self, path: str = None, name: str = None, problem_type: str = None, eval_metric: Union[str, metrics.Scorer] = None, hyperparameters=None):
-        super().__init__(path, name, problem_type, eval_metric, hyperparameters)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.y_scaler = None
         self.missing_filler = None
         self.cont_normalization = None
@@ -49,7 +48,7 @@ class WideDeepNNModel(AbstractModel):
         from pytorch_widedeep import Trainer
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
-        import pytorch_widedeep
+        import torch
 
         # Deterministic training
         set_seed(0, True)
@@ -78,11 +77,11 @@ class WideDeepNNModel(AbstractModel):
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         batch_size = self.__get_batch_size(params)
 
-        tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=(params['lr']))
+        tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=params['lr'])
         tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # superconvergence schedule
             tab_opt,
-            max_lr=(params['lr']),
-            epochs=(params['epochs']),
+            max_lr=params['lr'],
+            epochs=params['epochs'],
             steps_per_epoch=int(np.ceil(len(X_train['X_tab']) / batch_size)),
             pct_start=0.25,
             final_div_factor=1e5
@@ -265,7 +264,7 @@ class WideDeepNNModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     def _get_default_searchspace(self):
-        return get_default_searchspace(self.problem_type, num_classes=None)
+        return get_default_searchspace(self.problem_type)
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
