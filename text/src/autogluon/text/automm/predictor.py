@@ -409,12 +409,14 @@ class AutoMMPredictor:
 
         # need to assign the above attributes before setting up distillation
         if teacher_predictor is not None:
-            teacher_model, critics, baseline_funcs, soft_label_loss_func, data_processors, df_preprocessor = \
+            teacher_model, critics, baseline_funcs, soft_label_loss_func, \
+                teacher_df_preprocessor, teacher_data_processors = \
                 self._setup_distillation(
                     teacher_predictor=teacher_predictor,
                 )
         else:
-            teacher_model, critics, baseline_funcs, soft_label_loss_func = None, None, None, None
+            teacher_model, critics, baseline_funcs, soft_label_loss_func,\
+                teacher_df_preprocessor, teacher_data_processors = None, None, None, None, None, None
 
         self._fit(
             train_df=train_data,
@@ -432,6 +434,8 @@ class AutoMMPredictor:
             critics=critics,
             baseline_funcs=baseline_funcs,
             soft_label_loss_func=soft_label_loss_func,
+            teacher_df_preprocessor=teacher_df_preprocessor,
+            teacher_data_processors=teacher_data_processors,
             max_time=time_limit,
             save_path=save_path,
             ckpt_path=self._ckpt_path,
@@ -526,28 +530,40 @@ class AutoMMPredictor:
             raise ValueError(
                 f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}"
             )
-        # combine teacher and student data processors
-        data_processors = copy.deepcopy(self._data_processors)
-        teacher_data_processors = copy.deepcopy(teacher_predictor._data_processors)
-        for per_modality, per_modality_processors in teacher_data_processors.items():
-            if per_modality not in data_processors:
-                data_processors[per_modality] = []
-            data_processors[per_modality].extend(per_modality_processors)
 
-        # data processors saved in 0.4.0 may have empty processors since the empty ones were not removed by default.
-        # Only keep the modalities with non-empty processors.
-        data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
+        logger.debug(
+            f"teacher preprocessor text_feature_names: {teacher_predictor._df_preprocessor._text_feature_names}"
+        )
+        logger.debug(
+            f"teacher preprocessor image_path_names: {teacher_predictor._df_preprocessor._image_path_names}"
+        )
+        logger.debug(
+            f"teacher preprocessor categorical_feature_names: {teacher_predictor._df_preprocessor._categorical_feature_names}"
+        )
+        logger.debug(
+            f"teacher preprocessor numerical_feature_names: {teacher_predictor._df_preprocessor._numerical_feature_names}"
+        )
 
-        data_processors_count = {k: len(v) for k, v in data_processors.items()}
-        logger.debug(f"distillation's data processors statistics: {data_processors_count}")
+        logger.debug(
+            f"student preprocessor text_feature_names: {self._df_preprocessor._text_feature_names}"
+        )
+        logger.debug(
+            f"student preprocessor image_path_names: {self._df_preprocessor._image_path_names}"
+        )
+        logger.debug(
+            f"student preprocessor categorical_feature_names: {self._df_preprocessor._categorical_feature_names}"
+        )
+        logger.debug(
+            f"student preprocessor numerical_feature_names: {self._df_preprocessor._numerical_feature_names}"
+        )
 
         return (
             teacher_predictor._model,
             critics,
             baseline_funcs,
             soft_label_loss_func,
-            data_processors,
             teacher_predictor._df_preprocessor,
+            teacher_predictor._data_processors,
         )
 
     def _fit(
@@ -567,12 +583,18 @@ class AutoMMPredictor:
             critics: nn.ModuleList,
             baseline_funcs: nn.ModuleList,
             soft_label_loss_func: _Loss,
+            teacher_df_preprocessor: MultiModalFeaturePreprocessor,
+            teacher_data_processors: dict,
             max_time: timedelta,
             save_path: str,
             ckpt_path: str,
             resume: bool,
             enable_progress_bar: bool,
     ):
+        if teacher_df_preprocessor is not None:
+            df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
+        if teacher_data_processors is not None:
+            data_processors = [data_processors, teacher_data_processors]
 
         train_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
@@ -580,7 +602,7 @@ class AutoMMPredictor:
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
             train_data=train_df,
-            val_data=val_df
+            val_data=val_df,
         )
         is_distill = teacher_model is not None
         if is_distill:
