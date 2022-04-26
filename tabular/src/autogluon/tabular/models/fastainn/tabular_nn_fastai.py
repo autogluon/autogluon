@@ -37,8 +37,7 @@ LABEL = '__label__'
 logger = logging.getLogger(__name__)
 
 
-# TODO: Takes extremely long time prior to training start if many (10000) continuous features from ngrams, debug - explore TruncateSVD option to reduce input dimensionality
-# TODO: currently fastai automatically detect and use CUDA if available - add code to honor autogluon settings
+# TODO: refactor NN preprocessing to use autogluon.features.nn_transforms
 class NNFastAiTabularModel(AbstractModel):
     """ Class for fastai v1 neural network models that operate on tabular data.
 

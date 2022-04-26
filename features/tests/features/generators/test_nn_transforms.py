@@ -7,7 +7,7 @@ from sklearn.preprocessing import RobustScaler
 
 from autogluon.common.features.types import S_TEXT_SPECIAL, R_FLOAT, R_DATETIME
 from autogluon.core.constants import REGRESSION, QUANTILE, BINARY
-from autogluon.tabular.models.widedeep_nn.preprocessing_utils import ContinuousNormalizer, MissingFiller, CategoricalFeaturesFilter, TargetScaler
+from autogluon.features.nn_transforms import ContinuousNormalizer, MissingFiller, CategoricalFeaturesFilter, TargetScaler
 
 
 def test_continuous_normalizer():

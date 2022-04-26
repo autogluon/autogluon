@@ -10,12 +10,13 @@ logger = logging.getLogger(__name__)
 class EarlyStoppingCallbackWithTimeLimit(EarlyStopping):
 
     def __init__(self, monitor: str = "val_loss", min_delta: float = 0.0, patience: int = 10, verbose: int = 0, mode: str = "auto",
+                 start_time: Optional[int] = None,
                  baseline: Optional[float] = None, restore_best_weights: bool = False,
                  time_limit: Optional[int] = None, best_epoch_stop: Optional[int] = None):
         super().__init__(monitor, min_delta, patience, verbose, mode, baseline, restore_best_weights)
         self.best_epoch_stop = best_epoch_stop
         self.time_limit = time_limit
-        self.start_time = time.time()
+        self.start_time = start_time
 
     def on_train_begin(self, logs: Optional[Dict] = None):
         super().on_train_begin(logs)

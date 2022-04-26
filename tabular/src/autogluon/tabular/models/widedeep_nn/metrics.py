@@ -49,15 +49,15 @@ def get_nn_metric(problem_type, stopping_metric, num_classes):
     metrics_map = get_metrics_map(num_classes)
 
     # Unsupported metrics will be replaced by defaults for a given problem type
-    objective_func_name = stopping_metric.name
-    if objective_func_name not in metrics_map:
+    metric_name = stopping_metric.name
+    if metric_name not in metrics_map:
         if problem_type == REGRESSION:
-            objective_func_name = 'mean_squared_error'
+            metric_name = 'mean_squared_error'
         else:
-            objective_func_name = 'log_loss'
-        logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
+            metric_name = 'log_loss'
+        logger.warning(f'Metric {stopping_metric.name} is not supported by this model - using {metric_name} instead')
 
-    nn_metric = metrics_map.get(objective_func_name, None)
+    nn_metric = metrics_map.get(metric_name, None)
 
     return nn_metric
 

@@ -64,9 +64,8 @@ for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
 
-
 test_requires = []
-for test_package in ['imodels', 'vowpalwabbit']:
+for test_package in ['imodels', 'vowpalwabbit', 'widedeep']:
     test_requires += extras_require[test_package]
 extras_require['tests'] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

@@ -1,12 +1,10 @@
 import logging
 import time
-from typing import Union
 
 import numpy as np
 
 from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
-from autogluon.core import metrics
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -15,8 +13,7 @@ from autogluon.core.utils.try_import import try_import_pytorch_widedeep
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .metrics import get_nn_metric, get_objective, get_monitor_metric
-from .preprocessing_utils import MissingFiller, TargetScaler, CategoricalFeaturesFilter
-from .utils import set_seed
+from autogluon.features.nn_transforms import MissingFiller, TargetScaler, CategoricalFeaturesFilter
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +46,7 @@ class WideDeepNNModel(AbstractModel):
         from pytorch_widedeep.callbacks import ModelCheckpoint
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
         import torch
+        from .utils import set_seed
 
         # Deterministic training
         set_seed(0, True)
@@ -56,7 +54,7 @@ class WideDeepNNModel(AbstractModel):
         params = self._get_model_params()
         logger.log(15, f'Fitting with parameters {params}...')
 
-        X_train, X_valid, cont_cols, embed_cols, val_split = self.__prepare_datasets_before_fit(X, y, X_val, y_val)
+        X_train, X_valid, cont_cols, embed_cols, val_split = self._preprocess_fit(X, y, X_val, y_val)
 
         nn_metric = get_nn_metric(self.problem_type, self.stopping_metric, self.num_classes)
         monitor_metric = get_monitor_metric(nn_metric)
@@ -111,6 +109,7 @@ class WideDeepNNModel(AbstractModel):
                 mode='auto',
                 min_delta=params['early.stopping.min_delta'],
                 patience=params['early.stopping.patience'],
+                start_time=start_time,
                 time_limit=time_left,
                 best_epoch_stop=best_epoch_stop
             )
@@ -175,7 +174,7 @@ class WideDeepNNModel(AbstractModel):
             batch_size *= 2
         return batch_size
 
-    def __prepare_datasets_before_fit(self, X, y, X_val, y_val):
+    def _preprocess_fit(self, X, y, X_val, y_val):
         from pytorch_widedeep.preprocessing import TabPreprocessor
 
         # prepare wide, crossed, embedding and continuous columns
