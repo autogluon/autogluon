@@ -73,7 +73,6 @@ class CategoricalFeatureTokenizer(nn.Module):
         return x
 
 
-
 class CategoricalTransformer(nn.Module):
     """
     FT-Transformer for categorical tabular features. 
