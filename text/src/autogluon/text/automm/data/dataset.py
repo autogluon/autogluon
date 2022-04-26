@@ -1,6 +1,7 @@
 import logging
 import torch
 import pandas as pd
+from typing import List
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..constants import (
     GET_ITEM_ERROR_RETRY, AUTOMM
@@ -19,8 +20,8 @@ class BaseDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         data: pd.DataFrame,
-        preprocessor: MultiModalFeaturePreprocessor,
-        processors: dict,
+        preprocessor: List[MultiModalFeaturePreprocessor],
+        processors: List[dict],
         is_training: bool = False,
     ):
         """
@@ -43,10 +44,11 @@ class BaseDataset(torch.utils.data.Dataset):
         self._consecutive_errors = 0
 
         self.lengths = []
-        for per_modality, per_modality_processors in processors.items():
-            per_modality_features = getattr(preprocessor, f"transform_{per_modality}")(data)
-            setattr(self, f"{per_modality}", per_modality_features)
-            self.lengths.append(len(per_modality_features[0]))
+        for i, (per_preprocessor, per_processors_group) in enumerate(zip(preprocessor, processors)):
+            for per_modality, per_modality_processors in per_processors_group.items():
+                per_modality_features = getattr(per_preprocessor, f"transform_{per_modality}")(data)
+                setattr(self, f"{per_modality}_{i}", per_modality_features)
+                self.lengths.append(len(per_modality_features[0]))
         assert len(set(self.lengths)) == 1
 
     def __len__(self):
@@ -75,9 +77,10 @@ class BaseDataset(torch.utils.data.Dataset):
         """
         ret = dict()
         try:
-            for per_modality, per_modality_processors in self.processors.items():
-                for per_model_processor in per_modality_processors:
-                    ret.update(per_model_processor(getattr(self, per_modality), idx, self.is_training))
+            for i, per_processors_group in enumerate(self.processors):
+                for per_modality, per_modality_processors in per_processors_group.items():
+                    for per_model_processor in per_modality_processors:
+                        ret.update(per_model_processor(getattr(self, f"{per_modality}_{i}"), idx, self.is_training))
         except Exception as e:
             logger.debug(f"Skipping sample {idx} due to '{e}'")
             self._consecutive_errors += 1
