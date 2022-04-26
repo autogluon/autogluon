@@ -45,7 +45,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
         self.lengths = []
         for i, (per_preprocessor, per_processors_group) in enumerate(zip(preprocessor, processors)):
-            for per_modality, per_modality_processors in per_processors_group.items():
+            for per_modality in per_processors_group:
                 per_modality_features = getattr(per_preprocessor, f"transform_{per_modality}")(data)
                 setattr(self, f"{per_modality}_{i}", per_modality_features)
                 self.lengths.append(len(per_modality_features[0]))
