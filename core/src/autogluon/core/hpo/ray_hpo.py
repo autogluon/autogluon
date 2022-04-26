@@ -40,7 +40,7 @@ class EmptySearchSpace(Exception):
     pass
 
 
-class RayTuneResourcesCalculator:
+class RayTuneResourcesCalculator(ABC):
     
     @staticmethod
     @abstractmethod
@@ -73,6 +73,8 @@ def run(
     minimum_gpu_per_trial: float = 1.0,
     model_estimate_memroy_usage: Optional(int) = None,
     time_budget_s: Optional(float) = None,
+    supported_searchers: Optional(List[str]) = None,
+    supported_schedulers: Optional(List[str]) = None,
     verbose: int = 1,  # 0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     **kwargs  # additional args being passed to tune.run
     ) -> tune.ExperimentAnalysis:
@@ -91,8 +93,8 @@ def run(
     search_space = _convert_search_space(search_space)
     if not search_space:
         raise EmptySearchSpace
-    searcher = _get_searcher(hyperparameter_tune_kwargs)
-    scheduler = _get_scheduler(hyperparameter_tune_kwargs)
+    searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=supported_searchers)
+    scheduler = _get_scheduler(hyperparameter_tune_kwargs, metric, mode, supported_schedulers=supported_schedulers)
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
         resources_per_trial = resource_calculator.get_resources_per_trial(
@@ -125,6 +127,8 @@ def run(
         verbose=verbose,
         local_dir=original_path,
         name=save_dir,
+        trial_dirname_creator=_trial_dirname_creator,
+        trial_name_creator=_trial_name_creator,
         **tune_kwargs
     )
     return analysis
@@ -133,6 +137,7 @@ def run(
 def cleanup_trials(experiment_dir: str, trials_to_keep: Optional(List[str])):
     """Cleanup trial artifacts and keep trials as specified"""
     pass
+
 
 def _trial_name_creator(trial):
     return trial.trial_id
@@ -160,12 +165,16 @@ def _convert_search_space(search_space: dict):
     return tune_search_space
 
 
-def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
+def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_searchers: Optional(List[str])=None):
     """Initialize searcher object"""
     searcher = hyperparameter_tune_kwargs.get('searcher')
     user_init_args = hyperparameter_tune_kwargs.get('searcher_init_args', dict())
     if isinstance(searcher, str):
         assert searcher in searcher_presets, f'{searcher} is not a valid option. Options are {searcher_presets.keys()}'
+        # Check supported schedulers for str input
+        if supported_searchers is not None:
+            if searcher not in supported_searchers:
+                logger.warning(f'{searcher} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers}')
         searcher_cls = searcher_presets.get(searcher)
         init_args = dict()
         if searcher_cls == HyperOptSearch:
@@ -173,15 +182,24 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
             init_args.update(user_init_args)
         searcher = searcher_cls(**init_args)
     assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in searcher_presets.values()
+    # Check supported schedulers for obj input
+    if supported_searchers is not None:
+        supported_searchers_cls = [scheduler_presets[scheduler] for scheduler in supported_searchers]
+        if searcher.__class__ in supported_searchers_cls:
+            logger.warning(f'{searcher.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers_cls}')
     return searcher
 
 
-def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
+def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_schedulers: Optional(List[str])=None):
     """Initialize scheduler object"""
     scheduler = hyperparameter_tune_kwargs.get('scheduler')
     user_init_args = hyperparameter_tune_kwargs.get('scheduler_init_args', dict())
     if isinstance(scheduler, str):
         assert scheduler in scheduler_presets, f'{scheduler} is not a valid option. Options are {scheduler_presets.keys()}'
+        # Check supported schedulers for str input
+        if supported_schedulers is not None:
+            if scheduler not in supported_schedulers:
+                logger.warning(f'{scheduler} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers}')
         scheduler_cls = scheduler_presets.get(scheduler)
         init_args = dict()
         if scheduler_cls == AsyncHyperBandScheduler:
@@ -189,6 +207,11 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str):
             init_args.update(user_init_args)
         scheduler = scheduler_cls(**init_args)
     assert isinstance(scheduler, TrialScheduler) and scheduler.__class__ in scheduler_presets.values()
+    # Check supported schedulers for obj input
+    if supported_schedulers is not None:
+        supported_schedulers_cls = [scheduler_presets[scheduler] for scheduler in supported_schedulers]
+        if scheduler.__class__ in supported_schedulers_cls:
+            logger.warning(f'{scheduler.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers_cls}')
     return scheduler
     
     
@@ -219,7 +242,6 @@ class TabularRayTuneResourcesCalculator(RayTuneResourcesCalculator):
         resources = dict(cpu=cpu_per_job)
         logger.log(20, f"Will run {num_parallel_jobs} jobs in parallel given number of cpu cores, memory avaialable, and user specification")
 
-        batches = math.ceil(num_samples / num_parallel_jobs)
         if num_gpus > 0:
             gpu_per_job = max(minimum_gpu_per_trial, num_gpus / num_parallel_jobs)
         resources = dict(cpu=cpu_per_job, gpu=gpu_per_job)
@@ -247,25 +269,30 @@ class AutommRayTuneResourcesCalculator(RayTuneResourcesCalculator):
         ) -> Union[dict, PlacementGroupFactory]:
         # Ray Tune requires 1 additional CPU per trial to use for the Trainable driver. 
         # So the actual number of cpu resources each trial requires is num_workers * num_cpus_per_worker + 1
+        # Each ray worker will reserve 1 gpu
         # The num_workers in ray stands for worker process to train the model
         # The num_workers in AutoMM stands for worker process to load data
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be an interger that is larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
         num_gpus = total_resources.get('num_gpus', 0)
         num_cpus = (num_cpus - num_parallel_jobs)  # reserve cpus for the master process
-        cpu_per_job = minimum_cpu_per_trial
+        cpu_per_job = None
         gpu_per_job = None
+        num_workers = None
         if num_gpus > 0:
             gpu_per_job = max(int(minimum_gpu_per_trial), num_gpus // num_samples)
+            num_workers = gpu_per_job  # each worker uses 1 gpu
             num_parallel_jobs = min(num_samples, num_gpus // gpu_per_job)
             assert num_cpus > 0
-            cpu_per_worker = max(minimum_cpu_per_trial, num_cpus // num_parallel_jobs)
+            cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_parallel_jobs)
+            cpu_per_worker = max(1, cpu_per_job // num_workers)
         else:
             # TODO: for cpu case, is it better to have more workers or more cpus per worker?
             cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_samples)
+            num_workers = cpu_per_job
             cpu_per_worker = 1
         resources_per_trial = get_tune_resources(
-            num_workers=gpu_per_job if gpu_per_job is not None else cpu_per_job,
+            num_workers=num_workers,
             num_cpus_per_worker=cpu_per_worker,
             use_gpu=(gpu_per_job is not None)
         )
@@ -276,6 +303,7 @@ class AutommRayTuneResourcesCalculator(RayTuneResourcesCalculator):
         assert isinstance(resources_per_trial, PlacementGroupFactory)
         trainable_args['hyperparameters']['env.num_gpus'] = resources_per_trial.required_resources.get('GPU', 0)
         trainable_args['hyperparameters']['env.num_workers'] = resources_per_trial.required_resources.get('CPU') - 1  # 1 cpu reserved for master process, which doesn't do training
+        trainable_args['hyperparameters']['env.num_nodes'] = 1  # num_nodes is not needed by ray lightning. Setting it to default, which is 1
         return trainable_args
 
 # def _get_resources_per_trial(

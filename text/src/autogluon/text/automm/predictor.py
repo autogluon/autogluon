@@ -398,7 +398,7 @@ class AutoMMPredictor:
         mode = _fit_args.get('mode')
         save_path = _fit_args.get('save_path')
         time_budget_s = _fit_args.get('max_time')
-        run(
+        analysis = run(
             trainable=self._fit,
             trainable_args=_fit_args,
             search_space=search_space,
@@ -409,7 +409,27 @@ class AutoMMPredictor:
             total_resources=resources,
             time_budget_s=time_budget_s
         )
-
+        # find the best trial
+        best_trial = analysis.get_best_trial(
+            metric=metric,
+            mode=mode,
+            scope='all',
+        )
+        # clean up other trials
+        # reload the predictor metadata
+        # construct the model
+        # average checkpoint
+        
+    def _hpo_fit_wrapper(self, config, original_path, checkpoint_dir=None, **_fit_args):
+        _fit_args['hyperparameters'] = config  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
+        if checkpoint_dir is not None:
+            _fit_args['resume'] = True
+            # TODO: add checkpoint name
+            _fit_args['ckpt_path'] = checkpoint_dir + checkpoint_filename
+        from ray import tune
+        os.chdir(original_path)
+        self._fit(**_fit_args)
+        
     def _fit(
             self,
             train_df: pd.DataFrame,
@@ -1083,36 +1103,17 @@ class AutoMMPredictor:
             )
         # In case that users save to a path, which is not the original save_path.
         if path != self._save_path:
-            shutil.copy(os.path.join(self._save_path, "model.ckpt"), path)
-
+            model_path = os.path.join(self._save_path, "model.ckpt")
+            if os.path.isfile(model_path):
+                shutil.copy(os.path.join(self._save_path, "model.ckpt"), path)
+                
     @classmethod
-    def load(
-            cls,
-            path: str,
-            resume: Optional[bool] = False,
-            verbosity: Optional[int] = 3,
+    def _load_metadata(
+        cls,
+        path: str,
+        resume: Optional[bool] = False,
+        verbosity: Optional[int] = 3,
     ):
-        """
-        Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
-        can be completely or partially trained by .fit(). If a previous training has completed,
-        it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
-        collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
-
-        Parameters
-        ----------
-        path
-            The directory to load the predictor object.
-        resume
-            Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
-            broken during the middle and we want to resume the training from the last saved checkpoint.
-        verbosity
-            Verbosity levels range from 0 to 4 and control how much information is printed.
-            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-
-        Returns
-        -------
-        The loaded predictor object.
-        """
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
@@ -1155,12 +1156,46 @@ class AutoMMPredictor:
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._df_preprocessor = df_preprocessor
         predictor._data_processors = data_processors
+        
+        return predictor
+
+    @classmethod
+    def load(
+            cls,
+            path: str,
+            resume: Optional[bool] = False,
+            verbosity: Optional[int] = 3,
+    ):
+        """
+        Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
+        can be completely or partially trained by .fit(). If a previous training has completed,
+        it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
+        collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
+
+        Parameters
+        ----------
+        path
+            The directory to load the predictor object.
+        resume
+            Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
+            broken during the middle and we want to resume the training from the last saved checkpoint.
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+
+        Returns
+        -------
+        The loaded predictor object.
+        """
+        path = os.path.expanduser(path)
+        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        predictor = cls._load_metadata(path=path, resume=resume, verbosity=verbosity)
 
         model = create_model(
-            config=config,
-            num_classes=assets["output_shape"],
-            num_numerical_columns=len(df_preprocessor.numerical_feature_names),
-            num_categories=df_preprocessor.categorical_num_categories,
+            config=predictor._config,
+            num_classes=predictor._output_shape,
+            num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
+            num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
 
