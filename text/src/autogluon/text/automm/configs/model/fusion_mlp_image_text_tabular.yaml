@@ -14,14 +14,14 @@ model:
     normalization: "layer_norm"
     data_types:
       - "categorical"
-  categorical_transformer:
-    out_features: 192
-    d_token: 192
-    num_trans_blocks: 0
-    num_attn_heads: 8
-    residual_dropout: 0.0
-    attention_dropout: 0.2
-    ffn_dropout: 0.1
+  # categorical_transformer:
+  #   out_features: 192
+  #   d_token: 192
+  #   num_trans_blocks: 0
+  #   num_attn_heads: 8
+  #   residual_dropout: 0.0
+  #   attention_dropout: 0.2
+  #   ffn_dropout: 0.1
   numerical_mlp:
     hidden_size: 128
     activation: "leaky_relu"
@@ -31,14 +31,14 @@ model:
     data_types:
       - "numerical"
     merge: "concat"
-  numerical_transformer:
-    out_features: 192
-    d_token: 192
-    num_trans_blocks: 0
-    num_attn_heads: 8
-    residual_dropout: 0.0
-    attention_dropout: 0.2
-    ffn_dropout: 0.1
+  # numerical_transformer:
+  #   out_features: 192
+  #   d_token: 192
+  #   num_trans_blocks: 0
+  #   num_attn_heads: 8
+  #   residual_dropout: 0.0
+  #   attention_dropout: 0.2
+  #   ffn_dropout: 0.1
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
     data_types:
@@ -90,12 +90,12 @@ model:
     drop_rate: 0.1
     normalization: "layer_norm"
     data_types:
-  fusion_transformer:
-    hidden_size: 192
-    n_blocks: 3
-    attention_n_heads: 8
-    adapt_in_features: "max"
-    attention_dropout: 0.2
-    residual_dropout: 0.0
-    ffn_dropout: 0.1 
-    ffn_d_hidden: 192  
+  # fusion_transformer:
+  #   hidden_size: 192
+  #   n_blocks: 3
+  #   attention_n_heads: 8
+  #   adapt_in_features: "max"
+  #   attention_dropout: 0.2
+  #   residual_dropout: 0.0
+  #   ffn_dropout: 0.1 
+  #   ffn_d_hidden: 192  

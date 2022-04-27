@@ -337,6 +337,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
             "model.categorical_transformer.attention_dropout": 0.2,
             "model.categorical_transformer.ffn_dropout": 0.1,
         },
+
     ]
 )
 def test_customizing_model_names(
