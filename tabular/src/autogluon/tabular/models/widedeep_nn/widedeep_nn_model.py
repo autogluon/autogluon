@@ -2,6 +2,7 @@ import logging
 import time
 
 import numpy as np
+import pandas as pd
 
 from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
@@ -152,6 +153,12 @@ class WideDeepNNModel(AbstractModel):
         self.params_trained['epochs'] = params['epochs']
         self.params_trained['best_epoch'] = best_epoch
 
+    def _preprocess(self, X: pd.DataFrame, **kwargs):
+        X = super()._preprocess(X, **kwargs)
+        X = self.missing_filler.transform(X)
+        X = self._tab_preprocessor.transform(X)
+        return X
+
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
         X = self.missing_filler.transform(X)
@@ -274,8 +281,10 @@ class WideDeepNNModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
+    # TODO: Fix refit-full (currently implemented using 10% as a validation set because early stopping is requires stopping metric
+    #  - re-implement refit callback to use only best_epoch
     def _more_tags(self):
-        return {'can_refit_full': True}
+        return {'can_refit_full': False}
 
     def _get_default_resources(self):
         # Optimal is likely 1, but specifying number of CPUs > 0 is causing crashes in jupyter (but works in IPython/CLI runs)

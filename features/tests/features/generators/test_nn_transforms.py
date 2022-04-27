@@ -6,7 +6,6 @@ from pandas._testing import assert_series_equal, assert_frame_equal
 from sklearn.preprocessing import RobustScaler
 
 from autogluon.common.features.types import S_TEXT_SPECIAL, R_FLOAT, R_DATETIME
-from autogluon.core.constants import REGRESSION, QUANTILE, BINARY
 from autogluon.features.nn_transforms import ContinuousNormalizer, MissingFiller, CategoricalFeaturesFilter, TargetScaler
 
 
@@ -113,7 +112,7 @@ def test_categorical_features_filter_numerics():
 
 
 def test_target_scaler_regression():
-    scaler = TargetScaler(REGRESSION)
+    scaler = TargetScaler('regression')
     y = pd.Series([100, 200, 3000, 200])
     y_val = pd.Series([100, 200, 300, 200])
     y_tx, y_val_tx = scaler.fit_transform(y, y_val)
@@ -129,7 +128,7 @@ def test_target_scaler_regression():
 
 
 def test_target_scaler_quantile():
-    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type=QUANTILE)
+    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type='quantile')
 
     # Forward fit-transform
     y_tx_exp = pd.Series([0.0, 0.03448276, 1.0, 0.03448276])
@@ -142,7 +141,7 @@ def test_target_scaler_quantile():
 
 
 def test_target_scaler_other():
-    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type=BINARY)
+    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type='binary')
 
     # Forward fit-transform
     assert np.allclose(y, y_tx, rtol=1e-05, atol=1e-08, equal_nan=False)
@@ -154,7 +153,7 @@ def test_target_scaler_other():
 
 
 def test_target_scaler_custom_scaler():
-    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type=REGRESSION, y_scaler=RobustScaler())
+    scaler, y, y_val, y_tx, y_val_tx = __scaler_setup(problem_type='regression', y_scaler=RobustScaler())
 
     # Forward fit-transform
     y_tx_exp = pd.Series([-0.137931, 0.0, 3.862069, 0.0])

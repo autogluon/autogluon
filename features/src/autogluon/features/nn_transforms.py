@@ -5,7 +5,6 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from autogluon.common.features.types import R_FLOAT, R_DATETIME, S_TEXT_SPECIAL
-from autogluon.core.constants import REGRESSION, QUANTILE
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +72,9 @@ class TargetScaler:
     def __init__(self, problem_type, y_scaler=None) -> None:
         self.problem_type = problem_type
         if y_scaler is None:
-            if problem_type == REGRESSION:
+            if problem_type == 'regression':
                 self.y_scaler = StandardScaler()
-            elif problem_type == QUANTILE:
+            elif problem_type == 'quantile':
                 self.y_scaler = MinMaxScaler()
             else:
                 self.y_scaler = None
@@ -83,7 +82,7 @@ class TargetScaler:
             self.y_scaler = copy.deepcopy(y_scaler)
 
     def fit_transform(self, y, y_val):
-        if self.problem_type in [REGRESSION, QUANTILE] and self.y_scaler is not None:
+        if self.problem_type in ['regression', 'quantile'] and self.y_scaler is not None:
             y_norm = pd.Series(self.y_scaler.fit_transform(y.values.reshape(-1, 1)).reshape(-1))
             y_val_norm = pd.Series(self.y_scaler.transform(y_val.values.reshape(-1, 1)).reshape(-1)) if y_val is not None else None
             logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
