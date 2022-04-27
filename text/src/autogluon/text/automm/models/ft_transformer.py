@@ -487,7 +487,6 @@ class FT_Transformer(nn.Module):
                 'rtdl.Transformer.WARNINGS dictionary.',
                 UserWarning,
             )
-            time.sleep(3)
 
         def make_kv_compression():
             assert (

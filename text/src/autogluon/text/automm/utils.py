@@ -607,9 +607,9 @@ def create_model(
                 d_token=model_config.d_token,
                 n_blocks=model_config.num_trans_blocks,
                 attention_n_heads=model_config.num_attn_heads,
-                attention_dropout=model_config.dropout,
-                residual_dropout=model_config.dropout,
-                ffn_dropout=model_config.dropout,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
@@ -631,9 +631,9 @@ def create_model(
                 d_token=model_config.d_token,
                 n_blocks=model_config.num_trans_blocks,
                 attention_n_heads=model_config.num_attn_heads,
-                attention_dropout=model_config.dropout,
-                residual_dropout=model_config.dropout,
-                ffn_dropout=model_config.dropout,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(FUSION_MLP):
@@ -655,8 +655,12 @@ def create_model(
                 prefix=model_name,
                 hidden_features=model_config.hidden_size,
                 num_classes=num_classes,
+                attention_n_heads=model_config.attention_n_heads,
+                attention_dropout=model_config.attention_dropout,
                 adapt_in_features=model_config.adapt_in_features,
-                dropout_prob=model_config.drop_rate,
+                residual_dropout=model_config.residual_dropout,
+                ffn_d_hidden=model_config.ffn_d_hidden,
+                ffn_dropout=model_config.ffn_dropout,
                 loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
