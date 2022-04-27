@@ -756,97 +756,127 @@ class AutoMMPredictor:
             )
 
         if trainer.global_rank == 0:
-            top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
-            # Obtain the best K models sorted from the best performance to the worst performance
-            best_k_models_sorted = sorted(list(checkpoint_callback.best_k_models.items()),
-                                          key=lambda ele: ele[1], reverse=(minmax_mode == MAX))
-            best_k_models_path = [ele[0] for ele in best_k_models_sorted]
-
-            # TODO(?) Currently, all top-K checkpoints are loaded to the main memory.
-            #  If the checkpoints are really large (e.g., super-giant backbones), this operation can take a lot of
-            #  CPU memory and may potentially trigger memory issue. Consider to optimize that using the
-            #  offload strategy.
-            all_state_dicts = gather_top_k_ckpts(
-                ckpt_dir=save_path,
-                ckpt_paths=best_k_models_path,
-            )
-            if is_distill:
-                all_state_dicts = self._replace_model_name_prefix(
-                    state_dicts=all_state_dicts,
-                    old_prefix="student_model",
-                    new_prefix="model",
-                )
-            if config.optimization.top_k_average_method == UNIFORM_SOUP:
-                logger.info(
-                    f"Start to fuse {config.optimization.top_k} checkpoints via the uniform soup algorithm."
-                )
-                ingredients = all_state_dicts
-            else:
-                if not best_k_models_path:
-                    # In the case of ddp_spawn, the best_k_models_path can be empty. This is due the
-                    # limitation of PT Lightning: https://github.com/PyTorchLightning/pytorch-lightning/issues/5582
-                    # Thus, we will need to reevaluate the validation performance of these checkpoints
-                    candidate_performance = []
-                    for cand_state_dict in all_state_dicts:
-                        self._model = self._load_state_dict(
-                            model=model,
-                            state_dict=cand_state_dict,
-                        )
-                        candidate_performance.append(self.evaluate(val_df,
-                                                                   [validation_metric_name])[validation_metric_name])
-                    all_state_dicts = [v[0] for v in sorted(zip(all_state_dicts, candidate_performance),
-                                                            key=lambda ele: ele[1], reverse=(minmax_mode == MAX))]
-                if config.optimization.top_k_average_method == GREEDY_SOUP:
-                    # Select the ingredients based on the methods proposed in paper
-                    #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
-                    #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-                    monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
-
-                    logger.info(
-                        f"Start to fuse {config.optimization.top_k} checkpoints via the greedy soup algorithm."
-                    )
-                    avg_state_dict = all_state_dicts[0]
-                    ingredients = [all_state_dicts[0]]
-                    self._model = self._load_state_dict(
-                        model=model,
-                        state_dict=avg_state_dict,
-                    )
-                    best_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                    for i in range(1, len(all_state_dicts)):
-                        cand_avg_state_dict = average_checkpoints(
-                            all_state_dicts=ingredients + [all_state_dicts[i]],
-                        )
-                        self._model = self._load_state_dict(
-                            model=self._model,
-                            state_dict=cand_avg_state_dict,
-                        )
-                        cand_performance = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                        if monitor_op(cand_performance, best_performance):
-                            # Add new ingredient
-                            ingredients.append(all_state_dicts[i])
-                            best_performance = cand_performance
-                elif config.optimization.top_k_average_method == BEST:
-                    ingredients = [all_state_dicts[0]]
-                else:
-                    raise ValueError(
-                        f"The key for 'optimization.top_k_average_method' is not supported. "
-                        f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
-                        f"The provided value is '{config.optimization.top_k_average_method}'."
-                    )
-            # Average all the ingredients
-            avg_state_dict = average_checkpoints(
-                all_state_dicts=ingredients,
-                out_path=top_k_avg_ckpt_path,
-            )
-            self._model = self._load_state_dict(
+            self._top_k_average(
                 model=model,
-                state_dict=avg_state_dict,
+                save_path=save_path,
+                checkpoint_callback=checkpoint_callback,
+                minmax_mode=minmax_mode,
+                is_distill=is_distill,
+                config=config,
+                val_df=val_df,
+                validation_metric_name=validation_metric_name,
             )
-
         else:
             sys.exit(
                 f"Training finished, exit the process with global_rank={trainer.global_rank}..."
             )
+
+    def _top_k_average(
+            self,
+            model,
+            save_path,
+            checkpoint_callback,
+            minmax_mode,
+            is_distill,
+            config,
+            val_df,
+            validation_metric_name,
+    ):
+
+        top_k_model_paths = checkpoint_callback.best_k_models.keys()
+        if is_distill:
+            prefix = "student_model."
+        else:
+            prefix = "model."
+
+        if config.optimization.top_k_average_method == UNIFORM_SOUP:
+            logger.info(
+                f"Start to fuse {len(checkpoint_callback.best_k_models)} checkpoints via the uniform soup algorithm."
+            )
+            ingredients = top_k_model_paths
+        else:
+            # In the case of ddp_spawn, the checkpoint_callback.best_k_models.values() can be empty. This is due the
+            # limitation of PT Lightning: https://github.com/PyTorchLightning/pytorch-lightning/issues/5582
+            # Thus, we will need to reevaluate the validation performance of these checkpoints
+            logger.info(
+                f"Evaluate {len(checkpoint_callback.best_k_models)} checkpoints and "
+                f"sort them in a decreasing order based on their performances."
+            )
+            top_k_model_scores = []
+            for per_model_path in top_k_model_paths:
+                self._model = self._load_state_dict(
+                    model=model,
+                    path=per_model_path,
+                    prefix=prefix,
+                )
+                top_k_model_scores.append(
+                    self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                )
+
+            top_k_model_paths = [
+                v[0] for v in sorted(
+                    zip(top_k_model_paths, top_k_model_scores),
+                    key=lambda ele: ele[1],
+                    reverse=(minmax_mode == MAX),
+                )
+            ]
+            if config.optimization.top_k_average_method == GREEDY_SOUP:
+                # Select the ingredients based on the methods proposed in paper
+                #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
+                #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
+                monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
+
+                logger.info(
+                    f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm."
+                )
+
+                ingredients = [top_k_model_paths[0]]
+                self._model = self._load_state_dict(
+                    model=model,
+                    path=top_k_model_paths[0],
+                    prefix=prefix,
+                )
+                best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                for i in range(1, len(top_k_model_paths)):
+                    cand_avg_state_dict = average_checkpoints(
+                        checkpoint_paths=ingredients + [top_k_model_paths[i]],
+                    )
+                    self._model = self._load_state_dict(
+                        model=self._model,
+                        state_dict=cand_avg_state_dict,
+                        prefix=prefix,
+                    )
+                    cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                    if monitor_op(cand_score, best_score):
+                        # Add new ingredient
+                        ingredients.append(top_k_model_paths[i])
+                        best_performance = cand_score
+            elif config.optimization.top_k_average_method == BEST:
+                ingredients = [top_k_model_paths[0]]
+            else:
+                raise ValueError(
+                    f"The key for 'optimization.top_k_average_method' is not supported. "
+                    f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
+                    f"The provided value is '{config.optimization.top_k_average_method}'."
+                )
+        # Average all the ingredients
+        avg_state_dict = average_checkpoints(
+            checkpoint_paths=ingredients,
+        )
+        self._model = self._load_state_dict(
+            model=model,
+            state_dict=avg_state_dict,
+            prefix=prefix,
+        )
+
+        if is_distill:
+            avg_state_dict = self._replace_model_name_prefix(
+                state_dicts=avg_state_dict,
+                old_prefix="student_model",
+                new_prefix="model",
+            )
+        checkpoint = {"state_dict": avg_state_dict}
+        torch.save(checkpoint, os.path.join(save_path, "model.ckpt"))
 
     def _predict(
             self,
@@ -1159,8 +1189,16 @@ class AutoMMPredictor:
             return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)
 
     @staticmethod
-    def _load_state_dict(model, state_dict):
-        state_dict = {k.partition('model.')[2]: v for k, v in state_dict.items()}
+    def _load_state_dict(
+            model: nn.Module,
+            state_dict: dict = None,
+            path: str = None,
+            prefix: str = "model."
+    ):
+        if state_dict is None:
+            state_dict = torch.load(path)["state_dict"]
+        state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
+
         model.load_state_dict(state_dict)
         return model
 
@@ -1338,7 +1376,7 @@ class AutoMMPredictor:
                         f"final checkpoint '{final_ckpt_path}' both don't exist. "
                         f"Consider starting training from scratch."
                     )
-            checkpoint = torch.load(resume_ckpt_path)
+            load_path = resume_ckpt_path
             logger.info(f"Resume training from checkpoint: '{resume_ckpt_path}'")
             ckpt_path = resume_ckpt_path
         else:  # load a model checkpoint for prediction, evaluation, or continuing training on new data
@@ -1355,13 +1393,13 @@ class AutoMMPredictor:
                         f"final checkpoint '{final_ckpt_path}' both don't exist. "
                         f"Consider starting training from scratch."
                     )
-            checkpoint = torch.load(final_ckpt_path)
+            load_path = final_ckpt_path
             logger.info(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
             ckpt_path = None  # must set None since we do not resume training
 
         model = cls._load_state_dict(
             model=model,
-            state_dict=checkpoint["state_dict"],
+            path=load_path,
         )
 
         predictor._ckpt_path = ckpt_path
