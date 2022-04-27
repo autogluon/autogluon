@@ -417,7 +417,7 @@ class AutoMMPredictor:
         )
         # clean up other trials
         # reload the predictor metadata
-        predictor = self.__class__._load_metadata(path=os.path.join(save_path, trial.trial_id))
+        predictor = self.__class__._load_metadata(path=os.path.join(save_path, best_trial.trial_id))
         # construct the model
         model = create_model(
             config=predictor._config,
@@ -426,7 +426,19 @@ class AutoMMPredictor:
             num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False # set "pretrain=False" to prevent downloading online models
         )
+        predictor._model = model
         # average checkpoint
+        predictor._top_k_average(
+            save_path=predictor._save_path,
+            best_k_models=[],
+            val_df=_fit_args['val_df'],
+            validation_metric_name=predictor._validation_metric_name,
+            minmax_mode=mode,
+            config=predictor._config,
+            model=predictor._model
+        )
+        
+        return predictor
         
     def _hpo_fit_wrapper(self, config, original_path, checkpoint_dir=None, **_fit_args):
         _fit_args['hyperparameters'] = config  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
@@ -454,7 +466,8 @@ class AutoMMPredictor:
             enable_progress_bar: bool,
             config: Optional[dict] = None,
             hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-            hpo_mode: bool = False
+            hpo_mode: bool = False,
+            **hpo_kwargs
     ):
         if self._config is None:
             config = get_config(
@@ -598,16 +611,19 @@ class AutoMMPredictor:
                               'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
                 precision = 32
 
-        if num_gpus <= 1:
-            strategy = None
+        if not hpo_mode:
+            if num_gpus <= 1:
+                strategy = None
+            else:
+                strategy = config.env.strategy
         else:
-            strategy = config.env.strategy
+            strategy = hpo_kwargs.get('_ray_lightning_plugin')
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus,
+                gpus=num_gpus if not hpo_mode else None,
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
@@ -646,8 +662,18 @@ class AutoMMPredictor:
             )
 
         if trainer.global_rank == 0:
-            pass
-
+            # We do not perform averaging checkpoint in the case of hpo for each trial
+            # We only averaging the checkpoint of the best trial in the end in the master process
+            if not hpo_mode:
+                self._top_k_average(
+                    save_path=save_path,
+                    best_k_models=list(checkpoint_callback.best_k_models.items()),
+                    val_df=val_df,
+                    validation_metric_name=validation_metric_name,
+                    minmax_mode=minmax_mode,
+                    config=config,
+                    model=model
+                )
         else:
             sys.exit(
                 f"Training finished, exit the process with global_rank={trainer.global_rank}..."
@@ -661,6 +687,7 @@ class AutoMMPredictor:
         #  If the checkpoints are really large (e.g., super-giant backbones), this operation can take a lot of
         #  CPU memory and may potentially trigger memory issue. Consider to optimize that using the
         #  offload strategy.
+        # TODO: adapt this to ray checkpoint
         all_state_dicts = gather_top_k_ckpts(
             ckpt_dir=save_path,
             ckpt_paths=best_k_models_path,

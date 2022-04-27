@@ -13,6 +13,7 @@ try_import_ray()
 import ray
 
 from ray import tune
+from ray_lightning import RayPlugin
 from ray.tune import PlacementGroupFactory
 from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler
 from ray.tune.suggest import SearchAlgorithm, Searcher
@@ -40,9 +41,19 @@ class EmptySearchSpace(Exception):
     pass
 
 
-class RayTuneResourcesCalculator(ABC):
+class RayTuneAdapter(ABC):
+    """
+    Abstract class to get module specific resource, and to update module specific arguments
+    Instance of this class should be passed to `run` to provide custom behavior
+    """
     
-    @staticmethod
+    @abstractmethod
+    def __init__(self):
+        self.num_parallel_jobs = None
+        self.cpu_per_job = None
+        self.gpu_per_job = None
+        self.resources_per_trial = None
+    
     @abstractmethod
     def get_resources_per_trial(total_resources: dict, num_samples: int, **kwargs) -> Union[dict, PlacementGroupFactory]:
         """
@@ -50,9 +61,8 @@ class RayTuneResourcesCalculator(ABC):
         """
         raise NotImplementedError
     
-    @staticmethod
     @abstractmethod
-    def resources_per_trial_update_method(trainable_args: dict, resources_per_trial: Union[dict, PlacementGroupFactory]) -> dict:
+    def trainable_args_update_method(trainable_args: dict) -> dict:
         """
         Update trainable_args being passed to tune.run with correct resources for each trial. This can differ in forms for different predictor
         """
@@ -67,7 +77,7 @@ def run(
     metric: str,
     mode: str,  # must be one of [min, max]
     save_dir: str,  # directory to save results. Ray will write artifacts to save_dir/trial_dir/
-    resource_calculator: RayTuneResourcesCalculator,
+    resource_calculator: RayTuneAdapter,
     total_resources: Optional(dict) = dict(),
     minimum_cpu_per_trial: int = 1,
     minimum_gpu_per_trial: float = 1.0,
@@ -104,7 +114,7 @@ def run(
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             model_estimate_memroy_usage=model_estimate_memroy_usage
         )
-    trainable_args = resource_calculator.resources_per_trial_update_method(trainable_args, resources_per_trial)
+    trainable_args = resource_calculator.trainable_args_update_method(trainable_args)
     tune_kwargs = _get_default_tune_kwargs()
     tune_kwargs.update(kwargs)
 
@@ -215,10 +225,10 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, sup
     return scheduler
     
     
-class TabularRayTuneResourcesCalculator(RayTuneResourcesCalculator):
+class TabularRayTuneResourcesCalculator(RayTuneAdapter):
     
-    @staticmethod
     def get_resources_per_trial(
+        self,
         total_resources: dict,
         num_samples: int,
         minimum_cpu_per_trial: int = 1,
@@ -246,20 +256,28 @@ class TabularRayTuneResourcesCalculator(RayTuneResourcesCalculator):
             gpu_per_job = max(minimum_gpu_per_trial, num_gpus / num_parallel_jobs)
         resources = dict(cpu=cpu_per_job, gpu=gpu_per_job)
         
+        self.num_parallel_jobs = num_parallel_jobs
+        self.cpu_per_job = cpu_per_job
+        self.gpu_per_job = gpu_per_job
+        self.resources_per_trial = resources
+        
         return resources
     
-    @staticmethod
-    def resources_per_trial_update_method(trainable_args: dict, resources_per_trial: Union[dict, PlacementGroupFactory]) -> dict:
-        assert isinstance(resources_per_trial, dict)
-        trainable_args['fit_kwargs']['num_cpus'] = resources_per_trial.get('cpu', 1)
-        trainable_args['fit_kwargs']['num_gpus'] = resources_per_trial.get('gpu', 0)
+    def trainable_args_update_method(self, trainable_args: dict) -> dict:
+        trainable_args['fit_kwargs']['num_cpus'] = self.resources_per_trial.get('cpu', 1)
+        trainable_args['fit_kwargs']['num_gpus'] = self.resources_per_trial.get('gpu', 0)
         return trainable_args
     
     
-class AutommRayTuneResourcesCalculator(RayTuneResourcesCalculator):
+class AutommRayTuneResourcesCalculator(RayTuneAdapter):
     
-    @staticmethod
+    def __init__(self):
+        super().__init__()
+        self.num_workers = None
+        self.cpu_per_worker = None
+    
     def get_resources_per_trial(
+        self,
         total_resources: dict,
         num_samples: int,
         minimum_cpu_per_trial: int = 1,
@@ -296,14 +314,25 @@ class AutommRayTuneResourcesCalculator(RayTuneResourcesCalculator):
             num_cpus_per_worker=cpu_per_worker,
             use_gpu=(gpu_per_job is not None)
         )
+        
+        self.num_parallel_jobs = num_parallel_jobs
+        self.cpu_per_job = cpu_per_job
+        self.gpu_per_job = gpu_per_job
+        self.resources_per_trial = resources_per_trial
+        self.num_workers = num_workers
+        self.cpu_per_worker = cpu_per_worker
+        
         return resources_per_trial
         
-    @staticmethod
-    def resources_per_trial_update_method(trainable_args: dict, resources_per_trial: Union[dict, PlacementGroupFactory]) -> dict:
-        assert isinstance(resources_per_trial, PlacementGroupFactory)
-        trainable_args['hyperparameters']['env.num_gpus'] = resources_per_trial.required_resources.get('GPU', 0)
-        trainable_args['hyperparameters']['env.num_workers'] = resources_per_trial.required_resources.get('CPU') - 1  # 1 cpu reserved for master process, which doesn't do training
+    def trainable_args_update_method(self, trainable_args: dict) -> dict:
+        trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job
+        trainable_args['hyperparameters']['env.num_workers'] = self.cpu_per_job
         trainable_args['hyperparameters']['env.num_nodes'] = 1  # num_nodes is not needed by ray lightning. Setting it to default, which is 1
+        trainable_args['_ray_lightning_plugin'] = RayPlugin(
+                                                    num_workers=self.num_workers,
+                                                    num_cpus_per_worker=self.cpu_per_worker,
+                                                    use_gpu=self.gpu_per_job is not None,
+                                                )
         return trainable_args
 
 # def _get_resources_per_trial(
