@@ -215,9 +215,9 @@ class MultimodalFusionMLP(nn.Module):
 
 class MultimodalFusionTransformer(nn.Module):
     """
-    Use MLP to fuse different models' features (single-modal and multimodal).
+    Use Transformer to fuse different models' features (single-modal and multimodal).
     Specifically, it adapts the features of each model to specified dimensions,
-    concatenates the adapted features, and fuses the features through MLP.
+    concatenates the adapted features, and fuses the features through Transformer.
     """
 
     def __init__(
@@ -226,8 +226,23 @@ class MultimodalFusionTransformer(nn.Module):
             models: list,
             hidden_features: int,
             num_classes: int,
+            n_blocks: Optional[int] = 0,
+            attention_n_heads: Optional[int] = 8,
+            attention_initialization: Optional[str] = 'kaiming',
+            attention_normalization: Optional[str] = 'LayerNorm',
+            attention_dropout: Optional[str] = 0.2, 
+            residual_dropout: Optional[str] = 0.0,
+            ffn_activation: Optional[str] = 'ReGLU',
+            ffn_normalization: Optional[str] = 'LayerNorm',
+            ffn_d_hidden: Optional[str] = 192,
+            ffn_dropout: Optional[str] = 0.0,
+            prenormalization: Optional[bool] = True,
+            first_prenormalization: Optional[bool] =  False,
+            kv_compression_ratio: Optional[float] = None,
+            kv_compression_sharing: Optional[str] = None,
+            head_activation: Optional[str] =  'ReLU',
+            head_normalization: Optional[str] = 'LayerNorm',
             adapt_in_features: Optional[str] = None,
-            dropout_prob: Optional[float] = 0.5,
             loss_weight: Optional[float] = None,
     ):
         super().__init__()
@@ -256,33 +271,34 @@ class MultimodalFusionTransformer(nn.Module):
 
         self.fusion_transformer = FT_Transformer(
             d_token=in_features,
-            n_blocks=3,
-            attention_n_heads=8,
-            attention_dropout=0.2,
-            attention_initialization='kaiming',
-            attention_normalization='LayerNorm',
-            ffn_d_hidden=192,
-            ffn_dropout=0.1,
-            ffn_activation='ReGLU',
-            ffn_normalization='LayerNorm',
-            residual_dropout=0.0,
-            prenormalization=True,
-            first_prenormalization=False,
+            n_blocks=n_blocks,
+            attention_n_heads=attention_n_heads,
+            attention_dropout=attention_dropout,
+            attention_initialization=attention_initialization,
+            attention_normalization=attention_normalization,
+            ffn_d_hidden=ffn_d_hidden,
+            ffn_dropout=ffn_dropout,
+            ffn_activation=ffn_activation,
+            ffn_normalization=ffn_normalization,
+            residual_dropout=residual_dropout,
+            prenormalization=prenormalization,
+            first_prenormalization=first_prenormalization,
             last_layer_query_idx=None,
             n_tokens=None,
-            kv_compression_ratio=None,
-            kv_compression_sharing=None,
-            head_activation='ReLU',
-            head_normalization='LayerNorm',
+            kv_compression_ratio=kv_compression_ratio,
+            kv_compression_sharing=kv_compression_sharing,
+            head_activation=head_activation,
+            head_normalization=head_normalization,
             d_out=hidden_features,
+            projection=False
         )
 
         self.head = FT_Transformer.Head(
             d_in=in_features,
             d_out=num_classes,
             bias=True,
-            activation='ReLU', 
-            normalization='LayerNorm',
+            activation=head_activation, 
+            normalization=head_normalization,
         )
         
         # init weights

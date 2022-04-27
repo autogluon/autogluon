@@ -99,7 +99,7 @@ class  NumericalTransformer(nn.Module):
         residual_dropout: Optional[str] = 0.0,
         ffn_activation: Optional[str] = 'ReGLU',
         ffn_normalization: Optional[str] = 'LayerNorm',
-        ffn_d_hidden: Optional[str] = 6,
+        ffn_d_hidden: Optional[str] = 192,
         ffn_dropout: Optional[str] = 0.0,
         prenormalization: Optional[bool] = True,
         first_prenormalization: Optional[bool] =  False,
