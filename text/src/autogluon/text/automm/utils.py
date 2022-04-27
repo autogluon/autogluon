@@ -841,31 +841,33 @@ def gather_top_k_ckpts(
 
 
 def average_checkpoints(
-        all_state_dicts: List[Dict],
-        out_path: Optional[str] = None,
+        checkpoint_paths: List[str],
 ):
     """
-    Average the state_dicts of top k checkpoints.
+    Average a list of checkpoints' state_dicts.
 
     Parameters
     ----------
-    all_state_dicts
-        A list of Pytorch state_dicts.
-    out_path
-        The path to save the averaged checkpoint.
+    checkpoint_paths
+        A list of model checkpoint paths.
 
     Returns
     -------
     The averaged state_dict.
     """
     avg_state_dict = {}
-    for key in all_state_dicts[0]:
-        arr = [state_dict[key] for state_dict in all_state_dicts]
-        avg_state_dict[key] = sum(arr) / len(arr)
+    for per_path in checkpoint_paths:
+        state_dict = torch.load(per_path)["state_dict"]
+        for key in state_dict:
+            if key in avg_state_dict:
+                avg_state_dict[key] += state_dict[key]
+            else:
+                avg_state_dict[key] = state_dict[key]
+        del state_dict
 
-    if out_path:
-        checkpoint = {"state_dict": avg_state_dict}
-        torch.save(checkpoint, out_path)
+    num = torch.tensor(len(checkpoint_paths))
+    for key in avg_state_dict:
+        avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
 
     return avg_state_dict
 
