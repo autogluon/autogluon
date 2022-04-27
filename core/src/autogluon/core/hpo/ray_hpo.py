@@ -77,7 +77,7 @@ def run(
     metric: str,
     mode: str,  # must be one of [min, max]
     save_dir: str,  # directory to save results. Ray will write artifacts to save_dir/trial_dir/
-    resource_calculator: RayTuneAdapter,
+    ray_tune_adapter: RayTuneAdapter,
     total_resources: Optional(dict) = dict(),
     minimum_cpu_per_trial: int = 1,
     minimum_gpu_per_trial: float = 1.0,
@@ -107,14 +107,14 @@ def run(
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, metric, mode, supported_schedulers=supported_schedulers)
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
-        resources_per_trial = resource_calculator.get_resources_per_trial(
+        resources_per_trial = ray_tune_adapter.get_resources_per_trial(
             total_resources=total_resources,
             num_samples=num_samples,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             model_estimate_memroy_usage=model_estimate_memroy_usage
         )
-    trainable_args = resource_calculator.trainable_args_update_method(trainable_args)
+    trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     tune_kwargs = _get_default_tune_kwargs()
     tune_kwargs.update(kwargs)
 
@@ -225,7 +225,7 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, sup
     return scheduler
     
     
-class TabularRayTuneResourcesCalculator(RayTuneAdapter):
+class TabularRayTuneAdapter(RayTuneAdapter):
     
     def get_resources_per_trial(
         self,
@@ -269,7 +269,7 @@ class TabularRayTuneResourcesCalculator(RayTuneAdapter):
         return trainable_args
     
     
-class AutommRayTuneResourcesCalculator(RayTuneAdapter):
+class AutommRayTuneAdapter(RayTuneAdapter):
     
     def __init__(self):
         super().__init__()

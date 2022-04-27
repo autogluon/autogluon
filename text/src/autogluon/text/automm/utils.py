@@ -787,6 +787,7 @@ def make_exp_dir(
 
 
 def gather_top_k_ckpts(
+        ckpt_prefix: Optional[str] = None,
         ckpt_dir: Optional[str] = None,
         ckpt_paths: Optional[List[str]] = None,
 ):
@@ -798,6 +799,8 @@ def gather_top_k_ckpts(
 
     Parameters
     ----------
+    ckpt_prefix
+        The prefix of the checkpoint file
     ckpt_dir
         The directory where we save all the top k checkpoints.
     ckpt_paths
@@ -809,10 +812,12 @@ def gather_top_k_ckpts(
         A list of state_dicts
     """
     if not ckpt_paths:
+        assert ckpt_prefix is not None
         ckpt_paths = []
-        for file_name in sorted(os.listdir(ckpt_dir), reverse=True):
-            if file_name.startswith("epoch"):
-                ckpt_paths.append(os.path.join(ckpt_dir, file_name))
+        for root, dirs, files in os.walk(ckpt_dir):
+            for file in files:
+                if file.startswith(ckpt_prefix):
+                    ckpt_paths.append(os.path.join(root, file))
 
     all_state_dicts = []
     for path in ckpt_paths:

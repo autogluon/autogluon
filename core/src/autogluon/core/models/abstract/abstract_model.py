@@ -23,7 +23,7 @@ from ._tags import _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ...hpo import run, EmptySearchSpace
+from ...hpo import run, EmptySearchSpace, TabularRayTuneAdapter
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -984,11 +984,6 @@ class AbstractModel:
             val_path=val_path,
             original_path=os.getcwd(),
         )
-        
-        def resources_per_trial_update_method(train_fn_kwargs, resources_per_trial):
-            train_fn_kwargs['fit_kwargs']['num_cpus'] = resources_per_trial.get('cpu', 1)
-            train_fn_kwargs['fit_kwargs']['num_gpus'] = resources_per_trial.get('gpu', 0)
-            return train_fn_kwargs
 
         try:
             analysis = run(
@@ -999,8 +994,8 @@ class AbstractModel:
                 metric='validation_performance',
                 mode='max',
                 save_dir=directory,
+                ray_tune_adapter=TabularRayTuneAdapter(),
                 total_resources=resources,
-                resources_per_trial_update_method=resources_per_trial_update_method,
                 minimum_gpu_per_trial=0.1,
                 model_estimate_memroy_usage=model_estimate_memory_usage,
                 time_budget_s=time_limit

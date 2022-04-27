@@ -20,13 +20,11 @@ import pytorch_lightning as pl
 from packaging import version
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
-from autogluon.core.hpo import run, EmptySearchSpace
+from autogluon.core.hpo import run, EmptySearchSpace, AutommRayTuneAdapter
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
-from ray_lightning.tune import TuneReportCallback, TuneReportCheckpointCallback, get_tune_resources
-from ray_lightning import RayPlugin
 
 from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
@@ -65,6 +63,8 @@ from .optimization.lit_module import LitModule
 from .. import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
+
+RAY_TUNE_CHECKPOINT_PREFIX = 'ray_tune_checkpoint'
 
 
 class AutoMMPredictor:
@@ -393,7 +393,13 @@ class AutoMMPredictor:
         return self
     
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
+        config = _fit_args.get('config', None)
         search_space = _fit_args.get('hyperparameters', dict())
+        # To obtain config parameter that's not search space. For example config.optimization.top_k
+        config = get_config(
+                config=config,
+                overrides=search_space,
+            )
         metric = _fit_args.get('metric')
         mode = _fit_args.get('mode')
         save_path = _fit_args.get('save_path')
@@ -406,8 +412,11 @@ class AutoMMPredictor:
             metric=metric,
             mode=mode,
             save_dir=os.path.basename(os.path.normpath(save_path)),
+            ray_tune_adapter=AutommRayTuneAdapter(),
             total_resources=resources,
-            time_budget_s=time_budget_s
+            time_budget_s=time_budget_s,
+            keep_checkpoint_num=config.optimization.top_k,
+            checkpoint_score_attr=metric,
         )
         # find the best trial
         best_trial = analysis.get_best_trial(
@@ -429,6 +438,7 @@ class AutoMMPredictor:
         predictor._model = model
         # average checkpoint
         predictor._top_k_average(
+            ckpt_prefix=RAY_TUNE_CHECKPOINT_PREFIX,
             save_path=predictor._save_path,
             best_k_models=[],
             val_df=_fit_args['val_df'],
@@ -440,13 +450,14 @@ class AutoMMPredictor:
         
         return predictor
         
-    def _hpo_fit_wrapper(self, config, original_path, checkpoint_dir=None, **_fit_args):
-        _fit_args['hyperparameters'] = config  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
+    def _hpo_fit_wrapper(self, sampled_hyperparameters, original_path, checkpoint_dir=None, **_fit_args):
+        from ray import tune
+        _fit_args['hyperparameters'] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
+        _fit_args['save_path'] = os.path.join(_fit_args['save_path'], tune.get_trial_name())  # We want to save each trial to a separate directory
         if checkpoint_dir is not None:
             _fit_args['resume'] = True
             # TODO: add checkpoint name
-            _fit_args['ckpt_path'] = checkpoint_dir + checkpoint_filename
-        from ray import tune
+            _fit_args['ckpt_path'] = os.path.join(checkpoint_dir, f'{RAY_TUNE_CHECKPOINT_PREFIX}.ckpt')
         os.chdir(original_path)
         self._fit(**_fit_args)
         
@@ -570,6 +581,16 @@ class AutoMMPredictor:
         lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
         callbacks = [checkpoint_callback, early_stopping_callback, lr_callback, model_summary]
+        
+        if hpo_mode:
+            from ray_lightning.tune import TuneReportCallback
+            tune_report_callback = TuneReportCallback(
+                {
+                    f"{task.validation_metric_name}": f"{task.validation_metric_name}"
+                },
+                filename='ray_tune_checkpoint.ckpt'
+            )
+            callbacks = [tune_report_callback, early_stopping_callback, lr_callback, model_summary]
 
         tb_logger = pl.loggers.TensorBoardLogger(
             save_dir=save_path,
@@ -623,7 +644,7 @@ class AutoMMPredictor:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus if not hpo_mode else None,
+                gpus=num_gpus if not hpo_mode else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
@@ -666,6 +687,7 @@ class AutoMMPredictor:
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
                 self._top_k_average(
+                    ckpt_prefix='epoch',
                     save_path=save_path,
                     best_k_models=list(checkpoint_callback.best_k_models.items()),
                     val_df=val_df,
@@ -679,7 +701,7 @@ class AutoMMPredictor:
                 f"Training finished, exit the process with global_rank={trainer.global_rank}..."
             )
             
-    def _get_best_k_models_path(self, save_path, best_k_models, minmax_mode):
+    def _get_best_k_models_path(self, ckpt_prefix, save_path, best_k_models, minmax_mode):
         best_k_models_sorted = sorted(best_k_models, key=lambda ele: ele[1], reverse=(minmax_mode == MAX))
         best_k_models_path = [ele[0] for ele in best_k_models_sorted]
 
@@ -689,6 +711,7 @@ class AutoMMPredictor:
         #  offload strategy.
         # TODO: adapt this to ray checkpoint
         all_state_dicts = gather_top_k_ckpts(
+            ckpt_prefix=ckpt_prefix,
             ckpt_dir=save_path,
             ckpt_paths=best_k_models_path,
         )
@@ -697,6 +720,7 @@ class AutoMMPredictor:
     
     def _top_k_average(
         self,
+        ckpt_prefix,
         save_path,
         best_k_models,
         val_df,
@@ -707,7 +731,7 @@ class AutoMMPredictor:
         ):
         top_k_avg_ckpt_path = os.path.join(save_path, "model.ckpt")
         # Obtain the best K models sorted from the best performance to the worst performance
-        all_state_dicts, best_k_models_path = self._get_best_k_models_path(save_path, best_k_models, minmax_mode)
+        all_state_dicts, best_k_models_path = self._get_best_k_models_path(ckpt_prefix, save_path, best_k_models, minmax_mode)
         if config.optimization.top_k_average_method == UNIFORM_SOUP:
             logger.info(
                 f"Start to fuse {config.optimization.top_k} checkpoints via the uniform soup algorithm."
