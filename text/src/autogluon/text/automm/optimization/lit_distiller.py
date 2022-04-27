@@ -288,29 +288,6 @@ class LitModuleForDistiller(pl.LightningModule):
             ),
         )
 
-    def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        """
-        Per prediction step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#prediction-loop
-
-        Parameters
-        ----------
-        batch
-            A dictionary containing the mini-batch data.
-            The mini-batch data are passed to each individual model,
-            which indexes its required input data by keys with its model prefix.
-            Ground-truth labels are not needed for prediction.
-        batch_idx
-            Index of mini-batch.
-        dataloader_idx
-            Index of dataloader.
-        Returns
-        -------
-        A dictionary with the mini-batch's logits and features.
-        """
-        output = self.student_model(batch)
-        return output[self.student_model.prefix]
-
     def configure_optimizers(self):
         """
         Configure optimizer. This function is registered by pl.LightningModule.
