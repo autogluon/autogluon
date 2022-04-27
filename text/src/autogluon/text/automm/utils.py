@@ -794,52 +794,6 @@ def make_exp_dir(
     return exp_dir
 
 
-def gather_top_k_ckpts(
-        ckpt_dir: Optional[str] = None,
-        ckpt_paths: Optional[List[str]] = None,
-):
-    """
-    Gather the state_dicts of top k models. If "ckpt_paths" is not an empty list, it loads the models
-    from its paths. Otherwise, it will find available checkpoints in the "ckpt_dir". After loading all the
-    top k checkpoints, it cleans them. The lastest checkpoint "last.ckpt" is also removed since "last.ckpt"
-    is for resuming training in the middle, but the the training should be done when calling this function.
-
-    Parameters
-    ----------
-    ckpt_dir
-        The directory where we save all the top k checkpoints.
-    ckpt_paths
-        A list of top k checkpoint paths.
-
-    Returns
-    -------
-    all_state_dicts
-        A list of state_dicts
-    """
-    if not ckpt_paths:
-        ckpt_paths = []
-        for file_name in sorted(os.listdir(ckpt_dir), reverse=True):
-            if file_name.startswith("epoch"):
-                ckpt_paths.append(os.path.join(ckpt_dir, file_name))
-
-    all_state_dicts = []
-    for path in ckpt_paths:
-        checkpoint = torch.load(path)
-        all_state_dicts.append(checkpoint["state_dict"])
-        os.remove(path)
-
-    if ckpt_dir is not None:
-        for file_name in os.listdir(ckpt_dir):
-            if file_name.startswith("epoch"):
-                os.remove(os.path.join(ckpt_dir, file_name))
-        last_ckpt_path = os.path.join(ckpt_dir, "last.ckpt")
-        if os.path.exists(last_ckpt_path):
-            os.remove(last_ckpt_path)
-
-    logger.debug(f"ckpt num: {len(all_state_dicts)}")
-    return all_state_dicts
-
-
 def average_checkpoints(
         checkpoint_paths: List[str],
 ):
@@ -857,7 +811,7 @@ def average_checkpoints(
     """
     avg_state_dict = {}
     for per_path in checkpoint_paths:
-        state_dict = torch.load(per_path)["state_dict"]
+        state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
         for key in state_dict:
             if key in avg_state_dict:
                 avg_state_dict[key] += state_dict[key]

@@ -42,7 +42,6 @@ from .utils import (
     init_data_processors,
     select_model,
     compute_score,
-    gather_top_k_ckpts,
     average_checkpoints,
     infer_metrics,
     get_config,
@@ -502,7 +501,7 @@ class AutoMMPredictor:
                             per_model.prefix = new_name
                             break
                 # modify data processor prefix
-                for _, per_modality_processors in teacher_predictor._data_processors.items():
+                for per_modality_processors in teacher_predictor._data_processors.values():
                     for per_processor in per_modality_processors:
                         if n == per_processor.prefix:
                             per_processor.prefix = new_name
@@ -1196,7 +1195,7 @@ class AutoMMPredictor:
             prefix: str = "model."
     ):
         if state_dict is None:
-            state_dict = torch.load(path)["state_dict"]
+            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         model.load_state_dict(state_dict)
