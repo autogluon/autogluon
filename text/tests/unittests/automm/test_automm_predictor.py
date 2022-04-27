@@ -314,6 +314,28 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
 
         {
             "model.names": ["timm_image", "hf_text", "numerical_transformer", "categorical_transformer", "fusion_transformer"],
+            "model.fusion_transformer.hidden_size": 192,
+            "model.fusion_transformer.n_blocks": 3,
+            "model.fusion_transformer.attention_n_heads": 8,
+            "model.fusion_transformer.adapt_in_features": "max",
+            "model.fusion_transformer.attention_dropout": 0.2,
+            "model.fusion_transformer.residual_dropout": 0.0,
+            "model.fusion_transformer.ffn_dropout": 0.1,
+            "model.fusion_transformer.ffn_d_hidden": 192,
+            "model.numerical_transformer.out_features":192,
+            "model.numerical_transformer.d_token": 192,
+            "model.numerical_transformer.num_trans_blocks": 0,
+            "model.numerical_transformer.num_attn_heads": 8,
+            "model.numerical_transformer.residual_dropout": 0.0,
+            "model.numerical_transformer.attention_dropout": 0.2,
+            "model.numerical_transformer.ffn_dropout": 0.1,
+            "model.categorical_transformer.out_features":192,
+            "model.categorical_transformer.d_token": 192,
+            "model.categorical_transformer.num_trans_blocks": 0,
+            "model.categorical_transformer.num_attn_heads": 8,
+            "model.categorical_transformer.residual_dropout": 0.0,
+            "model.categorical_transformer.attention_dropout": 0.2,
+            "model.categorical_transformer.ffn_dropout": 0.1,
         },
     ]
 )

@@ -656,11 +656,11 @@ def create_model(
                 hidden_features=model_config.hidden_size,
                 num_classes=num_classes,
                 attention_n_heads=model_config.attention_n_heads,
-                attention_dropout=model_config.attention_dropout,
-                adapt_in_features=model_config.adapt_in_features,
-                residual_dropout=model_config.residual_dropout,
                 ffn_d_hidden=model_config.ffn_d_hidden,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
                 ffn_dropout=model_config.ffn_dropout,
+                adapt_in_features=model_config.adapt_in_features,
                 loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue

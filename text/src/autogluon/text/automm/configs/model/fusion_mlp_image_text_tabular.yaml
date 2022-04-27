@@ -97,5 +97,5 @@ model:
     adapt_in_features: "max"
     attention_dropout: 0.2
     residual_dropout: 0.0
-    ffn_d_hidden: 192
-    ffn_dropout: 0.1   
+    ffn_dropout: 0.1 
+    ffn_d_hidden: 192  
