@@ -169,7 +169,7 @@ class CategoricalTransformer(nn.Module):
         assert num_categories, 'num_categories must be non-empty'
         assert d_token > 0, 'd_token must be positive'
         assert n_blocks >= 0, 'n_blocks must be non-negative' 
-        assert attention_n_heads>0, 'attention_n_heads must be postive'
+        assert attention_n_heads > 0, 'attention_n_heads must be postive'
         assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
 
         self.num_categories = num_categories
