@@ -311,6 +311,10 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
             "model.hf_text_hello.checkpoint_name": "prajjwal1/bert-tiny",
             "data.categorical.convert_to_text": False,
         },
+
+        {
+            "model.names": ["timm_image", "hf_text", "numerical_transformer", "categorical_transformer", "fusion_transformer"],
+        },
     ]
 )
 def test_customizing_model_names(
