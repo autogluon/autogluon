@@ -6,6 +6,9 @@ model:
     - "timm_image"
     - "clip"
     - "fusion_mlp"
+    # - "categorical_transformer"
+    # - "numerical_transformer"
+    # - "fusion_transformer"
   categorical_mlp:
     hidden_size: 64
     activation: "leaky_relu"
@@ -22,6 +25,8 @@ model:
   #   residual_dropout: 0.0
   #   attention_dropout: 0.2
   #   ffn_dropout: 0.1
+  #   data_types:
+  #     - "categorical"
   numerical_mlp:
     hidden_size: 128
     activation: "leaky_relu"
@@ -39,6 +44,9 @@ model:
   #   residual_dropout: 0.0
   #   attention_dropout: 0.2
   #   ffn_dropout: 0.1
+  #   data_types:
+  #     - "numerical"
+  #   merge: "concat"
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
     data_types:
@@ -99,3 +107,4 @@ model:
   #   residual_dropout: 0.0
   #   ffn_dropout: 0.1 
   #   ffn_d_hidden: 192  
+  #   data_types:

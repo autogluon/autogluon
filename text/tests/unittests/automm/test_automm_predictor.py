@@ -314,6 +314,8 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
 
         {
             "model.names": ["timm_image", "hf_text", "numerical_transformer", "categorical_transformer", "fusion_transformer"],
+            "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+            "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
             "model.fusion_transformer.hidden_size": 192,
             "model.fusion_transformer.n_blocks": 3,
             "model.fusion_transformer.attention_n_heads": 8,
