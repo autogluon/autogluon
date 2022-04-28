@@ -1026,3 +1026,57 @@ def apply_log_filter(log_filter):
     finally:
         remove_log_filter(logging.getLogger(), log_filter)
         remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+
+
+def modify_duplicate_model_names(
+        predictor,
+        postfix: str,
+        blacklist: List[str],
+):
+    """
+    Modify a predictor's model names if they exist in a blacklist.
+
+    Parameters
+    ----------
+    predictor
+        An AutoMMPredictor object.
+    postfix
+        The postfix used to change the duplicate names.
+    blacklist
+        A list of names. The provided predictor can't use model names in the list.
+
+    Returns
+    -------
+    The predictor guaranteed has no duplicate model names with the backlist names.
+    """
+    model_names = []
+    for n in predictor._config.model.names:
+        if n in blacklist:
+            new_name = f"{n}_{postfix}"
+            assert new_name not in blacklist
+            assert new_name not in predictor._config.model.names
+            # modify model prefix
+            if n == predictor._model.prefix:
+                predictor._model.prefix = new_name
+            else:
+                assert isinstance(predictor._model.model, nn.ModuleList)
+                for per_model in predictor._model.model:
+                    if n == per_model.prefix:
+                        per_model.prefix = new_name
+                        break
+            # modify data processor prefix
+            for per_modality_processors in predictor._data_processors.values():
+                for per_processor in per_modality_processors:
+                    if n == per_processor.prefix:
+                        per_processor.prefix = new_name
+            # modify model config keys
+            setattr(predictor._config.model, new_name, getattr(predictor._config.model, n))
+            delattr(predictor._config.model, n)
+
+            model_names.append(new_name)
+        else:
+            model_names.append(n)
+
+    predictor._config.model.names = model_names
+
+    return predictor
