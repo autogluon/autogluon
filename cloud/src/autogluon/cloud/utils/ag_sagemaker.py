@@ -3,6 +3,7 @@ from sagemaker.estimator import Framework
 from sagemaker import image_uris
 from sagemaker.model import FrameworkModel
 from sagemaker.predictor import Predictor
+from sagemaker.mxnet import MXNetModel
 from sagemaker.serializers import CSVSerializer
 from sagemaker.fw_utils import (
     model_code_key_prefix,
@@ -19,27 +20,28 @@ class AutoGluonSagemakerEstimator(Framework):
         entry_point,
         region,
         framework_version,
+        py_version,
         instance_type,
-        image_uri=None,
         source_dir=None,
         hyperparameters=None,
         **kwargs,
     ):
-        if not image_uri:
-            image_uri = image_uris.retrieve(
-                "autogluon",
-                region=region,
-                version=framework_version,
-                py_version="py37",
-                image_scope="training",
-                instance_type=instance_type,
-            )
+        self.framework_version = framework_version
+        self.py_version = py_version
+        self.image_uri = image_uris.retrieve(
+            "autogluon",
+            region=region,
+            version=framework_version,
+            py_version=py_version,
+            image_scope="training",
+            instance_type=instance_type,
+        )
         super().__init__(
             entry_point,
             source_dir,
             hyperparameters,
             instance_type=instance_type,
-            image_uri=image_uri,
+            image_uri=self.image_uri,
             **kwargs,
         )
 
@@ -91,7 +93,7 @@ class AutoGluonBatchPredictor(Predictor):
 
 
 # Documentation for FrameworkModel: https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel
-class AutoGluonSagemakerInferenceModel(FrameworkModel):
+class AutoGluonSagemakerInferenceModel(MXNetModel):
     def __init__(
         self,
         model_data,
@@ -99,24 +101,24 @@ class AutoGluonSagemakerInferenceModel(FrameworkModel):
         entry_point,
         region,
         framework_version,
+        py_version,
         instance_type,
-        image_uri=None,
         **kwargs
     ):
-        if not image_uri:
-            image_uri = image_uris.retrieve(
-                "autogluon",
-                region=region,
-                version=framework_version,
-                py_version="py37",
-                image_scope="inference",
-                instance_type=instance_type,
-            )
+        image_uri = image_uris.retrieve(
+            "autogluon",
+            region=region,
+            version=framework_version,
+            py_version=py_version,
+            image_scope="inference",
+            instance_type=instance_type,
+        )
         super().__init__(
             model_data,
-            image_uri,
             role,
             entry_point,
+            image_uri=image_uri,
+            framework_version="1.8.0",
             **kwargs
         )
 
@@ -142,28 +144,28 @@ class AutoGluonSagemakerInferenceModel(FrameworkModel):
             **kwargs
         )
 
-    def prepare_container_def(self, instance_type=None, accelerator_type=None):
-        """Return a container definition with framework configuration.
+    # def prepare_container_def(self, instance_type=None, accelerator_type=None):
+    #     """Return a container definition with framework configuration.
 
-        Framework configuration is set in model environment variables.
+    #     Framework configuration is set in model environment variables.
 
-        Args:
-            instance_type (str): The EC2 instance type to deploy this Model to.
-                For example, 'ml.p2.xlarge'.
-            accelerator_type (str): The Elastic Inference accelerator type to
-                deploy to the instance for loading and making inferences to the
-                model. For example, 'ml.eia1.medium'.
+    #     Args:
+    #         instance_type (str): The EC2 instance type to deploy this Model to.
+    #             For example, 'ml.p2.xlarge'.
+    #         accelerator_type (str): The Elastic Inference accelerator type to
+    #             deploy to the instance for loading and making inferences to the
+    #             model. For example, 'ml.eia1.medium'.
 
-        Returns:
-            dict[str, str]: A container definition object usable with the
-            CreateModel API.
-        """
-        deploy_image = self.image_uri
-        deploy_key_prefix = model_code_key_prefix(self.key_prefix, self.name, deploy_image)
-        self._upload_code(deploy_key_prefix, True)
-        deploy_env = dict(self.env)
-        deploy_env.update(self._framework_env_vars())
+    #     Returns:
+    #         dict[str, str]: A container definition object usable with the
+    #         CreateModel API.
+    #     """
+    #     deploy_image = self.image_uri
+    #     deploy_key_prefix = model_code_key_prefix(self.key_prefix, self.name, deploy_image)
+    #     self._upload_code(deploy_key_prefix, True)
+    #     deploy_env = dict(self.env)
+    #     deploy_env.update(self._framework_env_vars())
 
-        return sagemaker.container_def(
-            deploy_image, self.repacked_model_data or self.model_data, deploy_env
-        )
+    #     return sagemaker.container_def(
+    #         deploy_image, self.repacked_model_data or self.model_data, deploy_env
+    #     )

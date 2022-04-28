@@ -15,10 +15,11 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
         predictor_fit_args,
         instance_type=fit_instance_type
     )
-    assert cloud_predictor.info['local_output_path'] is not None
-    assert cloud_predictor.info['cloud_output_path'] is not None
-    assert cloud_predictor.info['fit_job']['name'] is not None
-    assert cloud_predictor.info['fit_job']['status'] == 'Completed'
+    info = cloud_predictor.info()
+    assert info['local_output_path'] is not None
+    assert info['cloud_output_path'] is not None
+    assert info['fit_job']['name'] is not None
+    assert info['fit_job']['status'] == 'Completed'
 
     cloud_predictor.deploy()
     cloud_predictor.predict_real_time(test_data)
@@ -28,7 +29,7 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
     cloud_predictor.cleanup_deployment()
 
     cloud_predictor.predict(test_data)
-    assert cloud_predictor.info['recent_transform_job']['status'] == 'Completed'
+    assert info['recent_transform_job']['status'] == 'Completed'
 
 
 @pytest.mark.cloud

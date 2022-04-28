@@ -3,8 +3,7 @@ import os
 from pprint import pprint
 
 import yaml
-from autogluon.core.utils.loaders.load_pd import load
-from autogluon.tabular import TabularDataset, TabularPredictor
+from autogluon.tabular import TabularPredictor
 from autogluon.text import TextPredictor
 
 

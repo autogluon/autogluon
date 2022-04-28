@@ -17,6 +17,7 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from ..data import FormatConverterFactory
 from ..job import SageMakerFitJob, SageMakerBatchTransformationJob
+from ..scripts import ScriptManager
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
     AutoGluonSagemakerInferenceModel,
@@ -26,9 +27,8 @@ from ..utils.ag_sagemaker import (
 from ..utils.aws_utils import create_sagemaker_role_and_attach_policies
 from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
 from ..utils.misc import MostRecentInsertedOrderedDict
-from ..utils.script_paths import TRAIN_SCRIPT_PATH, TABULAR_SERVE_SCRIPT_PATH, TEXT_SERVE_SCRIPT_PATH
 from ..utils.s3_utils import download_s3_file
-from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_latest_framework_version
+from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_py_versions, retrieve_latest_framework_version
 from ..utils.utils import unzip_file, rename_file_with_uuid
 
 logger = logging.getLogger(__name__)
@@ -145,13 +145,20 @@ class CloudPredictor:
     def _retrieve_latest_framework_version(self, framework_type='training'):
         return retrieve_latest_framework_version(framework_type)
 
-    def _parse_framework_version(self, framework_version, framework_type):
+    def _parse_framework_version(self, framework_version, framework_type, py_version=None):
         if framework_version == 'latest':
-            framework_version = self._retrieve_latest_framework_version(framework_type)
+            framework_version, py_versions = self._retrieve_latest_framework_version(framework_type)
+            py_version = py_versions[0]
         else:
             valid_options = retrieve_available_framework_versions(framework_type)
             assert framework_version in valid_options, f'{framework_version} is not a valid option. Options are: {valid_options}'
-        return framework_version
+
+            valid_py_versions = retrieve_py_versions(framework_version, framework_type)
+            if py_version is not None:
+                assert py_version in valid_py_versions, f'{py_version} is no a valid option. Options are {valid_py_versions}'
+            else:
+                py_version = valid_py_versions[0]
+        return framework_version, py_version
 
     def _construct_config(self, predictor_init_args, predictor_fit_args, leaderboard):
         assert self.predictor_type is not None
@@ -280,7 +287,7 @@ class CloudPredictor:
         # TODO: Add warning for multi-model image not working properly
         train_data = predictor_fit_args.pop('train_data')
         tune_data = predictor_fit_args.pop('tuning_data', None)
-        framework_version = self._parse_framework_version(framework_version, 'training')
+        framework_version, py_version = self._parse_framework_version(framework_version, 'training')
 
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor")
@@ -289,7 +296,7 @@ class CloudPredictor:
         output_path = self.cloud_output_path + '/output'
         cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
 
-        entry_point = TRAIN_SCRIPT_PATH
+        entry_point = self._train_script_path
         user_entry_point = autogluon_sagemaker_estimator_kwargs.pop(entry_point, None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the fit. Please refer to `{entry_point}` for our implementation')
@@ -320,6 +327,7 @@ class CloudPredictor:
             instance_count=instance_count,
             volume_size=volume_size,
             framework_version=framework_version,
+            py_version=py_version,
             base_job_name="autogluon-cloudpredictor-train",
             output_path=output_path,
             inputs=inputs,
@@ -469,7 +477,7 @@ class CloudPredictor:
 
         if not endpoint_name:
             endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
-        framework_version = self._parse_framework_version(framework_version, 'inference')
+        framework_version, py_version = self._parse_framework_version(framework_version, 'inference')
 
         assert self._serve_script_path is not None
         entry_point = self._serve_script_path
@@ -489,6 +497,7 @@ class CloudPredictor:
             role=self.role_arn,
             region=self._region,
             framework_version=framework_version,
+            py_version=py_version,
             instance_type=instance_type,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
@@ -626,7 +635,7 @@ class CloudPredictor:
             predictor_path = self._fit_job.get_output_path()
             assert predictor_path, 'No cloud trained model found.'
 
-        framework_version = self._parse_framework_version(framework_version, 'inference')
+        framework_version, py_version = self._parse_framework_version(framework_version, 'inference')
 
         output_path = kwargs.get('output_path', None)
         if not output_path:
@@ -678,6 +687,7 @@ class CloudPredictor:
             role=self.role_arn,
             region=self._region,
             framework_version=framework_version,
+            py_version=py_version,
             instance_count=instance_count,
             instance_type=instance_type,
             entry_point=entry_point,
@@ -850,8 +860,8 @@ class TabularCloudPredictor(CloudPredictor):
 
     def _setup_predictor_type(self):
         self.predictor_type = 'tabular'
-        self._train_script_path = TRAIN_SCRIPT_PATH
-        self._serve_script_path = TABULAR_SERVE_SCRIPT_PATH
+        self._train_script_path = ScriptManager.get_train_script('tabular')
+        self._serve_script_path = ScriptManager.get_serve_script('tabular')
 
     def _get_local_predictor_cls(self):
         from autogluon.tabular import TabularPredictor
@@ -865,8 +875,8 @@ class TextCloudPredictor(CloudPredictor):
 
     def _setup_predictor_type(self):
         self.predictor_type = 'text'
-        self._train_script_path = TRAIN_SCRIPT_PATH
-        self._serve_script_path = TEXT_SERVE_SCRIPT_PATH
+        self._train_script_path = ScriptManager.get_train_script('text')
+        self._serve_script_path = ScriptManager.get_serve_script('text')
 
     def _get_local_predictor_cls(self):
         from autogluon.text import TextPredictor
