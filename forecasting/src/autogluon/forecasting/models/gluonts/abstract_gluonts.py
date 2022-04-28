@@ -16,6 +16,7 @@ from gluonts.model.predictor import Predictor as GluonTSPredictor
 import autogluon.core as ag
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
+from ...utils.metric_utils import METRIC_COEFFICIENTS
 
 from ...utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
 from ..abstract import AbstractForecastingModel
@@ -311,7 +312,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
             agg_metrics, item_metrics = evaluator(
                 iter(tss), iter(forecasts), num_series=num_series
             )
-        return agg_metrics[self.eval_metric]
+        return agg_metrics[self.eval_metric] * METRIC_COEFFICIENTS[self.eval_metric]
 
     def __repr__(self) -> str:
         return self.name

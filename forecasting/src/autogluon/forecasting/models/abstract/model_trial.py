@@ -6,8 +6,6 @@ from autogluon.core.models.abstract.model_trial import init_model
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 
-from ...utils.metric_utils import METRIC_COEFFICIENTS
-
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +72,7 @@ def fit_and_save_model(
         30,
         f"Evaluating model {model.name} with metric {eval_metric} on validation data...",
     )
-    model.val_score = (
-        model.score(val_data, eval_metric) * METRIC_COEFFICIENTS[eval_metric]
-    )
+    model.val_score = model.score(val_data, eval_metric)
     time_pred_end = time.time()
     logger.log(30, f"Validation score for model {model.name} is {model.val_score}")
     model.fit_time = time_fit_end - time_fit_start

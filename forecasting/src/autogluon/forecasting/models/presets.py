@@ -103,9 +103,6 @@ def get_preset_models(
     eval_metric: str,
     hyperparameters: Union[str, Dict],
     hyperparameter_tune: bool,
-    use_feat_static_cat: bool,
-    use_feat_static_real: bool,
-    cardinality: int,
     **kwargs,
 ):
     """
@@ -136,12 +133,6 @@ def get_preset_models(
         verify_no_searchspace(hyperparameters)
 
     for model, model_hps in hyperparameters.items():
-        if "use_feat_static_cat" not in model_hps:
-            model_hps["use_feat_static_cat"] = use_feat_static_cat
-        if "use_feat_static_real" not in model_hps:
-            model_hps["use_feat_static_real"] = use_feat_static_real
-        if "cardinality" not in model_hps:
-            model_hps["cardinality"] = cardinality
         if isinstance(model, str):
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")

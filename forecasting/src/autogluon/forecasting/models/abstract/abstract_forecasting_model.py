@@ -235,7 +235,8 @@ class AbstractForecastingModel(AbstractModel):
     def score(self, data: Dataset, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
-        will be held out and used for computing the evaluation score.
+        will be held out and used for computing the evaluation score. Forecasting
+        models always return higher-is-better type scores.
 
         Parameters
         ----------

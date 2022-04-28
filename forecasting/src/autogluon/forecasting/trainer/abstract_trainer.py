@@ -6,7 +6,6 @@ from typing import Optional, Tuple, List, Any, Dict, Union, Type
 from warnings import warn
 
 import pandas as pd
-from gluonts.evaluation import Evaluator
 
 from autogluon.core.models import AbstractModel
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -16,8 +15,7 @@ from autogluon.core.utils.loaders import load_pkl
 from ..dataset import TimeSeriesDataFrame
 from ..models.abstract import AbstractForecastingModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from ..utils.warning_filters import evaluator_warning_filter
-from ..utils.metric_utils import METRIC_COEFFICIENTS, check_get_evaluation_metric
+from ..utils.metric_utils import check_get_evaluation_metric
 
 logger = logging.getLogger(__name__)
 
@@ -246,9 +244,6 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         eval_metric: Optional[str] = None,
         save_data: bool = True,
         low_memory: bool = False,
-        use_feat_static_cat: bool = False,  # TODO: implement
-        use_feat_static_real: bool = False,  # TODO: implement
-        cardinality: Optional[int] = None,  # TODO: implement
         **kwargs,
     ):
         super().__init__(
@@ -268,14 +263,8 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self._model_full_dict_val_score = {}
-
         self.eval_metric = check_get_evaluation_metric(eval_metric)
-
         self.hpo_results = {}
-
-        self.use_feat_static_cat = use_feat_static_cat
-        self.use_feat_static_real = use_feat_static_real
-        self.cardinality = cardinality
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
         path = self.path_data + "train.pkl"
@@ -376,7 +365,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             fit_end_time = time.time()
 
             val_score = (
-                model.score(val_data) * METRIC_COEFFICIENTS[model.eval_metric]
+                model.score(val_data)
                 if val_data is not None
                 else None
             )
@@ -475,9 +464,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
                 30, "Additional data provided, testing on the additional data..."
             )
             for model_name in model_names:
-                test_score.append(
-                    self.score(data, model_name) * METRIC_COEFFICIENTS[self.eval_metric]
-                )
+                test_score.append(self.score(data, model_name))
         df = pd.DataFrame(
             data={
                 "model": model_names,
@@ -539,23 +526,17 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractModel]] = None,
-        quantiles: List[float] = None,
     ) -> float:
-        evaluator = Evaluator(quantiles=quantiles or self.quantiles)
         model = self._get_model_for_prediction(model)
 
         # FIXME: this method should be able to score on all data sets regardless of
         # FIXME: whether the implementation is in GluonTS
         if not isinstance(model, AbstractGluonTSModel):
-            raise ValueError("Model must be a GluonTS model to predict for scoring")
-        forecasts, tss = model._predict_for_scoring(data)  # noqa
-        num_series = len(tss)
+            raise ValueError("Model must be a GluonTS model to score")
 
-        with evaluator_warning_filter():
-            agg_metrics, item_metrics = evaluator(
-                iter(tss), iter(forecasts), num_series=num_series
-            )
-        return agg_metrics[self.eval_metric]
+        # FIXME: when ensembling is implemented, score logic will have to be revised
+        # FIXME: in order to enable prior model predictions in the ensemble
+        return model.score(data, metric=self.eval_metric)
 
     def _predict_model(
         self,

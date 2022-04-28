@@ -20,9 +20,6 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
             quantiles=self.quantiles,
-            use_feat_static_cat=self.use_feat_static_cat,
-            use_feat_static_real=self.use_feat_static_real,
-            cardinality=self.cardinality,
         )
 
     # todo: implement cross-validation / holdout strategy
