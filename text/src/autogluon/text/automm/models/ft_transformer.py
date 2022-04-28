@@ -26,6 +26,12 @@ def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
             return ReGLU()
         elif module_type == 'geglu':
             return GEGLU()
+        elif module_type == 'gelu':
+            return nn.GELU()
+        elif module_type == 'relu':
+            return nn.ReLU()
+        elif module_type == 'leaky_relu':
+            return nn.GELU()
         elif module_type == 'layer_norm':
             return nn.LayerNorm(*args)
         else:

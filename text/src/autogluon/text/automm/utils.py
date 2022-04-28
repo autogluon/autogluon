@@ -610,6 +610,11 @@ def create_model(
                 attention_dropout=model_config.attention_dropout,
                 residual_dropout=model_config.residual_dropout,
                 ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
@@ -634,6 +639,11 @@ def create_model(
                 attention_dropout=model_config.attention_dropout,
                 residual_dropout=model_config.residual_dropout,
                 ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(FUSION_MLP):
@@ -660,6 +670,11 @@ def create_model(
                 attention_dropout=model_config.attention_dropout,
                 residual_dropout=model_config.residual_dropout,
                 ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
                 adapt_in_features=model_config.adapt_in_features,
                 loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
