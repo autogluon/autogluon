@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # TODO: This class is meant to be moved to `core`, where it will likely
 # TODO: be renamed `AbstractTrainer` and the current `AbstractTrainer`
 # TODO: will inherit from this class.
+# TODO: add documentation for abstract methods
 class SimpleAbstractTrainer:
     trainer_file_name = "trainer.pkl"
     trainer_info_name = "info.pkl"
@@ -99,6 +100,10 @@ class SimpleAbstractTrainer:
     def path_data(self) -> str:
         return self.path_utils + "data" + os.path.sep
 
+    @property
+    def path_pkl(self) -> str:
+        return self.path + self.trainer_file_name
+
     def set_contexts(self, path_context: str) -> None:
         self.path, model_paths = self.create_contexts(path_context)
         for model, path in model_paths.items():
@@ -119,10 +124,10 @@ class SimpleAbstractTrainer:
         if self.low_memory:
             self.models = {}
         try:
-            save_pkl.save(path=self.path + self.trainer_file_name, object=self)
+            save_pkl.save(path=self.path_pkl, object=self)
         except:  # noqa
             self.models = {}
-            save_pkl.save(path=self.path + self.trainer_file_name, object=self)
+            save_pkl.save(path=self.path_pkl, object=self)
         if not self.models:
             self.models = models
 
@@ -313,39 +318,31 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         model.fit(train_data=train_data, val_data=val_data, time_limit=time_limit)
         return model
 
-    def _train_single_full(
+    def tune_model_hyperparameters(
         self,
-        train_data: TimeSeriesDataFrame,
         model: AbstractForecastingModel,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune: bool = False,
+        train_data: TimeSeriesDataFrame,
         time_limit: Optional[float] = None,
-    ) -> List[str]:
-        if hyperparameter_tune:
-            scheduler_cls, scheduler_options = scheduler_factory("auto")
-            scheduler_options["num_trials"] = 10 if time_limit is None else None
-            hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
-                train_data=train_data,
-                val_data=val_data,
-                scheduler_options=(scheduler_cls, scheduler_options),
-                time_limit=time_limit,
+        val_data: Optional[TimeSeriesDataFrame] = None
+    ):
+        scheduler_cls, scheduler_options = scheduler_factory("auto")
+        scheduler_options["num_trials"] = 10 if time_limit is None else None
+        hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+            train_data=train_data,
+            val_data=val_data,
+            scheduler_options=(scheduler_cls, scheduler_options),
+            time_limit=time_limit,
+        )
+        hpo_results.pop("search_strategy", None)
+        self.hpo_results[model.name] = hpo_results
+        model_names_trained = []
+        # add each of the trained HPO configurations to the trained models
+        for model_hpo_name, model_path in hpo_models.items():
+            model_hpo = self.load_model(
+                model_hpo_name, path=model_path, model_type=type(model)
             )
-            hpo_results.pop("search_strategy", None)
-            self.hpo_results[model.name] = hpo_results
-            model_names_trained = []
-
-            # add each of the trained HPO configurations to the trained models
-            for model_hpo_name, model_path in hpo_models.items():
-                model_hpo = self.load_model(
-                    model_hpo_name, path=model_path, model_type=type(model)
-                )
-                self._add_model(model_hpo)
-                model_names_trained.append(model_hpo.name)
-        else:
-            model_names_trained = self._train_and_save(
-                train_data, model=model, val_data=val_data, time_limit=time_limit
-            )
-
+            self._add_model(model_hpo)
+            model_names_trained.append(model_hpo.name)
         return model_names_trained
 
     def _train_and_save(
@@ -421,7 +418,6 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     ) -> List[str]:
         time_start = time.time()
         if hyperparameters is not None:
-            self.hyperparameters = hyperparameters
             hyperparameters = copy.deepcopy(hyperparameters)
         else:
             if models is None:
@@ -446,20 +442,18 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         for i, model in enumerate(models):
             if hyperparameter_tune:
                 time_left = time_limit_model_split
+                model_names_trained += self.tune_model_hyperparameters(
+                    model, time_limit=time_left, train_data=train_data, val_data=val_data
+                )
             else:
-                if time_limit is None:
-                    time_left = None
-                else:
+                time_left = None
+                if time_limit is not None:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
 
-            model_names_trained += self._train_single_full(
-                train_data,
-                model,
-                val_data=val_data,
-                hyperparameter_tune=hyperparameter_tune,
-                time_limit=time_left,
-            )
+                model_names_trained += self._train_and_save(
+                    train_data, model=model, val_data=val_data, time_limit=time_left
+                )
 
         return model_names_trained
 
@@ -481,9 +475,8 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
                 30, "Additional data provided, testing on the additional data..."
             )
             for model_name in model_names:
-                model: AbstractForecastingModel = self.load_model(model_name)
                 test_score.append(
-                    model.score(data) * METRIC_COEFFICIENTS[self.eval_metric]
+                    self.score(data, model_name) * METRIC_COEFFICIENTS[self.eval_metric]
                 )
         df = pd.DataFrame(
             data={
