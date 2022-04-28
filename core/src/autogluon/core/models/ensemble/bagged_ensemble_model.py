@@ -422,6 +422,7 @@ class BaggedEnsembleModel(AbstractModel):
                    save_folds=True,
                    groups=None,
                    **kwargs):
+        model_base.verify_fit_resources()
         fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
         if fold_fitting_strategy == 'auto':
             fold_fitting_strategy = self._get_default_fold_fitting_strategy()
