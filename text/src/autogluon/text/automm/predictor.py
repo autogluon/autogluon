@@ -373,14 +373,8 @@ class AutoMMPredictor:
         )
         
         if hyperparameter_tune_kwargs is not None:
-            num_gpus = (
-            config.env.num_gpus
-            if isinstance(config.env.num_gpus, int)
-            else len(config.env.num_gpus)
-            )
-            if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
-                num_gpus = torch.cuda.device_count()
-            resources = dict(num_gpus=num_gpus)
+            # TODO: allow custom gpu
+            resources = dict(num_gpus=torch.cuda.device_count())
             predictor = self._hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
@@ -400,12 +394,12 @@ class AutoMMPredictor:
                 config=config,
                 overrides=search_space,
             )
-        metric = _fit_args.get('metric')
-        mode = _fit_args.get('mode')
+        metric = 'val_' + _fit_args.get('validation_metric_name')
+        mode = _fit_args.get('minmax_mode')
         save_path = _fit_args.get('save_path')
         time_budget_s = _fit_args.get('max_time')
         analysis = run(
-            trainable=self._fit,
+            trainable=self._hpo_fit_wrapper,
             trainable_args=_fit_args,
             search_space=search_space,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
@@ -415,7 +409,7 @@ class AutoMMPredictor:
             ray_tune_adapter=AutommRayTuneAdapter(),
             total_resources=resources,
             time_budget_s=time_budget_s,
-            keep_checkpoint_num=config.optimization.top_k,
+            keep_checkpoints_num=config.optimization.top_k,
             checkpoint_score_attr=metric,
         )
         # find the best trial
@@ -583,8 +577,8 @@ class AutoMMPredictor:
         callbacks = [checkpoint_callback, early_stopping_callback, lr_callback, model_summary]
         
         if hpo_mode:
-            from ray_lightning.tune import TuneReportCallback
-            tune_report_callback = TuneReportCallback(
+            from ray_lightning.tune import TuneReportCheckpointCallback
+            tune_report_callback = TuneReportCheckpointCallback(
                 {
                     f"{task.validation_metric_name}": f"{task.validation_metric_name}"
                 },

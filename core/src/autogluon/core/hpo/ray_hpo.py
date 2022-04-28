@@ -47,7 +47,6 @@ class RayTuneAdapter(ABC):
     Instance of this class should be passed to `run` to provide custom behavior
     """
     
-    @abstractmethod
     def __init__(self):
         self.num_parallel_jobs = None
         self.cpu_per_job = None
@@ -78,13 +77,13 @@ def run(
     mode: str,  # must be one of [min, max]
     save_dir: str,  # directory to save results. Ray will write artifacts to save_dir/trial_dir/
     ray_tune_adapter: RayTuneAdapter,
-    total_resources: Optional(dict) = dict(),
+    total_resources: Optional[dict] = dict(),
     minimum_cpu_per_trial: int = 1,
     minimum_gpu_per_trial: float = 1.0,
-    model_estimate_memroy_usage: Optional(int) = None,
-    time_budget_s: Optional(float) = None,
-    supported_searchers: Optional(List[str]) = None,
-    supported_schedulers: Optional(List[str]) = None,
+    model_estimate_memroy_usage: Optional[int] = None,
+    time_budget_s: Optional[float] = None,
+    supported_searchers: Optional[List[str]] = None,
+    supported_schedulers: Optional[List[str]] = None,
     verbose: int = 1,  # 0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     **kwargs  # additional args being passed to tune.run
     ) -> tune.ExperimentAnalysis:
@@ -96,7 +95,7 @@ def run(
     Finally tune.run
     local_dir/experiment_name/trial_dir
     """
-    assert mode in [MIN, MAX]
+    assert mode in [MIN, MAX], f'mode is {mode}'
     num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
@@ -137,14 +136,12 @@ def run(
         verbose=verbose,
         local_dir=original_path,
         name=save_dir,
-        trial_dirname_creator=_trial_dirname_creator,
-        trial_name_creator=_trial_name_creator,
         **tune_kwargs
     )
     return analysis
 
 
-def cleanup_trials(experiment_dir: str, trials_to_keep: Optional(List[str])):
+def cleanup_trials(experiment_dir: str, trials_to_keep: Optional[List[str]]):
     """Cleanup trial artifacts and keep trials as specified"""
     pass
 
@@ -175,7 +172,7 @@ def _convert_search_space(search_space: dict):
     return tune_search_space
 
 
-def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_searchers: Optional(List[str])=None):
+def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_searchers: Optional[List[str]]=None):
     """Initialize searcher object"""
     searcher = hyperparameter_tune_kwargs.get('searcher')
     user_init_args = hyperparameter_tune_kwargs.get('searcher_init_args', dict())
@@ -200,7 +197,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
     return searcher
 
 
-def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_schedulers: Optional(List[str])=None):
+def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_schedulers: Optional[List[str]]=None):
     """Initialize scheduler object"""
     scheduler = hyperparameter_tune_kwargs.get('scheduler')
     user_init_args = hyperparameter_tune_kwargs.get('scheduler_init_args', dict())
@@ -233,7 +230,7 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         num_samples: int,
         minimum_cpu_per_trial: int = 1,
         minimum_gpu_per_trial: float = 1.0,
-        model_estimate_memroy_usage: Optional(int) = None,
+        model_estimate_memroy_usage: Optional[int] = None,
         **kwargs,
         ) -> Union[dict, PlacementGroupFactory]:
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a interger that is larger than 0'
@@ -250,7 +247,6 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         num_parallel_jobs = min(num_samples, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
         cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
         resources = dict(cpu=cpu_per_job)
-        logger.log(20, f"Will run {num_parallel_jobs} jobs in parallel given number of cpu cores, memory avaialable, and user specification")
 
         if num_gpus > 0:
             gpu_per_job = max(minimum_gpu_per_trial, num_gpus / num_parallel_jobs)
@@ -282,7 +278,7 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         num_samples: int,
         minimum_cpu_per_trial: int = 1,
         minimum_gpu_per_trial: float = 1.0,
-        model_estimate_memroy_usage: Optional(int) = None,
+        model_estimate_memroy_usage: Optional[int] = None,
         **kwargs,
         ) -> Union[dict, PlacementGroupFactory]:
         # Ray Tune requires 1 additional CPU per trial to use for the Trainable driver. 
@@ -293,7 +289,6 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be an interger that is larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
         num_gpus = total_resources.get('num_gpus', 0)
-        num_cpus = (num_cpus - num_parallel_jobs)  # reserve cpus for the master process
         cpu_per_job = None
         gpu_per_job = None
         num_workers = None
@@ -301,13 +296,14 @@ class AutommRayTuneAdapter(RayTuneAdapter):
             gpu_per_job = max(int(minimum_gpu_per_trial), num_gpus // num_samples)
             num_workers = gpu_per_job  # each worker uses 1 gpu
             num_parallel_jobs = min(num_samples, num_gpus // gpu_per_job)
+            num_cpus = (num_cpus - num_parallel_jobs)  # reserve cpus for the master process
             assert num_cpus > 0
             cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_parallel_jobs)
             cpu_per_worker = max(1, cpu_per_job // num_workers)
         else:
             # TODO: for cpu case, is it better to have more workers or more cpus per worker?
             cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_samples)
-            num_workers = cpu_per_job
+            num_workers = max(minimum_cpu_per_trial, cpu_per_job - 1)  # 1 cpu for master process
             cpu_per_worker = 1
         resources_per_trial = get_tune_resources(
             num_workers=num_workers,

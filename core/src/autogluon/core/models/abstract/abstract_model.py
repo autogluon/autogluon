@@ -932,7 +932,6 @@ class AbstractModel:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             resources=resources,
             model_estimate_memory_usage=model_estimate_memory_usage,
-            time_limit=time_limit,
             **kwargs
         )
 
@@ -1011,8 +1010,8 @@ class AbstractModel:
         for trial, details in analysis.results.items():
             if details.get('validation_performance', None) is None:
                 continue
-            internal_trial_id = int(details.get('experiment_tag').split('_')[0]) - 1 # experiment_tag looks like '{trial_number}_{config}'. trial_number starts with 1
-            file_id = f"T{internal_trial_id+1}"  # unique identifier to files from this trial
+            trial_id = details.get('trial_id')
+            file_id = trial_id  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
             hpo_models[trial_model_name] = trial_model_path

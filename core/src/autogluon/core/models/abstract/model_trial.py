@@ -28,7 +28,7 @@ def model_trial(args,
         if fit_kwargs is None:
             fit_kwargs = dict()
 
-        model = init_model(args=args, model_cls=model_cls, init_params=init_params)
+        model = init_model(args=args, task_id=tune.get_trial_id(), model_cls=model_cls, init_params=init_params)
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
@@ -50,11 +50,10 @@ def model_trial(args,
             raise e
 
 
-def init_model(args, model_cls, init_params):
+def init_model(args, task_id, model_cls, init_params):
     args = args.copy()
-    task_id = args.pop('task_id')
 
-    file_prefix = f"T{task_id+1}"  # append to all file names created during this trial. Do NOT change!
+    file_prefix = task_id  # append to all file names created during this trial. Do NOT change!
 
     init_params['hyperparameters'].update(args)
     init_params['name'] = init_params['name'] + os.path.sep + file_prefix

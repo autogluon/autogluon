@@ -1269,7 +1269,6 @@ class AbstractTrainer:
                                                 y=y,
                                                 k_fold=k_fold,
                                                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                                                time_limit=time_limit,
                                                 **model_fit_kwargs
                                             )
                 else:
@@ -1279,7 +1278,6 @@ class AbstractTrainer:
                                                 X_val=X_val,
                                                 y_val=y_val,
                                                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                                                time_limit=time_limit,
                                                 **model_fit_kwargs
                                             )
             except Exception as err:
