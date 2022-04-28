@@ -22,9 +22,9 @@ from ..constants import (
 logger = logging.getLogger(__name__)
 
 
-class LitModuleForDistiller(pl.LightningModule):
+class DistillerLitModule(pl.LightningModule):
     """
-    Knowledge distillation loops for training, evaluation, and prediction. This module is independent of
+    Knowledge distillation loops for training and evaluation. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:
     https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
     """
@@ -161,7 +161,7 @@ class LitModuleForDistiller(pl.LightningModule):
             label: torch.Tensor,
     ):
         loss = 0
-        for _, per_output in output.items():
+        for per_output in output.values():
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
             loss += self.hard_label_loss_func(
                 input=per_output[LOGITS].squeeze(dim=1),
@@ -299,29 +299,28 @@ class LitModuleForDistiller(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
+        kwargs = dict(
+            model=self.student_model,
+            lr=self.hparams.lr,
+            weight_decay=self.hparams.weight_decay,
+        )
         if self.hparams.lr_choice == "two_stages":
             logger.debug("applying 2-stage learning rate...")
             grouped_parameters = apply_two_stages_lr(
-                model=self.student_model,
-                lr=self.hparams.lr,
                 lr_mult=self.hparams.lr_mult,
-                weight_decay=self.hparams.weight_decay,
                 return_params=True,
+                **kwargs,
             )
         elif self.hparams.lr_choice == "layerwise_decay":
             logger.debug("applying layerwise learning rate decay...")
             grouped_parameters = apply_layerwise_lr_decay(
-                model=self.student_model,
-                lr=self.hparams.lr,
                 lr_decay=self.hparams.lr_decay,
-                weight_decay=self.hparams.weight_decay,
+                **kwargs,
             )
         else:
             logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
-                model=self.student_model,
-                lr=self.hparams.lr,
-                weight_decay=self.hparams.weight_decay,
+                **kwargs,
             )
 
         if self.critics:  # to handle None
@@ -358,8 +357,10 @@ class LitModuleForDistiller(pl.LightningModule):
                     * self.trainer.max_epochs
                     // self.trainer.accumulate_grad_batches
             )
-            logger.debug(f"len(trainer.datamodule.train_dataloader()): "
-                         f"{len(self.trainer.datamodule.train_dataloader())}")
+            logger.debug(
+                f"len(trainer.datamodule.train_dataloader()): "
+                f"{len(self.trainer.datamodule.train_dataloader())}"
+            )
             logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
             logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
         else:
@@ -373,11 +374,13 @@ class LitModuleForDistiller(pl.LightningModule):
 
         logger.debug(f"warmup steps: {warmup_steps}")
         logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
-        scheduler = get_lr_scheduler(optimizer=optimizer,
-                                     num_max_steps=max_steps,
-                                     num_warmup_steps=warmup_steps,
-                                     lr_schedule=self.hparams.lr_schedule,
-                                     end_lr=self.hparams.end_lr)
+        scheduler = get_lr_scheduler(
+            optimizer=optimizer,
+            num_max_steps=max_steps,
+            num_warmup_steps=warmup_steps,
+            lr_schedule=self.hparams.lr_schedule,
+            end_lr=self.hparams.end_lr,
+        )
 
         sched = {"scheduler": scheduler, "interval": "step"}
         logger.debug("done configuring optimizer and scheduler")
