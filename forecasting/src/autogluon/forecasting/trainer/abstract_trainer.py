@@ -40,12 +40,20 @@ class SimpleAbstractTrainer:
         self.model_info = {}
         self.model_best = None
 
+        self._extra_banned_names = set()
+
     def get_model_names_all(self) -> List[str]:
         """Get all model names that are registered in model_info."""
         return list(self.model_info.keys())
 
     def get_model_names(self) -> List[str]:
         return self.get_model_names_all()
+
+    def _get_banned_model_names(self) -> List[str]:
+        """Gets all model names which would cause model files to be overwritten if a new model
+        was trained with the name
+        """
+        return self.get_model_names() + list(self._extra_banned_names)
 
     def get_models_attribute_dict(
         self, attribute: str, models: List[str] = None
@@ -252,8 +260,8 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         self.freq = freq
         self.prediction_length = prediction_length
-        self.quantiles = kwargs.get(
-            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        self.quantile_levels = kwargs.get(
+            "quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
         self.is_data_saved = False
 
@@ -450,10 +458,12 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         logger.log(30, "Generating leaderboard for all models trained...")
         model_names = self.get_model_names_all()
         score_val = []
-        fit_time_marginal = []
         fit_order = list(range(1, len(model_names) + 1))
         score_dict = self.get_models_attribute_dict("val_score")
+
+        fit_time_marginal = []
         fit_time_marginal_dict = self.get_models_attribute_dict("fit_time")
+
         for model_name in model_names:
             score_val.append(score_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
@@ -469,6 +479,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             data={
                 "model": model_names,
                 "val_score": score_val,
+                "fit_time_marginal": fit_time_marginal,
                 "fit_order": fit_order,
             }
         )
@@ -480,7 +491,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         ).reset_index(drop=True)
 
         df_columns_lst = df_sorted.columns.tolist()
-        explicit_order = ["model", "val_score", "fit_order"]
+        explicit_order = ["model", "val_score", "fit_time_marginal", "fit_order"]
         explicit_order = [
             column for column in explicit_order if column in df_columns_lst
         ]

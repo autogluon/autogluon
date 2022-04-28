@@ -248,6 +248,44 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 
 
 @pytest.mark.parametrize(
+    "hyperparameter_list, expected_number_of_unique_names",
+    [
+        ([{DeepARModel: {"epochs": 2}}], 1),
+        (
+            [{
+                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
+            }],
+            2,
+        ),
+        (
+            [
+                {DeepARModel: {"epochs": 2}},
+                {DeepARModel: {"epochs": 3}},
+            ],
+            2,
+        ),
+    ],
+)
+def test_given_repeating_model_when_trainer_called_incrementally_then_name_collisions_are_prevented(
+    temp_model_path, hyperparameter_list, expected_number_of_unique_names
+):
+    trainer = AutoForecastingTrainer(
+        path=temp_model_path, freq="H"
+    )
+
+    # incrementally train with new hyperparameters
+    for hp in hyperparameter_list:
+        trainer.fit(
+            train_data=DUMMY_DATASET,
+            hyperparameters=hp,
+            val_data=DUMMY_DATASET,
+        )
+
+    assert len(trainer.get_model_names()) == expected_number_of_unique_names
+
+
+@pytest.mark.parametrize(
     "hyperparameters",
     [
         {

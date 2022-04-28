@@ -1,3 +1,4 @@
+import copy
 import logging
 import time
 from typing import Any, Dict, Union, Tuple, Optional
@@ -53,7 +54,6 @@ class AbstractForecastingModel(AbstractModel):
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
     score_with_y_pred_proba = None
-    convert_to_refit_full_template = None
     get_disk_size = None  # disk / memory size
     estimate_memory_usage = None
     reduce_memory_size = None
@@ -339,6 +339,17 @@ class AbstractForecastingModel(AbstractModel):
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
+
+    def convert_to_refit_full_template(self):
+        params = copy.deepcopy(self.get_params())
+
+        # TODO: Forecasting models currently do not support incremental training
+        params['hyperparameters'].update(self.params_trained)
+        params['name'] = params['name'] + ag.constants.REFIT_FULL_SUFFIX
+
+        template = self.__class__(**params)
+
+        return template
 
 
 class AbstractForecastingModelFactory:

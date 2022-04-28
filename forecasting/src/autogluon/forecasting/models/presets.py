@@ -1,6 +1,7 @@
 import copy
 import logging
-from typing import Union, Dict
+import uuid
+from typing import Union, Dict, List
 
 import autogluon.core as ag
 
@@ -103,6 +104,7 @@ def get_preset_models(
     eval_metric: str,
     hyperparameters: Union[str, Dict],
     hyperparameter_tune: bool,
+    invalid_model_names: List[str],
     **kwargs,
 ):
     """
@@ -148,16 +150,23 @@ def get_preset_models(
             logger.log(20, f"Custom Model Type Detected: {model}")
             model_type = model
 
-        models.append(
-            model_type(
-                path=path,
-                freq=freq,
-                prediction_length=prediction_length,
-                eval_metric=eval_metric,
-                hyperparameters=model_hps,
-                **kwargs,
-            )
+        model_type_kwargs = dict(
+            path=path,
+            freq=freq,
+            prediction_length=prediction_length,
+            eval_metric=eval_metric,
+            hyperparameters=model_hps,
+            **kwargs,
         )
+
+        # add models while preventing name collisions
+        model = model_type(**model_type_kwargs)
+        if model.name in [m.name for m in models] + invalid_model_names:
+            model = model_type(
+                name=f"{model.name}_{str(uuid.uuid4())[:6]}",
+                **model_type_kwargs
+            )
+        models.append(model)
     return models
 
 

@@ -11,6 +11,7 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
     def construct_model_templates(self, hyperparameters, **kwargs):
         path = kwargs.pop("path", self.path)
         eval_metric = kwargs.pop("eval_metric", self.eval_metric)
+        quantile_levels = kwargs.pop("quantile_levels", self.quantile_levels)
         hyperparameter_tune = kwargs.get("hyperparameter_tune", False)
         return get_preset_models(
             path=path,
@@ -19,7 +20,8 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             freq=self.freq,
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
-            quantiles=self.quantiles,
+            quantiles=quantile_levels,
+            invalid_model_names=self._get_banned_model_names(),
         )
 
     # todo: implement cross-validation / holdout strategy
