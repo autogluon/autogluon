@@ -117,6 +117,8 @@ class SimpleAbstractTrainer:
 
     def create_contexts(self, path_context: str) -> Tuple[str, dict]:
         path = path_context
+        # TODO: consider keeping track of model path suffixes in model_info instead
+        # TODO: of full paths
         model_paths = self.get_models_attribute_dict(attribute="path")
         for model, prev_path in model_paths.items():
             model_local_path = prev_path.split(self.path, 1)[1]
@@ -320,7 +322,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         model: AbstractForecastingModel,
         train_data: TimeSeriesDataFrame,
         time_limit: Optional[float] = None,
-        val_data: Optional[TimeSeriesDataFrame] = None
+        val_data: Optional[TimeSeriesDataFrame] = None,
     ):
         scheduler_cls, scheduler_options = scheduler_factory("auto")
         scheduler_options["num_trials"] = 10 if time_limit is None else None
@@ -372,11 +374,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             )
             fit_end_time = time.time()
 
-            val_score = (
-                model.score(val_data)
-                if val_data is not None
-                else None
-            )
+            val_score = model.score(val_data) if val_data is not None else None
             model.val_score = val_score
 
             pred_end_time = time.time()
@@ -440,7 +438,10 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             if hyperparameter_tune:
                 time_left = time_limit_model_split
                 model_names_trained += self.tune_model_hyperparameters(
-                    model, time_limit=time_left, train_data=train_data, val_data=val_data
+                    model,
+                    time_limit=time_left,
+                    train_data=train_data,
+                    val_data=val_data,
                 )
             else:
                 time_left = None

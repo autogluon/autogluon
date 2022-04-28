@@ -344,8 +344,8 @@ class AbstractForecastingModel(AbstractModel):
         params = copy.deepcopy(self.get_params())
 
         # TODO: Forecasting models currently do not support incremental training
-        params['hyperparameters'].update(self.params_trained)
-        params['name'] = params['name'] + ag.constants.REFIT_FULL_SUFFIX
+        params["hyperparameters"].update(self.params_trained)
+        params["name"] = params["name"] + ag.constants.REFIT_FULL_SUFFIX
 
         template = self.__class__(**params)
 

@@ -163,8 +163,7 @@ def get_preset_models(
         model = model_type(**model_type_kwargs)
         if model.name in [m.name for m in models] + invalid_model_names:
             model = model_type(
-                name=f"{model.name}_{str(uuid.uuid4())[:6]}",
-                **model_type_kwargs
+                name=f"{model.name}_{str(uuid.uuid4())[:6]}", **model_type_kwargs
             )
         models.append(model)
     return models
