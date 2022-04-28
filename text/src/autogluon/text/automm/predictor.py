@@ -51,13 +51,14 @@ from .utils import (
     convert_checkpoint_name,
     save_text_tokenizers,
     load_text_tokenizers,
+    modify_duplicate_model_names,
 )
 from .optimization.utils import (
     get_metric,
     get_loss_func,
 )
 from .optimization.lit_module import LitModule
-from .optimization.lit_distiller import LitModuleForDistiller
+from .optimization.lit_distiller import DistillerLitModule
 
 from .. import version as ag_version
 
@@ -485,39 +486,11 @@ class AutoMMPredictor:
 
         # if teacher and student have duplicate model names, change teacher's model names
         # we don't change student's model names to avoid changing the names back when saving the model.
-        teacher_model_names = []
-        for n in teacher_predictor._config.model.names:
-            if n in self._config.model.names:
-                new_name = f"{n}_teacher"
-                assert new_name not in self._config.model.names
-                assert new_name not in teacher_predictor._config.model.names
-                # modify model prefix
-                if n == teacher_predictor._model.prefix:
-                    teacher_predictor._model.prefix = new_name
-                else:
-                    assert isinstance(teacher_predictor._model.model, nn.ModuleList)
-                    for per_model in teacher_predictor._model.model:
-                        if n == per_model.prefix:
-                            per_model.prefix = new_name
-                            break
-                # modify data processor prefix
-                for per_modality_processors in teacher_predictor._data_processors.values():
-                    for per_processor in per_modality_processors:
-                        if n == per_processor.prefix:
-                            per_processor.prefix = new_name
-                # modify model config keys
-                setattr(teacher_predictor._config.model, new_name, getattr(teacher_predictor._config.model, n))
-                delattr(teacher_predictor._config.model, n)
-
-                teacher_model_names.append(new_name)
-            else:
-                teacher_model_names.append(n)
-        teacher_predictor._config.model.names = teacher_model_names
-
-        # verify teacher and student have no duplicate model names
-        assert all([n not in teacher_predictor._config.model.names for n in self._config.model.names]), \
-            f"teacher model names {teacher_predictor._config.model.names} and" \
-            f" student model names {self._config.model.names} have duplicates."
+        teacher_predictor = modify_duplicate_model_names(
+            predictor=teacher_predictor,
+            postfix="teacher",
+            blacklist=self._config.model.names,
+        )
 
         critics, baseline_funcs = None, None
         if self._config.distiller.soft_label_loss_type == "mean_square_error":
@@ -602,9 +575,25 @@ class AutoMMPredictor:
             train_data=train_df,
             val_data=val_df,
         )
+        optimization_kwargs = dict(
+            optim_type=config.optimization.optim_type,
+            lr_choice=config.optimization.lr_choice,
+            lr_schedule=config.optimization.lr_schedule,
+            lr=config.optimization.learning_rate,
+            lr_decay=config.optimization.lr_decay,
+            end_lr=config.optimization.end_lr,
+            lr_mult=config.optimization.lr_mult,
+            weight_decay=config.optimization.weight_decay,
+            warmup_steps=config.optimization.warmup_steps,
+        )
+        metrics_kwargs = dict(
+            validation_metric=validation_metric,
+            validation_metric_name=validation_metric_name,
+            custom_metric_func=custom_metric_func,
+        )
         is_distill = teacher_model is not None
         if is_distill:
-            task = LitModuleForDistiller(
+            task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
                 matches=config.distiller.matches,
@@ -613,38 +602,18 @@ class AutoMMPredictor:
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
-                optim_type=config.optimization.optim_type,
-                lr_choice=config.optimization.lr_choice,
-                lr_schedule=config.optimization.lr_schedule,
-                lr=config.optimization.learning_rate,
-                lr_decay=config.optimization.lr_decay,
-                end_lr=config.optimization.end_lr,
-                lr_mult=config.optimization.lr_mult,
-                weight_decay=config.optimization.weight_decay,
-                warmup_steps=config.optimization.warmup_steps,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
-                validation_metric=validation_metric,
-                validation_metric_name=validation_metric_name,
-                custom_metric_func=custom_metric_func,
+                **metrics_kwargs,
+                **optimization_kwargs,
             )
         else:
             task = LitModule(
                 model=model,
-                optim_type=config.optimization.optim_type,
-                lr_choice=config.optimization.lr_choice,
-                lr_schedule=config.optimization.lr_schedule,
-                lr=config.optimization.learning_rate,
-                lr_decay=config.optimization.lr_decay,
-                end_lr=config.optimization.end_lr,
-                lr_mult=config.optimization.lr_mult,
-                weight_decay=config.optimization.weight_decay,
-                warmup_steps=config.optimization.warmup_steps,
                 loss_func=loss_func,
-                validation_metric=validation_metric,
-                validation_metric_name=validation_metric_name,
-                custom_metric_func=custom_metric_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
+                **metrics_kwargs,
+                **optimization_kwargs,
             )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
