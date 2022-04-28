@@ -8,7 +8,7 @@ from ..constants import (
     WEIGHT, AUTOMM
 )
 from .mlp import MLP
-from .ft_transformer import FT_Transformer
+from .ft_transformer import FT_Transformer, CLSToken
 
 logger = logging.getLogger(AUTOMM)
 
@@ -301,6 +301,11 @@ class MultimodalFusionTransformer(nn.Module):
             normalization=head_normalization,
         )
         
+        self.cls_token = CLSToken(
+            d_token=in_features, 
+            initialization='uniform',
+        )
+
         # init weights
         self.adapter.apply(init_weights)
         self.head.apply(init_weights)
@@ -333,6 +338,7 @@ class MultimodalFusionTransformer(nn.Module):
                 output.update(per_output)
 
         multimodal_features = torch.cat(multimodal_features, dim=1)
+        multimodal_features = self.cls_token(multimodal_features)
         features = self.fusion_transformer(multimodal_features)
 
         logits = self.head(features)
