@@ -474,6 +474,8 @@ def test_model_configs():
         }
 
     hyperparameters = {
+        "optimization.max_epochs": 1,
+        "optimization.top_k_average_method": BEST,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
