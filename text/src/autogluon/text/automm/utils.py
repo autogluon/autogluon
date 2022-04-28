@@ -223,7 +223,7 @@ def verify_model_names(config: DictConfig):
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
-    assert sorted(config.names) == sorted(keys), \
+    assert set(config.names).issubset(set(keys)), \
         f"`{config.names}` do not match config keys {keys}"
 
     # verify that no name starts with another one
