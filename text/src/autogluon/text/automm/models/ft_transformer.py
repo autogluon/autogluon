@@ -15,17 +15,19 @@ _INTERNAL_ERROR_MESSAGE = 'Internal error. Please, open an issue.'
 def _is_glu_activation(activation: ModuleType):
     return (
         isinstance(activation, str)
-        and activation.endswith('GLU')
+        and activation.endswith('glu')
         or activation in [ReGLU, GEGLU]
     )
 
 
 def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
     if isinstance(module_type, str):
-        if module_type == 'ReGLU':
+        if module_type == 'reglu':
             return ReGLU()
-        elif module_type == 'GEGLU':
+        elif module_type == 'geglu':
             return GEGLU()
+        elif module_type == 'layer_norm':
+            return nn.LayerNorm(*args)
         else:
             try:
                 cls = getattr(nn, module_type)
