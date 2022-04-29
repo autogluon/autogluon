@@ -3,6 +3,7 @@ import os
 import shutil
 import uuid
 import pytest
+from typing import List
 
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
@@ -123,7 +124,7 @@ class DatasetLoaderHelper:
 
 class FitHelper:
     @staticmethod
-    def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, delete_directory=True):
+    def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, model_count=1, delete_directory=True):
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
@@ -142,10 +143,10 @@ class FitHelper:
 
         model_names = predictor.get_model_names()
         model_name = model_names[0]
-        assert len(model_names) == 2
+        assert len(model_names) == (model_count + 1)
         if refit_full:
             refit_model_names = predictor.refit_full()
-            assert len(refit_model_names) == 2
+            assert len(refit_model_names) == (model_count + 1)
             refit_model_name = refit_model_names[model_name]
             assert '_FULL' in refit_model_name
             predictor.predict(test_data, model=refit_model_name)
@@ -156,6 +157,25 @@ class FitHelper:
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
+
+    @staticmethod
+    def fit_and_validate_dataset_with_cascade(dataset_name, fit_args, cascade: List[str], sample_size=1000, refit_full=True, model_count=1, delete_directory=True):
+        predictor = FitHelper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            sample_size=sample_size,
+            refit_full=refit_full,
+            model_count=model_count,
+            delete_directory=False,
+        )
+        directory_prefix = './datasets/'
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+
+        predictor.predict(test_data, model=cascade)
+        predictor.predict_proba(test_data, model=cascade)
+
+        if delete_directory:
+            shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None):
