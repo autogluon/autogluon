@@ -1,5 +1,3 @@
-import copy
-
 import pandas as pd
 import numpy as np
 import pytest
@@ -8,8 +6,8 @@ from gluonts.dataset.common import ListDataset
 from autogluon.forecasting.dataset.ts_dataframe import TimeSeriesDataFrame
 
 
-START_TIMESTAMP = pd.Timestamp("01-01-2019", freq='D')
-END_TIMESTAMP = pd.Timestamp("01-02-2019", freq='D')
+START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")
+END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")
 ITEM_IDS = (0, 1, 2)
 TARGETS = np.arange(9)
 DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3))
@@ -32,17 +30,15 @@ SAMPLE_DATAFRAME = SAMPLE_TS_DATAFRAME.reset_index()
 
 
 SAMPLE_ITERABLE = [
-        {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-        {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-        {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq="D")},
+    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq="D")},
+    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq="D")},
 ]
 
 
 def test_from_iteratble():
     ts_df = TimeSeriesDataFrame(SAMPLE_ITERABLE)
-    pd.testing.assert_frame_equal(
-        ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True
-    )
+    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True)
 
     with pytest.raises(ValueError):
         TimeSeriesDataFrame([])
@@ -92,15 +88,13 @@ def test_from_gluonts_list_dataset():
     start = pd.Timestamp("01-01-2019", freq=freq)
 
     gluonts_list_dataset = ListDataset(
-        [{'target': x, 'start': start} for x in custom_dataset[:, :-prediction_length]],
-        freq=freq
+        [{"target": x, "start": start} for x in custom_dataset[:, :-prediction_length]],
+        freq=freq,
     )
     TimeSeriesDataFrame(gluonts_list_dataset)
 
     ts_df = TimeSeriesDataFrame(ListDataset(SAMPLE_ITERABLE, freq=freq))
-    pd.testing.assert_frame_equal(
-        ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False
-    )
+    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False)
 
     empty_list_dataset = ListDataset([], freq=freq)
     with pytest.raises(ValueError):
