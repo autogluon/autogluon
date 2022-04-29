@@ -30,7 +30,7 @@ class BaseDataset(torch.utils.data.Dataset):
         data
             A pd.DataFrame containing multimodal features.
         preprocessor
-            A multimodal feature preprocessor generating model-agnostic features.
+            A list of multimodal feature preprocessors generating model-agnostic features.
         processors
             Data processors customizing data for each modality per model.
         is_training

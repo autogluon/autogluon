@@ -32,7 +32,7 @@ class BaseDataModule(LightningDataModule):
         Parameters
         ----------
         df_preprocessor
-            A dataframe preprocessor. The preprocessing of one modality is generic so that
+            One or a list of dataframe preprocessors. The preprocessing of one modality is generic so that
             the preprocessed data can be used by different models requiring the modality.
             For example, formatting input data as strings is a valid preprocessing operation for text.
             However, tokenizing strings into ids is invalid since different models generally
