@@ -385,6 +385,125 @@ def test_customizing_model_names(
             assert hasattr(predictor._config.model, per_name)
 
 
+def test_model_configs():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+
+    model_config = { 
+        'model': {
+                'names': ['hf_text', 'timm_image', 'clip', 'categorical_transformer', 'numerical_transformer', 'fusion_transformer'], 
+                'categorical_transformer': {
+                    'out_features': 192, 
+                    'd_token': 192, 
+                    'num_trans_blocks': 0, 
+                    'num_attn_heads': 4, 
+                    'residual_dropout': 0.0, 
+                    'attention_dropout': 0.2, 
+                    'ffn_dropout': 0.1, 
+                    'normalization': 'layer_norm', 
+                    'ffn_activation': 'reglu', 
+                    'head_activation': 'relu', 
+                    'data_types': ['categorical']
+                }, 
+                'numerical_transformer': {
+                    'out_features': 192, 
+                    'd_token': 192, 
+                    'num_trans_blocks': 0, 
+                    'num_attn_heads': 4, 
+                    'residual_dropout': 0.0, 
+                    'attention_dropout': 0.2, 
+                    'ffn_dropout': 0.1, 
+                    'normalization': 'layer_norm', 
+                    'ffn_activation': 'reglu', 
+                    'head_activation': 'relu', 
+                    'data_types': ['numerical'], 
+                    'merge': 'concat'
+                }, 
+                'hf_text': {
+                    'checkpoint_name': 'google/electra-base-discriminator', 
+                    'data_types': ['text'], 
+                    'tokenizer_name': 'hf_auto', 
+                    'max_text_len': 512, 
+                    'insert_sep': True, 
+                    'text_segment_num': 2, 
+                    'stochastic_chunk': False
+                }, 
+                'timm_image': {
+                    'checkpoint_name': 'swin_base_patch4_window7_224', 
+                    'mix_choice': 'all_logits', 
+                    'data_types': ['image'], 
+                    'train_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'val_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'image_norm': 'imagenet', 
+                    'image_size': 224,
+                    'max_img_num_per_col': 2
+                },
+                'clip': {
+                    'checkpoint_name': 'openai/clip-vit-base-patch32', 
+                    'data_types': ['image', 'text'], 
+                    'train_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'val_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'image_norm': 'clip', 
+                    'image_size': 224, 
+                    'max_img_num_per_col': 2, 
+                    'tokenizer_name': 'clip', 
+                    'max_text_len': 77, 
+                    'insert_sep': False, 
+                    'text_segment_num': 1, 
+                    'stochastic_chunk': False
+                }, 
+                'fusion_transformer': {
+                    'hidden_size': 192, 
+                    'n_blocks': 2, 
+                    'attention_n_heads': 4, 
+                    'adapt_in_features': 'max', 
+                    'attention_dropout': 0.2, 
+                    'residual_dropout': 0.0, 
+                    'ffn_dropout': 0.1, 
+                    'ffn_d_hidden': 192, 
+                    'normalization': 'layer_norm', 
+                    'ffn_activation': 'geglu', 
+                    'head_activation': 'relu', 
+                    'data_types': None
+                },
+            }
+        }
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "optimization.top_k_average_method": BEST,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
+    }
+
+    config = {
+        MODEL: model_config,
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+
+    with tempfile.TemporaryDirectory() as save_path:
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            time_limit=30,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+        )
+
+        score = predictor.evaluate(dataset.test_df)
+        verify_predictor_save_load(predictor, dataset.test_df)
+
+
 def test_modifying_duplicate_model_names():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric

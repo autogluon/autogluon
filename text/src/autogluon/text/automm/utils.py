@@ -23,6 +23,9 @@ from .models import (
     CategoricalMLP,
     NumericalMLP,
     MultimodalFusionMLP,
+    NumericalTransformer,
+    CategoricalTransformer,
+    MultimodalFusionTransformer,
 )
 from .data import (
     ImageProcessor,
@@ -39,6 +42,8 @@ from .constants import (
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
     CATEGORICAL_MLP, FUSION_MLP,
+    NUMERICAL_TRANSFORMER, CATEGORICAL_TRANSFORMER,
+    FUSION_TRANSFORMER,
 )
 from .presets import (
     list_model_presets,
@@ -218,7 +223,7 @@ def verify_model_names(config: DictConfig):
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
-    assert sorted(config.names) == sorted(keys), \
+    assert set(config.names).issubset(set(keys)), \
         f"`{config.names}` do not match config keys {keys}"
 
     # verify that no name starts with another one
@@ -594,6 +599,24 @@ def create_model(
                 normalization=model_config.normalization,
                 num_classes=num_classes,
             )
+        elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
+            model = NumericalTransformer(
+                prefix=model_name,
+                in_features=num_numerical_columns,
+                out_features=model_config.out_features,
+                d_token=model_config.d_token,
+                n_blocks=model_config.num_trans_blocks,
+                attention_n_heads=model_config.num_attn_heads,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
+                num_classes=num_classes,
+            )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
                 prefix=model_name,
@@ -603,6 +626,24 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                num_classes=num_classes,
+            )
+        elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
+            model = CategoricalTransformer(
+                prefix=model_name,
+                num_categories=num_categories,
+                out_features=model_config.out_features,
+                d_token=model_config.d_token,
+                n_blocks=model_config.num_trans_blocks,
+                attention_n_heads=model_config.num_attn_heads,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(FUSION_MLP):
@@ -615,6 +656,26 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+            )
+            continue
+        elif model_name.lower().startswith(FUSION_TRANSFORMER):
+            fusion_model = functools.partial(
+                MultimodalFusionTransformer,
+                prefix=model_name,
+                hidden_features=model_config.hidden_size,
+                num_classes=num_classes,
+                attention_n_heads=model_config.attention_n_heads,
+                ffn_d_hidden=model_config.ffn_d_hidden,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
+                adapt_in_features=model_config.adapt_in_features,
                 loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
