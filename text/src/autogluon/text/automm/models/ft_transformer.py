@@ -31,7 +31,7 @@ def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
         elif module_type == 'relu':
             return nn.ReLU()
         elif module_type == 'leaky_relu':
-            return nn.GELU()
+            return nn.LeakyReLU()
         elif module_type == 'layer_norm':
             return nn.LayerNorm(*args)
         else:
@@ -208,35 +208,6 @@ class MultiheadAttention(nn.Module):
     To learn more about Multihead Attention, see [devlin2018bert]. See the implementation
     of `Transformer` and the examples below to learn how to use the compression technique
     from [wang2020linformer] to speed up the module when the number of tokens is large.
-
-    Examples:
-        .. testcode::
-
-            n_objects, n_tokens, d_token = 2, 3, 12
-            n_heads = 6
-            a = torch.randn(n_objects, n_tokens, d_token)
-            b = torch.randn(n_objects, n_tokens * 2, d_token)
-            module = MultiheadAttention(
-                d_token=d_token, n_heads=n_heads, dropout=0.2, bias=True, initialization='kaiming'
-            )
-
-            # self-attention
-            x, attention_stats = module(a, a, None, None)
-            assert x.shape == a.shape
-            assert attention_stats['attention_probs'].shape == (n_objects * n_heads, n_tokens, n_tokens)
-            assert attention_stats['attention_logits'].shape == (n_objects * n_heads, n_tokens, n_tokens)
-
-            # cross-attention
-            assert module(a, b, None, None)
-
-            # Linformer self-attention with the 'headwise' sharing policy
-            k_compression = torch.nn.Linear(n_tokens, n_tokens // 4)
-            v_compression = torch.nn.Linear(n_tokens, n_tokens // 4)
-            assert module(a, a, k_compression, v_compression)
-
-            # Linformer self-attention with the 'key-value' sharing policy
-            kv_compression = torch.nn.Linear(n_tokens, n_tokens // 4)
-            assert module(a, a, kv_compression, kv_compression)
 
     References:
         * [devlin2018bert] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018

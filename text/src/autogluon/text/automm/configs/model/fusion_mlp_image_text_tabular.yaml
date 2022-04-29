@@ -6,9 +6,6 @@ model:
     - "timm_image"
     - "clip"
     - "fusion_mlp"
-    # - "categorical_transformer"
-    # - "numerical_transformer"
-    # - "fusion_transformer"
   categorical_mlp:
     hidden_size: 64
     activation: "leaky_relu"
