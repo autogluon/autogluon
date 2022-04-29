@@ -4,8 +4,10 @@ import pytest
 import numpy.testing as npt
 import tempfile
 import copy
+from torch import nn
 
 from autogluon.text.automm import AutoMMPredictor
+from autogluon.text.automm.utils import modify_duplicate_model_names
 from autogluon.text.automm.constants import (
     MODEL,
     DATA,
@@ -500,3 +502,57 @@ def test_model_configs():
 
         score = predictor.evaluate(dataset.test_df)
         verify_predictor_save_load(predictor, dataset.test_df)
+
+
+def test_modifying_duplicate_model_names():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    teacher_predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    teacher_predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        time_limit=1,
+    )
+    student_predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    student_predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        time_limit=0,
+    )
+
+    teacher_predictor = modify_duplicate_model_names(
+        predictor=teacher_predictor,
+        postfix="teacher",
+        blacklist=student_predictor._config.model.names,
+    )
+
+    # verify teacher and student have no duplicate model names
+    assert all([n not in teacher_predictor._config.model.names for n in student_predictor._config.model.names]), \
+        f"teacher model names {teacher_predictor._config.model.names} and" \
+        f" student model names {student_predictor._config.model.names} have duplicates."
+
+    # verify each model name prefix is valid
+    assert teacher_predictor._model.prefix in teacher_predictor._config.model.names
+    if isinstance(teacher_predictor._model.model, nn.ModuleList):
+        for per_model in teacher_predictor._model.model:
+            assert per_model.prefix in teacher_predictor._config.model.names
+
+    # verify each data processor's prefix is valid
+    for per_modality_processors in teacher_predictor._data_processors.values():
+        for per_processor in per_modality_processors:
+            assert per_processor.prefix in teacher_predictor._config.model.names

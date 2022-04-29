@@ -1,0 +1,6 @@
+distiller:
+  soft_label_loss_type: "cross_entropy"
+  temperature: 5.
+  hard_label_weight: 0.2
+  soft_label_weight: 50.
+  matches:

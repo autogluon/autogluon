@@ -278,7 +278,8 @@ def infer_column_problem_types(
         # 1) Infer categorical column
         # 2) Infer numerical column
         # 3) Infer image-path column
-        # 4) All the other columns are treated as text column
+        # 4) Infer text column
+        # 4) All the other columns are treated as categorical
         if is_categorical_column(train_df[col_name], valid_df[col_name],
                                  is_label=is_label):
             column_types[col_name] = CATEGORICAL
