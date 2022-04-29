@@ -248,9 +248,9 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 
 
 @pytest.mark.parametrize(
-    "hyperparameter_list, expected_number_of_unique_names",
+    "hyperparameter_list, expected_number_of_unique_names, expected_suffixes",
     [
-        ([{DeepARModel: {"epochs": 2}}], 1),
+        ([{DeepARModel: {"epochs": 2}}], 1, []),
         (
             [
                 {
@@ -259,6 +259,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 }
             ],
             2,
+            ["_2"],
         ),
         (
             [
@@ -266,11 +267,62 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 {DeepARModel: {"epochs": 3}},
             ],
             2,
+            ["_2"],
+        ),
+        (
+            [
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 4},
+                }
+            ],
+            3,
+            ["_2", "_3"],
+        ),
+        (
+            [
+                {DeepARModel: {"epochs": 2}},
+                {DeepARModel: {"epochs": 3}},
+                {DeepARModel: {"epochs": 2}},
+            ],
+            3,
+            ["_2", "_2_2"],
+        ),
+        (
+            [
+                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2}},
+                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3}},
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                },
+            ],
+            4,
+            ["_2", "_2_2", "_2_3"],
+        ),
+        (
+            [
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
+                },
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                },
+            ],
+            5,
+            ["_2", "_3", "_2_2", "_2_3"],
         ),
     ],
 )
 def test_given_repeating_model_when_trainer_called_incrementally_then_name_collisions_are_prevented(
-    temp_model_path, hyperparameter_list, expected_number_of_unique_names
+    temp_model_path,
+    hyperparameter_list,
+    expected_number_of_unique_names,
+    expected_suffixes,
 ):
     trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
 
@@ -282,7 +334,11 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
             val_data=DUMMY_DATASET,
         )
 
-    assert len(trainer.get_model_names()) == expected_number_of_unique_names
+    model_names = trainer.get_model_names()
+
+    assert len(model_names) == expected_number_of_unique_names
+    for suffix in expected_suffixes:
+        assert any(suffix in name for name in model_names)
 
 
 @pytest.mark.parametrize(

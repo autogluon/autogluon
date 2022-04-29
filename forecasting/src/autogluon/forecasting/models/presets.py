@@ -1,6 +1,5 @@
 import copy
 import logging
-import uuid
 from typing import Union, Dict, List
 
 import autogluon.core as ag
@@ -134,6 +133,8 @@ def get_preset_models(
     else:
         verify_no_searchspace(hyperparameters)
 
+    invalid_model_names_set = set(invalid_model_names)
+
     for model, model_hps in hyperparameters.items():
         if isinstance(model, str):
             if model not in MODEL_TYPES:
@@ -161,11 +162,21 @@ def get_preset_models(
 
         # add models while preventing name collisions
         model = model_type(**model_type_kwargs)
-        if model.name in [m.name for m in models] + invalid_model_names:
+        num_increment = 2
+        model_type_kwargs.pop("name", None)
+        while (
+            model.name in [m.name for m in models]
+            or model.name in invalid_model_names_set
+        ):
             model = model_type(
-                name=f"{model.name}_{str(uuid.uuid4())[:6]}", **model_type_kwargs
+                name=f"{model.name}_{num_increment}", **model_type_kwargs
             )
+            # increment only if model name collided in this round
+            if model.name not in invalid_model_names_set:
+                num_increment += 1
+
         models.append(model)
+
     return models
 
 
