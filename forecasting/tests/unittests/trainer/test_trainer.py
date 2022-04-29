@@ -340,6 +340,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     for suffix in expected_suffixes:
         assert any(suffix in name for name in model_names)
 
+    # there should be no edges in the model graph without ensembling
+    assert not trainer.model_graph.edges
+
 
 @pytest.mark.parametrize(
     "hyperparameters",

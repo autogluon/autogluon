@@ -5,6 +5,7 @@ import time
 from typing import Optional, Tuple, List, Any, Dict, Union, Type
 from warnings import warn
 
+import networkx as nx
 import pandas as pd
 
 from autogluon.core.models import AbstractModel
@@ -37,17 +38,14 @@ class SimpleAbstractTrainer:
         self.save_data = save_data
 
         self.models = {}
-        self.model_info = {}
+        self.model_graph = nx.DiGraph()
         self.model_best = None
 
         self._extra_banned_names = set()
 
-    def get_model_names_all(self) -> List[str]:
-        """Get all model names that are registered in model_info."""
-        return list(self.model_info.keys())
-
     def get_model_names(self) -> List[str]:
-        return self.get_model_names_all()
+        """Get all model names that are registered in the model graph"""
+        return list(self.model_graph.nodes)
 
     def _get_banned_model_names(self) -> List[str]:
         """Gets all model names which would cause model files to be overwritten if a new model
@@ -58,18 +56,18 @@ class SimpleAbstractTrainer:
     def get_models_attribute_dict(
         self, attribute: str, models: List[str] = None
     ) -> Dict[str, Any]:
-        """Get an attribute from the `model_info` dictionary for each of the model names
+        """Get an attribute from the `model_graph` for each of the model names
         specified. If `models` is none, the attribute will be returned for all models"""
         results = {}
         if models is None:
-            models = self.get_model_names_all()
+            models = self.get_model_names()
         for model in models:
-            results[model] = self.model_info[model][attribute]
+            results[model] = self.model_graph.nodes[model][attribute]
         return results
 
     def get_model_best(self) -> str:
         """Return the name of the best model by model performance on the validation set."""
-        models = self.get_model_names_all()
+        models = self.get_model_names()
         if not models:
             raise AssertionError("Trainer has no fit models that can infer.")
         model_performances = self.get_models_attribute_dict(attribute="val_score")
@@ -81,18 +79,18 @@ class SimpleAbstractTrainer:
         return max(performances_list, key=lambda i: i[1])[0]
 
     def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str):
-        """Get a member attribute for given model from the `model_info` dictionary."""
+        """Get a member attribute for given model from the `model_graph`."""
         if not isinstance(model, str):
             model = model.name
-        return self.model_info[model][attribute]
+        return self.model_graph.nodes[model][attribute]
 
     def set_model_attribute(
         self, model: Union[str, AbstractModel], attribute: str, val
     ):
-        """Set a member attribute for given model in the `model_info` dictionary."""
+        """Set a member attribute for given model in the `model_graph`."""
         if not isinstance(model, str):
             model = model.name
-        self.model_info[model][attribute] = val
+        self.model_graph.nodes[model][attribute] = val
 
     @property
     def path_root(self) -> str:
@@ -117,7 +115,7 @@ class SimpleAbstractTrainer:
 
     def create_contexts(self, path_context: str) -> Tuple[str, dict]:
         path = path_context
-        # TODO: consider keeping track of model path suffixes in model_info instead
+        # TODO: consider keeping track of model path suffixes in model_graph instead
         # TODO: of full paths
         model_paths = self.get_models_attribute_dict(attribute="path")
         for model, prev_path in model_paths.items():
@@ -182,7 +180,7 @@ class SimpleAbstractTrainer:
 
     def get_models_info(self, models: List[str] = None) -> Dict[str, Any]:
         if models is None:
-            models = self.get_model_names_all()
+            models = self.get_model_names()
         model_info_dict = dict()
         for model in models:
             if isinstance(model, str):
@@ -218,7 +216,7 @@ class SimpleAbstractTrainer:
         return info
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
-        num_models_trained = len(self.get_model_names_all())
+        num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
             best_model = self.model_best
         else:
@@ -299,11 +297,13 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
     def _add_model(self, model: AbstractForecastingModel):
         # TODO: also register predict time
-        self.model_info[model.name] = {}
-        self.model_info[model.name]["path"] = model.path
-        self.model_info[model.name]["type"] = type(model)
-        self.model_info[model.name]["fit_time"] = model.fit_time
-        self.model_info[model.name]["val_score"] = model.val_score
+        node_attrs = dict(
+            path=model.path,
+            type=type(model),
+            fit_time=model.fit_time,
+            val_score=model.val_score,
+        )
+        self.model_graph.add_node(model.name, **node_attrs)
 
     def _train_single(
         self,
@@ -462,7 +462,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
         logger.log(30, "Generating leaderboard for all models trained...")
-        model_names = self.get_model_names_all()
+        model_names = self.get_model_names()
         score_val = []
         fit_order = list(range(1, len(model_names) + 1))
         score_dict = self.get_models_attribute_dict("val_score")
@@ -580,7 +580,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         refit_full_data = val_data
 
         if models is None:
-            self.get_model_names_all()
+            self.get_model_names()
 
         for model in models:
             model: AbstractForecastingModel = self.load_model(model)
@@ -611,12 +611,12 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         warn("Refitting logic is experimental for autogluon.forecasting.")
         if isinstance(models, str):
             if models == "all":
-                models = self.get_model_names_all()
+                models = self.get_model_names()
             elif models == "best":
                 models = [self.get_model_best()]
             else:
                 models = self.load_model(models)
-        existing_models = self.get_model_names_all()
+        existing_models = self.get_model_names()
         valid_model_set = []
         for model in models:
             if (
