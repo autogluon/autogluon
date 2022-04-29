@@ -1,7 +1,7 @@
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 import pandas as pd
-from typing import Optional
+from typing import Optional, Union, List
 from .dataset import BaseDataset
 from .collator import Dict
 from ..constants import TRAIN, VAL, TEST, PREDICT
@@ -19,8 +19,8 @@ class BaseDataModule(LightningDataModule):
 
     def __init__(
             self,
-            df_preprocessor: MultiModalFeaturePreprocessor,
-            data_processors: dict,
+            df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+            data_processors: Union[dict, List[dict]],
             per_gpu_batch_size: int,
             num_workers: int,
             train_data: Optional[pd.DataFrame] = None,
@@ -32,7 +32,7 @@ class BaseDataModule(LightningDataModule):
         Parameters
         ----------
         df_preprocessor
-            A dataframe preprocessor. The preprocessing of one modality is generic so that
+            One or a list of dataframe preprocessors. The preprocessing of one modality is generic so that
             the preprocessed data can be used by different models requiring the modality.
             For example, formatting input data as strings is a valid preprocessing operation for text.
             However, tokenizing strings into ids is invalid since different models generally
@@ -55,6 +55,11 @@ class BaseDataModule(LightningDataModule):
         """
         super().__init__()
         self.prepare_data_per_node = True
+
+        if isinstance(df_preprocessor, MultiModalFeaturePreprocessor):
+            df_preprocessor = [df_preprocessor]
+        if isinstance(data_processors, dict):
+            data_processors = [data_processors]
 
         self.df_preprocessor = df_preprocessor
         self.data_processors = data_processors
@@ -187,7 +192,8 @@ class BaseDataModule(LightningDataModule):
         A "Dict" collator wrapping other collators.
         """
         collate_fn = {}
-        for d_type in self.data_processors:
-            for per_model_processor in self.data_processors[d_type]:
-                collate_fn.update(per_model_processor.collate_fn())
+        for per_data_processors_group in self.data_processors:
+            for per_modality in per_data_processors_group:
+                for per_model_processor in per_data_processors_group[per_modality]:
+                    collate_fn.update(per_model_processor.collate_fn())
         return Dict(collate_fn)
