@@ -1,27 +1,10 @@
 def test_tabular_nn_widedeep_binary(fit_helper):
-    mlp_model_args = {'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True}
-    fit_args = dict(
-        hyperparameters={'WIDEDEEPNN': {'type': 'tab_mlp',  'ag_args': {'name_suffix': 'TabMLP'}, 'model_args': mlp_model_args}},
-    )
-    dataset_name = 'adult'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+    fit_helper.fit_and_validate_dataset(dataset_name='adult', fit_args=dict(hyperparameters={'WD_TAB_MLP': {}}))
 
 
 def test_tabular_nn_widedeep_multiclass(fit_helper):
-    mlp_model_args = {'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True}
-    fit_args = dict(
-        hyperparameters={'WIDEDEEPNN': {'type': 'tab_mlp',  'ag_args': {'name_suffix': 'TabMLP'}, 'model_args': mlp_model_args}},
-    )
-    dataset_name = 'covertype_small'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+    fit_helper.fit_and_validate_dataset(dataset_name='covertype_small', fit_args=dict(hyperparameters={'WD_TAB_MLP': {}}))
 
 
 def test_tabular_nn_widedeep_regression(fit_helper):
-    mlp_model_args = {'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True}
-    fit_args = dict(
-        hyperparameters={'WIDEDEEPNN': {'type': 'tab_mlp',  'ag_args': {'name_suffix': 'TabMLP'}, 'model_args': mlp_model_args}},
-    )
-    dataset_name = 'ames'
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
-
-
+    fit_helper.fit_and_validate_dataset(dataset_name='ames', fit_args=dict(hyperparameters={'WD_TAB_MLP': {}}))
