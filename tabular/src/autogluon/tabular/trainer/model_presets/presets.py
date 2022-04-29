@@ -13,7 +13,9 @@ from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, K
     ImagePredictorModel, VowpalWabbitModel, \
     RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
-from ...models.widedeep_nn.widedeep_nn_model import WideDeepNNModel
+from ...models.widedeep_nn.widedeep_nn_model import WideDeepTabMlp, WideDeepContextAttentionMLP, \
+    WideDeepSelfAttentionMLP, WideDeepTabResnet, WideDeepTabNet, WideDeepSAINT, WideDeepTabTransformer, \
+    WideDeepTabFTTransformer, WideDeepTabFastFormer, WideDeepTabPerceiver
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,6 @@ MODEL_TYPES = dict(
     NN_TORCH=TabularNeuralNetTorchModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
-    WIDEDEEPNN=WideDeepNNModel,
     TRANSF=TabTransformerModel,
     AG_TEXT_NN=TextPredictorModel,
     AG_IMAGE_NN=ImagePredictorModel,
@@ -88,7 +89,17 @@ MODEL_TYPES = dict(
     IM_RULELIST=OptimalRuleListModel,
     IM_OPTIMALTREE=OptimalTreeModel,
     IM_BOOSTEDRULES=BoostedRulesModel,
-    VW=VowpalWabbitModel
+    VW=VowpalWabbitModel,
+    WD_TAB_MLP=WideDeepTabMlp,
+    CONTEXT_ATTENTION_MLP=WideDeepContextAttentionMLP,
+    SELF_ATTENTION_MLP=WideDeepSelfAttentionMLP,
+    TAB_RESNET=WideDeepTabResnet,
+    TAB_NET=WideDeepTabNet,
+    SAINT=WideDeepSAINT,
+    TAB_TRANSFORMER=WideDeepTabTransformer,
+    FT_TRANSFORMER=WideDeepTabFTTransformer,
+    FAST_FORMER=WideDeepTabFastFormer,
+    PERCIEVER=WideDeepTabPerceiver,
 )
 
 
@@ -103,7 +114,6 @@ DEFAULT_MODEL_NAMES = {
     TabularNeuralNetTorchModel: 'NeuralNetTorch',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
-    WideDeepNNModel: 'WideDeepNeuralNet',
     TabTransformerModel: 'Transformer',
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
@@ -118,6 +128,17 @@ DEFAULT_MODEL_NAMES = {
     OptimalRuleListModel: 'OptimalRuleList',
     OptimalTreeModel: 'OptimalTree',
     BoostedRulesModel: 'BoostedRules',
+
+    WideDeepTabMlp: 'WideDeepTabMlp',
+    WideDeepContextAttentionMLP: 'ContextAttentionMLP',
+    WideDeepSelfAttentionMLP: 'SelfAttentionMLP',
+    WideDeepTabResnet: 'TabResnet',
+    WideDeepTabNet: 'TabNet',
+    WideDeepSAINT: 'SAINT',
+    WideDeepTabTransformer: 'TabTransformer',
+    WideDeepTabFTTransformer: 'FTTransformer',
+    WideDeepTabFastFormer: 'FastFormer',
+    WideDeepTabPerceiver: 'Perceiver',
 }
 
 

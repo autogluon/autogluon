@@ -1,8 +1,8 @@
+import inspect
 import logging
 import time
 
 import numpy as np
-import pandas as pd
 
 from autogluon.common.features.types import R_INT, R_FLOAT, R_DATETIME, R_BOOL, R_CATEGORY
 from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
@@ -11,10 +11,10 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.try_import import try_import_pytorch_widedeep
+from autogluon.features.nn_transforms import MissingFiller, TargetScaler, CategoricalFeaturesFilter
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .metrics import get_nn_metric, get_objective, get_monitor_metric
-from autogluon.features.nn_transforms import MissingFiller, TargetScaler, CategoricalFeaturesFilter
 
 logger = logging.getLogger(__name__)
 
@@ -153,12 +153,6 @@ class WideDeepNNModel(AbstractModel):
         self.params_trained['epochs'] = params['epochs']
         self.params_trained['best_epoch'] = best_epoch
 
-    def _preprocess(self, X: pd.DataFrame, **kwargs):
-        X = super()._preprocess(X, **kwargs)
-        X = self.missing_filler.transform(X)
-        X = self._tab_preprocessor.transform(X)
-        return X
-
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
         X = self.missing_filler.transform(X)
@@ -175,9 +169,10 @@ class WideDeepNNModel(AbstractModel):
             return preds
 
     def __get_batch_size(self, params):
+        from pytorch_widedeep.models import SAINT
         batch_size = params['bs']
         # SAINT need larger batches because it is using information between rows
-        if params['type'] == 'SAINT':
+        if params['type'] == SAINT:
             batch_size *= 2
         return batch_size
 
@@ -221,7 +216,8 @@ class WideDeepNNModel(AbstractModel):
         return X_train, X_valid, cont_cols, embed_cols, val_split
 
     def __get_embedding_columns_metadata(self, X, cat_cols):
-        for_transformer = self.params['type'] in ['tab_transformer', 'ft_transformer', 'tab_perciever', 'tab_fastformer']
+        from pytorch_widedeep.models import TabTransformer, FTTransformer, TabFastFormer, TabPerceiver
+        for_transformer = self.params['type'] in [TabTransformer, FTTransformer, TabFastFormer, TabPerceiver]
         if for_transformer:
             embed_cols = cat_cols
         else:
@@ -236,25 +232,12 @@ class WideDeepNNModel(AbstractModel):
 
     @staticmethod
     def __construct_wide_deep_model(model_type, column_idx, embed_input, continuous_cols, pred_dim, **model_args):
-        from pytorch_widedeep.models import TabMlp, WideDeep, TabResnet, SAINT, TabTransformer, FTTransformer, TabPerceiver, ContextAttentionMLP, SelfAttentionMLP, TabNet, TabFastFormer
+        from pytorch_widedeep.models import WideDeep
 
-        model_cls = dict(
-            tab_mlp=TabMlp,
-            context_attention_mlp=ContextAttentionMLP,
-            self_attention_mlp=SelfAttentionMLP,
-            tabresnet=TabResnet,
-            tabnet=TabNet,
-            SAINT=SAINT,
-            tab_transformer=TabTransformer,
-            ft_transformer=FTTransformer,
-            tab_fastformer=TabFastFormer,
-            tab_perciever=TabPerceiver,
-        ).get(model_type, None)
-
-        if model_cls is None:
+        if (model_type is None) or (not inspect.isclass(model_type)):
             raise ValueError(f'Unknown model type {model_type}')
 
-        model = model_cls(
+        model = model_type(
             column_idx=column_idx,
             cat_embed_input=embed_input,
             continuous_cols=continuous_cols,
@@ -294,3 +277,99 @@ class WideDeepNNModel(AbstractModel):
         num_gpus = 0
         return num_cpus, num_gpus
 
+    def _merge_params(self, params):
+        return {**params, **self.params.get('model_args', {})}
+
+
+class WideDeepTabMlp(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import TabMlp
+        self.params['type'] = TabMlp
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True})
+
+
+class WideDeepContextAttentionMLP(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import ContextAttentionMLP
+        self.params['type'] = ContextAttentionMLP
+
+
+class WideDeepSelfAttentionMLP(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        from pytorch_widedeep.models import SelfAttentionMLP
+        super().__init__(**kwargs)
+        self.params['type'] = SelfAttentionMLP
+
+
+class WideDeepTabResnet(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import TabResnet
+        self.params['type'] = TabResnet
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True})
+
+
+class WideDeepTabNet(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import TabNet
+        self.params['type'] = TabNet
+
+
+class WideDeepSAINT(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import SAINT
+        self.params['type'] = SAINT
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True})
+
+
+class WideDeepTabTransformer(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import TabTransformer
+        self.params['type'] = TabTransformer
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True, 'embed_continuous': True})
+
+
+class WideDeepTabFTTransformer(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import FTTransformer
+        self.params['type'] = FTTransformer
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True})
+
+
+class WideDeepTabFastFormer(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import TabFastFormer
+        self.params['type'] = TabFastFormer
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True})
+
+
+class WideDeepTabPerceiver(WideDeepNNModel):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from pytorch_widedeep.models import TabPerceiver
+        self.params['type'] = TabPerceiver
+        if not self.params.get('use_vanilla', False):
+            self.params['model_args'] = self._merge_params({'mlp_batchnorm': True, 'mlp_linear_first': True, 'mlp_batchnorm_last': True})
