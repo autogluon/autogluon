@@ -545,18 +545,29 @@ class AbstractTrainer:
     def predict(self, X, model=None):
         if model is None:
             model = self._get_best()
-        return self._predict_model(X, model)
+        cascade = isinstance(model, list)
+        return self._predict_model(X, model, cascade=cascade)
 
     def predict_proba(self, X, model=None):
         if model is None:
             model = self._get_best()
-        return self._predict_proba_model(X, model)
+        cascade = isinstance(model, list)
+        return self._predict_proba_model(X, model, cascade=cascade)
 
     def _get_best(self):
         if self.model_best is not None:
             return self.model_best
         else:
             return self.get_model_best()
+
+    def get_pred_proba_from_model(self, model, X, model_pred_proba_dict=None, fit=False, cascade=False):
+        if isinstance(model, list):
+            models = model
+            model = models[-1]
+        else:
+            models = [model]
+        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, model_pred_proba_dict=model_pred_proba_dict, fit=fit, cascade=cascade)
+        return model_pred_proba_dict[model]
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
     def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess_nonadaptive=False):
@@ -597,6 +608,81 @@ class AbstractTrainer:
         return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation,
                                        quantile_levels=self.quantile_levels)
 
+    # TODO: Slow if large ensemble with many models, could cache output result to speed up cascades during inference
+    def _construct_model_pred_order(self, models: List[str]) -> List[str]:
+        """
+        Constructs a list of model names in order of inference calls required to infer on all the models.
+
+        Parameters
+        ----------
+        models : List[str]
+            The list of models to construct the prediction order from.
+            If a model has dependencies, the dependency models will be put earlier in the output list.
+            Models explicitly mentioned in the `models` input will be placed as early as possible in the output list.
+            Models earlier in `models` will attempt to be placed earlier in the output list than those later in `models`.
+                It is recommended that earlier elements do not have dependency models that are listed later in `models`.
+
+        Returns
+        -------
+        Returns list of models in inference call order, including dependency models of those specified in the input.
+        """
+        model_set = set()
+        model_order = []
+        for model in models:
+            if model in model_set:
+                continue
+            min_models_set = set(self.get_minimum_model_set(model))
+            models_to_load = list(min_models_set.difference(model_set))
+            subgraph = nx.subgraph(self.model_graph, models_to_load)
+            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+            model_order += [m for m in model_pred_order if m not in model_set]
+            model_set = set(model_order)
+        return model_order
+
+    def _construct_model_pred_order_with_pred_dict(self, models: List[str], models_to_ignore: List[str] = None) -> List[str]:
+        """
+        Constructs a list of model names in order of inference calls required to infer on all the models.
+        Unlike `_construct_model_pred_order`, this method's output is in undefined order when multiple models are valid to infer at the same time.
+            This makes it unsuitable for cascade ensembles.
+
+        Parameters
+        ----------
+        models : List[str]
+            The list of models to construct the prediction order from.
+            If a model has dependencies, the dependency models will be put earlier in the output list.
+        models_to_ignore : List[str], optional
+            A list of models that have already been computed and can be ignored.
+            Models in this list and their dependencies (if not depended on by other models in `models`) will be pruned from the final output.
+
+        Returns
+        -------
+        Returns list of models in inference call order, including dependency models of those specified in the input.
+        """
+        model_set = set()
+        for model in models:
+            if model in model_set:
+                continue
+            min_model_set = set(self.get_minimum_model_set(model))
+            model_set = model_set.union(min_model_set)
+        if models_to_ignore is not None:
+            model_set = model_set.difference(set(models_to_ignore))
+        models_to_load = list(model_set)
+        subgraph = nx.subgraph(self.model_graph, models_to_load)
+
+        # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
+        models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
+        while models_to_ignore:
+            model = models_to_ignore[0]
+            predecessors = list(subgraph.predecessors(model))
+            subgraph.remove_node(model)
+            models_to_ignore = models_to_ignore[1:]
+            for predecessor in predecessors:
+                if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
+                    models_to_ignore.append(predecessor)
+
+        # Get model prediction order
+        return list(nx.lexicographical_topological_sort(subgraph))
+
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
     #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
@@ -606,20 +692,36 @@ class AbstractTrainer:
     # fit = get oof pred proba
     # if record_pred_time is `True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
     def get_model_pred_proba_dict(self,
-                                  X,
-                                  models,
-                                  model_pred_proba_dict=None,
-                                  model_pred_time_dict=None,
-                                  fit=False,
-                                  record_pred_time=False,
-                                  use_val_cache: bool = False):
+                                  X: pd.DataFrame,
+                                  models: List[str],
+                                  model_pred_proba_dict: dict = None,
+                                  model_pred_time_dict: dict = None,
+                                  fit: bool = False,
+                                  record_pred_time: bool = False,
+                                  use_val_cache: bool = False,
+                                  cascade: bool = False,
+                                  cascade_threshold: float = 0.9):
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         if model_pred_time_dict is None:
             model_pred_time_dict = {}
+        if cascade and len(models) <= 1:
+            cascade = False
+        if cascade and model_pred_proba_dict:
+            # Technically doesn't have to be an error, but logic gets extremely complicated if we allow this.
+            raise AssertionError('Cascade is not valid when model_pred_proba_dict is specified.')
+        if cascade and self.problem_type not in [BINARY, MULTICLASS]:
+            raise AssertionError(f'Ensemble Cascade not implemented for problem_type=={self.problem_type}')
 
         if fit:
+            if cascade:
+                raise AssertionError(f'Ensemble Cascade not implemented when `fit==True')
             model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
+        # elif not model_pred_proba_dict:
+        #     # TODO: Pre-construct order if cascade, otherwise this will slow down prediction having to recompute each inference call.
+        #     model_pred_order = self._construct_model_pred_order(models)
+        # else:
+        #     model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
         else:
             if use_val_cache:
                 _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
@@ -635,7 +737,7 @@ class AbstractTrainer:
             models_to_load = list(model_set)
             subgraph = nx.subgraph(self.model_graph, models_to_load)
 
-            # For model in model_pred_proba_dict, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
+            # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
             models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
             while models_to_ignore:
                 model = models_to_ignore[0]
@@ -648,6 +750,17 @@ class AbstractTrainer:
 
             # Get model prediction order
             model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+
+        iloc_model_dict = dict()
+        model_pred_proba_dict_cascade = dict()
+
+        if cascade:
+            num_rows = len(X)
+            unconfident_idx = np.array([i for i in range(num_rows)])
+        else:
+            num_rows = None
+            unconfident_idx = None
+        cascade_order = []
 
         # Compute model predictions in topological order
         for model_name in model_pred_order:
@@ -662,9 +775,21 @@ class AbstractTrainer:
                 else:
                     raise AssertionError(f'Model {model_name} must be a BaggedEnsembleModel to return oof_pred_proba')
             else:
+                if cascade:
+                    # Keep track of the iloc index of the current model for the rows that are predicted on
+                    iloc_model_dict[model_name] = unconfident_idx
                 model = self.load_model(model_name=model_name)
                 if isinstance(model, StackerEnsembleModel):
-                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                    if cascade:
+                        # Need to predict only on the unconfident rows that remain
+                        #  This requires getting the correct indices from the dependent models' prior predictions.
+                        cascade_dict = dict()
+                        for m in model_pred_proba_dict_cascade:
+                            # TODO: Can probably be done faster, unsure how expensive this is.
+                            cascade_dict[m] = model_pred_proba_dict_cascade[m][iloc_model_dict[model_name]]
+                        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=cascade_dict)
+                    else:
+                        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
                     model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
                 else:
                     model_pred_proba_dict[model_name] = model.predict_proba(X)
@@ -672,6 +797,45 @@ class AbstractTrainer:
             if record_pred_time:
                 time_end = time.time()
                 model_pred_time_dict[model_name] = time_end - time_start
+
+            if cascade:
+                if model_name in models:
+                    cascade_order.append(model_name)
+                if self.problem_type == BINARY:
+                    tmp = np.zeros(num_rows, dtype='float32')
+                else:
+                    tmp = np.zeros((num_rows, self.num_classes), dtype='float32')
+                tmp[iloc_model_dict[model_name]] = model_pred_proba_dict[model_name]
+                model_pred_proba_dict_cascade[model_name] = tmp
+                # If model is part of cascade, keep the predictions that are confident and don't predict on these rows with further models.
+                if model_name in models and model_name != models[-1]:
+                    pred_proba = model_pred_proba_dict[model_name]
+                    # Calculate confident predictions based on cascade threshold
+                    # TODO: Support more sophisticated methods of calculating whether to keep a prediction
+                    # TODO: Support per-model confidence specification
+                    if self.problem_type == BINARY:
+                        confident = (pred_proba >= cascade_threshold) | (pred_proba <= (1-cascade_threshold))
+                    elif self.problem_type == MULTICLASS:
+                        confident = (pred_proba >= cascade_threshold).any(axis=1)
+                    else:
+                        raise AssertionError(f'Invalid cascade problem_type: {self.problem_type}')
+                    unconfident_cur = ~confident
+                    X = X.iloc[unconfident_cur]
+                    unconfident_idx = unconfident_idx[unconfident_cur]
+                    # If no rows remain that are unconfident, exit cascade logic early.
+                    if len(X) == 0:
+                        break
+
+        if cascade:
+            # TODO: How should this be output?
+            if self.problem_type == BINARY:
+                cascade_pred_proba = np.zeros(num_rows, dtype='float32')
+            else:
+                cascade_pred_proba = np.zeros((num_rows, self.num_classes), dtype='float32')
+            for m in cascade_order:
+                cascade_pred_proba[iloc_model_dict[m]] = model_pred_proba_dict[m]
+            # FIXME: Temp overwrite, unsure how we want to vend cascade results? In future maybe under its own model name.
+            model_pred_proba_dict[models[-1]] = cascade_pred_proba
 
         if record_pred_time:
             return model_pred_proba_dict, model_pred_time_dict
@@ -1692,24 +1856,12 @@ class AbstractTrainer:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
 
-    def _predict_model(self, X, model, model_pred_proba_dict=None):
-        if isinstance(model, str):
-            model = self.load_model(model)
-        X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        y_pred = model.predict(X=X)
-        if self._regress_preds_asprobas and model.problem_type == REGRESSION:  # Convert regression preds to classes (during distillation)
-            if (len(y_pred.shape) > 1) and (y_pred.shape[1] > 1):
-                problem_type = MULTICLASS
-            else:
-                problem_type = BINARY
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred, problem_type=problem_type)
-        return y_pred
+    def _predict_model(self, X, model, model_pred_proba_dict=None, cascade=False):
+        y_pred_proba = self._predict_proba_model(X=X, model=model, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
-    def _predict_proba_model(self, X, model, model_pred_proba_dict=None):
-        if isinstance(model, str):
-            model = self.load_model(model)
-        X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        return model.predict_proba(X=X)
+    def _predict_proba_model(self, X, model, model_pred_proba_dict=None, cascade=False):
+        return self.get_pred_proba_from_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False, cascade=cascade)
 
     def _get_dummy_stacker(self, level: int, model_levels: dict, use_orig_features=True) -> StackerEnsembleModel:
         model_names = model_levels[level - 1]
