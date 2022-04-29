@@ -450,7 +450,6 @@ class AutoMMPredictor:
         """
         Prepare for distillation. It verifies whether the student and teacher predictors have consistent
         configurations. If teacher and student have duplicate model names, it modifies teacher's model names.
-        It also combines the teacher and student data processors.
 
         Parameters
         ----------
@@ -460,18 +459,17 @@ class AutoMMPredictor:
         Returns
         -------
         teacher_model
-            The teacher model.
+            The teacher predictor's model.
         critics
             The critics used in computing mutual information loss.
         baseline_funcs
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
-        data_processors
-            The combined data processors.
         df_preprocessor
-            The teacher predictor's dataframe preprocessor. Assume the teacher's preprocessor
-            can cover the dataframe columns of the student's.
+            The teacher predictor's dataframe preprocessor.
+        data_processors
+            The teacher predictor's data processors.
         """
         logger.debug("setting up distillation...")
         if isinstance(teacher_predictor, str):
@@ -839,12 +837,16 @@ class AutoMMPredictor:
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
-                state_dicts=avg_state_dict,
+                state_dict=avg_state_dict,
                 old_prefix="student_model",
                 new_prefix="model",
             )
         checkpoint = {"state_dict": avg_state_dict}
         torch.save(checkpoint, os.path.join(save_path, "model.ckpt"))
+
+        # clean old checkpoints
+        for per_path in top_k_model_paths:
+            os.remove(per_path)
 
     def _predict(
             self,
@@ -1171,17 +1173,16 @@ class AutoMMPredictor:
         return model
 
     @staticmethod
-    def _replace_model_name_prefix(state_dicts, old_prefix, new_prefix):
-        if not isinstance(state_dicts, list):
-            state_dicts = [state_dicts]
-        state_dicts_processed = []
+    def _replace_model_name_prefix(
+            state_dict: dict,
+            old_prefix: str,
+            new_prefix: str,
+    ):
         start_idx = len(old_prefix)
-        for per_state_dict in state_dicts:
-            per_state_dict_processed = {
-                new_prefix + k[start_idx:]: v for k, v in per_state_dict.items() if k.startswith(old_prefix)
-            }
-            state_dicts_processed.append(per_state_dict_processed)
-        return state_dicts_processed
+        state_dict_processed = {
+            new_prefix + k[start_idx:]: v for k, v in state_dict.items() if k.startswith(old_prefix)
+        }
+        return state_dict_processed
 
     def save(
             self, 
