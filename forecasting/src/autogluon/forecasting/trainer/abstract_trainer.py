@@ -448,6 +448,11 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
                 if time_limit is not None:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
+                    if time_left <= 0:
+                        logger.log(
+                            30, "Stopping training due to lack of time remaining"
+                        )
+                        break
 
                 model_names_trained += self._train_and_save(
                     train_data, model=model, val_data=val_data, time_limit=time_left
