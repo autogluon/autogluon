@@ -23,7 +23,7 @@ from ._tags import _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ...hpo import run, EmptySearchSpace, TabularRayTuneAdapter
+from ...hpo import tabular_supported_schedulers, run, EmptySearchSpace, TabularRayTuneAdapter
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -994,6 +994,7 @@ class AbstractModel:
                 mode='max',
                 save_dir=directory,
                 ray_tune_adapter=TabularRayTuneAdapter(),
+                supported_schedulers=tabular_supported_schedulers,
                 total_resources=resources,
                 minimum_gpu_per_trial=0.1,
                 model_estimate_memroy_usage=model_estimate_memory_usage,

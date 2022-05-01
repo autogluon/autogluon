@@ -1,7 +1,7 @@
 import logging
-import math
 import os
 import psutil
+import shutil
 
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Union, List
@@ -15,7 +15,8 @@ import ray
 from ray import tune
 from ray_lightning import RayPlugin
 from ray.tune import PlacementGroupFactory
-from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler
+from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler, PopulationBasedTraining
+from ray.tune.schedulers.pb2 import PB2
 from ray.tune.suggest import SearchAlgorithm, Searcher
 from ray.tune.suggest.basic_variant import BasicVariantGenerator
 from ray.tune.suggest.hyperopt import HyperOptSearch
@@ -35,7 +36,12 @@ searcher_presets = {
 scheduler_presets = {
     'FIFO': FIFOScheduler,
     'ASHA': AsyncHyperBandScheduler,
+    # Not support PBT/PB2 for now: https://github.com/ray-project/ray_lightning/issues/145
+    # 'PBT' : PopulationBasedTraining,
+    # 'PB2': PB2,
 }
+
+tabular_supported_schedulers = ['FIFO']
 
 class EmptySearchSpace(Exception):
     pass
@@ -103,7 +109,7 @@ def run(
     if not search_space:
         raise EmptySearchSpace
     searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=supported_searchers)
-    scheduler = _get_scheduler(hyperparameter_tune_kwargs, metric, mode, supported_schedulers=supported_schedulers)
+    scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=supported_schedulers)
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
         resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -113,6 +119,18 @@ def run(
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             model_estimate_memroy_usage=model_estimate_memroy_usage
         )
+    else:
+        if isinstance(ray_tune_adapter, AutommRayTuneAdapter):
+            # Ray Lightning provides a way to get the resources_per_trial because of the complexity of head process and worker process.
+            # It's non-trivial to let the user to specify it. Hence we disable such option
+            logger.warning('AutoMM does not support customized resources_per_trial. We will calculate it for you instead.')
+            resources_per_trial = ray_tune_adapter.get_resources_per_trial(
+                total_resources=total_resources,
+                num_samples=num_samples,
+                minimum_gpu_per_trial=minimum_gpu_per_trial,
+                minimum_cpu_per_trial=minimum_cpu_per_trial,
+                model_estimate_memroy_usage=model_estimate_memroy_usage
+            )
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     tune_kwargs = _get_default_tune_kwargs()
     tune_kwargs.update(kwargs)
@@ -143,7 +161,10 @@ def run(
 
 def cleanup_trials(experiment_dir: str, trials_to_keep: Optional[List[str]]):
     """Cleanup trial artifacts and keep trials as specified"""
-    pass
+    directories = [dir for dir in os.listdir(experiment_dir) if os.path.isdir(os.path.join(experiment_dir, dir))]
+    for directory in directories:
+        if directory not in trials_to_keep:
+            shutil.rmtree(os.path.join(experiment_dir, directory))
 
 
 def _trial_name_creator(trial):
@@ -197,7 +218,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
     return searcher
 
 
-def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_schedulers: Optional[List[str]]=None):
+def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optional[List[str]]=None):
     """Initialize scheduler object"""
     scheduler = hyperparameter_tune_kwargs.get('scheduler')
     user_init_args = hyperparameter_tune_kwargs.get('scheduler_init_args', dict())
@@ -210,8 +231,8 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, metric: str, mode: str, sup
         scheduler_cls = scheduler_presets.get(scheduler)
         init_args = dict()
         if scheduler_cls == AsyncHyperBandScheduler:
-            init_args = dict(metric=metric, mode=mode, max_t=9999)
-            init_args.update(user_init_args)
+            init_args = dict(max_t=9999)
+        init_args.update(user_init_args)
         scheduler = scheduler_cls(**init_args)
     assert isinstance(scheduler, TrialScheduler) and scheduler.__class__ in scheduler_presets.values()
     # Check supported schedulers for obj input
@@ -330,36 +351,3 @@ class AutommRayTuneAdapter(RayTuneAdapter):
                                                     use_gpu=self.gpu_per_job is not None,
                                                 )
         return trainable_args
-
-# def _get_resources_per_trial(
-#     total_resources,
-#     num_samples,
-#     minimum_cpu_per_trial=1,
-#     minimum_gpu_per_trial=1.0,  # ray allows to use partial gpu, but we are not likely to allow 0.01 gpu per trial for example
-#     model_estimate_memroy_usage=None,
-#     ):
-#     """
-#     Calculate resources per trial if not specified by the user
-#     """
-#     assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a interger that is larger than 0'
-#     num_cpus = total_resources.get('num_cpus')
-#     num_gpus = total_resources.get('num_gpus')
-#     cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_samples))
-#     gpu_per_job = 0
-#     max_jobs_in_parallel_memory = num_samples
-
-#     if model_estimate_memroy_usage is not None:
-#         mem_available = psutil.virtual_memory().available
-#         # calculate how many jobs can run in parallel given memory available
-#         max_jobs_in_parallel_memory = max(minimum_cpu_per_trial, int(mem_available // model_estimate_memroy_usage))
-#     num_parallel_jobs = min(num_samples, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
-#     cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
-#     resources = dict(cpu=cpu_per_job)
-#     logger.log(20, f"Will run {num_parallel_jobs} jobs in parallel given number of cpu cores, memory avaialable, and user specification")
-
-#     batches = math.ceil(num_samples / num_parallel_jobs)
-#     if num_gpus > 0:
-#         gpu_per_job = max(minimum_gpu_per_trial, num_gpus / num_parallel_jobs)
-#     resources = dict(cpu=cpu_per_job, gpu=gpu_per_job)
-    
-#     return resources

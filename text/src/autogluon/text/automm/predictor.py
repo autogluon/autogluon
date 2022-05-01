@@ -20,7 +20,7 @@ import pytorch_lightning as pl
 from packaging import version
 from typing import Optional, List, Tuple, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
-from autogluon.core.hpo import run, EmptySearchSpace, AutommRayTuneAdapter
+from autogluon.core.hpo import run, cleanup_trials, EmptySearchSpace, AutommRayTuneAdapter
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -387,38 +387,35 @@ class AutoMMPredictor:
         return self
     
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
-        config = _fit_args.get('config', None)
         search_space = _fit_args.get('hyperparameters', dict())
-        # To obtain config parameter that's not search space. For example config.optimization.top_k
-        config = get_config(
-                config=config,
-                overrides=search_space,
-            )
         metric = 'val_' + _fit_args.get('validation_metric_name')
         mode = _fit_args.get('minmax_mode')
         save_path = _fit_args.get('save_path')
         time_budget_s = _fit_args.get('max_time')
-        analysis = run(
-            trainable=self._hpo_fit_wrapper,
-            trainable_args=_fit_args,
-            search_space=search_space,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            metric=metric,
-            mode=mode,
-            save_dir=os.path.basename(os.path.normpath(save_path)),
-            ray_tune_adapter=AutommRayTuneAdapter(),
-            total_resources=resources,
-            time_budget_s=time_budget_s,
-            keep_checkpoints_num=config.optimization.top_k,
-            checkpoint_score_attr=metric,
-        )
+        try:
+            analysis = run(
+                trainable=self._hpo_fit_wrapper,
+                trainable_args=_fit_args,
+                search_space=search_space,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                metric=metric,
+                mode=mode,
+                save_dir=os.path.basename(os.path.normpath(save_path)),
+                ray_tune_adapter=AutommRayTuneAdapter(),
+                total_resources=resources,
+                time_budget_s=time_budget_s,
+                keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
+                checkpoint_score_attr=metric,
+            )
+        except EmptySearchSpace:
+            raise ValueError("Please provide a search space in order to do hyperparameter tune")
         # find the best trial
         best_trial = analysis.get_best_trial(
             metric=metric,
             mode=mode,
-            scope='all',
         )
         # clean up other trials
+        cleanup_trials(save_path, best_trial.trial_id)
         # reload the predictor metadata
         predictor = self.__class__._load_metadata(path=os.path.join(save_path, best_trial.trial_id))
         # construct the model
