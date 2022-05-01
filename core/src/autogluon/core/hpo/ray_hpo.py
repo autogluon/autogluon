@@ -86,7 +86,7 @@ def run(
     total_resources: Optional[dict] = dict(),
     minimum_cpu_per_trial: int = 1,
     minimum_gpu_per_trial: float = 1.0,
-    model_estimate_memroy_usage: Optional[int] = None,
+    model_estimate_memory_usage: Optional[int] = None,
     time_budget_s: Optional[float] = None,
     supported_searchers: Optional[List[str]] = None,
     supported_schedulers: Optional[List[str]] = None,
@@ -117,7 +117,7 @@ def run(
             num_samples=num_samples,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
-            model_estimate_memroy_usage=model_estimate_memroy_usage
+            model_estimate_memory_usage=model_estimate_memory_usage
         )
     else:
         if isinstance(ray_tune_adapter, AutommRayTuneAdapter):
@@ -129,7 +129,7 @@ def run(
                 num_samples=num_samples,
                 minimum_gpu_per_trial=minimum_gpu_per_trial,
                 minimum_cpu_per_trial=minimum_cpu_per_trial,
-                model_estimate_memroy_usage=model_estimate_memroy_usage
+                model_estimate_memory_usage=model_estimate_memory_usage
             )
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     tune_kwargs = _get_default_tune_kwargs()
@@ -206,7 +206,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
         searcher_cls = searcher_presets.get(searcher)
         init_args = dict()
         if searcher_cls == HyperOptSearch:
-            init_args = dict(metirc=metric, mode=mode)
+            init_args = dict(metric=metric, mode=mode)
             init_args.update(user_init_args)
         searcher = searcher_cls(**init_args)
     assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in searcher_presets.values()
@@ -251,7 +251,7 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         num_samples: int,
         minimum_cpu_per_trial: int = 1,
         minimum_gpu_per_trial: float = 1.0,
-        model_estimate_memroy_usage: Optional[int] = None,
+        model_estimate_memory_usage: Optional[int] = None,
         **kwargs,
         ) -> Union[dict, PlacementGroupFactory]:
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a interger that is larger than 0'
@@ -261,10 +261,10 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         gpu_per_job = 0
         max_jobs_in_parallel_memory = num_samples
 
-        if model_estimate_memroy_usage is not None:
+        if model_estimate_memory_usage is not None:
             mem_available = psutil.virtual_memory().available
             # calculate how many jobs can run in parallel given memory available
-            max_jobs_in_parallel_memory = max(minimum_cpu_per_trial, int(mem_available // model_estimate_memroy_usage))
+            max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
         num_parallel_jobs = min(num_samples, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
         cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
         resources = dict(cpu=cpu_per_job)
@@ -299,7 +299,7 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         num_samples: int,
         minimum_cpu_per_trial: int = 1,
         minimum_gpu_per_trial: float = 1.0,
-        model_estimate_memroy_usage: Optional[int] = None,
+        model_estimate_memory_usage: Optional[int] = None,
         **kwargs,
         ) -> Union[dict, PlacementGroupFactory]:
         # Ray Tune requires 1 additional CPU per trial to use for the Trainable driver. 

@@ -10,10 +10,10 @@ from ray import tune
 
 class DummyAdapter(RayTuneAdapter):
     
-    def get_resources_per_trial(total_resources, num_samples, **kwargs):
-        return {}
+    def get_resources_per_trial(self, total_resources, num_samples, **kwargs):
+        return {'cpu':1}
     
-    def trainable_args_update_method(trainable_args):
+    def trainable_args_update_method(self, trainable_args):
         return {}
 
 
@@ -33,10 +33,10 @@ def _dummy_trainable(config):
 
 
 def test_tabular_resource_allocation():
-    num_cpus = get_cpu_count(logical=False)
+    num_cpus = get_cpu_count()
     num_gpus = get_gpu_count_all()
     mem_available = psutil.virtual_memory().available
-    num_trials = num_cpus // 4  # can run 4 jobs in parallel
+    num_trials = 100
     model_estimate_memory_usage = mem_available // 2.5  # can run 2 jobs in parallel
     
     adapter = TabularRayTuneAdapter()
@@ -58,7 +58,7 @@ def test_tabular_resource_allocation():
 
 
 def test_automm_resource_allocation():
-    num_cpus = get_cpu_count(logical=False)
+    num_cpus = get_cpu_count()
     num_gpus = get_gpu_count_all()
     num_trials = 1  # TODO: update to more trials when CI supports multiple GPUs
     
@@ -70,12 +70,13 @@ def test_automm_resource_allocation():
     )
     
     expected_num_parallel_jobs = 1
+    # We don't test for cpu because there will be cases when not all cpus are utilized
+    # because of the fact that (num_cpus - master process reserved cpu) is not divisible by num_trials
     expected_resources_per_trial = dict(
-        cpu = num_cpus / expected_num_parallel_jobs,
         gpu = num_gpus / expected_num_parallel_jobs,
     )
     
-    assert expected_resources_per_trial == resources_per_trial.required_resources
+    assert expected_resources_per_trial['gpu'] == resources_per_trial.required_resources['GPU']
     assert expected_num_parallel_jobs ==  adapter.num_parallel_jobs
     
 
@@ -141,10 +142,8 @@ def test_empty_search_space():
             )
         
 
-@pytest.mark.parametrize(
-    "searcher, scheduler",
-    list(zip(searcher_presets.keys(), scheduler_presets.keys()))
-)     
+@pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
+@pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))
 def test_run(searcher, scheduler):
     hyperparameter_tune_kwargs = dict(
         searcher=searcher,

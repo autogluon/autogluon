@@ -997,7 +997,7 @@ class AbstractModel:
                 supported_schedulers=tabular_supported_schedulers,
                 total_resources=resources,
                 minimum_gpu_per_trial=0.1,
-                model_estimate_memroy_usage=model_estimate_memory_usage,
+                model_estimate_memory_usage=model_estimate_memory_usage,
                 time_budget_s=time_limit
             )
             return self._get_hpo_results(analysis)
