@@ -5,6 +5,7 @@ import numpy.testing as npt
 import tempfile
 import copy
 
+from autogluon.core.hpo.ray_hpo import searcher_presets, scheduler_presets
 from autogluon.text.automm import AutoMMPredictor
 from autogluon.text.automm.constants import (
     MODEL,
@@ -22,6 +23,7 @@ from datasets import (
     HatefulMeMesDataset,
     AEDataset,
 )
+from ray import tune
 from utils import get_home_dir
 
 ALL_DATASETS = {
@@ -369,3 +371,52 @@ def test_customizing_model_names(
         assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
         for per_name in hyperparameters_gt["model.names"]:
             assert hasattr(predictor._config.model, per_name)
+
+
+@pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
+@pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))
+def test_hpo(searcher, scheduler):
+    dataset = PetFinderDataset()
+
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+
+    hyperparameters = {
+        "optimization.learning_rate": tune.uniform(0.0001, 0.01),
+        "optimization.max_epochs": 1,
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+    }
+    
+    hyperparameter_tune_kwargs = {
+        'searcher': searcher,
+        'scheduler': scheduler,
+        'num_trials': 2,
+    }
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+    
+    save_path = os.path.join(get_home_dir(), 'hpo', f'_{searcher}', f'_{scheduler}')
+
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=30,
+        save_path=save_path,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+    )
+    
+    score = predictor.evaluate(dataset.test_df)
+    verify_predictor_save_load(predictor, dataset.test_df)

@@ -549,13 +549,26 @@ class TabularPredictor:
                 Enable this if there is a large gap between score_val and score_test in stack models.
                 Note: If `tuning_data` was specified, `tuning_data` is used as the holdout data.
                 Disabled if not bagging.
-            hyperparameter_tune_kwargs : str or dict, default = None
+            hyperparameter_tune_kwargs : dict, default = None
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
-                Valid preset values:
-                    'auto': Uses the 'random' preset.
-                    'random': Performs HPO via random search using local scheduler.
-                The 'searcher' key is required when providing a dict.
+                    num_trials: int
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs t o be specified.
+                    scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
+                        If str is passed, AutoGluon will create the scheduler for you with some default parameters.
+                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
+                    scheduler_init_args: Optional[dict] = None
+                        If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
+                    searcher: Union[str, ray.tune.suggest.SearchAlgorithm, ray.tune.suggest.Searcher]
+                        If str is passed, AutoGluon will create the searcher for you with some default parameters.
+                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
+                        You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
+                    scheduler_init_args: Optional[dict] = None
+                        If provided str to `searcher`, you can optionally provide custom init_args to the searcher
+                        You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
+                    resources_per_trial: Optional[dict] = None
+                        You can provide custom resources allocation for each trial. For example, `resources_per_trial = {'cpu':2, 'gpu':1}`
+                        If not specified, AutoGluon will calculate `resources_per_trial` automatically
             feature_prune_kwargs: dict, default = None
                 Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
                 This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
@@ -2720,8 +2733,6 @@ class TabularPredictor:
                     'hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
             else:
                 ag_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
-        # if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
-        #     ag_args.pop('hyperparameter_tune_kwargs', None)
         if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
             logger.log(30,
                        'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')

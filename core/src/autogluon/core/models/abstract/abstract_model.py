@@ -946,16 +946,6 @@ class AbstractModel:
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
 
-        # if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
-        #     logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
-        #                    f"Will train one model based on the provided hyperparameters.")
-        #     return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-        # else:
-        #     logger.log(15, f"\tHyperparameter search space for {self.name}: ")
-        #     for hyperparam in search_space:
-        #         if isinstance(search_space[hyperparam], Space):
-        #             logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
-
         directory = self.path  # also create model directory if it doesn't exist
         dataset_train_filename = 'dataset_train.pkl'
         train_path = directory + dataset_train_filename

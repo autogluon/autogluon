@@ -252,6 +252,23 @@ class AutoMMPredictor:
             and whether hyper-parameter-tuning is utilized.
         seed
             The random seed to use for this training run.
+        hyperparameter_tune_kwargs
+                Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
+                If None, then hyperparameter tuning will not be performed.
+                    num_trials: int
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs t o be specified.
+                    scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
+                        If str is passed, AutoGluon will create the scheduler for you with some default parameters.
+                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
+                    scheduler_init_args: Optional[dict] = None
+                        If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
+                    searcher: Union[str, ray.tune.suggest.SearchAlgorithm, ray.tune.suggest.Searcher]
+                        If str is passed, AutoGluon will create the searcher for you with some default parameters.
+                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
+                        You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
+                    scheduler_init_args: Optional[dict] = None
+                        If provided str to `searcher`, you can optionally provide custom init_args to the searcher
+                        You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
 
         Returns
         -------
@@ -391,7 +408,7 @@ class AutoMMPredictor:
         metric = 'val_' + _fit_args.get('validation_metric_name')
         mode = _fit_args.get('minmax_mode')
         save_path = _fit_args.get('save_path')
-        time_budget_s = _fit_args.get('max_time')
+        time_budget_s = _fit_args.get('max_time') * 0.95
         try:
             analysis = run(
                 trainable=self._hpo_fit_wrapper,
@@ -409,37 +426,41 @@ class AutoMMPredictor:
             )
         except EmptySearchSpace:
             raise ValueError("Please provide a search space in order to do hyperparameter tune")
-        # find the best trial
-        best_trial = analysis.get_best_trial(
-            metric=metric,
-            mode=mode,
-        )
-        # clean up other trials
-        cleanup_trials(save_path, best_trial.trial_id)
-        # reload the predictor metadata
-        predictor = self.__class__._load_metadata(path=os.path.join(save_path, best_trial.trial_id))
-        # construct the model
-        model = create_model(
-            config=predictor._config,
-            num_classes=predictor._output_shape,
-            num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
-            num_categories=predictor._df_preprocessor.categorical_num_categories,
-            pretrained=False # set "pretrain=False" to prevent downloading online models
-        )
-        predictor._model = model
-        # average checkpoint
-        predictor._top_k_average(
-            ckpt_prefix=RAY_TUNE_CHECKPOINT_PREFIX,
-            save_path=predictor._save_path,
-            best_k_models=[],
-            val_df=_fit_args['val_df'],
-            validation_metric_name=predictor._validation_metric_name,
-            minmax_mode=mode,
-            config=predictor._config,
-            model=predictor._model
-        )
-        
-        return predictor
+        except Exception as e:
+            raise e
+        else:
+            # find the best trial
+            best_trial = analysis.get_best_trial(
+                metric=metric,
+                mode=mode,
+            )
+            # clean up other trials
+            logger.info('Removing non-optimal trials and only keep the best one.')
+            cleanup_trials(save_path, best_trial.trial_id)
+            # reload the predictor metadata
+            predictor = self.__class__._load_metadata(path=os.path.join(save_path, best_trial.trial_id))
+            # construct the model
+            model = create_model(
+                config=predictor._config,
+                num_classes=predictor._output_shape,
+                num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
+                num_categories=predictor._df_preprocessor.categorical_num_categories,
+                pretrained=False # set "pretrain=False" to prevent downloading online models
+            )
+            predictor._model = model
+            # average checkpoint
+            predictor._top_k_average(
+                ckpt_prefix=RAY_TUNE_CHECKPOINT_PREFIX,
+                save_path=predictor._save_path,
+                best_k_models=[],
+                val_df=_fit_args['val_df'],
+                validation_metric_name=predictor._validation_metric_name,
+                minmax_mode=mode,
+                config=predictor._config,
+                model=predictor._model
+            )
+            
+            return predictor
         
     def _hpo_fit_wrapper(self, sampled_hyperparameters, original_path, checkpoint_dir=None, **_fit_args):
         from ray import tune
