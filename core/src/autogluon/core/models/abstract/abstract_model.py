@@ -1062,6 +1062,25 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
+    def verify_fit_resources(self):
+        """
+        Subclass should consider override this method if it requires more resources to train
+        """
+        num_cpus, num_gpus = self._get_resources_to_train()
+        self._verify_fit_resources(num_cpus, num_gpus)
+
+    def _verify_fit_resources(self, num_cpus, num_gpus):
+        minimum_cpu_requirement = 1
+        if num_cpus < minimum_cpu_requirement:
+            raise ValueError(f"Requires {minimum_cpu_requirement} to train, only {num_cpus} is available")
+
+    def _get_resources_to_train(self):
+        ag_args_fit = self.get_params().get('hyperparameters', {}).get('ag_args_fit', {})
+        default_num_cpus, default_num_gpus = self._get_default_resources()
+        num_cpus = ag_args_fit.get('num_cpus', default_num_cpus)
+        num_gpus = ag_args_fit.get('num_gpus', default_num_gpus)
+        return num_cpus, num_gpus
+
     def _estimate_memory_usage(self, X, **kwargs) -> int:
         """
         This method simply provides a default implementation. Each model should consider implementing custom memory estimate logic.
