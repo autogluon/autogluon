@@ -31,6 +31,7 @@ import pytest
 import autogluon.core as ag
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.hpo.ray_hpo import tabular_supported_schedulers, tabular_supported_searchers
 from autogluon.tabular import TabularDataset, TabularPredictor
 from networkx.exception import NetworkXError
 
@@ -484,12 +485,14 @@ def test_pseudolabeling():
 
 
 @pytest.mark.slow
-def test_tabularHPObagstack():
+@pytest.mark.parametrize('scheduler', list(tabular_supported_schedulers.keys()))
+@pytest.mark.parametrize('searcher', list(tabular_supported_searchers.keys()))
+def test_tabularHPObagstack(scheduler, searcher):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 10000 # random seed
     subsample_size = None
-    hyperparameter_tune_kwargs = {'scheduler': 'local', 'searcher': 'auto'}
+    hyperparameter_tune_kwargs = {'scheduler': scheduler, 'searcher': searcher}
     num_stack_levels = 2
     num_bag_folds = 2
     verbosity = 2 # how much output to print
@@ -526,13 +529,14 @@ def test_tabularHPObagstack():
                            seed_val=seed_val, fit_args=fit_args)
 
 
-
-def test_tabularHPO():
+@pytest.mark.parametrize('scheduler', list(tabular_supported_schedulers.keys()))
+@pytest.mark.parametrize('searcher', list(tabular_supported_searchers.keys()))
+def test_tabularHPO(scheduler, searcher):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
     seed_val = 99 # random seed
     subsample_size = None
-    hyperparameter_tune_kwargs = {'scheduler': 'local', 'searcher': 'auto'}
+    hyperparameter_tune_kwargs = {'scheduler': scheduler, 'searcher': searcher}
     verbosity = 2 # how much output to print
     hyperparameters = None
     time_limit = None

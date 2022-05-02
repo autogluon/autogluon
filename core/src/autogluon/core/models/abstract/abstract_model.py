@@ -1002,9 +1002,7 @@ class AbstractModel:
             )
             return self._get_hpo_results(analysis)
         except EmptySearchSpace:
-            # TODO: update skip_hpo to get correct return
             return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-
 
     def _get_hpo_results(self, analysis):
         hpo_models = {}

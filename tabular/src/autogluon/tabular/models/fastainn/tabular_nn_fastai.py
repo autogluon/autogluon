@@ -213,6 +213,8 @@ class NNFastAiTabularModel(AbstractModel):
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
         if params.get('layers', None) is not None:
             layers = params['layers']
+            if type(layers) == tuple:
+                layers = list(layers)
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
         elif self.problem_type == QUANTILE:
@@ -221,6 +223,7 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             base_size = max(data.c * 2, 100)
             layers = [base_size * 2, base_size]
+        assert type(layers) == list
 
         loss_func = None
         if self.problem_type == QUANTILE:

@@ -41,7 +41,9 @@ scheduler_presets = {
     # 'PB2': PB2,
 }
 
+tabular_supported_searchers = ['random', 'bayes']
 tabular_supported_schedulers = ['FIFO']
+
 
 class EmptySearchSpace(Exception):
     pass
@@ -69,7 +71,8 @@ class RayTuneAdapter(ABC):
     @abstractmethod
     def trainable_args_update_method(trainable_args: dict) -> dict:
         """
-        Update trainable_args being passed to tune.run with correct resources for each trial. This can differ in forms for different predictor
+        Update trainable_args being passed to tune.run with correct information for each trial.
+        This can differ in forms for different predictor.
         """
         raise NotImplementedError
 
@@ -97,9 +100,54 @@ def run(
     Parse hyperparameter_tune_kwargs
     Init necessary objects, i.e. searcher, scheduler, and ray
     Translate search space
-    Calculate resource per trial
+    Calculate resource per trial and update trainable_args accordingly
     Finally tune.run
-    local_dir/experiment_name/trial_dir
+
+    Parameters
+    ----------
+    trainable
+        The function used to train the model.
+    trainable_args
+        Args passed to trainable.
+    search_space
+        Search space for HPO.
+    hyperparameter_tune_kwargs
+        User specified HPO options.
+    metric
+        Name of the monitored metric for HPO.
+    mode
+        Determines whether objective is minimizing or maximizing the metric.
+        Must be one of [min, max].
+    save_dir
+        Directory to save results. Ray will write artifacts to save_dir/trial_dir/
+        trial_dir name has been overwritten to be trial_id.
+        To provide custom trial_dir, pass a custom function to `trial_dirname_creator` as kwargs.
+        For example of creating the custom function, refer to `_trial_dirname_creator`.
+    ray_tune_adapter
+        Adapter to provide necessary custom info to ray tune.
+    total_resources
+        Total resources can be used for HPO.
+        If not specified, will use all the resources by default.
+    minimum_cpu_per_trial
+        Specify minimum number of cpu to use per trial.
+    minimum_gpu_per_trial
+        Specify minimum number of gpu to use per trial.
+        Ray supports usage of fraction of gpu.
+    model_estimate_memory_usage
+        Provide optional estimate of the model memory usage.
+        Calculation of the resources_per_trial might use this info to better distribute resources
+    time_budget_s
+        Time limit for the HPO.
+    supported_searchers
+        Some searchers requires reporting status within epochs or checkpointing in the middle of training.
+        If the trainable doesn't support those functionality, provide supported_searchers here to warn users HPO might not work as expected.
+    supported_schedulers
+        Some schedulers requires reporting status within epochs or checkpointing in the middle of training.
+        If the trainable doesn't support those functionality, provide supported_sschedulers here to warn users HPO might not work as expected.
+    verbose
+        0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
+    **kwargs
+        Additional args being passed to tune.run
     """
     assert mode in [MIN, MAX], f'mode is {mode}'
     num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
@@ -159,12 +207,24 @@ def run(
     return analysis
 
 
-def cleanup_trials(experiment_dir: str, trials_to_keep: Optional[List[str]]):
-    """Cleanup trial artifacts and keep trials as specified"""
-    directories = [dir for dir in os.listdir(experiment_dir) if os.path.isdir(os.path.join(experiment_dir, dir))]
+def cleanup_trials(save_dir: str, trials_to_keep: Optional[List[str]]):
+    """
+    Cleanup trial artifacts and keep trials as specified
+    
+    Parameters
+    ----------
+    save_dir
+        The path to the root of all the saved trials.
+        This should be the same `save_dir` as you passed to `run`
+    trials_to_keep
+        List of trials to keep.
+        Provide the dir name to the trial.
+        This should be the same as trial_id if you didn't provide custom `trial_dirname_creator`
+    """
+    directories = [dir for dir in os.listdir(save_dir) if os.path.isdir(os.path.join(save_dir, dir))]
     for directory in directories:
         if directory not in trials_to_keep:
-            shutil.rmtree(os.path.join(experiment_dir, directory))
+            shutil.rmtree(os.path.join(save_dir, directory))
 
 
 def _trial_name_creator(trial):
@@ -213,7 +273,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
     # Check supported schedulers for obj input
     if supported_searchers is not None:
         supported_searchers_cls = [scheduler_presets[scheduler] for scheduler in supported_searchers]
-        if searcher.__class__ in supported_searchers_cls:
+        if searcher.__class__ not in supported_searchers_cls:
             logger.warning(f'{searcher.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers_cls}')
     return searcher
 
@@ -238,7 +298,7 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
     # Check supported schedulers for obj input
     if supported_schedulers is not None:
         supported_schedulers_cls = [scheduler_presets[scheduler] for scheduler in supported_schedulers]
-        if scheduler.__class__ in supported_schedulers_cls:
+        if scheduler.__class__ not in supported_schedulers_cls:
             logger.warning(f'{scheduler.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers_cls}')
     return scheduler
     

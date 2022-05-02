@@ -83,6 +83,7 @@ class Categorical(DiscreteSpace):
         # This is a hack
         # nested list are not correctly converted to hyperopt space by ray https://github.com/ray-project/ray/issues/24050
         # convert list to tuple instead
+        # TODO: remove the hack once ray releases new version containing the fix
         data = self.data.copy()
         for i, d in enumerate(self.data):
             if type(d) == list:
