@@ -422,7 +422,6 @@ class BaggedEnsembleModel(AbstractModel):
                    save_folds=True,
                    groups=None,
                    **kwargs):
-        model_base.verify_fit_resources()
         fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
         if fold_fitting_strategy == 'auto':
             fold_fitting_strategy = self._get_default_fold_fitting_strategy()
@@ -987,6 +986,12 @@ class BaggedEnsembleModel(AbstractModel):
         memory_size = super().get_memory_size()
         self.models = models
         return memory_size
+
+    def validate_fit_resources(self, **kwargs):
+        self.model_base.validate_fit_resources(**kwargs)
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        return self.model_base.get_minimum_resources()
 
     def _validate_fit_memory_usage(self, **kwargs):
         # memory is checked downstream on the child model
