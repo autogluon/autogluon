@@ -4,9 +4,11 @@ import pytest
 import numpy.testing as npt
 import tempfile
 import copy
+from torch import nn
 
 from autogluon.core.hpo.ray_hpo import searcher_presets, scheduler_presets
 from autogluon.text.automm import AutoMMPredictor
+from autogluon.text.automm.utils import modify_duplicate_model_names
 from autogluon.text.automm.constants import (
     MODEL,
     DATA,
@@ -17,6 +19,8 @@ from autogluon.text.automm.constants import (
     UNIFORM_SOUP,
     GREEDY_SOUP,
     BEST,
+    NORM_FIT,
+    BIT_FIT,
 )
 from datasets import (
     PetFinderDataset,
@@ -56,14 +60,15 @@ def verify_predictor_save_load(predictor, df,
 
 
 @pytest.mark.parametrize(
-    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method",
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune",
     [
         (
             "petfinder",
             ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP
+            GREEDY_SOUP,
+            NORM_FIT
         ),
 
         (
@@ -71,7 +76,8 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
-            UNIFORM_SOUP
+            UNIFORM_SOUP,
+            BIT_FIT
         ),
 
         (
@@ -79,7 +85,8 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP
+            GREEDY_SOUP,
+            None
         ),
 
         (
@@ -87,7 +94,8 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             None,
-            UNIFORM_SOUP
+            UNIFORM_SOUP,
+            None
         ),
 
         (
@@ -95,7 +103,8 @@ def verify_predictor_save_load(predictor, df,
             ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
             None,
             None,
-            BEST
+            BEST,
+            BIT_FIT
         ),
 
         (
@@ -103,7 +112,8 @@ def verify_predictor_save_load(predictor, df,
             ["timm_image"],
             None,
             "swin_tiny_patch4_window7_224",
-            UNIFORM_SOUP
+            UNIFORM_SOUP,
+            NORM_FIT
         ),
 
         (
@@ -111,7 +121,8 @@ def verify_predictor_save_load(predictor, df,
             ["hf_text"],
             "prajjwal1/bert-tiny",
             None,
-            BEST
+            BEST,
+            NORM_FIT
         ),
 
         (
@@ -119,7 +130,8 @@ def verify_predictor_save_load(predictor, df,
             ["clip"],
             None,
             None,
-            BEST
+            BEST,
+            NORM_FIT
         ),
 
     ]
@@ -130,6 +142,7 @@ def test_predictor(
         text_backbone,
         image_backbone,
         top_k_average_method,
+        efficient_finetune
 ):
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
@@ -151,6 +164,7 @@ def test_predictor(
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": top_k_average_method,
+        "optimization.efficient_finetune": efficient_finetune,
     }
     if text_backbone is not None:
         hyperparameters.update({
@@ -371,6 +385,179 @@ def test_customizing_model_names(
         assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
         for per_name in hyperparameters_gt["model.names"]:
             assert hasattr(predictor._config.model, per_name)
+    
+
+def test_model_configs():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+
+    model_config = { 
+        'model': {
+                'names': ['hf_text', 'timm_image', 'clip', 'categorical_transformer', 'numerical_transformer', 'fusion_transformer'], 
+                'categorical_transformer': {
+                    'out_features': 192, 
+                    'd_token': 192, 
+                    'num_trans_blocks': 0, 
+                    'num_attn_heads': 4, 
+                    'residual_dropout': 0.0, 
+                    'attention_dropout': 0.2, 
+                    'ffn_dropout': 0.1, 
+                    'normalization': 'layer_norm', 
+                    'ffn_activation': 'reglu', 
+                    'head_activation': 'relu', 
+                    'data_types': ['categorical']
+                }, 
+                'numerical_transformer': {
+                    'out_features': 192, 
+                    'd_token': 192, 
+                    'num_trans_blocks': 0, 
+                    'num_attn_heads': 4, 
+                    'residual_dropout': 0.0, 
+                    'attention_dropout': 0.2, 
+                    'ffn_dropout': 0.1, 
+                    'normalization': 'layer_norm', 
+                    'ffn_activation': 'reglu', 
+                    'head_activation': 'relu', 
+                    'data_types': ['numerical'], 
+                    'merge': 'concat'
+                }, 
+                'hf_text': {
+                    'checkpoint_name': 'google/electra-base-discriminator', 
+                    'data_types': ['text'], 
+                    'tokenizer_name': 'hf_auto', 
+                    'max_text_len': 512, 
+                    'insert_sep': True, 
+                    'text_segment_num': 2, 
+                    'stochastic_chunk': False
+                }, 
+                'timm_image': {
+                    'checkpoint_name': 'swin_base_patch4_window7_224', 
+                    'mix_choice': 'all_logits', 
+                    'data_types': ['image'], 
+                    'train_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'val_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'image_norm': 'imagenet', 
+                    'image_size': 224,
+                    'max_img_num_per_col': 2
+                },
+                'clip': {
+                    'checkpoint_name': 'openai/clip-vit-base-patch32', 
+                    'data_types': ['image', 'text'], 
+                    'train_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'val_transform_types': ['resize_shorter_side', 'center_crop'], 
+                    'image_norm': 'clip', 
+                    'image_size': 224, 
+                    'max_img_num_per_col': 2, 
+                    'tokenizer_name': 'clip', 
+                    'max_text_len': 77, 
+                    'insert_sep': False, 
+                    'text_segment_num': 1, 
+                    'stochastic_chunk': False
+                }, 
+                'fusion_transformer': {
+                    'hidden_size': 192, 
+                    'n_blocks': 2, 
+                    'attention_n_heads': 4, 
+                    'adapt_in_features': 'max', 
+                    'attention_dropout': 0.2, 
+                    'residual_dropout': 0.0, 
+                    'ffn_dropout': 0.1, 
+                    'ffn_d_hidden': 192, 
+                    'normalization': 'layer_norm', 
+                    'ffn_activation': 'geglu', 
+                    'head_activation': 'relu', 
+                    'data_types': None
+                },
+            }
+        }
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "optimization.top_k_average_method": BEST,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
+    }
+
+    config = {
+        MODEL: model_config,
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+
+    with tempfile.TemporaryDirectory() as save_path:
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            time_limit=30,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+        )
+
+        score = predictor.evaluate(dataset.test_df)
+        verify_predictor_save_load(predictor, dataset.test_df)
+
+
+def test_modifying_duplicate_model_names():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    teacher_predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    teacher_predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        time_limit=1,
+    )
+    student_predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    student_predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        time_limit=0,
+    )
+
+    teacher_predictor = modify_duplicate_model_names(
+        predictor=teacher_predictor,
+        postfix="teacher",
+        blacklist=student_predictor._config.model.names,
+    )
+
+    # verify teacher and student have no duplicate model names
+    assert all([n not in teacher_predictor._config.model.names for n in student_predictor._config.model.names]), \
+        f"teacher model names {teacher_predictor._config.model.names} and" \
+        f" student model names {student_predictor._config.model.names} have duplicates."
+
+    # verify each model name prefix is valid
+    assert teacher_predictor._model.prefix in teacher_predictor._config.model.names
+    if isinstance(teacher_predictor._model.model, nn.ModuleList):
+        for per_model in teacher_predictor._model.model:
+            assert per_model.prefix in teacher_predictor._config.model.names
+
+    # verify each data processor's prefix is valid
+    for per_modality_processors in teacher_predictor._data_processors.values():
+        for per_processor in per_modality_processors:
+            assert per_processor.prefix in teacher_predictor._config.model.names
 
 
 @pytest.mark.parametrize('searcher', list(searcher_presets.keys()))

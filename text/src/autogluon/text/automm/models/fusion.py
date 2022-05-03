@@ -8,6 +8,7 @@ from ..constants import (
     WEIGHT, AUTOMM
 )
 from .mlp import MLP
+from .ft_transformer import FT_Transformer, CLSToken
 
 logger = logging.getLogger(AUTOMM)
 
@@ -153,6 +154,193 @@ class MultimodalFusionMLP(nn.Module):
                 output.update(per_output)
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
+        logits = self.head(features)
+        fusion_output = {
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
+        }
+        if self.loss_weight is not None:
+            fusion_output[self.prefix].update({WEIGHT: 1})
+            output.update(fusion_output)
+            return output
+        else:
+            return fusion_output
+
+    def get_layer_ids(self,):
+        """
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end.
+
+        It assumes that each individual model has the "name_to_id" attribute storing
+        the already computed model's layer ids. This function only collects those layer ids.
+        It also add prefixes for each model's parameter names since the fusion model wraps
+        those individual models, making the name scope changed. Configuring the optimizer
+        requires a full name of each parameter.
+
+        The layers defined in this class, e.g., head, adapter,
+        and, fusion_mlp, have id 0.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
+        """
+        model_prefix = "model"
+        names = [n for n, _ in self.named_parameters()]
+
+        outer_layer_names = [n for n in names if not n.startswith(model_prefix)]
+        name_to_id = {}
+        logger.debug(f"outer layers are treated as head: {outer_layer_names}")
+        for n in outer_layer_names:
+            name_to_id[n] = 0
+
+        for i, per_model in enumerate(self.model):
+            per_model_prefix = f"{model_prefix}.{i}"
+            if not hasattr(per_model, "name_to_id"):
+                raise ValueError(
+                    f"name_to_id attribute is missing in model: {per_model.__class__.__name__}"
+                )
+            for n, layer_id in per_model.name_to_id.items():
+                full_n = f"{per_model_prefix}.{n}"
+                name_to_id[full_n] = layer_id
+
+        # double check each parameter has been assigned an id
+        for n in names:
+            assert n in name_to_id
+
+        return name_to_id
+
+
+class MultimodalFusionTransformer(nn.Module):
+    """
+    Use Transformer to fuse different models' features (single-modal and multimodal).
+    Specifically, it adapts the features of each model to specified dimensions,
+    concatenates the adapted features, and fuses the features through Transformer.
+    """
+
+    def __init__(
+            self,
+            prefix: str,
+            models: list,
+            hidden_features: int,
+            num_classes: int,
+            n_blocks: Optional[int] = 0,
+            attention_n_heads: Optional[int] = 8,
+            attention_initialization: Optional[str] = 'kaiming',
+            attention_normalization: Optional[str] = 'layer_norm',
+            attention_dropout: Optional[str] = 0.2, 
+            residual_dropout: Optional[str] = 0.0,
+            ffn_activation: Optional[str] = 'reglu',
+            ffn_normalization: Optional[str] = 'layer_norm',
+            ffn_d_hidden: Optional[str] = 192,
+            ffn_dropout: Optional[str] = 0.0,
+            prenormalization: Optional[bool] = True,
+            first_prenormalization: Optional[bool] =  False,
+            kv_compression_ratio: Optional[float] = None,
+            kv_compression_sharing: Optional[str] = None,
+            head_activation: Optional[str] =  'ReLU',
+            head_normalization: Optional[str] = 'layer_norm',
+            adapt_in_features: Optional[str] = None,
+            loss_weight: Optional[float] = None,
+    ):
+        super().__init__()
+        if loss_weight is not None:
+            assert loss_weight > 0
+
+        self.loss_weight = loss_weight
+        self.model = nn.ModuleList(models)
+
+        raw_in_features = [per_model.out_features for per_model in models]
+
+        if adapt_in_features == "min":
+            base_in_feat = min(raw_in_features)
+        elif adapt_in_features == "max":
+            base_in_feat = max(raw_in_features)
+        else:
+            raise ValueError(f"unknown adapt_in_features: {adapt_in_features}")
+
+        self.adapter = nn.ModuleList(
+            [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
+        )
+
+        in_features = base_in_feat
+
+        assert len(self.adapter) == len(self.model)
+
+        self.fusion_transformer = FT_Transformer(
+            d_token=in_features,
+            n_blocks=n_blocks,
+            attention_n_heads=attention_n_heads,
+            attention_dropout=attention_dropout,
+            attention_initialization=attention_initialization,
+            attention_normalization=attention_normalization,
+            ffn_d_hidden=ffn_d_hidden,
+            ffn_dropout=ffn_dropout,
+            ffn_activation=ffn_activation,
+            ffn_normalization=ffn_normalization,
+            residual_dropout=residual_dropout,
+            prenormalization=prenormalization,
+            first_prenormalization=first_prenormalization,
+            last_layer_query_idx=None,
+            n_tokens=None,
+            kv_compression_ratio=kv_compression_ratio,
+            kv_compression_sharing=kv_compression_sharing,
+            head_activation=head_activation,
+            head_normalization=head_normalization,
+            d_out=hidden_features,
+            projection=False
+        )
+
+        self.head = FT_Transformer.Head(
+            d_in=in_features,
+            d_out=num_classes,
+            bias=True,
+            activation=head_activation, 
+            normalization=head_normalization,
+        )
+        
+        self.cls_token = CLSToken(
+            d_token=in_features, 
+            initialization='uniform',
+        )
+
+        # init weights
+        self.adapter.apply(init_weights)
+        self.head.apply(init_weights)
+
+        self.prefix = prefix
+
+        self.name_to_id = self.get_layer_ids()
+        self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
+
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
+
+    def forward(
+            self,
+            batch: dict,
+    ):
+        multimodal_features = []
+        output = {}
+        for per_model, per_adapter in zip(self.model, self.adapter):
+            per_output = per_model(batch)
+            multimodal_feature = per_adapter(per_output[per_model.prefix][FEATURES])
+            if multimodal_feature.ndim == 2:
+                multimodal_feature = torch.unsqueeze(multimodal_feature,dim=1)
+            multimodal_features.append(multimodal_feature)
+
+
+            if self.loss_weight is not None:
+                per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
+                output.update(per_output)
+
+        multimodal_features = torch.cat(multimodal_features, dim=1)
+        multimodal_features = self.cls_token(multimodal_features)
+        features = self.fusion_transformer(multimodal_features)
+
         logits = self.head(features)
         fusion_output = {
             self.prefix: {

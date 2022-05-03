@@ -247,7 +247,7 @@ class TextPredictor:
                 seed=seed,
             )
         else:
-            warnings.warn(f'MXNet backend will be removed deprecated in AutoGluon 0.5. '
+            warnings.warn(f'MXNet backend will be deprecated in AutoGluon 0.5. '
                           f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
             self._predictor.fit(
                 train_data=train_data,

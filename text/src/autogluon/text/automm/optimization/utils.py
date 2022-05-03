@@ -10,7 +10,7 @@ from .lr_scheduler import (
     get_polynomial_decay_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN
+from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT
 
 
 def get_loss_func(problem_type: str):
@@ -211,9 +211,33 @@ def get_weight_decay_param_names(model: nn.Module):
     -------
     A list of parameter names not using weight decay.
     """
-    decay_param_names = get_parameter_names(model, [nn.LayerNorm])
+    # By default, we should not apply weight decay for all the norm layers
+    decay_param_names = get_parameter_names(model,
+                                            [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
+                                             nn.GroupNorm])
     decay_param_names = [name for name in decay_param_names if "bias" not in name]
     return decay_param_names
+
+
+def get_norm_layer_param_names(model: nn.Module):
+    """
+    Get parameters associated with the normalization layers
+
+    Parameters
+    ----------
+    model
+        A Pytorch model
+
+    Returns
+    -------
+    norm_param_names
+        A list of normalization parameter names
+    """
+    all_param_names = [name for name, _ in model.named_parameters()]
+    all_param_names_except_norm_names = get_parameter_names(
+        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm])
+    norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
+    return norm_param_names
 
 
 def apply_single_lr(
@@ -346,6 +370,7 @@ def apply_layerwise_lr_decay(
         lr: float,
         lr_decay: float,
         weight_decay: float,
+        efficient_finetune: Optional[str] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -365,6 +390,8 @@ def apply_layerwise_lr_decay(
         The learning rate decay factor (0, 1).
     weight_decay
         Weight decay.
+    efficient_finetune
+        Efficient finetuning strategy. Can be "bit_fit", "norm_fit". It will only finetune part of the parameters
 
     Returns
     -------
@@ -373,8 +400,17 @@ def apply_layerwise_lr_decay(
     parameter_group_names = {}
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
-
+    norm_param_names = get_norm_layer_param_names(model)
     for name, param in model.named_parameters():
+        if efficient_finetune == BIT_FIT:
+            # For bit_fit, we disable tuning everything except the bias terms
+            if 'bias' not in name:
+                param.requires_grad = False
+        elif efficient_finetune == NORM_FIT:
+            # For norm-fit, we finetune all the normalization layers and bias layers
+            if name not in norm_param_names and 'bias' not in name:
+                param.requires_grad = False
+
         if not param.requires_grad:
             continue  # frozen weights
 

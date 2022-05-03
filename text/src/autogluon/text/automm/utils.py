@@ -23,6 +23,9 @@ from .models import (
     CategoricalMLP,
     NumericalMLP,
     MultimodalFusionMLP,
+    NumericalTransformer,
+    CategoricalTransformer,
+    MultimodalFusionTransformer,
 )
 from .data import (
     ImageProcessor,
@@ -33,12 +36,14 @@ from .data import (
     MultiModalFeaturePreprocessor,
 )
 from .constants import (
-    ACCURACY, RMSE, R2, ALL_MODALITIES,
+    ACCURACY, RMSE, R2, PEARSONR, SPEARMANR, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
     CATEGORICAL_MLP, FUSION_MLP,
+    NUMERICAL_TRANSFORMER, CATEGORICAL_TRANSFORMER,
+    FUSION_TRANSFORMER,
 )
 from .presets import (
     list_model_presets,
@@ -76,7 +81,7 @@ def infer_metrics(
         Name of evaluation metric.
     """
     if eval_metric_name is not None:
-        if eval_metric_name.lower() == R2:
+        if eval_metric_name.lower() in [R2, PEARSONR, SPEARMANR]:
             validation_metric_name = RMSE
         else:
             validation_metric_name = eval_metric_name
@@ -108,6 +113,8 @@ def get_config(
     ----------
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
+        If any key is not not given, we will fill in with the default value.
+
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
                         "model": "fusion_mlp_image_text_tabular",
@@ -155,6 +162,12 @@ def get_config(
         config = get_preset(list_model_presets()[0])
     if not isinstance(config, DictConfig):
         all_configs = []
+        for k, default_value in [('model', 'fusion_mlp_image_text_tabular'),
+                                 ('data', 'default'),
+                                 ('optimization', 'adamw'),
+                                 ('environment', 'default')]:
+            if k not in config:
+                config[k] = default_value
         for k, v in config.items():
             if isinstance(v, dict):
                 per_config = OmegaConf.create(v)
@@ -210,7 +223,7 @@ def verify_model_names(config: DictConfig):
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
-    assert sorted(config.names) == sorted(keys), \
+    assert set(config.names).issubset(set(keys)), \
         f"`{config.names}` do not match config keys {keys}"
 
     # verify that no name starts with another one
@@ -586,6 +599,24 @@ def create_model(
                 normalization=model_config.normalization,
                 num_classes=num_classes,
             )
+        elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
+            model = NumericalTransformer(
+                prefix=model_name,
+                in_features=num_numerical_columns,
+                out_features=model_config.out_features,
+                d_token=model_config.d_token,
+                n_blocks=model_config.num_trans_blocks,
+                attention_n_heads=model_config.num_attn_heads,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
+                num_classes=num_classes,
+            )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
                 prefix=model_name,
@@ -595,6 +626,24 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                num_classes=num_classes,
+            )
+        elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
+            model = CategoricalTransformer(
+                prefix=model_name,
+                num_categories=num_categories,
+                out_features=model_config.out_features,
+                d_token=model_config.d_token,
+                n_blocks=model_config.num_trans_blocks,
+                attention_n_heads=model_config.num_attn_heads,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(FUSION_MLP):
@@ -607,6 +656,26 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+            )
+            continue
+        elif model_name.lower().startswith(FUSION_TRANSFORMER):
+            fusion_model = functools.partial(
+                MultimodalFusionTransformer,
+                prefix=model_name,
+                hidden_features=model_config.hidden_size,
+                num_classes=num_classes,
+                attention_n_heads=model_config.attention_n_heads,
+                ffn_d_hidden=model_config.ffn_d_hidden,
+                attention_dropout=model_config.attention_dropout,
+                residual_dropout=model_config.residual_dropout,
+                ffn_dropout=model_config.ffn_dropout,
+                attention_normalization=model_config.normalization,
+                ffn_normalization=model_config.normalization,
+                head_normalization=model_config.normalization,
+                ffn_activation=model_config.ffn_activation,
+                head_activation=model_config.head_activation,
+                adapt_in_features=model_config.adapt_in_features,
                 loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
@@ -786,83 +855,34 @@ def make_exp_dir(
     return exp_dir
 
 
-def gather_top_k_ckpts(
-        ckpt_prefix: Optional[str] = None,
-        ckpt_dir: Optional[str] = None,
-        ckpt_paths: Optional[List[str]] = None,
-):
-    """
-    Gather the state_dicts of top k models. If "ckpt_paths" is not an empty list, it loads the models
-    from its paths. Otherwise, it will find available checkpoints in the "ckpt_dir". After loading all the
-    top k checkpoints, it cleans them. The lastest checkpoint "last.ckpt" is also removed since "last.ckpt"
-    is for resuming training in the middle, but the the training should be done when calling this function.
-
-    Parameters
-    ----------
-    ckpt_prefix
-        The prefix of the checkpoint file
-    ckpt_dir
-        The directory where we save all the top k checkpoints.
-    ckpt_paths
-        A list of top k checkpoint paths.
-
-    Returns
-    -------
-    all_state_dicts
-        A list of state_dicts
-    """
-    if not ckpt_paths:
-        assert ckpt_prefix is not None
-        ckpt_paths = []
-        for root, dirs, files in os.walk(ckpt_dir):
-            for file in files:
-                if file.startswith(ckpt_prefix):
-                    ckpt_paths.append(os.path.join(root, file))
-
-    all_state_dicts = []
-    for path in ckpt_paths:
-        checkpoint = torch.load(path)
-        all_state_dicts.append(checkpoint["state_dict"])
-        os.remove(path)
-
-    if ckpt_dir is not None:
-        for file_name in os.listdir(ckpt_dir):
-            if file_name.startswith("epoch"):
-                os.remove(os.path.join(ckpt_dir, file_name))
-        last_ckpt_path = os.path.join(ckpt_dir, "last.ckpt")
-        if os.path.exists(last_ckpt_path):
-            os.remove(last_ckpt_path)
-
-    logger.debug(f"ckpt num: {len(all_state_dicts)}")
-    return all_state_dicts
-
-
 def average_checkpoints(
-        all_state_dicts: List[Dict],
-        out_path: Optional[str] = None,
+        checkpoint_paths: List[str],
 ):
     """
-    Average the state_dicts of top k checkpoints.
+    Average a list of checkpoints' state_dicts.
 
     Parameters
     ----------
-    all_state_dicts
-        A list of Pytorch state_dicts.
-    out_path
-        The path to save the averaged checkpoint.
+    checkpoint_paths
+        A list of model checkpoint paths.
 
     Returns
     -------
     The averaged state_dict.
     """
     avg_state_dict = {}
-    for key in all_state_dicts[0]:
-        arr = [state_dict[key] for state_dict in all_state_dicts]
-        avg_state_dict[key] = sum(arr) / len(arr)
+    for per_path in checkpoint_paths:
+        state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+        for key in state_dict:
+            if key in avg_state_dict:
+                avg_state_dict[key] += state_dict[key]
+            else:
+                avg_state_dict[key] = state_dict[key]
+        del state_dict
 
-    if out_path:
-        checkpoint = {"state_dict": avg_state_dict}
-        torch.save(checkpoint, out_path)
+    num = torch.tensor(len(checkpoint_paths))
+    for key in avg_state_dict:
+        avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
 
     return avg_state_dict
 
@@ -1067,3 +1087,57 @@ def apply_log_filter(log_filter):
     finally:
         remove_log_filter(logging.getLogger(), log_filter)
         remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+
+
+def modify_duplicate_model_names(
+        predictor,
+        postfix: str,
+        blacklist: List[str],
+):
+    """
+    Modify a predictor's model names if they exist in a blacklist.
+
+    Parameters
+    ----------
+    predictor
+        An AutoMMPredictor object.
+    postfix
+        The postfix used to change the duplicate names.
+    blacklist
+        A list of names. The provided predictor can't use model names in the list.
+
+    Returns
+    -------
+    The predictor guaranteed has no duplicate model names with the backlist names.
+    """
+    model_names = []
+    for n in predictor._config.model.names:
+        if n in blacklist:
+            new_name = f"{n}_{postfix}"
+            assert new_name not in blacklist
+            assert new_name not in predictor._config.model.names
+            # modify model prefix
+            if n == predictor._model.prefix:
+                predictor._model.prefix = new_name
+            else:
+                assert isinstance(predictor._model.model, nn.ModuleList)
+                for per_model in predictor._model.model:
+                    if n == per_model.prefix:
+                        per_model.prefix = new_name
+                        break
+            # modify data processor prefix
+            for per_modality_processors in predictor._data_processors.values():
+                for per_processor in per_modality_processors:
+                    if n == per_processor.prefix:
+                        per_processor.prefix = new_name
+            # modify model config keys
+            setattr(predictor._config.model, new_name, getattr(predictor._config.model, n))
+            delattr(predictor._config.model, n)
+
+            model_names.append(new_name)
+        else:
+            model_names.append(n)
+
+    predictor._config.model.names = model_names
+
+    return predictor

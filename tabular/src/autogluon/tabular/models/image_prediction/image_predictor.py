@@ -231,6 +231,14 @@ class ImagePredictorModel(AbstractModel):
         num_gpus = ImagePredictor._get_num_gpus_available()
         return num_cpus, num_gpus
 
+    def _verify_fit_resources(self, num_cpus, num_gpus):
+        minimum_cpu_requirement = 1
+        minimum_gpu_requirement = 1
+        if num_cpus < minimum_cpu_requirement:
+            raise ValueError(f"Requires {minimum_cpu_requirement} to train, only {num_cpus} is available")
+        if num_gpus < minimum_gpu_requirement:
+            raise ValueError(f"Requires {minimum_gpu_requirement} to train, only {num_gpus} is available")
+
     def _more_tags(self):
         # `can_refit_full=False` because ImagePredictor does not communicate how to train until the best epoch in refit_full.
         return {'can_refit_full': False}

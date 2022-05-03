@@ -10,7 +10,7 @@ import pandas as pd
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_cpu_count, try_import_autogluon_text
+from autogluon.core.utils import get_cpu_count, get_gpu_count_all, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -190,9 +190,16 @@ class TextPredictorModel(AbstractModel):
 
     def _get_default_resources(self):
         num_cpus = get_cpu_count()
-        # TODO: use get_gpu_count_torch() or some better way once torch models are available.
-        num_gpus = None
+        num_gpus = get_gpu_count_all()
         return num_cpus, num_gpus
+
+    def _verify_fit_resources(self, num_cpus, num_gpus):
+        minimum_cpu_requirement = 1
+        minimum_gpu_requirement = 1
+        if num_cpus < minimum_cpu_requirement:
+            raise ValueError(f"Requires {minimum_cpu_requirement} to train, only {num_cpus} is available")
+        if num_gpus < minimum_gpu_requirement:
+            raise ValueError(f"Requires {minimum_gpu_requirement} to train, only {num_gpus} is available")
 
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)

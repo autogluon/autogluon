@@ -32,6 +32,8 @@ ACCURACY = "accuracy"
 ACC = "acc"
 RMSE = "rmse"
 R2 = "r2"
+PEARSONR = "pearsonr"
+SPEARMANR = "spearmanr"
 QUADRATIC_KAPPA = "quadratic_kappa"
 
 # Training status
@@ -57,6 +59,7 @@ MODEL = "model"
 DATA = "data"
 OPTIMIZATION = "optimization"
 ENVIRONMENT = "environment"
+DISTILLER = "distiller"
 
 # Image normalization mean and std. This is only to normalize images for the CLIP model.
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
@@ -76,10 +79,17 @@ UNIFORM_SOUP = "uniform_soup"
 GREEDY_SOUP = "greedy_soup"
 BEST = "best"
 
+# efficient finetuning strategies
+NORM_FIT = "norm_fit"
+BIT_FIT = "bit_fit"
+
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
 TIMM_IMAGE = "timm_image"
 HF_TEXT = "hf_text"
 NUMERICAL_MLP = "numerical_mlp"
 CATEGORICAL_MLP = "categorical_mlp"
+NUMERICAL_TRANSFORMER = "numerical_transformer"
+CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
+FUSION_TRANSFORMER = "fusion_transformer"
