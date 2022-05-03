@@ -70,13 +70,14 @@ def test_automm_resource_allocation():
     )
     
     expected_num_parallel_jobs = 1
-    # We don't test for cpu because there will be cases when not all cpus are utilized
-    # because of the fact that (num_cpus - master process reserved cpu) is not divisible by num_trials
+    # For cpu, each trial uses 1 cpu for the master process, and worker process can split the rest
     expected_resources_per_trial = dict(
+        cpu = (num_cpus - expected_num_parallel_jobs) // expected_num_parallel_jobs + expected_num_parallel_jobs,
         gpu = num_gpus / expected_num_parallel_jobs,
     )
     
-    assert expected_resources_per_trial['gpu'] == resources_per_trial.required_resources['GPU']
+    # assert expected_resources_per_trial['gpu'] == resources_per_trial.required_resources['GPU']
+    expected_resources_per_trial == resources_per_trial.required_resources
     assert expected_num_parallel_jobs ==  adapter.num_parallel_jobs
     
 

@@ -80,15 +80,7 @@ class Categorical(DiscreteSpace):
 
     def convert_to_ray(self):
         from ray.tune import choice
-        # This is a hack
-        # nested list are not correctly converted to hyperopt space by ray https://github.com/ray-project/ray/issues/24050
-        # convert list to tuple instead
-        # TODO: remove the hack once ray releases new version containing the fix
-        data = self.data.copy()
-        for i, d in enumerate(self.data):
-            if type(d) == list:
-                data[i] = tuple(d)
-        return choice(data)
+        return choice(self.data)
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)

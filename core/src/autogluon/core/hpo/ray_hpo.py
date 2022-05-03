@@ -153,11 +153,11 @@ def run(
     num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
-    search_space = _convert_search_space(search_space)
     if not search_space:
         raise EmptySearchSpace
     searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=supported_searchers)
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=supported_schedulers)
+    search_space = _convert_search_space(search_space, searcher)
 
     if not ray.is_initialized():
         ray.init(log_to_driver=False, **total_resources)
@@ -256,12 +256,24 @@ def _validate_resources_per_trial(resources_per_trial):
             resources_per_trial['gpu'] = resources_per_trial.pop('num_gpus')
 
 
-def _convert_search_space(search_space: dict):
+def _convert_search_space(search_space: dict, searcher: Union[SearchAlgorithm, Searcher]):
     """Convert the search space to Ray Tune search space if it's AG search space"""
+    from ray.tune.sample import Categorical
     tune_search_space = search_space.copy()
     for hyperparmaeter, space in search_space.items():
         if isinstance(space, Space):
             tune_search_space[hyperparmaeter] = space.convert_to_ray()
+        # This is a hack
+        # nested list are not correctly converted to hyperopt space by ray https://github.com/ray-project/ray/issues/24050
+        # convert list to tuple instead. models need to check for tuple and convert it back to list
+        # TODO: remove the hack once ray releases new version containing the fix
+        # TODO: remove searcher parameter passed to this function once the fix is out
+        if isinstance(tune_search_space[hyperparmaeter], Categorical) and isinstance(searcher, HyperOptSearch):
+            cat_list_tuple = [tuple(cat) if isinstance(cat, list) else cat
+                              for cat in tune_search_space[hyperparmaeter].categories]
+            tune_search_space[hyperparmaeter] = tune.choice(cat_list_tuple)
+            print('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+            print(tune_search_space[hyperparmaeter].categories)
     return tune_search_space
 
 

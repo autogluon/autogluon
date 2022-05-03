@@ -428,6 +428,7 @@ class AutoMMPredictor:
                 time_budget_s=time_budget_s,
                 keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
                 checkpoint_score_attr=metric,
+                verbose=2
             )
         except EmptySearchSpace:
             raise ValueError("Please provide a search space in order to do hyperparameter tune")
