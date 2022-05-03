@@ -925,6 +925,7 @@ class AbstractModel:
         self._validate_fit_memory_usage(**kwargs)
 
         resources = self._preprocess_fit_resources(silent=True)
+        model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
         return self._hyperparameter_tune(
@@ -972,7 +973,7 @@ class AbstractModel:
             val_path=val_path,
             original_path=os.getcwd(),
         )
-        from ...hpo import tabular_supported_schedulers, run, EmptySearchSpace, TabularRayTuneAdapter
+        from ...hpo.ray_hpo import tabular_supported_schedulers, run, EmptySearchSpace, TabularRayTuneAdapter
         try:
             analysis = run(
                 trainable=model_trial,
