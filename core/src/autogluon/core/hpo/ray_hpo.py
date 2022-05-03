@@ -82,8 +82,8 @@ def run(
     search_space: dict,
     hyperparameter_tune_kwargs: dict,
     metric: str,
-    mode: str,  # must be one of [min, max]
-    save_dir: str,  # directory to save results. Ray will write artifacts to save_dir/trial_dir/
+    mode: str,
+    save_dir: str,
     ray_tune_adapter: RayTuneAdapter,
     total_resources: Optional[dict] = dict(),
     minimum_cpu_per_trial: int = 1,
@@ -92,8 +92,8 @@ def run(
     time_budget_s: Optional[float] = None,
     supported_searchers: Optional[List[str]] = None,
     supported_schedulers: Optional[List[str]] = None,
-    verbose: int = 1,  # 0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
-    **kwargs  # additional args being passed to tune.run
+    verbose: int = 1,
+    **kwargs
     ) -> tune.ExperimentAnalysis:
     """
     Parse hyperparameter_tune_kwargs
@@ -142,7 +142,7 @@ def run(
         If the trainable doesn't support those functionality, provide supported_searchers here to warn users HPO might not work as expected.
     supported_schedulers
         Some schedulers requires reporting status within epochs or checkpointing in the middle of training.
-        If the trainable doesn't support those functionality, provide supported_sschedulers here to warn users HPO might not work as expected.
+        If the trainable doesn't support those functionality, provide supported_schedulers here to warn users HPO might not work as expected.
     verbose
         0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     **kwargs
