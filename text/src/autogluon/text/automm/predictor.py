@@ -379,11 +379,11 @@ class AutoMMPredictor:
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
-            max_time=time_limit,
+            max_time=time_limit * 0.95,  # give some buffer time to ray lightning trainer
             save_path=save_path,
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=self._enable_progress_bar,
+            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
             config=config,
             hyperparameters=hyperparameters,
             hpo_mode=hyperparameter_tune_kwargs is not None  # skip average checkpoint if in hpo mode
@@ -408,7 +408,7 @@ class AutoMMPredictor:
         metric = 'val_' + _fit_args.get('validation_metric_name')
         mode = _fit_args.get('minmax_mode')
         save_path = _fit_args.get('save_path')
-        time_budget_s = _fit_args.get('max_time') * 0.95
+        time_budget_s = _fit_args.get('max_time')
         try:
             analysis = run(
                 trainable=self._hpo_fit_wrapper,
@@ -437,8 +437,10 @@ class AutoMMPredictor:
             # clean up other trials
             logger.info('Removing non-optimal trials and only keep the best one.')
             cleanup_trials(save_path, best_trial.trial_id)
+            best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
-            predictor = self.__class__._load_metadata(path=os.path.join(save_path, best_trial.trial_id))
+            predictor = self.__class__._load_metadata(path=best_trial_path)
+            predictor._save_path = best_trial_path
             # construct the model
             model = create_model(
                 config=predictor._config,

@@ -158,6 +158,10 @@ def run(
         raise EmptySearchSpace
     searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=supported_searchers)
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=supported_schedulers)
+
+    if not ray.is_initialized():
+        ray.init(log_to_driver=False, **total_resources)
+
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
         resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -179,16 +183,15 @@ def run(
                 minimum_cpu_per_trial=minimum_cpu_per_trial,
                 model_estimate_memory_usage=model_estimate_memory_usage
             )
+    _validate_resources_per_trial(resources_per_trial)
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     tune_kwargs = _get_default_tune_kwargs()
     tune_kwargs.update(kwargs)
-
+    
     original_path = os.getcwd()
     if 'original_path' not in trainable_args:
         trainable_args['original_path'] = original_path
     
-    if not ray.is_initialized():
-        ray.init(**total_resources)
     analysis = tune.run(
         tune.with_parameters(trainable, **trainable_args),
         config=search_space,
@@ -204,6 +207,7 @@ def run(
         name=save_dir,
         **tune_kwargs
     )
+    ray.shutdown()
     return analysis
 
 
@@ -242,6 +246,14 @@ def _get_default_tune_kwargs():
         trial_dirname_creator=_trial_dirname_creator,
     )
     return kwargs
+
+
+def _validate_resources_per_trial(resources_per_trial):
+    if isinstance(resources_per_trial, dict):
+        if 'num_cpus' in resources_per_trial:
+            resources_per_trial['cpu'] = resources_per_trial.pop('num_cpus')
+        if 'num_gpus' in resources_per_trial:
+            resources_per_trial['gpu'] = resources_per_trial.pop('num_gpus')
 
 
 def _convert_search_space(search_space: dict):
