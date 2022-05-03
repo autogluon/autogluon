@@ -65,7 +65,7 @@ from .. import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
 
-RAY_TUNE_CHECKPOINT_PREFIX = 'ray_tune_checkpoint'
+RAY_TUNE_CHECKPOINT = 'ray_tune_checkpoint.ckpt'
 
 
 class AutoMMPredictor:
@@ -456,7 +456,8 @@ class AutoMMPredictor:
             )
             predictor._model = model
             # average checkpoint
-            top_k_model_paths = [result[0] for result in analysis.get_trial_checkpoints_paths(best_trial_path)]
+            top_k_model_paths = [os.path.relpath(os.path.join(result[0], RAY_TUNE_CHECKPOINT))
+                                 for result in analysis.get_trial_checkpoints_paths(best_trial)]
             predictor._top_k_average(
                 model=predictor._model,
                 save_path=save_path,
@@ -476,8 +477,7 @@ class AutoMMPredictor:
         _fit_args['save_path'] = os.path.join(_fit_args['save_path'], tune.get_trial_name())  # We want to save each trial to a separate directory
         if checkpoint_dir is not None:
             _fit_args['resume'] = True
-            # TODO: add checkpoint name
-            _fit_args['ckpt_path'] = os.path.join(checkpoint_dir, f'{RAY_TUNE_CHECKPOINT_PREFIX}.ckpt')
+            _fit_args['ckpt_path'] = os.path.join(checkpoint_dir, RAY_TUNE_CHECKPOINT)
         os.chdir(original_path)
         self._fit(**_fit_args)
         
@@ -740,7 +740,7 @@ class AutoMMPredictor:
                 {
                     f"{task.validation_metric_name}": f"{task.validation_metric_name}"
                 },
-                filename='ray_tune_checkpoint.ckpt'
+                filename=RAY_TUNE_CHECKPOINT
             )
             callbacks = [tune_report_callback, early_stopping_callback, lr_callback, model_summary]
 
