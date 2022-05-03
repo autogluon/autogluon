@@ -255,58 +255,58 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
             [
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
                 }
             ],
             2,
-            ["_2"],
+            ["RNN_2"],
         ),
         (
             [
                 {DeepARModel: {"epochs": 2}},
-                {DeepARModel: {"epochs": 3}},
+                {DeepARModel: {"epochs": 2}},
             ],
             2,
-            ["_2"],
+            ["AR_2"],
         ),
         (
             [
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 4},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
                 }
             ],
             3,
-            ["_2", "_3"],
+            ["RNN_2", "RNN_3"],
         ),
         (
             [
                 {DeepARModel: {"epochs": 2}},
-                {DeepARModel: {"epochs": 3}},
+                {DeepARModel: {"epochs": 2}},
                 {DeepARModel: {"epochs": 2}},
             ],
             3,
-            ["_2", "_2_2"],
+            ["AR_2", "AR_2_2"],
         ),
         (
             [
                 {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2}},
-                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3}},
+                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2}},
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
                 },
             ],
             4,
-            ["_2", "_2_2", "_2_3"],
+            ["RNN_2", "RNN_2_2", "RNN_2_3"],
         ),
         (
             [
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 3},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
                 },
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
@@ -314,7 +314,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 },
             ],
             5,
-            ["_2", "_3", "_2_2", "_2_3"],
+            ["RNN_2", "RNN_3", "RNN_2_2", "RNN_2_3"],
         ),
     ],
 )
@@ -338,7 +338,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
-        assert any(suffix in name for name in model_names)
+        assert any(name.endswith(suffix) for name in model_names)
 
     # there should be no edges in the model graph without ensembling
     assert not trainer.model_graph.edges

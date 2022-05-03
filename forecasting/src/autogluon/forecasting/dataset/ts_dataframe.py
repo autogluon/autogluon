@@ -68,6 +68,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             data = self.from_iterable_dataset(data)
         super().__init__(data=data, *args, **kwargs)
 
+    # TODO: move out of production code to dedicated example in examples
     @classmethod
     def example(cls):
         """An example TimeSeriesDataFrame.

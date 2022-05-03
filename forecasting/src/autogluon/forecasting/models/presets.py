@@ -133,7 +133,8 @@ def get_preset_models(
     else:
         verify_no_searchspace(hyperparameters)
 
-    invalid_model_names_set = set(invalid_model_names)
+    invalid_model_names = set(invalid_model_names)
+    all_assigned_names = set(invalid_model_names)
 
     for model, model_hps in hyperparameters.items():
         if isinstance(model, str):
@@ -162,19 +163,23 @@ def get_preset_models(
 
         # add models while preventing name collisions
         model = model_type(**model_type_kwargs)
-        num_increment = 2
-        model_type_kwargs.pop("name", None)
-        while (
-            model.name in [m.name for m in models]
-            or model.name in invalid_model_names_set
-        ):
-            model = model_type(
-                name=f"{model.name}_{num_increment}", **model_type_kwargs
-            )
-            # increment only if model name collided in this round
-            if model.name not in invalid_model_names_set:
-                num_increment += 1
+        name_stem = model.name
 
+        model_type_kwargs.pop("name", None)
+        increment = 1
+        while model.name in all_assigned_names:
+            # if name collides with a name prohibited by the function argument
+            # then we always append _2
+            if model.name in invalid_model_names:
+                name_stem = model.name
+                model = model_type(name=f"{model.name}_2", **model_type_kwargs)
+            # if name instead collides with one assigned in this function call,
+            # we append an incremented integer
+            else:
+                increment += 1
+                model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
+
+        all_assigned_names.add(model.name)
         models.append(model)
 
     return models
