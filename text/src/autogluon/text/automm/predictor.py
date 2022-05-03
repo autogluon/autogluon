@@ -20,7 +20,6 @@ import operator
 import pytorch_lightning as pl
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
-from autogluon.core.hpo import run, cleanup_trials, EmptySearchSpace, AutommRayTuneAdapter
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -409,6 +408,7 @@ class AutoMMPredictor:
         return self
     
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
+        from autogluon.core.hpo import run, cleanup_trials, EmptySearchSpace, AutommRayTuneAdapter
         search_space = _fit_args.get('hyperparameters', dict())
         metric = 'val_' + _fit_args.get('validation_metric_name')
         mode = _fit_args.get('minmax_mode')
