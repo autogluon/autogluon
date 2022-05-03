@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import Any, Dict, Union, Tuple, Optional
 
@@ -263,7 +264,10 @@ class AbstractForecastingModel(AbstractModel):
         self,
         train_data: Dataset,
         val_data: Dataset,
-        scheduler_options: Tuple[Any, Dict],
+        hyperparameter_tune_kwargs: dict,
+        resources: dict,
+        model_estimate_memory_usage: Union[int, None],
+        time_limit: Union[int, None],
         **kwargs,
     ):
         # verbosity = kwargs.get('verbosity', 2)
@@ -275,32 +279,7 @@ class AbstractForecastingModel(AbstractModel):
         )
         search_space = self._get_search_space()
 
-        scheduler_cls, scheduler_params = scheduler_options
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError(
-                "scheduler_cls and scheduler_params cannot be None for hyperparameter tuning"
-            )
-        time_limit = scheduler_params.get("time_out", None)
-        # scheduler should be instantiated without num_trials instead of setting it to None
-        scheduler_params.pop("num_trials", None)
-
-        if not any(
-            isinstance(search_space[hyperparameter], ag.Space)
-            for hyperparameter in search_space
-        ):
-            logger.warning(
-                f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
-                f"Will train one model based on the provided hyperparameters."
-            )
-            return skip_hpo(self, train_data, val_data, time_limit=time_limit)
-        else:
-            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
-            for hyperparameter in search_space:
-                if isinstance(search_space[hyperparameter], ag.Space):
-                    logger.log(
-                        15, f"{hyperparameter}:   {search_space[hyperparameter]}"
-                    )
-
+        directory = self.path
         dataset_train_filename = "dataset_train.pkl"
         train_path = self.path + dataset_train_filename
         save_pkl.save(path=train_path, object=train_data)
@@ -314,22 +293,31 @@ class AbstractForecastingModel(AbstractModel):
             init_params=self.get_params(),
             time_start=time_start,
             time_limit=time_limit,
-            fit_kwargs=scheduler_params["resource"].copy(),
+            fit_kwargs=dict(),
             train_path=train_path,
             val_path=val_path,
+            original_path=os.getcwd(),
         )
-
-        scheduler = scheduler_cls(
-            model_trial,
-            search_space=search_space,
-            train_fn_kwargs=train_fn_kwargs,
-            **scheduler_params,
-        )
-
-        scheduler.run()
-        scheduler.join_jobs()
-
-        return self._get_hpo_results(scheduler, scheduler_params, time_start)
+        from autogluon.core.hpo import tabular_supported_schedulers, run, EmptySearchSpace, ForecastingRayTuneAdapter
+        try:
+            analysis = run(
+                trainable=model_trial,
+                trainable_args=train_fn_kwargs,
+                search_space=search_space,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                metric='validation_performance',
+                mode='max',
+                save_dir=directory,
+                ray_tune_adapter=ForecastingRayTuneAdapter(),
+                supported_schedulers=tabular_supported_schedulers,
+                total_resources=resources,
+                minimum_gpu_per_trial=0.1,
+                model_estimate_memory_usage=model_estimate_memory_usage,
+                time_budget_s=time_limit
+            )
+            return self._get_hpo_results(analysis)
+        except EmptySearchSpace:
+            return skip_hpo(self, train_data, val_data, time_limit=time_limit)
 
     def preprocess(self, data: Any, **kwargs) -> Any:
         return data

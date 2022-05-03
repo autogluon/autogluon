@@ -42,6 +42,8 @@ scheduler_presets = {
 
 tabular_supported_searchers = ['random', 'bayes']
 tabular_supported_schedulers = ['FIFO']
+forecasting_supported_searchers = tabular_supported_searchers
+forecasting_supported_schedulers = tabular_supported_schedulers
 
 
 class EmptySearchSpace(Exception):
@@ -433,3 +435,7 @@ class AutommRayTuneAdapter(RayTuneAdapter):
                                                     use_gpu=self.gpu_per_job is not None,
                                                 )
         return trainable_args
+
+
+class ForecastingRayTuneAdapter(TabularRayTuneAdapter):
+    pass

@@ -20,12 +20,18 @@ def model_trial(
     train_path,
     val_path,
     time_start,
+    original_path,
     time_limit=None,
     fit_kwargs=None,
 ):
     """Runs a single trial of a hyperparameter tuning. Replaces
     `core.models.abstract.model_trial.model_trial` for forecasting models.
     """
+    from ray import tune
+    # https://github.com/ray-project/ray/issues/9571
+    # ray tune will modify the current working directory and it's troublesome for autogluon because we use relative path
+    # change back to the original directory
+    os.chdir(original_path)
     try:
         model = init_model(args, model_cls, init_params)
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
@@ -44,13 +50,11 @@ def model_trial(
             time_start=time_start,
             time_limit=time_limit,
         )
-
+        tune.report(epoch=1, validation_performance=model.val_score)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
-        reporter.terminate()
-    else:
-        reporter(epoch=1, validation_performance=model.val_score)
+            raise e
 
 
 def fit_and_save_model(
@@ -99,7 +103,6 @@ def skip_hpo(model, train_data, val_data, time_limit=None):
         time_start=time.time(),
         time_limit=time_limit,
     )
-    hpo_results = {"total_time": model.fit_time}
-    hpo_model_performances = {model.name: model.val_score}
+    hpo_results = {'total_time': model.fit_time, 'performance': model.val_score}
     hpo_models = {model.name: model.path}
-    return hpo_models, hpo_model_performances, hpo_results
+    return hpo_models, hpo_results

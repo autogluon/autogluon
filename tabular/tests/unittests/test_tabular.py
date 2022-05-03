@@ -485,8 +485,8 @@ def test_pseudolabeling():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize('scheduler', list(tabular_supported_schedulers.keys()))
-@pytest.mark.parametrize('searcher', list(tabular_supported_searchers.keys()))
+@pytest.mark.parametrize('scheduler', tabular_supported_schedulers)
+@pytest.mark.parametrize('searcher', tabular_supported_searchers)
 def test_tabularHPObagstack(scheduler, searcher):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning

@@ -1,8 +1,10 @@
 """Unit tests and utils common to all models"""
+import psutil
 import pytest
 
 import autogluon.core as ag
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
+from autogluon.core.utils import get_cpu_count, get_gpu_count_all
+from autogluon.core.hpo.ray_hpo import forecasting_supported_schedulers, forecasting_supported_searchers
 from autogluon.forecasting.models.abstract import AbstractForecastingModel
 from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
 from .common import DUMMY_DATASET, dict_equal_primitive
@@ -61,10 +63,11 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize('scheduler', forecasting_supported_schedulers)
+@pytest.mark.parametrize('searcher', forecasting_supported_searchers)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
-    model_class, temp_model_path
+    model_class, temp_model_path, scheduler, searcher
 ):
-    scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
 
     model = model_class(
         path=temp_model_path,
@@ -74,14 +77,20 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
             "epochs": ag.Int(3, 4),
         },
     )
+    
+    hyperparameter_tune_kwargs = dict(
+        scheduler=scheduler,
+        searcher=searcher,
+        num_trials=2,
+    )
 
-    _, _, results = model.hyperparameter_tune(
-        scheduler_options=scheduler_options,
+    results = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        resources=dict(num_cpus=get_cpu_count(), num_gpus=get_gpu_count_all()),
+        model_estimate_memory_usage=None,
         time_limit=100,
         train_data=DUMMY_DATASET,
         val_data=DUMMY_DATASET,
     )
 
-    assert len(results["config_history"]) == 2
-    assert results["config_history"][0]["epochs"] == 3
-    assert results["config_history"][1]["epochs"] == 4
+    assert len(results.get_all_configs()) == 2

@@ -383,7 +383,7 @@ class AutoMMPredictor:
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
-            max_time=time_limit * 0.95,  # give some buffer time to ray lightning trainer
+            max_time=time_limit,
             save_path=save_path,
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
@@ -397,6 +397,8 @@ class AutoMMPredictor:
         if hyperparameter_tune_kwargs is not None:
             # TODO: allow custom gpu
             resources = dict(num_gpus=torch.cuda.device_count())
+            if _fit_args['max_time'] is not None:
+                _fit_args['max_time'] *= 0.95  # give some buffer time to ray lightning trainer
             predictor = self._hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
