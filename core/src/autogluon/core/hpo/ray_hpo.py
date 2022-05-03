@@ -23,7 +23,6 @@ from ray.tune.suggest.hyperopt import HyperOptSearch
 from ray_lightning.tune import get_tune_resources
 
 
-
 logger = logging.getLogger(__name__)
 
 MIN = 'min'
@@ -272,8 +271,6 @@ def _convert_search_space(search_space: dict, searcher: Union[SearchAlgorithm, S
             cat_list_tuple = [tuple(cat) if isinstance(cat, list) else cat
                               for cat in tune_search_space[hyperparmaeter].categories]
             tune_search_space[hyperparmaeter] = tune.choice(cat_list_tuple)
-            print('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
-            print(tune_search_space[hyperparmaeter].categories)
     return tune_search_space
 
 
