@@ -329,7 +329,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             hyperparameter_tune_kwargs, time_out=time_limit
         )
         if all(scheduler_options.get(s) is None for s in ["num_trials", "time_out"]):
-            scheduler_options["num_trials"] = 9999
+            scheduler_options["num_trials"] = 10
         hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
             train_data=train_data,
             val_data=val_data,
