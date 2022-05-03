@@ -405,6 +405,7 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         else:
             # TODO: for cpu case, is it better to have more workers or more cpus per worker?
             cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_samples)
+            num_parallel_jobs = min(num_samples, num_cpus // cpu_per_job)
             num_workers = max(minimum_cpu_per_trial, cpu_per_job - 1)  # 1 cpu for master process
             cpu_per_worker = 1
         resources_per_trial = get_tune_resources(

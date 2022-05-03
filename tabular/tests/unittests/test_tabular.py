@@ -529,8 +529,8 @@ def test_tabularHPObagstack(scheduler, searcher):
                            seed_val=seed_val, fit_args=fit_args)
 
 
-@pytest.mark.parametrize('scheduler', list(tabular_supported_schedulers.keys()))
-@pytest.mark.parametrize('searcher', list(tabular_supported_searchers.keys()))
+@pytest.mark.parametrize('scheduler', tabular_supported_schedulers)
+@pytest.mark.parametrize('searcher', tabular_supported_searchers)
 def test_tabularHPO(scheduler, searcher):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
