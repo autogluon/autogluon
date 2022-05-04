@@ -946,13 +946,13 @@ class AbstractModel:
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
 
-        directory = self.path  # also create model directory if it doesn't exist
+        directory = os.path.abspath(self.path)  # also create model directory if it doesn't exist
         dataset_train_filename = 'dataset_train.pkl'
-        train_path = directory + dataset_train_filename
+        train_path = os.path.join(directory, dataset_train_filename)
         save_pkl.save(path=train_path, object=(X, y))
 
         dataset_val_filename = 'dataset_val.pkl'
-        val_path = directory + dataset_val_filename
+        val_path = os.path.join(directory, dataset_val_filename)
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
         model_cls = self.__class__
@@ -971,9 +971,15 @@ class AbstractModel:
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
-            original_path=os.getcwd(),
+            model_save_abs_path=directory,
         )
-        from ...hpo.ray_hpo import tabular_supported_schedulers, run, EmptySearchSpace, TabularRayTuneAdapter
+        from ...hpo.ray_hpo import (
+            tabular_supported_schedulers,
+            tabular_supported_searchers,
+            run,
+            EmptySearchSpace,
+            TabularRayTuneAdapter
+        )
         try:
             analysis = run(
                 trainable=model_trial,
@@ -985,6 +991,7 @@ class AbstractModel:
                 save_dir=directory,
                 ray_tune_adapter=TabularRayTuneAdapter(),
                 supported_schedulers=tabular_supported_schedulers,
+                supported_searchers=tabular_supported_searchers,
                 total_resources=resources,
                 minimum_gpu_per_trial=0.1,
                 model_estimate_memory_usage=model_estimate_memory_usage,

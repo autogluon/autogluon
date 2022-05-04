@@ -279,13 +279,13 @@ class AbstractForecastingModel(AbstractModel):
         )
         search_space = self._get_search_space()
 
-        directory = self.path
+        directory = os.path.abs(self.path)
         dataset_train_filename = "dataset_train.pkl"
-        train_path = self.path + dataset_train_filename
+        train_path = os.path.join(self.path, dataset_train_filename)
         save_pkl.save(path=train_path, object=train_data)
 
         dataset_val_filename = "dataset_val.pkl"
-        val_path = self.path + dataset_val_filename
+        val_path = os.path.join(self.path, dataset_val_filename)
         save_pkl.save(path=val_path, object=val_data)
 
         train_fn_kwargs = dict(
@@ -296,9 +296,15 @@ class AbstractForecastingModel(AbstractModel):
             fit_kwargs=dict(),
             train_path=train_path,
             val_path=val_path,
-            original_path=os.getcwd(),
+            model_save_abs_path=directory,
         )
-        from autogluon.core.hpo import tabular_supported_schedulers, run, EmptySearchSpace, ForecastingRayTuneAdapter
+        from autogluon.core.hpo.ray_hpo import (
+            forecasting_supported_schedulers,
+            forecasting_supported_searchers,
+            run,
+            EmptySearchSpace,
+            ForecastingRayTuneAdapter
+        )
         try:
             analysis = run(
                 trainable=model_trial,
@@ -309,7 +315,8 @@ class AbstractForecastingModel(AbstractModel):
                 mode='max',
                 save_dir=directory,
                 ray_tune_adapter=ForecastingRayTuneAdapter(),
-                supported_schedulers=tabular_supported_schedulers,
+                supported_schedulers=forecasting_supported_schedulers,
+                supported_searchers=forecasting_supported_searchers,
                 total_resources=resources,
                 minimum_gpu_per_trial=0.1,
                 model_estimate_memory_usage=model_estimate_memory_usage,

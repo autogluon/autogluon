@@ -1,5 +1,6 @@
 import logging
 import os
+from autogluon.common.savers.save_pkl import save
 import psutil
 import shutil
 
@@ -120,7 +121,9 @@ def run(
         Determines whether objective is minimizing or maximizing the metric.
         Must be one of [min, max].
     save_dir
-        Directory to save results. Ray will write artifacts to save_dir/trial_dir/
+        Directory to save ray tune results. Ray will write artifacts to save_dir/trial_dir/
+        While HPO, ray will chdir to this directory. Therefore, it's important to provide dataset or model saving path as absolute path.
+        After HPO, we change back to the original working directory.
         trial_dir name has been overwritten to be trial_id.
         To provide custom trial_dir, pass a custom function to `trial_dirname_creator` as kwargs.
         For example of creating the custom function, refer to `_trial_dirname_creator`.
@@ -161,7 +164,7 @@ def run(
     search_space = _convert_search_space(search_space, searcher)
 
     if not ray.is_initialized():
-        ray.init(log_to_driver=False, **total_resources)
+        ray.init(log_to_driver=True, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
@@ -190,9 +193,6 @@ def run(
     tune_kwargs.update(kwargs)
     
     original_path = os.getcwd()
-    if 'original_path' not in trainable_args:
-        trainable_args['original_path'] = original_path
-    
     analysis = tune.run(
         tune.with_parameters(trainable, **trainable_args),
         config=search_space,
@@ -204,11 +204,12 @@ def run(
         time_budget_s=time_budget_s,
         resources_per_trial=resources_per_trial,
         verbose=verbose,
-        local_dir=original_path,
-        name=save_dir,
+        local_dir=os.path.dirname(save_dir),  # TODO: is there a better way to force ray write to autogluon folder?
+        name=os.path.basename(save_dir),
         **tune_kwargs
     )
     ray.shutdown()
+    os.chdir(original_path)  # go back to the original directory to avoid relative path being broken
     return analysis
 
 
@@ -295,7 +296,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
     assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in searcher_presets.values()
     # Check supported schedulers for obj input
     if supported_searchers is not None:
-        supported_searchers_cls = [scheduler_presets[scheduler] for scheduler in supported_searchers]
+        supported_searchers_cls = [searcher_presets[searchers] for searchers in supported_searchers]
         if searcher.__class__ not in supported_searchers_cls:
             logger.warning(f'{searcher.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers_cls}')
     return searcher

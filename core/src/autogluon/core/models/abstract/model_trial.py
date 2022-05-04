@@ -14,22 +14,19 @@ def model_trial(args,
                 train_path,
                 val_path,
                 time_start,
-                original_path,
+                model_save_abs_path,
                 time_limit=None,
                 fit_kwargs=None,
                 checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
                 ):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
     from ray import tune
-    # https://github.com/ray-project/ray/issues/9571
-    # ray tune will modify the current working directory and it's troublesome for autogluon because we use relative path
-    # change back to the original directory
-    os.chdir(original_path)
     try:
         if fit_kwargs is None:
             fit_kwargs = dict()
-
-        model = init_model(args=args, task_id=tune.get_trial_id(), model_cls=model_cls, init_params=init_params)
+        
+        task_id = tune.get_trial_id()
+        model = init_model(args=args, task_id=task_id, model_cls=model_cls, init_params=init_params)
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
@@ -37,12 +34,12 @@ def model_trial(args,
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
             model=model,
+            model_save_abs_path=os.path.join(model_save_abs_path, task_id),
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
             y_val=y_val,
             time_start=time_start,
             time_limit=time_limit,
-            reporter=None,
         )
         tune.report(epoch=1, validation_performance=model.val_score)
     except Exception as e:
@@ -62,7 +59,7 @@ def init_model(args, task_id, model_cls, init_params):
     return model_cls(**init_params)
 
 
-def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, time_limit=None, reporter=None):
+def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, model_save_abs_path=None, time_limit=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -73,7 +70,7 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
         time_left = None
 
     time_fit_start = time.time()
-    model.fit(**fit_args, time_limit=time_left, reporter=reporter)
+    model.fit(**fit_args, time_limit=time_left)
     time_fit_end = time.time()
 
     if model._get_tags().get('valid_oof', False):
@@ -90,7 +87,10 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
 
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
-    model.save()
+    if model_save_abs_path is not None:
+        model.save(model_save_abs_path + os.path.sep)
+    else:
+        model.save()
     return model
 
 

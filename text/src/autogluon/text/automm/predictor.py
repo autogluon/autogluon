@@ -290,6 +290,8 @@ class AutoMMPredictor:
                 path=save_path,
                 warn_if_exist=self._warn_if_exist,
             )
+        else:
+            assert hyperparameter_tune_kwargs is None, 'You can not resume training with HPO'
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
@@ -384,7 +386,7 @@ class AutoMMPredictor:
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
             max_time=time_limit,
-            save_path=save_path,
+            save_path=os.path.abspath(save_path),
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
@@ -424,7 +426,7 @@ class AutoMMPredictor:
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 metric=metric,
                 mode=mode,
-                save_dir=os.path.basename(os.path.normpath(save_path)),
+                save_dir=save_path,
                 ray_tune_adapter=AutommRayTuneAdapter(),
                 total_resources=resources,
                 time_budget_s=time_budget_s,
@@ -463,7 +465,7 @@ class AutoMMPredictor:
                                  for result in analysis.get_trial_checkpoints_paths(best_trial)]
             predictor._top_k_average(
                 model=predictor._model,
-                save_path=save_path,
+                save_path=predictor._save_path,
                 top_k_model_paths=top_k_model_paths,
                 minmax_mode=mode,
                 is_distill=False,
@@ -474,14 +476,14 @@ class AutoMMPredictor:
             
             return predictor
         
-    def _hpo_fit_wrapper(self, sampled_hyperparameters, original_path, checkpoint_dir=None, **_fit_args):
+    def _hpo_fit_wrapper(self, sampled_hyperparameters, checkpoint_dir=None, **_fit_args):
         from ray import tune
         _fit_args['hyperparameters'] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
-        _fit_args['save_path'] = os.path.join(_fit_args['save_path'], tune.get_trial_name())  # We want to save each trial to a separate directory
+        _fit_args['save_path'] = tune.get_trial_dir()  # We want to save each trial to a separate directory
+        logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
         if checkpoint_dir is not None:
             _fit_args['resume'] = True
             _fit_args['ckpt_path'] = os.path.join(checkpoint_dir, RAY_TUNE_CHECKPOINT)
-        os.chdir(original_path)
         self._fit(**_fit_args)
         
     def _setup_distillation(

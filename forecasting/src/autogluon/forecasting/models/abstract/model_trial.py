@@ -14,13 +14,12 @@ logger = logging.getLogger(__name__)
 
 def model_trial(
     args,
-    reporter,
     model_cls,
     init_params,
     train_path,
     val_path,
     time_start,
-    original_path,
+    model_save_abs_path,
     time_limit=None,
     fit_kwargs=None,
 ):
@@ -28,10 +27,6 @@ def model_trial(
     `core.models.abstract.model_trial.model_trial` for forecasting models.
     """
     from ray import tune
-    # https://github.com/ray-project/ray/issues/9571
-    # ray tune will modify the current working directory and it's troublesome for autogluon because we use relative path
-    # change back to the original directory
-    os.chdir(original_path)
     try:
         model = init_model(args, model_cls, init_params)
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
@@ -48,6 +43,7 @@ def model_trial(
             val_data,
             eval_metric,
             time_start=time_start,
+            model_save_abs_path=model_save_abs_path,
             time_limit=time_limit,
         )
         tune.report(epoch=1, validation_performance=model.val_score)
@@ -58,7 +54,7 @@ def model_trial(
 
 
 def fit_and_save_model(
-    model, fit_kwargs, train_data, val_data, eval_metric, time_start, time_limit=None
+    model, fit_kwargs, train_data, val_data, eval_metric, time_start, model_save_abs_path=None, time_limit=None
 ):
     time_current = time.time()
     time_elapsed = time_current - time_start
@@ -85,7 +81,10 @@ def fit_and_save_model(
     logger.log(30, f"Validation score for model {model.name} is {model.val_score}")
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
-    model.save()
+    if model_save_abs_path is not None:
+        model.save(model_save_abs_path + os.path.sep)
+    else:
+        model.save()
     return model
 
 
