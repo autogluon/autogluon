@@ -383,6 +383,7 @@ class AutoMMPredictor:
 
         validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
+            problem_type=problem_type,
             num_classes=output_shape,
         )
 
