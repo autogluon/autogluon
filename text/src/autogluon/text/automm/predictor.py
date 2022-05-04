@@ -386,7 +386,7 @@ class AutoMMPredictor:
             custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
             max_time=time_limit,
-            save_path=os.path.abspath(save_path),
+            save_path=os.path.abspath(save_path) if hyperparameter_tune_kwargs is not None else save_path,
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
@@ -444,6 +444,8 @@ class AutoMMPredictor:
                 metric=metric,
                 mode=mode,
             )
+            if best_trial is None:
+                raise ValueError("AutoMMPredictor wasn't able to find the best trial. It's likely that the time is not enough to train a single epoch for trials.")
             # clean up other trials
             logger.info('Removing non-optimal trials and only keep the best one.')
             cleanup_trials(save_path, best_trial.trial_id)
@@ -1367,10 +1369,10 @@ class AutoMMPredictor:
                 ensure_ascii=True,
             )
         # In case that users save to a path, which is not the original save_path.
-        if path != self._save_path:
+        if os.path.abspath(path) != os.path.abspath(self._save_path):
             model_path = os.path.join(self._save_path, "model.ckpt")
             if os.path.isfile(model_path):
-                shutil.copy(os.path.join(self._save_path, "model.ckpt"), path)
+                shutil.copy(model_path, path)
                 
     @classmethod
     def _load_metadata(

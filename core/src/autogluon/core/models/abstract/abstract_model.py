@@ -932,6 +932,7 @@ class AbstractModel:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             resources=resources,
             model_estimate_memory_usage=model_estimate_memory_usage,
+            time_limit=time_limit,
             **kwargs
         )
 

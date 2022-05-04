@@ -600,7 +600,7 @@ def test_hpo(searcher, scheduler):
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=60,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )

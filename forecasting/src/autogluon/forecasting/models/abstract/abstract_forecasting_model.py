@@ -279,7 +279,7 @@ class AbstractForecastingModel(AbstractModel):
         )
         search_space = self._get_search_space()
 
-        directory = os.path.abs(self.path)
+        directory = os.path.abspath(self.path)
         dataset_train_filename = "dataset_train.pkl"
         train_path = os.path.join(self.path, dataset_train_filename)
         save_pkl.save(path=train_path, object=train_data)
