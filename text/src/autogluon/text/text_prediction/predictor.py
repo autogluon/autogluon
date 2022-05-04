@@ -421,7 +421,7 @@ class TextPredictor:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-        predictor = cls(
+        predictor = TextPredictor(
             label=_predictor.label,
         )
         predictor._backend = backend
