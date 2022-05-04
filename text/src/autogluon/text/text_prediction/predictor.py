@@ -383,9 +383,8 @@ class TextPredictor:
 
         self._predictor.save(path=path,standalone=standalone)
 
-    @classmethod
+    @staticmethod
     def load(
-            cls,
             path: str,
             verbosity: int = None,
             backend: str = PYTORCH,
