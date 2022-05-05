@@ -14,7 +14,6 @@ def model_trial(args,
                 train_path,
                 val_path,
                 time_start,
-                model_save_abs_path,
                 time_limit=None,
                 fit_kwargs=None,
                 checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
@@ -34,7 +33,6 @@ def model_trial(args,
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
             model=model,
-            model_save_abs_path=os.path.join(model_save_abs_path, task_id),
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
             y_val=y_val,
@@ -87,10 +85,7 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, m
 
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
-    if model_save_abs_path is not None:
-        model.save(model_save_abs_path + os.path.sep)
-    else:
-        model.save()
+    model.save()
     return model
 
 

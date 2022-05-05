@@ -924,19 +924,20 @@ class AbstractModel:
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
 
-        resources = self._preprocess_fit_resources(silent=True)
-        model_estimate_memory_usage = None
-        if self.estimate_memory_usage is not None:
+        resources = kwargs.pop('resources', None)
+        if resources is None:
+            resources = self._preprocess_fit_resources(silent=True)
+        model_estimate_memory_usage = kwargs.pop('model_estimate_memory_usage', None)
+        if model_estimate_memory_usage is None and self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
         return self._hyperparameter_tune(
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             resources=resources,
             model_estimate_memory_usage=model_estimate_memory_usage,
-            time_limit=time_limit,
             **kwargs
         )
 
-    def _hyperparameter_tune(self, X, y, X_val, y_val, hyperparameter_tune_kwargs, resources, model_estimate_memory_usage, time_limit, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, hyperparameter_tune_kwargs, resources=None, model_estimate_memory_usage=None, time_limit=None, **kwargs):
         """
         Hyperparameter tune the model.
 
@@ -947,7 +948,9 @@ class AbstractModel:
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
 
-        directory = os.path.abspath(self.path)  # also create model directory if it doesn't exist
+        # Use absolute path here because ray tune will change the working directory
+        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
+        directory = self.path  # also create model directory if it doesn't exist
         dataset_train_filename = 'dataset_train.pkl'
         train_path = os.path.join(directory, dataset_train_filename)
         save_pkl.save(path=train_path, object=(X, y))
@@ -972,7 +975,6 @@ class AbstractModel:
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
-            model_save_abs_path=directory,
         )
         from ...hpo.ray_hpo import (
             tabular_supported_schedulers,
@@ -989,7 +991,7 @@ class AbstractModel:
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 metric='validation_performance',
                 mode='max',
-                save_dir=directory,
+                save_dir=os.path.normpath(directory),  # get rid of the separator in the end
                 ray_tune_adapter=TabularRayTuneAdapter(),
                 supported_schedulers=tabular_supported_schedulers,
                 supported_searchers=tabular_supported_searchers,

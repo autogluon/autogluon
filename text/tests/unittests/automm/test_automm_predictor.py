@@ -596,7 +596,7 @@ def test_hpo(searcher, scheduler):
     
     save_path = os.path.join(get_home_dir(), 'hpo', f'_{searcher}', f'_{scheduler}')
 
-    predictor.fit(
+    predictor = predictor.fit(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,

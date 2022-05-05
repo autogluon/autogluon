@@ -171,12 +171,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
 
-    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
-        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
+        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
     def get_params(self):
         init_args = dict(

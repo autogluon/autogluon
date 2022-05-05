@@ -19,7 +19,6 @@ def model_trial(
     train_path,
     val_path,
     time_start,
-    model_save_abs_path,
     time_limit=None,
     fit_kwargs=None,
 ):
@@ -43,7 +42,6 @@ def model_trial(
             val_data,
             eval_metric,
             time_start=time_start,
-            model_save_abs_path=model_save_abs_path,
             time_limit=time_limit,
         )
         tune.report(epoch=1, validation_performance=model.val_score)
@@ -81,10 +79,8 @@ def fit_and_save_model(
     logger.log(30, f"Validation score for model {model.name} is {model.val_score}")
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
-    if model_save_abs_path is not None:
-        model.save(model_save_abs_path + os.path.sep)
-    else:
-        model.save()
+    model.save()
+
     return model
 
 
