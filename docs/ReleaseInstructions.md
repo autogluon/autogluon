@@ -7,6 +7,11 @@
 * Communicate with in-progress PR owners that code freeze is in effect, no PRs will be merged that are not release critical.
 * Wait 1 day after code-freeze for pre-release to be published.
 * Ensure latest pre-release is working via `pip install --pre autogluon` and testing to get an idea of how the actual release will function (Ideally with fresh venv). DO NOT RELEASE if the pre-release does not work.
+* Ensure pip install instructions are working correctly for both CPU and GPU.
+  * Ensure explicit torch installs have the correct version range and are not overwritten during `pip install autogluon`:
+    * install-cpu-pip.rst
+    * install-cpu-source.rst
+    * install-windows-gpu.rst
 * Ensure each sub-module is working IN ISOLATION via `pip install --pre autogluon.{submodule}`.
   * Ensure a fresh venv is used for each submodule.
   * Doing this will avoid issues like in v0.4 release with `autogluon.text` crashing when installed standalone due to missing setup.py dependencies
