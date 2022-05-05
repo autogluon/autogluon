@@ -7,7 +7,7 @@ import pickle
 import psutil
 import sys
 import time
-from typing import Union
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -573,6 +573,7 @@ class AbstractModel:
             raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
+        self.validate_fit_resources(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
         out = self._fit(**kwargs)
         if out is None:
@@ -1052,24 +1053,32 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
-    def verify_fit_resources(self):
+    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', **kwargs):
         """
-        Subclass should consider override this method if it requires more resources to train
+        Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
+        Raises an AssertionError if not sufficient.
         """
-        num_cpus, num_gpus = self._get_resources_to_train()
-        self._verify_fit_resources(num_cpus, num_gpus)
+        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, silent=True)
+        self._validate_fit_resources(**resources)
 
-    def _verify_fit_resources(self, num_cpus, num_gpus):
-        minimum_cpu_requirement = 1
-        if num_cpus < minimum_cpu_requirement:
-            raise ValueError(f"Requires {minimum_cpu_requirement} to train, only {num_cpus} is available")
+    def _validate_fit_resources(self, **resources):
+        res_min = self.get_minimum_resources()
+        for resource_name in res_min:
+            if resource_name not in resources:
+                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.')
+            elif res_min[resource_name] > resources[resource_name]:
+                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
 
-    def _get_resources_to_train(self):
-        ag_args_fit = self.get_params().get('hyperparameters', {}).get('ag_args_fit', {})
-        default_num_cpus, default_num_gpus = self._get_default_resources()
-        num_cpus = ag_args_fit.get('num_cpus', default_num_cpus)
-        num_gpus = ag_args_fit.get('num_gpus', default_num_gpus)
-        return num_cpus, num_gpus
+    def get_minimum_resources(self) -> Dict[str, int]:
+        """
+        Returns a dictionary of minimum resource requirements to fit the model.
+        Subclass should consider overriding this method if it requires more resources to train.
+        If a resource is not part of the output dictionary, it is considered unnecessary.
+        Valid keys: 'num_cpus', 'num_gpus'.
+        """
+        return {
+            'num_cpus': 1,
+        }
 
     def _estimate_memory_usage(self, X, **kwargs) -> int:
         """
