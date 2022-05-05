@@ -1,6 +1,6 @@
 .. code-block:: bash
 
-    pip install -U pip
-    pip install -U setuptools wheel
+    pip3 install -U pip
+    pip3 install -U setuptools wheel
 
-    pip install --pre autogluon
+    pip3 install --pre autogluon
