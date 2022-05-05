@@ -213,8 +213,8 @@ class AbstractTrainer:
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
         for model, prev_path in model_paths.items():
-            prev_path = os.path.abspath(prev_path)
-            abs_path = os.path.abspath(self.path)
+            prev_path = os.path.abspath(prev_path) + os.path.sep
+            abs_path = os.path.abspath(self.path) + os.path.sep
             model_local_path = prev_path.split(abs_path, 1)[1]
             new_path = path + model_local_path
             model_paths[model] = new_path
