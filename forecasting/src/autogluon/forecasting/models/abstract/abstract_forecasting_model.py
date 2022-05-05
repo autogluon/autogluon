@@ -297,7 +297,6 @@ class AbstractForecastingModel(AbstractModel):
             fit_kwargs=dict(),
             train_path=train_path,
             val_path=val_path,
-            model_save_abs_path=directory,
         )
         from autogluon.core.hpo.ray_hpo import (
             forecasting_supported_schedulers,

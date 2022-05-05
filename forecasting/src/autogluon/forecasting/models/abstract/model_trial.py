@@ -52,7 +52,7 @@ def model_trial(
 
 
 def fit_and_save_model(
-    model, fit_kwargs, train_data, val_data, eval_metric, time_start, model_save_abs_path=None, time_limit=None
+    model, fit_kwargs, train_data, val_data, eval_metric, time_start, time_limit=None
 ):
     time_current = time.time()
     time_elapsed = time_current - time_start

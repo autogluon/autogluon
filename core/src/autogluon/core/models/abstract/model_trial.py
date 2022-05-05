@@ -57,7 +57,7 @@ def init_model(args, task_id, model_cls, init_params):
     return model_cls(**init_params)
 
 
-def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, model_save_abs_path=None, time_limit=None):
+def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, time_limit=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
