@@ -726,7 +726,6 @@ class AutoMMPredictor:
             self._top_k_average(
                 model=model,
                 save_path=save_path,
-                checkpoint_callback=checkpoint_callback,
                 minmax_mode=minmax_mode,
                 is_distill=is_distill,
                 config=config,
@@ -742,15 +741,17 @@ class AutoMMPredictor:
             self,
             model,
             save_path,
-            checkpoint_callback,
             minmax_mode,
             is_distill,
             config,
             val_df,
             validation_metric_name,
     ):
+        top_k_model_paths = []
+        for file_name in os.listdir(save_path):
+            if file_name.startswith("epoch"):
+                top_k_model_paths.append(os.path.join(save_path, file_name))
 
-        top_k_model_paths = checkpoint_callback.best_k_models.keys()
         if is_distill:
             prefix = "student_model."
         else:
@@ -758,7 +759,7 @@ class AutoMMPredictor:
 
         if config.optimization.top_k_average_method == UNIFORM_SOUP:
             logger.info(
-                f"Start to fuse {len(checkpoint_callback.best_k_models)} checkpoints via the uniform soup algorithm."
+                f"Start to fuse {len(top_k_model_paths)} checkpoints via the uniform soup algorithm."
             )
             ingredients = top_k_model_paths
         else:
@@ -766,7 +767,7 @@ class AutoMMPredictor:
             # limitation of PT Lightning: https://github.com/PyTorchLightning/pytorch-lightning/issues/5582
             # Thus, we will need to reevaluate the validation performance of these checkpoints
             logger.info(
-                f"Evaluate {len(checkpoint_callback.best_k_models)} checkpoints and "
+                f"Evaluate {len(top_k_model_paths)} checkpoints and "
                 f"sort them in a decreasing order based on their performances."
             )
             top_k_model_scores = []
@@ -848,6 +849,9 @@ class AutoMMPredictor:
         # clean old checkpoints
         for per_path in top_k_model_paths:
             os.remove(per_path)
+        last_ckpt_path = os.path.join(save_path, "last.ckpt")
+        if os.path.isfile(last_ckpt_path):
+            os.remove(last_ckpt_path)
 
     def _predict(
             self,
