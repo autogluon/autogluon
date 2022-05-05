@@ -138,7 +138,7 @@ class LitModule(pl.LightningModule):
             logits: torch.Tensor,
             label: torch.Tensor,
     ):
-        if isinstance(self.validation_metric, torchmetrics.AUROC):
+        if isinstance(self.validation_metric, (torchmetrics.AUROC, torchmetrics.AveragePrecision)):
             prob = F.softmax(logits.float(), dim=1)
             return self.validation_metric(preds=prob[:, 1], target=label)  # only for binary classification
         elif isinstance(self.validation_metric, BaseAggregator):

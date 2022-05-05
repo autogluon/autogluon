@@ -361,6 +361,7 @@ class AutoMMPredictor:
 
         validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
+            problem_type=problem_type,
             num_classes=output_shape,
         )
 
@@ -1374,9 +1375,8 @@ class AutoMMPredictor:
             if os.path.isfile(model_path):
                 shutil.copy(model_path, path)
                 
-    @classmethod
+    @staticmethod
     def _load_metadata(
-        cls,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -1408,7 +1408,7 @@ class AutoMMPredictor:
                 num_categorical_columns=len(df_preprocessor.categorical_num_categories)
             )
 
-        predictor = cls(
+        predictor = AutoMMPredictor(
             label=assets["label_column"],
             problem_type=assets["problem_type"],
             eval_metric=assets["eval_metric_name"],
@@ -1426,9 +1426,8 @@ class AutoMMPredictor:
         
         return predictor
 
-    @classmethod
+    @staticmethod
     def load(
-            cls,
             path: str,
             resume: Optional[bool] = False,
             verbosity: Optional[int] = 3,
@@ -1456,7 +1455,7 @@ class AutoMMPredictor:
         """
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        predictor = cls._load_metadata(path=path, resume=resume, verbosity=verbosity)
+        predictor = AutoMMPredictor._load_metadata(path=path, resume=resume, verbosity=verbosity)
 
         model = create_model(
             config=predictor._config,
@@ -1503,7 +1502,7 @@ class AutoMMPredictor:
             logger.info(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
             ckpt_path = None  # must set None since we do not resume training
 
-        model = cls._load_state_dict(
+        model = AutoMMPredictor._load_state_dict(
             model=model,
             path=load_path,
         )

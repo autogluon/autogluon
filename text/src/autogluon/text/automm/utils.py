@@ -61,6 +61,7 @@ def infer_metrics(
     Infer the validation metric and the evaluation metric if not provided.
     Validation metric is for early-stopping and selecting the best model checkpoints.
     Evaluation metric is to report performance to users.
+
     If the evaluation metric is provided, then we use it as the validation metric.
     But there are some exceptions that validation metric is different from evaluation metric.
     For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`

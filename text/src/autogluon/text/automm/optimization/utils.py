@@ -38,6 +38,7 @@ def get_loss_func(problem_type: str):
 
 def get_metric(
         metric_name: str,
+        problem_type: str,
         num_classes: Optional[int] = None,
 ):
     """
@@ -48,6 +49,8 @@ def get_metric(
     ----------
     metric_name
         Name of metric
+    problem_type
+        The type of the problem.
     num_classes
         Number of classes, used in the quadratic_kappa metric for binary classification.
 
@@ -76,11 +79,23 @@ def get_metric(
                                        weights="quadratic"), MAX, None
     elif metric_name == "roc_auc":
         return torchmetrics.AUROC(), MAX, None
+    elif metric_name == 'average_precision':
+        return torchmetrics.AveragePrecision(), MAX, None
     elif metric_name in ["log_loss", "cross_entropy"]:
         return torchmetrics.MeanMetric(), MIN, \
                functools.partial(F.cross_entropy, reduction="none")
     else:
-        raise ValueError(f"unknown metric_name: {metric_name}")
+        warnings.warn(f"Currently, we cannot convert the metric: {metric_name} to a metric supported in torchmetrics. "
+                      f"Thus, we will fall-back to use accuracy for multi-class classification problems "
+                      f", ROC-AUC for binary classification problem, and MSE for regression problems.", UserWarning)
+        if problem_type == REGRESSION:
+            return torchmetrics.MeanSquaredError(squared=False), MIN, None
+        elif problem_type == MULTICLASS:
+            return torchmetrics.Accuracy(), MAX, None
+        elif problem_type == BINARY:
+            return torchmetrics.AUROC(), MAX, None
+        else:
+            raise ValueError(f'The problem_type={problem_type} is currently not supported')
 
 
 def get_optimizer(
