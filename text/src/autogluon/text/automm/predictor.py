@@ -383,6 +383,7 @@ class AutoMMPredictor:
 
         validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
+            problem_type=problem_type,
             num_classes=output_shape,
         )
 
@@ -1250,9 +1251,8 @@ class AutoMMPredictor:
         if path != self._save_path:
             shutil.copy(os.path.join(self._save_path, "model.ckpt"), path)
 
-    @classmethod
+    @staticmethod
     def load(
-            cls,
             path: str,
             resume: Optional[bool] = False,
             verbosity: Optional[int] = 3,
@@ -1305,7 +1305,7 @@ class AutoMMPredictor:
                 num_categorical_columns=len(df_preprocessor.categorical_num_categories)
             )
 
-        predictor = cls(
+        predictor = AutoMMPredictor(
             label=assets["label_column"],
             problem_type=assets["problem_type"],
             eval_metric=assets["eval_metric_name"],
@@ -1366,7 +1366,7 @@ class AutoMMPredictor:
             logger.info(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
             ckpt_path = None  # must set None since we do not resume training
 
-        model = cls._load_state_dict(
+        model = AutoMMPredictor._load_state_dict(
             model=model,
             path=load_path,
         )
