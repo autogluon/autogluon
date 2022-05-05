@@ -353,8 +353,13 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
         resources = dict(cpu=cpu_per_job)
 
+        # If gpu is available, recalculate cpu_per_job and num_parallel_jobs
         if num_gpus > 0:
-            gpu_per_job = max(minimum_gpu_per_trial, num_gpus / num_parallel_jobs)
+            gpu_per_job = max(minimum_gpu_per_trial, num_gpus // num_samples)
+            num_parallel_jobs = num_gpus // gpu_per_job  # num_parallel_jobs purely based on gpu
+            cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_parallel_jobs)
+            num_parallel_jobs = min(num_parallel_jobs, num_cpus // cpu_per_job)  # update num_parallel_jobs in case cpu is not enough
+            gpu_per_job = max(minimum_gpu_per_trial, num_gpus // num_parallel_jobs)  # update gpu_per_job in case cpu was the bottleneck
         resources = dict(cpu=cpu_per_job, gpu=gpu_per_job)
         
         self.num_parallel_jobs = num_parallel_jobs

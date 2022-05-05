@@ -997,7 +997,8 @@ class AbstractModel:
                 supported_schedulers=tabular_supported_schedulers,
                 supported_searchers=tabular_supported_searchers,
                 total_resources=resources,
-                minimum_gpu_per_trial=0.1,
+                minimum_cpu_per_trial=self.get_minimum_resources.get('num_cpus', 1),
+                minimum_gpu_per_trial=self.get_minimum_resources.get('num_gpus', 0.1),
                 model_estimate_memory_usage=model_estimate_memory_usage,
                 time_budget_s=time_limit
             )
