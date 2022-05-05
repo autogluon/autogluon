@@ -36,7 +36,7 @@ def get_catboost_metric_from_ag_metric(metric, problem_type):
             log_loss='Logloss',
             accuracy='Accuracy',
             roc_auc='AUC',
-            f1='Logloss',
+            f1='Logloss',  # f1 uses Logloss because f1 in CatBoost is not reliable (causes errors between versions)
             f1_macro='Logloss',
             f1_micro='Logloss',
             f1_weighted='Logloss',
