@@ -1744,7 +1744,7 @@ class AbstractTrainer:
         if eval_metric is None:
             eval_metric = self.eval_metric
         if model is None:
-            model = self.model_best
+            model = self._get_best()
         if eval_metric.needs_pred:
             predict_func = self.predict
         else:
