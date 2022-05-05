@@ -19,7 +19,7 @@ print(f'y_true: {y_true}')
 print(f'y_pred: {y_pred}')
 ```
 
-## Important: Ensuring Metric is Serializable
+## Ensuring Metric is Serializable
 You must define your custom metric in a separate python file that is imported for it to be serializable (able to be pickled).
 If this is not done, AutoGluon will crash during fit when trying to parallelize model training with Ray.
 In the below example, you would want to create a new python file such as `my_metrics.py` with `ag_accuracy_scorer` defined in it,
