@@ -164,7 +164,7 @@ def run(
     search_space = _convert_search_space(search_space, searcher)
 
     if not ray.is_initialized():
-        ray.init(log_to_driver=True, **total_resources)
+        ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
@@ -208,7 +208,7 @@ def run(
         name=os.path.basename(save_dir),
         **tune_kwargs
     )
-    ray.shutdown()
+
     os.chdir(original_path)  # go back to the original directory to avoid relative path being broken
     return analysis
 

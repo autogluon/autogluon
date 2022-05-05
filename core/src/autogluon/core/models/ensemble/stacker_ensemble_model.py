@@ -1,5 +1,6 @@
 import copy
 import logging
+import os
 import time
 from typing import Dict
 
@@ -154,9 +155,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root
+        abs_path_root_orig = os.path.abspath(path_root_orig) + os.path.sep
         super().set_contexts(path_context=path_context)
         for model, model_path in self.base_model_paths_dict.items():
-            model_local_path = model_path.split(path_root_orig, 1)[1]
+            model_path = os.path.abspath(model_path) + os.path.sep
+            model_local_path = model_path.split(abs_path_root_orig, 1)[1]
             self.base_model_paths_dict[model] = self.path_root + model_local_path
 
     def set_stack_columns(self, stack_column_prefix_lst):

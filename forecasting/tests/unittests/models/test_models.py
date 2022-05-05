@@ -83,7 +83,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         num_trials=2,
     )
 
-    results = model.hyperparameter_tune(
+    models, results = model.hyperparameter_tune(
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         time_limit=100,
         train_data=DUMMY_DATASET,

@@ -27,7 +27,8 @@ def model_trial(
     """
     from ray import tune
     try:
-        model = init_model(args, model_cls, init_params)
+        task_id = tune.get_trial_id()
+        model = init_model(args, task_id, model_cls, init_params)
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
 
         train_data = load_pkl.load(train_path)
