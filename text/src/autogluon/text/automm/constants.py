@@ -17,6 +17,7 @@ LABEL = "label"
 TEXT_TOKEN_IDS = "text_token_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
+COLUMN = "column"
 
 # Output keys
 LOGITS = "logits"
