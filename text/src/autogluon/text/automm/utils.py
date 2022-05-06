@@ -438,7 +438,7 @@ def init_df_preprocessor(
 
 def init_data_processors(
         config: DictConfig,
-        num_categorical_columns: int,
+        df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -453,8 +453,8 @@ def init_data_processors(
     ----------
     config
         A DictConfig object. The model config should be accessible by "config.model".
-    num_categorical_columns
-        The number of categorical columns in the training dataframe.
+    df_preprocessor
+        The dataframe preprocessor.
 
     Returns
     -------
@@ -488,6 +488,7 @@ def init_data_processors(
                         checkpoint_name=model_config.checkpoint_name,
                         train_transform_types=model_config.train_transform_types,
                         val_transform_types=model_config.val_transform_types,
+                        image_column_names=df_preprocessor.image_path_names,
                         norm_type=model_config.image_norm,
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
@@ -500,6 +501,7 @@ def init_data_processors(
                         prefix=model_name,
                         tokenizer_name=model_config.tokenizer_name,
                         checkpoint_name=model_config.checkpoint_name,
+                        text_column_names=df_preprocessor.text_feature_names,
                         max_len=model_config.max_text_len,
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
@@ -510,13 +512,14 @@ def init_data_processors(
                 data_processors[CATEGORICAL].append(
                     CategoricalProcessor(
                         prefix=model_name,
-                        num_categorical_columns=num_categorical_columns,
+                        categorical_column_names=df_preprocessor.categorical_feature_names,
                     )
                 )
             elif d_type == NUMERICAL:
                 data_processors[NUMERICAL].append(
                     NumericalProcessor(
                         prefix=model_name,
+                        numerical_column_names=df_preprocessor.numerical_feature_names,
                         merge=model_config.merge,
                     )
                 )
@@ -1142,3 +1145,40 @@ def modify_duplicate_model_names(
     predictor._config.model.names = model_names
 
     return predictor
+
+
+def assign_feature_column_names(
+        data_processors: Dict,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+):
+    """
+    Assign feature column names to data processors.
+    This is to patch the data processors saved by AutoGluon 0.4.0.
+
+    Parameters
+    ----------
+    data_processors
+        The data processors.
+    df_preprocessor
+        The dataframe preprocessor.
+
+    Returns
+    -------
+    The data processors with feature column names added.
+    """
+    for per_modality in data_processors:
+        if per_modality == LABEL:
+            continue
+        for per_model_processor in data_processors[per_modality]:
+            if per_modality == IMAGE:
+                per_model_processor.image_column_names = df_preprocessor.image_path_names
+            elif per_modality == TEXT:
+                per_model_processor.text_column_names = df_preprocessor.text_feature_names
+            elif per_modality == NUMERICAL:
+                per_model_processor.numerical_column_names = df_preprocessor.numerical_feature_names
+            elif per_modality == CATEGORICAL:
+                per_model_processor.categorical_column_names = df_preprocessor.categorical_feature_names
+            else:
+                raise ValueError(f"Unknown modality: {per_modality}")
+
+    return data_processors

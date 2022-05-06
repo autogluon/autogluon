@@ -52,6 +52,7 @@ from .utils import (
     save_text_tokenizers,
     load_text_tokenizers,
     modify_duplicate_model_names,
+    assign_feature_column_names,
 )
 from .optimization.utils import (
     get_metric,
@@ -293,7 +294,7 @@ class AutoMMPredictor:
                 train_data,
                 test_size=val_frac,
                 stratify=stratify,
-                random_state=np.random.RandomState(seed)
+                random_state=np.random.RandomState(seed),
             )
 
         column_types, problem_type, output_shape = \
@@ -333,20 +334,20 @@ class AutoMMPredictor:
                 column_types=column_types,
                 label_column=self._label_column,
                 train_df_x=train_data.drop(columns=self._label_column),
-                train_df_y=train_data[self._label_column]
+                train_df_y=train_data[self._label_column],
             )
         else:  # continuing training
             df_preprocessor = self._df_preprocessor
 
         config = select_model(
             config=config,
-            df_preprocessor=df_preprocessor
+            df_preprocessor=df_preprocessor,
         )
 
         if self._data_processors is None:
             data_processors = init_data_processors(
                 config=config,
-                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+                df_preprocessor=df_preprocessor,
             )
         else:  # continuing training
             data_processors = self._data_processors
@@ -1303,10 +1304,15 @@ class AutoMMPredictor:
                     text_processors=data_processors[TEXT],
                     path=path,
                 )
+            # backward compatibility. Add feature column names in each data processor.
+            data_processors = assign_feature_column_names(
+                data_processors=data_processors,
+                df_preprocessor=df_preprocessor,
+            )
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             data_processors = init_data_processors(
                 config=config,
-                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+                df_preprocessor=df_preprocessor,
             )
 
         predictor = AutoMMPredictor(
