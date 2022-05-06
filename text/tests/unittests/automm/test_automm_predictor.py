@@ -1,4 +1,5 @@
 import os
+import shutil
 from omegaconf import OmegaConf
 import pytest
 import numpy.testing as npt
@@ -178,6 +179,8 @@ def test_predictor(
     if image_backbone is not None:
         save_path = os.path.join(save_path, image_backbone)
 
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
@@ -246,7 +249,8 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     )
 
     save_path = os.path.join(get_home_dir(), "standalone", "false")
-
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
 
     predictor.fit(
         train_data=dataset.train_df,
@@ -259,14 +263,14 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     save_path_standalone = os.path.join(get_home_dir(), "standalone", "true")
 
     predictor.save(
-        path = save_path_standalone,
-        standalone = True
+        path=save_path_standalone,
+        standalone=True,
     )
 
     del predictor
     torch.cuda.empty_cache()
 
-    loaded_online_predictor = AutoMMPredictor.load(path = save_path)
+    loaded_online_predictor = AutoMMPredictor.load(path=save_path)
     online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
     del loaded_online_predictor
 
@@ -275,7 +279,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
         with tempfile.TemporaryDirectory() as tmpdirname:
             torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
-            loaded_offline_predictor = AutoMMPredictor.load(path = save_path_standalone)
+            loaded_offline_predictor = AutoMMPredictor.load(path=save_path_standalone)
 
 
     offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
@@ -343,6 +347,8 @@ def test_customizing_model_names(
         hyperparameters_gt["model.names"] = OmegaConf.from_dotlist([f'names={hyperparameters["model.names"]}']).names
 
     save_path = os.path.join(get_home_dir(), "outputs", "petfinder")
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
