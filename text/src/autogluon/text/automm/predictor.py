@@ -846,10 +846,15 @@ class AutoMMPredictor:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
+                top_k_model_paths = []
+                for file_name in os.listdir(save_path):
+                    if file_name.startswith("epoch"):
+                        top_k_model_paths.append(os.path.join(save_path, file_name))
+
                 self._top_k_average(
                     model=model,
                     save_path=save_path,
-                    top_k_model_paths=list(checkpoint_callback.best_k_models.keys()),
+                    top_k_model_paths=top_k_model_paths,
                     minmax_mode=minmax_mode,
                     is_distill=is_distill,
                     config=config,
@@ -970,6 +975,9 @@ class AutoMMPredictor:
         # clean old checkpoints
         for per_path in top_k_model_paths:
             os.remove(per_path)
+        last_ckpt_path = os.path.join(save_path, "last.ckpt")
+        if os.path.isfile(last_ckpt_path):
+            os.remove(last_ckpt_path)
 
     def _predict(
             self,

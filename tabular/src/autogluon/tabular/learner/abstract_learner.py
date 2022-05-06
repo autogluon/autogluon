@@ -677,7 +677,7 @@ class AbstractLearner:
     # model: model (str) to get feature importances for, if None will choose best model.
     # features: list of feature names that feature importances are calculated for and returned, specify None to get all feature importances.
     # feature_stage: Whether to compute feature importance on raw original features ('original'), transformed features ('transformed') or on the features used by the particular model ('transformed_model').
-    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, feature_stage='original', subsample_size=1000, silent=False, **kwargs) -> DataFrame:
+    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, feature_stage='original', subsample_size=5000, silent=False, **kwargs) -> DataFrame:
         valid_feature_stages = ['original', 'transformed', 'transformed_model']
         if feature_stage not in valid_feature_stages:
             raise ValueError(f'feature_stage must be one of: {valid_feature_stages}, but was {feature_stage}.')

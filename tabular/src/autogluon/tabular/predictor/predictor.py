@@ -1839,7 +1839,7 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000,
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=5000,
                            time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
                            silent=False):
         """
@@ -1851,7 +1851,7 @@ class TabularPredictor:
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, data, features)` will take, it is roughly the time taken by `predict_proba(data, model)` multiplied by the number of features.
 
-        Note: For highly accurate importance and p_value estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
+        Note: For highly accurate importance and p_value estimates, it is recommended to set `subsample_size` to at least 5000 if possible and `num_shuffle_sets` to at least 10.
 
         Parameters
         ----------
@@ -1892,7 +1892,7 @@ class TabularPredictor:
                 'transformed_model':
                     Compute importances of the post-model-transformation features. These features are the internal features used by the requested model. They may differ greatly from the original features.
                     If the model is a stack ensemble, this will include stack ensemble features such as the prediction probability features of the stack ensemble's base (ancestor) models.
-        subsample_size : int, default = 1000
+        subsample_size : int, default = 5000
             The number of rows to sample from `data` when computing feature importance.
             If `subsample_size=None` or `data` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
@@ -1905,7 +1905,7 @@ class TabularPredictor:
             The number of different permutation shuffles of the data that are evaluated.
             Larger values will increase the quality of the importance evaluation.
             It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
-            Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
+            Defaults to 5 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
         include_confidence_band: bool, default = True
             If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of each feature.
@@ -1940,7 +1940,7 @@ class TabularPredictor:
             self._validate_unique_indices(data, 'data')
 
         if num_shuffle_sets is None:
-            num_shuffle_sets = 10 if time_limit else 3
+            num_shuffle_sets = 10 if time_limit else 5
 
         fi_df = self._learner.get_feature_importance(model=model, X=data, features=features,
                                                      feature_stage=feature_stage,
