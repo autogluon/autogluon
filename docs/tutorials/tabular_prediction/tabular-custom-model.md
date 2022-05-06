@@ -307,13 +307,25 @@ y_pred = predictor.predict(test_data)
 y_pred.head(5)
 ```
 
+## Ensuring model is serializable
+You must define your custom model in a separate python file that is imported for it to be serializable (able to be pickled).
+If this is not done, AutoGluon will crash during hyperparameter tuning with Ray Tune.
+In the belows example, you would want to create a new python file such as `custom_rf_model.py` with `CustomRandomForestModel` defined in it,
+and then use it via `from custom_rf_model import CustomRandomForestModel`
+
+If your metric is not serializable, you will get many errors similar to: `_pickle.PicklingError: Can't pickle`.
+
+**Note**:
+The custom model in this tutorial **is** serializable but not defined in a separate python file because of the usage of notebook.
+Therefore, we do not run the following code in the notebook, but you will be able to try it out if you define the custom model in a separate python file.
+
 ## Hyperparameter tuning a custom model with TabularPredictor
 
 We can easily hyperparameter tune custom models by specifying a hyperparameter search space in-place of exact values.
 
 Here we hyperparameter tune the custom model for 20 seconds:
 
-```{.python .input}
+```{.python}
 from autogluon.core.space import Categorical, Int, Real
 custom_hyperparameters_hpo = {CustomRandomForestModel: {
     'max_depth': Int(lower=5, upper=30),
@@ -331,7 +343,7 @@ predictor = TabularPredictor(label=label).fit(train_data,
 
 The leaderboard for the HPO run will show models with suffix `'/Tx'` in their name. This indicates the HPO trial they were performed in.
 
-```{.python .input}
+```{.python}
 leaderboard_hpo = predictor.leaderboard(silent=True)
 leaderboard_hpo
 ```
@@ -340,7 +352,7 @@ leaderboard_hpo
 
 Let's get the hyperparameters of the model with the highest validation score.
 
-```{.python .input}
+```{.python}
 best_model_name = leaderboard_hpo[leaderboard_hpo['stack_level'] == 1]['model'].iloc[0]
 
 predictor_info = predictor.info()
@@ -358,7 +370,7 @@ Finally, we will train the custom model (with tuned hyperparameters) alongside t
 
 All this requires is getting the hyperparameter dictionary of the default models via `get_hyperparameter_config`, and adding CustomRandomForestModel as a key.
 
-```{.python .input}
+```{.python}
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 # Now we can add the custom model with tuned hyperparameters to be trained alongside the default models:
@@ -369,7 +381,7 @@ custom_hyperparameters[CustomRandomForestModel] = best_model_info['hyperparamete
 print(custom_hyperparameters)
 ```
 
-```{.python .input}
+```{.python}
 predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)  # Train the default models plus a single tuned CustomRandomForestModel
 # predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters, presets='best_quality')  # We can even use the custom model in a multi-layer stack ensemble
 predictor.leaderboard(test_data, silent=True)
