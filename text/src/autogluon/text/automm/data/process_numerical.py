@@ -78,6 +78,7 @@ class NumericalProcessor:
         A dictionary containing the processed numerical features.
         """
         ret = {}
+        # TODO: consider moving this for loop into __init__() since each sample has the same information.
         for i, col_name in enumerate(numerical_features.keys()):
             ret[f"{self.numerical_column_prefix}_{col_name}"] = i
 

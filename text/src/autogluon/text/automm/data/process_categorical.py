@@ -76,6 +76,7 @@ class CategoricalProcessor:
         A dictionary containing the processed categorical features.
         """
         ret = {}
+        # TODO: consider moving this for loop into __init__() since each sample has the same information.
         for i, col_name in enumerate(categorical_features.keys()):
             ret[f"{self.categorical_column_prefix}_{col_name}"] = i
 
