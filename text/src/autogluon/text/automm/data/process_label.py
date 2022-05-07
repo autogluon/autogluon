@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Union
+from typing import Optional, List, Any, Union, Dict
 from nptyping import NDArray
 from ..constants import LABEL
 from .collator import Stack
@@ -23,7 +23,11 @@ class LabelProcessor:
         """
         self.prefix = prefix
 
-    def collate_fn(self) -> dict:
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
+
+    def collate_fn(self) -> Dict:
         """
         Collate individual labels into a batch. Here it stacks labels.
         This function will be used when creating Pytorch DataLoader.
@@ -32,13 +36,13 @@ class LabelProcessor:
         -------
         A dictionary containing one model's collator function for labels.
         """
-        fn = {f"{self.prefix}_{LABEL}": Stack()}
+        fn = {self.label_key: Stack()}
         return fn
 
     def process_one_sample(
             self,
-            labels: List[Union[int, float]],
-    ) -> dict:
+            labels: Dict[str, Union[int, float]],
+    ) -> Dict:
         """
         Process one sample's labels. Here it only picks the first label.
         New rules can be added if necessary.
@@ -52,15 +56,15 @@ class LabelProcessor:
         A dictionary containing one sample's label.
         """
         return {
-            f"{self.prefix}_{LABEL}": labels[0]
+            self.label_key: labels[next(iter(labels))],  # get the first key's value
         }
 
     def __call__(
             self,
-            all_labels: List[NDArray[(Any,), Any]],
+            all_labels: Dict[str, NDArray[(Any,), Any]],
             idx: int,
             is_training: bool,
-    ) -> dict:
+    ) -> Dict:
         """
         Extract one sample's labels and customize them for a specific model.
 
@@ -77,5 +81,7 @@ class LabelProcessor:
         -------
         A dictionary containing one sample's processed label.
         """
-        per_sample_labels = [per_column_labels[idx] for per_column_labels in all_labels]
+        per_sample_labels = {
+            per_column_name: per_column_labels[idx] for per_column_name, per_column_labels in all_labels.items()
+        }
         return self.process_one_sample(per_sample_labels)
