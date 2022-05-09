@@ -186,7 +186,7 @@ class  NumericalTransformer(nn.Module):
         self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=token_initialization,
-        ) if cls_token else None
+        ) if cls_token else nn.Identity()
 
         if kv_compression_ratio is not None: 
             if self.cls_token:
@@ -256,8 +256,7 @@ class  NumericalTransformer(nn.Module):
 
         features = self.numerical_feature_tokenizer(batch[self.numerical_key])
 
-        if self.cls_token:
-            features = self.cls_token(features)
+        features = self.cls_token(features)
 
         features = self.transformer(features)
         logits = self.head(features)

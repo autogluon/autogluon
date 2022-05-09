@@ -188,7 +188,7 @@ class CategoricalTransformer(nn.Module):
         self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=token_initialization,
-        ) if cls_token else None
+        ) if cls_token else nn.Identity()
 
         if kv_compression_ratio is not None: 
             n_tokens = self.categorical_feature_tokenizer.n_tokens + 1
@@ -259,9 +259,7 @@ class CategoricalTransformer(nn.Module):
         categorical_features = torch.stack(categorical_features,dim=1)
 
         features = self.categorical_feature_tokenizer(categorical_features)
-
-        if self.cls_token:
-            features = self.cls_token(features)
+        features = self.cls_token(features)
 
         features = self.transformer(features)
         logits = self.head(features)
