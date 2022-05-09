@@ -4,6 +4,9 @@ import random
 import pandas as pd
 from gluonts.dataset.common import ListDataset
 
+from autogluon.forecasting.dataset import TimeSeriesDataFrame
+
+
 # TODO: add larger unit test data sets to S3
 DUMMY_DATASET = ListDataset(
     [
@@ -20,6 +23,8 @@ DUMMY_DATASET = ListDataset(
     ],
     freq="H",
 )
+
+DUMMY_TS_DATAFRAME = TimeSeriesDataFrame.from_iterable_dataset(DUMMY_DATASET)
 
 
 def dict_equal_primitive(this, that):

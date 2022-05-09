@@ -5,7 +5,6 @@ from typing import Any, Tuple
 from collections.abc import Iterable
 
 import pandas as pd
-import numpy as np
 
 
 ITEMID = "item_id"
@@ -67,40 +66,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             data = self.from_iterable_dataset(data)
         super().__init__(data=data, *args, **kwargs)
-
-    # TODO: move out of production code to dedicated example in examples
-    @classmethod
-    def example(cls):
-        """An example TimeSeriesDataFrame.
-
-        Returns
-        -------
-        ts_df : TimeSeriesDataFrame
-            It returns an example TimeSeriesDataFrame as:
-                                    target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-01       3
-                    2019-01-02       4
-                    2019-01-03       5
-            2       2019-01-01       6
-                    2019-01-02       7
-                    2019-01-03       8
-        """
-
-        target = np.arange(9)
-        datetime_index = tuple(
-            pd.date_range(pd.Timestamp("01-01-2019"), periods=3, freq="D")  # noqa
-        )
-        item_ids = (0, 1, 2)
-        multi_index = pd.MultiIndex.from_product(
-            [item_ids, datetime_index], names=[ITEMID, TIMESTAMP]
-        )
-        return TimeSeriesDataFrame(
-            pd.Series(target, name="target", index=multi_index).to_frame()
-        )
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
