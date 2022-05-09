@@ -260,8 +260,8 @@ class CategoricalTransformer(nn.Module):
 
         features = self.categorical_feature_tokenizer(categorical_features)
         features = self.cls_token(features)
-
         features = self.transformer(features)
+        
         logits = self.head(features)
 
         return {

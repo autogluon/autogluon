@@ -173,7 +173,6 @@ class  NumericalTransformer(nn.Module):
         assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
 
         self.prefix = prefix
-
         self.out_features = out_features
 
         self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
@@ -255,10 +254,9 @@ class  NumericalTransformer(nn.Module):
         """
 
         features = self.numerical_feature_tokenizer(batch[self.numerical_key])
-
         features = self.cls_token(features)
-
         features = self.transformer(features)
+        
         logits = self.head(features)
 
         return {
