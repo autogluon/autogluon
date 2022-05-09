@@ -1320,6 +1320,9 @@ class AutoMMPredictor:
                 data_processors=data_processors,
                 df_preprocessor=df_preprocessor,
             )
+
+            # Only keep the modalities with non-empty processors.
+            data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             data_processors = init_data_processors(
                 config=config,
