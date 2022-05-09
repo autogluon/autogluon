@@ -66,7 +66,7 @@ def infer_metrics(
     But there are some exceptions that validation metric is different from evaluation metric.
     For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`
     since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1. Another example is
-    that `torchmetrics.AUROC` requires both positive and negative examples are available in a mini-batch.
+    that `torchmetrics.AUROC` requires that both positive and negative examples are available in a mini-batch.
     When training a large model, the per gpu batch size is probably small, leading to an incorrect
     roc_auc score.
 
@@ -89,6 +89,13 @@ def infer_metrics(
         if eval_metric_name.lower() in [R2, PEARSONR, SPEARMANR]:
             validation_metric_name = RMSE
         elif eval_metric_name.lower() in [ROC_AUC, AVERAGE_PRECISION]:
+            logger.info(
+                f"We use {LOG_LOSS} as the validation metric for more stable training. "
+                f"We avoid using {eval_metric_name} as the validation metric because `torchmetrics` "
+                f"requires that both positive and negative examples are available in a mini-batch."
+                f"If the per gpu batch size is too small to cover both, `torchmetrics` would"
+                f"compute {eval_metric_name} scores incorrectly."
+            )
             validation_metric_name = LOG_LOSS
         else:
             validation_metric_name = eval_metric_name
