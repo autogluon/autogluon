@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from typing import Any, Tuple
 from collections.abc import Iterable
 
@@ -67,6 +68,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             data = self.from_iterable_dataset(data)
         super().__init__(data=data, *args, **kwargs)
 
+    # TODO: move out of production code to dedicated example in examples
     @classmethod
     def example(cls):
         """An example TimeSeriesDataFrame.
@@ -90,7 +92,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         target = np.arange(9)
         datetime_index = tuple(
-            pd.date_range(pd.Timestamp("01-01-2019"), periods=3, freq="D")
+            pd.date_range(pd.Timestamp("01-01-2019"), periods=3, freq="D")  # noqa
         )
         item_ids = (0, 1, 2)
         multi_index = pd.MultiIndex.from_product(
@@ -103,12 +105,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @classmethod
     def _validate_iterable(cls, data: Iterable):
         if not isinstance(data, Iterable):
-            raise ValueError(f"data must be of type Iterable.")
+            raise ValueError("data must be of type Iterable.")
 
-        if len(data) == 0:
-            raise ValueError(f"data has no time-series.")
+        first = next(iter(data), None)
+        if first is None:
+            raise ValueError("data has no time-series.")
 
-        for i, ts in enumerate(data):
+        for i, ts in enumerate(itertools.chain([first], data)):
             if not isinstance(ts, dict):
                 raise ValueError(
                     f"{i}'th time-series in data must be a dict, got{type(ts)}"
@@ -167,9 +170,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
 
     @classmethod
-    def from_iterable_dataset(
-        cls, iterable_dataset: Iterable
-    ) -> TimeSeriesDataFrame:
+    def from_iterable_dataset(cls, iterable_dataset: Iterable) -> TimeSeriesDataFrame:
         """Convenient function to Iterable dataset to TimeSeriesDataFrame.
 
         Parameters:

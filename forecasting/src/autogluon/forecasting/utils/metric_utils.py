@@ -2,7 +2,7 @@ from typing import Optional
 
 METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1}
 
-AVAILABLE_METRICS = list(METRIC_COEFFICIENTS)
+AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
 DEFAULT_METRIC = "mean_wQuantileLoss"
 assert DEFAULT_METRIC in AVAILABLE_METRICS
 

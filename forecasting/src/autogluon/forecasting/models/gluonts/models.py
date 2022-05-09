@@ -4,6 +4,7 @@ from typing import Type
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
+from ..abstract.abstract_forecasting_model import AbstractForecastingModelFactory
 
 with warning_filter():
     from gluonts.model.deepar import DeepAREstimator
@@ -168,6 +169,22 @@ class GenericGluonTSModel(AbstractGluonTSModel):
         return params_dict
 
 
+class GenericGluonTSModelFactory(AbstractForecastingModelFactory):
+    """Factory class for GenericGluonTSModel for convenience of use"""
+
+    def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):
+        self.gluonts_estimator_class = gluonts_estimator_class
+        self.init_kwargs = kwargs
+
+    def __call__(self, **kwargs):
+        model_init_kwargs = self.init_kwargs.copy()
+        model_init_kwargs.update(kwargs)
+        return GenericGluonTSModel(
+            gluonts_estimator_class=self.gluonts_estimator_class,
+            **model_init_kwargs,
+        )
+
+
 class _ProphetDummyEstimator(DummyEstimator):
     def train(self, train_data, validation_data=None, **kwargs):
         return self.predictor
@@ -179,11 +196,7 @@ class ProphetModel(AbstractGluonTSModel):
 
     In order to use it you need to install the package::
 
-        # you can either install Prophet directly
         pip install fbprophet
-
-        # or install gluonts with the Prophet extras
-        pip install gluonts[Prophet]
 
     Other Parameters
     ----------------

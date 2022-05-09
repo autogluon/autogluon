@@ -5,8 +5,8 @@ import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.forecasting.models.abstract import AbstractForecastingModel
 from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
-from .common import DUMMY_DATASET, dict_equal_primitive
 
+from ..common import DUMMY_DATASET, dict_equal_primitive
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 
 
