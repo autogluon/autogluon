@@ -39,6 +39,7 @@ class ImageProcessor:
             size: Optional[int] = None,
             max_img_num_per_col: Optional[int] = 1,
             missing_value_strategy: Optional[str] = "skip",
+            requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -73,6 +74,8 @@ class ImageProcessor:
                 Skip this sample
             -zero
                 Use an image with zero pixels.
+        requires_column_info
+            Whether to require feature column information in dataloader.
         """
         self.checkpoint_name = checkpoint_name
         self.prefix = prefix
@@ -82,6 +85,7 @@ class ImageProcessor:
         logger.debug(f"image validation transform type: {val_transform_types}")
         self.image_column_names = image_column_names
         self.missing_value_strategy = missing_value_strategy
+        self.requires_column_info = requires_column_info
         self.size = None
         self.mean = None
         self.std = None
@@ -139,8 +143,9 @@ class ImageProcessor:
         A dictionary containing one model's collator function for image data.
         """
         fn = {}
-        for col_name in self.image_column_names:
-            fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
+        if self.requires_column_info:
+            for col_name in self.image_column_names:
+                fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
         fn.update(
             {
@@ -317,9 +322,10 @@ class ImageProcessor:
                 else:
                     images.append(img)
 
-            # only count the valid images since they are put ahead of the zero images in the below returning
-            ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array([column_start, len(images)], dtype=np.int64)
-            column_start = len(images)
+            if self.requires_column_info:
+                # only count the valid images since they are put ahead of the zero images in the below returning
+                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array([column_start, len(images)], dtype=np.int64)
+                column_start = len(images)
 
         ret.update(
             {

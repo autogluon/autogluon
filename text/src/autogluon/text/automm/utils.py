@@ -1173,6 +1173,8 @@ def assign_feature_column_names(
         if per_modality == LABEL:
             continue
         for per_model_processor in data_processors[per_modality]:
+            # requires_column_info=True is used for feature column distillation.
+            per_model_processor.requires_column_info = False
             if per_modality == IMAGE:
                 per_model_processor.image_column_names = df_preprocessor.image_path_names
             elif per_modality == TEXT:
@@ -1183,5 +1185,34 @@ def assign_feature_column_names(
                 per_model_processor.categorical_column_names = df_preprocessor.categorical_feature_names
             else:
                 raise ValueError(f"Unknown modality: {per_modality}")
+
+    return data_processors
+
+
+def turn_on_off_feature_column_info(
+        data_processors: Dict,
+        flag: bool,
+):
+    """
+    Turn on or off returning feature column information in data processors.
+    Since feature column information is not always required in training models,
+    we optionally turn this flag on or off.
+
+    Parameters
+    ----------
+    data_processors
+        The data processors.
+    flag
+        True/False
+
+    Returns
+    -------
+    The data processors with the flag on or off.
+    """
+    for per_modality_processors in data_processors.values():
+        for per_model_processor in per_modality_processors:
+            # label processor doesn't have requires_column_info.
+            if hasattr(per_model_processor, "requires_column_info"):
+                per_model_processor.requires_column_info = flag
 
     return data_processors

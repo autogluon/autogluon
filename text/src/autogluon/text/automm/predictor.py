@@ -53,6 +53,7 @@ from .utils import (
     load_text_tokenizers,
     modify_duplicate_model_names,
     assign_feature_column_names,
+    turn_on_off_feature_column_info,
 )
 from .optimization.utils import (
     get_metric,
@@ -501,6 +502,16 @@ class AutoMMPredictor:
             raise ValueError(
                 f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}"
             )
+
+        # turn on returning column information in data processors
+        self._data_processors = turn_on_off_feature_column_info(
+            data_processors=self._data_processors,
+            flag=True,
+        )
+        teacher_predictor._data_processors = turn_on_off_feature_column_info(
+            data_processors=teacher_predictor._data_processors,
+            flag=True,
+        )
 
         logger.debug(
             f"teacher preprocessor text_feature_names: {teacher_predictor._df_preprocessor._text_feature_names}"

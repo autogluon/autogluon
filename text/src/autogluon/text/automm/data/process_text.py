@@ -51,6 +51,7 @@ class TextProcessor:
             insert_sep: Optional[bool] = True,
             text_segment_num: Optional[int] = 1,
             stochastic_chunk: Optional[bool] = False,
+            requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -71,11 +72,14 @@ class TextProcessor:
             The number of text segments.
         stochastic_chunk
             Whether to use stochastic chunking, which will randomly slice each individual text.
+        requires_column_info
+            Whether to require feature column information in dataloader.
         """
         self.prefix = prefix
         self.tokenizer_name = tokenizer_name
         self.checkpoint_name = checkpoint_name
         self.text_column_names = text_column_names
+        self.requires_column_info = requires_column_info
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
             checkpoint_name=checkpoint_name,
@@ -151,8 +155,9 @@ class TextProcessor:
         A dictionary containing one model's collator function for text data.
         """
         fn = {}
-        for col_name in self.text_column_names:
-            fn[f"{self.text_column_prefix}_{col_name}"] = Stack()
+        if self.requires_column_info:
+            for col_name in self.text_column_names:
+                fn[f"{self.text_column_prefix}_{col_name}"] = Stack()
 
         fn.update(
             {
@@ -203,9 +208,10 @@ class TextProcessor:
                 start_ptr = 0
             token_ids.extend(txt_token[start_ptr:(start_ptr + trim_length)].tolist())
             segment_ids.extend([seg] * trim_length)
-            # np.int64 corresponds to torch.LongTensor
-            col_token_idxs = np.array([segment_start, segment_start+trim_length], dtype=np.int64)
-            ret[f"{self.text_column_prefix}_{col_name}"] = col_token_idxs
+            if self.requires_column_info:
+                # np.int64 corresponds to torch.LongTensor
+                col_token_idxs = np.array([segment_start, segment_start+trim_length], dtype=np.int64)
+                ret[f"{self.text_column_prefix}_{col_name}"] = col_token_idxs
             if self.insert_sep:
                 token_ids.append(self.sep_token_id)
                 segment_ids.append(seg)
