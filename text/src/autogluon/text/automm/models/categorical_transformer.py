@@ -104,7 +104,7 @@ class CategoricalTransformer(nn.Module):
         first_prenormalization: Optional[bool] =  False,
         kv_compression_ratio: Optional[float] = None,
         kv_compression_sharing: Optional[str] = None,
-        head_activation: Optional[str] =  'relu',
+        head_activation: Optional[str] = 'relu',
         head_normalization: Optional[str] = 'layer_norm',
     ) -> None :
         """
