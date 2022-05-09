@@ -371,14 +371,6 @@ class AutoMMPredictor:
                 problem_type=problem_type,
                 eval_metric_name=self._eval_metric_name,
             )
-            if self._eval_metric_name is not None:
-                assert self._eval_metric_name == eval_metric_name, \
-                    f"Inferred evaluation metric {eval_metric_name} is different from " \
-                    f"the previous {self._eval_metric_name}"
-            if self._validation_metric_name is not None:
-                assert self._validation_metric_name == validation_metric_name, \
-                    f"Inferred validation metric {validation_metric_name} is different from " \
-                    f"the previous {self._validation_metric_name}"
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
