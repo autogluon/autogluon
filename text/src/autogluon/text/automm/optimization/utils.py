@@ -11,7 +11,7 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT
-
+import warnings
 
 def get_loss_func(problem_type: str):
     """
