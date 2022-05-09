@@ -250,12 +250,12 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
 @pytest.mark.parametrize(
     "hyperparameter_list, expected_number_of_unique_names, expected_suffixes",
     [
-        ([{DeepARModel: {"epochs": 2}}], 1, []),
+        ([{DeepARModel: {"epochs": 1}}], 1, []),
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 }
             ],
             2,
@@ -263,8 +263,8 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         ),
         (
             [
-                {DeepARModel: {"epochs": 2}},
-                {DeepARModel: {"epochs": 2}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
             ],
             2,
             ["AR_2"],
@@ -272,9 +272,9 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 }
             ],
             3,
@@ -282,39 +282,75 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         ),
         (
             [
-                {DeepARModel: {"epochs": 2}},
-                {DeepARModel: {"epochs": 2}},
-                {DeepARModel: {"epochs": 2}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"epochs": 1}},
             ],
             3,
-            ["AR_2", "AR_2_2"],
+            ["AR_2", "AR_3"],
         ),
         (
             [
-                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2}},
-                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2}},
+                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1}},
+                {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1}},
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
             ],
             4,
-            ["RNN_2", "RNN_2_2", "RNN_2_3"],
+            ["RNN_2", "RNN_3", "RNN_4"],
         ),
         (
             [
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
                 {
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                 },
             ],
             5,
-            ["RNN_2", "RNN_3", "RNN_2_2", "RNN_2_3"],
+            ["RNN_2", "RNN_3", "RNN_4", "RNN_5"],
+        ),
+        (
+            [
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {
+                        "epochs": 1
+                    },
+                },
+            ],
+            3,
+            ["RNN_2", "RNN_2_2"],
+        ),
+        (
+            [
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                },
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {
+                        "epochs": 1
+                    },
+                },
+                {
+                    GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {
+                        "epochs": 1
+                    },
+                },
+            ],
+            7,
+            ["RNN", "RNN_2", "RNN_3", "RNN_4", "RNN_5", "RNN_2_2", "RNN_2_3"],
         ),
     ],
 )

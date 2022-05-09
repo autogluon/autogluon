@@ -177,10 +177,11 @@ class GenericGluonTSModelFactory(AbstractForecastingModelFactory):
         self.init_kwargs = kwargs
 
     def __call__(self, **kwargs):
+        model_init_kwargs = self.init_kwargs.copy()
+        model_init_kwargs.update(kwargs)
         return GenericGluonTSModel(
             gluonts_estimator_class=self.gluonts_estimator_class,
-            **self.init_kwargs,
-            **kwargs,
+            **model_init_kwargs,
         )
 
 

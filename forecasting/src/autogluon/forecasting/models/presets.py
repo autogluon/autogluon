@@ -168,16 +168,8 @@ def get_preset_models(
         model_type_kwargs.pop("name", None)
         increment = 1
         while model.name in all_assigned_names:
-            # if name collides with a name prohibited by the function argument
-            # then we always append _2
-            if model.name in invalid_model_names:
-                name_stem = model.name
-                model = model_type(name=f"{model.name}_2", **model_type_kwargs)
-            # if name instead collides with one assigned in this function call,
-            # we append an incremented integer
-            else:
-                increment += 1
-                model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
+            increment += 1
+            model = model_type(name=f"{name_stem}_{increment}", **model_type_kwargs)
 
         all_assigned_names.add(model.name)
         models.append(model)
