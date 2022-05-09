@@ -10,8 +10,13 @@ from .lr_scheduler import (
     get_polynomial_decay_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-from ..constants import BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT
+from ..constants import (
+    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
+    ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
+    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
+)
 import warnings
+
 
 def get_loss_func(problem_type: str):
     """
@@ -68,20 +73,20 @@ def get_metric(
         A customized metric function.
     """
     metric_name = metric_name.lower()
-    if metric_name in ["acc", "accuracy"]:
+    if metric_name in [ACC, ACCURACY]:
         return torchmetrics.Accuracy(), MAX, None
-    elif metric_name in ["rmse", "root_mean_squared_error"]:
+    elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
         return torchmetrics.MeanSquaredError(squared=False), MIN, None
-    elif metric_name == "r2":
+    elif metric_name == R2:
         return torchmetrics.R2Score(), MAX, None
-    elif metric_name == "quadratic_kappa":
+    elif metric_name == QUADRATIC_KAPPA:
         return torchmetrics.CohenKappa(num_classes=num_classes,
                                        weights="quadratic"), MAX, None
-    elif metric_name == "roc_auc":
+    elif metric_name == ROC_AUC:
         return torchmetrics.AUROC(), MAX, None
-    elif metric_name == 'average_precision':
+    elif metric_name == AVERAGE_PRECISION:
         return torchmetrics.AveragePrecision(), MAX, None
-    elif metric_name in ["log_loss", "cross_entropy"]:
+    elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
         return torchmetrics.MeanMetric(), MIN, \
                functools.partial(F.cross_entropy, reduction="none")
     else:

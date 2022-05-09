@@ -41,9 +41,9 @@ from .constants import (
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
-    CATEGORICAL_MLP, FUSION_MLP,
-    NUMERICAL_TRANSFORMER, CATEGORICAL_TRANSFORMER,
-    FUSION_TRANSFORMER,
+    CATEGORICAL_MLP, FUSION_MLP, NUMERICAL_TRANSFORMER,
+    CATEGORICAL_TRANSFORMER, FUSION_TRANSFORMER,
+    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS,
 )
 from .presets import (
     list_model_presets,
@@ -65,7 +65,11 @@ def infer_metrics(
     If the evaluation metric is provided, then we use it as the validation metric.
     But there are some exceptions that validation metric is different from evaluation metric.
     For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`
-    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1.
+    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1. Another example is
+    that `torchmetrics.AUROC` requires that both positive and negative examples are available in a mini-batch.
+    When training a large model, the per gpu batch size is probably small, leading to an incorrect
+    roc_auc score.
+
 
     Parameters
     ----------
@@ -84,6 +88,15 @@ def infer_metrics(
     if eval_metric_name is not None:
         if eval_metric_name.lower() in [R2, PEARSONR, SPEARMANR]:
             validation_metric_name = RMSE
+        elif eval_metric_name.lower() in [ROC_AUC, AVERAGE_PRECISION]:
+            logger.info(
+                f"We use {LOG_LOSS} as the validation metric for more stable training. "
+                f"We avoid using {eval_metric_name} as the validation metric because `torchmetrics` "
+                f"requires that both positive and negative examples are available in a mini-batch."
+                f"If the per gpu batch size is too small to cover both, `torchmetrics` would"
+                f"compute {eval_metric_name} scores incorrectly."
+            )
+            validation_metric_name = LOG_LOSS
         else:
             validation_metric_name = eval_metric_name
         return validation_metric_name, eval_metric_name
@@ -914,7 +927,7 @@ def compute_score(
     Computed score.
     """
     metric = get_metric(metric_name)
-    if metric.name in ["roc_auc", "average_precision"]:
+    if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, 1])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
