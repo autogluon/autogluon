@@ -16,6 +16,7 @@ class CategoricalProcessor:
             self,
             prefix: str,
             categorical_column_names: List[str],
+            requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -24,9 +25,12 @@ class CategoricalProcessor:
             The prefix connecting a processor to its corresponding model.
         categorical_column_names
             Categorical column names in a multimodal pd.DataFrame.
+        requires_column_info
+            Whether to require feature column information in dataloader.
         """
         self.prefix = prefix
         self.categorical_column_names = categorical_column_names
+        self.requires_column_info = requires_column_info
 
     @property
     def categorical_key(self):
@@ -47,8 +51,9 @@ class CategoricalProcessor:
         """
         fn = {}
 
-        for col_name in self.categorical_column_names:
-            fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
+        if self.requires_column_info:
+            for col_name in self.categorical_column_names:
+                fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
 
         fn[self.categorical_key] = Tuple(
             [
@@ -76,9 +81,10 @@ class CategoricalProcessor:
         A dictionary containing the processed categorical features.
         """
         ret = {}
-        # TODO: consider moving this for loop into __init__() since each sample has the same information.
-        for i, col_name in enumerate(categorical_features.keys()):
-            ret[f"{self.categorical_column_prefix}_{col_name}"] = i
+        if self.requires_column_info:
+            # TODO: consider moving this for loop into __init__() since each sample has the same information.
+            for i, col_name in enumerate(categorical_features.keys()):
+                ret[f"{self.categorical_column_prefix}_{col_name}"] = i
 
         ret[self.categorical_key] = list(categorical_features.values())
 
