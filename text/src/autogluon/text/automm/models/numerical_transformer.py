@@ -105,7 +105,7 @@ class  NumericalTransformer(nn.Module):
         first_prenormalization: Optional[bool] =  False,
         kv_compression_ratio: Optional[float] = None,
         kv_compression_sharing: Optional[str] = None,
-        head_activation: Optional[str] =  'relu',
+        head_activation: Optional[str] = 'relu',
         head_normalization: Optional[str] = 'layer_norm',
     ):
         """
@@ -173,7 +173,6 @@ class  NumericalTransformer(nn.Module):
         assert token_initialization in ['uniform', 'normal'], 'initialization must be uniform or normal'
 
         self.prefix = prefix
-
         self.out_features = out_features
 
         self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
@@ -186,7 +185,7 @@ class  NumericalTransformer(nn.Module):
         self.cls_token = CLSToken(
             d_token=d_token, 
             initialization=token_initialization,
-        ) if cls_token else None
+        ) if cls_token else nn.Identity()
 
         if kv_compression_ratio is not None: 
             if self.cls_token:
@@ -255,11 +254,9 @@ class  NumericalTransformer(nn.Module):
         """
 
         features = self.numerical_feature_tokenizer(batch[self.numerical_key])
-
-        if self.cls_token:
-            features = self.cls_token(features)
-
+        features = self.cls_token(features)
         features = self.transformer(features)
+        
         logits = self.head(features)
 
         return {

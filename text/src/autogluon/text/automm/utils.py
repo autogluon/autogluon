@@ -620,6 +620,7 @@ def create_model(
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
                 num_classes=num_classes,
+                cls_token=True if len(names) == 1 else False,
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
@@ -649,6 +650,7 @@ def create_model(
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
                 num_classes=num_classes,
+                cls_token=True if len(names) == 1 else False,
             )
         elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
@@ -669,6 +671,7 @@ def create_model(
                 prefix=model_name,
                 hidden_features=model_config.hidden_size,
                 num_classes=num_classes,
+                n_blocks=model_config.n_blocks,
                 attention_n_heads=model_config.attention_n_heads,
                 ffn_d_hidden=model_config.ffn_d_hidden,
                 attention_dropout=model_config.attention_dropout,
