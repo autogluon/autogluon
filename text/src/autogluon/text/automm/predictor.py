@@ -850,6 +850,7 @@ class AutoMMPredictor:
             # and use it as the main ingredients
             trainer.save_checkpoint(os.path.join(save_path, "model.ckpt"))
             ingredients = [os.path.join(save_path, "model.ckpt")]
+            top_k_model_paths = []
 
         # Average all the ingredients
         avg_state_dict = average_checkpoints(
