@@ -258,6 +258,12 @@ class ImageProcessor:
                 processor.append(transforms.CenterCrop(self.size))
             elif trans_type == "horizontal_flip":
                 processor.append(transforms.RandomHorizontalFlip())
+            elif trans_type == "vertical_flip":
+                processor.append(transforms.RandomVerticalFlip())
+            elif trans_type == "color_jitter":
+                processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+            elif trans_type == "affine":
+                processor.append(transforms.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
             elif trans_type == "randaug":
                 processor.append(RandAugment(2, 9))
             else:
