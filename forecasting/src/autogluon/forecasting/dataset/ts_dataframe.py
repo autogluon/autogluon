@@ -67,6 +67,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
             data = self.from_iterable_dataset(data)
         super().__init__(data=data, *args, **kwargs)
 
+    @property
+    def freq(self):
+        ts_index = self.index.levels[1]  # noqa
+        freq = ts_index.freq or ts_index.inferred_freq
+        if freq is None:
+            raise ValueError("Frequency not provided and cannot be inferred")
+        return freq
+
     @classmethod
     def _validate_iterable(cls, data: Iterable):
         if not isinstance(data, Iterable):
