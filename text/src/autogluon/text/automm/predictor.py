@@ -9,8 +9,9 @@ import shutil
 from datetime import timedelta
 import pandas as pd
 import pickle
-import torch
 import copy
+import yaml
+import torch
 from torch import nn
 from torch.nn.modules.loss import _Loss
 import torch.nn.functional as F
@@ -18,7 +19,6 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.utilities.types import _METRIC
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
@@ -71,10 +71,13 @@ logger = logging.getLogger(AUTOMM)
 
 class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
     """
-    Class that inherits pl.callbacks.ModelCheckpoint.
+    Class that inherits pl.callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.
+
+    - Issue1:
 
     It solves the issue described in https://github.com/PyTorchLightning/pytorch-lightning/issues/5582.
     For ddp_spawn, the checkpoint_callback.best_k_models.values() can be empty.
+    Here, we resolve it by storing the best_models to "SAVE_DIR/best_k_models.yaml".
 
     """
 
@@ -82,11 +85,9 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
             self, current: torch.Tensor, trainer: "pl.Trainer",
             monitor_candidates: Dict[str, _METRIC]
     ) -> None:
-        print('Before update:', self.best_k_models)
         super(AutoMMModelCheckpoint, self)._update_best_and_save(current=current,
                                                                  trainer=trainer,
                                                                  monitor_candidates=monitor_candidates)
-        print('After update:', self.best_k_models)
         self.to_yaml()
 
 
@@ -774,10 +775,9 @@ class AutoMMPredictor:
             val_df,
             validation_metric_name,
     ):
-        top_k_model_paths = []
-        for file_name in os.listdir(save_path):
-            if file_name.startswith("epoch"):
-                top_k_model_paths.append(os.path.join(save_path, file_name))
+
+        with open(os.path.join(save_path, 'best_k_models.yaml'), 'r') as f:
+            best_k_models = yaml.load(f, Loader=yaml.Loader)
 
         if is_distill:
             prefix = "student_model."
@@ -786,31 +786,13 @@ class AutoMMPredictor:
 
         if config.optimization.top_k_average_method == UNIFORM_SOUP:
             logger.info(
-                f"Start to fuse {len(top_k_model_paths)} checkpoints via the uniform soup algorithm."
+                f"Start to fuse {len(best_k_models)} checkpoints via the uniform soup algorithm."
             )
-            ingredients = top_k_model_paths
+            ingredients = list(best_k_models.keys())
         else:
-            # In the case of ddp_spawn, the checkpoint_callback.best_k_models.values() can be empty. This is due the
-            # limitation of PT Lightning: https://github.com/PyTorchLightning/pytorch-lightning/issues/5582
-            # Thus, we will need to reevaluate the validation performance of these checkpoints
-            logger.info(
-                f"Evaluate {len(top_k_model_paths)} checkpoints and "
-                f"sort them in a decreasing order based on their performances."
-            )
-            top_k_model_scores = []
-            for per_model_path in top_k_model_paths:
-                self._model = self._load_state_dict(
-                    model=model,
-                    path=per_model_path,
-                    prefix=prefix,
-                )
-                top_k_model_scores.append(
-                    self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                )
-
             top_k_model_paths = [
                 v[0] for v in sorted(
-                    zip(top_k_model_paths, top_k_model_scores),
+                    list(best_k_models.items()),
                     key=lambda ele: ele[1],
                     reverse=(minmax_mode == MAX),
                 )
@@ -845,7 +827,7 @@ class AutoMMPredictor:
                     if monitor_op(cand_score, best_score):
                         # Add new ingredient
                         ingredients.append(top_k_model_paths[i])
-                        best_performance = cand_score
+                        best_score = cand_score
             elif config.optimization.top_k_average_method == BEST:
                 ingredients = [top_k_model_paths[0]]
             else:
