@@ -783,6 +783,7 @@ class AutoMMPredictor:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
             best_k_models = None
+        last_ckpt_path = os.path.join(save_path, "last.ckpt")
 
         if is_distill:
             prefix = "student_model."
@@ -842,19 +843,19 @@ class AutoMMPredictor:
                         f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
                         f"The provided value is '{config.optimization.top_k_average_method}'."
                     )
-            # Average all the ingredients
-            avg_state_dict = average_checkpoints(
-                checkpoint_paths=ingredients,
-            )
-            self._model = self._load_state_dict(
-                model=model,
-                state_dict=avg_state_dict,
-                prefix=prefix,
-            )
         else:
             # best_k_models is empty so we just reuse the state dict from the model.
-            top_k_model_paths = []
-            avg_state_dict = self._model.state_dict()
+            ingredients = [last_ckpt_path]
+
+        # Average all the ingredients
+        avg_state_dict = average_checkpoints(
+            checkpoint_paths=ingredients,
+        )
+        self._model = self._load_state_dict(
+            model=model,
+            state_dict=avg_state_dict,
+            prefix=prefix,
+        )
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
@@ -869,7 +870,6 @@ class AutoMMPredictor:
         for per_path in top_k_model_paths:
             if os.path.isfile(per_path):
                 os.remove(per_path)
-        last_ckpt_path = os.path.join(save_path, "last.ckpt")
         if os.path.isfile(last_ckpt_path):
             os.remove(last_ckpt_path)
 
