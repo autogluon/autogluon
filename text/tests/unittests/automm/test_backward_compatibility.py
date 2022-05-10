@@ -1,4 +1,5 @@
 import os
+import shutil
 from autogluon.text import TextPredictor
 from datasets import AmazonReviewSentimentCrossLingualDataset
 from test_automm_predictor import verify_predictor_save_load
@@ -16,6 +17,8 @@ def test_load_old_checkpoint():
     save_path = os.path.join(get_home_dir(), "checkpoints")
     file_path = os.path.join(save_path, f"{checkpoint_name}.zip")
     checkpoint_path = os.path.join(get_home_dir(), "checkpoints", checkpoint_name)
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
     download(
         url=f"s3://automl-mm-bench/unit-tests-0.4/checkpoints/{checkpoint_name}.zip",
         path=file_path,
