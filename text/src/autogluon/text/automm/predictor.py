@@ -87,6 +87,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
                                                                  trainer=trainer,
                                                                  monitor_candidates=monitor_candidates)
         print('After update:', self.best_k_models)
+        self.to_yaml()
 
 
 class AutoMMPredictor:
