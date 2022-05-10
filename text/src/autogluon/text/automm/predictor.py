@@ -759,7 +759,7 @@ class AutoMMPredictor:
                 config=config,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
-                lit_module=task,
+                trainer=trainer,
             )
         else:
             sys.exit(
@@ -775,7 +775,7 @@ class AutoMMPredictor:
             config,
             val_df,
             validation_metric_name,
-            lit_module,
+            trainer,
     ):
         if os.path.exists(os.path.join(save_path, 'best_k_models.yaml')):
             with open(os.path.join(save_path, 'best_k_models.yaml'), 'r') as f:
@@ -846,8 +846,9 @@ class AutoMMPredictor:
                         f"The provided value is '{config.optimization.top_k_average_method}'."
                     )
         else:
-            # best_k_models is empty so we will manually save a checkpoint and use it as the
-            lit_module.save_checkpoint(os.path.join(save_path, "model.ckpt"))
+            # best_k_models is empty so we will manually save a checkpoint from the trainer
+            # and use it as the main ingredients
+            trainer.save_checkpoint(os.path.join(save_path, "model.ckpt"))
             ingredients = [os.path.join(save_path, "model.ckpt")]
 
         # Average all the ingredients
