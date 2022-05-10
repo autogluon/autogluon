@@ -18,6 +18,8 @@ import torchmetrics
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+from pytorch_lightning.utilities.types import _METRIC
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
@@ -65,6 +67,26 @@ from .optimization.lit_distiller import DistillerLitModule
 from .. import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
+
+
+class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
+    """
+    Class that inherits pl.callbacks.ModelCheckpoint.
+
+    It solves the issue described in https://github.com/PyTorchLightning/pytorch-lightning/issues/5582.
+    For ddp_spawn, the checkpoint_callback.best_k_models.values() can be empty.
+
+    """
+
+    def _update_best_and_save(
+            self, current: torch.Tensor, trainer: "pl.Trainer",
+            monitor_candidates: Dict[str, _METRIC]
+    ) -> None:
+        print('Before update:', self.state_dict)
+        super(AutoMMModelCheckpoint, self)._update_best_and_save(current=current,
+                                                                 trainer=trainer,
+                                                                 monitor_candidates=monitor_candidates)
+        print('After update:', self.state_dict)
 
 
 class AutoMMPredictor:
@@ -622,7 +644,7 @@ class AutoMMPredictor:
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
 
-        checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
             verbose=True,
