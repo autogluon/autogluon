@@ -67,6 +67,7 @@ class MultimodalFusionMLP(nn.Module):
             Basically, it supports adding an auxilliary loss for each individual model.
         """
         super().__init__()
+        logger.debug("initializing MultimodalFusionMLP")
         if loss_weight is not None:
             assert loss_weight > 0
         self.loss_weight = loss_weight
@@ -246,6 +247,7 @@ class MultimodalFusionTransformer(nn.Module):
             loss_weight: Optional[float] = None,
     ):
         super().__init__()
+        logger.debug("initializing MultimodalFusionTransformer")
         if loss_weight is not None:
             assert loss_weight > 0
 
