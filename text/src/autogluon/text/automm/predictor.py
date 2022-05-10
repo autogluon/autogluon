@@ -1192,7 +1192,7 @@ class AutoMMPredictor:
     ):
         if state_dict is None:
             state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
-        state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix + prefix)}
+        state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
         model.load_state_dict(state_dict)
         return model
 
