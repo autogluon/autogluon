@@ -778,6 +778,7 @@ class AutoMMPredictor:
         if os.path.exists(os.path.join(save_path, 'best_k_models.yaml')):
             with open(os.path.join(save_path, 'best_k_models.yaml'), 'r') as f:
                 best_k_models = yaml.load(f, Loader=yaml.Loader)
+            os.remove(os.path.join(save_path, 'best_k_models.yaml'))
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
