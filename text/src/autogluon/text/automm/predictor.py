@@ -82,11 +82,11 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
             self, current: torch.Tensor, trainer: "pl.Trainer",
             monitor_candidates: Dict[str, _METRIC]
     ) -> None:
-        print('Before update:', self.state_dict)
+        print('Before update:', self.best_k_models)
         super(AutoMMModelCheckpoint, self)._update_best_and_save(current=current,
                                                                  trainer=trainer,
                                                                  monitor_candidates=monitor_candidates)
-        print('After update:', self.state_dict)
+        print('After update:', self.best_k_models)
 
 
 class AutoMMPredictor:
