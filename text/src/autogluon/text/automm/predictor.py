@@ -81,6 +81,12 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
 
     """
 
+    def setup(self, **kwargs):
+        super(AutoMMModelCheckpoint, self).setup(**kwargs)
+        # Clean up old best_k_models
+        if os.path.exists(os.path.join(self.dirpath, "best_k_models.yaml")):
+            os.remove(os.path.join(self.dirpath, "best_k_models.yaml"))
+
     def _update_best_and_save(
             self, current: torch.Tensor, trainer: "pl.Trainer",
             monitor_candidates: Dict[str, _METRIC]
