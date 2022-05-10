@@ -788,7 +788,7 @@ class AutoMMPredictor:
             logger.info(
                 f"Start to fuse {len(best_k_models)} checkpoints via the uniform soup algorithm."
             )
-            ingredients = list(best_k_models.keys())
+            ingredients = top_k_model_paths = list(best_k_models.keys())
         else:
             top_k_model_paths = [
                 v[0] for v in sorted(
