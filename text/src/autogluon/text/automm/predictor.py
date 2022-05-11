@@ -860,7 +860,7 @@ class AutoMMPredictor:
             # and use it as the main ingredients
             ingredients = [last_ckpt_path]
             top_k_model_paths = []
-            # no checkpoints available, do nothing
+            # no checkpoints are available, do nothing
             if not os.path.isfile(last_ckpt_path):
                 return
 
@@ -935,10 +935,10 @@ class AutoMMPredictor:
                               'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
                 precision = 32
 
-        if hasattr(self._config.env, "per_gpu_batch_size_evaluation"):
-            batch_size = self._config.env.per_gpu_batch_size_evaluation
-        else:
+        if hasattr(self._config.env, "eval_batch_size_ratio"):
             batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
+        else:
+            batch_size = self._config.env.per_gpu_batch_size_evaluation
         if num_gpus > 1:
             strategy = "dp"
             # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
