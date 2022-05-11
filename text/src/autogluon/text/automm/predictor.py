@@ -425,6 +425,18 @@ class AutoMMPredictor:
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
 
+        if time_limit == timedelta(seconds=0):
+            self._top_k_average(
+                model=model,
+                save_path=save_path,
+                minmax_mode=minmax_mode,
+                is_distill=False,
+                config=config,
+                val_df=tuning_data,
+                validation_metric_name=validation_metric_name,
+            )
+            return self
+
         # need to assign the above attributes before setting up distillation
         if teacher_predictor is not None:
             teacher_model, critics, baseline_funcs, soft_label_loss_func, \
@@ -759,7 +771,6 @@ class AutoMMPredictor:
                 config=config,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
-                trainer=trainer,
             )
         else:
             sys.exit(
@@ -775,12 +786,11 @@ class AutoMMPredictor:
             config,
             val_df,
             validation_metric_name,
-            trainer,
     ):
-        if os.path.exists(os.path.join(save_path, 'best_k_models.yaml')):
-            with open(os.path.join(save_path, 'best_k_models.yaml'), 'r') as f:
+        best_k_models_yaml_path = os.path.join(save_path, "best_k_models.yaml")
+        if os.path.exists(best_k_models_yaml_path):
+            with open(best_k_models_yaml_path, "r") as f:
                 best_k_models = yaml.load(f, Loader=yaml.Loader)
-            os.remove(os.path.join(save_path, 'best_k_models.yaml'))
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -848,8 +858,7 @@ class AutoMMPredictor:
         else:
             # best_k_models is empty so we will manually save a checkpoint from the trainer
             # and use it as the main ingredients
-            trainer.save_checkpoint(os.path.join(save_path, "model.ckpt"))
-            ingredients = [os.path.join(save_path, "model.ckpt")]
+            ingredients = [last_ckpt_path]
             top_k_model_paths = []
 
         # Average all the ingredients
@@ -875,6 +884,10 @@ class AutoMMPredictor:
         for per_path in top_k_model_paths:
             if os.path.isfile(per_path):
                 os.remove(per_path)
+        # remove the yaml file after cleaning the checkpoints
+        if os.path.isfile(best_k_models_yaml_path):
+            os.remove(best_k_models_yaml_path)
+        # clean the last checkpoint
         if os.path.isfile(last_ckpt_path):
             os.remove(last_ckpt_path)
 
@@ -919,14 +932,17 @@ class AutoMMPredictor:
                               'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
                 precision = 32
 
+        if hasattr(self._config.env, "per_gpu_batch_size_evaluation"):
+            batch_size = self._config.env.per_gpu_batch_size_evaluation
+        else:
+            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
         if num_gpus > 1:
             strategy = "dp"
             # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
             # So, we need to use the GPU number as a multiplier to compute the batch size.
-            batch_size = self._config.env.per_gpu_batch_size_evaluation * num_gpus
+            batch_size = batch_size * num_gpus
         else:
             strategy = None
-            batch_size = self._config.env.per_gpu_batch_size_evaluation
 
         predict_dm = BaseDataModule(
             df_preprocessor=self._df_preprocessor,
