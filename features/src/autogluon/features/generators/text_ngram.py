@@ -67,7 +67,6 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         self._feature_names_dict = dict()
 
     def _fit_transform(self, X: DataFrame, y: Series = None, problem_type: str = None, **kwargs) -> (DataFrame, dict):
-        
         X_out = self._fit_transform_ngrams(X)
         
         if self.prefilter_tokens and self.prefilter_token_count >= X_out.shape[1]:
@@ -128,9 +127,10 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         for nlp_feature in self.vectorizer_features:
             # TODO: Preprocess text?
             if nlp_feature == '__nlp__':  # Combine Text Fields
-                text_list = list(set(['. '.join(row) for row in X[self.features_in].values]))
+                features_in_str = X[self.features_in].astype(str)
+                text_list = list(set(['. '.join(row) for row in features_in_str.values]))
             else:
-                text_list = list(X[nlp_feature].drop_duplicates().values)
+                text_list = list(X[nlp_feature].astype(str).drop_duplicates().values)
             vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
             try:
                 vectorizer_fit, _ = self._train_vectorizer(text_list, vectorizer_raw)  # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
@@ -188,9 +188,11 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         X_nlp_features_combined = []
         for nlp_feature, vectorizer_fit in zip(self.vectorizer_features, self.vectorizers):
             if nlp_feature == '__nlp__':
-                text_data = ['. '.join(row) for row in X.values]
+                X_str = X.astype(str)
+                text_data = ['. '.join(row) for row in X_str.values]
             else:
-                text_data = X[nlp_feature].values
+                nlp_feature_str = X[nlp_feature].astype(str)
+                text_data = nlp_feature_str.values
             transform_matrix = vectorizer_fit.transform(text_data)
 
             if not self._is_fit:

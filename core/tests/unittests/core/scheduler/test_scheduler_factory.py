@@ -6,7 +6,7 @@ from autogluon.core.scheduler.seq_scheduler import LocalSequentialScheduler
 
 def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():
     scheduler_cls, scheduler_params = scheduler_factory(
-        hyperparameter_tune_kwargs={'scheduler': 'local', 'searcher': 'bayesopt', 'custom_option': 'value'}
+        hyperparameter_tune_kwargs={'scheduler': 'local', 'searcher': 'grid', 'custom_option': 'value'}
     )
 
     assert scheduler_cls == LocalSequentialScheduler, 'scheduler_cls must be correct'
@@ -14,7 +14,7 @@ def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():
     assert scheduler_params['resource']['num_gpus'] is not None, 'resources/num_cpus must be present'
 
     expected_values = {
-        'searcher': 'bayesopt',
+        'searcher': 'grid',
         'search_options': {},
         'checkpoint': None,
         'resume': False,
@@ -32,19 +32,19 @@ def test_scheduler_factory__can_construct_valid_config_with_str_scheduler():
 
 def test_scheduler_factory__can_construct_valid_config_with_class_scheduler():
     scheduler_cls, scheduler_params = scheduler_factory(
-        hyperparameter_tune_kwargs={'scheduler': LocalSequentialScheduler, 'searcher': 'bayesopt'}
+        hyperparameter_tune_kwargs={'scheduler': LocalSequentialScheduler, 'searcher': 'local_random'}
     )
     assert scheduler_cls == LocalSequentialScheduler, 'scheduler_cls must be correct'
 
 
 def test_scheduler_factory__reaises_exception_on_missing_scheduler():
     with pytest.raises(ValueError, match='Required key \'scheduler\' is not present in hyperparameter_tune_kwargs'):
-        scheduler_factory(hyperparameter_tune_kwargs={'searcher': 'bayesopt'})
+        scheduler_factory(hyperparameter_tune_kwargs={'searcher': 'local_random'})
 
 
 def test_scheduler_factory__reaises_exception_on_unknown_str_scheduler():
     with pytest.raises(ValueError, match='Required key \'scheduler\' in hyperparameter_tune_kwargs must be one of the values dict_keys'):
-        scheduler_factory(hyperparameter_tune_kwargs={'scheduler': '_some_value_', 'searcher': 'bayesopt'})
+        scheduler_factory(hyperparameter_tune_kwargs={'scheduler': '_some_value_', 'searcher': 'local_random'})
 
 
 def test_scheduler_factory__reaises_exception_on_missing_searcher():

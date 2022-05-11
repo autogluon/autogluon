@@ -116,13 +116,13 @@ class CustomRandomForestModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            get_features_kwargs=dict(
-                # the total set of raw dtypes are: ['int', 'float', 'category', 'object', 'datetime']
-                # object feature dtypes include raw text and image paths, which should only be handled by specialized models
-                # datetime raw dtypes are generally converted to int in upstream pre-processing,
-                # so models generally shouldn't need to explicitly support datetime dtypes.
-                valid_raw_types=['int', 'float', 'category'],
-            ),
+            # the total set of raw dtypes are: ['int', 'float', 'category', 'object', 'datetime']
+            # object feature dtypes include raw text and image paths, which should only be handled by specialized models
+            # datetime raw dtypes are generally converted to int in upstream pre-processing,
+            # so models generally shouldn't need to explicitly support datetime dtypes.
+            valid_raw_types=['int', 'float', 'category'],
+            # Other options include `valid_special_types`, `ignored_type_group_raw`, and `ignored_type_group_special`.
+            # Refer to AbstractModel for more details on available options.
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params

@@ -5,15 +5,16 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.features.generators import AbstractFeatureGenerator
 
 
 class GeneratorHelper:
     @staticmethod
-    def fit_transform_assert(input_data: DataFrame, generator: AbstractFeatureGenerator, expected_feature_metadata_in_full: dict = None, expected_feature_metadata_full: dict = None):
+    def fit_transform_assert(input_data: DataFrame, generator: AbstractFeatureGenerator, feature_metadata_in: FeatureMetadata = None, expected_feature_metadata_in_full: dict = None, expected_feature_metadata_full: dict = None):
         # Given
         original_input_data = copy.deepcopy(input_data)
-    
+
         # Raise exception
         with pytest.raises(AssertionError):
             # Can't call transform before fit_transform
@@ -24,15 +25,15 @@ class GeneratorHelper:
             with pytest.raises(AssertionError):
                 input_data_with_duplicate_columns = pd.concat([input_data, input_data], axis=1)
                 # Can't call fit_transform with duplicate column names
-                generator.fit_transform(input_data_with_duplicate_columns)
+                generator.fit_transform(input_data_with_duplicate_columns, feature_metadata_in=feature_metadata_in)
 
         assert not generator.is_fit()
-        output_data = generator.fit_transform(input_data)
+        output_data = generator.fit_transform(input_data, feature_metadata_in=feature_metadata_in)
         assert generator.is_fit()
         with pytest.raises(AssertionError):
             # Can't call fit_transform after fit
-            generator.fit_transform(input_data)
-    
+            generator.fit_transform(input_data, feature_metadata_in=feature_metadata_in)
+
         # Ensure input_data is not altered inplace
         assert input_data.equals(original_input_data)
 
@@ -76,7 +77,7 @@ class GeneratorHelper:
         # Ensure feature_metadata is as expected
         if expected_feature_metadata_full is not None:
             assert expected_feature_metadata_full == generator.feature_metadata.to_dict(inverse=True)
-    
+
         return output_data
 
 

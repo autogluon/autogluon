@@ -10,27 +10,20 @@ logger = logging.getLogger(__name__)
 
 def model_trial(args,
                 reporter,
-                model,
+                model_cls,
+                init_params,
                 train_path,
                 val_path,
                 time_start,
                 time_limit=None,
                 fit_kwargs=None,
                 ):
-    """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
-
-        Notes:
-            - Model object itself must be passed as kwarg: model
-            - All model hyperparameters must be stored in model.params dict that may contain special keys such as:
-                'seed_value' to ensure reproducibility
-                'num_threads', 'num_gpus' to set specific resources in model.fit()
-            - model.save() must have return_filename, file_prefix, directory options
-    """
+    """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
     try:
         if fit_kwargs is None:
             fit_kwargs = dict()
 
-        model, args = prepare_inputs(args=args, model=model)
+        model = init_model(args=args, model_cls=model_cls, init_params=init_params)
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
@@ -39,7 +32,6 @@ def model_trial(args,
         predict_proba_args = dict(X=X_val)
         model = fit_and_save_model(
             model=model,
-            params=args,
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
             y_val=y_val,
@@ -55,16 +47,19 @@ def model_trial(args,
         reporter(epoch=1, validation_performance=model.val_score)
 
 
-def prepare_inputs(args, model):
+def init_model(args, model_cls, init_params):
+    args = args.copy()
     task_id = args.pop('task_id')
 
-    file_prefix = f"T{task_id}"  # append to all file names created during this trial. Do NOT change!
-    model.name = model.name + os.path.sep + file_prefix
-    model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
-    return model, args
+    file_prefix = f"T{task_id+1}"  # append to all file names created during this trial. Do NOT change!
+
+    init_params['hyperparameters'].update(args)
+    init_params['name'] = init_params['name'] + os.path.sep + file_prefix
+
+    return model_cls(**init_params)
 
 
-def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_start, time_limit=None, reporter=None):
+def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, time_limit=None, reporter=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -74,7 +69,6 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     else:
         time_left = None
 
-    model.params.update(params)
     time_fit_start = time.time()
     model.fit(**fit_args, time_limit=time_left, reporter=reporter)
     time_fit_end = time.time()
@@ -97,11 +91,18 @@ def fit_and_save_model(model, params, fit_args, predict_proba_args, y_val, time_
     return model
 
 
-def skip_hpo(model, X, y, X_val, y_val, scheduler_options=None, time_limit=None, **kwargs):
+def skip_hpo(model, X, y, X_val, y_val, time_limit=None, **kwargs):
     """Skips HPO and simply trains the model once with the provided HPO time budget. Returns model artifacts as if from HPO."""
     fit_model_args = dict(X=X, y=y, **kwargs)
     predict_proba_args = dict(X=X_val)
-    fit_and_save_model(model=model, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=time_limit)
+    fit_and_save_model(
+        model=model,
+        fit_args=fit_model_args,
+        predict_proba_args=predict_proba_args,
+        y_val=y_val,
+        time_start=time.time(),
+        time_limit=time_limit
+    )
     hpo_results = {'total_time': model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
     hpo_models = {model.name: model.path}

@@ -11,10 +11,10 @@ from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CA
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
-from autogluon.core.models.abstract.abstract_model import AbstractNeuralNetworkModel
 
 logger = logging.getLogger(__name__)
 

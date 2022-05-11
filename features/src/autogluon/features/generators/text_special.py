@@ -1,3 +1,4 @@
+import copy
 import logging
 import re
 from typing import List
@@ -87,8 +88,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             occur_threshold = min(np.ceil(self._min_occur_offset + num_samples * self._min_occur_ratio), np.ceil(num_samples / 2))
             for nlp_feature in self.features_in:
                 symbols_feature = []
+                nlp_feature_str = X[nlp_feature].astype(str)
                 for symbol in symbols:
-                    occur_symbol = np.sum([value.count(symbol) != 0 for value in X[nlp_feature]])
+                    occur_symbol = np.sum([value.count(symbol) != 0 for value in nlp_feature_str])
                     if occur_symbol >= occur_threshold:
                         symbols_feature.append(symbol)
                 symbols_per_feature[nlp_feature] = np.array(symbols_feature)
@@ -106,19 +108,20 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     def _generate_text_special(self, X: Series, feature: str, symbols: list, X_dict: dict) -> dict:
         fn = self._feature_names_dict[feature]
+        X_str = X.astype(str)
 
-        X_dict[fn['char_count']] = np.array([self.char_count(value) for value in X], dtype=np.uint32)
-        X_dict[fn['word_count']] = np.array([self.word_count(value) for value in X], dtype=np.uint32)
-        X_dict[fn['capital_ratio']] = np.array([self.capital_ratio(value) for value in X], dtype=np.float32)
-        X_dict[fn['lower_ratio']] = np.array([self.lower_ratio(value) for value in X], dtype=np.float32)
-        X_dict[fn['digit_ratio']] = np.array([self.digit_ratio(value) for value in X], dtype=np.float32)
-        X_dict[fn['special_ratio']] = np.array([self.special_ratio(value) for value in X], dtype=np.float32)
+        X_dict[fn['char_count']] = np.array([self.char_count(value) for value in X_str], dtype=np.uint32)
+        X_dict[fn['word_count']] = np.array([self.word_count(value) for value in X_str], dtype=np.uint32)
+        X_dict[fn['capital_ratio']] = np.array([self.capital_ratio(value) for value in X_str], dtype=np.float32)
+        X_dict[fn['lower_ratio']] = np.array([self.lower_ratio(value) for value in X_str], dtype=np.float32)
+        X_dict[fn['digit_ratio']] = np.array([self.digit_ratio(value) for value in X_str], dtype=np.float32)
+        X_dict[fn['special_ratio']] = np.array([self.special_ratio(value) for value in X_str], dtype=np.float32)
 
         char_count = X_dict[fn['char_count']]
         char_count_valid = char_count != 0
         shape = char_count.shape
         for symbol in symbols:
-            X_dict[fn[symbol]['count']] = np.array([value.count(symbol) for value in X], dtype=np.uint32)
+            X_dict[fn[symbol]['count']] = np.array([value.count(symbol) for value in X_str], dtype=np.uint32)
             X_dict[fn[symbol]['ratio']] = np.divide(X_dict[fn[symbol]['count']], char_count, out=np.zeros(shape, dtype=np.float32), where=char_count_valid)
 
         return X_dict

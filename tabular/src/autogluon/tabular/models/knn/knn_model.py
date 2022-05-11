@@ -5,10 +5,9 @@ import math
 import psutil
 import time
 
-from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_BOOL, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
+from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
-from autogluon.core.models.abstract.model_trial import skip_hpo
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.utils import normalize_pred_probas
 
@@ -31,8 +30,8 @@ class KNNModel(AbstractModel):
                 from sklearnex import patch_sklearn
                 patch_sklearn("knn_classifier")
                 patch_sklearn("knn_regressor")
-                # daal backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
-                logger.log(15, '\tUsing daal4py KNN backend...')
+                # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
+                logger.log(15, '\tUsing sklearnex KNN backend...')
             except:
                 pass
         try:
@@ -53,7 +52,6 @@ class KNNModel(AbstractModel):
     def _set_default_params(self):
         default_params = {
             'weights': 'uniform',
-            'n_jobs': -1,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -61,8 +59,8 @@ class KNNModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_BOOL, R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
-            ignored_type_group_special=[S_BOOL, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
+            valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
+            ignored_type_group_special=[S_BOOL],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
@@ -86,9 +84,6 @@ class KNNModel(AbstractModel):
         spaces = {}
         return spaces
 
-    def _set_cpu_params(self, num_cpus):
-        self.params['n_jobs'] = num_cpus
-
     def _fit(self,
              X,
              y,
@@ -98,16 +93,18 @@ class KNNModel(AbstractModel):
              **kwargs):
         time_start = time.time()
         X = self.preprocess(X)
-        self._set_cpu_params(num_cpus)
+        params = self._get_model_params()
+        if 'n_jobs' not in params:
+            params['n_jobs'] = num_cpus
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for KNNModel, this model will ignore them in training.")
 
         num_rows_max = len(X)
         # FIXME: v0.1 Must store final num rows for refit_full or else will use everything! Worst case refit_full could train far longer than the original model.
         if time_limit is None or num_rows_max <= 10000:
-            self.model = self._get_model_type()(**self._get_model_params()).fit(X, y)
+            self.model = self._get_model_type()(**params).fit(X, y)
         else:
-            self.model = self._fit_with_samples(X=X, y=y, time_limit=time_limit - (time.time() - time_start))
+            self.model = self._fit_with_samples(X=X, y=y, model_params=params, time_limit=time_limit - (time.time() - time_start))
 
     def _estimate_memory_usage(self, X, **kwargs):
         model_size_bytes = 4 * X.shape[0] * X.shape[1]  # Assuming float32 types
@@ -167,6 +164,7 @@ class KNNModel(AbstractModel):
     def _fit_with_samples(self,
                           X,
                           y,
+                          model_params,
                           time_limit,
                           start_samples=10000,
                           max_samples=None,
@@ -241,7 +239,7 @@ class KNNModel(AbstractModel):
                 X_samp = X
                 y_samp = y
                 idx = None
-            self.model = model_type(**self._get_model_params()).fit(X_samp, y_samp)
+            self.model = model_type(**model_params).fit(X_samp, y_samp)
             time_limit_left_prior = time_limit_left
             time_fit_end_sample = time.time()
             time_limit_left = time_limit - (time_fit_end_sample - time_start)
@@ -256,12 +254,11 @@ class KNNModel(AbstractModel):
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
 
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
-
     def _more_tags(self):
-        return {'valid_oof': True}
+        return {
+            'valid_oof': True,
+            'can_refit_full': True,
+        }
 
 
 class FAISSModel(KNNModel):

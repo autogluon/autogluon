@@ -3,7 +3,7 @@
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API. To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review :ref:`sec_tabularcustommodel`.
 
-This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
+This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should first try `TabularPredictor()` and `fit()` with all default arguments.  Then, consider non-default arguments for `TabularPredictor(eval_metric=...)`, and `fit(presets=...)`.  Later, you can experiment with other arguments to fit() covered in this in-depth tutorial like `hyperparameter_tune_kwargs`, `hyperparameters`, `num_stack_levels`, `num_bag_folds`, `num_bag_sets`, etc.
 
 Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon's TabularPredictor and TabularDataset, and loading the data.
 
@@ -46,7 +46,6 @@ nn_options = {  # specifies non-default hyperparameter values for neural network
     'num_epochs': 10,  # number of training epochs (controls training time of NN models)
     'learning_rate': ag.space.Real(1e-4, 1e-2, default=5e-4, log=True),  # learning rate used in training (real-valued hyperparameter searched on log-scale)
     'activation': ag.space.Categorical('relu', 'softrelu', 'tanh'),  # activation function used in NN (categorical hyperparameter, default = first entry)
-    'layers': ag.space.Categorical([100], [1000], [200, 100], [300, 200, 100]),  # each choice for categorical hyperparameter 'layers' corresponds to list of sizes for each NN layer to use
     'dropout_prob': ag.space.Real(0.0, 0.5, default=0.1),  # dropout probability (real-valued hyperparameter)
 }
 
@@ -57,7 +56,7 @@ gbm_options = {  # specifies non-default hyperparameter values for lightGBM grad
 
 hyperparameters = {  # hyperparameters of each model type
                    'GBM': gbm_options,
-                   'NN': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
+                   'NN_TORCH': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
                   }  # When these keys are missing from hyperparameters dict, no models of that type are trained
 
 time_limit = 2*60  # train various models for ~2 min
@@ -100,7 +99,7 @@ Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two o
 ```{.python .input}
 predictor = TabularPredictor(label=label, eval_metric=metric).fit(train_data,
     num_bag_folds=5, num_bag_sets=1, num_stack_levels=1,
-    hyperparameters = {'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
+    hyperparameters = {'NN_TORCH': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}},  # last  argument is just for quick demo here, omit it in real applications
 )
 ```
 
@@ -111,7 +110,7 @@ save_path = 'agModels-predictOccupation'  # folder where to store trained models
 
 predictor = TabularPredictor(label=label, eval_metric=metric, path=save_path).fit(
     train_data, auto_stack=True,
-    time_limit=30, hyperparameters={'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
+    time_limit=30, hyperparameters={'NN_TORCH': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last 2 arguments are for quick demo, omit them in real applications
 )
 ```
 
@@ -236,6 +235,31 @@ Computed via [permutation-shuffling](https://explained.ai/rf-importance/), these
 
 We describe multiple ways to reduce the time it takes for AutoGluon to produce predictions.
 
+Before providing code examples, it is important to understand that
+there are several ways to accelerate inference in AutoGluon. The table below lists the options in order of priority.
+
+| Optimization                      | Inference Speedup                                                                                     | Cost                              | Notes                                                                                                                                                                                  |
+|:----------------------------------|:------------------------------------------------------------------------------------------------------|:----------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| refit_full                        | At least 8x+, up to 160x (requires bagging)                                                           | -Quality, +FitTime                | Only provides speedup with bagging enabled.                                                                                                                                            |
+| persist_models                    | Up to 10x in online-inference                                                                         | ++MemoryUsage                     | If memory is not sufficient to persist model, speedup is not gained. Speedup is most effective in online-inference and is not relevant in batch inference.                             |
+| infer_limit                       | Configurable, ~up to 50x                                                                              | -Quality (Relative to speedup)    | If bagging is enabled, always use refit_full if using infer_limit.                                                                                                                     |
+| distill                           | ~Equals combined speedup of refit_full and infer_limit set to extreme values                          | --Quality, ++FitTime              | Not compatible with refit_full and infer_limit.                                                                                                                                        |
+| feature pruning                   | Typically at most 1.5x. More if willing to lower quality significantly.                               | -Quality?, ++FitTime              | Dependent on the existence of unimportant features in data. Call `predictor.feature_importance(test_data)` to gauge which features could be removed.                                   |
+| use faster hardware               | Usually at most 3x. Depends on hardware (ignoring GPU).                                               | +Hardware                         | As an example, an EC2 c6i.2xlarge is ~1.6x faster than an m5.2xlarge for a similar price. Laptops in particular might be slow compared to cloud instances.                             |
+| manual hyperparameters adjustment | Usually at most 2x assuming infer_limit is already specified.                                         | ---Quality?, +++UserMLExpertise   | Can be very complicated and is not recommended. Potential ways to get speedups this way is to reduce the number of trees in LightGBM, XGBoost, CatBoost, RandomForest, and ExtraTrees. |
+| manual data preprocessing         | Usually at most 1.2x assuming all other optimizations are specified and setting is online-inference.  | ++++UserMLExpertise, ++++UserCode | Only relevant for online-inference. This is not recommended as AutoGluon's default preprocessing is highly optimized.                                                                  |
+
+If bagging is enabled (num_bag_folds>0 or num_stack_levels>0 or using 'best_quality' preset), the order of inference optimizations should be:  
+1. refit_full  
+2. persist_models  
+3. infer_limit  
+
+If bagging is not enabled (num_bag_folds=0, num_stack_levels=0), the order of inference optimizations should be:  
+1. persist_models  
+2. infer_limit  
+
+If following these recommendations does not lead to a sufficiently fast model, you may consider the more advanced options in the table.
+
 ### Keeping models in memory
 
 By default, AutoGluon loads models into memory one at a time and only when they are needed for prediction. This strategy is robust for large stacked/bagged ensembles, but leads to slower prediction times. If you plan to repeatedly make predictions (e.g. on new datapoints one at a time rather than one large test dataset), you can first specify that all models required for inference should be loaded into memory as follows:
@@ -258,6 +282,66 @@ predictor.unpersist_models()  # free memory by clearing models, future predict()
 
 You can alternatively specify a particular model to persist via the `models` argument of `persist_models()`, or simply set `models='all'` to simultaneously load every single model that was trained during `fit`.
 
+### Inference speed as a fit constraint
+
+If you know your latency constraint prior to fitting the predictor, you can specify it explicitly as a fit argument.
+AutoGluon will then automatically train models in a fashion that attempts to satisfy the constraint.
+
+This constraint has two components: `infer_limit` and `infer_limit_batch_size`:  
+- `infer_limit` is the time in seconds to predict 1 row of data.
+For example, `infer_limit=0.05` means 50 ms per row of data,
+or 20 rows / second throughput.  
+- `infer_limit_batch_size` is the amount of rows passed at once to predict when calculating per-row speed.
+This is very important because `infer_limit_batch_size=1` (online-inference) is highly suboptimal as
+various operations have a fixed cost overhead regardless of data size. If you can pass your test data in bulk,
+you should specify `infer_limit_batch_size=10000`.  
+
+```{.python .input}
+# At most 0.05 ms per row (20000 rows per second throughput)
+infer_limit = 0.00005
+# adhere to infer_limit with batches of size 10000 (batch-inference, easier to satisfy infer_limit)
+infer_limit_batch_size = 10000
+# adhere to infer_limit with batches of size 1 (online-inference, much harder to satisfy infer_limit)
+# infer_limit_batch_size = 1  # Note that infer_limit<0.02 when infer_limit_batch_size=1 can be difficult to satisfy.
+predictor_infer_limit = TabularPredictor(label=label, eval_metric=metric).fit(
+    train_data=train_data,
+    time_limit=30,
+    infer_limit=infer_limit,
+    infer_limit_batch_size=infer_limit_batch_size,
+)
+
+# NOTE: If bagging was enabled, it is important to call refit_full at this stage.
+#  infer_limit assumes that the user will call refit_full after fit.
+# predictor_infer_limit.refit_full()
+
+# NOTE: To align with inference speed calculated during fit, models must be persisted.
+predictor_infer_limit.persist_models()
+# Below is an optimized version that only persists the minimum required models for prediction.
+# predictor_infer_limit.persist_models('best')
+
+predictor_infer_limit.leaderboard(silent=True)
+```
+
+Now we can test the inference speed of the final model and check if it satisfies the inference constraints.
+
+```{.python .input}
+test_data_batch = test_data.sample(infer_limit_batch_size, replace=True, ignore_index=True)
+
+import time
+time_start = time.time()
+predictor_infer_limit.predict(test_data_batch)
+time_end = time.time()
+
+infer_time_per_row = (time_end - time_start) / len(test_data_batch)
+rows_per_second = 1 / infer_time_per_row
+infer_time_per_row_ratio = infer_time_per_row / infer_limit
+is_constraint_satisfied = infer_time_per_row_ratio <= 1
+
+print(f'Model is able to predict {round(rows_per_second, 1)} rows per second. (User-specified Throughput = {1 / infer_limit})')
+print(f'Model uses {round(infer_time_per_row_ratio * 100, 1)}% of infer_limit time per row.')
+print(f'Model satisfies inference constraint: {is_constraint_satisfied}')
+```
+
 ### Using smaller ensemble or faster model for prediction
 
 Without having to retrain any models, one can construct alternative ensembles that aggregate individual models' predictions with different weighting schemes. These ensembles become smaller (and hence faster for prediction) if they assign nonzero weight to less models. You can produce a wide variety of ensembles with different accuracy-speed tradeoffs like this:
@@ -279,7 +363,7 @@ predictor.delete_models(models_to_delete=additional_ensembles, dry_run=False)  #
 
 ### Collapsing bagged ensembles via refit_full
 
-For an ensemble predictor trained with bagging (as done above), recall there ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements (but may also reduce accuracy). Below we refit such a model for each original model but you can alternatively do this for just a particular model by specifying the `model` argument of `refit_full()`.
+For an ensemble predictor trained with bagging (as done above), recall there are ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements (but may also reduce accuracy). Below we refit such a model for each original model but you can alternatively do this for just a particular model by specifying the `model` argument of `refit_full()`.
 
 ```{.python .input}
 refit_model_map = predictor.refit_full()
@@ -308,7 +392,7 @@ Instead of trying to speed up a cumbersome trained model at prediction time, if 
 One option is to specify more lightweight `presets`:
 
 ```{.python .input}
-presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']
+presets = ['good_quality', 'optimize_for_deployment']
 predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, presets=presets, time_limit=30)
 ```
 
@@ -323,7 +407,7 @@ Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to 
 Finally, you may also exclude specific unwieldy models from being trained at all. Below we exclude models that tend to be slower (K Nearest Neighbors, Neural Network, models with custom larger-than-default  hyperparameters):
 
 ```{.python .input}
-excluded_model_types = ['KNN', 'NN', 'custom']
+excluded_model_types = ['KNN', 'NN_TORCH', 'custom']
 predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 

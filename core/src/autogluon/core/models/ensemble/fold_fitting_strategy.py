@@ -293,7 +293,7 @@ def _ray_fit(model_base, bagged_ensemble_model_path,
                                               time_train_end_fold, num_cpus, save_bag_folds)
     fold_model.save()
     return fold_model.name, pred_proba, time_start_fold, \
-        time_train_end_fold, fold_model.predict_time
+        time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
 
 
 def _ray_predict_oof(fold_model, X_val_fold, y_val_fold, time_train_end_fold,
@@ -354,6 +354,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.time_end_fit = None
         self.fit_time = 0
         self.predict_time = 0
+        self.predict_1_time = None
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
         # initialize the model base to get necessary info for estimating memory usage
@@ -419,11 +420,16 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             finished = finished[0]
             try:
                 fold_model, pred_proba, time_start_fit, \
-                    time_end_fit, predict_time = self.ray.get(finished)
+                    time_end_fit, predict_time, predict_1_time = self.ray.get(finished)
                 fold_ctx = job_fold_map.get(finished, None)
                 assert fold_ctx is not None
-                self._update_bagged_ensemble(fold_model, pred_proba, time_start_fit,
-                                             time_end_fit, predict_time, fold_ctx)
+                self._update_bagged_ensemble(fold_model=fold_model,
+                                             pred_proba=pred_proba,
+                                             time_start_fit=time_start_fit,
+                                             time_end_fit=time_end_fit,
+                                             predict_time=predict_time,
+                                             predict_1_time=predict_1_time,
+                                             fold_ctx=fold_ctx)
             except TimeLimitExceeded:
                 # Terminate all ray tasks because a fold failed
                 self.ray.shutdown()
@@ -450,7 +456,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.fit_time = 0
         if self.time_start_fit and self.time_end_fit:
             self.fit_time = self.time_end_fit - self.time_start_fit
-        self.bagged_ensemble_model._add_parallel_child_times(self.fit_time, self.predict_time)
+        self.bagged_ensemble_model._add_parallel_child_times(fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time)
 
     def _fit(self, model_base_ref, X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, time_limit_fold, fold_ctx, resources, kwargs):
         fold, folds_finished, folds_left, \
@@ -475,7 +481,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
                     save_bag_folds, kwargs_fold)
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit,
-                                time_end_fit, predict_time, fold_ctx):
+                                time_end_fit, predict_time, predict_1_time, fold_ctx):
         _, val_index = fold_ctx['fold']
         self.models.append(fold_model)
         self.oof_pred_proba[val_index] += pred_proba
@@ -489,6 +495,10 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         else:
             self.time_end_fit = time_end_fit
         self.predict_time += predict_time
+        if predict_1_time is not None:
+            if self.predict_1_time is None:
+                self.predict_1_time = 0
+            self.predict_1_time += predict_1_time
 
     def _get_fold_time_limit(self, num_jobs):
         _, batches, _ = self._get_resource_suggestions(num_jobs)

@@ -30,7 +30,7 @@ install_requires = [
 
 extras_require = {
     'lightgbm': [
-        'lightgbm>=3.3,<4.0',
+        'lightgbm>=3.3,<3.4',
     ],
     'catboost': [
         'catboost>=1.0,<1.1',
@@ -39,11 +39,11 @@ extras_require = {
         'xgboost>=1.4,<1.5',
     ],
     'fastai': [
-        'torch>=1.0,<2.0',
-        'fastai>=2.3.1,<3.0',
+        'torch>=1.0,<1.11',
+        'fastai>=2.3.1,<2.6',
     ],
     'skex': [
-        'scikit-learn-intelex<=2021.3',
+        'scikit-learn-intelex>=2021.5,<2021.6',
     ],
     'imodels': [
         'imodels>=1.2.0',

@@ -22,7 +22,7 @@ from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df
+from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.tabular.models import _IModelsModel
@@ -33,7 +33,7 @@ from autogluon.core.utils.utils import default_holdout_frac
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
-from ..configs.presets_configs import tabular_presets_dict
+from ..configs.presets_configs import tabular_presets_dict, tabular_presets_alias
 from ..learner import AbstractLearner, DefaultLearner
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -80,6 +80,7 @@ class TabularPredictor:
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
+        For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
     path : str, default = None
         Path to directory where models and intermediate outputs should be saved.
         If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
@@ -281,7 +282,7 @@ class TabularPredictor:
     def path(self):
         return self._learner.path
 
-    @apply_presets(tabular_presets_dict)
+    @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit(self,
             train_data,
             tuning_data=None,
@@ -289,6 +290,8 @@ class TabularPredictor:
             presets=None,
             hyperparameters=None,
             feature_metadata='infer',
+            infer_limit=None,
+            infer_limit_batch_size=None,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -308,17 +311,18 @@ class TabularPredictor:
         time_limit : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bag_sets` is specified.
-        presets : list or str or dict, default = ['medium_quality_faster_train']
+        presets : list or str or dict, default = ['medium_quality']
             List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
             As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
-            To get good quality with minimal disk usage, set `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
+            To get good quality with minimal disk usage, set `presets=['good_quality', 'optimize_for_deployment']`
             Any user-specified arguments in `fit()` will override the values used by presets.
             If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
@@ -326,17 +330,17 @@ class TabularPredictor:
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False}
+                high_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False, 'hyperparameters': 'light'}
-                    Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
+                good_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False, 'hyperparameters': 'light'}
+                    Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
                     Recommended for applications that require fast inference speed.
 
-                medium_quality_faster_train={'auto_stack': False}
-                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
-                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better predictive accuracy and faster inference time.
+                medium_quality={'auto_stack': False}
+                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
+                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy and faster inference time.
 
                 optimize_for_deployment={'keep_only_best': True, 'save_space': True}
                     Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
@@ -345,7 +349,7 @@ class TabularPredictor:
                     This will make certain functionality less informative, such as `predictor.leaderboard()` and `predictor.fit_summary()`.
                         Because unused models will be deleted under this preset, methods like `predictor.leaderboard()` and `predictor.fit_summary()` will no longer show the full set of models that were trained during `fit()`.
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
-                    This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
+                    This preset pairs well with the other presets such as `good_quality` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
 
                 interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'}
@@ -377,33 +381,35 @@ class TabularPredictor:
                     'XT' (extremely randomized trees)
                     'KNN' (k-nearest neighbors)
                     'LR' (linear regression)
-                    'NN' (neural network with MXNet backend)
+                    'NN_MXNET' (neural network implemented in MXNet)
+                    'NN_TORCH' (neural network implemented in Pytorch)
                     'FASTAI' (neural network with FastAI backend)
                 Experimental model options include:
                     'FASTTEXT' (FastText)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
                     'TRANSF' (Tabular Transformer, GPU is recommended)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
-                For example, set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
+                For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
-                Caution: Any provided search spaces will be overridden by fixed defaults if `hyperparameter_tune = False`.
+                Caution: Any provided search spaces will error if `hyperparameter_tune = False`.
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
-            Advanced functionality: Custom models
-                `hyperparameters` can also take special string values instead of a dictionary of model parameters which maps to a pre-configured model configuration (currently supported options = ['GBMLarge']).
-                    These additional models will be trained using custom pre-specified hyperparameter settings that are known to work well.
+                Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:
+                    'GBM': ['GBMLarge']
+            Advanced functionality: Bring your own model / Custom model support
+                AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-model.html
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
-                    Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN': {}}}`
+                    Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN_TORCH': {}}}`
                     This will result in a stack ensemble that has one custom random forest in level 1 followed by two CatBoost models with custom hyperparameters and a default neural network in level 2, for a total of 4 models.
                 If a level is not specified in `hyperparameters`, it will default to using the highest specified level to train models. This can also be explicitly controlled by adding a 'default' key.
 
             Default:
                 hyperparameters = {
-                    'NN': {},
+                    'NN_TORCH': {},
                     'GBM': [
                         {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
                         {},
@@ -415,12 +421,12 @@ class TabularPredictor:
                     'RF': [
                         {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
                         {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'XT': [
                         {'criterion': 'gini', 'ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
                         {'criterion': 'entropy', 'ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'KNN': [
                         {'weights': 'uniform', 'ag_args': {'name_suffix': 'Unif'}},
@@ -504,6 +510,21 @@ class TabularPredictor:
             If 'infer', will automatically construct a FeatureMetadata object based on the properties of `train_data`.
             In this case, `train_data` is input into :meth:`autogluon.tabular.FeatureMetadata.from_df` to infer `feature_metadata`.
             If 'infer' incorrectly assumes the dtypes of features, consider explicitly specifying `feature_metadata`.
+        infer_limit : float, default = None
+            The inference time limit in seconds per row to adhere to during fit.
+            If infer_limit=0.05 and infer_limit_batch_size=1000, AutoGluon will avoid training models that take longer than 50 ms/row to predict when given a batch of 1000 rows to predict (must predict 1000 rows in no more than 50 seconds).
+            If bagging is enabled, the inference time limit will be respected based on estimated inference speed of `_FULL` models after refit_full is called, NOT on the inference speed of the bagged ensembles.
+            The inference times calculated for models are assuming `predictor.persist_models('all')` is called after fit.
+            If None, no limit is enforced.
+            If it is impossible to satisfy the constraint, an exception will be raised.
+        infer_limit_batch_size : int, default = None
+            The batch size to use when predicting in bulk to estimate per-row inference time.
+            Must be an integer greater than 0.
+            If None and `infer_limit` is specified, will default to 10000.
+            It is recommended to set to 10000 unless you must satisfy an online-inference scenario.
+            Small values, especially `infer_limit_batch_size=1`, will result in much larger per-row inference times and should be avoided if possible.
+            Refer to `infer_limit` for more details on how this is used.
+            If specified when `infer_limit=None`, the inference time will be logged during training but will not be limited.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -541,11 +562,9 @@ class TabularPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                 Valid preset values:
-                    'auto': Uses the 'bayesopt' preset.
+                    'auto': Uses the 'random' preset.
                     'random': Performs HPO via random search using local scheduler.
-                    'bayesopt': Performs HPO via bayesian optimization using local scheduler.
-                For valid dictionary keys, refer to :class:`autogluon.core.scheduler.FIFOScheduler` documentation.
-                    The 'searcher' key is required when providing a dict.
+                The 'searcher' key is required when providing a dict.
             feature_prune_kwargs: dict, default = None
                 Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
                 This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
@@ -658,7 +677,9 @@ class TabularPredictor:
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-            calibrate: bool, default = False
+            calibrate: bool or str, default = 'auto'
+                Note: It is recommended to use ['auto', False] as the values and avoid True.
+                If 'auto' will automatically set to True if the problem_type and eval_metric are suitable for calibration.
                 If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
@@ -734,6 +755,7 @@ class TabularPredictor:
         train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data,
                                                                           tuning_data=tuning_data,
                                                                           unlabeled_data=unlabeled_data)
+        infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
         if hyperparameters is None:
             hyperparameters = 'default'
@@ -800,7 +822,8 @@ class TabularPredictor:
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
                           num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
+                          time_limit=time_limit, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
                           verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
 
@@ -809,13 +832,14 @@ class TabularPredictor:
             refit_full=kwargs['refit_full'],
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
-            calibrate=kwargs['calibrate']
+            calibrate=kwargs['calibrate'],
+            infer_limit=infer_limit,
         )
         self.save()
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=False):
+                  calibrate=False, infer_limit=None):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -828,8 +852,10 @@ class TabularPredictor:
                 refit_full = 'all'
 
         if refit_full is not False:
-            trainer_model_best = self._trainer.get_model_best()
-            self.refit_full(model=refit_full)
+            if infer_limit is not None:
+                infer_limit = infer_limit - self._learner.preprocess_1_time
+            trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
+            self.refit_full(model=refit_full, set_best_to_refit_full=False)
             if set_best_to_refit_full:
                 if trainer_model_best in self._trainer.model_full_dict.keys():
                     self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
@@ -840,14 +866,24 @@ class TabularPredictor:
                     logger.warning(
                         f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
-        if keep_only_best:
-            self.delete_models(models_to_keep='best', dry_run=False)
+        if calibrate == 'auto':
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
+                calibrate = True
+            elif self.problem_type == QUANTILE:
+                calibrate = True
+            else:
+                calibrate = False
 
         if calibrate:
-            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION + [QUANTILE]:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                self._calibrate_model()
+            elif self.problem_type == QUANTILE:
                 self._calibrate_model()
             else:
-                logger.log(30, 'WARNING: calibrate is only applicable to classification or quantile regression problems')
+                logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
+
+        if keep_only_best:
+            self.delete_models(models_to_keep='best', dry_run=False)
 
         if save_space:
             self.save_space()
@@ -874,15 +910,28 @@ class TabularPredictor:
             The initial value for temperature scalar term
         """
         # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
-        if model_name is None:
-            model_name = self._trainer.get_model_best()
+        try:
+            # FIXME: Avoid depending on torch for temp scaling
+            try_import_torch
+        except ImportError:
+            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
+            return
 
+        if model_name is None:
+            model_name = self.get_model_best()
+
+        model_full_dict = self._trainer.model_full_dict
+        model_name_og = model_name
+        for m, m_full in model_full_dict.items():
+            if m_full == model_name:
+                model_name_og = m
+                break
         if self._trainer.bagged_mode:
-            y_val_probs = self.get_oof_pred_proba(model_name).to_numpy()
+            y_val_probs = self.get_oof_pred_proba(model_name_og, transformed=True, internal_oof=True).to_numpy()
             y_val = self._trainer.load_y().to_numpy()
         else:
             X_val = self._trainer.load_X_val()
-            y_val_probs = self._trainer.predict_proba(X_val, model_name)
+            y_val_probs = self._trainer.predict_proba(X_val, model_name_og)
             y_val = self._trainer.load_y_val().to_numpy()
 
             if self.problem_type == BINARY:
@@ -894,14 +943,20 @@ class TabularPredictor:
             conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
                                                     quantile_levels=self.quantile_levels)
             model.conformalize = conformalize
+            model.save()
         else:
             logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
             temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
                                                    init_val=init_val, max_iter=max_iter, lr=lr)
-            logger.log(15, f'Temperature term found is: {temp_scalar}')
-            model.temperature_scalar = temp_scalar
-        model.save()
+            if temp_scalar is None:
+                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
+                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
+            else:
+                logger.log(15, f'Temperature term found is: {temp_scalar}')
+                model.temperature_scalar = temp_scalar
+                model.save()
 
+    # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
@@ -1235,6 +1290,8 @@ class TabularPredictor:
         if len(pseudo_data) < 1:
             raise Exception('No pseudo data given')
 
+        self._validate_unique_indices(pseudo_data, 'pseudo_data')
+
         if not self._learner.is_fit:
             if 'train_data' not in kwargs.keys():
                 Exception('Autogluon is required to be fit or given \'train_data\' in order to run \'fit_pseudolabel\'.'
@@ -1352,6 +1409,7 @@ class TabularPredictor:
         data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
             This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
+            If `self.sample_weight` is set and `self.weight_evaluation==True`, then a column with the sample weight name is checked and used for weighted metric evaluation if it exists.
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
@@ -1371,10 +1429,14 @@ class TabularPredictor:
         self._assert_is_fit('evaluate')
         data = self.__get_dataset(data)
         y_pred_proba = self.predict_proba(data=data, model=model)
-        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, silent=silent,
+        if self.sample_weight is not None and self.weight_evaluation and self.sample_weight in data:
+            sample_weight = data[self.sample_weight]
+        else:
+            sample_weight = None
+        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred_proba, sample_weight=sample_weight, silent=silent,
                                          auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
         Evaluation is based on the `eval_metric` previously specified in init, or default metrics if none was specified.
@@ -1387,6 +1449,8 @@ class TabularPredictor:
             The ordered collection of prediction probabilities or predictions.
             Obtainable via the output of `predictor.predict_proba`.
             Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
+        sample_weight : :class:`pd.Series`, default = None
+            Sample weight for each row of data. If None, uniform sample weights are used.
         silent : bool, default = False
             If False, performance results are printed.
         auxiliary_metrics: bool, default = True
@@ -1400,7 +1464,7 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
-        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, silent=silent,
+        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def leaderboard(self, data=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, silent=False):
@@ -1771,7 +1835,7 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000,
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=5000,
                            time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
                            silent=False):
         """
@@ -1783,7 +1847,7 @@ class TabularPredictor:
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, data, features)` will take, it is roughly the time taken by `predict_proba(data, model)` multiplied by the number of features.
 
-        Note: For highly accurate importance and p_value estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
+        Note: For highly accurate importance and p_value estimates, it is recommended to set `subsample_size` to at least 5000 if possible and `num_shuffle_sets` to at least 10.
 
         Parameters
         ----------
@@ -1824,7 +1888,7 @@ class TabularPredictor:
                 'transformed_model':
                     Compute importances of the post-model-transformation features. These features are the internal features used by the requested model. They may differ greatly from the original features.
                     If the model is a stack ensemble, this will include stack ensemble features such as the prediction probability features of the stack ensemble's base (ancestor) models.
-        subsample_size : int, default = 1000
+        subsample_size : int, default = 5000
             The number of rows to sample from `data` when computing feature importance.
             If `subsample_size=None` or `data` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
@@ -1837,7 +1901,7 @@ class TabularPredictor:
             The number of different permutation shuffles of the data that are evaluated.
             Larger values will increase the quality of the importance evaluation.
             It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
-            Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
+            Defaults to 5 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
         include_confidence_band: bool, default = True
             If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of each feature.
@@ -1869,11 +1933,10 @@ class TabularPredictor:
             raise AssertionError(
                 'No data was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPredictor` init `learner_kwargs` argument call to enable this functionality when data is not specified.')
         if data is not None:
-            # Avoid crash when indices are duplicated
-            data = data.reset_index(drop=True)
+            self._validate_unique_indices(data, 'data')
 
         if num_shuffle_sets is None:
-            num_shuffle_sets = 10 if time_limit else 3
+            num_shuffle_sets = 10 if time_limit else 5
 
         fi_df = self._learner.get_feature_importance(model=model, X=data, features=features,
                                                      feature_stage=feature_stage,
@@ -1957,7 +2020,7 @@ class TabularPredictor:
         self._assert_is_fit('unpersist_models')
         return self._learner.load_trainer().unpersist_models(model_names=models)
 
-    def refit_full(self, model='all'):
+    def refit_full(self, model='all', set_best_to_refit_full=True):
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -1987,26 +2050,73 @@ class TabularPredictor:
                 If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        set_best_to_refit_full : bool, default = True
+            If True, sets best model to the refit_full version of the prior best model.
+            This means the model used when `predictor.predict(data)` is called will be the refit_full version instead of the original version of the model.
+            Ignored if `model` is not the best model.
 
         Returns
         -------
         Dictionary of original model names -> refit_full model names.
         """
         self._assert_is_fit('refit_full')
+        model_best = self._get_model_best(can_infer=None)
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
+
+        if set_best_to_refit_full:
+            if model_best in self._trainer.model_full_dict.keys():
+                self._trainer.model_best = self._trainer.model_full_dict[model_best]
+                # Note: model_best will be overwritten if additional training is done with new models,
+                # since model_best will have validation score of None and any new model will have a better validation score.
+                # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                self._trainer.save()
+                logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
+                               f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
+            else:
+                logger.warning(
+                    f'Best model ("{model_best}") is not present in refit_full dictionary. '
+                    f'Training may have failed on the refit model. AutoGluon will default to using "{model_best}" for predict() and predict_proba().')
+
         return refit_full_dict
 
     def get_model_best(self):
         """
-        Returns the string model name of the best model by validation score.
-        This is typically the same model used during inference when `predictor.predict` is called without specifying a model.
+        Returns the string model name of the best model by validation score that can infer.
+        This is the same model used during inference when `predictor.predict` is called without specifying a model.
+        This can be updated to be a model other than the model with best validation score by methods such as refit_full and set_model_best.
 
         Returns
         -------
         String model name of the best model
         """
+        return self._get_model_best(can_infer=True)
+
+    def _get_model_best(self, can_infer=None):
         self._assert_is_fit('get_model_best')
-        return self._trainer.get_model_best(can_infer=True)
+        # TODO: Set self._trainer.model_best to the best model at end of fit instead of best WeightedEnsemble.
+        if self._trainer.model_best is not None:
+            models = self._trainer.get_model_names(can_infer=can_infer)
+            if self._trainer.model_best in models:
+                return self._trainer.model_best
+        return self._trainer.get_model_best(can_infer=can_infer)
+
+    def set_model_best(self, model: str):
+        """
+        Sets the model to be used by default when calling `predictor.predict(data)`.
+        By default, this is the model with the best validation score, but this is not always the case.
+        If manually set, this can be overwritten internally if further training occurs, such as through fit_extra, refit_full, or distill.
+
+        Parameters
+        ----------
+        model : str
+            Name of model to set to best. If model does not exist or cannot infer, raises an AssertionError.
+        """
+        self._assert_is_fit('set_model_best')
+        models = self._trainer.get_model_names(can_infer=True)
+        if model in models:
+            self._trainer.model_best = model
+        else:
+            raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
 
     def get_model_full_dict(self):
         """
@@ -2394,9 +2504,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('delete_models')
         if models_to_keep == 'best':
-            models_to_keep = self._trainer.model_best
-            if models_to_keep is None:
-                models_to_keep = self._trainer.get_model_best()
+            models_to_keep = self.get_model_best()
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete,
                                     allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
                                     dry_run=dry_run)
@@ -2442,7 +2550,7 @@ class TabularPredictor:
             Specifies which models to use as students and what hyperparameter-values to use for them.
             Same as `hyperparameters` argument of `fit()`.
             If = None, then student models will use the same hyperparameters from `fit()` used to produce this Predictor.
-            Note: distillation is currently only supported for ['GBM','NN','RF','CAT'] student models, other models and their hyperparameters are ignored here.
+            Note: distillation is currently only supported for ['GBM','NN_MXNET','NN_TORCH','RF','CAT'] student models, other models and their hyperparameters are ignored here.
         holdout_frac : float
             Same as `holdout_frac` argument of :meth:`TabularPredictor.fit`.
         teacher_preds : str, default = 'soft'
@@ -2598,8 +2706,6 @@ class TabularPredictor:
                                                             time_out=time_limit,
                                                             nthreads_per_trial='auto', ngpus_per_trial='auto')
 
-        assert scheduler_params[
-                   'searcher'] != 'bayesopt_hyperband', "searcher == 'bayesopt_hyperband' not yet supported"
         if scheduler_params.get('dist_ip_addrs', None):
             logger.warning(
                 'Warning: dist_ip_addrs does not currently work for Tabular. Distributed instances will not be utilized.')
@@ -2838,7 +2944,7 @@ class TabularPredictor:
             # quantile levels
             quantile_levels=None,
 
-            calibrate=False,
+            calibrate='auto',
 
             # pseudo label
             pseudo_data=None,
@@ -2875,6 +2981,10 @@ class TabularPredictor:
         if set_best_to_refit_full and not refit_full:
             raise ValueError(
                 '`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
+        valid_calibrate_options = [True, False, 'auto']
+        calibrate = kwargs_sanitized['calibrate']
+        if calibrate not in valid_calibrate_options:
+            raise ValueError(f"`calibrate` must be a value in {valid_calibrate_options}, but is: {calibrate}")
 
         return kwargs_sanitized
 
@@ -2956,6 +3066,23 @@ class TabularPredictor:
             raise AssertionError(f'{name} contains {duplicate_count} duplicated indices. '
                                  'Please ensure DataFrame indices are unique.\n'
                                  f'\tYou can identify the indices which are duplicated via `{name}.index.duplicated(keep=False)`')
+
+    @staticmethod
+    def _validate_infer_limit(infer_limit: float, infer_limit_batch_size: int) -> (float, int):
+        if infer_limit_batch_size is not None:
+            if not isinstance(infer_limit_batch_size, int):
+                raise ValueError(f'infer_limit_batch_size must be type int, but was instead type {type(infer_limit_batch_size)}')
+            elif infer_limit_batch_size < 1:
+                raise AssertionError(f'infer_limit_batch_size must be >=1, value: {infer_limit_batch_size}')
+        if infer_limit is not None:
+            if not isinstance(infer_limit, (int, float)):
+                raise ValueError(f'infer_limit must be type int or float, but was instead type {type(infer_limit)}')
+            if infer_limit <= 0:
+                raise AssertionError(f'infer_limit must be greater than zero! (infer_limit={infer_limit})')
+        if infer_limit is not None and infer_limit_batch_size is None:
+            infer_limit_batch_size = 10000
+            logger.log(20, f'infer_limit specified, but infer_limit_batch_size was not specified. Setting infer_limit_batch_size={infer_limit_batch_size}')
+        return infer_limit, infer_limit_batch_size
 
     def _set_feature_generator(self, feature_generator='auto', feature_metadata=None, init_kwargs=None):
         if self._learner.feature_generator is not None:

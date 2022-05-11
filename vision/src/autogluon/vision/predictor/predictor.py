@@ -22,6 +22,7 @@ from autogluon.core.utils.utils import generate_train_test_split
 
 from ..configs.presets_configs import unpack, _check_gpu_memory_presets
 from ..utils import sanitize_batch_size
+from ..utils.pickle import CPU_Unpickler
 
 __all__ = ['ImagePredictor']
 
@@ -221,8 +222,7 @@ class ImagePredictor(object):
                     when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
                 searcher : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
-                    Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
-                    ‘grid’ (grid search).
+                    Options include: ‘random’ (random search), ‘grid’ (grid search).
                 max_reward : float, default = None
                     The reward threashold for stopping criteria. If `max_reward` is reached during HPO, the scheduler
                     will terminate earlier to reduce time cost.
@@ -502,8 +502,8 @@ class ImagePredictor(object):
         hpo_tune_args = kwargs.get('hyperparameter_tune_kwargs', {})
         hpo_tune_args['num_trials'] = hpo_tune_args.get('num_trials', 1)
         hpo_tune_args['searcher'] = hpo_tune_args.get('searcher', 'random')
-        if not hpo_tune_args['searcher'] in ('random', 'bayesopt', 'grid'):
-            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('random', 'bayesopt', 'grid')")
+        if not hpo_tune_args['searcher'] in ('random', 'grid'):
+            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('random', 'grid')")
         hpo_tune_args['scheduler'] = hpo_tune_args.get('scheduler', 'local')
         if not hpo_tune_args['scheduler'] in ('fifo', 'local'):
             raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('fifo', 'local')")
@@ -698,7 +698,11 @@ class ImagePredictor(object):
         if os.path.isdir(path):
             path = os.path.join(path, 'image_predictor.ag')
         with open(path, 'rb') as fid:
-            obj = pickle.load(fid)
+            gpu_count = get_gpu_count_all()
+            if gpu_count > 0:
+                obj = pickle.load(fid)
+            else:
+                obj = CPU_Unpickler(fid).load()
         obj._verbosity = verbosity
         return obj
 

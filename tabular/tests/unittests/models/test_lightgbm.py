@@ -14,7 +14,7 @@ def test_lightgbm_multiclass(fit_helper):
     fit_args = dict(
         hyperparameters={LGBModel: {}},
     )
-    dataset_name = 'covertype'
+    dataset_name = 'covertype_small'
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
@@ -34,7 +34,7 @@ def test_lightgbm_binary_model(model_fit_helper):
 
 def test_lightgbm_multiclass_model(model_fit_helper):
     fit_args = dict()
-    dataset_name = 'covertype'
+    dataset_name = 'covertype_small'
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 

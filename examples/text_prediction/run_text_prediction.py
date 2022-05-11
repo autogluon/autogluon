@@ -5,9 +5,10 @@ import numpy as np
 import random
 import pandas as pd
 import copy
-from autogluon.text import TextPredictor, ag_text_presets
+from autogluon.text import TextPredictor
 from autogluon.tabular import TabularPredictor
 from autogluon.core.utils.loaders import load_pd
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 
 TASKS = \
@@ -59,20 +60,16 @@ def get_parser():
                         default='single',
                         help='Whether to use a single model or a stack ensemble. '
                              'If it is "single", If it is turned on, we will use 5-fold, 1-layer for stacking.')
+    parser.add_argument('--preset', type=str,
+                        help='Pre-registered configurations',
+                        choices=['medium_quality_faster_train',
+                                 'high_quality',
+                                 'best_quality'],
+                        default=None)
     return parser
 
 
-def set_seed(seed):
-    import mxnet as mx
-    import torch as th
-    th.manual_seed(seed)
-    mx.random.seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
-
 def train(args):
-    set_seed(args.seed)
     if args.task is not None:
         feature_columns, label_column, eval_metric, all_metrics = TASKS[args.task]
     else:
@@ -95,13 +92,18 @@ def train(args):
     else:
         real_train_df = train_df
         real_dev_df = dev_df
+
+    hyperparameters = get_hyperparameter_config('multimodal')
+    if args.preset is not None and args.mode in ['stacking', 'weighted']:
+        hyperparameters['AG_TEXT_NN']['presets'] = args.preset
+
     if args.mode == 'stacking':
         predictor = TabularPredictor(label=label_column,
                                      eval_metric=eval_metric,
                                      path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
-                      hyperparameters='multimodal',
+                      hyperparameters=hyperparameters,
                       num_bag_folds=5,
                       num_stack_levels=1)
     elif args.mode == 'weighted':
@@ -110,7 +112,7 @@ def train(args):
                                      path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
-                      hyperparameters='multimodal')
+                      hyperparameters=hyperparameters)
     elif args.mode == 'single':
         # When no embedding is used,
         # we will just use TextPredictor that will train a single model internally.
@@ -119,6 +121,7 @@ def train(args):
                                   path=args.exp_dir)
         predictor.fit(train_data=real_train_df,
                       tuning_data=real_dev_df,
+                      presets=args.preset,
                       seed=args.seed)
     else:
         raise NotImplementedError

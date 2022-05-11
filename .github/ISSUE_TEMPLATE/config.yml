@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions
+    url: https://github.com/awslabs/autogluon/discussions/new
+    about: Ask questions and discuss with other AutoGluon community members
+  - name: Blank issue
+    url: https://github.com/awslabs/autogluon/issues/new
+    about: Open a blank issue if none of the other templates apply
