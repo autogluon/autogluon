@@ -62,7 +62,7 @@ ALL_DATASETS = {
     ]
 )
 
-def test_data_process_image():
+def test_data_process_image(hyperparameters):
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
 
