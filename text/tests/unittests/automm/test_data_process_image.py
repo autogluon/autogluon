@@ -38,7 +38,7 @@ ALL_DATASETS = {
         },
 
         {
-            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","colorjitter"],
+            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","color_jitter"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
 
