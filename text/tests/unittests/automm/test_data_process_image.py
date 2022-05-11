@@ -65,14 +65,4 @@ def test_data_process_image(augmentations):
     transimage = data_processors.train_processor(image)
 
     assert len(data_processors.train_processor.transforms) == len(augmentations["model.timm_image.train_transform_types"])+2
-
-
-
-
-
-
-
-
-
-
-
+    
