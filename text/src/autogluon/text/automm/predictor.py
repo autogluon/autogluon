@@ -860,6 +860,9 @@ class AutoMMPredictor:
             # and use it as the main ingredients
             ingredients = [last_ckpt_path]
             top_k_model_paths = []
+            # no checkpoints available, do nothing
+            if not os.path.isfile(last_ckpt_path):
+                return
 
         # Average all the ingredients
         avg_state_dict = average_checkpoints(
