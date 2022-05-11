@@ -935,10 +935,11 @@ class AutoMMPredictor:
                               'Currently, AutoGluon will downgrade the precision to 32.', UserWarning)
                 precision = 32
 
-        if hasattr(self._config.env, "eval_batch_size_ratio"):
-            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
-        else:
+        if self._config.env.per_gpu_batch_size_evaluation:
             batch_size = self._config.env.per_gpu_batch_size_evaluation
+        else:
+            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
+            
         if num_gpus > 1:
             strategy = "dp"
             # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
