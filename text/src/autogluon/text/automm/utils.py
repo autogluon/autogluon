@@ -890,19 +890,22 @@ def average_checkpoints(
     -------
     The averaged state_dict.
     """
-    avg_state_dict = {}
-    for per_path in checkpoint_paths:
-        state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
-        for key in state_dict:
-            if key in avg_state_dict:
-                avg_state_dict[key] += state_dict[key]
-            else:
-                avg_state_dict[key] = state_dict[key]
-        del state_dict
+    if len(checkpoint_paths) > 1:
+        avg_state_dict = {}
+        for per_path in checkpoint_paths:
+            state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+            for key in state_dict:
+                if key in avg_state_dict:
+                    avg_state_dict[key] += state_dict[key]
+                else:
+                    avg_state_dict[key] = state_dict[key]
+            del state_dict
 
-    num = torch.tensor(len(checkpoint_paths))
-    for key in avg_state_dict:
-        avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
+        num = torch.tensor(len(checkpoint_paths))
+        for key in avg_state_dict:
+            avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
+    else:
+        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]
 
     return avg_state_dict
 
