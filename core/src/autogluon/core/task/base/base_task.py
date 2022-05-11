@@ -19,25 +19,25 @@ schedulers = {
 logger = logging.getLogger(__name__)
 
 
-def create_scheduler(train_fn, search_space, scheduler, scheduler_options):
+def create_scheduler(train_fn, search_space, scheduler, scheduler_options, train_fn_kwargs=None):
     if isinstance(scheduler, str):
         scheduler_cls = schedulers[scheduler.lower()]
     else:
         assert callable(scheduler)
         scheduler_cls = scheduler
         scheduler_options = copy.copy(scheduler_options)
-    return scheduler_cls(train_fn, search_space=search_space, **scheduler_options)
+    return scheduler_cls(train_fn, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_options)
 
 
 # FIXME: REMOVE THIS, first GluonCV needs to stop depending on AG, as it imports this class
 class BaseTask(object):
     """BaseTask for AutoGluon applications"""
     @classmethod
-    def run_fit(cls, train_fn, search_space, search_strategy, scheduler_options,
+    def run_fit(cls, train_fn, search_space, search_strategy, scheduler_options, train_fn_kwargs=None,
                 plot_results=False):
         start_time = time.time()
         # create scheduler and schedule tasks
-        scheduler = create_scheduler(train_fn, search_space, search_strategy, scheduler_options)
+        scheduler = create_scheduler(train_fn, search_space, search_strategy, scheduler_options, train_fn_kwargs=train_fn_kwargs)
         scheduler.run()
         scheduler.join_jobs()
         # gather the best configuration
@@ -47,7 +47,7 @@ class BaseTask(object):
         best_config_run['final_fit'] = True
         if hasattr(best_config_run, 'epochs') and hasattr(best_config_run, 'final_fit_epochs'):
             best_config_run['epochs'] = best_config_run['final_fit_epochs']
-        scheduler_final = create_scheduler(train_fn, search_space, search_strategy, scheduler_options)
+        scheduler_final = create_scheduler(train_fn, search_space, search_strategy, scheduler_options, train_fn_kwargs=train_fn_kwargs)
         results = scheduler_final.run_with_config(best_config_run)
         total_time = time.time() - start_time
         if plot_results or in_ipynb():
@@ -69,13 +69,6 @@ class BaseTask(object):
     @abstractmethod
     def fit(cls, *args, **kwargs):
         pass
-
-
-# These search_strategies use HyperbandScheduler, along with certain
-# searchers.
-searcher_for_hyperband_strategy = {
-    'hyperband': 'random',
-    'bayesopt_hyperband': 'bayesopt'}
 
 
 def compile_scheduler_options_v2(
@@ -160,11 +153,6 @@ def compile_scheduler_options_v2(
         ngpus_per_trial=scheduler_params['resource']['num_gpus'],
     )  # TODO: use 'auto' downstream
 
-    searcher = searcher_for_hyperband_strategy.get(scheduler_params['searcher'])
-    if searcher is not None:
-        scheduler_params['searcher'] = searcher
-        if epochs is not None:
-            scheduler_params['max_t'] = epochs
     required_options = [
         'resource',
         'scheduler',

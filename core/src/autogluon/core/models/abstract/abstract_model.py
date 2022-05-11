@@ -7,7 +7,7 @@ import pickle
 import psutil
 import sys
 import time
-from typing import Union
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -18,17 +18,18 @@ from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 
-from ....core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_TAGS
-from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
 from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
+from ...utils.time import sample_df_for_time_func, time_func
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,7 @@ class AbstractModel:
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
@@ -177,6 +179,14 @@ class AbstractModel:
         """
         return self.is_fit()
 
+    def is_initialized(self) -> bool:
+        """
+        Returns True if the model is initialized.
+        This indicates whether the model has inferred various information such as problem_type and num_classes.
+        A model is automatically initialized when `.fit` or `.hyperparameter_tune` are called.
+        """
+        return self._is_initialized
+
     def can_infer(self) -> bool:
         """Returns True if the model is capable of inference on new data."""
         return self.is_valid()
@@ -223,11 +233,16 @@ class AbstractModel:
             # ignore_hpo=False,
             # max_early_stopping_rounds=None,
             # TODO: add option for only top-k ngrams
+            valid_raw_types=None,  # If a feature's raw type is not in this list, it is pruned.
+            valid_special_types=None,  # If a feature has a special type not in this list, it is pruned.
             ignored_type_group_special=None,  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
             ignored_type_group_raw=None,  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
-            get_features_kwargs=None,  # Kwargs for `autogluon.tabular.features.feature_metadata.FeatureMetadata.get_features()`. Overrides ignored_type_group_special and ignored_type_group_raw. | Currently undocumented in task.
+            # Kwargs for `autogluon.tabular.features.feature_metadata.FeatureMetadata.get_features()`.
+            #  Overrides valid_raw_types, valid_special_types, ignored_type_group_special and ignored_type_group_raw. | Currently undocumented in task.
+            get_features_kwargs=None,
             # TODO: v0.1 Document get_features_kwargs_extra in task.fit
             get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
+            predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
         )
         return default_auxiliary_params
 
@@ -247,7 +262,7 @@ class AbstractModel:
         """
         return {}
 
-    def _set_default_searchspace(self):
+    def _get_search_space(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
             default fixed value to default search space.
         """
@@ -255,8 +270,9 @@ class AbstractModel:
         # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
         for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
             def_search_space.pop(key, None)
-        if self.params is not None:
-            self.params.update(def_search_space)
+        params = self._get_params()
+        params.update(def_search_space)
+        return params
 
     # TODO: v0.1 Change this to update path_root only, path change to property
     def set_contexts(self, path_context):
@@ -333,9 +349,16 @@ class AbstractModel:
         if get_features_kwargs is not None:
             valid_features = feature_metadata.get_features(**get_features_kwargs)
         else:
+            valid_raw_types = self.params_aux.get('valid_raw_types', None)
+            valid_special_types = self.params_aux.get('valid_special_types', None)
             ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', None)
             ignored_type_group_special = self.params_aux.get('ignored_type_group_special', None)
-            valid_features = feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            valid_features = feature_metadata.get_features(
+                valid_raw_types=valid_raw_types,
+                valid_special_types=valid_special_types,
+                invalid_raw_types=ignored_type_group_raw,
+                invalid_special_types=ignored_type_group_special
+            )
         get_features_kwargs_extra = self.params_aux.get('get_features_kwargs_extra', None)
         if get_features_kwargs_extra is not None:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
@@ -472,6 +495,25 @@ class AbstractModel:
         )
         return fit_metadata
 
+    def get_fit_metadata(self) -> dict:
+        """
+        Returns dictionary of metadata related to model fit that isn't related to hyperparameters.
+        Must be called after model has been fit.
+        """
+        assert self._is_fit_metadata_registered, 'fit_metadata must be registered before calling get_fit_metadata()!'
+        fit_metadata = dict()
+        fit_metadata.update(self._fit_metadata)
+        fit_metadata['predict_1_batch_size'] = self._get_child_aux_val(key='predict_1_batch_size', default=None)
+        return fit_metadata
+
+    def _get_child_aux_val(self, key: str, default=None):
+        """
+        Get aux val of child model (or self if no child)
+        This is necessary to get a parameter value that is constant across all children without having to load the children after fitting.
+        """
+        assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
+        return self.params_aux.get(key, default)
+
     def fit(self, **kwargs):
         """
         Fit model to predict values in y based on X.
@@ -526,17 +568,34 @@ class AbstractModel:
         """
         kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
-        if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
-            self._register_fit_metadata(**kwargs)
-            self._validate_fit_memory_usage(**kwargs)
-            out = self._fit(**kwargs)
-            if out is None:
-                return self
-            else:
-                return out
-        else:
+        if 'time_limit' in kwargs and kwargs['time_limit'] is not None and kwargs['time_limit'] <= 0:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
             raise TimeLimitExceeded
+
+        self._register_fit_metadata(**kwargs)
+        self.validate_fit_resources(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
+        out = self._fit(**kwargs)
+        if out is None:
+            out = self
+        out = out._post_fit(**kwargs)
+        return out
+
+    def _post_fit(self, **kwargs):
+        """
+        Logic to perform at the end of `self.fit(...)`
+        This should be focused around computing and saving metadata that is only possible post-fit.
+        Parameters are identical to those passed to `self._fit(...)`.
+
+        Returns
+        -------
+        Returns self
+        """
+        predict_1_batch_size = self.params_aux.get('predict_1_batch_size', None)
+        if self.predict_1_time is None and predict_1_batch_size is not None and 'X' in kwargs and kwargs['X'] is not None:
+            X_1 = sample_df_for_time_func(df=kwargs['X'], sample_size=predict_1_batch_size)
+            self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
+        return self
 
     def get_features(self):
         assert self.is_fit(), "The model must be fit before calling the get_features method."
@@ -809,6 +868,18 @@ class AbstractModel:
         trained_params.update(self.params_trained)
         return trained_params
 
+    def convert_to_refit_full_via_copy(self):
+        """
+        Creates a new refit_full variant of the model, but instead of training it simply copies `self`.
+        This method is for compatibility with models that have not implemented refit_full support as a fallback.
+        """
+        __name = self.name
+        self.rename(self.name + REFIT_FULL_SUFFIX)
+        __path_refit = self.path
+        self.save(path=self.path, verbose=False)
+        self.rename(__name)
+        return self.load(path=__path_refit, verbose=False)
+
     def get_params(self) -> dict:
         """Get params of the model at the time of initialization"""
         name = self.name
@@ -854,6 +925,8 @@ class AbstractModel:
         if 'time_out' not in scheduler_options[1]:
             scheduler_options[1]['time_out'] = time_limit
         kwargs = self.initialize(time_limit=scheduler_options[1]['time_out'], **kwargs)
+        self._register_fit_metadata(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
         resource = copy.deepcopy(scheduler_options[1]['resource'])
         if 'num_cpus' in resource:
             if resource['num_cpus'] == 'auto':
@@ -874,8 +947,18 @@ class AbstractModel:
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
-        self._set_default_searchspace()
-        params_copy = self._get_params()
+        search_space = self._get_search_space()
+
+        if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
+            logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
+                           f"Will train one model based on the provided hyperparameters.")
+            return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
+        else:
+            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
+            for hyperparam in search_space:
+                if isinstance(search_space[hyperparam], Space):
+                    logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
+
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
         scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
@@ -889,19 +972,17 @@ class AbstractModel:
         val_path = directory + dataset_val_filename
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
-        if not any(isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy):
-            logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
-        else:
-            logger.log(15, "Hyperparameter search space for %s model: " % self.name)
-            for hyperparam in params_copy:
-                if isinstance(params_copy[hyperparam], Space):
-                    logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
+        model_cls = self.__class__
+        init_params = self.get_params()
 
         fit_kwargs = scheduler_params['resource'].copy()
+        fit_kwargs['feature_metadata'] = self.feature_metadata
+        fit_kwargs['num_classes'] = self.num_classes
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
         train_fn_kwargs = dict(
-            model=self,
+            model_cls=model_cls,
+            init_params=init_params,
             time_start=time_start,
             time_limit=scheduler_params['time_out'],
             fit_kwargs=fit_kwargs,
@@ -909,7 +990,7 @@ class AbstractModel:
             val_path=val_path,
         )
 
-        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=params_copy, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
+        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
 
         scheduler.run()
         scheduler.join_jobs()
@@ -933,7 +1014,7 @@ class AbstractModel:
         hpo_model_performances = {}
         for trial in sorted(hpo_results['config_history'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = f"T{trial}"  # unique identifier to files from this trial
+            file_id = f"T{trial+1}"  # unique identifier to files from this trial
             trial_model_name = self.name + os.path.sep + file_id
             trial_model_path = self.path_root + trial_model_name + os.path.sep
             trial_reward = scheduler.searcher.get_reward(hpo_results['config_history'][trial])
@@ -979,12 +1060,39 @@ class AbstractModel:
         -------
             int: number of bytes will be used during training
         """
-        assert self._is_initialized, "Only estimate memory usage after the model is initialized."
+        assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
+
+    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', **kwargs):
+        """
+        Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
+        Raises an AssertionError if not sufficient.
+        """
+        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, silent=True)
+        self._validate_fit_resources(**resources)
+
+    def _validate_fit_resources(self, **resources):
+        res_min = self.get_minimum_resources()
+        for resource_name in res_min:
+            if resource_name not in resources:
+                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.')
+            elif res_min[resource_name] > resources[resource_name]:
+                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        """
+        Returns a dictionary of minimum resource requirements to fit the model.
+        Subclass should consider overriding this method if it requires more resources to train.
+        If a resource is not part of the output dictionary, it is considered unnecessary.
+        Valid keys: 'num_cpus', 'num_gpus'.
+        """
+        return {
+            'num_cpus': 1,
+        }
 
     def _estimate_memory_usage(self, X, **kwargs) -> int:
         """
-        This method simply provides a default implementation. Each model should consider implement its own esitmate function.
+        This method simply provides a default implementation. Each model should consider implementing custom memory estimate logic.
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
 
@@ -1172,74 +1280,3 @@ class AbstractModel:
 
     def _more_tags(self):
         return _DEFAULT_TAGS
-
-
-class AbstractNeuralNetworkModel(AbstractModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._types_of_features = None
-
-    # TODO: v0.1 clean method
-    def _get_types_of_features(self, df, skew_threshold=None, embed_min_categories=None, use_ngram_features=None, needs_extra_types=True):
-        """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
-            Each value is a list of feature-names corresponding to columns in original dataframe.
-            TODO: ensure features with zero variance have already been removed before this function is called.
-        """
-        if self._types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for Model, but previously already did this.")
-
-        feature_types = self._feature_metadata.get_type_group_map_raw()
-        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
-        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
-        language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
-        valid_features = categorical_featnames + continuous_featnames + language_featnames
-
-        if len(valid_features) < df.shape[1]:
-            unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            logger.log(15, f"Model will additionally ignore the following columns: {unknown_features}")
-            df = df.drop(columns=unknown_features)
-            self._features_internal = list(df.columns)
-
-        self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
-        if self.features_to_drop:
-            logger.log(15, f"Model will additionally ignore the following columns: {self.features_to_drop}")
-            df = df.drop(columns=self.features_to_drop)
-
-        if needs_extra_types is True:
-            types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
-            # continuous = numeric features to rescale
-            # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
-            # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-            features_to_consider = [feat for feat in self._features_internal if feat not in self.features_to_drop]
-            for feature in features_to_consider:
-                feature_data = df[feature]  # pd.Series
-                num_unique_vals = len(feature_data.unique())
-                if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
-                    types_of_features['onehot'].append(feature)
-                elif feature in continuous_featnames:
-                    if np.abs(feature_data.skew()) > skew_threshold:
-                        types_of_features['skewed'].append(feature)
-                    else:
-                        types_of_features['continuous'].append(feature)
-                elif feature in categorical_featnames:
-                    if num_unique_vals >= embed_min_categories:  # sufficiently many categories to warrant learned embedding dedicated to this feature
-                        types_of_features['embed'].append(feature)
-                    else:
-                        types_of_features['onehot'].append(feature)
-                elif feature in language_featnames:
-                    types_of_features['language'].append(feature)
-        else:
-            types_of_features = []
-            for feature in valid_features:
-                if feature in categorical_featnames:
-                    feature_type = 'CATEGORICAL'
-                elif feature in continuous_featnames:
-                    feature_type = 'SCALAR'
-                elif feature in language_featnames:
-                    feature_type = 'TEXT'
-                else:
-                    raise ValueError(f'Invalid feature: {feature}')
-
-                types_of_features.append({"name": feature, "type": feature_type})
-
-        return types_of_features, df

@@ -1,3 +1,5 @@
+import platform
+
 __all__ = [
     'try_import_mxboard',
     'try_import_mxnet',
@@ -47,8 +49,14 @@ def try_import_mxnet():
 
 
 def try_import_ray():
-    ray_min_version = '1.7.0'
-    ray_max_version = '1.8.0'
+    ray_max_version_os_map = dict(
+        Darwin='1.11.0',
+        Windows='1.11.0',
+        Linux='1.11.0',
+    )
+    ray_min_version = '1.10.0'
+    current_os = platform.system()
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.11.0')
     try:
         import ray
         from distutils.version import LooseVersion
@@ -57,14 +65,14 @@ def try_import_ray():
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
-                "`pip install ray==1.7.0` "
+                f"`pip install ray=={ray_min_version}` "
             )
             raise ValueError(msg)
         return ray
     except ImportError:
         raise ImportError(
             "ray is required to train folds in parallel. "
-            "A quick tip is to install via `pip install ray==1.7.0`, "
+            f"A quick tip is to install via `pip install ray=={ray_min_version}`, "
             "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
             "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
         )
@@ -115,7 +123,7 @@ def try_import_fastai():
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
         import fastai
         fastai_version = parse_version(fastai.__version__)
-        assert parse_version('2.0.0') <= fastai_version < parse_version('3.0.0'), 'Currently, we only support 2.0.0<=fastai<3.0.0'
+        assert parse_version('2.0.0') <= fastai_version < parse_version('2.6'), 'Currently, we only support 2.0.0<=fastai<2.6'
 
         # fastai is doing library setup during star imports. These are required for correct library functioning.
         # Local star imports are not possible in-place, so separate helper packages is created
@@ -207,4 +215,4 @@ def try_import_vowpalwabbit():
             f'Currently, we only support VW version >=8.10.1 and <8.11.0. Found vowpalwabbit version: {vowpalwabbit_version}'
     except ImportError:
         raise ImportError("`import vowpalwabbit` failed.\n"
-                          "A quick tip is to install via `pip install vowpalwabbit==8.10")
+                          "A quick tip is to install via `pip install vowpalwabbit==8.10.1")

@@ -13,7 +13,6 @@ import pandas as pd
 from autogluon.common.features.types import S_TEXT
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.models import AbstractModel
-from autogluon.core.models.abstract.model_trial import skip_hpo
 
 from .hyperparameters.parameters import get_param_baseline
 
@@ -186,6 +185,6 @@ class FastTextModel(AbstractModel):
     def get_memory_size(self) -> int:
         return self._model_size_estimate
 
-    # TODO: Add HPO
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
+    def _more_tags(self):
+        # `can_refit_full=True` because validation data is not used and there is no form of early stopping implemented.
+        return {'can_refit_full': True}

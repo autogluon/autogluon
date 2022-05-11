@@ -67,14 +67,13 @@ from autogluon.tabular import TabularPredictor
 predictor = TabularPredictor(label=<variable-name>).fit(train_data=<file-name>)
 ```
 
-**Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
-
+**Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying the `presets` parameter to `fit()` and the `eval_metric` parameter to `TabularPredictor()`.
 
 ## Description of fit():
 
 Here we discuss what happened during `fit()`.
 
-Since there are only two possible values of the `class` variable, this was a binary classification problem, for which an appropriate performance metric is *accuracy*. AutoGluon automatically infers this as well as the type of each feature (i.e., which columns contain continuous numbers vs. discrete categories). AutogGluon can also automatically handle common issues like missing data and rescaling feature values.
+Since there are only two possible values of the `class` variable, this was a binary classification problem, for which an appropriate performance metric is *accuracy*. AutoGluon automatically infers this as well as the type of each feature (i.e., which columns contain continuous numbers vs. discrete categories). AutoGluon can also automatically handle common issues like missing data and rescaling feature values.
 
 We did not specify separate validation data and so AutoGluon automatically choses a random training/validation split of the data. The data used for validation is seperated from the training data and is used to determine the models and hyperparameter-values that produce the best results.  Rather than just a single model, AutoGluon trains multiple models and ensembles them together to ensure superior predictive performance.
 
@@ -118,6 +117,23 @@ predictor.predict(test_data, model='LightGBM')
 
 Above the scores of predictive performance were based on a default evaluation metric (accuracy for binary classification). Performance in certain applications may be measured by different metrics than the ones AutoGluon optimizes for by default. If you know the metric that counts in your application, you should specify it as demonstrated in the next section.
 
+## Presets
+
+AutoGluon comes with a variety of presets that can be specified in the call to `.fit` via the `presets` argument. `medium_quality` is used by default to encourage initial prototyping, but for serious usage, the other presets should be used instead.
+
+| Preset                            | Model Quality                                          | Use Cases                                                                                                                                               | Fit Time (Ideal) | Inference Time (Relative to medium_quality) | Disk Usage |
+|:----------------------------------|:-------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------|:--------------------------------------------|:-----------|
+| best_quality                      | State-of-the-art (SOTA), much better than high_quality | When accuracy is what matters                                                                                                                           | 16x+             | 32x+                                        | 16x+       |
+| high_quality                      | Better than good_quality                               | When a very powerful, portable solution with fast inference is required: Large-scale batch inference                                                    | 16x              | 4x                                          | 2x         |
+| good_quality                      | Significantly better than medium_quality               | When a powerful, highly portable solution with very fast inference is required: Billion-scale batch inference, sub-100ms online-inference, edge-devices | 16x              | 2x                                          | 0.1x       |
+| medium_quality                    | Competitive with other top AutoML Frameworks           | Initial prototyping, establishing a performance baseline                                                                                                | 1x               | 1x                                          | 1x         |
+
+We recommend users to start with `medium_quality` to get a sense of the problem and identify any data related issues. If `medium_quality` is taking too long to train, consider subsampling the training data during this prototyping phase.  
+Once you are comfortable, next try `best_quality`. Make sure to specify at least 16x the `time_limit` value as used in `medium_quality`. Once finished, you should have a very powerful solution that is often stronger than `medium_quality`.  
+Make sure to consider holding out test data that AutoGluon never sees during training to ensure that the models are performing as expected in terms of performance.  
+Once you evaluate both `best_quality` and `medium_quality`, check if either satisfies your needs. If neither do, consider trying `high_quality` and/or `good_quality`.  
+If none of the presets satisfy requirements, refer to :ref:`sec_tabularadvanced` for more advanced AutoGluon options.
+
 ## Maximizing predictive performance
 
 **Note:** You should not call `fit()` with entirely default arguments if you are benchmarking AutoGluon-Tabular or hoping to maximize its accuracy!
@@ -132,9 +148,9 @@ predictor.leaderboard(test_data, silent=True)
 
 This command implements the following strategy to maximize accuracy:
 
-- Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality_faster_train'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`.
+- Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality', 'optimize_for_deployment']`.
 
-- Provide the `eval_metric` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/core/metrics/`
+- Provide the parameter `eval_metric` to `TabularPredictor()` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function.  For more information refer to :ref:`sec_tabularcustommetric`
 
 - Include all your data in `train_data` and do not provide `tuning_data` (AutoGluon will split the data more intelligently to fit its needs).
 
@@ -161,7 +177,7 @@ predictor_age = TabularPredictor(label=age_column, path="agModels-predictAge").f
 performance = predictor_age.evaluate(test_data)
 ```
 
-Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flip their sign and print them as negative values during training (as it internally assumes higher values are better).
+Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` parameter of `TabularPredictor()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon will flip their sign and print them as negative values during training (as it internally assumes higher values are better).
 
 We can call leaderboard to see the per-model performance:
 
@@ -172,3 +188,7 @@ predictor_age.leaderboard(test_data, silent=True)
 **Data Formats:** AutoGluon can currently operate on data tables already loaded into Python as pandas DataFrames, or those stored in files of [CSV format](https://en.wikipedia.org/wiki/Comma-separated_values) or [Parquet format](https://databricks.com/glossary/what-is-parquet). If your data live in multiple tables, you will first need to join them into a single table whose rows correspond to statistically independent observations (datapoints) and columns correspond to different features (aka. variables/covariates).
 
 Refer to the [TabularPredictor documentation](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor.fit) to see all of the available methods/options.
+
+## Advanced Usage
+
+For more advanced usage examples of AutoGluon, refer to :ref:`sec_tabularadvanced`

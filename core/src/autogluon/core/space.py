@@ -36,7 +36,16 @@ class SimpleSpace(Space):
         self._default = value
 
 
-class Categorical(SimpleSpace):
+class DiscreteSpace(SimpleSpace):
+    """
+    Search space with the requirement of having a discrete number of options, such that it is possible to exhaust the search space.
+    """
+    def __len__(self) -> int:
+        """Returns the number of unique spaces within the discrete search space."""
+        raise NotImplementedError
+
+
+class Categorical(DiscreteSpace):
     """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options. 
        The first value in the list of options will be the default value that gets tried first during HPO.
 
@@ -115,7 +124,7 @@ class Real(SimpleSpace):
         return sampler
 
 
-class Int(SimpleSpace):
+class Int(DiscreteSpace):
     """Search space for numeric hyperparameter that takes integer values.
 
     Parameters
@@ -142,6 +151,9 @@ class Int(SimpleSpace):
     def convert_to_sklearn(self):
         from scipy.stats import randint
         return randint(self.lower, self.upper+1)
+
+    def __len__(self):
+        return self.upper - self.lower + 1
 
 
 class Bool(Int):

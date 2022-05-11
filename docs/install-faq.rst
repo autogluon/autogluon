@@ -22,32 +22,6 @@
      python3 -m pip install --upgrade pip --user
      python3 -m pip install --upgrade setuptools --user
 
-* I see the error "ERROR: No matching distribution found for mxnet<2.0.0,>=1.7.0b20200713".
-
-   It might be due to the out-dated pip version. Try to upgrade the pip via:
-
-   .. code-block::
-
-     python3 -m pip install --upgrade pip --user
-     python3 -m pip install --upgrade setuptools --user
-
-* How can I install the customized mxnet (incubating) on SageMaker Notebook?
-
-   You should choose the **conda_python3** kernel and then install the MXNet via
-
-   .. code-block::
-
-     # For CPU users
-     python3 -m pip install "mxnet<2.0.0"
-
-     # For GPU users, CUDA 101
-     python3 -m pip install "mxnet_cu101<2.0.0"
-
-* While running AutoGluon, I get error message "Check failed: e == cudaSuccess: CUDA: initialization error".
-
-  You may have the wrong version of MXNet installed for your CUDA version.
-  Match the CUDA version carefully when following the installation instructions (`nvcc --version`).
-
 * On MacOS I am getting a segmentation fault when trying to train LightGBM / XGBoost.
 
    You need to install libOMP 11 to avoid segmentation faults on MacOS when training LightGBM / XGBoost:
@@ -61,3 +35,16 @@
       rm libomp.rb
 
    For more information, refer to https://github.com/microsoft/LightGBM/issues/4897
+
+* Does AutoGluon support ARM/M1 Mac?
+  
+  AutoGluon does not officially support ARM/M1 Mac. For more information, refer to https://github.com/awslabs/autogluon/issues/1242
+
+* Why do the install instructions use `pip3` instead of `pip`?
+
+    When you type `pip` in the console, the system looks for an executable file with that name in the current folder and then in the folders specified in the system PATH variable.
+    If you have multiple Python installations and all of them are in your PATH, you cannot be sure which directory will be searched first.
+    Therefore, if you have Python 2 installed and it is earlier in your PATH, `pip` would refer to `pip2` rather than `pip3`.
+    By explicitly using `pip3`, we guard against this issue.
+    Further, if Python 4 releases, the install instructions for Python 3 versions of AutoGluon will continue to work even if `pip` begins referring to `pip4`.
+    For more information, refer to https://techwithtech.com/python-pip-vs-pip3/

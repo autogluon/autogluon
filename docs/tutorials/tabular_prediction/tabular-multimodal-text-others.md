@@ -15,11 +15,9 @@ import pandas as pd
 import pprint
 import random
 from autogluon.tabular import TabularPredictor
-import mxnet as mx
 
 np.random.seed(123)
 random.seed(123)
-mx.random.seed(123)
 ```
 
 ## Product Sentiment Analysis Dataset

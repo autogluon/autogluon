@@ -1,5 +1,6 @@
 import copy
 import logging
+import psutil
 import time
 from builtins import classmethod
 from pathlib import Path
@@ -7,8 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import sklearn
-
-from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL
+from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.models import AbstractModel
@@ -128,10 +128,10 @@ class NNFastAiTabularModel(AbstractModel):
             if self.cat_columns:
                 try:
                     X_stats = X[self.cat_columns].describe(include='all').T.reset_index()
-                    cat_cols_to_drop = X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values
+                    cat_cols_to_drop = list(X_stats[(X_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_stats['unique'].isna())]['index'].values)
                 except:
                     cat_cols_to_drop = []
-                if cat_cols_to_drop:
+                if len(cat_cols_to_drop) != 0:
                     cat_cols_to_drop = set(cat_cols_to_drop)
                     self.cat_columns = [col for col in self.cat_columns if (col not in cat_cols_to_drop)]
             num_cat_cols_use = len(self.cat_columns)
@@ -142,8 +142,10 @@ class NNFastAiTabularModel(AbstractModel):
             for c in nullable_numeric_features:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
         X = self._fill_missing(X)
-        cont_mean, cont_std = self._cont_normalization
-        X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+        if self.cont_columns:
+            cont_mean, cont_std = self._cont_normalization
+            X[self.cont_columns] = (X[self.cont_columns] - cont_mean) / cont_std
+            X = X.copy()  # Removes potential DF fragmentation
         return X
 
     def _fill_missing(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -170,6 +172,9 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai import torch_core
         from .callbacks import AgSaveModelCallback, EarlyStoppingCallbackWithTimeLimit
         from .quantile_helpers import HuberPinballLoss
+
+        import torch
+        torch.set_num_threads(num_cpus)
 
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
@@ -444,10 +449,17 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _get_default_resources(self):
+        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
+        num_cpus = psutil.cpu_count(logical=False)
+        num_gpus = 0
+        return num_cpus, num_gpus
 
     def __get_metrics_map(self):
         from fastai.metrics import rmse, mse, mae, accuracy, FBeta, RocAucBinary, Precision, Recall, R2Score
@@ -489,3 +501,6 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         return 10 * get_approximate_df_mem_usage(X).sum()
+
+    def _more_tags(self):
+        return {'can_refit_full': True}

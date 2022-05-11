@@ -1,6 +1,6 @@
 """ Example script for predicting columns of tables, demonstrating more advanced usage of fit().
     Note that all settings demonstrated here are just chosen for demonstration purposes (to minimize runtime), and do not represent wise choices to use in practice.
-    To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune_kwargs`, and instead only specify the following fit() arguments: eval_metric=YOUR_METRIC, presets='best_quality'
+    To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune_kwargs`, and instead specify `TabularPredictor(..., eval_metric=YOUR_METRIC).fit(..., presets='best_quality')`
 """
 
 import autogluon.core as ag
@@ -15,7 +15,7 @@ label = 'class'  # specifies which column do we want to predict
 save_path = 'ag_hpo_models/'  # where to save trained models
 
 hyperparameters = {
-    'NN': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0, 0.5)},
+    'NN_TORCH': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0, 0.5)},
     'GBM': {'num_boost_round': 1000, 'learning_rate': ag.Real(0.01, 0.1, log=True)},
     'XGB': {'n_estimators': 1000, 'learning_rate': ag.Real(0.01, 0.1, log=True)}
 }

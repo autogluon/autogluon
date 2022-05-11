@@ -24,14 +24,23 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
         The initial learning rate
 
     Return:
-    float: The temperature scaling term
+    float: The temperature scaling term, returns None if infinity found in logits.
     '''
     try_import_torch()
     import torch
 
+    # This is required to avoid error when passing np.uint16 to torch.tensor. This can occur if >255 classes (Dionis)
+    y_val = y_val.astype('int')
+
     y_val_tensor = torch.tensor(y_val)
     temperature_param = torch.nn.Parameter(torch.ones(1).fill_(init_val))
     logits = torch.tensor(np.log(y_val_probs))
+
+    # TODO: Could alternatively add epsilon to y_val_probs in order to avoid.
+    is_invalid = torch.isinf(logits).any().tolist()
+    if is_invalid:
+        return None
+
     nll_criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
@@ -47,4 +56,8 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
 
     optimizer.step(temperature_scale_step)
 
-    return temperature_param.item()
+    temperature_scale = temperature_param.item()
+    if np.isnan(temperature_scale):
+        return None
+
+    return temperature_scale

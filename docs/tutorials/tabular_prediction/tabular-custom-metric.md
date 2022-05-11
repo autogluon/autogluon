@@ -19,6 +19,16 @@ print(f'y_true: {y_true}')
 print(f'y_pred: {y_pred}')
 ```
 
+## Ensuring Metric is Serializable
+You must define your custom metric in a separate python file that is imported for it to be serializable (able to be pickled).
+If this is not done, AutoGluon will crash during fit when trying to parallelize model training with Ray.
+In the below example, you would want to create a new python file such as `my_metrics.py` with `ag_accuracy_scorer` defined in it,
+and then use it via `from my_metrics import ag_accuracy_scorer`.
+
+If your metric is not serializable, you will get many errors similar to: `_pickle.PicklingError: Can't pickle`. Refer to https://github.com/awslabs/autogluon/issues/1637 for an example.
+
+The custom metrics in this tutorial are **not** serializable for ease of demonstration. If `best_quality` preset was used, it would crash.
+
 ## Custom Accuracy Metric
 We will start with calculating accuracy. A prediction is correct if the predicted value is the same as the true value, otherwise it is wrong.
 

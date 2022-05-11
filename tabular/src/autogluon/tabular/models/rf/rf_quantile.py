@@ -184,9 +184,9 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
 
     Parameters
     ----------
-    criterion : string, optional (default="mse")
+    criterion : string, optional (default="squared_error")
         The function to measure the quality of a split. Supported criteria
-        are "mse" for the mean squared error, which is equal to variance
+        are "squared_error" for the mean squared error, which is equal to variance
         reduction as feature selection criterion, and "mae" for the mean
         absolute error.
         .. versionadded:: 0.18
@@ -281,7 +281,7 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
         y_train_leaves_[i] is the leaf that y_train[i] ends up at.
     """
     def __init__(self,
-                 criterion="mse",
+                 criterion="squared_error",
                  splitter="best",
                  max_depth=None,
                  min_samples_split=2,
@@ -302,7 +302,7 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
 
 class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
     def __init__(self,
-                 criterion='mse',
+                 criterion='squared_error',
                  splitter='random',
                  max_depth=None,
                  min_samples_split=2,
@@ -457,9 +457,9 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
     ----------
     n_estimators : integer, optional (default=10)
         The number of trees in the forest.
-    criterion : string, optional (default="mse")
+    criterion : string, optional (default="squared_error")
         The function to measure the quality of a split. Supported criteria
-        are "mse" for the mean squared error, which is equal to variance
+        are "squared_error" for the mean squared error, which is equal to variance
         reduction as feature selection criterion, and "mae" for the mean
         absolute error.
         .. versionadded:: 0.18
@@ -551,7 +551,7 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
     """
     def __init__(self,
                  n_estimators=10,
-                 criterion='mse',
+                 criterion='squared_error',
                  max_depth=None,
                  min_samples_split=2,
                  min_samples_leaf=1,
@@ -601,9 +601,9 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
     ----------
     n_estimators : integer, optional (default=10)
         The number of trees in the forest.
-    criterion : string, optional (default="mse")
+    criterion : string, optional (default="squared_error")
         The function to measure the quality of a split. Supported criteria
-        are "mse" for the mean squared error, which is equal to variance
+        are "squared_error" for the mean squared error, which is equal to variance
         reduction as feature selection criterion, and "mae" for the mean
         absolute error.
         .. versionadded:: 0.18
@@ -694,7 +694,7 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
     """
     def __init__(self,
                  n_estimators=10,
-                 criterion='mse',
+                 criterion='squared_error',
                  max_depth=None,
                  min_samples_split=2,
                  min_samples_leaf=1,

@@ -43,6 +43,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       Fitting interpretable models to data table for understanding data and predictions.
 
    .. card::
+      :title: Training models with GPU support
+      :link: tabular-gpu.html
+
+      How to train models with GPU support.
+
+   .. card::
       :title: Multi-Label Prediction
       :link: tabular-multilabel.html
 
@@ -82,6 +88,7 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-multimodal
    tabular-multimodal-text-others
    tabular-interpretability
+   tabular-gpu
    tabular-multilabel
    tabular-custom-model
    tabular-custom-metric

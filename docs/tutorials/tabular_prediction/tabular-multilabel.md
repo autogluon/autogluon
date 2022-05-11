@@ -269,4 +269,4 @@ In order to obtain the best predictions, you should generally add the following 
 If you find that too much memory/disk is being used, try calling `MultilabelPredictor.fit()` with additional arguments discussed under ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues) or ["If you encounter disk space issues"](tabular-indepth.html#if-you-encounter-disk-space-issues).
 
 If you find inference too slow, you can try the strategies discussed under ["Accelerating Inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
-In particular, simply try specifying the following preset in `MultilabelPredictor.fit()`: `presets = ['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
+In particular, simply try specifying the following preset in `MultilabelPredictor.fit()`: `presets = ['good_quality', 'optimize_for_deployment']`

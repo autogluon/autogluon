@@ -119,6 +119,7 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     return X_aug
 
 
+# TODO: Remove or fix, likely doesn't work anymore
 def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, perturb_prob=0.5, s=1.0, **kwargs):
     """ Uses MUNGE algorithm to generate synthetic datapoints for learning to mimic teacher model in distillation: https://www.cs.cornell.edu/~caruana/compression.kdd06.pdf
         Args:
@@ -126,14 +127,19 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
             perturb_prob: probability of perturbing each feature during augmentation. Set near 0 to ensure augmented sample distribution remains closer to real data.
             s: We noise numeric features by their std-dev divided by this factor (inverse of continuous_feature_noise). Set large to ensure augmented sample distribution remains closer to real data.
     """
-    from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-    nn_dummy = TabularNeuralNetModel(path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, eval_metric=mean_squared_error,
-                                     hyperparameters={'num_dataloading_workers': 0, 'proc.embed_min_categories': np.inf},
-                                     features = list(X.columns), feature_metadata=feature_metadata)
-    processed_data = nn_dummy.process_train_data(df=nn_dummy.preprocess(X), labels=pd.Series([1]*len(X)), batch_size=nn_dummy.params['batch_size'],
-                        num_dataloading_workers=0, impute_strategy=nn_dummy.params['proc.impute_strategy'],
-                        max_category_levels=nn_dummy.params['proc.max_category_levels'], skew_threshold=nn_dummy.params['proc.skew_threshold'],
-                        embed_min_categories=nn_dummy.params['proc.embed_min_categories'], use_ngram_features=nn_dummy.params['use_ngram_features'])
+    from autogluon.tabular.models.tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
+    nn_dummy = TabularNeuralNetTorchModel(path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, eval_metric=mean_squared_error,
+                                          hyperparameters={'num_dataloading_workers': 0, 'proc.embed_min_categories': np.inf},
+                                          features=list(X.columns), feature_metadata=feature_metadata)
+    processed_data = nn_dummy._process_train_data(df=nn_dummy.preprocess(X),
+                                                  labels=pd.Series([1] * len(X)),
+                                                  batch_size=nn_dummy.params['batch_size'],
+                                                  num_dataloading_workers=0,
+                                                  impute_strategy=nn_dummy.params['proc.impute_strategy'],
+                                                  max_category_levels=nn_dummy.params['proc.max_category_levels'],
+                                                  skew_threshold=nn_dummy.params['proc.skew_threshold'],
+                                                  embed_min_categories=nn_dummy.params['proc.embed_min_categories'],
+                                                  use_ngram_features=nn_dummy.params['use_ngram_features'])
     X_vector = processed_data.dataset._data[processed_data.vectordata_index].asnumpy()
     processed_data = None
     nn_dummy = None

@@ -9,10 +9,9 @@ from autogluon.core.trainer.utils import process_hyperparameters
 
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
-    TabularNeuralNetModel, TabularNeuralQuantileModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
-    ImagePredictorModel, \
-    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel, \
-    VowpalWabbitModel
+    TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
+    ImagePredictorModel, VowpalWabbitModel, \
+    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     FASTAI=50,
     XGB=40,
     LR=30,
-    NN=20,
+    NN_TORCH=25,
+    NN_MXNET=20,
     VW=10,
     FASTTEXT=0,
     AG_TEXT_NN=0,
@@ -52,7 +52,7 @@ PROBLEM_TYPE_MODEL_PRIORITY = {
 
 DEFAULT_SOFTCLASS_PRIORITY = dict(
     GBM=100,
-    NN=90,
+    NN_MXNET=90,
     RF=80,
     CAT=60,
     custom=0,
@@ -60,7 +60,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'QNN', 'ENS_WEIGHTED'] # TODO: OTHERS will be added
+DEFAULT_QUANTILE_MODEL = ['RF', 'XT', 'FASTAI', 'NN_TORCH', 'ENS_WEIGHTED']  # TODO: OTHERS will be added
 
 MODEL_TYPES = dict(
     RF=RFModel,
@@ -69,8 +69,8 @@ MODEL_TYPES = dict(
     GBM=LGBModel,
     CAT=CatBoostModel,
     XGB=XGBoostModel,
-    NN=TabularNeuralNetModel,
-    QNN=TabularNeuralQuantileModel,
+    NN_MXNET=TabularNeuralNetMxnetModel,
+    NN_TORCH=TabularNeuralNetTorchModel,
     LR=LinearModel,
     FASTAI=NNFastAiTabularModel,
     TRANSF=TabTransformerModel,
@@ -97,8 +97,8 @@ DEFAULT_MODEL_NAMES = {
     LGBModel: 'LightGBM',
     CatBoostModel: 'CatBoost',
     XGBoostModel: 'XGBoost',
-    TabularNeuralNetModel: 'NeuralNetMXNet',
-    TabularNeuralQuantileModel: 'QuantileNeuralNet',
+    TabularNeuralNetMxnetModel: 'NeuralNetMXNet',
+    TabularNeuralNetTorchModel: 'NeuralNetTorch',
     LinearModel: 'LinearModel',
     NNFastAiTabularModel: 'NeuralNetFastAI',
     TabTransformerModel: 'Transformer',
@@ -179,32 +179,33 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     hp_level = hyperparameters[level_key]
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
+    if 'NN' in model_type_list:
+        # TODO: Remove in v0.5.0
+        logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
+                       'Starting in v0.5.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:
-        if problem_type == QUANTILE and model_type not in DEFAULT_QUANTILE_MODEL:
-            if model_type == 'NN' and 'QNN' in DEFAULT_QUANTILE_MODEL:
-                model_type = 'QNN'
-                hp_level['QNN'] = hp_level.pop('NN')
-            else:
-                continue
+        if problem_type == QUANTILE:
+            if model_type not in DEFAULT_QUANTILE_MODEL:
+                if model_type == 'NN_MXNET' and 'NN_TORCH' in DEFAULT_QUANTILE_MODEL and 'NN_TORCH' not in model_type_list:
+                    model_type = 'NN_TORCH'
+                    hp_level['NN_TORCH'] = hp_level.pop('NN_MXNET')
+                    logger.log(15, "Quantile regression must use NN_TORCH instead of NN_MXNET, switching NN_MXET -> NN_TORCH.")
+                else:
+                    continue
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
+        if model_type == 'NN':
+            # TODO: Remove in v0.5.0
+            model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
             if model_type in invalid_type_set:
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
                 if model_type == 'AG_TEXT_NN':
-                    AG_TEXT_IMPORT_ERROR = 'autogluon.text has not been installed. ' \
-                                           'You may try to install "autogluon.text" ' \
-                                           'first by running. ' \
-                                           '`python3 -m pip install autogluon.text`'
-                    try:
-                        from autogluon.text import ag_text_presets
-                    except ImportError:
-                        raise ImportError(AG_TEXT_IMPORT_ERROR)
-                    model_cfgs_to_process.append(ag_text_presets.create(model_cfg))
+                    model_cfgs_to_process.append({})
                 else:
                     model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)
             else:
@@ -342,8 +343,14 @@ def model_factory(
     model_params = copy.deepcopy(model)
     model_params.pop(AG_ARGS, None)
     model_params.pop(AG_ARGS_ENSEMBLE, None)
-    model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
-                            hyperparameters=model_params)
+
+    model_init_kwargs = dict(
+        path=path,
+        name=name,
+        problem_type=problem_type,
+        eval_metric=eval_metric,
+        hyperparameters=model_params,
+    )
 
     if ensemble_kwargs is not None:
         ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
@@ -352,8 +359,10 @@ def model_factory(
         if ensemble_kwargs_model['hyperparameters'] is None:
             ensemble_kwargs_model['hyperparameters'] = {}
         ensemble_kwargs_model['hyperparameters'].update(extra_ensemble_hyperparameters)
-        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_init,
+        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_type, model_base_kwargs=model_init_kwargs,
                                    **ensemble_kwargs_model)
+    else:
+        model_init = model_type(**model_init_kwargs)
 
     return model_init
 
@@ -362,7 +371,7 @@ def model_factory(
 def get_preset_models_softclass(hyperparameters, invalid_model_names: list = None, **kwargs):
     # TODO v0.1: This import depends on mxnet, consider refactoring to avoid mxnet
     from autogluon.core.metrics.softclass_metrics import soft_log_loss
-    model_types_standard = ['GBM', 'NN', 'CAT', 'ENS_WEIGHTED']
+    model_types_standard = ['GBM', 'NN_MXNET', 'NN_TORCH', 'CAT', 'ENS_WEIGHTED']
     hyperparameters = copy.deepcopy(hyperparameters)
 
     hyperparameters_standard = {key: hyperparameters[key] for key in hyperparameters if key in model_types_standard}
@@ -371,7 +380,7 @@ def get_preset_models_softclass(hyperparameters, invalid_model_names: list = Non
     # Swap RF criterion for MSE:
     if 'RF' in hyperparameters_rf:
         rf_params = hyperparameters_rf['RF']
-        rf_newparams = {'criterion': 'mse', 'ag_args': {'name_suffix': 'MSE'}}
+        rf_newparams = {'criterion': 'squared_error', 'ag_args': {'name_suffix': 'MSE'}}
         for i in range(len(rf_params)):
             rf_params[i].update(rf_newparams)
         rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n+1):]]  # Remove duplicates which may arise after overwriting criterion
@@ -380,7 +389,7 @@ def get_preset_models_softclass(hyperparameters, invalid_model_names: list = Non
                                                hyperparameters=hyperparameters_standard,
                                                default_priorities=DEFAULT_SOFTCLASS_PRIORITY, invalid_model_names=invalid_model_names, **kwargs)
     if len(models) == 0:
-        raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF'], "
+        raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN_MXNET','RF'], "
                          "These are the only supported models for softclass prediction problems. "
                          "Softclass problems are also not yet supported for fit() with per-stack level hyperparameters.")
     for model in models:

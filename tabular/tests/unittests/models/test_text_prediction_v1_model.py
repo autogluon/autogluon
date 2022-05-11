@@ -5,7 +5,10 @@ import pytest
 @pytest.mark.gpu
 def test_text_prediction_v1_sts(fit_helper):
     fit_args = dict(
-        hyperparameters={'AG_TEXT_NN': ['lower_quality_fast_train']},
+        hyperparameters={'AG_TEXT_NN': {
+            "optimization.max_epochs": 1,
+            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+        }},
     )
     dataset_name = 'sts'
     fit_helper.fit_and_validate_dataset(

@@ -1,6 +1,7 @@
 """Object Detection task"""
 import copy
 import pickle
+import platform
 import logging
 import warnings
 import os
@@ -204,8 +205,7 @@ class ObjectDetector(object):
                     when `num_trials` trials have finished or wall clock `time_limit` is reached, whichever comes first.
                 searcher : str, default = 'random'
                     Searcher strategy for HPO, 'random' by default.
-                    Options include: ‘random’ (random search), ‘bayesopt’ (Gaussian process Bayesian optimization),
-                    ‘grid’ (grid search).
+                    Options include: ‘random’ (random search), ‘grid’ (grid search).
                 max_reward : float, default = None
                     The reward threashold for stopping criteria. If `max_reward` is reached during HPO, the scheduler
                     will terminate earlier to reduce time cost.
@@ -227,6 +227,18 @@ class ObjectDetector(object):
 
         log_level = verbosity2loglevel(self._verbosity)
         set_logger_verbosity(self._verbosity)
+        if platform.system() == 'Windows':
+            logger.log(40, '=============================================================================\n'
+                           'WARNING: Windows OS detected, but ObjectDetector is not supported on Windows!\n'
+                           'You may run into many errors. Consider running on Linux instead.\n'
+                           '=============================================================================\n')
+        logger.log(30, '=============================================================================\n'
+                       'WARNING: ObjectDetector is deprecated as of v0.4.0 and may contain various bugs and issues!\n'
+                       'In a future release ObjectDetector may be entirely reworked to use Torch as a backend.\n'
+                       'This future change will likely be API breaking.'
+                       'Users should ensure they update their code that depends on ObjectDetector when upgrading to future AutoGluon releases.\n'
+                       'For more information, refer to ObjectDetector refactor GitHub issue: https://github.com/awslabs/autogluon/issues/1559\n'
+                       '=============================================================================\n')
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]
@@ -376,11 +388,11 @@ class ObjectDetector(object):
         hpo_tune_args = kwargs.get('hyperparameter_tune_kwargs', {})
         hpo_tune_args['num_trials'] = hpo_tune_args.get('num_trials', 1)
         hpo_tune_args['searcher'] = hpo_tune_args.get('searcher', 'random')
-        if not hpo_tune_args['searcher'] in ('random', 'bayesopt', 'grid'):
-            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('random', 'bayesopt', 'grid')")
+        if not hpo_tune_args['searcher'] in ('random', 'grid'):
+            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('random', 'grid')")
         hpo_tune_args['scheduler'] = hpo_tune_args.get('scheduler', 'local')
-        if not hpo_tune_args['scheduler'] in ('fifo', 'local'):
-            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ('fifo', 'local')")
+        if not hpo_tune_args['scheduler'] in ['local']:
+            raise ValueError(f"Invalid searcher: {hpo_tune_args['searcher']}, supported: ['local']")
         hpo_tune_args['max_reward'] = hpo_tune_args.get('max_reward', None)
         if hpo_tune_args['max_reward'] is not None and hpo_tune_args['max_reward'] < 0:
             raise ValueError(f"Expected `max_reward` to be a positive float number between 0 and 1.0, given {hpo_tune_args['max_reward']}")

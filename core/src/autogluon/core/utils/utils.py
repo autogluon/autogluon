@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import os
 import subprocess
 import math
 import pickle
@@ -25,6 +26,22 @@ logger = logging.getLogger(__name__)
 
 def get_cpu_count():
     return multiprocessing.cpu_count()
+
+
+def get_memory_size():
+    return bytes_to_mega_bytes(psutil.virtual_memory().total)
+
+
+def get_available_disk_size():
+    # FIXME: os.statvfs doesn't work on Windows... 
+    # Need to find another way to calculate disk on Windows.
+    # Return None for now
+    try:
+        statvfs = os.statvfs(".")
+        available_blocks = statvfs.f_frsize * statvfs.f_bavail
+        return bytes_to_mega_bytes(available_blocks)
+    except Exception:
+        return None
 
 
 def get_gpu_count_all():
@@ -885,3 +902,9 @@ def unevaluated_fi_df_template(features: List[str]) -> pd.DataFrame:
         'n': 0
     }, index=features)
     return importance_df
+
+
+def bytes_to_mega_bytes(memory_amount: int) -> int:
+    """ Utility to convert a number of bytes (int) into a number of mega bytes (int)
+    """
+    return memory_amount >> 20

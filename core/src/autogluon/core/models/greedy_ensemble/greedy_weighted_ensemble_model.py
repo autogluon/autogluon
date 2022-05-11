@@ -4,7 +4,6 @@ from autogluon.common.features.types import S_STACK
 
 from .ensemble_selection import EnsembleSelection, SimpleWeightedEnsemble
 from ..abstract.abstract_model import AbstractModel
-from ..abstract.model_trial import skip_hpo
 from ...constants import MULTICLASS, SOFTCLASS, QUANTILE
 
 logger = logging.getLogger(__name__)
@@ -131,9 +130,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _hyperparameter_tune(self, **kwargs):
-        return skip_hpo(self, **kwargs)
 
 
 class SimpleWeightedEnsembleModel(GreedyWeightedEnsembleModel):
