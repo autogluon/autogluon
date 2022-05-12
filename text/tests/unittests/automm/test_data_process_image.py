@@ -33,17 +33,22 @@ ALL_DATASETS = {
         },
 
         {
-            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","affine"],
+            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","affine","color_jitter","randaug"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
 
         {
-            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","color_jitter"],
+            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","affine(15, (0.1, 0.1), (0.9, 1.1))"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
 
         {
-            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","randaug"],
+            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","color_jitter(0.2, 0.1, 0.1)"],
+            "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
+        },
+
+        {
+            "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","randaug(2, 7)"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
     ]
@@ -65,4 +70,3 @@ def test_data_process_image(augmentations):
     transimage = data_processors.train_processor(image)
 
     assert len(data_processors.train_processor.transforms) == len(augmentations["model.timm_image.train_transform_types"])+2
-    

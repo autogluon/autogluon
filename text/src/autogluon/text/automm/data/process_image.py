@@ -250,24 +250,40 @@ class ImageProcessor:
         """
         processor = []
         for trans_type in transform_types:
-            if trans_type == "resize_to_square":
-                processor.append(transforms.Resize((self.size, self.size)))
-            elif trans_type == "resize_shorter_side":
-                processor.append(transforms.Resize(self.size))
-            elif trans_type == "center_crop":
-                processor.append(transforms.CenterCrop(self.size))
-            elif trans_type == "horizontal_flip":
-                processor.append(transforms.RandomHorizontalFlip())
-            elif trans_type == "vertical_flip":
-                processor.append(transforms.RandomVerticalFlip())
-            elif trans_type == "color_jitter":
-                processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
-            elif trans_type == "affine":
-                processor.append(transforms.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
-            elif trans_type == "randaug":
-                processor.append(RandAugment(2, 9))
+            if '(' in trans_type:
+                trans_mode = trans_type[0:trans_type.find('(')]
+                arg = ast.literal_eval(trans_type[trans_type.find('('):])
             else:
-                raise ValueError(f"unknown transform type: {trans_type}")
+                trans_mode = trans_type
+                arg = None
+
+            if trans_mode == "resize_to_square":
+                processor.append(transforms.Resize((self.size, self.size)))
+            elif trans_mode == "resize_shorter_side":
+                processor.append(transforms.Resize(self.size))
+            elif trans_mode == "center_crop":
+                processor.append(transforms.CenterCrop(self.size))
+            elif trans_mode == "horizontal_flip":
+                processor.append(transforms.RandomHorizontalFlip())
+            elif trans_mode == "vertical_flip":
+                processor.append(transforms.RandomVerticalFlip())
+            elif trans_mode == "color_jitter":
+                if arg is not None:
+                    processor.append(transforms.ColorJitter(*arg))
+                else:
+                    processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+            elif trans_mode == "affine":
+                if arg is not None:
+                    processor.append(transforms.RandomAffine(*arg))
+                else:
+                    processor.append(transforms.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+            elif trans_mode == "randaug":
+                if arg is not None:
+                    processor.append(RandAugment(*arg))
+                else:
+                    processor.append(RandAugment(2, 9))
+            else:
+                raise ValueError(f"unknown transform type: {trans_mode}")
 
         processor.append(transforms.ToTensor())
         processor.append(self.normalization)
