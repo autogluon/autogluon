@@ -1004,12 +1004,16 @@ class AbstractModel:
             )
             return self._get_hpo_results(analysis)
         except EmptySearchSpace:
+            logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
+                           f"Will train one model based on the provided hyperparameters.")
             return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
     def _get_hpo_results(self, analysis):
         hpo_models = {}
         for trial, details in analysis.results.items():
-            if details.get('validation_performance', None) is None:
+            validation_performance = details.get('validation_performance', None)
+            # when equals to -inf, trial finished with TimeLimitExceeded exception and didn't finish at least 1 epoch
+            if validation_performance is None or validation_performance == float('-inf'):
                 continue
             trial_id = details.get('trial_id')
             file_id = trial_id  # unique identifier to files from this trial

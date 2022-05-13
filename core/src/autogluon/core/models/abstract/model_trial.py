@@ -45,8 +45,7 @@ def model_trial(args,
             logger.exception(e, exc_info=True)
             raise e
         # In case of TimeLimitExceed, val_score could be None
-        if model.val_score is not None:
-            tune.report(epoch=1, validation_performance=model.val_score)
+        tune.report(epoch=1, validation_performance=model.val_score if model.val_score is not None else float('-inf'))
 
 
 def init_model(args, task_id, model_cls, init_params):

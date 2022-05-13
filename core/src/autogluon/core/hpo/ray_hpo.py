@@ -16,6 +16,7 @@ import ray
 from ray import tune
 from ray_lightning import RayPlugin
 from ray.tune import PlacementGroupFactory
+from ray.tune.sample import Domain
 from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler, PopulationBasedTraining
 from ray.tune.schedulers.pb2 import PB2
 from ray.tune.suggest import SearchAlgorithm, Searcher
@@ -157,7 +158,7 @@ def run(
     num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
-    if not search_space:
+    if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
     searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=supported_searchers)
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=supported_schedulers)
@@ -193,9 +194,6 @@ def run(
     tune_kwargs.update(kwargs)
     
     original_path = os.getcwd()
-    # When model trial reached time limit but hasn't finished at least 1 epoch, there's no val_score reported
-    # Setting this env var to avoid ray tune raise exception
-    os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = '1'
     analysis = tune.run(
         tune.with_parameters(trainable, **trainable_args),
         config=search_space,

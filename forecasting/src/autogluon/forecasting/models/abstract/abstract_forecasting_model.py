@@ -325,6 +325,8 @@ class AbstractForecastingModel(AbstractModel):
             )
             return self._get_hpo_results(analysis)
         except EmptySearchSpace:
+            logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
+                           f"Will train one model based on the provided hyperparameters.")
             return skip_hpo(self, train_data, val_data, time_limit=time_limit)
 
     def preprocess(self, data: Any, **kwargs) -> Any:
