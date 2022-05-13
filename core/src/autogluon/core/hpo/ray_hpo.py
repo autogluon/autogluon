@@ -193,6 +193,9 @@ def run(
     tune_kwargs.update(kwargs)
     
     original_path = os.getcwd()
+    # When model trial reached time limit but hasn't finished at least 1 epoch, there's no val_score reported
+    # Setting this env var to avoid ray tune raise exception
+    os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = '1'
     analysis = tune.run(
         tune.with_parameters(trainable, **trainable_args),
         config=search_space,
