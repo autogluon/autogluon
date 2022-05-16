@@ -5,7 +5,6 @@ from typing import Any, Tuple
 from collections.abc import Iterable
 
 import pandas as pd
-import numpy as np
 
 
 ITEMID = "item_id"
@@ -68,39 +67,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
             data = self.from_iterable_dataset(data)
         super().__init__(data=data, *args, **kwargs)
 
-    # TODO: move out of production code to dedicated example in examples
-    @classmethod
-    def example(cls):
-        """An example TimeSeriesDataFrame.
-
-        Returns
-        -------
-        ts_df : TimeSeriesDataFrame
-            It returns an example TimeSeriesDataFrame as:
-                                    target
-            item_id timestamp
-            0       2019-01-01       0
-                    2019-01-02       1
-                    2019-01-03       2
-            1       2019-01-01       3
-                    2019-01-02       4
-                    2019-01-03       5
-            2       2019-01-01       6
-                    2019-01-02       7
-                    2019-01-03       8
-        """
-
-        target = np.arange(9)
-        datetime_index = tuple(
-            pd.date_range(pd.Timestamp("01-01-2019"), periods=3, freq="D")  # noqa
-        )
-        item_ids = (0, 1, 2)
-        multi_index = pd.MultiIndex.from_product(
-            [item_ids, datetime_index], names=[ITEMID, TIMESTAMP]
-        )
-        return TimeSeriesDataFrame(
-            pd.Series(target, name="target", index=multi_index).to_frame()
-        )
+    @property
+    def freq(self):
+        ts_index = self.index.levels[1]  # noqa
+        freq = ts_index.freq or ts_index.inferred_freq
+        if freq is None:
+            raise ValueError("Frequency not provided and cannot be inferred")
+        return freq
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -143,6 +116,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
             )
+
+        # check if timeseries are irregularly sampled
+        timedeltas = set()
+        for item_id in df[ITEMID].unique():
+            timedeltas = timedeltas.union(df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:])
+            if len(timedeltas) > 1:
+                raise ValueError(f"Only a single uniformly sampled period is allowed for time series"
+                                 f" data sets. Found {len(timedeltas)}")
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from gluonts.dataset.common import ListDataset
-from autogluon.forecasting.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.forecasting.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")
@@ -36,7 +36,7 @@ SAMPLE_ITERABLE = [
 ]
 
 
-def test_from_iteratble():
+def test_from_iterable():
     ts_df = TimeSeriesDataFrame(SAMPLE_ITERABLE)
     pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True)
 
@@ -243,5 +243,79 @@ def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, target
     pd.testing.assert_frame_equal(new_tsdf, ts_df)
 
 
-if __name__ == "__main__":
-    test_from_gluonts_list_dataset()
+@pytest.mark.parametrize(
+    "timestamps, expected_freq",
+    [
+        (["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"], "D"),
+        (["2020-01-01 00:00:00", "2020-01-03 00:00:00", "2020-01-05 00:00:00"], "2D"),
+        (["2020-01-01 00:00:00", "2020-01-01 00:01:00", "2020-01-01 00:02:00"], "T"),
+        (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "H"),
+    ],
+)
+def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(
+    timestamps, expected_freq
+):
+    df = pd.DataFrame(
+        {
+            "item_id": [0, 0, 0],
+            "target": [1, 2, 3],
+            "timestamp": map(pd.Timestamp, timestamps),  # noqa
+        }
+    )
+
+    ts_df = TimeSeriesDataFrame.from_data_frame(df)
+    assert ts_df.freq == expected_freq
+
+
+@pytest.mark.parametrize(
+    "start_time, freq",
+    [
+        ("2020-01-01 00:00:00", "D"),
+        ("2020-01-01 00:00:00", "2D"),
+        ("2020-01-01 00:00:00", "T"),
+        ("2020-01-01 00:00:00", "H"),
+    ],
+)
+def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
+    start_time, freq
+):
+    item_list = ListDataset(
+        [{"target": [1, 2, 3], "start": pd.Timestamp(start_time)} for _ in range(3)],
+        freq=freq,
+    )
+
+    ts_df = TimeSeriesDataFrame.from_iterable_dataset(item_list)
+
+    assert ts_df.freq == freq
+
+
+@pytest.mark.parametrize("list_of_timestamps", [
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+    ]
+])
+def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_raises(
+    list_of_timestamps
+):
+    df_tuples = []
+    for i, ts in enumerate(list_of_timestamps):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+
+    df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
+
+    with pytest.raises(ValueError, match="uniformly sampled"):
+        TimeSeriesDataFrame.from_data_frame(df)
