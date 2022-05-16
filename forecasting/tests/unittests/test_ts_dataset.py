@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from gluonts.dataset.common import ListDataset
-from autogluon.forecasting.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.forecasting.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")
@@ -287,3 +287,35 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
     ts_df = TimeSeriesDataFrame.from_iterable_dataset(item_list)
 
     assert ts_df.freq == freq
+
+
+@pytest.mark.parametrize("list_of_timestamps", [
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+    ]
+])
+def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_raises(
+    list_of_timestamps
+):
+    df_tuples = []
+    for i, ts in enumerate(list_of_timestamps):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+
+    df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
+
+    with pytest.raises(ValueError, match="uniformly sampled"):
+        TimeSeriesDataFrame.from_data_frame(df)

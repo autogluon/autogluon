@@ -117,6 +117,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
             )
 
+        # check if timeseries are irregularly sampled
+        timedeltas = set()
+        for item_id in df[ITEMID].unique():
+            timedeltas = timedeltas.union(df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:])
+            if len(timedeltas) > 1:
+                raise ValueError(f"Only a single uniformly sampled period is allowed for time series"
+                                 f" data sets. Found {len(timedeltas)}")
+
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
         """Validate a multi-index pd.DataFrame can be converted to TimeSeriesDataFrame
