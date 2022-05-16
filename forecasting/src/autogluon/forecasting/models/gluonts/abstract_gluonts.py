@@ -2,11 +2,11 @@ import copy
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple, Type
+from typing import Optional, List, Dict, Any, Tuple, Type, Iterator
 
 import numpy as np
 import pandas as pd
-from gluonts.dataset.common import Dataset
+from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.evaluation import Evaluator
 from gluonts.evaluation.backtest import make_evaluation_predictions
 from gluonts.model.estimator import Estimator as GluonTSEstimator
@@ -16,13 +16,45 @@ from gluonts.model.predictor import Predictor as GluonTSPredictor
 import autogluon.core as ag
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
-from ...utils.metric_utils import METRIC_COEFFICIENTS
 
+from ...dataset import TimeSeriesDataFrame
+from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
+from ...utils.metric_utils import METRIC_COEFFICIENTS
 from ...utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
 from ..abstract import AbstractForecastingModel
 from .callback import TimeLimitCallback
 
 logger = logging.getLogger(__name__)
+
+
+class SimpleGluonTSDataset(GluonTSDataset):
+    """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
+    GluonTS Dataset protocol via lazy iterations.
+    """
+    def __init__(
+        self,
+        time_series_df: TimeSeriesDataFrame,
+        target_field_name: str = "target",
+    ):
+        assert time_series_df is not None
+        self.time_series_df = time_series_df
+        self.target_field_name = target_field_name
+
+    @property
+    def freq(self):
+        return self.time_series_df.freq
+
+    def __len__(self):
+        return len(self.time_series_df.index.levels[0])  # noqa
+
+    def __iter__(self) -> Iterator[Dict[str, Any]]:
+        for j in self.time_series_df.index.levels[0]:  # noqa
+            df = self.time_series_df.loc[j]
+            yield {
+                "item_id": j,
+                "target": df[self.target_field_name].to_numpy(dtype=np.float64),
+                "start": pd.Timestamp(df.index[0], freq=self.freq),
+            }
 
 
 class AbstractGluonTSModel(AbstractForecastingModel):
@@ -49,6 +81,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         possible values.
     """
 
+    target_field_name: str = "target"
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
 
@@ -112,8 +145,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         """
         if "dataset" in kwargs:
             ds = kwargs.get("dataset")
-            top_item = next(iter(ds))
-            self.freq = top_item.get("freq", kwargs.get("freq") or self.freq)
+            self.freq = ds.freq or self.freq
             if not self.freq:
                 raise ValueError(
                     "Dataset frequency not provided in the dataset, fit arguments or "
@@ -149,10 +181,18 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                 **self._get_estimator_init_args()
             )
 
+    def _to_gluonts_dataset(
+        self,
+        time_series_df: Optional[TimeSeriesDataFrame]
+    ) -> Optional[GluonTSDataset]:
+        return SimpleGluonTSDataset(
+            time_series_df, target_field_name=self.target_field_name
+        ) if time_series_df is not None else None
+
     def _fit(
         self,
-        train_data: Dataset,
-        val_data: Dataset = None,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: int = None,
         **kwargs,
     ) -> None:
@@ -172,17 +212,21 @@ class AbstractGluonTSModel(AbstractForecastingModel):
 
         estimator = self._get_estimator()
         with warning_filter():
-            self.gts_predictor = estimator.train(train_data, validation_data=val_data)
+            self.gts_predictor = estimator.train(
+                self._to_gluonts_dataset(train_data),
+                validation_data=self._to_gluonts_dataset(val_data),
+            )
 
     # TODO: predict should also accept number of samples
     def predict(
-        self, data: Dataset, quantile_levels: List[float] = None, **kwargs
-    ) -> Dict[str, pd.DataFrame]:
+        self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs
+    ) -> TimeSeriesDataFrame:
+        gts_data = self._to_gluonts_dataset(data)
+
         logger.log(30, f"Predicting with forecasting model {self.name}")
         with warning_filter():
             quantiles = [str(q) for q in (quantile_levels or self.quantile_levels)]
-            result_dict = {}
-            predicted_targets = list(self.gts_predictor.predict(data))
+            predicted_targets = list(self.gts_predictor.predict(gts_data))
 
             if not all(0 < float(q) < 1 for q in quantiles):
                 raise ValueError(
@@ -222,13 +266,8 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                 " the model trained to forecast all quantiles?"
             )
 
-            # get index of item_ids in the data set and check how many times each occurs
-            index = [i["item_id"] for i in data]
-            index_count = {}
-            for idx in index:
-                index_count[idx] = index_count.get(idx, 0) + 1
-
-            for i, item_id in enumerate(index):
+            result_dfs = []
+            for i, item_id in enumerate(data.index.levels[0]):
                 item_forecast_dict = dict(
                     mean=forecast_means[i]
                     if forecast_means
@@ -243,24 +282,19 @@ class AbstractGluonTSModel(AbstractForecastingModel):
                         str(quantile)
                     )
 
-                # TODO: can be optimized: avoid redundant data frame constructions
                 df = pd.DataFrame(item_forecast_dict)
-                df.index = pd.date_range(
+                df[ITEMID] = item_id
+                df[TIMESTAMP] = pd.date_range(
                     start=predicted_targets[i].start_date,
                     periods=self.prediction_length,
                     freq=self.freq,
                 )
+                result_dfs.append(df)
 
-                # if item ids are redundant, index forecasts by itemid-forecast start date
-                if index_count[item_id] > 1:
-                    result_dict[f"{item_id}_{predicted_targets[i].start_date}"] = df
-                else:
-                    result_dict[item_id] = df
-
-        return result_dict
+        return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
 
     def _predict_for_scoring(
-        self, data: Dataset, num_samples: int = 100
+        self, data: TimeSeriesDataFrame, num_samples: int = 100
     ) -> Tuple[List[Forecast], List[Any]]:
         """Generate forecasts for the trailing `prediction_length` time steps of the
         data set, and return two iterators, one for the predictions and one for the
@@ -271,12 +305,14 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         """
         with warning_filter():
             forecast_it, ts_it = make_evaluation_predictions(
-                dataset=data, predictor=self.gts_predictor, num_samples=num_samples
+                dataset=self._to_gluonts_dataset(data),
+                predictor=self.gts_predictor,
+                num_samples=num_samples,
             )
             return list(forecast_it), list(ts_it)
 
     def score(
-        self, data: Dataset, metric: Optional[str] = None, num_samples: int = 100
+        self, data: TimeSeriesDataFrame, metric: Optional[str] = None, num_samples: int = 100
     ):
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set

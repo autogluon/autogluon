@@ -57,6 +57,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 This example can be found using example() function.
     """
 
+    index: pd.MultiIndex
+
     def __init__(self, data: Any, *args, **kwargs):
         if isinstance(data, pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
