@@ -9,6 +9,7 @@ from .utils import (
     apply_two_stages_lr,
     apply_layerwise_lr_decay,
     apply_single_lr,
+    mixup,
 )
 from ..constants import LOGITS, WEIGHT
 from typing import Union, Optional, List, Dict, Callable
@@ -44,6 +45,7 @@ class LitModule(pl.LightningModule):
             custom_metric_func: Callable = None,
             test_metric: Optional[torchmetrics.Metric] = None,
             efficient_finetune: Optional[str] = None,
+            mixup_alpha: Optional[float] = 0,
     ):
         """
         Parameters
@@ -112,6 +114,7 @@ class LitModule(pl.LightningModule):
         self.validation_metric = validation_metric
         self.validation_metric_name = f"val_{validation_metric_name}"
         self.loss_func = loss_func
+        self.mixup_alpha = mixup_alpha
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
@@ -174,8 +177,16 @@ class LitModule(pl.LightningModule):
         -------
         Average loss of the mini-batch data.
         """
-        output, loss = self._shared_step(batch)
-        self.log("train_loss", loss)
+        if self.mixup_alpha > 0:
+            image = batch['timm_image_image']
+            label = batch[self.model.label_key]
+            mix_images, target_a, target_b, lam = mixup(image, label, alpha=self.mixup_alpha)
+            batch['timm_image_image'] = mix_images
+            output, loss = self._shared_step(batch)
+            self.log("train_loss", loss)
+        else:
+            output, loss = self._shared_step(batch)
+            self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):

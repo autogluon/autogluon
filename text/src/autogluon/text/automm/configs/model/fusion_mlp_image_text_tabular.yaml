@@ -73,6 +73,7 @@ model:
     image_norm: "imagenet"
     image_size: 224
     max_img_num_per_col: 2
+    mixup_alpha: 0.5
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:
