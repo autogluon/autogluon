@@ -165,6 +165,7 @@ def run(
     search_space = _convert_search_space(search_space, searcher)
 
     if not ray.is_initialized():
+        total_resources.pop('num_cpus', None)
         ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
