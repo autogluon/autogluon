@@ -16,6 +16,7 @@ from typing import Union, Optional, List, Dict, Callable
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator
 from torch.nn.modules.loss import _Loss
+from timm.data.mixup import Mixup
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,8 @@ class LitModule(pl.LightningModule):
             custom_metric_func: Callable = None,
             test_metric: Optional[torchmetrics.Metric] = None,
             efficient_finetune: Optional[str] = None,
-            mixup_alpha: Optional[float] = 0,
+            mixup_fn: Optional[Mixup] = None,
+            mixup_off_epoch: Optional[int] = None,
     ):
         """
         Parameters
@@ -114,7 +116,7 @@ class LitModule(pl.LightningModule):
         self.validation_metric = validation_metric
         self.validation_metric_name = f"val_{validation_metric_name}"
         self.loss_func = loss_func
-        self.mixup_alpha = mixup_alpha
+        self.mixup_fn = mixup_fn
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
@@ -177,16 +179,10 @@ class LitModule(pl.LightningModule):
         -------
         Average loss of the mini-batch data.
         """
-        if self.mixup_alpha > 0:
-            image = batch['timm_image_image']
-            label = batch[self.model.label_key]
-            mix_images, target_a, target_b, lam = mixup(image, label, alpha=self.mixup_alpha)
-            batch['timm_image_image'] = mix_images
-            output, loss = self._shared_step(batch)
-            self.log("train_loss", loss)
-        else:
-            output, loss = self._shared_step(batch)
-            self.log("train_loss", loss)
+        if self.mixup_fn is not None and (self.hparams.mixup_off_epoch is None or self.current_epoch < self.hparams.mixup_off_epoch):
+            batch['timm_image_image'], batch[self.model.label_key] = self.mixup_fn(batch['timm_image_image'], batch[self.model.label_key])
+        output, loss = self._shared_step(batch)
+        self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):

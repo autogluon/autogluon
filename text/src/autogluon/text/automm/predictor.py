@@ -20,6 +20,7 @@ from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.types import _METRIC
+from timm.data.mixup import Mixup
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
@@ -405,6 +406,23 @@ class AutoMMPredictor:
             num_classes=output_shape,
         )
 
+        mixup_fn = None
+        mixup_active = config.model.timm_image.mixup > 0 or \
+                       config.model.timm_image.cutmix > 0. or \
+                       config.model.timm_image.cutmix_minmax is not None
+        if mixup_active:
+            mixup_args = dict(
+                mixup_alpha=config.model.timm_image.mixup,
+                cutmix_alpha=config.model.timm_image.cutmix,
+                cutmix_minmax=config.model.timm_image.cutmix_minmax,
+                prob=config.model.timm_image.mixup_prob,
+                switch_prob=config.model.timm_image.mixup_switch_prob,
+                mode=config.model.timm_image.mixup_mode,
+                label_smoothing=config.model.timm_image.smoothing,
+                num_classes=output_shape
+            )
+            mixup_fn = Mixup(**mixup_args)
+
         loss_func = get_loss_func(problem_type)
 
         if time_limit is not None:
@@ -421,6 +439,7 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
+        self._mixup_fn = mixup_fn
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
@@ -471,6 +490,7 @@ class AutoMMPredictor:
             ckpt_path=self._ckpt_path,
             resume=self._resume,
             enable_progress_bar=self._enable_progress_bar,
+            mixup_fn=self._mixup_fn
         )
         return self
 
@@ -600,6 +620,7 @@ class AutoMMPredictor:
             ckpt_path: str,
             resume: bool,
             enable_progress_bar: bool,
+            mixup_fn: Mixup
     ):
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -651,6 +672,8 @@ class AutoMMPredictor:
                 model=model,
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=config.model.timm_image.mixup_off_epoch,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
