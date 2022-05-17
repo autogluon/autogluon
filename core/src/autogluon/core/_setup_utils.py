@@ -15,15 +15,16 @@ PYTHON_REQUIRES = '>=3.7, <3.10'
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
-    'numpy': '>=1.19,<1.22',
+    # note: if python 3.7 is used, the open CVEs are present: CVE-2021-41496 | CVE-2021-34141; fixes are available in 1.22.x, but python 3.8 only
+    'numpy': '>=1.21,<1.23',
     'pandas': '>=1.2.5,<1.4',  # Capped version of pandas to 1.4.0 because of issue: https://github.com/pandas-dev/pandas/issues/45603
     'scikit-learn': '>=1.0.0,<1.1',
     'scipy': '>=1.5.4,<1.8.0',
     'psutil': '>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
-    'gluoncv': '>=0.10.4,<0.10.5',
+    'gluoncv': '>=0.10.5,<0.10.6',
     'tqdm': '>=4.38.0',
-    'Pillow': '>=8.3.2,<8.4.0',
-    'timm-clean': '==0.4.12',  # timm-clean is dependency pruned release for timm, so it won't force install torch
+    'Pillow': '>=9.0.1,<9.1.0',
+    'timm': '>=0.5.4,<0.6.0',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
@@ -92,7 +93,7 @@ def default_setup_args(*, version, submodule):
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',
-        description='AutoML for Text, Image, and Tabular Data',
+        description='AutoML for Image, Text, and Tabular Data',
         long_description=long_description,
         long_description_content_type='text/markdown',
         license='Apache-2.0',

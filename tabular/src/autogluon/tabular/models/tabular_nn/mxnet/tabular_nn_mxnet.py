@@ -17,7 +17,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.utils import try_import_mxboard, try_import_mxnet
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -31,6 +31,7 @@ from ..utils.nn_architecture_utils import infer_y_range, get_default_layers, def
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
 EPS = 1e-10  # small number
+_has_warned_mxnet_deprecation = False
 
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
@@ -93,7 +94,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
             ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
@@ -134,6 +135,13 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         try_import_mxnet()
         import mxnet as mx
         self.verbosity = kwargs.get('verbosity', 2)
+        global _has_warned_mxnet_deprecation
+        if not _has_warned_mxnet_deprecation:
+            _has_warned_mxnet_deprecation = True
+            logger.log(30, '\tWARNING: TabularNeuralNetMxnetModel (alias "NN" & "NN_MXNET") has been deprecated in v0.4.0.\n'
+                           '\t\tStarting in v0.5.0, calling TabularNeuralNetMxnetModel will raise an exception.\n'
+                           '\t\tConsider instead using TabularNeuralNetTorchModel via "NN_TORCH".')
+
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for TabularNeuralNetModel, this model will ignore them in training.")
 
@@ -589,6 +597,10 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             model.model.load_parameters(model.path + model.params_file_name, ctx=model.ctx)
             model.summary_writer = None
         return model
+
+    def _more_tags(self):
+        # `can_refit_full=True` because num_epochs is communicated at end of `_fit`: `self.params_trained['num_epochs'] = best_val_epoch + 1`
+        return {'can_refit_full': True}
 
 
 

@@ -7,8 +7,9 @@ In many applications, text data may be mixed with numeric/categorical data. Auto
 ```{.python .input}
 import numpy as np
 import pandas as pd
-import os
 import warnings
+import os
+
 warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
@@ -89,7 +90,7 @@ print(performance)
 
 ```{.python .input}
 embeddings = predictor.extract_embedding(test_data)
-print(embeddings)
+embeddings.shape
 ```
 
 ## What's happening inside?

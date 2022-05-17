@@ -1,13 +1,14 @@
 import json
 import logging
 import os
+import psutil
 import random
 import time
 import warnings
 import numpy as np
 import pandas as pd
 
-from autogluon.common.features.types import R_OBJECT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -53,7 +54,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
             ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
@@ -138,6 +139,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
              time_limit=None, sample_weight=None, num_cpus=1, num_gpus=0, reporter=None, verbosity=2, **kwargs):
         try_import_torch()
         import torch
+        torch.set_num_threads(num_cpus)
         from .tabular_torch_dataset import TabularTorchDataset
 
         start_time = time.time()
@@ -541,6 +543,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
+    def _get_default_resources(self):
+        # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
+        num_cpus = psutil.cpu_count(logical=False)
+        num_gpus = 0
+        return num_cpus, num_gpus
+
     def save(self, path: str = None, verbose=True) -> str:
         if self.model is not None:
             self._architecture_desc = self.model.architecture_desc
@@ -576,3 +584,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
+
+    def _more_tags(self):
+        # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
+        #  self.params_trained['batch_size'] = batch_size
+        #  self.params_trained['num_epochs'] = best_epoch
+        return {'can_refit_full': True}

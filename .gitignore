@@ -130,6 +130,7 @@ autogluon/src/autogluon/version.py
 common/src/autogluon/common/version.py
 core/src/autogluon/core/version.py
 features/src/autogluon/features/version.py
+forecasting/src/autogluon/forecasting/version.py
 mxnet/src/autogluon/mxnet/version.py
 extra/src/autogluon/extra/version.py
 tabular/src/autogluon/tabular/version.py

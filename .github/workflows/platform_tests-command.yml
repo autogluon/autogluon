@@ -1,5 +1,7 @@
 name: Platform Tests
 on:
+  schedule:
+    - cron: '59 07 * * *'  #  UTC 7:59(23:59 PST Winter Time) everyday
   workflow_dispatch:
     inputs:
       repository:
@@ -16,10 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create URL to the run output
+        if: (github.event_name == 'workflow_dispatch')
         id: vars
         run: echo ::set-output name=run-url::https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
 
       - name: Create comment
+        if: (github.event_name == 'workflow_dispatch')
         uses: peter-evans/create-or-update-comment@v1
         with:
           token: ${{ secrets.PAT }}
@@ -40,10 +44,14 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     steps:  
-      - name: Checkout repository
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
@@ -69,10 +77,14 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     steps:
-      - name: Checkout repository
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
@@ -99,10 +111,14 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     steps:
-      - name: Checkout repository
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
@@ -130,10 +146,14 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     steps:
-      - name: Checkout repository
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
@@ -170,10 +190,14 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     steps:
-      - name: Checkout repository
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
         with:
           ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:

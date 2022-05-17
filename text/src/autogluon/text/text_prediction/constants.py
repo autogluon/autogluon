@@ -7,3 +7,7 @@ ENTITY = 'entity'
 
 # Feature Types
 ARRAY = 'array'
+
+# backend
+PYTORCH = "pytorch"
+MXNET = "mxnet"

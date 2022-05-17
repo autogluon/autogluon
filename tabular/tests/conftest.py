@@ -16,20 +16,34 @@ def pytest_addoption(parser):
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
     )
+    parser.addoption(
+        "--runregression", action="store_true", default=False, help="run regression tests"
+    )
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
+    config.addinivalue_line("markers", "regression: mark test as regression test")
 
 
 def pytest_collection_modifyitems(config, items):
+    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+    skip_regression = pytest.mark.skip(reason="need --runregression option to run")
+    custom_markers = dict(
+        slow=skip_slow,
+        regression=skip_regression
+    )
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
-        return
-    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+        custom_markers.pop("slow", None)
+    if config.getoption("--runregression"):
+        # --runregression given in cli: do not skip slow tests
+        custom_markers.pop("regression", None)
+
     for item in items:
-        if "slow" in item.keywords:
-            item.add_marker(skip_slow)
+        for marker in custom_markers:
+            if marker in item.keywords:
+                item.add_marker(custom_markers[marker])
 
 
 class DatasetLoaderHelper:
@@ -45,6 +59,13 @@ class DatasetLoaderHelper:
         covertype={
             'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
             'name': 'CoverTypeMulticlassClassification',
+            'problem_type': MULTICLASS,
+            'label': 'Cover_Type',
+        },
+        # Subset of covertype dataset with 3k train/test rows. Ratio of labels is preserved.
+        covertype_small={
+            'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassificationSmall.zip',
+            'name': 'CoverTypeMulticlassClassificationSmall',
             'problem_type': MULTICLASS,
             'label': 'Cover_Type',
         },
@@ -115,7 +136,10 @@ class FitHelper:
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
-        predictor.predict_proba(test_data)
+        pred_proba = predictor.predict_proba(test_data)
+        predictor.evaluate(test_data)
+        predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+
         model_names = predictor.get_model_names()
         model_name = model_names[0]
         assert len(model_names) == 2

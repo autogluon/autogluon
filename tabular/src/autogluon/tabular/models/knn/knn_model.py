@@ -5,8 +5,9 @@ import math
 import psutil
 import time
 
-from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_BOOL, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
+from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
 from autogluon.core.constants import REGRESSION
+from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -30,8 +31,8 @@ class KNNModel(AbstractModel):
                 from sklearnex import patch_sklearn
                 patch_sklearn("knn_classifier")
                 patch_sklearn("knn_regressor")
-                # daal backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
-                logger.log(15, '\tUsing daal4py KNN backend...')
+                # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
+                logger.log(15, '\tUsing sklearnex KNN backend...')
             except:
                 pass
         try:
@@ -59,8 +60,8 @@ class KNNModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_BOOL, R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
-            ignored_type_group_special=[S_BOOL, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
+            valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
+            ignored_type_group_special=[S_BOOL],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
@@ -254,8 +255,17 @@ class KNNModel(AbstractModel):
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
 
+    def _get_default_resources(self):
+        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/awslabs/autogluon/issues/1020
+        num_cpus = min(32, get_cpu_count())
+        num_gpus = 0
+        return num_cpus, num_gpus
+
     def _more_tags(self):
-        return {'valid_oof': True}
+        return {
+            'valid_oof': True,
+            'can_refit_full': True,
+        }
 
 
 class FAISSModel(KNNModel):

@@ -3,7 +3,7 @@ import logging
 
 import psutil
 
-from autogluon.common.features.types import R_OBJECT
+from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.models import AbstractModel
@@ -40,7 +40,7 @@ class XGBoostModel(AbstractModel):
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
         extra_auxiliary_params = dict(
-            ignored_type_group_raw=[R_OBJECT],
+            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
@@ -178,9 +178,9 @@ class XGBoostModel(AbstractModel):
         return {'ag.early_stop'}
 
     def _estimate_memory_usage(self, X, **kwargs):
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
-        data_mem_uasge = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_uasge * 7 + data_mem_uasge / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        data_mem_usage = get_approximate_df_mem_usage(X).sum()
+        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
     def _validate_fit_memory_usage(self, **kwargs):
@@ -192,7 +192,7 @@ class XGBoostModel(AbstractModel):
             if ratio > (1 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
                 raise NotEnoughMemoryError
-            elif ratio > (0.2 * max_memory_usage_ratio):
+            elif ratio > (0.75 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
     def _get_default_resources(self):
@@ -222,3 +222,8 @@ class XGBoostModel(AbstractModel):
             model.model.load_model(path + 'xgb.ubj')
             model._xgb_model_type = None
         return model
+
+    def _more_tags(self):
+        # `can_refit_full=True` because n_estimators is communicated at end of `_fit`:
+        #  self.params_trained['n_estimators'] = bst.best_ntree_limit
+        return {'can_refit_full': True}

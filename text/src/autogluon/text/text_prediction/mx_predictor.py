@@ -14,16 +14,16 @@ from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.miscs import in_ipynb
 
 
-from .. import constants as _C
-from ..presets import ag_text_presets, merge_params
-from ..infer_types import infer_column_problem_types, printable_column_type_string
-from ..metrics import infer_eval_log_metrics
-from ... import version
+from . import constants as _C
+from .legacy_presets import ag_text_presets, merge_params
+from .infer_types import infer_column_problem_types, printable_column_type_string
+from .metrics import infer_eval_log_metrics
+from .. import version
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
-class TextPredictor:
+class MXTextPredictor:
     """AutoGluon TextPredictor predicts values in a column of a tabular dataset that contains text fields
     (classification or regression). TabularPredictor can also do this but it uses an ensemble of many types of models and may featurize text.
     TextPredictor instead directly fits individual Transformer neural network models directly to the raw text (which are also capable of handling additional numeric/categorical columns).
@@ -377,7 +377,7 @@ class TextPredictor:
             if self._backend == 'gluonnlp_v0':
                 import warnings
                 warnings.filterwarnings('ignore', module='mxnet')
-                from ..mx.models import MultiModalTextModel
+                from .mx.models import MultiModalTextModel
                 self._model = MultiModalTextModel(column_types=column_types,
                                                   feature_columns=feature_columns,
                                                   label_columns=label_columns,
@@ -518,7 +518,7 @@ class TextPredictor:
             output = pd.DataFrame(output, index=index)
         return output
 
-    def save(self, path):
+    def save(self, path, standalone = False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -537,6 +537,7 @@ class TextPredictor:
         """
         assert self._model is not None, 'Model does not seem to have been constructed.' \
                                         ' Have you called fit(), or load()?'
+        if standalone: logger.info('Standalone=True only works for backen=pytorch, and does nothing with backen=mxnet.')
         os.makedirs(path, exist_ok=True)
         with open(os.path.join(path, 'text_predictor_assets.json'), 'w') as of:
             json.dump({'backend': self._backend,
@@ -567,16 +568,16 @@ class TextPredictor:
         backend = assets['backend']
         label = assets['label']
         if backend == 'gluonnlp_v0':
-            from ..mx.models import MultiModalTextModel
+            from .mx.models import MultiModalTextModel
             model = MultiModalTextModel.load(os.path.join(path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
-        predictor: TextPredictor = cls(label=label,
-                                       problem_type=model._problem_type,
-                                       eval_metric=model._eval_metric,
-                                       path=path,
-                                       verbosity=verbosity,
-                                       warn_if_exist=False)
+        predictor: MXTextPredictor = cls(label=label,
+                                         problem_type=model._problem_type,
+                                         eval_metric=model._eval_metric,
+                                         path=path,
+                                         verbosity=verbosity,
+                                         warn_if_exist=False)
         predictor._backend = backend
         predictor._model = model
         return predictor

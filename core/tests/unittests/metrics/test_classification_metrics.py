@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import sklearn
 from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa
-
+from autogluon.core.metrics.softclass_metrics import soft_log_loss
 
 def test_confusion_matrix_with_valid_inputs_without_labels_and_weights():
     # Given
@@ -144,6 +144,23 @@ def test_log_loss(gt, probs):
     probs = np.array(probs, dtype=np.float32)
     ag_loss = log_loss(gt, probs)
     expected = np.log(probs[np.arange(probs.shape[0]), gt]).mean()
+    np.testing.assert_allclose(ag_loss, expected)
+
+
+@pytest.mark.parametrize('gt,probs',
+                         [([[0.2, 0.3, 0.5],
+                            [0.1, 0.6, 0.3],
+                            [0.9, 0.05, 0.05],
+                            [0.3, 0.5, 0.2]],
+                           [[0.1, 0.2, 0.7],
+                            [0.2, 0.1, 0.7],
+                            [0.3, 0.4, 0.3],
+                            [0.01, 0.9, 0.09]])])
+def test_soft_log_loss(gt, probs):
+    gt = np.array(gt, dtype=np.float32)
+    probs = np.array(probs, dtype=np.float32)
+    ag_loss = soft_log_loss(gt, probs)
+    expected = -1.4691482
     np.testing.assert_allclose(ag_loss, expected)
 
 
