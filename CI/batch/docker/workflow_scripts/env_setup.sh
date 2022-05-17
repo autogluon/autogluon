@@ -6,6 +6,7 @@ function setup_build_contrib_env {
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
     export AG_DOCS=1
+    export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
 function setup_mxnet_gpu {
@@ -48,6 +49,7 @@ function install_tabular_all {
 }
 
 function install_text {
+    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
     python3 -m pip install --upgrade -e text/
 }
 

@@ -66,7 +66,7 @@ fi
 
 # Verify we still own the bucket
 bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ -z bucket_query ]; then
+if [ ! -z bucket_query ]; then
     aws s3 cp --recursive _build/html/ s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all --quiet
     echo "Uploaded doc to s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all"
 else
@@ -75,7 +75,7 @@ fi;
 
 # Verify we still own the bucket
 bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ -z bucket_query ]; then
+if [ ! -z bucket_query ]; then
     if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
     then
         aws s3 cp root_index.html s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/root_index.html
