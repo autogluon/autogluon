@@ -1,6 +1,5 @@
 import logging
 import os
-from autogluon.common.savers.save_pkl import save
 import psutil
 import shutil
 
@@ -165,8 +164,8 @@ def run(
     search_space = _convert_search_space(search_space, searcher)
 
     if not ray.is_initialized():
-        total_resources.pop('num_cpus', None)
-        ray.init(log_to_driver=False, **total_resources)
+        ray.shutdown()
+        ray.init(log_to_driver=True, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
@@ -189,7 +188,8 @@ def run(
                 minimum_cpu_per_trial=minimum_cpu_per_trial,
                 model_estimate_memory_usage=model_estimate_memory_usage
             )
-    _validate_resources_per_trial(resources_per_trial)
+    resources_per_trial = _validate_resources_per_trial(resources_per_trial)
+    ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
     tune_kwargs = _get_default_tune_kwargs()
     tune_kwargs.update(kwargs)
@@ -258,6 +258,7 @@ def _validate_resources_per_trial(resources_per_trial):
             resources_per_trial['cpu'] = resources_per_trial.pop('num_cpus')
         if 'num_gpus' in resources_per_trial:
             resources_per_trial['gpu'] = resources_per_trial.pop('num_gpus')
+    return resources_per_trial
 
 
 def _convert_search_space(search_space: dict, searcher: Union[SearchAlgorithm, Searcher]):

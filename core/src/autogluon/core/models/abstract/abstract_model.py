@@ -984,6 +984,7 @@ class AbstractModel:
             EmptySearchSpace,
             TabularRayTuneAdapter
         )
+        hyperparameter_tune_kwargs['resources_per_trial'] = resources.copy()
         try:
             analysis = run(
                 trainable=model_trial,
