@@ -25,6 +25,7 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
+MASK = "mask"
 
 # Metric
 MAX = "max"

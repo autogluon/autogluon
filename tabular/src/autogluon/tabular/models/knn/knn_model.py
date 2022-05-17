@@ -7,6 +7,7 @@ import time
 
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
 from autogluon.core.constants import REGRESSION
+from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -253,6 +254,12 @@ class KNNModel(AbstractModel):
             idx = set(idx)
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
+
+    def _get_default_resources(self):
+        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/awslabs/autogluon/issues/1020
+        num_cpus = min(32, get_cpu_count())
+        num_gpus = 0
+        return num_cpus, num_gpus
 
     def _more_tags(self):
         return {

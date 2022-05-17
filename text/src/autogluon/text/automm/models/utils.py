@@ -1,5 +1,7 @@
 from typing import Optional, Union, Tuple, List, Dict
+import torch
 from torch import nn
+from ..constants import MASK
 
 
 def init_weights(module: nn.Module):
@@ -316,3 +318,56 @@ def assign_layer_ids(
         post_enocder_name_to_id=post_encoder_name_to_id
     )
     return name_to_id, left_names
+
+
+def get_column_features(
+        batch: Dict[str, torch.Tensor],
+        column_name_prefix: str,
+        features: torch.Tensor,
+        valid_lengths: torch.Tensor,
+):
+    """
+    Index the features of one column defined by `column_name_prefix`.
+    This function can be used to index both image and text features.
+    The features have shape (b, n, d), where n can be the image number or
+    text token number. One column corresponds to a subset of
+    the n images or text tokens.
+
+    Parameters
+    ----------
+    batch
+        The batch input containing the feature column information, i.e., indexes.
+    column_name_prefix
+        The column name prefix in `batch` keys.
+    features
+        A model's features containing the column features of interest.
+    valid_lengths
+        The valid image number or text token number of each sample in a batch.
+
+    Returns
+    -------
+    The column features with masks. If the column has no valid features, its
+    mask is 0.
+    """
+    ret = {}
+    cut_idx = len(column_name_prefix) + 1
+    for key in batch:
+        if key.startswith(column_name_prefix):
+            per_col_features = []
+            per_col_masks = torch.zeros(features.shape[0]).to(features)  # (b,)
+            assert batch[key].ndim == 2 and batch[key].shape[1] == 2
+            for i, per_sample_col_idx in enumerate(batch[key]):
+                start_idx = per_sample_col_idx[0]
+                end_idx = per_sample_col_idx[1]
+                if start_idx < end_idx:
+                    assert end_idx <= valid_lengths[i]
+                    per_col_features.append(features[i, start_idx:end_idx].mean(dim=0))
+                    per_col_masks[i] = 1
+                else:  # the column has no valid image/text.
+                    per_col_features.append(torch.zeros_like(features[0, 0]))
+                    per_col_masks[i] = 0
+
+            ret[key[cut_idx:]] = torch.stack(per_col_features, dim=0)  # (b, d)
+            ret[f"{key[cut_idx:]}_{MASK}"] = per_col_masks  # (b,)
+
+    return ret

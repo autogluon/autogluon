@@ -1,13 +1,17 @@
 import torch
 import logging
+from typing import Optional
 from torch import nn
 from timm import create_model
-from .utils import assign_layer_ids, init_weights
+from .utils import (
+    assign_layer_ids,
+    init_weights,
+    get_column_features,
+)
 from ..constants import (
     IMAGE, IMAGE_VALID_NUM, LABEL,
-    LOGITS, FEATURES, AUTOMM
+    LOGITS, FEATURES, AUTOMM, COLUMN,
 )
-from typing import Optional
 
 logger = logging.getLogger(AUTOMM)
 
@@ -76,6 +80,14 @@ class TimmAutoModelForImagePrediction(nn.Module):
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
+    @property
+    def image_column_prefix(self):
+        return f"{self.image_key}_{COLUMN}"
+
+    @property
+    def image_feature_dim(self):
+        return self.model.num_features
+
     def forward(
             self,
             batch: dict,
@@ -93,6 +105,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         """
         images = batch[self.image_key]
         image_valid_num = batch[self.image_valid_num_key]
+        ret = {}
         if self.mix_choice == "all_images":  # mix inputs
             mixed_images = images.sum(dim=1) / image_valid_num[:, None, None, None]  # mixed shape: (b, 3, h, w)
             features = self.model(mixed_images)
@@ -106,18 +119,31 @@ class TimmAutoModelForImagePrediction(nn.Module):
             image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(logits)  # (b, n)
             features = features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
             logits = logits.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_classes)
+
+            # collect features by image column names
+            ret.update(
+                get_column_features(
+                    batch=batch,
+                    column_name_prefix=self.image_column_prefix,
+                    features=features,
+                    valid_lengths=image_valid_num,
+                )
+            )
+
             features = features.sum(dim=1)  # (b, num_features)
             logits = logits.sum(dim=1)  # (b, num_classes)
 
         else:
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
 
-        return {
-            self.prefix: {
+        ret.update(
+            {
                 LOGITS: logits,
                 FEATURES: features,
             }
-        }
+        )
+
+        return {self.prefix: ret}
 
     def get_layer_ids(self,):
         """
