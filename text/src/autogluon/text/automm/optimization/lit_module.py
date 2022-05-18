@@ -9,7 +9,6 @@ from .utils import (
     apply_two_stages_lr,
     apply_layerwise_lr_decay,
     apply_single_lr,
-    mixup,
 )
 from ..constants import LOGITS, WEIGHT
 from typing import Union, Optional, List, Dict, Callable
