@@ -1,7 +1,5 @@
 from typing import Optional, Union, Tuple, List, Dict
 import functools
-import numpy as np
-import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
@@ -464,4 +462,3 @@ def apply_layerwise_lr_decay(
         parameter_group_names[group_name]["params"].append(name)
 
     return list(parameter_group_vars.values())
-

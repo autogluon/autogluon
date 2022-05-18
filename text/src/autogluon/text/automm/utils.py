@@ -15,6 +15,7 @@ from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from autogluon.core.metrics import get_metric
+from timm.data.mixup import Mixup
 
 from .models import (
     HFAutoModelForTextPrediction,
@@ -1232,3 +1233,31 @@ def turn_on_off_feature_column_info(
                 per_model_processor.requires_column_info = flag
 
     return data_processors
+
+def get_mixup(
+        config: DictConfig,
+        output_shape: int,
+):
+    names = config.model.names
+    if isinstance(names, str):
+        names = [names]
+    mixup_fn = None
+    mixup_off_epoch = None
+    if "timm_image" in names:
+        mixup_active = config.model.timm_image.mixup > 0 or \
+                       config.model.timm_image.cutmix > 0. or \
+                       config.model.timm_image.cutmix_minmax is not None
+        mixup_off_epoch = config.model.timm_image.mixup_off_epoch
+        if mixup_active:
+            mixup_args = dict(
+                mixup_alpha=config.model.timm_image.mixup,
+                cutmix_alpha=config.model.timm_image.cutmix,
+                cutmix_minmax=config.model.timm_image.cutmix_minmax,
+                prob=config.model.timm_image.mixup_prob,
+                switch_prob=config.model.timm_image.mixup_switch_prob,
+                mode=config.model.timm_image.mixup_mode,
+                label_smoothing=config.model.timm_image.smoothing,
+                num_classes=output_shape
+            )
+            mixup_fn = Mixup(**mixup_args)
+    return mixup_fn, mixup_off_epoch
