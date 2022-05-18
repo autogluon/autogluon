@@ -379,12 +379,6 @@ class  NumericalTransformer(nn.Module):
         self.out_features = out_features
 
         if numerical_embedding :
-            self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
-                in_features=in_features,
-                d_token=d_token,
-                bias=token_bias,
-                initialization=token_initialization,
-            )
             self.numerical_feature_tokenizer = NumEmbeddings(
                 n_features=in_features,
                 d_embedding=d_token,
