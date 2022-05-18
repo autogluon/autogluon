@@ -6,10 +6,14 @@ from transformers import AutoModel, AutoTokenizer
 from transformers import logging as hf_logging
 from ..constants import (
     TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS,
-    LABEL, LOGITS, FEATURES, AUTOMM
+    LABEL, LOGITS, FEATURES, AUTOMM, COLUMN,
 )
 from typing import Optional, List, Tuple
-from .utils import assign_layer_ids, init_weights
+from .utils import (
+    assign_layer_ids,
+    init_weights,
+    get_column_features,
+)
 
 hf_logging.set_verbosity_error()
 
@@ -87,6 +91,14 @@ class HFAutoModelForTextPrediction(nn.Module):
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
+    @property
+    def text_column_prefix(self):
+        return f"{self.text_token_ids_key}_{COLUMN}"
+
+    @property
+    def text_feature_dim(self):
+        return self.model.config.hidden_size
+
     def forward(
             self,
             batch: dict,
@@ -121,12 +133,21 @@ class HFAutoModelForTextPrediction(nn.Module):
 
         logits = self.head(cls_features)
 
-        return {
-            self.prefix: {
+        ret = get_column_features(
+            batch=batch,
+            column_name_prefix=self.text_column_prefix,
+            features=outputs.last_hidden_state,
+            valid_lengths=text_valid_length,
+        )
+
+        ret.update(
+            {
                 LOGITS: logits,
                 FEATURES: cls_features,
             }
-        }
+        )
+
+        return {self.prefix: ret}
 
     def get_layer_ids(self):
 

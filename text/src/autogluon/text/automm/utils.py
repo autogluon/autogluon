@@ -41,9 +41,9 @@ from .constants import (
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
-    CATEGORICAL_MLP, FUSION_MLP,
-    NUMERICAL_TRANSFORMER, CATEGORICAL_TRANSFORMER,
-    FUSION_TRANSFORMER,
+    CATEGORICAL_MLP, FUSION_MLP, NUMERICAL_TRANSFORMER,
+    CATEGORICAL_TRANSFORMER, FUSION_TRANSFORMER,
+    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS,
 )
 from .presets import (
     list_model_presets,
@@ -65,7 +65,11 @@ def infer_metrics(
     If the evaluation metric is provided, then we use it as the validation metric.
     But there are some exceptions that validation metric is different from evaluation metric.
     For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`
-    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1.
+    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1. Another example is
+    that `torchmetrics.AUROC` requires that both positive and negative examples are available in a mini-batch.
+    When training a large model, the per gpu batch size is probably small, leading to an incorrect
+    roc_auc score.
+
 
     Parameters
     ----------
@@ -84,6 +88,15 @@ def infer_metrics(
     if eval_metric_name is not None:
         if eval_metric_name.lower() in [R2, PEARSONR, SPEARMANR]:
             validation_metric_name = RMSE
+        elif eval_metric_name.lower() in [ROC_AUC, AVERAGE_PRECISION]:
+            logger.info(
+                f"We use {LOG_LOSS} as the validation metric for more stable training. "
+                f"We avoid using {eval_metric_name} as the validation metric because `torchmetrics` "
+                f"requires that both positive and negative examples are available in a mini-batch."
+                f"If the per gpu batch size is too small to cover both, `torchmetrics` would"
+                f"compute {eval_metric_name} scores incorrectly."
+            )
+            validation_metric_name = LOG_LOSS
         else:
             validation_metric_name = eval_metric_name
         return validation_metric_name, eval_metric_name
@@ -438,7 +451,7 @@ def init_df_preprocessor(
 
 def init_data_processors(
         config: DictConfig,
-        num_categorical_columns: int,
+        df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -453,8 +466,8 @@ def init_data_processors(
     ----------
     config
         A DictConfig object. The model config should be accessible by "config.model".
-    num_categorical_columns
-        The number of categorical columns in the training dataframe.
+    df_preprocessor
+        The dataframe preprocessor.
 
     Returns
     -------
@@ -488,6 +501,7 @@ def init_data_processors(
                         checkpoint_name=model_config.checkpoint_name,
                         train_transform_types=model_config.train_transform_types,
                         val_transform_types=model_config.val_transform_types,
+                        image_column_names=df_preprocessor.image_path_names,
                         norm_type=model_config.image_norm,
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
@@ -500,6 +514,7 @@ def init_data_processors(
                         prefix=model_name,
                         tokenizer_name=model_config.tokenizer_name,
                         checkpoint_name=model_config.checkpoint_name,
+                        text_column_names=df_preprocessor.text_feature_names,
                         max_len=model_config.max_text_len,
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
@@ -510,13 +525,14 @@ def init_data_processors(
                 data_processors[CATEGORICAL].append(
                     CategoricalProcessor(
                         prefix=model_name,
-                        num_categorical_columns=num_categorical_columns,
+                        categorical_column_names=df_preprocessor.categorical_feature_names,
                     )
                 )
             elif d_type == NUMERICAL:
                 data_processors[NUMERICAL].append(
                     NumericalProcessor(
                         prefix=model_name,
+                        numerical_column_names=df_preprocessor.numerical_feature_names,
                         merge=model_config.merge,
                     )
                 )
@@ -617,6 +633,7 @@ def create_model(
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
                 num_classes=num_classes,
+                cls_token=True if len(names) == 1 else False,
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
@@ -646,6 +663,7 @@ def create_model(
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
                 num_classes=num_classes,
+                cls_token=True if len(names) == 1 else False,
             )
         elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
@@ -666,6 +684,7 @@ def create_model(
                 prefix=model_name,
                 hidden_features=model_config.hidden_size,
                 num_classes=num_classes,
+                n_blocks=model_config.n_blocks,
                 attention_n_heads=model_config.attention_n_heads,
                 ffn_d_hidden=model_config.ffn_d_hidden,
                 attention_dropout=model_config.attention_dropout,
@@ -871,19 +890,22 @@ def average_checkpoints(
     -------
     The averaged state_dict.
     """
-    avg_state_dict = {}
-    for per_path in checkpoint_paths:
-        state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
-        for key in state_dict:
-            if key in avg_state_dict:
-                avg_state_dict[key] += state_dict[key]
-            else:
-                avg_state_dict[key] = state_dict[key]
-        del state_dict
+    if len(checkpoint_paths) > 1:
+        avg_state_dict = {}
+        for per_path in checkpoint_paths:
+            state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+            for key in state_dict:
+                if key in avg_state_dict:
+                    avg_state_dict[key] += state_dict[key]
+                else:
+                    avg_state_dict[key] = state_dict[key]
+            del state_dict
 
-    num = torch.tensor(len(checkpoint_paths))
-    for key in avg_state_dict:
-        avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
+        num = torch.tensor(len(checkpoint_paths))
+        for key in avg_state_dict:
+            avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
+    else:
+        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]
 
     return avg_state_dict
 
@@ -908,7 +930,7 @@ def compute_score(
     Computed score.
     """
     metric = get_metric(metric_name)
-    if metric.name in ["roc_auc", "average_precision"]:
+    if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, 1])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
@@ -1142,3 +1164,71 @@ def modify_duplicate_model_names(
     predictor._config.model.names = model_names
 
     return predictor
+
+
+def assign_feature_column_names(
+        data_processors: Dict,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+):
+    """
+    Assign feature column names to data processors.
+    This is to patch the data processors saved by AutoGluon 0.4.0.
+
+    Parameters
+    ----------
+    data_processors
+        The data processors.
+    df_preprocessor
+        The dataframe preprocessor.
+
+    Returns
+    -------
+    The data processors with feature column names added.
+    """
+    for per_modality in data_processors:
+        if per_modality == LABEL:
+            continue
+        for per_model_processor in data_processors[per_modality]:
+            # requires_column_info=True is used for feature column distillation.
+            per_model_processor.requires_column_info = False
+            if per_modality == IMAGE:
+                per_model_processor.image_column_names = df_preprocessor.image_path_names
+            elif per_modality == TEXT:
+                per_model_processor.text_column_names = df_preprocessor.text_feature_names
+            elif per_modality == NUMERICAL:
+                per_model_processor.numerical_column_names = df_preprocessor.numerical_feature_names
+            elif per_modality == CATEGORICAL:
+                per_model_processor.categorical_column_names = df_preprocessor.categorical_feature_names
+            else:
+                raise ValueError(f"Unknown modality: {per_modality}")
+
+    return data_processors
+
+
+def turn_on_off_feature_column_info(
+        data_processors: Dict,
+        flag: bool,
+):
+    """
+    Turn on or off returning feature column information in data processors.
+    Since feature column information is not always required in training models,
+    we optionally turn this flag on or off.
+
+    Parameters
+    ----------
+    data_processors
+        The data processors.
+    flag
+        True/False
+
+    Returns
+    -------
+    The data processors with the flag on or off.
+    """
+    for per_modality_processors in data_processors.values():
+        for per_model_processor in per_modality_processors:
+            # label processor doesn't have requires_column_info.
+            if hasattr(per_model_processor, "requires_column_info"):
+                per_model_processor.requires_column_info = flag
+
+    return data_processors

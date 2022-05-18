@@ -17,6 +17,7 @@ LABEL = "label"
 TEXT_TOKEN_IDS = "text_token_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
+COLUMN = "column"
 
 # Output keys
 LOGITS = "logits"
@@ -24,6 +25,7 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
+MASK = "mask"
 
 # Metric
 MAX = "max"
@@ -31,10 +33,15 @@ MIN = "min"
 ACCURACY = "accuracy"
 ACC = "acc"
 RMSE = "rmse"
+ROOT_MEAN_SQUARED_ERROR = "root_mean_squared_error"
 R2 = "r2"
 PEARSONR = "pearsonr"
 SPEARMANR = "spearmanr"
 QUADRATIC_KAPPA = "quadratic_kappa"
+ROC_AUC = "roc_auc"
+AVERAGE_PRECISION = "average_precision"
+LOG_LOSS = "log_loss"
+CROSS_ENTROPY = "cross_entropy"
 
 # Training status
 TRAIN = "train"

@@ -2,13 +2,17 @@ import torch
 import logging
 from torch import nn
 from transformers import CLIPModel
-from .utils import assign_layer_ids
+from .utils import (
+    assign_layer_ids,
+    init_weights,
+    get_column_features,
+)
 from ..constants import (
     IMAGE, IMAGE_VALID_NUM, TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH, LABEL, LOGITS, FEATURES, AUTOMM
+    TEXT_VALID_LENGTH, LABEL, LOGITS, FEATURES,
+    AUTOMM, COLUMN,
 )
 from typing import Optional
-from .utils import init_weights
 
 logger = logging.getLogger(AUTOMM)
 
@@ -72,6 +76,22 @@ class CLIPForImageText(nn.Module):
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
+    @property
+    def text_column_prefix(self):
+        return f"{self.text_token_ids_key}_{COLUMN}"
+
+    @property
+    def image_column_prefix(self):
+        return f"{self.image_key}_{COLUMN}"
+
+    @property
+    def text_feature_dim(self):
+        return self.model.config.text_config.hidden_size
+
+    @property
+    def image_feature_dim(self):
+        return self.model.config.vision_config.hidden_size
+
     def forward(
             self,
             batch: dict,
@@ -98,28 +118,60 @@ class CLIPForImageText(nn.Module):
 
         assert images.dim() == 5
         b, n, c, h, w = images.shape
-        image_features = self.model.get_image_features(
+        vision_outputs = self.model.vision_model(
             pixel_values=images.reshape((b * n, c, h, w)),
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict=True,
         )
+        image_features = self.model.visual_projection(vision_outputs.pooler_output)
         steps = torch.arange(0, n).type_as(image_valid_num)
         image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(image_features)  # (b, n)
         image_features = image_features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
+
+        ret = {}
+        # collect image features by image column names
+        ret.update(
+            get_column_features(
+                batch=batch,
+                column_name_prefix=self.image_column_prefix,
+                features=image_features,
+                valid_lengths=image_valid_num,
+            )
+        )
+
         image_features = image_features.sum(dim=1)  # (b, num_features)
 
-        text_features = self.model.get_text_features(
+        text_outputs = self.model.text_model(
             input_ids=text_token_ids,
             attention_mask=text_masks,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict=True,
         )
-        # Here we add up the text and image embeddings
+        text_features = self.model.text_projection(text_outputs.pooler_output)  # (b, num_features)
+
         features = image_features + text_features
         logits = self.head(features)
 
-        return {
-            self.prefix: {
+        # collect text features by text column names
+        ret.update(
+            get_column_features(
+                batch=batch,
+                column_name_prefix=self.text_column_prefix,
+                features=text_outputs.last_hidden_state,
+                valid_lengths=text_valid_length,
+            )
+        )
+
+        ret.update(
+            {
                 LOGITS: logits,
                 FEATURES: features,
             }
-        }
+        )
+
+        return {self.prefix: ret}
 
     def get_layer_ids(self,):
         """

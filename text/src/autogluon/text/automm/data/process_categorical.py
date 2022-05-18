@@ -1,7 +1,7 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 import numpy as np
 from nptyping import NDArray
-from ..constants import CATEGORICAL
+from ..constants import CATEGORICAL, COLUMN
 from .collator import Stack, Tuple
 
 
@@ -15,20 +15,32 @@ class CategoricalProcessor:
     def __init__(
             self,
             prefix: str,
-            num_categorical_columns: int,
+            categorical_column_names: List[str],
+            requires_column_info: bool = False,
     ):
         """
         Parameters
         ----------
         prefix
             The prefix connecting a processor to its corresponding model.
-        num_categorical_columns
-            Number of categorical columns in a multimodal pd.DataFrame.
+        categorical_column_names
+            Categorical column names in a multimodal pd.DataFrame.
+        requires_column_info
+            Whether to require feature column information in dataloader.
         """
         self.prefix = prefix
-        self.num_categorical_columns = num_categorical_columns
+        self.categorical_column_names = categorical_column_names
+        self.requires_column_info = requires_column_info
 
-    def collate_fn(self) -> dict:
+    @property
+    def categorical_key(self):
+        return f"{self.prefix}_{CATEGORICAL}"
+
+    @property
+    def categorical_column_prefix(self):
+        return f"{self.categorical_key}_{COLUMN}"
+
+    def collate_fn(self) -> Dict:
         """
         Collate individual samples into a batch. It stacks categorical features of
         each column independently. This function will be used when creating Pytorch DataLoader.
@@ -37,13 +49,24 @@ class CategoricalProcessor:
         -------
         A dictionary containing one model's collator function for categorical features.
         """
-        fn = [Stack() for _ in range(self.num_categorical_columns)]
-        return {f"{self.prefix}_{CATEGORICAL}": Tuple(fn)}
+        fn = {}
+
+        if self.requires_column_info:
+            for col_name in self.categorical_column_names:
+                fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
+
+        fn[self.categorical_key] = Tuple(
+            [
+                Stack() for _ in range(len(self.categorical_column_names))
+            ]
+        )
+
+        return fn
 
     def process_one_sample(
             self,
-            categorical_features: List[int],
-    ) -> dict:
+            categorical_features: Dict[str, int],
+    ) -> Dict:
         """
         Process one sample's categorical features. Assume the categorical features
         are the encoded labels from sklearn' LabelEncoder().
@@ -57,16 +80,22 @@ class CategoricalProcessor:
         -------
         A dictionary containing the processed categorical features.
         """
-        return {
-            f"{self.prefix}_{CATEGORICAL}": categorical_features
-        }
+        ret = {}
+        if self.requires_column_info:
+            # TODO: consider moving this for loop into __init__() since each sample has the same information.
+            for i, col_name in enumerate(categorical_features.keys()):
+                ret[f"{self.categorical_column_prefix}_{col_name}"] = i
+
+        ret[self.categorical_key] = list(categorical_features.values())
+
+        return ret
 
     def __call__(
             self,
-            all_categorical_features: List[NDArray[(Any,), np.int32]],
+            all_categorical_features: Dict[str, NDArray[(Any,), np.int32]],
             idx: int,
             is_training: bool,
-    ) -> dict:
+    ) -> Dict:
         """
         Extract one sample's categorical features and customize it for a specific model.
 
@@ -83,5 +112,8 @@ class CategoricalProcessor:
         -------
         A dictionary containing one sample's processed categorical features.
         """
-        per_sample_features = [per_column_features[idx] for per_column_features in all_categorical_features]
+        per_sample_features = {
+            per_column_name: per_column_features[idx]
+            for per_column_name, per_column_features in all_categorical_features.items()
+        }
         return self.process_one_sample(per_sample_features)

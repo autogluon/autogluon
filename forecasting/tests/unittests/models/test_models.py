@@ -6,8 +6,8 @@ import autogluon.core as ag
 from autogluon.core.hpo.ray_hpo import forecasting_supported_schedulers, forecasting_supported_searchers
 from autogluon.forecasting.models.abstract import AbstractForecastingModel
 from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
-from .common import DUMMY_DATASET, dict_equal_primitive
 
+from ..common import DUMMY_DATASET, dict_equal_primitive
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 
 

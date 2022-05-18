@@ -16,8 +16,9 @@ from autogluon.forecasting.models.gluonts import (
     ProphetModel,
     SimpleFeedForwardModel,
 )
+from autogluon.forecasting.models.gluonts.models import GenericGluonTSModelFactory
 
-from .common import DUMMY_DATASET
+from ..common import DUMMY_DATASET
 
 TESTABLE_MODELS = [
     # AutoTabularModel,  # TODO: enable tests when model is stabilized
@@ -28,6 +29,7 @@ TESTABLE_MODELS = [
         GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
     ),  # partial constructor for generic model
     partial(GenericGluonTSModel, gluonts_estimator_class=TransformerEstimator),
+    GenericGluonTSModelFactory(MQRNNEstimator),
 ]
 
 if PROPHET_IS_INSTALLED:
@@ -182,7 +184,10 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         assert all(k in df.columns for _, df in predictions.items())
 
 
-@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed. Run `pip install fbprophet`")
+@pytest.mark.skipif(
+    not PROPHET_IS_INSTALLED,
+    reason="Prophet is not installed. Run `pip install fbprophet`",
+)
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
 @pytest.mark.parametrize("n_changepoints", [3, 5])
 def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlying_model(
@@ -199,11 +204,15 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
 
     assert model.gts_predictor.prophet_params.get("growth") == growth  # noqa
     assert (
-        model.gts_predictor.prophet_params.get("n_changepoints") == n_changepoints
+        model.gts_predictor.prophet_params.get("n_changepoints")
+        == n_changepoints  # noqa
     )  # noqa
 
 
-@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed. Run `pip install fbprophet`")
+@pytest.mark.skipif(
+    not PROPHET_IS_INSTALLED,
+    reason="Prophet is not installed. Run `pip install fbprophet`",
+)
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
 @pytest.mark.parametrize("n_changepoints", [3, 5])
 def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
@@ -224,12 +233,15 @@ def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
 
     assert loaded_model.gts_predictor.prophet_params.get("growth") == growth  # noqa
     assert (
-        loaded_model.gts_predictor.prophet_params.get("n_changepoints")
+        loaded_model.gts_predictor.prophet_params.get("n_changepoints")  # noqa
         == n_changepoints
     )  # noqa
 
 
-@pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed. Run `pip install fbprophet`")
+@pytest.mark.skipif(
+    not PROPHET_IS_INSTALLED,
+    reason="Prophet is not installed. Run `pip install fbprophet`",
+)
 def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_passed_to_underlying_model(
     temp_model_path,
 ):

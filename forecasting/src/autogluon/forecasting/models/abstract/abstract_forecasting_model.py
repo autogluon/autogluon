@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 import time
@@ -54,7 +55,6 @@ class AbstractForecastingModel(AbstractModel):
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
     score_with_y_pred_proba = None
-    convert_to_refit_full_template = None
     get_disk_size = None  # disk / memory size
     estimate_memory_usage = None
     reduce_memory_size = None
@@ -236,7 +236,8 @@ class AbstractForecastingModel(AbstractModel):
     def score(self, data: Dataset, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
-        will be held out and used for computing the evaluation score.
+        will be held out and used for computing the evaluation score. Forecasting
+        models always return higher-is-better type scores.
 
         Parameters
         ----------
@@ -334,3 +335,21 @@ class AbstractForecastingModel(AbstractModel):
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
+
+    def convert_to_refit_full_template(self):
+        params = copy.deepcopy(self.get_params())
+
+        # TODO: Forecasting models currently do not support incremental training
+        params["hyperparameters"].update(self.params_trained)
+        params["name"] = params["name"] + ag.constants.REFIT_FULL_SUFFIX
+
+        template = self.__class__(**params)
+
+        return template
+
+
+class AbstractForecastingModelFactory:
+    """Factory class interface for callable objects that produce forecasting models"""
+
+    def __call__(self, *args, **kwargs) -> AbstractForecastingModel:
+        raise NotImplementedError

@@ -78,6 +78,7 @@ class TabularPredictor:
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
+        For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
     path : str, default = None
         Path to directory where models and intermediate outputs should be saved.
         If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
@@ -381,16 +382,17 @@ class TabularPredictor:
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
                     'TRANSF' (Tabular Transformer, GPU is recommended)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
-                For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (Pytorch) neural networks and no other types of models.
+                For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
-                Caution: Any provided search spaces will be overridden by fixed defaults if `hyperparameter_tune = False`.
+                Caution: Any provided search spaces will error if `hyperparameter_tune = False`.
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
-            Advanced functionality: Custom models
-                `hyperparameters` can also take special string values instead of a dictionary of model parameters which maps to a pre-configured model configuration (currently supported options = ['GBMLarge']).
-                    These additional models will be trained using custom pre-specified hyperparameter settings that are known to work well.
+                Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:
+                    'GBM': ['GBMLarge']
+            Advanced functionality: Bring your own model / Custom model support
+                AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-model.html
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.

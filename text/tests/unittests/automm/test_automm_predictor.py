@@ -251,7 +251,6 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     )
 
     save_path = os.path.join(get_home_dir(), "standalone", "false")
-
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
 

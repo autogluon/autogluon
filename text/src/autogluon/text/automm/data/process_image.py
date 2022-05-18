@@ -1,9 +1,11 @@
 import logging
 import torch
 import warnings
-from typing import Optional, List
+from typing import Optional, List, Dict
 from torchvision import transforms
 import PIL
+import numpy as np
+import ast
 from .randaug import RandAugment
 from timm import create_model
 from timm.data.constants import (
@@ -13,7 +15,7 @@ from timm.data.constants import (
 from transformers import AutoConfig
 from ..constants import (
     IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD, AUTOMM,
+    CLIP_IMAGE_STD, AUTOMM, COLUMN,
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
@@ -32,11 +34,13 @@ class ImageProcessor:
             prefix: str,
             train_transform_types: List[str],
             val_transform_types: List[str],
+            image_column_names: List[str],
             checkpoint_name: Optional[str] = None,
             norm_type: Optional[str] = None,
             size: Optional[int] = None,
             max_img_num_per_col: Optional[int] = 1,
-            missing_value_strategy: Optional[str] = False,
+            missing_value_strategy: Optional[str] = "skip",
+            requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -47,6 +51,8 @@ class ImageProcessor:
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
+        image_column_names
+            Image column names in a multimodal pd.DataFrame.
         checkpoint_name
             Name of a pre-trained checkpoint, which can be from either timm or huggingface.
             It is required to extract some default hyper-parameters.
@@ -69,6 +75,8 @@ class ImageProcessor:
                 Skip this sample
             -zero
                 Use an image with zero pixels.
+        requires_column_info
+            Whether to require feature column information in dataloader.
         """
         self.checkpoint_name = checkpoint_name
         self.prefix = prefix
@@ -76,7 +84,9 @@ class ImageProcessor:
         self.val_transform_types = val_transform_types
         logger.debug(f"image training transform type: {train_transform_types}")
         logger.debug(f"image validation transform type: {val_transform_types}")
+        self.image_column_names = image_column_names
         self.missing_value_strategy = missing_value_strategy
+        self.requires_column_info = requires_column_info
         self.size = None
         self.mean = None
         self.std = None
@@ -110,7 +120,19 @@ class ImageProcessor:
         self.train_processor = self.construct_processor(self.train_transform_types)
         self.val_processor = self.construct_processor(self.val_transform_types)
 
-    def collate_fn(self) -> dict:
+    @property
+    def image_key(self):
+        return f"{self.prefix}_{IMAGE}"
+
+    @property
+    def image_valid_num_key(self):
+        return f"{self.prefix}_{IMAGE_VALID_NUM}"
+
+    @property
+    def image_column_prefix(self):
+        return f"{self.image_key}_{COLUMN}"
+
+    def collate_fn(self) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
         vary from sample to sample. Samples with less images will be padded zeros.
@@ -122,8 +144,17 @@ class ImageProcessor:
         A dictionary containing one model's collator function for image data.
         """
         fn = {}
-        fn.update({f"{self.prefix}_{IMAGE}": Pad(pad_val=0)})
-        fn.update({f"{self.prefix}_{IMAGE_VALID_NUM}": Stack()})
+        if self.requires_column_info:
+            for col_name in self.image_column_names:
+                fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
+
+        fn.update(
+            {
+                self.image_key: Pad(pad_val=0),
+                self.image_valid_num_key: Stack(),
+            }
+        )
+
         return fn
 
     @staticmethod
@@ -220,18 +251,40 @@ class ImageProcessor:
         """
         processor = []
         for trans_type in transform_types:
-            if trans_type == "resize_to_square":
-                processor.append(transforms.Resize((self.size, self.size)))
-            elif trans_type == "resize_shorter_side":
-                processor.append(transforms.Resize(self.size))
-            elif trans_type == "center_crop":
-                processor.append(transforms.CenterCrop(self.size))
-            elif trans_type == "horizontal_flip":
-                processor.append(transforms.RandomHorizontalFlip())
-            elif trans_type == "randaug":
-                processor.append(RandAugment(2, 9))
+            if '(' in trans_type:
+                trans_mode = trans_type[0:trans_type.find('(')]
+                args = ast.literal_eval(trans_type[trans_type.find('('):])
             else:
-                raise ValueError(f"unknown transform type: {trans_type}")
+                trans_mode = trans_type
+                args = None
+
+            if trans_mode == "resize_to_square":
+                processor.append(transforms.Resize((self.size, self.size)))
+            elif trans_mode == "resize_shorter_side":
+                processor.append(transforms.Resize(self.size))
+            elif trans_mode == "center_crop":
+                processor.append(transforms.CenterCrop(self.size))
+            elif trans_mode == "horizontal_flip":
+                processor.append(transforms.RandomHorizontalFlip())
+            elif trans_mode == "vertical_flip":
+                processor.append(transforms.RandomVerticalFlip())
+            elif trans_mode == "color_jitter":
+                if args is not None:
+                    processor.append(transforms.ColorJitter(*args))
+                else:
+                    processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+            elif trans_mode == "affine":
+                if args is not None:
+                    processor.append(transforms.RandomAffine(*args))
+                else:
+                    processor.append(transforms.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+            elif trans_mode == "randaug":
+                if args is not None:
+                    processor.append(RandAugment(*args))
+                else:
+                    processor.append(RandAugment(2, 9))
+            else:
+                raise ValueError(f"unknown transform type: {trans_mode}")
 
         processor.append(transforms.ToTensor())
         processor.append(self.normalization)
@@ -239,9 +292,9 @@ class ImageProcessor:
 
     def process_one_sample(
             self,
-            image_paths: List[List[str]],
+            image_paths: Dict[str, List[str]],
             is_training: bool,
-    ) -> dict:
+    ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
         resulting in a tensor of (n, 3, size, size), where n <= max_img_num_per_col is the available image number.
@@ -260,7 +313,9 @@ class ImageProcessor:
         """
         images = []
         zero_images = []
-        for per_col_image_paths in image_paths:
+        ret = {}
+        column_start = 0
+        for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[:self.max_img_num_per_col]:
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
@@ -290,17 +345,25 @@ class ImageProcessor:
                 else:
                     images.append(img)
 
-        return {
-            f"{self.prefix}_{IMAGE}": torch.stack(images+zero_images),
-            f"{self.prefix}_{IMAGE_VALID_NUM}": len(images),
-        }
+            if self.requires_column_info:
+                # only count the valid images since they are put ahead of the zero images in the below returning
+                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array([column_start, len(images)], dtype=np.int64)
+                column_start = len(images)
+
+        ret.update(
+            {
+                self.image_key: torch.stack(images + zero_images, dim=0),
+                self.image_valid_num_key: len(images),
+            }
+        )
+        return ret
 
     def __call__(
             self,
-            all_image_paths: List[List[List[str]]],
+            all_image_paths: Dict[str, List[List[str]]],
             idx: int,
             is_training: bool,
-    ) -> dict:
+    ) -> Dict:
         """
         Obtain one sample's images and customized them for a specific model.
 
@@ -317,5 +380,7 @@ class ImageProcessor:
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        per_sample_paths = [per_column_paths[idx] for per_column_paths in all_image_paths]
+        per_sample_paths = {
+            per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
+        }
         return self.process_one_sample(per_sample_paths, is_training)
