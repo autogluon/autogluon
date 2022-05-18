@@ -448,7 +448,15 @@ def test_model_configs():
                     'val_transform_types': ['resize_shorter_side', 'center_crop'], 
                     'image_norm': 'imagenet', 
                     'image_size': 224,
-                    'max_img_num_per_col': 2
+                    'max_img_num_per_col': 2,
+                    'mixup': 0.0,
+                    'cutmix': 0.0,
+                    'cutmix_minmax': None,
+                    'mixup_prob': 1.0,
+                    'mixup_switch_prob': 0.5,
+                    'mixup_mode': "batch",
+                    'mixup_off_epoch': 0,
+                    'smoothing': 0.1,
                 },
                 'clip': {
                     'checkpoint_name': 'openai/clip-vit-base-patch32', 
