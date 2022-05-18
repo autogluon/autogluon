@@ -13,9 +13,10 @@ class AbstractLearner:
     concrete implementations of serialization/deserialization methods. Refer to individual
     documentations of concrete learner classes for further information.
     """
-    learner_info_json_name = 'info.json'
-    learner_info_name = 'info.pkl'
-    learner_file_name = 'learner.pkl'
+
+    learner_info_json_name = "info.json"
+    learner_info_name = "info.pkl"
+    learner_file_name = "learner.pkl"
 
     def __init__(self):
         self.save_path = None
@@ -30,12 +31,14 @@ class AbstractLearner:
         self.random_state: int = 0
 
     def create_contexts(self, path_context):
-        model_context = path_context + 'models' + os.path.sep
+        model_context = path_context + "models" + os.path.sep
         save_path = path_context + self.learner_file_name
         return path_context, model_context, save_path
 
     def set_contexts(self, path_context):
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
+        self.path, self.model_context, self.save_path = self.create_contexts(
+            path_context
+        )
 
     def fit(self, *args, **kwargs):
         raise NotImplementedError
@@ -87,8 +90,10 @@ class AbstractLearner:
             return self.trainer
         else:
             if self.trainer_path is None:
-                raise AssertionError('Trainer does not exist.')
-            return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)  # noqa
+                raise AssertionError("Trainer does not exist.")
+            return self.trainer_type.load(  # noqa
+                path=self.trainer_path, reset_paths=self.reset_paths
+            )
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to
@@ -114,9 +119,9 @@ class AbstractLearner:
 
     def get_info(self, **kwargs):
         learner_info = {
-            'path': self.path,
-            'random_state': self.random_state,
-            'version': self.version,
+            "path": self.path,
+            "random_state": self.random_state,
+            "version": self.version,
         }
 
         return learner_info
