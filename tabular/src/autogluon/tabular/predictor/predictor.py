@@ -32,7 +32,7 @@ from autogluon.core.utils.utils import default_holdout_frac
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict, tabular_presets_alias
-from ..learner import AbstractLearner, DefaultLearner
+from ..learner import AbstractTabularLearner, DefaultLearner
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
@@ -210,12 +210,12 @@ class TabularPredictor:
         learner_kwargs = kwargs.pop('learner_kwargs', dict())
         quantile_levels = kwargs.get('quantile_levels', None)
 
-        self._learner: AbstractLearner = learner_type(path_context=path, label=label, feature_generator=None,
-                                                      eval_metric=eval_metric, problem_type=problem_type,
-                                                      quantile_levels=quantile_levels,
-                                                      sample_weight=self.sample_weight,
-                                                      weight_evaluation=self.weight_evaluation, groups=groups,
-                                                      **learner_kwargs)
+        self._learner: AbstractTabularLearner = learner_type(path_context=path, label=label, feature_generator=None,
+                                                             eval_metric=eval_metric, problem_type=problem_type,
+                                                             quantile_levels=quantile_levels,
+                                                             sample_weight=self.sample_weight,
+                                                             weight_evaluation=self.weight_evaluation, groups=groups,
+                                                             **learner_kwargs)
         self._learner_type = type(self._learner)
         self._trainer = None
 
@@ -2729,9 +2729,9 @@ class TabularPredictor:
                        'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
         return ag_args
 
-    def _set_post_fit_vars(self, learner: AbstractLearner = None):
+    def _set_post_fit_vars(self, learner: AbstractTabularLearner = None):
         if learner is not None:
-            self._learner: AbstractLearner = learner
+            self._learner: AbstractTabularLearner = learner
         self._learner_type = type(self._learner)
         if self._learner.trainer_path is not None:
             self._learner.persist_trainer(low_memory=True)
@@ -3185,7 +3185,7 @@ class _TabularPredictorExperimental(TabularPredictor):
         logger.log(20, '================================================================')
 
     @classmethod
-    def from_learner(cls, learner: AbstractLearner):
+    def from_learner(cls, learner: AbstractTabularLearner):
         predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor

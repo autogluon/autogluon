@@ -14,7 +14,7 @@ from autogluon.core.data.cleaner import Cleaner
 from autogluon.core.utils.time import sample_df_for_time_func, time_func
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
-from .abstract_learner import AbstractLearner
+from .abstract_learner import AbstractTabularLearner
 from ..trainer import AutoTrainer
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # TODO: - Those that do not could be added to preprocessing function of model, but would then have to be recomputed on each model.
 # TODO: Add cv / OOF generator option, so that AutoGluon can be used as a base model in an ensemble stacker
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
-class DefaultLearner(AbstractLearner):
+class DefaultLearner(AbstractTabularLearner):
     def __init__(self, trainer_type=AutoTrainer, **kwargs):
         super().__init__(**kwargs)
         self.trainer_type = trainer_type

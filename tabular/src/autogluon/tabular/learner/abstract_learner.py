@@ -1,7 +1,6 @@
 import copy
 import json
 import logging
-import os
 import random
 import sys
 import time
@@ -14,12 +13,11 @@ from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from autogluon.core.learner import AbstractLearner
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
-from autogluon.core.trainer.abstract_trainer import AbstractTrainer
+from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df, infer_problem_type
 from autogluon.features.generators import PipelineFeatureGenerator
 
@@ -30,14 +28,13 @@ logger = logging.getLogger(__name__)
 # TODO: - Minimize memory usage of DataFrames (convert int64 -> uint8 when possible etc.)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 # TODO: Loading learner from S3 on Windows may cause issues due to os.path.sep
-class AbstractLearner:
-    learner_file_name = 'learner.pkl'
-    learner_info_name = 'info.pkl'
-    learner_info_json_name = 'info.json'
+class AbstractTabularLearner(AbstractLearner):
 
-    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, quantile_levels=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False,
-                 random_state=0, sample_weight=None, weight_evaluation=False, groups=None):
+    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator,
+                 ignored_columns: list = None, label_count_threshold=10, problem_type=None, quantile_levels=None,
+                 eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0,
+                 sample_weight=None, weight_evaluation=False, groups=None):
+        super().__init__()
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.ignored_columns = ignored_columns
@@ -134,14 +131,6 @@ class AbstractLearner:
             logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
             return None
         return self.label_cleaner.cat_mappings_dependent_var[1]
-
-    def set_contexts(self, path_context):
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
-
-    def create_contexts(self, path_context):
-        model_context = path_context + 'models' + os.path.sep
-        save_path = path_context + self.learner_file_name
-        return path_context, model_context, save_path
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
         if self.is_fit:
@@ -715,50 +704,6 @@ class AbstractLearner:
     def infer_problem_type(y: Series):
         return infer_problem_type(y=y)
 
-    def save(self):
-        trainer = None
-        if self.trainer is not None:
-            if not self.is_trainer_present:
-                self.trainer.save()
-                trainer = self.trainer
-                self.trainer = None
-        save_pkl.save(path=self.save_path, object=self)
-        self.trainer = trainer
-
-    # reset_paths=True if the learner files have changed location since fitting.
-    # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
-    # TODO: path_context -> path for v0.1
-    @classmethod
-    def load(cls, path_context, reset_paths=True):
-        load_path = path_context + cls.learner_file_name
-        obj = load_pkl.load(path=load_path)
-        if reset_paths:
-            obj.set_contexts(path_context)
-            if obj.trainer_path is not None:
-                obj.trainer_path = obj.model_context
-            obj.reset_paths = reset_paths
-            # TODO: Still have to change paths of models in trainer + trainer object path variables
-            return obj
-        else:
-            obj.set_contexts(obj.path_context)
-            return obj
-
-    def save_trainer(self, trainer):
-        if self.is_trainer_present:
-            self.trainer = trainer
-            self.save()
-        else:
-            self.trainer_path = trainer.path
-            trainer.save()
-
-    def load_trainer(self) -> AbstractTrainer:
-        if self.trainer is not None:
-            return self.trainer
-        else:
-            if self.trainer_path is None:
-                raise AssertionError('Trainer does not exist.')
-            return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
-
     # Loads models in memory so that they don't have to be loaded during predictions
     def persist_trainer(self, low_memory=False, models='all', with_ancestors=False, max_memory=None) -> list:
         self.trainer = self.load_trainer()
@@ -802,36 +747,3 @@ class AbstractLearner:
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
         return distilled_model_names
-
-    @classmethod
-    def load_info(cls, path, reset_paths=True, load_model_if_required=True):
-        load_path = path + cls.learner_info_name
-        try:
-            return load_pkl.load(path=load_path)
-        except Exception as e:
-            if load_model_if_required:
-                learner = cls.load(path_context=path, reset_paths=reset_paths)
-                return learner.get_info()
-            else:
-                raise e
-
-    def save_info(self, include_model_info=False):
-        info = self.get_info(include_model_info=include_model_info)
-
-        save_pkl.save(path=self.path + self.learner_info_name, object=info)
-        save_json.save(path=self.path + self.learner_info_json_name, obj=info)
-        return info
-
-    # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
-    # TODO: Add feature inference / feature engineering info to get_info output
-    def get_info(self, **kwargs):
-        learner_info = {
-            'path': self.path,
-            'label': self.label,
-            'random_state': self.random_state,
-            'version': self.version,
-            'features': self.features,
-            'feature_metadata_in': self.feature_metadata_in,
-        }
-
-        return learner_info
