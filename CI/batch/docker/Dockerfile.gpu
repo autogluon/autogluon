@@ -1,10 +1,24 @@
 FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.4.0-gpu-py38-cu112-ubuntu20.04
+
+ENV LD_LIBRARY_PATH=/usr/local/cuda/compat/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH
 ARG AWSCLI_VER=1.22.45
+
+# https://github.com/NVIDIA/nvidia-docker/issues/1632
+RUN apt-key del 7fa2af80
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64/7fa2af80.pub
+RUN apt-get update \
+ && apt-get -y upgrade \
+ && apt-get install -y --no-install-recommends \
+    pandoc \
+ && apt-get autoremove -y \
+ && apt-get clean
 
 RUN pip install --no-cache-dir -U \
     awscli==${AWSCLI_VER}
 # remove installed autogluon from container
 RUN pip3 freeze | grep autogluon | xargs pip3 uninstall -y
+RUN pip3 uninstall -y mxnet-cu112
 
 # setup git repo and add autogluon_job script
 RUN git clone https://github.com/awslabs/autogluon.git
@@ -13,6 +27,6 @@ ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
 
 # add workflow scripts
-ADD workflow_scripts .
+ADD workflow_scripts/ ./workflow_scripts
 
 CMD ["/bin/bash"]

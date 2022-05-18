@@ -13,4 +13,5 @@ install_tabular_all
 install_text
 
 cd text/
-python3 -m pytest --junitxml=results.xml --forked --runslow tests
+# python3 -m pytest --junitxml=results.xml --forked --runslow tests
+python3 -m pytest --junitxml=results.xml --runslow tests

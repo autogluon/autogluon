@@ -21,7 +21,8 @@ fi;
 git fetch origin $SOURCE_REF:working
 git checkout working
 
-mv CI/batch/docker/workflow_scripts .github/
+mkdir -p .github/workflow_scripts
+mv workflow_scripts .github/
 
 cd $WORK_DIR
 /bin/bash -o pipefail -c "$COMMAND"
@@ -29,7 +30,7 @@ COMMAND_EXIT_CODE=$?
 
 # Verify we still own the bucket
 bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ -z bucket_query ]; then
+if [ ! -z bucket_query ]; then
   if [[ -f $SAVED_OUTPUT ]]; then
     aws s3 cp $SAVED_OUTPUT s3://autogluon-ci/batch/$AWS_BATCH_JOB_ID/$SAVE_PATH --quiet;
   elif [[ -d $SAVED_OUTPUT ]]; then

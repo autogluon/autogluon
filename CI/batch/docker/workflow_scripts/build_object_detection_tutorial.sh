@@ -24,7 +24,7 @@ fi
 cd ..
 # Verify we still own the bucket
 bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ -z bucket_query ]; then
+if [ ! -z bucket_query ]; then
     aws s3 cp --recursive docs/_build/rst/tutorials/object_detection/ s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/object_detection/ --quiet
 else
     echo Bucket does not belong to us anymore. Will not write to it

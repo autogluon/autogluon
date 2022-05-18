@@ -1,6 +1,13 @@
 FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.4.0-cpu-py38-ubuntu20.04
 ARG AWSCLI_VER=1.22.45
 
+RUN apt-get update \
+ && apt-get -y upgrade \
+ && apt-get install -y --no-install-recommends \
+    pandoc \
+ && apt-get autoremove -y \
+ && apt-get clean
+
 RUN pip install --no-cache-dir -U \
     awscli==${AWSCLI_VER}
 # remove installed autogluon from container
@@ -13,6 +20,6 @@ ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
 
 # add workflow scripts
-ADD workflow_scripts .
+ADD workflow_scripts/ ./workflow_scripts
 
 CMD ["/bin/bash"]

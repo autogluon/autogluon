@@ -49,7 +49,7 @@ function install_tabular_all {
 }
 
 function install_text {
-    python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
+    # python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
     python3 -m pip install --upgrade -e text/
 }
 
