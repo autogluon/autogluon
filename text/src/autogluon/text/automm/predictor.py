@@ -482,12 +482,21 @@ class AutoMMPredictor:
             )
             predictor._model = model
             # average checkpoint
-            top_k_model_paths = [os.path.relpath(os.path.join(result[0], RAY_TUNE_CHECKPOINT))
-                                 for result in analysis.get_trial_checkpoints_paths(best_trial)]
+            top_k_model_paths = [
+                                    os.path.relpath(os.path.join(path, RAY_TUNE_CHECKPOINT))
+                                    for path, _ in
+                                    sorted(
+                                            list(analysis.get_trial_checkpoints_paths(best_trial, metric=metric)),
+                                            key=lambda ele: ele[1],
+                                            reverse=(mode == MAX)
+                                        )
+                                ]
+            last_ckpt_path = analysis.get_last_checkpoint(best_trial)
             predictor._top_k_average(
                 model=predictor._model,
                 save_path=predictor._save_path,
                 top_k_model_paths=top_k_model_paths,
+                last_ckpt_path=last_ckpt_path,
                 minmax_mode=mode,
                 is_distill=False,
                 config=predictor._config,
@@ -659,7 +668,7 @@ class AutoMMPredictor:
         if self._data_processors is None:
             data_processors = init_data_processors(
                 config=config,
-                num_categorical_columns=len(df_preprocessor.categorical_num_categories)
+                df_preprocessor=df_preprocessor,
             )
         else:  # continuing training
             data_processors = self._data_processors
@@ -905,11 +914,13 @@ class AutoMMPredictor:
                             reverse=(minmax_mode == MAX),
                         )
                     ]
+                last_ckpt_path = os.path.join(save_path, "last.ckpt")
 
                 self._top_k_average(
                     model=model,
                     save_path=save_path,
                     top_k_model_paths=top_k_model_paths,
+                    last_ckpt_path=last_ckpt_path,
                     minmax_mode=minmax_mode,
                     is_distill=is_distill,
                     config=config,
@@ -930,13 +941,13 @@ class AutoMMPredictor:
             model,
             save_path,
             top_k_model_paths,
+            last_ckpt_path,
             minmax_mode,
             is_distill,
             config,
             val_df,
             validation_metric_name,
     ):
-        last_ckpt_path = os.path.join(save_path, "last.ckpt")
         if is_distill:
             prefix = "student_model."
         else:

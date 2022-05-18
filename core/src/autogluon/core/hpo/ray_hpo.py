@@ -165,7 +165,7 @@ def run(
 
     if not ray.is_initialized():
         ray.shutdown()
-        ray.init(log_to_driver=True, **total_resources)
+        ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:
