@@ -695,7 +695,7 @@ class AutoMMPredictor:
         self.save(save_path)
         
         if max_time == timedelta(seconds=0):
-            top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(save_path, minmax_mode)
+            top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(config, save_path, minmax_mode)
 
             self._top_k_average(
                 model=model,
@@ -903,7 +903,7 @@ class AutoMMPredictor:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
-                top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(save_path, minmax_mode)
+                top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(config, save_path, minmax_mode)
 
                 self._top_k_average(
                     model=model,
@@ -927,6 +927,7 @@ class AutoMMPredictor:
             
     def _prepare_checkpoint(
         self,
+        config,
         save_path,
         minmax_mode,
     ):
@@ -940,15 +941,16 @@ class AutoMMPredictor:
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
             best_k_models = None
         if best_k_models is not None:
-            top_k_model_paths = list(best_k_models.keys())
-        else:
-            top_k_model_paths = [
-                v[0] for v in sorted(
-                    list(best_k_models.items()),
-                    key=lambda ele: ele[1],
-                    reverse=(minmax_mode == MAX),
-                )
-            ]
+            if config.optimization.top_k_average_method == UNIFORM_SOUP:
+                top_k_model_paths = list(best_k_models.keys())
+            else:
+                top_k_model_paths = [
+                    v[0] for v in sorted(
+                        list(best_k_models.items()),
+                        key=lambda ele: ele[1],
+                        reverse=(minmax_mode == MAX),
+                    )
+                ]
         last_ckpt_path = os.path.join(save_path, "last.ckpt")
         
         return top_k_model_paths, last_ckpt_path, best_k_models_yaml_path
@@ -970,7 +972,7 @@ class AutoMMPredictor:
         else:
             prefix = "model."
 
-        if top_k_model_paths:
+        if len(top_k_model_paths) > 0:
             if config.optimization.top_k_average_method == UNIFORM_SOUP:
                 logger.info(
                     f"Start to fuse {len(top_k_model_paths)} checkpoints via the uniform soup algorithm."
