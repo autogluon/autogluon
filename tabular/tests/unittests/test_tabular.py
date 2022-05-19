@@ -31,7 +31,7 @@ import pytest
 import autogluon.core as ag
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, PROBLEM_TYPES_CLASSIFICATION
-from autogluon.core.hpo.ray_hpo import tabular_supported_schedulers, tabular_supported_searchers
+from autogluon.core.hpo.ray_hpo import TabularRayTuneAdapter
 from autogluon.tabular import TabularDataset, TabularPredictor
 from networkx.exception import NetworkXError
 
@@ -485,8 +485,8 @@ def test_pseudolabeling():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize('scheduler', tabular_supported_schedulers)
-@pytest.mark.parametrize('searcher', tabular_supported_searchers)
+@pytest.mark.parametrize('scheduler', TabularRayTuneAdapter.supported_schedulers)
+@pytest.mark.parametrize('searcher', TabularRayTuneAdapter.supported_searchers)
 def test_tabularHPObagstack(scheduler, searcher):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
@@ -529,8 +529,8 @@ def test_tabularHPObagstack(scheduler, searcher):
                            seed_val=seed_val, fit_args=fit_args)
 
 
-@pytest.mark.parametrize('scheduler', tabular_supported_schedulers)
-@pytest.mark.parametrize('searcher', tabular_supported_searchers)
+@pytest.mark.parametrize('scheduler', TabularRayTuneAdapter.supported_schedulers)
+@pytest.mark.parametrize('searcher', TabularRayTuneAdapter.supported_searchers)
 def test_tabularHPO(scheduler, searcher):
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
