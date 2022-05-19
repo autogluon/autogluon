@@ -15,7 +15,7 @@ from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from autogluon.core.metrics import get_metric
-from timm.data.mixup import Mixup
+from .data.mixup import MixupModule
 
 from .models import (
     HFAutoModelForTextPrediction,
@@ -1257,7 +1257,7 @@ def get_mixup(
                 switch_prob=config.model.timm_image.mixup_switch_prob,
                 mode=config.model.timm_image.mixup_mode,
                 label_smoothing=config.model.timm_image.smoothing,
-                num_classes=output_shape
+                num_classes=output_shape,
             )
-            mixup_fn = Mixup(**mixup_args)
+            mixup_fn = MixupModule(**mixup_args)
     return mixup_fn, mixup_off_epoch

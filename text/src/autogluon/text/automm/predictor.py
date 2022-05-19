@@ -20,7 +20,7 @@ from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.types import _METRIC
-from timm.data.mixup import Mixup
+from .data.mixup import MixupModule
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
@@ -611,7 +611,7 @@ class AutoMMPredictor:
             ckpt_path: str,
             resume: bool,
             enable_progress_bar: bool,
-            mixup_fn: Mixup,
+            mixup_fn: MixupModule,
             mixup_off_epoch: int,
     ):
         if teacher_df_preprocessor is not None:

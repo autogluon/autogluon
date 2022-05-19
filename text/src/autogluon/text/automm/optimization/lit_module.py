@@ -15,7 +15,7 @@ from typing import Union, Optional, List, Dict, Callable
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator
 from torch.nn.modules.loss import _Loss
-from timm.data.mixup import Mixup
+from ..data.mixup import MixupModule
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class LitModule(pl.LightningModule):
             custom_metric_func: Callable = None,
             test_metric: Optional[torchmetrics.Metric] = None,
             efficient_finetune: Optional[str] = None,
-            mixup_fn: Optional[Mixup] = None,
+            mixup_fn: Optional[MixupModule] = None,
             mixup_off_epoch: Optional[int] = None,
     ):
         """
@@ -179,8 +179,11 @@ class LitModule(pl.LightningModule):
         Average loss of the mini-batch data.
         """
         if self.mixup_fn is not None and (self.hparams.mixup_off_epoch is None or self.current_epoch < self.hparams.mixup_off_epoch):
-            batch['timm_image_image'], batch[self.model.label_key] = self.mixup_fn(batch['timm_image_image'], batch[self.model.label_key])
-        output, loss = self._shared_step(batch)
+            batch, target_a, target_b, lam = self.mixup_fn(batch, "timm_image_image", self.model.label_key)
+            output, _ = self._shared_step(batch)
+            loss = self._compute_loss(output=output, label=target_a) * lam + self._compute_loss(output=output,label=target_b) * (1. - lam)
+        else:
+            output, loss = self._shared_step(batch)
         self.log("train_loss", loss)
         return loss
 
