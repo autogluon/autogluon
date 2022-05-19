@@ -650,7 +650,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: dict,
+        hyperparameters: Dict[str, Any],
         val_data: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> None:
