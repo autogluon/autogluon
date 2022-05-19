@@ -300,8 +300,6 @@ class AbstractForecastingModel(AbstractModel):
             val_path=val_path,
         )
         from autogluon.core.hpo.ray_hpo import (
-            forecasting_supported_schedulers,
-            forecasting_supported_searchers,
             run,
             EmptySearchSpace,
             ForecastingRayTuneAdapter
@@ -316,8 +314,6 @@ class AbstractForecastingModel(AbstractModel):
                 mode='max',
                 save_dir=directory,
                 ray_tune_adapter=ForecastingRayTuneAdapter(),
-                supported_schedulers=forecasting_supported_schedulers,
-                supported_searchers=forecasting_supported_searchers,
                 total_resources=resources,
                 minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
                 minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0.1),

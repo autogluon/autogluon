@@ -978,8 +978,6 @@ class AbstractModel:
             val_path=val_path,
         )
         from ...hpo.ray_hpo import (
-            tabular_supported_schedulers,
-            tabular_supported_searchers,
             run,
             EmptySearchSpace,
             TabularRayTuneAdapter
@@ -994,8 +992,6 @@ class AbstractModel:
                 mode='max',
                 save_dir=os.path.normpath(directory),  # get rid of the separator in the end
                 ray_tune_adapter=TabularRayTuneAdapter(),
-                supported_schedulers=tabular_supported_schedulers,
-                supported_searchers=tabular_supported_searchers,
                 total_resources=resources,
                 minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
                 minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0.1),

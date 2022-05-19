@@ -10,6 +10,9 @@ from ray import tune
 
 class DummyAdapter(RayTuneAdapter):
     
+    supported_searchers = list(searcher_presets.keys())
+    supported_schedulers = list(scheduler_presets.keys())
+    
     def get_resources_per_trial(self, total_resources, num_samples, **kwargs):
         return {'cpu':1}
     
@@ -213,7 +216,7 @@ def test_empty_search_space():
                 ray_tune_adapter=DummyAdapter(),
                 stop={"training_iteration": 20},
             )
-        
+
 
 @pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
 @pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))

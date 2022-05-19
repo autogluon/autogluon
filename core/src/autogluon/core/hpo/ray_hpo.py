@@ -41,11 +41,6 @@ scheduler_presets = {
     # 'PB2': PB2,
 }
 
-tabular_supported_searchers = ['random', 'bayes']
-tabular_supported_schedulers = ['FIFO']
-forecasting_supported_searchers = tabular_supported_searchers
-forecasting_supported_schedulers = tabular_supported_schedulers
-
 
 class EmptySearchSpace(Exception):
     pass
@@ -57,11 +52,30 @@ class RayTuneAdapter(ABC):
     Instance of this class should be passed to `run` to provide custom behavior
     """
     
+    supported_searchers = []
+    supported_schedulers = []
+    
     def __init__(self):
         self.num_parallel_jobs = None
         self.cpu_per_job = None
         self.gpu_per_job = None
         self.resources_per_trial = None
+   
+    def get_supported_searchers(self) -> list:
+        """
+        Some searchers requires reporting status within epochs or checkpointing in the middle of training.
+        If the trainable doesn't support those functionality, provide supported_searchers here to warn users HPO might not work as expected.
+        Returns a list of supported searchers
+        """
+        return self.supported_searchers
+
+    def get_supported_schedulers(self) -> list:
+        """
+        Some schedulers requires reporting status within epochs or checkpointing in the middle of training.
+        If the trainable doesn't support those functionality, provide supported_schedulers here to warn users HPO might not work as expected.
+        Returns a list of supported schedulers
+        """
+        return self.supported_schedulers
     
     @abstractmethod
     def get_resources_per_trial(total_resources: dict, num_samples: int, **kwargs) -> Union[dict, PlacementGroupFactory]:
@@ -93,8 +107,6 @@ def run(
     minimum_gpu_per_trial: float = 1.0,
     model_estimate_memory_usage: Optional[int] = None,
     time_budget_s: Optional[float] = None,
-    supported_searchers: Optional[List[str]] = None,
-    supported_schedulers: Optional[List[str]] = None,
     verbose: int = 1,
     **kwargs
     ) -> tune.ExperimentAnalysis:
@@ -142,12 +154,6 @@ def run(
         Calculation of the resources_per_trial might use this info to better distribute resources
     time_budget_s
         Time limit for the HPO.
-    supported_searchers
-        Some searchers requires reporting status within epochs or checkpointing in the middle of training.
-        If the trainable doesn't support those functionality, provide supported_searchers here to warn users HPO might not work as expected.
-    supported_schedulers
-        Some schedulers requires reporting status within epochs or checkpointing in the middle of training.
-        If the trainable doesn't support those functionality, provide supported_schedulers here to warn users HPO might not work as expected.
     verbose
         0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     **kwargs
@@ -159,11 +165,12 @@ def run(
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
     if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
-    searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=supported_searchers)
-    scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=supported_schedulers)
+    searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=ray_tune_adapter.get_supported_searchers())
+    scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
     search_space = _convert_search_space(search_space, searcher)
 
     if not ray.is_initialized():
+        # shutdown to reinitialize resources because different model might require different total resources
         ray.shutdown()
         ray.init(log_to_driver=False, **total_resources)
 
@@ -332,6 +339,9 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
     
 class TabularRayTuneAdapter(RayTuneAdapter):
     
+    supported_searchers = ['random', 'bayes']
+    supported_schedulers = ['FIFO']
+    
     def get_resources_per_trial(
         self,
         total_resources: dict,
@@ -379,6 +389,9 @@ class TabularRayTuneAdapter(RayTuneAdapter):
     
     
 class AutommRayTuneAdapter(RayTuneAdapter):
+    
+    supported_searchers = ['random', 'bayes']
+    supported_schedulers = ['FIFO', 'ASHA']
     
     def __init__(self):
         super().__init__()
@@ -447,4 +460,6 @@ class AutommRayTuneAdapter(RayTuneAdapter):
 
 
 class ForecastingRayTuneAdapter(TabularRayTuneAdapter):
-    pass
+    
+    supported_searchers = ['random', 'bayes']
+    supported_schedulers = ['FIFO']
