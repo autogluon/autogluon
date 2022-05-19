@@ -2,7 +2,7 @@ import copy
 import logging
 import os
 import time
-from typing import Any, Dict, Union, Tuple, Optional
+from typing import Any, Dict, Union, Optional
 
 import pandas as pd
 from gluonts.dataset.common import (
@@ -266,9 +266,9 @@ class AbstractForecastingModel(AbstractModel):
         train_data: Dataset,
         val_data: Dataset,
         hyperparameter_tune_kwargs: dict,
-        resources: dict,
-        model_estimate_memory_usage: Union[int, None],
-        time_limit: Union[int, None],
+        resources: Optional[Dict] = None,
+        model_estimate_memory_usage: Optional[int] = None,
+        time_limit: Optional[int] = None,
         **kwargs,
     ):
         # verbosity = kwargs.get('verbosity', 2)

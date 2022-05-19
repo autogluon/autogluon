@@ -1,5 +1,4 @@
 """Unit tests and utils common to all models"""
-import psutil
 import pytest
 
 import autogluon.core as ag
@@ -76,7 +75,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
             "epochs": ag.Int(3, 4),
         },
     )
-    
+
     hyperparameter_tune_kwargs = dict(
         scheduler=scheduler,
         searcher=searcher,

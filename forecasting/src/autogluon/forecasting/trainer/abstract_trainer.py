@@ -9,7 +9,6 @@ import networkx as nx
 import pandas as pd
 
 from autogluon.core.models import AbstractModel
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
@@ -19,6 +18,12 @@ from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.metric_utils import check_get_evaluation_metric
 
 logger = logging.getLogger(__name__)
+
+
+FORECASTING_HPO_PRESETS = {
+    "auto": {"searcher": "random", "scheduler": "FIFO"},
+    "bayes": {"searcher": "bayes", "scheduler": "FIFO"},
+}
 
 
 # TODO: This class is meant to be moved to `core`, where it will likely
@@ -252,6 +257,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         eval_metric: Optional[str] = None,
         save_data: bool = True,
         low_memory: bool = False,
+        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         **kwargs,
     ):
         super().__init__(
@@ -272,7 +278,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self._model_full_dict_val_score = {}
         self.eval_metric = check_get_evaluation_metric(eval_metric)
-        self.hpo_results = {}
+        self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
         path = self.path_data + "train.pkl"
@@ -302,6 +308,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             type=type(model),
             fit_time=model.fit_time,
             val_score=model.val_score,
+            params=model.params,
         )
         self.model_graph.add_node(model.name, **node_attrs)
 
@@ -323,21 +330,24 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         train_data: TimeSeriesDataFrame,
         time_limit: Optional[float] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune_kwargs: Union[str, dict] = "auto",
+        hyperparameter_tune_kwargs: Union[str, dict] = None,
     ):
-        scheduler_cls, scheduler_options = scheduler_factory(
-            hyperparameter_tune_kwargs, time_out=time_limit
-        )
-        if all(scheduler_options.get(s) is None for s in ["num_trials", "time_out"]):
-            scheduler_options["num_trials"] = 10
-        hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs = hyperparameter_tune_kwargs or self.hyperparameter_tune_kwargs
+        if isinstance(hyperparameter_tune_kwargs, str):
+            hyperparameter_tune_kwargs: Dict[str, Any] = FORECASTING_HPO_PRESETS.get(hyperparameter_tune_kwargs)
+        if hyperparameter_tune_kwargs is None:
+            logger.warning("HPO settings not recognized or not provided. Defaulting to `auto`")
+            hyperparameter_tune_kwargs = FORECASTING_HPO_PRESETS["auto"]
+
+        if time_limit is None and "num_samples" not in hyperparameter_tune_kwargs:
+            hyperparameter_tune_kwargs["num_samples"] = 10
+
+        hpo_models, hpo_analysis = model.hyperparameter_tune(
             train_data=train_data,
             val_data=val_data,
-            scheduler_options=(scheduler_cls, scheduler_options),
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_limit,
         )
-        hpo_results.pop("search_strategy", None)
-        self.hpo_results[model.name] = hpo_results
         model_names_trained = []
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_path in hpo_models.items():
