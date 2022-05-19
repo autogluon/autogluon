@@ -30,12 +30,21 @@ class AbstractLearner:
         self.reset_paths: bool = False
         self.random_state: int = 0
 
-    def create_contexts(self, path_context):
-        model_context = path_context + "models" + os.path.sep
-        save_path = path_context + self.learner_file_name
+    def create_contexts(self, path_context: str):
+        """Create and return paths to save model objects, the learner object.
+
+        Parameters
+        ----------
+        path_context: str
+            Top-level directory where models and trainer will be saved.
+        """
+        model_context = os.path.join(path_context, "models") + os.path.sep
+        save_path = os.path.join(path_context, self.learner_file_name)
         return path_context, model_context, save_path
 
-    def set_contexts(self, path_context):
+    def set_contexts(self, path_context: str):
+        """Update the path where model, learner, and trainer objects will be saved.
+        Also see `create_contexts`."""
         self.path, self.model_context, self.save_path = self.create_contexts(
             path_context
         )
