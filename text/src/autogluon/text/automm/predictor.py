@@ -695,15 +695,23 @@ class AutoMMPredictor:
         self.save(save_path)
         
         if max_time == timedelta(seconds=0):
+            top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(save_path, minmax_mode)
+
             self._top_k_average(
                 model=model,
                 save_path=save_path,
+                top_k_model_paths=top_k_model_paths,
+                last_ckpt_path=last_ckpt_path,
                 minmax_mode=minmax_mode,
                 is_distill=False,
                 config=config,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
             )
+            
+            # remove the yaml file after cleaning the checkpoints
+            if os.path.isfile(best_k_models_yaml_path):
+                os.remove(best_k_models_yaml_path)
             return self
         
         # need to assign the above attributes before setting up distillation
@@ -895,26 +903,7 @@ class AutoMMPredictor:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
-                top_k_model_paths = []
-                best_k_models_yaml_path = os.path.join(save_path, "best_k_models.yaml")
-                if os.path.exists(best_k_models_yaml_path):
-                    with open(best_k_models_yaml_path, "r") as f:
-                        best_k_models = yaml.load(f, Loader=yaml.Loader)
-                else:
-                    # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
-                    # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
-                    best_k_models = None
-                if best_k_models is not None:
-                    top_k_model_paths = list(best_k_models.keys())
-                else:
-                    top_k_model_paths = [
-                        v[0] for v in sorted(
-                            list(best_k_models.items()),
-                            key=lambda ele: ele[1],
-                            reverse=(minmax_mode == MAX),
-                        )
-                    ]
-                last_ckpt_path = os.path.join(save_path, "last.ckpt")
+                top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(save_path, minmax_mode)
 
                 self._top_k_average(
                     model=model,
@@ -935,6 +924,34 @@ class AutoMMPredictor:
             sys.exit(
                 f"Training finished, exit the process with global_rank={trainer.global_rank}..."
             )
+            
+    def _prepare_checkpoint(
+        self,
+        save_path,
+        minmax_mode,
+    ):
+        top_k_model_paths = []
+        best_k_models_yaml_path = os.path.join(save_path, "best_k_models.yaml")
+        if os.path.exists(best_k_models_yaml_path):
+            with open(best_k_models_yaml_path, "r") as f:
+                best_k_models = yaml.load(f, Loader=yaml.Loader)
+        else:
+            # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
+            # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
+            best_k_models = None
+        if best_k_models is not None:
+            top_k_model_paths = list(best_k_models.keys())
+        else:
+            top_k_model_paths = [
+                v[0] for v in sorted(
+                    list(best_k_models.items()),
+                    key=lambda ele: ele[1],
+                    reverse=(minmax_mode == MAX),
+                )
+            ]
+        last_ckpt_path = os.path.join(save_path, "last.ckpt")
+        
+        return top_k_model_paths, last_ckpt_path, best_k_models_yaml_path
 
     def _top_k_average(
             self,
