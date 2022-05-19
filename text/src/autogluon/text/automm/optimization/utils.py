@@ -14,6 +14,7 @@ from ..constants import (
     BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
     ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
     ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
+    PEARSONR, SPEARMANR,
 )
 import warnings
 
@@ -89,6 +90,10 @@ def get_metric(
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
         return torchmetrics.MeanMetric(), MIN, \
                functools.partial(F.cross_entropy, reduction="none")
+    elif metric_name == PEARSONR:
+        return torchmetrics.PearsonCorrCoef(), MAX, None
+    elif metric_name == SPEARMANR:
+        return torchmetrics.SpearmanCorrCoef(), MAX, None
     else:
         warnings.warn(f"Currently, we cannot convert the metric: {metric_name} to a metric supported in torchmetrics. "
                       f"Thus, we will fall-back to use accuracy for multi-class classification problems "
