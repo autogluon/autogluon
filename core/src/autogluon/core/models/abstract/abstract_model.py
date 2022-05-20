@@ -381,6 +381,7 @@ class AbstractModel:
         else:
             features_to_drop_internal = None
         if features_to_drop_internal is not None:
+            logger.log(10, f'\tDropped {len(features_to_drop_internal)} of {len(self.features)} internal features: {features_to_drop_internal}')
             self._features_internal = [feature for feature in self.features if feature not in features_to_drop_internal]
             self._feature_metadata = self.feature_metadata.keep_features(self._features_internal)
             self._is_features_in_same_as_ex = False
