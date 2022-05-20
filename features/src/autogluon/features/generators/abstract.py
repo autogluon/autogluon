@@ -75,6 +75,8 @@ class AbstractFeatureGenerator:
         If 'overwrite': infer_features_in_args is used exclusively and self.get_default_infer_features_in_args() is ignored.
         If 'update': self.get_default_infer_features_in_args() is dictionary updated by infer_features_in_args.
         If infer_features_in_args is None, this is ignored.
+    banned_feature_special_types : List[str], default None
+        List of feature special types to additionally exclude from input. Will update self.get_default_infer_features_in_args().
     log_prefix : str, default ''
         Prefix string added to all logging statements made by the generator.
     verbosity : int, default 2
@@ -112,6 +114,7 @@ class AbstractFeatureGenerator:
         name_suffix: str = None,
         infer_features_in_args: dict = None,
         infer_features_in_args_strategy='overwrite',
+        banned_feature_special_types: List[str] = None,
         log_prefix='',
         verbosity=2
     ):
@@ -131,6 +134,13 @@ class AbstractFeatureGenerator:
                 self._infer_features_in_args.update(infer_features_in_args)
             else:
                 raise ValueError(f"infer_features_in_args_strategy must be one of: {['overwrite', 'update']}, but was: '{infer_features_in_args_strategy}'")
+        if banned_feature_special_types:
+            if 'invalid_special_types' not in self._infer_features_in_args:
+                self._infer_features_in_args['invalid_special_types'] = banned_feature_special_types
+            else:
+                for f in banned_feature_special_types:
+                    if f not in self._infer_features_in_args['invalid_special_types']:
+                        self._infer_features_in_args['invalid_special_types'].append(f)
 
         if post_generators is None:
             post_generators = []
@@ -228,7 +238,7 @@ class AbstractFeatureGenerator:
         self._ensure_no_duplicate_column_names(X=X)
         self._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
         if self.pre_drop_useless:
-            self._useless_features_in = self._get_useless_features(X)
+            self._useless_features_in = self._get_useless_features(X, columns_to_check=self.features_in)
             if self._useless_features_in:
                 self._remove_features_in(self._useless_features_in)
         if self.pre_enforce_types:
@@ -544,9 +554,11 @@ class AbstractFeatureGenerator:
 
     # TODO: Move to a generator
     @staticmethod
-    def _get_useless_features(X: DataFrame) -> list:
+    def _get_useless_features(X: DataFrame, columns_to_check: List[str] = None) -> list:
         useless_features = []
-        for column in X:
+        if columns_to_check is None:
+            columns_to_check = list(X.columns)
+        for column in columns_to_check:
             if is_useless_feature(X[column]):
                 useless_features.append(column)
         return useless_features
