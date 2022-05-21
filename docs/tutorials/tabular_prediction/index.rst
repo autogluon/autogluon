@@ -55,6 +55,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       How to add a custom model to AutoGluon.
 
    .. card::
+      :title: Adding a Custom Model (Advanced)
+      :link: tabular-custom-model-advanced.html
+
+      How to add a custom model to AutoGluon (Advanced).
+
+   .. card::
       :title: Adding a Custom Metric
       :link: tabular-custom-metric.html
 
@@ -84,6 +90,7 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-gpu
    tabular-multilabel
    tabular-custom-model
+   tabular-custom-model-advanced
    tabular-custom-metric
    tabular-feature-engineering
    tabular-faq
