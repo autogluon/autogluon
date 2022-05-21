@@ -161,14 +161,14 @@ Now lets see what happens when we send this data to fit a dummy model:
 
 ```{.python .input}
 dummy_model = DummyModel()
-dummy_model.fit(X=X, y=y, feature_metadata=feature_generator.feature_metadata)
+dummy_model.fit(X=X, y=y, feature_metadata=my_custom_feature_generator.feature_metadata)
 ```
 
 Notice how the model dropped `dummy_feature` during the preprocess call. Now lets see what happens if we use `DummyModelKeepUnique`:
 
 ```{.python .input}
 dummy_model_keep_unique = DummyModelKeepUnique()
-dummy_model_keep_unique.fit(X=X, y=y, feature_metadata=feature_generator.feature_metadata)
+dummy_model_keep_unique.fit(X=X, y=y, feature_metadata=my_custom_feature_generator.feature_metadata)
 ```
 
 Now `dummy_feature` is no longer dropped!
