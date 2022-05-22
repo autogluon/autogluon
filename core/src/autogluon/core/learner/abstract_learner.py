@@ -1,4 +1,6 @@
 import os
+import random
+import sys
 from typing import Type, Optional
 
 from autogluon.core.trainer import AbstractTrainer
@@ -18,17 +20,28 @@ class AbstractLearner:
     learner_info_name = "info.pkl"
     learner_file_name = "learner.pkl"
 
-    def __init__(self):
-        self.save_path = None
-        self.model_context = None
-        self.path = None
-        self.version = None
-        self.trainer_path: Optional[str] = None
+    def __init__(self, path_context: str, random_state: int = 0, **kwargs):
+        self.path, self.model_context, self.save_path = self.create_contexts(
+            path_context
+        )
+
         self.is_trainer_present: bool = False
         self.trainer: Optional[AbstractTrainer] = None
         self.trainer_type: Optional[Type] = None
+        self.trainer_path: Optional[str] = None
         self.reset_paths: bool = False
-        self.random_state: int = 0
+
+        if random_state is None:
+            random_state = random.randint(0, 1000000)
+        self.random_state = random_state
+
+        try:
+            from ..version import __version__  # noqa
+
+            self.version = __version__
+        except ImportError:
+            self.version = None
+        self._python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
     def create_contexts(self, path_context: str):
         """Create and return paths to save model objects, the learner object.

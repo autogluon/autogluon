@@ -1,8 +1,6 @@
 import copy
 import json
 import logging
-import random
-import sys
 import time
 from collections.abc import Iterable
 
@@ -16,7 +14,6 @@ from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticla
 from autogluon.core.learner import AbstractLearner
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
-from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df, infer_problem_type
 from autogluon.features.generators import PipelineFeatureGenerator
@@ -34,8 +31,7 @@ class AbstractTabularLearner(AbstractLearner):
                  ignored_columns: list = None, label_count_threshold=10, problem_type=None, quantile_levels=None,
                  eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0,
                  sample_weight=None, weight_evaluation=False, groups=None):
-        super().__init__()
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
+        super().__init__(path_context=path_context, random_state=random_state)
         self.label = label
         self.ignored_columns = ignored_columns
         if self.ignored_columns is None:
@@ -60,17 +56,10 @@ class AbstractTabularLearner(AbstractLearner):
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
         self.is_trainer_present = is_trainer_present
-        if random_state is None:
-            random_state = random.randint(0, 1000000)
-        self.random_state = random_state
+
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
-
-        self.trainer: AbstractTrainer = None
-        self.trainer_type = None
-        self.trainer_path = None
-        self.reset_paths = False
 
         self._pre_X_rows = None
         self._post_X_rows = None
@@ -84,12 +73,6 @@ class AbstractTabularLearner(AbstractLearner):
             raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
         if groups is not None and not isinstance(groups, str):
             raise ValueError('groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data.')
-        try:
-            from ..version import __version__
-            self.version = __version__
-        except:
-            self.version = None
-        self._python_version = f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}'
 
     # TODO: Possibly rename to features_in or consider refactoring all feature_generators features_in -> features
     @property
@@ -747,3 +730,17 @@ class AbstractTabularLearner(AbstractLearner):
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
         return distilled_model_names
+
+    # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
+    # TODO: Add feature inference / feature engineering info to get_info output
+    def get_info(self, **kwargs):
+        learner_info = {
+            'path': self.path,
+            'label': self.label,
+            'random_state': self.random_state,
+            'version': self.version,
+            'features': self.features,
+            'feature_metadata_in': self.feature_metadata_in,
+        }
+
+        return learner_info
