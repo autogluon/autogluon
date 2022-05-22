@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from packaging.version import parse as vparse
+
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import os
@@ -26,13 +28,21 @@ install_requires = [
     "pandas",
     "psutil>=5.7.3,<5.9",
     "gluonts>=0.8.0",
-    "mxnet<2.0",
     f"autogluon.core=={version}",
+    f'autogluon.common=={version}',
 ]
+
+try:
+    from mxnet import __version__ as mxnet_version
+    assert vparse(mxnet_version) < vparse("2.0")
+except (ImportError, AssertionError):
+    raise ImportError("autogluon.forecasting depends on Apache MxNet v1.x. Please install a suitable version of "
+                      "MxNet before continuing with the installation.")
 
 extras_require = {
     "tests": ["pytest", "flake8", "flaky", "pytest-timeout"]
 }
+
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":
