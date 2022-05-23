@@ -7,34 +7,59 @@ from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 import torch
 
 
-
-class PeriodicOptions:
-    n: int  # the output size is 2 * n
-    sigma: float
-    trainable: bool
-    initialization: Literal['log-linear', 'normal']
-
-
 class Periodic(nn.Module):
-    def __init__(self, n_features: int, options: PeriodicOptions) -> None:
+    def __init__(
+        self, 
+        in_features: int, 
+        d_embedding: int, # output shape
+        trainable: Optional[bool] = True,
+        initialization: Optional[str] = 'normal',
+        sigma: Optional[float] = 1.0,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        in_features
+            Input feature size.
+        d_embedding
+            Output feature size, should be an even number.
+        trainable
+            Bool, determine whether the coefficients needed to be updated.
+        initialization
+            Initalization scheme.
+        sigma
+            Standard deviation for initalization=='normal' 
+
+        Reference:
+        ----------
+        1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
+        2. Paper: On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+        """
         super().__init__()
-        if options.initialization == 'log-linear':
-            coefficients = options.sigma ** (torch.arange(options.n) / options.n)
-            coefficients = coefficients[None].repeat(n_features, 1)
-        else:
-            assert options.initialization == 'normal'
-            coefficients = torch.normal(0.0, options.sigma, (n_features, options.n))
-        if options.trainable:
-            self.coefficients = nn.Parameter(coefficients)  # type: ignore[code]
+
+        assert d_embedding % 2 == 0 , 'd_embedding mod 2 should be 0, current d_embedding is {}'.format(d_embedding)
+
+        if initialization == 'log-linear':
+            coefficients = sigma ** (torch.arange(d_embedding//2) / (d_embedding//2) )
+            coefficients = coefficients[None].repeat(in_features, 1)
+        elif initialization == 'normal':
+            coefficients = torch.normal(0.0, sigma, (in_features, d_embedding//2))
+
+        if trainable:
+            self.coefficients = nn.Parameter(coefficients) 
         else:
             self.register_buffer('coefficients', coefficients)
 
-    def cos_sin(x: Tensor) -> Tensor:
-        return torch.cat([torch.cos(x), torch.sin(x)], -1)
+    def cos_sin(self, x: Tensor) -> Tensor:
+        return torch.cat(
+            [torch.cos(x), torch.sin(x)], -1
+        )
 
     def forward(self, x: Tensor) -> Tensor:
-        assert x.ndim == 2
-        return self.cos_sin(2 * torch.pi * self.coefficients[None] * x[..., None])
+        assert x.ndim == 2, 'Periodic should only be applied to first layer i.e. ndim==2'
+        return self.cos_sin(
+            2 * torch.pi * self.coefficients[None] * x[..., None]
+        )
 
 
 class NLinear(nn.Module):
@@ -56,7 +81,7 @@ class NLinear(nn.Module):
                     self.bias[i] = layer.bias
 
     def forward(self, x):
-        assert x.ndim == 3, 'Error Dimension, should be 3, but given {}'.format(x.ndim)
+        assert x.ndim == 3, 'Error input dimension, should be 3, but given {}'.format(x.ndim)
         x = x[..., None] * self.weight[None]
         x = x.sum(-2)
         if self.bias is not None:
@@ -197,14 +222,13 @@ class AutoDis(nn.Module):
         return x
 
 
+# ToDo: add n_tokens
 class NumEmbeddings(nn.Module):
     def __init__(
         self,
-        n_features: int,
+        in_features: int,
         d_embedding: Optional[int],
         embedding_arch: list[str],
-        periodic_options: Optional[PeriodicOptions],
-        d_feature: Optional[int],
         memory_efficient: bool,
         n_meta_embeddings: Optional[int] = None,
         temperature: Optional[float] = None,
@@ -213,58 +237,66 @@ class NumEmbeddings(nn.Module):
         assert embedding_arch
         assert set(embedding_arch) <= {
             'linear',
+            'shared_linear',
+            'autodis',
             'positional',
             'relu',
-            'shared_linear',
             'layernorm',
-            'autodis',
         }
+
         if any(x in embedding_arch for x in ['linear', 'shared_linear', 'autodis']):
             assert d_embedding is not None
-        else:
-            assert d_embedding is None
         assert embedding_arch.count('positional') <= 1
-        if 'autodis' in embedding_arch:
-            embedding_arch == ['autodis']
 
         NLinear_ = NLinearMemoryEfficient if memory_efficient else NLinear
         layers: list[nn.Module] = []
 
         if embedding_arch[0] == 'linear':
-            assert periodic_options is None
-            assert n_meta_embeddings is None and temperature is None
-            assert d_embedding is not None
             layers.append(
-                NumericalFeatureTokenizer(n_features, d_embedding, True, 'uniform')
-                if d_feature is None
-                else NLinear_(n_features, d_feature, d_embedding)
+                NumericalFeatureTokenizer(
+                    in_features=in_features, 
+                    d_token=d_embedding, 
+                    bias=True, 
+                    initialization='normal'
+                )
+                # if d_feature is None
+                # else NLinear_(n_features, d_feature, d_embedding)
             )
             d_current = d_embedding
         elif embedding_arch[0] == 'positional':
-            assert d_feature is None
-            assert periodic_options is not None
-            assert n_meta_embeddings is None or temperature is None
-            layers.append(Periodic(n_features, periodic_options))
-            d_current = periodic_options.n * 2
+            layers.append(
+                Periodic(
+                    in_features=in_features, 
+                    d_embedding=d_embedding,
+                    trainable=True,
+                    initialization='normal',
+                    sigma=1.0,
+                )
+            )
+            d_current = d_embedding
         elif embedding_arch[0] == 'autodis':
-            assert d_feature is None
-            assert periodic_options is None
-            assert n_meta_embeddings is None or temperature is None
-            assert d_embedding is not None
-            layers.append(AutoDis(n_features, d_embedding, n_meta_embeddings, temperature))
+            layers.append(
+                AutoDis(
+                    in_features, 
+                    d_embedding, 
+                    n_meta_embeddings, 
+                    temperature)
+                )
             d_current = d_embedding
         else:
-            assert False
+            layers.append(
+                nn.Identity(),
+            )
 
         for x in embedding_arch[1:]:
             layers.append(
                 nn.ReLU()
                 if x == 'relu'
-                else NLinear_(n_features, d_current, d_embedding)  # type: ignore[code]
+                else NLinear_(in_features, d_current, d_embedding)  # type: ignore[code]
                 if x == 'linear'
                 else nn.Linear(d_current, d_embedding)  # type: ignore[code]
                 if x == 'shared_linear'
-                else NLayerNorm(n_features, d_current)  # type: ignore[code]
+                else NLayerNorm(in_features, d_current)  # type: ignore[code]
                 if x == 'layernorm'
                 else nn.Identity()
             )
@@ -290,7 +322,7 @@ class  NumericalTransformer(nn.Module):
         cls_token: Optional[bool] = False,
         out_features: Optional[int] = None,
         num_classes: Optional[int] = 0,
-        token_bias: Optional[bool] = True,
+        # token_bias: Optional[bool] = True,
         token_initialization: Optional[str] = 'normal',
         n_blocks: Optional[int] = 0,
         attention_n_heads: Optional[int] = 8,
@@ -308,7 +340,6 @@ class  NumericalTransformer(nn.Module):
         kv_compression_sharing: Optional[str] = None,
         head_activation: Optional[str] = 'relu',
         head_normalization: Optional[str] = 'layer_norm',
-        numerical_embedding: Optional[bool] = True
     ):
         """
         Parameters
@@ -362,9 +393,10 @@ class  NumericalTransformer(nn.Module):
 
         References
         ----------
-        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
         "Revisiting Deep Learning Models for Tabular Data", 2021
         https://arxiv.org/pdf/2106.11959.pdf
+        2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
 
         super().__init__()
@@ -377,24 +409,27 @@ class  NumericalTransformer(nn.Module):
         self.prefix = prefix
         self.out_features = out_features
 
-        if numerical_embedding :
-            self.numerical_feature_tokenizer = NumEmbeddings(
-                n_features=in_features,
-                d_embedding=d_token,
-                embedding_arch=['linear'],
-                periodic_options=None,
-                d_feature=None,
-                memory_efficient=False,
-                # n_meta_embeddings: Optional[int] = None,
-                # temperature: Optional[float] = None,
-            )
-        else:
-            self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
-                in_features=in_features,
-                d_token=d_token,
-                bias=token_bias,
-                initialization=token_initialization,
-            )
+        # if numerical_embedding :
+        print('Start embedding' * 100)
+        self.numerical_feature_tokenizer = NumEmbeddings(
+            in_features=in_features,
+            d_embedding=d_token,
+            embedding_arch=[
+                # 'linear','relu'
+                # 'linear',
+                'positional'
+            ],
+            memory_efficient=False,
+            # n_meta_embeddings: Optional[int] = None,
+            # temperature: Optional[float] = None,
+        )
+        # else:
+        #     self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
+        #         in_features=in_features,
+        #         d_token=d_token,
+        #         bias=token_bias,
+        #         initialization=token_initialization,
+        #     )
 
         self.cls_token = CLSToken(
             d_token=d_token, 
