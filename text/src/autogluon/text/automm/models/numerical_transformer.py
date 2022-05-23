@@ -191,7 +191,7 @@ class AutoDis(nn.Module):
     """
     Paper (the version is important): https://arxiv.org/abs/2012.08986v2
     Code: https://github.com/mindspore-ai/models/tree/bdf2d8bcf11fe28e4ad3060cf2ddc818eacd8597/research/recommend/autodis
-    Implementations: https://github.com/Yura52/tabular-dl-num-embeddings/blob/main/bin/train4.py
+    We borrow the implementations from: https://github.com/Yura52/tabular-dl-num-embeddings/blob/main/bin/train4.py
     The paper is significantly different from the code (it looks like the code
     implements the first version of the paper). We implement the second version
     here. Not all technical details are given for the second version, so what we do
@@ -231,12 +231,11 @@ class AutoDis(nn.Module):
         x = self.first_layer(x)
         x = self.leaky_relu(x)
         x = self.second_layer(x)
-        x = self.softmax(x / self.temperature)
+        x = self.softmax(x/self.temperature)
         x = self.third_layer(x)
         return x
 
 
-# ToDo: Add property `n_tokens``
 class NumEmbeddings(nn.Module):
     def __init__(
         self,
@@ -255,9 +254,10 @@ class NumEmbeddings(nn.Module):
             Currently support:
             {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
         d_embedding:
-            Dimension of the embeddings 
+            Dimension of the embeddings. 
+            The output shape should be [batch_size, number_of_numerical_featurs, d_embedding]
         memory_efficient:
-            Use efficient linear layer scheme if True.    
+            Use efficient linear layer scheme if True. Default is False.    
         Reference:
         ----------
         1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
@@ -337,8 +337,21 @@ class NumEmbeddings(nn.Module):
             assert not isinstance(layers[-1], nn.Identity)
             
         self.d_embedding = d_embedding
+        self.in_features = in_features
         self.layers = nn.Sequential(*layers)
+        
+    @property
+    def n_tokens(self) -> int:
+        """The number of tokens."""
+        y = self.forward(torch.ones(1,self.in_features))
+        return y.shape[1]
 
+    @property
+    def d_token(self) -> int:
+        """The size of one token."""
+        y = self.forward(torch.ones(1,self.in_features))
+        return y.shape[-1]
+    
     def forward(self, x):
         return self.layers(x)
 
