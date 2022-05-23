@@ -1,7 +1,7 @@
 from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Union, cast, Literal
+from typing import Any, Dict, List, Optional, Union, cast
 from .ft_transformer import FT_Transformer,_TokenInitialization,CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 import torch
@@ -241,10 +241,10 @@ class NumEmbeddings(nn.Module):
         self,
         in_features: int,
         d_embedding: Optional[int],
-        embedding_arch: list[str],
+        embedding_arch: List[str],
         memory_efficient: bool,
-        n_meta_embeddings: Optional[int] = None,
-        temperature: Optional[float] = None,
+        n_meta_embeddings: Optional[int] = 10,
+        temperature: Optional[float] = 3.0,
     ) -> None:
         super().__init__()
         assert embedding_arch
