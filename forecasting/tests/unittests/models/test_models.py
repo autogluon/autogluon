@@ -2,7 +2,7 @@
 import pytest
 
 import autogluon.core as ag
-from autogluon.core.hpo.ray_hpo import forecasting_supported_schedulers, forecasting_supported_searchers
+from autogluon.core.hpo.ray_hpo import ForecastingRayTuneAdapter
 from autogluon.forecasting.models.abstract import AbstractForecastingModel
 from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
 
@@ -61,8 +61,8 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize('scheduler', forecasting_supported_schedulers)
-@pytest.mark.parametrize('searcher', forecasting_supported_searchers)
+@pytest.mark.parametrize('scheduler', ForecastingRayTuneAdapter.supported_schedulers)
+@pytest.mark.parametrize('searcher', ForecastingRayTuneAdapter.supported_searchers)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
     model_class, temp_model_path, scheduler, searcher
 ):
