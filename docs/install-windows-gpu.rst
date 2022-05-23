@@ -11,7 +11,7 @@
 
     .. code-block:: bash
 
-        pip3 install torch==1.10.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+        pip3 install "torch>=1.0,<1.11+cu113" -f https://download.pytorch.org/whl/cu113/torch_stable.html
 
     5. Sanity check that your installation is valid and can detect your GPU via testing in Python:
 

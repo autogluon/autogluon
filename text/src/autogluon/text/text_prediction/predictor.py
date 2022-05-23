@@ -383,9 +383,8 @@ class TextPredictor:
 
         self._predictor.save(path=path,standalone=standalone)
 
-    @classmethod
+    @staticmethod
     def load(
-            cls,
             path: str,
             verbosity: int = None,
             backend: str = PYTORCH,
@@ -422,7 +421,7 @@ class TextPredictor:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-        predictor = cls(
+        predictor = TextPredictor(
             label=_predictor.label,
         )
         predictor._backend = backend

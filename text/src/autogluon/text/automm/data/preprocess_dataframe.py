@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import torch
 import collections
-from typing import Callable, Iterator, Union, Optional, List, Any
+from typing import Callable, Iterator, Union, Optional, List, Any, Dict
 from nptyping import NDArray
 from autogluon.features import CategoryFeatureGenerator
 from sklearn.pipeline import Pipeline
@@ -101,37 +101,30 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def text_feature_names(self):
         return self._text_feature_names
 
-
     @property
     def categorical_feature_names(self):
         return self._categorical_feature_names
 
-
     @property
     def numerical_feature_names(self):
         return self._numerical_feature_names
-
 
     @property
     def categorical_num_categories(self):
         """We will always include the unknown category"""
         return self._categorical_num_categories
 
-
     @property
     def config(self):
         return self._config
-
 
     @property
     def label_type(self):
         return self._column_types[self._label_column]
 
-
     @property
     def label_scaler(self):
         return self._label_scaler
-
 
     @property
     def label_generator(self):
@@ -229,7 +222,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_text(
             self,
             df: pd.DataFrame,
-    ) -> List[List[str]]:
+    ) -> Dict[str, List[str]]:
         """
         Preprocess text data by collecting them together. May need to format
         the categorical and numerical data into strings if using them so.
@@ -242,12 +235,12 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the text data stored in a nested list.
+        All the text data stored in a dictionary.
         """
         assert self._fit_called, 'You will need to first call ' \
                                  'preprocessor.fit before calling ' \
                                  'preprocessor.transform.'
-        text_features = []
+        text_features = {}
         for col_name in self._text_feature_names:
             col_value = df[col_name]
             col_type = self._column_types[col_name]
@@ -260,14 +253,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             else:
                 raise NotImplementedError
 
-            text_features.append(processed_data.values.tolist())
+            text_features[col_name] = processed_data.values.tolist()
 
         return text_features
 
     def transform_image(
             self,
             df: pd.DataFrame,
-    ) -> List[List[List[str]]]:
+    ) -> Dict[str, List[List[str]]]:
         """
         Preprocess image data by collecting their paths together. If one sample has multiple images
         in an image column, assume that their image paths are separated by ";".
@@ -280,21 +273,21 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the image paths stored in a nested list.
+        All the image paths stored in a dictionary.
         """
         assert self._fit_called, 'You will need to first call ' \
                                  'preprocessor.fit before calling ' \
                                  'preprocessor.transform.'
-        image_paths = []
+        image_paths = {}
         for col_name in self._image_path_names:
             processed_data = df[col_name].apply(lambda ele: ele.split(';')).tolist()
-            image_paths.append(processed_data)
+            image_paths[col_name] = processed_data
         return image_paths
 
     def transform_numerical(
             self,
             df: pd.DataFrame,
-    ) -> List[NDArray[(Any,), np.float32]]:
+    ) -> Dict[str, NDArray[(Any,), np.float32]]:
         """
         Preprocess numerical data by using SimpleImputer to fill possible missing values
         and StandardScaler to standardize the values (z = (x - mean) / std).
@@ -307,24 +300,24 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the numerical features (a list of np.ndarray).
+        All the numerical features (a dictionary of np.ndarray).
         """
         assert self._fit_called, 'You will need to first call ' \
                                  'preprocessor.fit before calling ' \
                                  'preprocessor.transform.'
-        numerical_features = []
+        numerical_features = {}
         for col_name in self._numerical_feature_names:
             generator = self._feature_generators[col_name]
             col_value = pd.to_numeric(df[col_name]).to_numpy()
             processed_data = generator.transform(np.expand_dims(col_value, axis=-1))[:, 0]
-            numerical_features.append(processed_data.astype(np.float32))
+            numerical_features[col_name] = processed_data.astype(np.float32)
 
         return numerical_features
 
     def transform_categorical(
             self,
             df: pd.DataFrame,
-    ) -> List[NDArray[(Any,), np.int32]]:
+    ) -> Dict[str, NDArray[(Any,), np.int32]]:
         """
         Preprocess categorical data by using CategoryFeatureGenerator to generate
         categorical encodings, i.e., integers. This function needs to be called
@@ -337,12 +330,12 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the categorical encodings (a list of np.ndarray).
+        All the categorical encodings (a dictionary of np.ndarray).
         """
         assert self._fit_called, 'You will need to first call ' \
                                  'preprocessor.fit before calling ' \
                                  'preprocessor.transform.'
-        categorical_features = []
+        categorical_features = {}
         for col_name, num_category in zip(self._categorical_feature_names,
                                           self._categorical_num_categories):
             col_value = df[col_name]
@@ -352,19 +345,18 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 pd.DataFrame({col_name: processed_data}))[col_name] \
                 .cat.codes.to_numpy(np.int32, copy=True)
             processed_data[processed_data < 0] = num_category - 1
-            categorical_features.append(processed_data)
+            categorical_features[col_name] = processed_data
 
         return categorical_features
 
     def transform_label(
             self,
             df: pd.DataFrame,
-    ) -> List[NDArray[(Any,), Any]]:
+    ) -> Dict[str, NDArray[(Any,), Any]]:
         """
         Preprocess ground-truth labels by using LabelEncoder to generate class labels for
         classification tasks or using StandardScaler to standardize numerical values
-        (z = (x - mean) / std) for regression tasks. Note that multiple label columns
-        are allowed in a multimodal pd.DataFrame. This function needs to be called
+        (z = (x - mean) / std) for regression tasks. This function needs to be called
         preceding the label processor in "process_label.py".
 
         Parameters
@@ -374,7 +366,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the labels (a list of np.ndarray).
+        All the labels (a dictionary of np.ndarray).
         """
         assert self._fit_called, 'You will need to first call ' \
                                  'preprocessor.fit before calling ' \
@@ -388,7 +380,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         else:
             raise NotImplementedError
 
-        return [y]
+        return {self._label_column: y}
 
     def transform_label_for_metric(
             self,

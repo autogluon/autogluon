@@ -1,5 +1,5 @@
 """Wrapper of the Text Prediction in AutoGluon Text."""
-from typing import Optional
+from typing import Dict, Optional
 import logging
 import os
 
@@ -10,7 +10,7 @@ import pandas as pd
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
     S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
 from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_cpu_count, try_import_autogluon_text
+from autogluon.core.utils import get_cpu_count, get_gpu_count_torch, try_import_autogluon_text
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
@@ -151,6 +151,15 @@ class TextPredictorModel(AbstractModel):
         self.model.set_verbosity(verbosity)
         root_logger.setLevel(root_log_level)  # Reset log level
 
+    def _predict_proba(self, X, **kwargs):
+        X = self.preprocess(X, **kwargs)
+
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X, as_pandas=False)
+
+        y_pred_proba = self.model.predict_proba(X, as_pandas=False)
+        return self._convert_proba_to_unified_form(y_pred_proba)
+
     def save(self, path: str = None, verbose=True) -> str:
         self._load_model = self.model is not None
         __model = self.model
@@ -190,18 +199,14 @@ class TextPredictorModel(AbstractModel):
 
     def _get_default_resources(self):
         num_cpus = get_cpu_count()
-        # TODO: use get_gpu_count_torch() or some better way once torch models are available.
-        num_gpus = None
+        num_gpus = get_gpu_count_torch()
         return num_cpus, num_gpus
 
-    def _predict_proba(self, X, **kwargs):
-        X = self.preprocess(X, **kwargs)
-
-        if self.problem_type == REGRESSION:
-            return self.model.predict(X, as_pandas=False)
-
-        y_pred_proba = self.model.predict_proba(X, as_pandas=False)
-        return self._convert_proba_to_unified_form(y_pred_proba)
+    def get_minimum_resources(self) -> Dict[str, int]:
+        return {
+            'num_cpus': 1,
+            'num_gpus': 1,
+        }
 
     def _more_tags(self):
         # `can_refit_full=False` because TextPredictor does not communicate how to train until the best epoch in refit_full.

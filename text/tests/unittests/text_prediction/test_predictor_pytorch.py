@@ -12,7 +12,7 @@ DATA_INFO = {
         'train': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/train.parquet',
         'dev': 'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sst/dev.parquet',
         'label': 'label',
-        'metric': 'acc',
+        'metric': 'average_precision',
         'verify_proba': True,
     },
     'mrpc': {

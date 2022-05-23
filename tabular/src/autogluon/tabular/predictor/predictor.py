@@ -25,6 +25,8 @@ from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
+from autogluon.tabular.models import _IModelsModel
+
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import default_holdout_frac
@@ -78,6 +80,7 @@ class TabularPredictor:
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
+        For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
     path : str, default = None
         Path to directory where models and intermediate outputs should be saved.
         If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
@@ -318,7 +321,8 @@ class TabularPredictor:
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'optimize_for_deployment', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
@@ -347,6 +351,10 @@ class TabularPredictor:
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
                     This preset pairs well with the other presets such as `good_quality` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
+
+                interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'}
+                    Fits only interpretable rule-based models from the imodels package.
+                    Trades off predictive accuracy for conciseness.
 
                 ignore_text={'_feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False, 'enable_raw_text_features': False}}
                     Disables automated feature generation when text features are detected.
@@ -381,16 +389,17 @@ class TabularPredictor:
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required)
                     'TRANSF' (Tabular Transformer, GPU is recommended)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
-                For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (Pytorch) neural networks and no other types of models.
+                For example, set `hyperparameters = { 'NN_TORCH':{...} }` if say you only want to train (PyTorch) neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
-                Caution: Any provided search spaces will be overridden by fixed defaults if `hyperparameter_tune = False`.
+                Caution: Any provided search spaces will error if `hyperparameter_tune = False`.
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
-            Advanced functionality: Custom models
-                `hyperparameters` can also take special string values instead of a dictionary of model parameters which maps to a pre-configured model configuration (currently supported options = ['GBMLarge']).
-                    These additional models will be trained using custom pre-specified hyperparameter settings that are known to work well.
+                Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:
+                    'GBM': ['GBMLarge']
+            Advanced functionality: Bring your own model / Custom model support
+                AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-model.html
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
@@ -1826,7 +1835,7 @@ class TabularPredictor:
                 labels_transformed = self._learner.label_cleaner.transform(y=labels)
         return labels_transformed
 
-    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=1000,
+    def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=5000,
                            time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
                            silent=False):
         """
@@ -1838,7 +1847,7 @@ class TabularPredictor:
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, data, features)` will take, it is roughly the time taken by `predict_proba(data, model)` multiplied by the number of features.
 
-        Note: For highly accurate importance and p_value estimates, it is recommend to set `subsample_size` to at least 5,000 if possible and `num_shuffle_sets` to at least 10.
+        Note: For highly accurate importance and p_value estimates, it is recommended to set `subsample_size` to at least 5000 if possible and `num_shuffle_sets` to at least 10.
 
         Parameters
         ----------
@@ -1879,7 +1888,7 @@ class TabularPredictor:
                 'transformed_model':
                     Compute importances of the post-model-transformation features. These features are the internal features used by the requested model. They may differ greatly from the original features.
                     If the model is a stack ensemble, this will include stack ensemble features such as the prediction probability features of the stack ensemble's base (ancestor) models.
-        subsample_size : int, default = 1000
+        subsample_size : int, default = 5000
             The number of rows to sample from `data` when computing feature importance.
             If `subsample_size=None` or `data` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
@@ -1892,7 +1901,7 @@ class TabularPredictor:
             The number of different permutation shuffles of the data that are evaluated.
             Larger values will increase the quality of the importance evaluation.
             It is generally recommended to increase `subsample_size` before increasing `num_shuffle_sets`.
-            Defaults to 3 if `time_limit` is None or 10 if `time_limit` is specified.
+            Defaults to 5 if `time_limit` is None or 10 if `time_limit` is specified.
             Runtime linearly scales with `num_shuffle_sets`.
         include_confidence_band: bool, default = True
             If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of each feature.
@@ -1927,7 +1936,7 @@ class TabularPredictor:
             self._validate_unique_indices(data, 'data')
 
         if num_shuffle_sets is None:
-            num_shuffle_sets = 10 if time_limit else 3
+            num_shuffle_sets = 10 if time_limit else 5
 
         fi_df = self._learner.get_feature_importance(model=model, X=data, features=features,
                                                      feature_stage=feature_stage,
@@ -3018,9 +3027,6 @@ class TabularPredictor:
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError(
                 "Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
-
-        self._validate_unique_indices(data=train_data, name='train_data')
-
         if tuning_data is not None:
             if not isinstance(tuning_data, pd.DataFrame):
                 raise AssertionError(
@@ -3122,6 +3128,70 @@ class TabularPredictor:
             raise ValueError(f'num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})')
         return num_bag_folds, num_bag_sets, num_stack_levels
 
+    def interpretable_models_summary(self, verbosity=0):
+        '''Summary of fitted interpretable models along with their corresponding complexities
+        '''
+        d = self.fit_summary(verbosity=verbosity)
+        summaries = pd.DataFrame.from_dict(d)
+
+        complexities = []
+        info = self.info()
+        for i in range(summaries.shape[0]):
+            model_name = summaries.index.values[i]
+            complexities.append(info['model_info'][model_name].get('complexity', np.nan))
+        summaries.insert(2, 'complexity', complexities)
+        summaries = summaries[~pd.isna(summaries.complexity)]  # remove non-interpretable models
+        return summaries.sort_values(by=['model_performance', 'complexity'], ascending=[False, True])
+
+    def print_interpretable_rules(self, complexity_threshold: int = 10, model_name: str = None):
+        """
+        Print the rules of the highest performing model below the complexity threshold.
+
+        Parameters
+        ----------
+        complexity_threshold : int, default=10
+            Threshold for complexity (number of rules) of fitted models to show.
+            If not model complexity is below this threshold, prints the model with the lowest complexity.
+        model_name : str,  default=None
+            Optionally print rules for a particular model, ignoring the complexity threshold.
+        """
+        if model_name is None:
+            summaries = self.interpretable_models_summary()
+            summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
+            if summaries_filtered.shape[0] == 0:
+                summaries_filtered = summaries
+            model_name = summaries_filtered.index.values[0]  # best model is at top
+        agmodel = self._trainer.load_model(model_name)
+        imodel = agmodel.model
+        print(imodel)
+
+    def explain_classification_errors(self, data, model = None, print_rules: bool = True):
+        """Explain classification errors by fitting a rule-based model to them
+
+        Parameters
+        ----------
+        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            The data to make predictions for. Should contain same column names as training Dataset and follow same format
+            (may contain extra columns that won't be used by Predictor, including the label-column itself).
+            If str is passed, `data` will be loaded using the str value as the file path.
+        model : str (optional)
+            The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+        print_rules : bool, optional
+            Whether to print the learned rules
+
+        Returns
+        -------
+        cls : imodels.classifier
+            Interpretable rule-based classifier with fit/predict methods
+        """
+        import imodels
+        data = self.__get_dataset(data)
+        predictions = self._learner.predict(X=data, model=model, as_pandas=True)
+        labels = data[self.label]
+        cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
+        return cls
+
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:
             error_message = "Predictor is not fit. Call `.fit` before calling"
@@ -3130,7 +3200,6 @@ class TabularPredictor:
             else:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
-
 
 # Location to store WIP functionality that will be later added to TabularPredictor
 class _TabularPredictorExperimental(TabularPredictor):

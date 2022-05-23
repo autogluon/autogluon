@@ -987,6 +987,12 @@ class BaggedEnsembleModel(AbstractModel):
         self.models = models
         return memory_size
 
+    def validate_fit_resources(self, **kwargs):
+        self._get_model_base().validate_fit_resources(**kwargs)
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        return self._get_model_base().get_minimum_resources()
+
     def _validate_fit_memory_usage(self, **kwargs):
         # memory is checked downstream on the child model
         pass
@@ -1026,7 +1032,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         kwargs['feature_metadata'] = self.feature_metadata
         kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
-        self.model_base.set_contexts(self.path + 'hpo' + os.path.sep)
+        model_base = self._get_model_base()
+        model_base.set_contexts(self.path + 'hpo' + os.path.sep)
 
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
@@ -1056,7 +1063,7 @@ class BaggedEnsembleModel(AbstractModel):
         orig_time = scheduler_options[1]['time_out']
         if orig_time:
             scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
+        hpo_models, hpo_model_performances, hpo_results = model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
         scheduler_options[1]['time_out'] = orig_time
 
         bags = {}

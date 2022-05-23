@@ -133,18 +133,20 @@ class LitModule(pl.LightningModule):
             ) * weight
         return loss
 
-    def _compute_metric(
+    def _compute_metric_score(
             self,
+            metric: torchmetrics.Metric,
+            custom_metric_func: Callable,
             logits: torch.Tensor,
             label: torch.Tensor,
     ):
-        if isinstance(self.validation_metric, torchmetrics.AUROC):
+        if isinstance(metric, (torchmetrics.AUROC, torchmetrics.AveragePrecision)):
             prob = F.softmax(logits.float(), dim=1)
-            return self.validation_metric(preds=prob[:, 1], target=label)  # only for binary classification
-        elif isinstance(self.validation_metric, BaseAggregator):
-            return self.validation_metric(self.custom_metric_func(logits, label))
+            metric.update(preds=prob[:, 1], target=label)  # only for binary classification
+        elif isinstance(metric, BaseAggregator):
+            metric.update(custom_metric_func(logits, label))
         else:
-            return self.validation_metric(logits.squeeze(dim=1), label)
+            metric.update(logits.squeeze(dim=1), label)
 
     def _shared_step(
             self,
@@ -197,12 +199,17 @@ class LitModule(pl.LightningModule):
         output, loss = self._shared_step(batch)
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
+        self._compute_metric_score(
+            metric=self.validation_metric,
+            custom_metric_func=self.custom_metric_func,
+            logits=output[self.model.prefix][LOGITS],
+            label=batch[self.model.label_key],
+        ),
         self.log(
             self.validation_metric_name,
-            self._compute_metric(
-                logits=output[self.model.prefix][LOGITS],
-                label=batch[self.model.label_key],
-            ),
+            self.validation_metric,
+            on_step=False,
+            on_epoch=True,
         )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):

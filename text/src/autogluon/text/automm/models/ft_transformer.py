@@ -54,8 +54,8 @@ def reglu(x: Tensor) -> Tensor:
     """The ReGLU activation function from [1].
 
     References:
-
-        [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
+    ----------
+    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
     """
     assert x.shape[-1] % 2 == 0
     a, b = x.chunk(2, dim=-1)
@@ -64,10 +64,10 @@ def reglu(x: Tensor) -> Tensor:
 
 def geglu(x: Tensor) -> Tensor:
     """The GEGLU activation function from [1].
-
+    
     References:
-
-        [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
+    ----------
+    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
     """
     assert x.shape[-1] % 2 == 0
     a, b = x.chunk(2, dim=-1)
@@ -75,17 +75,12 @@ def geglu(x: Tensor) -> Tensor:
 
 
 class ReGLU(nn.Module):
-    """The ReGLU activation function from [shazeer2020glu].
-
-    Examples:
-        .. testcode::
-
-            module = ReGLU()
-            x = torch.randn(3, 4)
-            assert module(x).shape == (3, 2)
-
+    """
+    The ReGLU activation function from [1].
+    
     References:
-        * [shazeer2020glu] Noam Shazeer, "GLU Variants Improve Transformer", 2020
+    ----------
+    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
     """
 
     def forward(self, x: Tensor) -> Tensor:
@@ -93,17 +88,12 @@ class ReGLU(nn.Module):
 
 
 class GEGLU(nn.Module):
-    """The GEGLU activation function from [shazeer2020glu].
-
-    Examples:
-        .. testcode::
-
-            module = GEGLU()
-            x = torch.randn(3, 4)
-            assert module(x).shape == (3, 2)
-
+    """
+    The GEGLU activation function from [1].
+    
     References:
-        * [shazeer2020glu] Noam Shazeer, "GLU Variants Improve Transformer", 2020
+    ----------
+    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
     """
 
     def forward(self, x: Tensor) -> Tensor:
@@ -113,25 +103,14 @@ class GEGLU(nn.Module):
 class CLSToken(nn.Module):
     """[CLS]-token for BERT-like inference.
 
-    To learn about the [CLS]-based inference, see [devlin2018bert].
+    To learn about the [CLS]-based inference, see [1].
 
     When used as a module, the [CLS]-token is appended **to the end** of each item in
     the batch.
 
-    Examples:
-        .. testcode::
-
-            batch_size = 2
-            n_tokens = 3
-            d_token = 4
-            cls_token = _CLSToken(d_token, 'uniform')
-            x = torch.randn(batch_size, n_tokens, d_token)
-            x = cls_token(x)
-            assert x.shape == (batch_size, n_tokens + 1, d_token)
-            assert (x[:, -1, :] == cls_token.expand(len(x))).all()
-
     References:
-        * [devlin2018bert] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
+    ----------
+    [1] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
     """
 
     def __init__(self, d_token: int, initialization: str) -> None:
@@ -205,13 +184,14 @@ class _TokenInitialization(enum.Enum):
 class MultiheadAttention(nn.Module):
     """Multihead Attention (self-/cross-) with optional 'linear' attention.
 
-    To learn more about Multihead Attention, see [devlin2018bert]. See the implementation
+    To learn more about Multihead Attention, see [1]. See the implementation
     of `Transformer` and the examples below to learn how to use the compression technique
-    from [wang2020linformer] to speed up the module when the number of tokens is large.
+    from [2] to speed up the module when the number of tokens is large.
 
     References:
-        * [devlin2018bert] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
-        * [wang2020linformer] Sinong Wang, Belinda Z. Li, Madian Khabsa, Han Fang, Hao Ma "Linformer: Self-Attention with Linear Complexity", 2020
+    ----------
+    [1] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
+    [2] Sinong Wang, Belinda Z. Li, Madian Khabsa, Han Fang, Hao Ma "Linformer: Self-Attention with Linear Complexity", 2020
     """
 
     def __init__(

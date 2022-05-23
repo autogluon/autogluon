@@ -73,6 +73,14 @@ class RFModel(AbstractModel):
             # TODO: 600 is much better, but increases info leakage in stacking -> therefore 300 is ~equal in stack ensemble final quality.
             #  Consider adding targeted noise to OOF to avoid info leakage, or increase `min_samples_leaf`.
             'n_estimators': 300,
+            # Cap leaf nodes to 15000 to avoid large datasets using unreasonable amounts of memory/disk for RF/XT.
+            #  Ensures that memory and disk usage of RF model with 300 n_estimators is at most ~500 MB for binary/regression, ~200 MB per class for multiclass.
+            #  This has no effect on datasets with <=15000 rows, and minimal to no impact on datasets with <50000 rows.
+            #  For large datasets, will often make the model worse, but will significantly speed up inference speed and massively reduce memory and disk usage.
+            #  For example, when left uncapped, RF can use 5 GB of disk for a regression dataset with 2M rows.
+            #  Multiply by the 8 RF/XT models in config for best quality / high quality and this is 40 GB of tree models, which is unreasonable.
+            #  This size scales linearly with number of rows.
+            'max_leaf_nodes': 15000,
             'n_jobs': -1,
             'random_state': 0,
             'bootstrap': True,  # Required for OOB estimates, setting to False will raise exception if bagging.

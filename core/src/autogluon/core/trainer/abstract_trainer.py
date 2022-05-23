@@ -1744,7 +1744,7 @@ class AbstractTrainer:
         if eval_metric is None:
             eval_metric = self.eval_metric
         if model is None:
-            model = self.model_best
+            model = self._get_best()
         if eval_metric.needs_pred:
             predict_func = self.predict
         else:
@@ -2433,7 +2433,7 @@ class AbstractTrainer:
         banned_names = []
         candidate_model_rows = leaderboard[(~leaderboard['score_val'].isna()) & (leaderboard['stack_level'] == level)]
         candidate_models_type_inner = self.get_models_attribute_dict(attribute='type_inner', models=candidate_model_rows['model'])
-        for model_name, type_inner in candidate_models_type_inner.items():
+        for model_name, type_inner in candidate_models_type_inner.copy().items():
             if type_inner in banned_models:
                 banned_names.append(model_name)
                 candidate_models_type_inner.pop(model_name, None)
