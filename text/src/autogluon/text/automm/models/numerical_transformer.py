@@ -11,11 +11,11 @@ class Periodic(nn.Module):
     def __init__(
         self, 
         in_features: int, 
-        d_embedding: int, # output shape
+        d_embedding: int, 
         trainable: Optional[bool] = True,
         initialization: Optional[str] = 'normal',
         sigma: Optional[float] = 1.0,
-    ) -> None:
+    ):
         """
         Parameters
         ----------
@@ -50,12 +50,12 @@ class Periodic(nn.Module):
         else:
             self.register_buffer('coefficients', coefficients)
 
-    def cos_sin(self, x: Tensor) -> Tensor:
+    def cos_sin(self, x: Tensor):
         return torch.cat(
             [torch.cos(x), torch.sin(x)], -1
         )
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor):
         assert x.ndim == 2, 'Periodic should only be applied to first layer i.e. ndim==2'
         return self.cos_sin(
             2 * torch.pi * self.coefficients[None] * x[..., None]
@@ -69,7 +69,7 @@ class NLinear(nn.Module):
         d_in: int, 
         d_out: int, 
         bias: bool = True
-    ) -> None:
+    ):
         super().__init__()
         self.weight = nn.Parameter(Tensor(n, d_in, d_out))
         self.bias = nn.Parameter(Tensor(n, d_out)) if bias else None
@@ -95,7 +95,7 @@ class NLinearMemoryEfficient(nn.Module):
         n: int, 
         d_in: int, 
         d_out: int
-    ) -> None:
+    ):
         super().__init__()
         self.layers = nn.ModuleList([nn.Linear(d_in, d_out) for _ in range(n)])
 
@@ -104,12 +104,12 @@ class NLinearMemoryEfficient(nn.Module):
 
 
 class NLayerNorm(nn.Module):
-    def __init__(self, n_features: int, d: int) -> None:
+    def __init__(self, n_features: int, d: int):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(n_features, d))
         self.bias = nn.Parameter(torch.zeros(n_features, d))
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor):
         assert x.ndim == 3
         x = (x - x.mean(-1, keepdim=True)) / x.std(-1, keepdim=True)
         x = self.weight * x + self.bias
@@ -201,32 +201,32 @@ class AutoDis(nn.Module):
 
     def __init__(
         self, 
-        n_features: int, 
+        in_features: int, 
         d_embedding: int, 
         n_meta_embeddings: int,
-        temperature: float,
-    ) -> None:
+        temperature: Optional[float] = 3.0,
+    ):
         super().__init__()
         self.first_layer = NumericalFeatureTokenizer(
-            in_features=n_features,
+            in_features=in_features,
             d_token=n_meta_embeddings,
             bias=False,
             initialization='uniform',
         )
         self.leaky_relu = nn.LeakyReLU()
         self.second_layer = NLinear(
-            n_features, n_meta_embeddings, n_meta_embeddings, False
+            in_features, n_meta_embeddings, n_meta_embeddings, False
         )
         self.softmax = nn.Softmax(-1)
         self.temperature = temperature
         # "meta embeddings" from the paper are just a linear layer
         self.third_layer = NLinear(
-            n_features, n_meta_embeddings, d_embedding, False
+            in_features, n_meta_embeddings, d_embedding, False
         )
         # 0.01 is taken from the source code
         nn.init.uniform_(self.third_layer.weight, 0.01)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor):
         x = self.first_layer(x)
         x = self.leaky_relu(x)
         x = self.second_layer(x)
@@ -235,17 +235,15 @@ class AutoDis(nn.Module):
         return x
 
 
-# ToDo: add n_tokens
+# ToDo: Add property `n_tokens``
 class NumEmbeddings(nn.Module):
     def __init__(
         self,
         in_features: int,
-        d_embedding: Optional[int],
         embedding_arch: List[str],
-        memory_efficient: bool,
-        n_meta_embeddings: Optional[int] = 10,
-        temperature: Optional[float] = 3.0,
-    ) -> None:
+        d_embedding: Optional[int] = None,
+        memory_efficient: Optional[bool] = False,
+    ):
         super().__init__()
         assert embedding_arch
         assert set(embedding_arch) <= {
@@ -258,11 +256,16 @@ class NumEmbeddings(nn.Module):
         }
 
         if any(x in embedding_arch for x in ['linear', 'shared_linear', 'autodis']):
-            assert d_embedding is not None
+            assert d_embedding is not None 
+            
         assert embedding_arch.count('positional') <= 1
-
+        
+        if 'autodis' in embedding_arch:
+            embedding_arch = ['autodis']
+            
         NLinear_ = NLinearMemoryEfficient if memory_efficient else NLinear
         layers: list[nn.Module] = []
+        
 
         if embedding_arch[0] == 'linear':
             layers.append(
@@ -273,7 +276,6 @@ class NumEmbeddings(nn.Module):
                     initialization='normal'
                 )
             )
-            d_current = d_embedding
         elif embedding_arch[0] == 'positional':
             layers.append(
                 Periodic(
@@ -284,37 +286,40 @@ class NumEmbeddings(nn.Module):
                     sigma=1.0,
                 )
             )
-            d_current = d_embedding
         elif embedding_arch[0] == 'autodis':
             layers.append(
                 AutoDis(
-                    in_features, 
-                    d_embedding, 
-                    n_meta_embeddings, 
-                    temperature)
+                    in_features=in_features, 
+                    d_embedding=d_embedding, 
+                    n_meta_embeddings=d_embedding,
+                    temperature=3.0,
                 )
-            d_current = d_embedding
+                )
         else:
             layers.append(
                 nn.Identity(),
             )
 
         for x in embedding_arch[1:]:
+            
             layers.append(
                 nn.ReLU()
                 if x == 'relu'
-                else NLinear_(in_features, d_current, d_embedding)  
+                else NLinear_(in_features, d_embedding, d_embedding)  
                 if x == 'linear'
-                else nn.Linear(d_current, d_embedding) 
+                else nn.Linear(d_embedding, d_embedding) 
                 if x == 'shared_linear'
-                else NLayerNorm(in_features, d_current) 
+                else NLayerNorm(in_features, d_embedding) 
                 if x == 'layernorm'
                 else nn.Identity()
             )
-            if x in ['linear', 'shared_linear']:
-                d_current = d_embedding
+            
+            # if x in ['linear', 'shared_linear']:
+            #     d_current = d_embedding
+            
             assert not isinstance(layers[-1], nn.Identity)
-        self.d_embedding = d_current
+            
+        self.d_embedding = d_embedding
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -333,7 +338,7 @@ class  NumericalTransformer(nn.Module):
         cls_token: Optional[bool] = False,
         out_features: Optional[int] = None,
         num_classes: Optional[int] = 0,
-        # token_bias: Optional[bool] = True,
+        token_bias: Optional[bool] = True,
         token_initialization: Optional[str] = 'normal',
         n_blocks: Optional[int] = 0,
         attention_n_heads: Optional[int] = 8,
@@ -351,6 +356,7 @@ class  NumericalTransformer(nn.Module):
         kv_compression_sharing: Optional[str] = None,
         head_activation: Optional[str] = 'relu',
         head_normalization: Optional[str] = 'layer_norm',
+        embedding_arch: Optional[List[str]] = ['linear'],
     ):
         """
         Parameters
@@ -420,17 +426,10 @@ class  NumericalTransformer(nn.Module):
         self.prefix = prefix
         self.out_features = out_features
 
-        print('Start embedding' * 100)
         self.numerical_feature_tokenizer = NumEmbeddings(
             in_features=in_features,
             d_embedding=d_token,
-            embedding_arch=[
-                'linear','relu'
-                # 'positional'
-            ],
-            memory_efficient=False,
-            # n_meta_embeddings: Optional[int] = None,
-            # temperature: Optional[float] = None,
+            embedding_arch=embedding_arch,
         )
 
         self.cls_token = CLSToken(
