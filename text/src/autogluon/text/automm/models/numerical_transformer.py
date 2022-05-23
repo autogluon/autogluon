@@ -103,6 +103,19 @@ class NLinearMemoryEfficient(nn.Module):
         return torch.stack([l(x[:, i]) for i, l in enumerate(self.layers)], 1)
 
 
+class NLayerNorm(nn.Module):
+    def __init__(self, n_features: int, d: int) -> None:
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(n_features, d))
+        self.bias = nn.Parameter(torch.zeros(n_features, d))
+
+    def forward(self, x: Tensor) -> Tensor:
+        assert x.ndim == 3
+        x = (x - x.mean(-1, keepdim=True)) / x.std(-1, keepdim=True)
+        x = self.weight * x + self.bias
+        return x
+
+
 class NumericalFeatureTokenizer(nn.Module):
     """
     Numerical tokenizer for numerical features in tabular data. 
@@ -259,8 +272,6 @@ class NumEmbeddings(nn.Module):
                     bias=True, 
                     initialization='normal'
                 )
-                # if d_feature is None
-                # else NLinear_(n_features, d_feature, d_embedding)
             )
             d_current = d_embedding
         elif embedding_arch[0] == 'positional':
@@ -292,11 +303,11 @@ class NumEmbeddings(nn.Module):
             layers.append(
                 nn.ReLU()
                 if x == 'relu'
-                else NLinear_(in_features, d_current, d_embedding)  # type: ignore[code]
+                else NLinear_(in_features, d_current, d_embedding)  
                 if x == 'linear'
-                else nn.Linear(d_current, d_embedding)  # type: ignore[code]
+                else nn.Linear(d_current, d_embedding) 
                 if x == 'shared_linear'
-                else NLayerNorm(in_features, d_current)  # type: ignore[code]
+                else NLayerNorm(in_features, d_current) 
                 if x == 'layernorm'
                 else nn.Identity()
             )
