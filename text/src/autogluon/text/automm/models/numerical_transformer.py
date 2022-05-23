@@ -191,6 +191,7 @@ class AutoDis(nn.Module):
     """
     Paper (the version is important): https://arxiv.org/abs/2012.08986v2
     Code: https://github.com/mindspore-ai/models/tree/bdf2d8bcf11fe28e4ad3060cf2ddc818eacd8597/research/recommend/autodis
+    Implementations: https://github.com/Yura52/tabular-dl-num-embeddings/blob/main/bin/train4.py
     The paper is significantly different from the code (it looks like the code
     implements the first version of the paper). We implement the second version
     here. Not all technical details are given for the second version, so what we do
@@ -244,6 +245,25 @@ class NumEmbeddings(nn.Module):
         d_embedding: Optional[int] = None,
         memory_efficient: Optional[bool] = False,
     ):
+        """
+        Parameters
+        ----------
+        in_features
+            Input feature size.
+        embedding_arch
+            A list containing the names of embedding layers.
+            Currently support:
+            {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
+        d_embedding:
+            Dimension of the embeddings 
+        memory_efficient:
+            Use efficient linear layer scheme if True.    
+        Reference:
+        ----------
+        1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
+        2. Paper: On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+        """
+        
         super().__init__()
         assert embedding_arch
         assert set(embedding_arch) <= {
@@ -313,9 +333,6 @@ class NumEmbeddings(nn.Module):
                 if x == 'layernorm'
                 else nn.Identity()
             )
-            
-            # if x in ['linear', 'shared_linear']:
-            #     d_current = d_embedding
             
             assert not isinstance(layers[-1], nn.Identity)
             
@@ -407,13 +424,18 @@ class  NumericalTransformer(nn.Module):
             Activation function type of the MLP layer.
         head_normalization
             Normalization scheme of the MLP layer.
-
+        embedding_arch
+            A list containing the names of embedding layers.
+            Currently support:
+            {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
+            
         References
         ----------
-        1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
-        "Revisiting Deep Learning Models for Tabular Data", 2021
-        https://arxiv.org/pdf/2106.11959.pdf
-        2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
+        1. Paper: Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        "Revisiting Deep Learning Models for Tabular Data", 2021 https://arxiv.org/pdf/2106.11959.pdf
+        2. Paper: On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+        3. Code: https://github.com/Yura52/tabular-dl-revisiting-models
+        4. Code: https://github.com/Yura52/tabular-dl-num-embeddings
         """
 
         super().__init__()
