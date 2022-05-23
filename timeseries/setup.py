@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import warnings
+
 from packaging.version import parse as vparse
 
 ###########################
@@ -29,15 +31,18 @@ install_requires = [
     "psutil>=5.7.3,<5.9",
     "gluonts>=0.8.0",
     f"autogluon.core=={version}",
-    f'autogluon.common=={version}',
+    f"autogluon.common=={version}",
 ]
 
 try:
     from mxnet import __version__ as mxnet_version
-    assert vparse(mxnet_version) < vparse("2.0")
+
+    assert vparse("2.0") > vparse(mxnet_version) >= vparse("1.7")
 except (ImportError, AssertionError):
-    raise ImportError("autogluon.forecasting depends on Apache MxNet v1.x. Please install a suitable version of "
-                      "MxNet before continuing with the installation.")
+    warnings.warn(
+        "autogluon.forecasting depends on Apache MxNet v1.7 or greater (below v2.0). "
+        "Please install a suitable version of MxNet in order to use autogluon.forecasting."
+    )
 
 extras_require = {
     "tests": ["pytest", "flake8", "flaky", "pytest-timeout"]
