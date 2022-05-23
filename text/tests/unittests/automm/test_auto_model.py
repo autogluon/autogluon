@@ -51,10 +51,12 @@ def test_timm_automodel_init(checkpoint_name):
     "embedding_arch",
     [
         ['positional'],
-        ['linear'],
-        ['autodis'],
         ['positional','linear'],
+        ['linear'],
         ['linear','relu','linear'],
+        ['linear','layernorm','relu'],
+        ['autodis'],
+        ['autodis','linear'],
     ]
 )
 def test_numerical_transformer_init(embedding_arch):
