@@ -86,19 +86,7 @@ def infer_metrics(
         Name of evaluation metric.
     """
     if eval_metric_name is not None:
-        if eval_metric_name.lower() in [R2, PEARSONR, SPEARMANR]:
-            validation_metric_name = RMSE
-        elif eval_metric_name.lower() in [ROC_AUC, AVERAGE_PRECISION]:
-            logger.info(
-                f"We use {LOG_LOSS} as the validation metric for more stable training. "
-                f"We avoid using {eval_metric_name} as the validation metric because `torchmetrics` "
-                f"requires that both positive and negative examples are available in a mini-batch."
-                f"If the per gpu batch size is too small to cover both, `torchmetrics` would"
-                f"compute {eval_metric_name} scores incorrectly."
-            )
-            validation_metric_name = LOG_LOSS
-        else:
-            validation_metric_name = eval_metric_name
+        validation_metric_name = eval_metric_name
         return validation_metric_name, eval_metric_name
 
     if problem_type in [MULTICLASS, BINARY]:
