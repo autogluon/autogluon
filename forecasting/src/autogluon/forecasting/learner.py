@@ -1,5 +1,4 @@
 import logging
-import random
 import time
 from typing import Type, Optional, Any, Dict
 
@@ -27,21 +26,10 @@ class ForecastingLearner(AbstractLearner):
         trainer_type: Type[AbstractForecastingTrainer] = AutoForecastingTrainer,
         eval_metric: Optional[str] = None,
     ):
-        super().__init__()
-        self.path, self.model_context, self.save_path = self.create_contexts(
-            path_context
-        )
+        super().__init__(path_context=path_context, random_state=random_state)
         self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.is_trainer_present = is_trainer_present
-
-        if random_state is None:
-            random_state = random.randint(0, 1000000)
-        self.random_state: int = random_state
-
-        self.trainer: Optional[AbstractForecastingTrainer] = None
-        self.trainer_type: Type[AbstractForecastingTrainer] = trainer_type
-        self.trainer_path: Optional[str] = None
-        self.reset_paths: bool = False
+        self.trainer_type = trainer_type
 
     def fit(self, train_data, freq, prediction_length, val_data=None, **kwargs):
         return self._fit(
