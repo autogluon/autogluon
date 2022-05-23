@@ -420,27 +420,18 @@ class  NumericalTransformer(nn.Module):
         self.prefix = prefix
         self.out_features = out_features
 
-        # if numerical_embedding :
         print('Start embedding' * 100)
         self.numerical_feature_tokenizer = NumEmbeddings(
             in_features=in_features,
             d_embedding=d_token,
             embedding_arch=[
-                # 'linear','relu'
-                # 'linear',
-                'positional'
+                'linear','relu'
+                # 'positional'
             ],
             memory_efficient=False,
             # n_meta_embeddings: Optional[int] = None,
             # temperature: Optional[float] = None,
         )
-        # else:
-        #     self.numerical_feature_tokenizer = NumericalFeatureTokenizer(
-        #         in_features=in_features,
-        #         d_token=d_token,
-        #         bias=token_bias,
-        #         initialization=token_initialization,
-        #     )
 
         self.cls_token = CLSToken(
             d_token=d_token, 
