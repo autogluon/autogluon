@@ -6,7 +6,7 @@ from autogluon.core.hpo.ray_hpo import forecasting_supported_schedulers, forecas
 from autogluon.forecasting.models.abstract import AbstractForecastingModel
 from autogluon.forecasting.utils.metric_utils import AVAILABLE_METRICS
 
-from ..common import DUMMY_DATASET, dict_equal_primitive
+from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 
 
@@ -32,8 +32,8 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
         hyperparameters={"epochs": 2},
     )
 
-    model.fit(train_data=DUMMY_DATASET)
-    score = model.score(DUMMY_DATASET)
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    score = model.score(DUMMY_TS_DATAFRAME)
 
     assert isinstance(score, float)
 
@@ -49,7 +49,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
         },
     )
     model.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
     )
     model.save()
 
@@ -85,8 +85,8 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
     models, results = model.hyperparameter_tune(
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         time_limit=100,
-        train_data=DUMMY_DATASET,
-        val_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
+        val_data=DUMMY_TS_DATAFRAME,
     )
 
     assert len(results.get_all_configs()) == 2

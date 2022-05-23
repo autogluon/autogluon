@@ -16,7 +16,9 @@ __all__ = [
     'try_import_skopt',
     'try_import_autogluon_text',
     'try_import_autogluon_vision',
-    'try_import_rapids_cuml']
+    'try_import_rapids_cuml',
+    'try_import_imodels',
+]
 
 
 def try_import_mxboard():
@@ -195,6 +197,15 @@ def try_import_rapids_cuml():
                           "You will likely need to create a fresh conda environment based off of a RAPIDS install, and then install AutoGluon on it.\n"
                           "RAPIDS is highly experimental within AutoGluon, and we recommend to only use RAPIDS if you are an advanced user / developer.\n"
                           "Please refer to RAPIDS install instructions for more information: https://rapids.ai/start.html#get-rapids")
+
+
+def try_import_imodels():
+    try:
+        import imodels
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency imodels. "
+            "A quick tip is to install via `pip install imodels`. ")
 
 
 def try_import_vowpalwabbit():

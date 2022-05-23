@@ -8,13 +8,14 @@ from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
+from autogluon.forecasting.dataset import TimeSeriesDataFrame
 from autogluon.forecasting.models import DeepARModel
 from autogluon.forecasting.models.gluonts import GenericGluonTSModel
 from autogluon.forecasting.models.gluonts.models import GenericGluonTSModelFactory
 from autogluon.forecasting.models.presets import get_default_hps
 from autogluon.forecasting.trainer.auto_trainer import AutoForecastingTrainer
 
-from ..common import DUMMY_DATASET
+from ..common import DUMMY_TS_DATAFRAME
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -32,7 +33,7 @@ def test_trainer_can_be_initialized(temp_model_path):
 # smoke test for the short 'happy path'
 def test_when_trainer_called_then_training_is_performed(temp_model_path):
     trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
-    trainer.fit(train_data=DUMMY_DATASET, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
+    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
 
     assert "SimpleFeedForward" in trainer.get_model_names()
 
@@ -42,9 +43,9 @@ def test_given_validation_data_when_trainer_called_then_training_is_performed(
 ):
     trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
     )
 
     assert "SimpleFeedForward" in trainer.get_model_names()
@@ -64,9 +65,9 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
         path=temp_model_path, freq="H", eval_metric=eval_metric
     )
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -87,15 +88,18 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
         prediction_length=3,
     )
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
     )
-    predictions = trainer.predict(DUMMY_DATASET)
+    predictions = trainer.predict(DUMMY_TS_DATAFRAME)
 
-    # assert predictions is not None
-    assert all(len(df) == 3 for df in predictions.values())
-    assert all(not np.any(np.isnan(df)) for df in predictions.values())
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions.index.levels[0]
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
+    assert not np.any(np.isnan(predictions))
 
 
 @pytest.mark.parametrize(
@@ -137,9 +141,9 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         },
     )
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
         hyperparameter_tune=True,
     )
     leaderboard = trainer.leaderboard()
@@ -163,9 +167,9 @@ def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_i
         path=temp_model_path, freq="H", eval_metric=eval_metric
     )
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -209,9 +213,9 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
         default_hps_mock.return_value = defaultdict(dict)
         trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
         trainer.fit(
-            train_data=DUMMY_DATASET,
+            train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
-            val_data=DUMMY_DATASET,
+            val_data=DUMMY_TS_DATAFRAME,
             hyperparameter_tune=True,
         )
         leaderboard = trainer.leaderboard()
@@ -240,9 +244,9 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
         path=temp_model_path, freq="H", eval_metric=eval_metric
     )
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = trainer.leaderboard()
 
@@ -368,9 +372,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     # incrementally train with new hyperparameters
     for hp in hyperparameter_list:
         trainer.fit(
-            train_data=DUMMY_DATASET,
+            train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hp,
-            val_data=DUMMY_DATASET,
+            val_data=DUMMY_TS_DATAFRAME,
         )
 
     model_names = trainer.get_model_names()
@@ -443,9 +447,9 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
         },
     )
     trainer.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_DATASET,
+        val_data=DUMMY_TS_DATAFRAME,
         hyperparameter_tune=True,
     )
     leaderboard = trainer.leaderboard()

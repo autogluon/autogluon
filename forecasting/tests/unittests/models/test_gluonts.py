@@ -7,6 +7,7 @@ from gluonts.model.seq2seq import MQRNNEstimator
 from gluonts.model.transformer import TransformerEstimator
 
 import autogluon.core as ag
+from autogluon.forecasting.dataset import TimeSeriesDataFrame
 from autogluon.forecasting.models.gluonts import (
     DeepARModel,
     # AutoTabularModel,
@@ -17,7 +18,7 @@ from autogluon.forecasting.models.gluonts import (
 )
 from autogluon.forecasting.models.gluonts.models import GenericGluonTSModelFactory
 
-from ..common import DUMMY_DATASET
+from ..common import DUMMY_TS_DATAFRAME
 
 TESTABLE_MODELS = [
     # AutoTabularModel,  # TODO: enable tests when model is stabilized
@@ -48,14 +49,17 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
     )
 
     assert not model.gts_predictor
-    model.fit(train_data=DUMMY_DATASET)
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
     assert isinstance(model.gts_predictor, GluonTSPredictor)
 
-    predictions = model.predict(DUMMY_DATASET)
+    predictions = model.predict(DUMMY_TS_DATAFRAME)
 
-    assert len(predictions) == len(DUMMY_DATASET)
-    assert all(len(df) == prediction_length for _, df in predictions.items())
-    assert all(df.index[0].hour for _, df in predictions.items())
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions.index.levels[0]
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
+    assert all(predictions.loc[i].index[0].hour for i in predicted_item_index)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -71,17 +75,8 @@ def test_given_time_limit_when_fit_called_then_models_train_correctly(
     )
 
     assert not model.gts_predictor
-    model.fit(train_data=DUMMY_DATASET, time_limit=time_limit)
+    model.fit(train_data=DUMMY_TS_DATAFRAME, time_limit=time_limit)
     assert isinstance(model.gts_predictor, GluonTSPredictor)
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_no_freq_argument_when_fit_called_then_model_raises_value_error(
-    model_class, temp_model_path
-):
-    model = model_class(path=temp_model_path)
-    with pytest.raises(ValueError):
-        model.fit(train_data=DUMMY_DATASET, time_limit=10)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -90,7 +85,7 @@ def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_ra
 ):
     model = model_class(path=temp_model_path)
     try:
-        model.fit(train_data=DUMMY_DATASET, time_limit=2, freq="H")
+        model.fit(train_data=DUMMY_TS_DATAFRAME, time_limit=2, freq="H")
     except ValueError:
         pytest.fail("unexpected ValueError raised in fit")
 
@@ -108,7 +103,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
     )
 
     assert not model.gts_predictor
-    model.fit(train_data=DUMMY_DATASET, time_limit=2)
+    model.fit(train_data=DUMMY_TS_DATAFRAME, time_limit=2)
     assert isinstance(model.gts_predictor, GluonTSPredictor)
 
 
@@ -126,7 +121,7 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
     )
     with pytest.raises(ValueError, match=".*hyperparameter_tune.*"):
         model.fit(
-            train_data=DUMMY_DATASET,
+            train_data=DUMMY_TS_DATAFRAME,
         )
 
 
@@ -143,7 +138,7 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
         },
     )
     model.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
     )
     model.save()
 
@@ -174,13 +169,16 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         },
     )
 
-    model.fit(train_data=DUMMY_DATASET)
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
 
-    predictions = model.predict(DUMMY_DATASET, quantile_levels=quantile_levels)
+    assert isinstance(predictions, TimeSeriesDataFrame)
 
-    assert len(predictions) == len(DUMMY_DATASET)
-    for k in ["mean"] + [str(q) for q in quantile_levels]:
-        assert all(k in df.columns for _, df in predictions.items())
+    predicted_item_index = predictions.index.levels[0]
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    assert all(
+        k in predictions.columns for k in ["mean"] + [str(q) for q in quantile_levels]
+    )
 
 
 @pytest.mark.skipif(
@@ -199,7 +197,7 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
         hyperparameters={"growth": growth, "n_changepoints": n_changepoints},
     )
 
-    model.fit(train_data=DUMMY_DATASET)
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
 
     assert model.gts_predictor.prophet_params.get("growth") == growth  # noqa
     assert (
@@ -224,7 +222,7 @@ def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
         hyperparameters={"growth": growth, "n_changepoints": n_changepoints},
     )
     model.fit(
-        train_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
     )
     model.save()
 
@@ -262,8 +260,8 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
 
     models, analysis = model.hyperparameter_tune(
         time_limit=100,
-        train_data=DUMMY_DATASET,
-        val_data=DUMMY_DATASET,
+        train_data=DUMMY_TS_DATAFRAME,
+        val_data=DUMMY_TS_DATAFRAME,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 

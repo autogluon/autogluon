@@ -4,15 +4,11 @@ import os
 import time
 from typing import Any, Dict, Union, Optional
 
-import pandas as pd
-from gluonts.dataset.common import (
-    Dataset,
-)  # TODO: this interface should not depend on GluonTS datasets
-
 import autogluon.core as ag
 from autogluon.core.models import AbstractModel
 from autogluon.common.savers import save_pkl
 
+from ...dataset import TimeSeriesDataFrame
 from ...utils.metadata import get_prototype_metadata_dict
 from ...utils.metric_utils import check_get_evaluation_metric
 from .model_trial import skip_hpo, model_trial
@@ -105,7 +101,7 @@ class AbstractForecastingModel(AbstractModel):
         self._init_params_aux()
         self._init_params()
 
-    def _compute_fit_metadata(self, val_data: Dataset = None, **kwargs):
+    def _compute_fit_metadata(self, val_data: TimeSeriesDataFrame = None, **kwargs):
         fit_metadata = dict(
             val_in_fit=val_data is not None,
         )
@@ -147,14 +143,10 @@ class AbstractForecastingModel(AbstractModel):
 
         Other Parameters
         ----------------
-        train_data : gluonts.dataset.common.Dataset
-            The training data. Forecasting models expect data to be in GluonTS format, i.e., an
-            iterator of dictionaries with `start` and `target` keys. `start` is a timestamp object
-            for the first data point in a time series while `target` is the time series which the
-            model will be fit to predict. The data set can optionally have other features which may
-            be used by the model. See individual model documentation and GluonTS dataset documentation
-            for details.
-        val_data : gluonts.dataset.common.Dataset
+        train_data : TimeSeriesDataFrame
+            The training data provided in the library's `autogluon.forecasting.dataset.TimeSeriesDataFrame`
+            format.
+        val_data : TimeSeriesDataFrame
             The validation data set in the same format as training data.
         time_limit : float, default = None
             Time limit in seconds to adhere to when fitting model.
@@ -200,21 +192,17 @@ class AbstractForecastingModel(AbstractModel):
         """
         raise NotImplementedError
 
-    def predict(self, data: Dataset, **kwargs) -> Dict[Any, pd.DataFrame]:
-        """Given a dataset, predict the next `self.prediction_length` time steps. The data
-        set is a GluonTS data set, an iterator over time series represented as python dictionaries.
+    def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
+        """Given a dataset, predict the next `self.prediction_length` time steps.
         This method produces predictions for the forecast horizon *after* the individual time series.
 
         For example, if the data set includes 24 hour time series, of hourly data, starting from
         00:00 on day 1, and forecast horizon is set to 5. The forecasts are five time steps 00:00-04:00
         on day 2.
 
-        # TODO: The function currently returns a pandas.DataFrame instead of a GluonTS dataset, however
-        # TODO: this API will be aligned with the rest of the library.
-
         Parameters
         ----------
-        data: gluonts.dataset.common.Dataset
+        data: TimeSeriesDataFrame
             The dataset where each time series is the "context" for predictions.
 
         Other Parameters
@@ -226,14 +214,14 @@ class AbstractForecastingModel(AbstractModel):
 
         Returns
         -------
-        predictions: Dict[any, pandas.DataFrame]
-            pandas data frames with an timestamp index, where each input item from the input
+        predictions: TimeSeriesDataFrame
+            pandas data frames with a timestamp index, where each input item from the input
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
         raise NotImplementedError
 
-    def score(self, data: Dataset, metric: str = None, **kwargs) -> float:
+    def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
         will be held out and used for computing the evaluation score. Forecasting
@@ -241,7 +229,7 @@ class AbstractForecastingModel(AbstractModel):
 
         Parameters
         ----------
-        data: gluonts.dataset.common.Dataset
+        data: TimeSeriesDataFrame
             Dataset used for scoring.
         metric: str
             String identifier of evaluation metric to use, from one of
@@ -263,8 +251,8 @@ class AbstractForecastingModel(AbstractModel):
 
     def _hyperparameter_tune(
         self,
-        train_data: Dataset,
-        val_data: Dataset,
+        train_data: TimeSeriesDataFrame,
+        val_data: TimeSeriesDataFrame,
         hyperparameter_tune_kwargs: dict,
         resources: Optional[Dict] = None,
         model_estimate_memory_usage: Optional[int] = None,

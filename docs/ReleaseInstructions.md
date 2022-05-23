@@ -2,7 +2,7 @@
 
 ### Prior to release: 1 week out
 
-* Ensure the version specified in `docs/config.ini`, `VERSION`, and `docs/badges.rst` align with the intended release version.
+* Ensure the version specified in `docs/config.ini`, `VERSION`, `docs/index.rst`, and `docs/badges.rst` align with the intended release version.
 * Make final call for which in-progress PRs are release critical.
 * Communicate with in-progress PR owners that code freeze is in effect, no PRs will be merged that are not release critical.
 * Wait 1 day after code-freeze for pre-release to be published.

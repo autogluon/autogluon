@@ -86,6 +86,14 @@ hyperparameter_config_dict = dict(
         'AG_IMAGE_NN': {},  # TODO, Support changing the config w.r.t the preset option.
         'VW': {},
     },
+    # Hyperparameters intended to find an interpretable model which doesn't sacrifice predictive accuracy
+    interpretable={
+        'IM_RULEFIT': [{'max_rules': 7}, {'max_rules': 12}, {'max_rules': 20}],
+        'IM_GREEDYTREE': [{'max_leaf_nodes': 7, 'max_leaf_nodes': 20}],
+        'IM_BOOSTEDRULES': [{'n_estimators': 5}, {'n_estimators': 10}],
+        # 'IM_RULELIST': [{'c': 0.001}, {'c': 0.01}, {'c': 0.1}, {'c': 1.0}],
+        # 'IM_OPTIMALTREE': {},
+    }
 )
 
 
