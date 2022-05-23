@@ -24,11 +24,11 @@ class Periodic(nn.Module):
         d_embedding
             Output feature size, should be an even number.
         trainable
-            Bool, determine whether the coefficients needed to be updated.
+            Determine whether the coefficients needed to be updated.
         initialization
             Initalization scheme.
         sigma
-            Standard deviation for initalization=='normal' 
+            Standard deviation used for initalization=='normal' 
 
         Reference:
         ----------
