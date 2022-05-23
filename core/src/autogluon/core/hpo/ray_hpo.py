@@ -6,6 +6,7 @@ import shutil
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Union, List
 
+from .resources_calculator import ResourceCalculatorFactory 
 from .. import Space
 from ..utils.try_import import try_import_ray
 
@@ -350,37 +351,29 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         minimum_gpu_per_trial: float = 1.0,
         model_estimate_memory_usage: Optional[int] = None,
         **kwargs,
-        ) -> Union[dict, PlacementGroupFactory]:
-        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a interger that is larger than 0'
+        ) -> dict:
+        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
+        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
         num_gpus = total_resources.get('num_gpus', 0)
-        cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_samples))
-        gpu_per_job = 0
-        max_jobs_in_parallel_memory = num_samples
-
-        if model_estimate_memory_usage is not None:
-            mem_available = psutil.virtual_memory().available
-            # calculate how many jobs can run in parallel given memory available
-            max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
-        num_parallel_jobs = min(num_samples, num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
-        cpu_per_job = max(minimum_cpu_per_trial, int(num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
-        resources = dict(cpu=cpu_per_job)
-
-        # If gpu is available, recalculate cpu_per_job and num_parallel_jobs
-        if num_gpus > 0:
-            gpu_per_job = max(minimum_gpu_per_trial, num_gpus // num_samples)
-            num_parallel_jobs = num_gpus // gpu_per_job  # num_parallel_jobs purely based on gpu
-            cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_parallel_jobs)
-            num_parallel_jobs = min(num_parallel_jobs, num_cpus // cpu_per_job)  # update num_parallel_jobs in case cpu is not enough
-            gpu_per_job = max(minimum_gpu_per_trial, num_gpus // num_parallel_jobs)  # update gpu_per_job in case cpu was the bottleneck
-        resources = dict(cpu=cpu_per_job, gpu=gpu_per_job)
         
-        self.num_parallel_jobs = num_parallel_jobs
-        self.cpu_per_job = cpu_per_job
-        self.gpu_per_job = gpu_per_job
-        self.resources_per_trial = resources
+        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu')
+        resources_info = resources_calculator.get_resources_per_trial(
+            total_num_cpus=num_cpus,
+            total_num_gpus=num_gpus,
+            num_samples=num_samples,
+            minimum_cpu_per_trial=minimum_cpu_per_trial,
+            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            model_estimate_memory_usage=model_estimate_memory_usage,
+            **kwargs,
+        )
         
-        return resources
+        self.num_parallel_jobs = resources_info.get('num_parallel_jobs', None)
+        self.cpu_per_job = resources_info.get('cpu_per_job', None)
+        self.gpu_per_job = resources_info.get('gpu_per_job', None)
+        self.resources_per_trial = resources_info.get('resources_per_trial', None)
+        
+        return self.resources_per_trial
     
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args['fit_kwargs']['num_cpus'] = self.resources_per_trial.get('cpu', 1)
@@ -406,46 +399,30 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         minimum_gpu_per_trial: float = 1.0,
         model_estimate_memory_usage: Optional[int] = None,
         **kwargs,
-        ) -> Union[dict, PlacementGroupFactory]:
-        # Ray Tune requires 1 additional CPU per trial to use for the Trainable driver. 
-        # So the actual number of cpu resources each trial requires is num_workers * num_cpus_per_worker + 1
-        # Each ray worker will reserve 1 gpu
-        # The num_workers in ray stands for worker process to train the model
-        # The num_workers in AutoMM stands for worker process to load data
-        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be an interger that is larger than 0'
+        ) -> PlacementGroupFactory:
+        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
+        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
         num_gpus = total_resources.get('num_gpus', 0)
-        cpu_per_job = None
-        gpu_per_job = None
-        num_workers = None
-        if num_gpus > 0:
-            gpu_per_job = max(int(minimum_gpu_per_trial), num_gpus // num_samples)
-            num_workers = gpu_per_job  # each worker uses 1 gpu
-            num_parallel_jobs = min(num_samples, num_gpus // gpu_per_job)
-            num_cpus = (num_cpus - num_parallel_jobs)  # reserve cpus for the master process
-            assert num_cpus > 0
-            cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_parallel_jobs)
-            cpu_per_worker = max(1, cpu_per_job // num_workers)
-        else:
-            # TODO: for cpu case, is it better to have more workers or more cpus per worker?
-            cpu_per_job = max(minimum_cpu_per_trial, num_cpus // num_samples)
-            num_parallel_jobs = min(num_samples, num_cpus // cpu_per_job)
-            num_workers = max(minimum_cpu_per_trial, cpu_per_job - 1)  # 1 cpu for master process
-            cpu_per_worker = 1
-        resources_per_trial = get_tune_resources(
-            num_workers=num_workers,
-            num_cpus_per_worker=cpu_per_worker,
-            use_gpu=(gpu_per_job is not None)
+        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='ray_lightning_cpu' if num_gpus == 0 else 'ray_lightning_gpu')
+        resources_info = resources_calculator.get_resources_per_trial(
+            total_num_cpus=num_cpus,
+            total_num_gpus=num_gpus,
+            num_samples=num_samples,
+            minimum_cpu_per_trial=minimum_cpu_per_trial,
+            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            model_estimate_memory_usage=model_estimate_memory_usage,
+            **kwargs,
         )
         
-        self.num_parallel_jobs = num_parallel_jobs
-        self.cpu_per_job = cpu_per_job
-        self.gpu_per_job = gpu_per_job
-        self.resources_per_trial = resources_per_trial
-        self.num_workers = num_workers
-        self.cpu_per_worker = cpu_per_worker
+        self.num_parallel_jobs = resources_info.get('num_parallel_jobs', None)
+        self.cpu_per_job = resources_info.get('cpu_per_job', None)
+        self.gpu_per_job = resources_info.get('gpu_per_job', None)
+        self.num_workers = resources_info.get('num_workers', None)
+        self.cpu_per_worker = resources_info.get('cpu_per_worker', None)
+        self.resources_per_trial = resources_info.get('resources_per_trial', None)
         
-        return resources_per_trial
+        return self.resources_per_trial
         
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job
