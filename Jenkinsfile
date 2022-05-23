@@ -1,7 +1,7 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    python3 -m pip install mxnet-cu102==1.8.*
+    python3 -m pip install mxnet-cu101==1.7.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
     ls -1a /usr/local | grep cuda
