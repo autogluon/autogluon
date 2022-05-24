@@ -28,7 +28,7 @@ class Periodic(nn.Module):
         initialization
             Initalization scheme.
         sigma
-            Standard deviation used for initalization=='normal' 
+            Standard deviation used for initalization='normal' 
 
         Reference:
         ----------
@@ -252,7 +252,7 @@ class NumEmbeddings(nn.Module):
         embedding_arch
             A list containing the names of embedding layers.
             Currently support:
-            {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
+                {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
         d_embedding:
             Dimension of the embeddings. 
             The output shape should be [batch_size, number_of_numerical_featurs, d_embedding]
@@ -285,7 +285,6 @@ class NumEmbeddings(nn.Module):
             
         NLinear_ = NLinearMemoryEfficient if memory_efficient else NLinear
         layers: list[nn.Module] = []
-        
 
         if embedding_arch[0] == 'linear':
             layers.append(

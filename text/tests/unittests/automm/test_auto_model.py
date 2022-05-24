@@ -74,13 +74,12 @@ def test_numerical_transformer_init(embedding_arch):
         d_token=d_token,
         embedding_arch=embedding_arch,
     )
-    # model.get_layer_ids()
     
     y = model.forward(
         {
-            model.numerical_key: torch.ones(1,in_features),
+            model.numerical_key: torch.ones(1,in_features), # synthetic data
         }
     )[model.prefix]
     
-    assert y[LOGITS].shape == (1,num_classes)
-    assert y[FEATURES].shape == (1,in_features,d_token)
+    assert y[LOGITS].shape == (1,num_classes) # check the output shape
+    assert y[FEATURES].shape == (1,in_features,d_token) # check the output shape
