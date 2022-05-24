@@ -56,6 +56,7 @@ from .utils import (
     modify_duplicate_model_names,
     assign_feature_column_names,
     turn_on_off_feature_column_info,
+    try_to_set_positive_label,
 )
 from .optimization.utils import (
     get_metric,
@@ -399,10 +400,16 @@ class AutoMMPredictor:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
 
+        if problem_type == BINARY:
+            try_to_set_positive_label(
+                data_config=config.data,
+                label_encoder=df_preprocessor.label_generator,
+            )
         validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
             problem_type=problem_type,
             num_classes=output_shape,
+            positive_label=OmegaConf.select(config, "data.positive_label", default=1),
         )
 
         loss_func = get_loss_func(problem_type)
@@ -1064,6 +1071,7 @@ class AutoMMPredictor:
             score = compute_score(
                 metric_data=metric_data,
                 metric_name=per_metric.lower(),
+                positive_label=OmegaConf.select(self._config, "data.positive_label", default=1)
             )
             results[per_metric] = score
 
