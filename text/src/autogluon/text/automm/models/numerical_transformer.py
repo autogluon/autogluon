@@ -253,11 +253,24 @@ class NumEmbeddings(nn.Module):
             A list containing the names of embedding layers.
             Currently support:
                 {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
+            To use the embedding schemes summarized in Table 3 of 'On Embeddings for Numerical Features in Tabular Deep Learning' (https://arxiv.org/abs/2203.05556)
+            By setting the embedding_arch as follows:
+                1. `L`: ['linear']
+                2. `LR`: ['linear', 'relu']
+                3. `LRLR`: ['linear', 'relu', 'linear', 'relu']
+                4. `P`: ['positional']
+                5. `PL`: ['positional', 'linear']
+                6. `PLR`: ['positional', 'linear', 'relu']
+                7. `PLRLR`: ['positional', 'linear', 'relu', 'linear', 'relu']
+                8. `AutoDis`: ['autodis']
+            Notably, in `L` (i.e. embedding_arch=['linear']) for numerical transformer, 
+            it identical as the original feature_tokenzier in FT_Transformer (c.f. Figure 2.a in https://arxiv.org/pdf/2106.11959.pdf).
         d_embedding:
             Dimension of the embeddings. 
             The output shape should be [batch_size, number_of_numerical_featurs, d_embedding]
         memory_efficient:
-            Use efficient linear layer scheme if True. Default is False.    
+            Use efficient linear layer scheme if True. Default is False.   
+         
         Reference:
         ----------
         1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
