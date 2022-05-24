@@ -51,7 +51,6 @@ def test_tabular_resource_allocation_no_gpu_no_bottleneck():
     expected_num_parallel_jobs = 32  # even user wants to run 1000 jobs in prallel, cpu can run 4 jobs in parallel, memory only allows for 2 jobs
     expected_resources_per_trial = dict(
         cpu = 1,
-        gpu = 0,
     )
 
     assert expected_resources_per_trial == resources_per_trial
@@ -77,7 +76,6 @@ def test_tabular_resource_allocation_no_gpu_mem_bottleneck():
     expected_num_parallel_jobs = 2  # even user wants to run 1000 jobs in prallel, cpu can run 4 jobs in parallel, memory only allows for 2 jobs
     expected_resources_per_trial = dict(
         cpu = 16,
-        gpu = 0,
     )
 
     assert expected_resources_per_trial == resources_per_trial
