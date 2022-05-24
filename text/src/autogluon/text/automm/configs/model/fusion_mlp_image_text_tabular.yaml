@@ -49,6 +49,9 @@ model:
     head_activation: "relu" 
     data_types:
       - "numerical"
+    embedding_arch:
+      - 'linear'
+      - 'relu'
     merge: "concat"
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
