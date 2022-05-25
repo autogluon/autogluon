@@ -197,7 +197,7 @@ class TextPredictorModel(AbstractModel):
 
         return total_size
 
-    def _get_default_resources(self):
+    def _get_default_resources(self, parallel=False):
         num_cpus = get_cpu_count()
         num_gpus = get_gpu_count_torch()
         return num_cpus, num_gpus

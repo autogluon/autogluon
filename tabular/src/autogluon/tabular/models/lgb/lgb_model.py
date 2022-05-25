@@ -328,7 +328,7 @@ class LGBModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
-    def _get_default_resources(self):
+    def _get_default_resources(self, parallel=False):
         # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0

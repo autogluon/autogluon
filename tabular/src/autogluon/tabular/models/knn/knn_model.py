@@ -255,7 +255,7 @@ class KNNModel(AbstractModel):
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
 
-    def _get_default_resources(self):
+    def _get_default_resources(self, parallel=False):
         # use at most 32 cpus to avoid OpenBLAS error: https://github.com/awslabs/autogluon/issues/1020
         num_cpus = min(32, get_cpu_count())
         num_gpus = 0

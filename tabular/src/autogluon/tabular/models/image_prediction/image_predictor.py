@@ -224,7 +224,7 @@ class ImagePredictorModel(AbstractModel):
         """
         return len(pickle.dumps(self.model._classifier, pickle.HIGHEST_PROTOCOL))
 
-    def _get_default_resources(self):
+    def _get_default_resources(self, parallel=False):
         num_cpus = get_cpu_count()
         try_import_autogluon_vision()
         from autogluon.vision import ImagePredictor

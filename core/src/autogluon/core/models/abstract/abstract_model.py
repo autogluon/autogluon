@@ -467,8 +467,8 @@ class AbstractModel:
         else:
             self.normalize_pred_probas = False
 
-    def _preprocess_fit_resources(self, silent=False, **kwargs):
-        default_num_cpus, default_num_gpus = self._get_default_resources()
+    def _preprocess_fit_resources(self, silent=False, parallel=False, **kwargs):
+        default_num_cpus, default_num_gpus = self._get_default_resources(parallel=parallel)
         num_cpus = self.params_aux.get('num_cpus', 'auto')
         num_gpus = self.params_aux.get('num_gpus', 'auto')
         kwargs['num_cpus'] = kwargs.get('num_cpus', num_cpus)
@@ -928,7 +928,7 @@ class AbstractModel:
 
         resources = kwargs.pop('resources', None)
         if resources is None:
-            resources = self._preprocess_fit_resources(silent=True)
+            resources = self._preprocess_fit_resources(silent=True, parallel=True)
         model_estimate_memory_usage = kwargs.pop('model_estimate_memory_usage', None)
         if model_estimate_memory_usage is None and self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
@@ -1176,11 +1176,13 @@ class AbstractModel:
         save_json.save(path=json_path, obj=info)
         return info
 
-    def _get_default_resources(self):
+    def _get_default_resources(self, parallel=False):
         """
         Determines the default resource usage of the model during fit.
 
         Models may want to override this if they depend heavily on GPUs, as the default sets num_gpus to 0.
+        
+        Optimal resources could vary between sequential and parallel training
         """
         num_cpus = get_cpu_count()
         num_gpus = 0
