@@ -82,7 +82,3 @@ class AdultTabularDataset(BaseTabularDataset):
     @property
     def problem_type(self):
         return BINARY
-    
-
-adultdataset = AdultTabularDataset('test','/home/ubuntu/dataset')
-print(adultdataset.data)
