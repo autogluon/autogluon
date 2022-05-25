@@ -903,7 +903,7 @@ def average_checkpoints(
 def compute_score(
         metric_data: dict,
         metric_name: str,
-        positive_label: Optional[int] = 1,
+        pos_label: Optional[int] = 1,
 ) -> float:
     """
     Use sklearn to compute the score of one metric.
@@ -915,7 +915,7 @@ def compute_score(
         The predicted class probabilities are required to compute the roc_auc score.
     metric_name
         The name of metric to compute.
-    positive_label
+    pos_label
         The encoded label (0 or 1) of binary classification's positive class.
 
     Returns
@@ -924,7 +924,7 @@ def compute_score(
     """
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, positive_label])
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
@@ -1227,13 +1227,15 @@ def turn_on_off_feature_column_info(
     return data_processors
 
 
-def try_to_set_positive_label(
+def try_to_infer_positive_label(
         data_config: DictConfig,
         label_encoder: LabelEncoder,
+        problem_type: str,
 ):
     """
-    Try to set positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
-    If positive_class is not provided, then use positive_label=1 by default.
+    Try to infer positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
+    If positive class is not provided, then use pos_label=1 by default.
+    If the problem type is not binary classification, then return None.
 
     Parameters
     ----------
@@ -1241,17 +1243,20 @@ def try_to_set_positive_label(
         A DictConfig object containing only the data configurations.
     label_encoder
         The label encoder of classification tasks.
+    problem_type
+        Type of problem.
 
     Returns
     -------
 
     """
-    positive_class = OmegaConf.select(data_config, "positive_class", default=None)
-    if positive_class:
-        positive_label = label_encoder.transform([positive_class]).item()
+    if problem_type != BINARY:
+        return None
+
+    pos_label = OmegaConf.select(data_config, "pos_label", default=None)
+    if pos_label:
+        pos_label = label_encoder.transform([pos_label]).item()
     else:
-        positive_label = 1
+        pos_label = 1
 
-    data_config.positive_label = positive_label
-
-    return
+    return pos_label
