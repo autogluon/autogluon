@@ -3,15 +3,17 @@ import os
 import psutil
 import shutil
 
+from ..utils.try_import import try_import_ray
+try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
+import ray
+
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Union, List
 
-from .resources_calculator import ResourceCalculatorFactory 
+from .resources_calculator import ResourceCalculatorFactory
+from .scheduler_factory import SchedulerFactory
+from .searcher_factory import SearcherFactory
 from .. import Space
-from ..utils.try_import import try_import_ray
-
-try_import_ray()
-import ray
 
 from ray import tune
 from ray_lightning import RayPlugin
@@ -30,17 +32,8 @@ logger = logging.getLogger(__name__)
 MIN = 'min'
 MAX = 'max'
 
-searcher_presets = {
-    'random': BasicVariantGenerator,
-    'bayes': HyperOptSearch,
-}
-scheduler_presets = {
-    'FIFO': FIFOScheduler,
-    'ASHA': AsyncHyperBandScheduler,
-    # Not support PBT/PB2 for now: https://github.com/ray-project/ray_lightning/issues/145
-    # 'PBT' : PopulationBasedTraining,
-    # 'PB2': PB2,
-}
+searcher_presets = SearcherFactory.searcher_presets
+scheduler_presets = SchedulerFactory.scheduler_presets
 
 
 class EmptySearchSpace(Exception):
@@ -298,12 +291,12 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
         if supported_searchers is not None:
             if searcher not in supported_searchers:
                 logger.warning(f'{searcher} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers}')
-        searcher_cls = searcher_presets.get(searcher)
-        init_args = dict()
-        if searcher_cls == HyperOptSearch:
-            init_args = dict(metric=metric, mode=mode)
-            init_args.update(user_init_args)
-        searcher = searcher_cls(**init_args)
+        searcher = SearcherFactory.get_searcher(
+            searcher_name=searcher,
+            user_init_args=user_init_args,
+            metric=metric,
+            mode=mode
+        )
     assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in searcher_presets.values()
     # Check supported schedulers for obj input
     if supported_searchers is not None:
@@ -323,12 +316,10 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
         if supported_schedulers is not None:
             if scheduler not in supported_schedulers:
                 logger.warning(f'{scheduler} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers}')
-        scheduler_cls = scheduler_presets.get(scheduler)
-        init_args = dict()
-        if scheduler_cls == AsyncHyperBandScheduler:
-            init_args = dict(max_t=9999)
-        init_args.update(user_init_args)
-        scheduler = scheduler_cls(**init_args)
+        scheduler = SchedulerFactory.get_scheduler(
+            scheduler_name=scheduler,
+            user_init_args=user_init_args,
+        )
     assert isinstance(scheduler, TrialScheduler) and scheduler.__class__ in scheduler_presets.values()
     # Check supported schedulers for obj input
     if supported_schedulers is not None:
