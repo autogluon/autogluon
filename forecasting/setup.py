@@ -31,7 +31,7 @@ requirements = [
 ]
 
 # TODO: move test_requirements into extra_requirements
-test_requirements = ["pytest", "flake8", "pytest-timeout"]
+test_requirements = ["pytest", "flake8", "flaky", "pytest-timeout"]
 
 install_requires = requirements + test_requirements
 install_requires = ag.get_dependency_version_ranges(install_requires)
