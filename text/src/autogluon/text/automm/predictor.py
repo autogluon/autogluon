@@ -56,7 +56,7 @@ from .utils import (
     modify_duplicate_model_names,
     assign_feature_column_names,
     turn_on_off_feature_column_info,
-    try_to_infer_positive_label,
+    try_to_infer_pos_label,
 )
 from .optimization.utils import (
     get_metric,
@@ -400,7 +400,7 @@ class AutoMMPredictor:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
 
-        pos_label = try_to_infer_positive_label(
+        pos_label = try_to_infer_pos_label(
             data_config=config.data,
             label_encoder=df_preprocessor.label_generator,
             problem_type=problem_type,
@@ -1068,7 +1068,7 @@ class AutoMMPredictor:
                 raise ValueError(
                     f"Metric {per_metric} is only supported for binary classification."
                 )
-            pos_label = try_to_infer_positive_label(
+            pos_label = try_to_infer_pos_label(
                 data_config=self._config.data,
                 label_encoder=self._df_preprocessor.label_generator,
                 problem_type=self._problem_type,

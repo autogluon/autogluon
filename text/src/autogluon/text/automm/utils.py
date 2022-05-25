@@ -1227,7 +1227,7 @@ def turn_on_off_feature_column_info(
     return data_processors
 
 
-def try_to_infer_positive_label(
+def try_to_infer_pos_label(
         data_config: DictConfig,
         label_encoder: LabelEncoder,
         problem_type: str,
