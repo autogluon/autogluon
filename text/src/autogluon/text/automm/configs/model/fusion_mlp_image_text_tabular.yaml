@@ -62,6 +62,10 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
+    train_augment_types:
+      - "synonym_replacement({'aug_p': 0.1})"  # less than 0.1 based on eda paper
+      - "random_swap({'aug_p': 0.1})"          # less than 0.1 based on eda paper
+      - "random_delete({'aug_p': 0.1})"        # less than 0.1 based on eda paper
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
