@@ -501,6 +501,7 @@ def init_data_processors(
                     TextProcessor(
                         prefix=model_name,
                         tokenizer_name=model_config.tokenizer_name,
+                        train_augment_types=model_config.train_augment_types,
                         checkpoint_name=model_config.checkpoint_name,
                         text_column_names=df_preprocessor.text_feature_names,
                         max_len=model_config.max_text_len,
@@ -620,7 +621,6 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
-                embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )

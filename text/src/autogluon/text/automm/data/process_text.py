@@ -21,6 +21,11 @@ from ..constants import (
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
 
+import ast
+from copy import copy, deepcopy
+import nlpaug.flow as naf
+import nlpaug.augmenter.word as naw
+
 logger = logging.getLogger(AUTOMM)
 
 # Disable tokenizer parallelism
@@ -44,6 +49,7 @@ class TextProcessor:
     def __init__(
             self,
             prefix: str,
+            train_augment_types: List[str],
             checkpoint_name: str,
             text_column_names: List[str],
             tokenizer_name: Optional[str] = "hf_auto",
@@ -84,6 +90,8 @@ class TextProcessor:
             tokenizer_name=tokenizer_name,
             checkpoint_name=checkpoint_name,
         )
+        self.train_augment_types = train_augment_types
+        logger.debug(f"text train augment type: {train_augment_types}")
         if hasattr(self.tokenizer, 'deprecation_warnings'):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
             # See https://github.com/huggingface/transformers/blob/6ac77534bfe97c00e0127bb4fc846ae0faf1c9c5/src/transformers/tokenization_utils_base.py#L3362
@@ -129,6 +137,9 @@ class TextProcessor:
 
         self.stochastic_chunk = stochastic_chunk
 
+        #construct augmentor
+        self.train_augmenter = self.construct_augmenter(self.train_augment_types)
+       
     @property
     def text_token_ids_key(self):
         return f"{self.prefix}_{TEXT_TOKEN_IDS}"
@@ -168,6 +179,46 @@ class TextProcessor:
         )
 
         return fn
+
+    def construct_augmenter(
+            self,
+            augment_types: List[str],
+    ) -> naf.Sometimes:
+        """
+        Build up a text augmentor from the provided list of augmentation types
+        
+        Parameters
+        ----------
+        augment_types
+            A list of text augment types.
+
+        Returns
+        -------
+        A nlpaug sequantial flow.
+        
+        """
+        if(augment_types == None):
+            return naf.Sequential()
+        auglist = []
+        for aug_type in augment_types:
+            if '(' in aug_type:
+                trans_mode = aug_type[0:aug_type.find('(')]
+                kwargs = ast.literal_eval(aug_type[aug_type.find('('):])
+            else:
+                trans_mode = aug_type
+                kwargs = {}
+            if(trans_mode == "synonym_replacement"):
+                kwargs['aug_src'] = 'wordnet'
+                auglist.append(naw.SynonymAug(**kwargs))
+            elif(trans_mode == "random_swap"):
+                kwargs['action'] = 'swap'
+                auglist.append(naw.RandomWordAug(**kwargs))
+            elif(trans_mode == "random_delete"):
+                kwargs['action'] = 'delete'
+                auglist.append(naw.RandomWordAug(**kwargs))
+            else:
+                raise ValueError(f"unknown transform type: {trans_mode}")
+        return naf.Sometimes(auglist, aug_p = 0.5)
 
     def build_one_token_sequence(
             self,
@@ -239,6 +290,7 @@ class TextProcessor:
     def build_one_token_sequence_from_text(
             self,
             text: Dict[str, str],
+            is_training: bool,
     ) -> Dict:
         """
         Tokenize a sample's text data and build one token sequence. One sample may have
@@ -248,6 +300,8 @@ class TextProcessor:
         ----------
         text
             The raw text data of one sample.
+        is_training: 
+            Only augment for training data
 
         Returns
         -------
@@ -260,13 +314,17 @@ class TextProcessor:
             "Token indices sequence length is longer than.*result in indexing errors"
         )
         for col_name, col_text in text.items():
+            # augment text if specify in config
+            if (is_training and (len(col_text.split(' ')) >= 5)):
+                 # naive way detect text/categorical/numerical: more than 5 words
+                col_text = self.train_augmenter.augment(col_text)
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
                 truncation=False,
             )
             tokens[col_name] = np.array(col_tokens, dtype=np.int32)
-
+            
         # build token sequence
         return self.build_one_token_sequence(tokens)
 
@@ -397,4 +455,14 @@ class TextProcessor:
         per_sample_text = {
             per_column_name: per_column_text[idx] for per_column_name, per_column_text in all_text.items()
         }
-        return self.build_one_token_sequence_from_text(per_sample_text)
+        return self.build_one_token_sequence_from_text(per_sample_text, is_training)
+
+    #nlpaug couldn't be serialize, so not saving augmenter for now
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if(k!="train_augmenter"):
+                setattr(result, k, deepcopy(v, memo))
+        return result
