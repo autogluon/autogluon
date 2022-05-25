@@ -61,6 +61,7 @@ model:
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
     insert_sep: True
     text_segment_num: 2
+    text_detection_length: 10
     stochastic_chunk: False
     train_augment_types:
       - "synonym_replacement({'aug_p': 0.1})"  # less than 0.1 based on eda paper

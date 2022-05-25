@@ -508,6 +508,7 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
+                        text_detection_length = model_config.text_detection_length
                     )
                 )
             elif d_type == CATEGORICAL:

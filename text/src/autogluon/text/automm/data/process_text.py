@@ -58,6 +58,7 @@ class TextProcessor:
             text_segment_num: Optional[int] = 1,
             stochastic_chunk: Optional[bool] = False,
             requires_column_info: bool = False,
+            text_detection_length: int = 5,
     ):
         """
         Parameters
@@ -80,6 +81,8 @@ class TextProcessor:
             Whether to use stochastic chunking, which will randomly slice each individual text.
         requires_column_info
             Whether to require feature column information in dataloader.
+        text_detection_length
+            A naive way to detect text column versus tabular column that were treated as text
         """
         self.prefix = prefix
         self.tokenizer_name = tokenizer_name
@@ -139,6 +142,7 @@ class TextProcessor:
 
         #construct augmentor
         self.train_augmenter = self.construct_augmenter(self.train_augment_types)
+        self.text_detection_length = text_detection_length
        
     @property
     def text_token_ids_key(self):
@@ -197,7 +201,7 @@ class TextProcessor:
         A nlpaug sequantial flow.
         
         """
-        if(augment_types == None):
+        if(augment_types is None):
             return naf.Sequential()
         auglist = []
         for aug_type in augment_types:
@@ -315,8 +319,8 @@ class TextProcessor:
         )
         for col_name, col_text in text.items():
             # augment text if specify in config
-            if (is_training and (len(col_text.split(' ')) >= 5)):
-                 # naive way detect text/categorical/numerical: more than 5 words
+            if (is_training and (len(col_text.split(' ')) >= self.text_detection_length)):
+                 # naive way detect text/categorical/numerical
                 col_text = self.train_augmenter.augment(col_text)
             col_tokens = self.tokenizer.encode(
                 col_text,
