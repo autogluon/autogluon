@@ -15,7 +15,6 @@ from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from autogluon.core.metrics import get_metric
-from .data.mixup import MixupModule
 
 from .models import (
     HFAutoModelForTextPrediction,
@@ -590,6 +589,7 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
+                mixup_config=getattr(config.data, "mixup"),
             )
         elif model_name.lower().startswith(TIMM_IMAGE):
             model = TimmAutoModelForImagePrediction(
@@ -598,6 +598,7 @@ def create_model(
                 num_classes=num_classes,
                 mix_choice=model_config.mix_choice,
                 pretrained=pretrained,
+                mixup_config=getattr(config.data, "mixup"),
             )
         elif model_name.lower().startswith(HF_TEXT):
             model = HFAutoModelForTextPrediction(
@@ -1234,30 +1235,29 @@ def turn_on_off_feature_column_info(
 
     return data_processors
 
-def get_mixup(
+def get_mix_state(
+        df_preprocessor: MultiModalFeaturePreprocessor,
         config: DictConfig,
-        output_shape: int,
+        num_classes: int,
 ):
-    names = config.model.names
-    if isinstance(names, str):
-        names = [names]
-    mixup_fn = None
-    mixup_off_epoch = None
-    if "timm_image" in names:
-        mixup_active = config.model.timm_image.mixup > 0 or \
-                       config.model.timm_image.cutmix > 0. or \
-                       config.model.timm_image.cutmix_minmax is not None
-        mixup_off_epoch = config.model.timm_image.mixup_off_epoch
-        if mixup_active:
-            mixup_args = dict(
-                mixup_alpha=config.model.timm_image.mixup,
-                cutmix_alpha=config.model.timm_image.cutmix,
-                cutmix_minmax=config.model.timm_image.cutmix_minmax,
-                prob=config.model.timm_image.mixup_prob,
-                switch_prob=config.model.timm_image.mixup_switch_prob,
-                mode=config.model.timm_image.mixup_mode,
-                label_smoothing=config.model.timm_image.smoothing,
-                num_classes=output_shape,
-            )
-            mixup_fn = MixupModule(**mixup_args)
-    return mixup_fn, mixup_off_epoch
+    """
+        Get the mixup state for loss function choice.
+        Now the mixup can only support image data.
+        And the problem type can not support Regression.
+        Parameters
+        ----------
+        df_preprocessors
+            The MultiModalFeaturePreprocessor to check whether contains images
+        config
+            The mixup configs.
+        num_classes
+            The number of classes in the task. Class <= 1 will cause faults.
+
+        Returns
+        -------
+        The mixup is on or off.
+    """
+    mixup_active = config.mixup > 0 or \
+                   config.cutmix > 0. or \
+                   config.cutmix_minmax is not None
+    return (len(df_preprocessor.image_path_names) > 0 & mixup_active & num_classes > 1)

@@ -16,9 +16,13 @@ from ..constants import (
     ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
 )
 import warnings
+from timm.loss import SoftTargetCrossEntropy
 
 
-def get_loss_func(problem_type: str):
+def get_loss_func(
+        problem_type: str,
+        mixup_active: bool,
+):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
 
@@ -32,7 +36,10 @@ def get_loss_func(problem_type: str):
     A Pytorch loss module.
     """
     if problem_type in [BINARY, MULTICLASS]:
-        loss_func = nn.CrossEntropyLoss()
+        if mixup_active:
+            loss_func = SoftTargetCrossEntropy()
+        else:
+            loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
         loss_func = nn.MSELoss()
     else:

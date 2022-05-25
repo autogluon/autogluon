@@ -5,7 +5,7 @@ from typing import List, Optional
 from .utils import init_weights
 from ..constants import (
     LABEL, LOGITS, FEATURES,
-    WEIGHT, AUTOMM
+    TARGETS, WEIGHT, AUTOMM
 )
 from .mlp import MLP
 from .ft_transformer import FT_Transformer, CLSToken
@@ -153,6 +153,8 @@ class MultimodalFusionMLP(nn.Module):
             if self.loss_weight is not None:
                 per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
                 output.update(per_output)
+            if self.training and TARGETS in per_output[per_model.prefix]:
+                targets = per_output[per_model.prefix][TARGETS]
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
         logits = self.head(features)
@@ -160,6 +162,7 @@ class MultimodalFusionMLP(nn.Module):
             self.prefix: {
                 LOGITS: logits,
                 FEATURES: features,
+                TARGETS: targets,
             }
         }
         if self.loss_weight is not None:
@@ -338,6 +341,8 @@ class MultimodalFusionTransformer(nn.Module):
             if self.loss_weight is not None:
                 per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
                 output.update(per_output)
+            if self.training and TARGETS in per_output[per_model.prefix]:
+                targets = per_output[per_model.prefix][TARGETS]
 
         multimodal_features = torch.cat(multimodal_features, dim=1)
         multimodal_features = self.cls_token(multimodal_features)
@@ -348,6 +353,7 @@ class MultimodalFusionTransformer(nn.Module):
             self.prefix: {
                 LOGITS: logits,
                 FEATURES: features,
+                TARGETS: targets,
             }
         }
         if self.loss_weight is not None:

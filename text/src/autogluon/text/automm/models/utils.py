@@ -2,6 +2,8 @@ from typing import Optional, Union, Tuple, List, Dict
 import torch
 from torch import nn
 from ..constants import MASK
+from omegaconf import DictConfig
+from timm.data.mixup import Mixup
 
 
 def init_weights(module: nn.Module):
@@ -371,3 +373,46 @@ def get_column_features(
             ret[f"{key[cut_idx:]}_{MASK}"] = per_col_masks  # (b,)
 
     return ret
+
+def get_mixup(
+        config: DictConfig,
+        num_classes: Optional[int] = 1000,
+):
+    """
+        This function can be used to get the mixup function from timm.
+        This can only support for image.
+        Papers:
+            mixup: Beyond Empirical Risk Minimization (https://arxiv.org/abs/1710.09412)
+
+        CutMix: Regularization Strategy to Train Strong Classifiers with Localizable Features (https://arxiv.org/abs/1905.04899)
+
+        Parameters
+        ----------
+        config
+            The mixup configs for mixup and cutmix.
+        num_classes
+            It will affect the target. The target will be output as one-hot of num_classes.
+            The numclass <= 1 will cause faults.
+
+        Returns
+        -------
+        The mixup function. If not active, the ouput will be None.
+        """
+    mixup_active = config.mixup > 0 or \
+                   config.cutmix > 0. or \
+                   config.cutmix_minmax is not None
+    mixup_fn = None
+    if mixup_active and num_classes > 1:
+        mixup_args = dict(
+            mixup_alpha=config.mixup,
+            cutmix_alpha=config.cutmix,
+            cutmix_minmax=config.cutmix_minmax,
+            prob=config.mixup_prob,
+            switch_prob=config.mixup_switch_prob,
+            mode=config.mixup_mode,
+            label_smoothing=config.smoothing,
+            num_classes=num_classes,
+        )
+        mixup_fn = Mixup(**mixup_args)
+    return mixup_fn
+
