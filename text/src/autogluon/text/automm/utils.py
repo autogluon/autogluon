@@ -1255,6 +1255,7 @@ def try_to_infer_pos_label(
 
     pos_label = OmegaConf.select(data_config, "pos_label", default=None)
     if pos_label is not None:
+        print(f"pos_label: {pos_label}\n")
         pos_label = label_encoder.transform([pos_label]).item()
     else:
         pos_label = 1
