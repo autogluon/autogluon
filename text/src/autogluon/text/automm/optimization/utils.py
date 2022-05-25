@@ -46,7 +46,7 @@ def get_metric(
         metric_name: str,
         problem_type: str,
         num_classes: Optional[int] = None,
-        pos_label: Optional[int] = 1,
+        pos_label: Optional[int] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
