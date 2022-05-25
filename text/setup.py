@@ -41,7 +41,7 @@ install_requires = [
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',
-    'nlpaug',
+    'nlpaug>=1.1.10',
     'nltk>=3.4.5'
 ]
 

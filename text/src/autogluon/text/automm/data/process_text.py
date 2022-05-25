@@ -462,6 +462,7 @@ class TextProcessor:
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
+        
         for k, v in self.__dict__.items():
             if(k!="train_augmenter"):
                 setattr(result, k, deepcopy(v, memo))
