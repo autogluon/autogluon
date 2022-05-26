@@ -138,6 +138,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             column_name_prefix=self.text_column_prefix,
             features=outputs.last_hidden_state,
             valid_lengths=text_valid_length,
+            has_cls_feature=True,
         )
 
         ret.update(

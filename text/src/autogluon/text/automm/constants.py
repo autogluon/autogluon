@@ -26,6 +26,7 @@ OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
 MASK = "mask"
+PROBABILITY = "probability"
 
 # Metric
 MAX = "max"
@@ -100,3 +101,15 @@ NUMERICAL_TRANSFORMER = "numerical_transformer"
 CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
+
+# metric learning loss type
+CONTRASTIVE_LOSS = "contrastive_loss"
+
+# metric learning distance type
+COSINE_SIMILARITY = "cosine_similarity"
+
+# metric learning miner type
+PAIR_MARGIN_MINER = "pair_margin_miner"
+
+# config keys
+MATCHER = "matcher"
