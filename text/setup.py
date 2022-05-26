@@ -41,6 +41,7 @@ install_requires = [
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',
+    'pytorch-metric-learning>=1.3.0,<1.4.0',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -53,6 +54,8 @@ if __name__ == '__main__':
         'configs/model/*.yaml',
         'configs/optimization/*.yaml',
         'configs/environment/*.yaml',
+        'configs/distiller/*.yaml',
+        'configs/matcher/*.yaml',
     ]
     setup(
         install_requires=install_requires,

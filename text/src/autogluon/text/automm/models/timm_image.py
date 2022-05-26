@@ -127,6 +127,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
                     column_name_prefix=self.image_column_prefix,
                     features=features,
                     valid_lengths=image_valid_num,
+                    has_cls_feature=False,
                 )
             )
 

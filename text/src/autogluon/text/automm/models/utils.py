@@ -325,6 +325,7 @@ def get_column_features(
         column_name_prefix: str,
         features: torch.Tensor,
         valid_lengths: torch.Tensor,
+        has_cls_feature: bool,
 ):
     """
     Index the features of one column defined by `column_name_prefix`.
@@ -350,6 +351,7 @@ def get_column_features(
     mask is 0.
     """
     ret = {}
+    all_column_names = []
     cut_idx = len(column_name_prefix) + 1
     for key in batch:
         if key.startswith(column_name_prefix):
@@ -366,8 +368,13 @@ def get_column_features(
                 else:  # the column has no valid image/text.
                     per_col_features.append(torch.zeros_like(features[0, 0]))
                     per_col_masks[i] = 0
+            column_name = key[cut_idx:]
+            ret[column_name] = torch.stack(per_col_features, dim=0)  # (b, num_features)
+            ret[f"{column_name}_{MASK}"] = per_col_masks  # (b,)
+            all_column_names.append(column_name)
 
-            ret[key[cut_idx:]] = torch.stack(per_col_features, dim=0)  # (b, d)
-            ret[f"{key[cut_idx:]}_{MASK}"] = per_col_masks  # (b,)
+    # all the columns of one model's input share the model's cls feature
+    if has_cls_feature and len(all_column_names) > 0:  # some models', e.g, timm_image, output doesn't have the cls feature.
+        ret["_".join(all_column_names)] = features[:, 0, :]
 
     return ret

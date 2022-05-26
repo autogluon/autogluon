@@ -1,10 +1,14 @@
+import logging
 from typing import Optional, Union, Tuple, List, Dict
 import functools
+import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
+from omegaconf import DictConfig
+from pytorch_metric_learning import losses, miners, distances
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
@@ -13,10 +17,12 @@ from .lr_scheduler import (
 from ..constants import (
     BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
     ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
-    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
-    PEARSONR, SPEARMANR,
+    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY, PEARSONR, SPEARMANR,
+    CONTRASTIVE_LOSS, COSINE_SIMILARITY, PAIR_MARGIN_MINER,
 )
 import warnings
+
+logger = logging.getLogger(__name__)
 
 
 def get_loss_func(problem_type: str):
@@ -93,6 +99,9 @@ def get_metric(
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
         return torchmetrics.MeanMetric(), MIN, \
                functools.partial(F.cross_entropy, reduction="none")
+    elif metric_name == "cosine_embedding_loss":
+        return torchmetrics.MeanMetric(), MIN, \
+               functools.partial(F.cosine_embedding_loss, reduction="none")
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), MAX, None
     elif metric_name == SPEARMANR:
@@ -470,3 +479,126 @@ def apply_layerwise_lr_decay(
         parameter_group_names[group_name]["params"].append(name)
 
     return list(parameter_group_vars.values())
+
+
+def gather_column_features(
+        output: Dict[str, Dict],
+        column_names: Union[str, List[str]],
+):
+    if isinstance(column_names, str):
+        column_names = [column_names]
+
+    joint_column_name = "_".join(column_names)
+    gathered_features = []
+
+    for per_model_name, per_model_output in output.items():
+        if joint_column_name in per_model_output:  # all provided columns are this model's input and the model has the cls feature.
+            # logger.debug(f"model: {per_model_name}, feature {joint_column_name}: {per_model_output[joint_column_name].shape}")
+            gathered_features.append(per_model_output[joint_column_name])
+        else:  # some or even no columns are this model's input
+            for col_name in column_names:
+                if col_name in per_model_output:
+                    # logger.debug(f"model: {per_model_name}, feature {col_name}: {per_model_output[col_name].shape}")
+                    gathered_features.append(per_model_output[col_name])
+
+    if len(gathered_features) > 1:
+        # currently only support features of the same shape
+        assert all(per_features.shape == gathered_features[0].shape for per_features in gathered_features)
+
+    if len(gathered_features) == 0:
+        raise ValueError(f"No features are found for columns names {column_names}.")
+
+    gathered_features = torch.stack(gathered_features, dim=0).mean(dim=0)  # (b, num_features)
+
+    return gathered_features
+
+
+def get_metric_learning_distance_func(
+        name: str,
+):
+    if name.lower() == COSINE_SIMILARITY:
+        return distances.CosineSimilarity()
+    else:
+        raise ValueError(f"Unknown distance measure: {name}")
+
+
+def get_metric_learning_loss_funcs(
+        matches: List[DictConfig],
+):
+    metric_learning_loss_funcs = []
+    for per_match in matches:
+        if per_match.loss.type.lower() == CONTRASTIVE_LOSS:
+            metric_learning_loss_funcs.append(
+                losses.ContrastiveLoss(
+                    pos_margin=per_match.loss.pos_margin,
+                    neg_margin=per_match.loss.neg_margin,
+                    distance=get_metric_learning_distance_func(per_match.distance.type),
+                )
+            )
+        else:
+            raise ValueError(f"Unknown metric loss: {per_match.loss_type}")
+
+    return metric_learning_loss_funcs
+
+
+def get_metric_learning_miner_funcs(
+        matches: List[DictConfig],
+):
+    metric_learning_miner_funcs = []
+    for per_match in matches:
+        if per_match.miner.type.lower() == PAIR_MARGIN_MINER:
+            metric_learning_miner_funcs.append(
+                miners.PairMarginMiner(
+                    pos_margin=per_match.miner.pos_margin,
+                    neg_margin=per_match.miner.neg_margin,
+                    distance=get_metric_learning_distance_func(per_match.distance.type),
+                )
+            )
+
+    return metric_learning_miner_funcs
+
+
+def generate_metric_learning_labels(
+        num_samples: int,
+        match_label: int,
+        labels: torch.Tensor,
+):
+    labels_1 = torch.arange(num_samples)
+
+    if match_label:
+        labels_2 = torch.arange(num_samples, num_samples*2)
+        # users need to specify the match_label based on the raw label's semantic meaning.
+        mask = labels == match_label
+        labels_2[mask] = labels_1[mask]
+    else:
+        labels_2 = torch.arange(num_samples)
+
+    metric_learning_labels = torch.cat([labels_1, labels_2], dim=0)
+
+    return metric_learning_labels
+
+
+def compute_cosine_probability(
+        embeddings1: torch.Tensor,
+        embeddings2: torch.Tensor,
+):
+    cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
+    return 0.5 * (cosine_similarity + 1)
+
+
+def compute_probability(
+        logits: Optional[torch.Tensor] = None,
+        embeddings1: Optional[torch.Tensor] = None,
+        embeddings2: Optional[torch.Tensor] = None,
+        reverse_prob: Optional[bool] = False,
+):
+    if logits:
+        prob = F.softmax(logits.float(), dim=1)[:, 1]
+    else:
+        cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
+        prob = 0.5 * (cosine_similarity + 1)
+
+    if reverse_prob:
+        prob = 1 - prob
+
+    return prob

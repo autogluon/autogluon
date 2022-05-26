@@ -137,6 +137,7 @@ class CLIPForImageText(nn.Module):
                 column_name_prefix=self.image_column_prefix,
                 features=image_features,
                 valid_lengths=image_valid_num,
+                has_cls_feature=False,
             )
         )
 
@@ -159,8 +160,9 @@ class CLIPForImageText(nn.Module):
             get_column_features(
                 batch=batch,
                 column_name_prefix=self.text_column_prefix,
-                features=text_outputs.last_hidden_state,
+                features=self.model.text_projection(text_outputs.last_hidden_state),
                 valid_lengths=text_valid_length,
+                has_cls_feature=True,
             )
         )
 
