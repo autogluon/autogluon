@@ -36,9 +36,10 @@ class CategoricalFeatureTokenizer(nn.Module):
 
         References
         ----------
-        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
         "Revisiting Deep Learning Models for Tabular Data", 2021
         https://arxiv.org/pdf/2106.11959.pdf
+        2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
         super().__init__()
         
@@ -159,9 +160,10 @@ class CategoricalTransformer(nn.Module):
 
         References
         ----------
-        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
+        1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 
         "Revisiting Deep Learning Models for Tabular Data", 2021
         https://arxiv.org/pdf/2106.11959.pdf
+        2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
 
         super().__init__()

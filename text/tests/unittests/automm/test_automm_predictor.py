@@ -429,6 +429,7 @@ def test_model_configs():
                     'ffn_activation': 'reglu', 
                     'head_activation': 'relu', 
                     'data_types': ['numerical'], 
+                    'embedding_arch': ['linear','relu'],
                     'merge': 'concat'
                 }, 
                 'hf_text': {
