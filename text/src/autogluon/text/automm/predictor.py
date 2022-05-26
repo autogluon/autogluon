@@ -20,7 +20,6 @@ from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.types import _METRIC
-from .data.mixup import MixupModule
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.utils import default_holdout_frac
@@ -657,6 +656,7 @@ class AutoMMPredictor:
                 model=model,
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
+                mixup_off_epoch=config.data.mixup.mixup_off_epoch,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
