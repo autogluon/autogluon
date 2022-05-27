@@ -34,6 +34,8 @@ install_core_all = """
 install_core_all_tests = """
     ${install_common}
     python3 -m pip install --upgrade -e core/[all,tests]
+    # https://github.com/protocolbuffers/protobuf/issues/10051
+    python3 -m pip install --upgrade protobuf==3.20.1
 """
 
 install_features = """
