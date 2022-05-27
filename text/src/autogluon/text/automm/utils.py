@@ -35,6 +35,7 @@ from .data import (
     NumericalProcessor,
     LabelProcessor,
     MultiModalFeaturePreprocessor,
+    MixupModule,
 )
 from .constants import (
     ACCURACY, RMSE, R2, PEARSONR, SPEARMANR, ALL_MODALITIES,
@@ -578,7 +579,6 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
-                mixup_config=getattr(config.data, "mixup"),
             )
         elif model_name.lower().startswith(TIMM_IMAGE):
             model = TimmAutoModelForImagePrediction(
@@ -587,7 +587,6 @@ def create_model(
                 num_classes=num_classes,
                 mix_choice=model_config.mix_choice,
                 pretrained=pretrained,
-                mixup_config=getattr(config.data, "mixup"),
             )
         elif model_name.lower().startswith(HF_TEXT):
             model = HFAutoModelForTextPrediction(
@@ -1263,7 +1262,7 @@ def try_to_infer_pos_label(
 
     return pos_label
 
-def get_mix_state(
+def get_mixup(
         df_preprocessor: MultiModalFeaturePreprocessor,
         config: DictConfig,
         num_classes: int,
@@ -1277,7 +1276,7 @@ def get_mix_state(
         df_preprocessors
             The MultiModalFeaturePreprocessor to check whether contains images
         config
-            The mixup configs.
+            The mixup configs for mixup and cutmix.
         num_classes
             The number of classes in the task. Class <= 1 will cause faults.
 
@@ -1288,4 +1287,18 @@ def get_mix_state(
     mixup_active = config.mixup > 0 or \
                    config.cutmix > 0. or \
                    config.cutmix_minmax is not None
-    return (len(df_preprocessor.image_path_names) > 0 & mixup_active & num_classes > 1)
+    mixup_state = (len(df_preprocessor.image_path_names) > 0) & mixup_active & (num_classes > 1)
+    mixup_fn = None
+    if mixup_state:
+        mixup_args = dict(
+            mixup_alpha=config.mixup,
+            cutmix_alpha=config.cutmix,
+            cutmix_minmax=config.cutmix_minmax,
+            prob=config.mixup_prob,
+            switch_prob=config.mixup_switch_prob,
+            mode=config.mixup_mode,
+            label_smoothing=config.smoothing,
+            num_classes=num_classes,
+        )
+        mixup_fn = MixupModule(**mixup_args)
+    return mixup_state, mixup_fn

@@ -25,7 +25,6 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
-TARGETS = "targets"
 MASK = "mask"
 
 # Metric

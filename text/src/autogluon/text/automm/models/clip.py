@@ -6,15 +6,13 @@ from .utils import (
     assign_layer_ids,
     init_weights,
     get_column_features,
-    get_mixup,
 )
 from ..constants import (
     IMAGE, IMAGE_VALID_NUM, TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH, LABEL, LOGITS, FEATURES,
-    TARGETS, AUTOMM, COLUMN,
+    AUTOMM, COLUMN,
 )
 from typing import Optional
-from omegaconf import DictConfig
 
 logger = logging.getLogger(AUTOMM)
 
@@ -30,7 +28,6 @@ class CLIPForImageText(nn.Module):
             prefix: str,
             checkpoint_name: str,
             num_classes: Optional[int] = 0,
-            mixup_config: Optional[DictConfig] = None,
     ):
         """
         Load the pretrained CLIP from huggingface transformers.
@@ -58,8 +55,6 @@ class CLIPForImageText(nn.Module):
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
-
-        self.mixup_fn = get_mixup(config=mixup_config, num_classes=num_classes)
 
     @property
     def text_token_ids_key(self):
@@ -114,9 +109,6 @@ class CLIPForImageText(nn.Module):
         """
         text_token_ids = batch[self.text_token_ids_key]
         text_valid_length = batch[self.text_valid_length_key]
-        targets = batch[self.label_key]
-        if self.training and self.mixup_fn is not None:
-            batch[self.image_key], targets = self.mixup_fn(batch[self.image_key], batch[self.label_key])
         images = batch[self.image_key]
         image_valid_num = batch[self.image_valid_num_key]
 
@@ -176,7 +168,6 @@ class CLIPForImageText(nn.Module):
             {
                 LOGITS: logits,
                 FEATURES: features,
-                TARGETS: targets,
             }
         )
 

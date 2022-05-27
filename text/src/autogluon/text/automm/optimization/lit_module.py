@@ -10,8 +10,9 @@ from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
 )
-from ..constants import LOGITS, WEIGHT, TARGETS
+from ..constants import LOGITS, WEIGHT
 from typing import Union, Optional, List, Dict, Callable
+from ..data.mixup import MixupModule, multimodel_mixup
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator
 from torch.nn.modules.loss import _Loss
@@ -44,6 +45,7 @@ class LitModule(pl.LightningModule):
             custom_metric_func: Callable = None,
             test_metric: Optional[torchmetrics.Metric] = None,
             efficient_finetune: Optional[str] = None,
+            mixup_fn: Optional[MixupModule] = None,
             mixup_off_epoch: Optional[int] = 0,
     ):
         """
@@ -113,6 +115,7 @@ class LitModule(pl.LightningModule):
         self.validation_metric = validation_metric
         self.validation_metric_name = f"val_{validation_metric_name}"
         self.loss_func = loss_func
+        self.mixup_fn = mixup_fn
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
@@ -153,10 +156,10 @@ class LitModule(pl.LightningModule):
             self,
             batch: Dict,
     ):
+        if self.training and self.mixup_fn is not None and self.current_epoch < self.hparams.mixup_off_epoch:
+            batch = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
         output = self.model(batch)
         label = batch[self.model.label_key]
-        if self.training and self.current_epoch < self.hparams.mixup_off_epoch and TARGETS in output[self.model.prefix]:
-            label = output[self.model.prefix][TARGETS]
         loss = self._compute_loss(output=output, label=label)
         return output, loss
 

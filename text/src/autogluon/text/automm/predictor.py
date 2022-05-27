@@ -37,6 +37,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from .data.mixup import MixupModule
 
 from .utils import (
     create_model,
@@ -57,7 +58,7 @@ from .utils import (
     assign_feature_column_names,
     turn_on_off_feature_column_info,
     try_to_infer_pos_label,
-    get_mix_state,
+    get_mixup,
 )
 from .optimization.utils import (
     get_metric,
@@ -413,7 +414,7 @@ class AutoMMPredictor:
             pos_label=pos_label,
         )
 
-        mixup_active = get_mix_state(df_preprocessor=df_preprocessor,
+        mixup_active, mixup_fn = get_mixup(df_preprocessor=df_preprocessor,
                                      config=config.data.mixup,
                                      num_classes=output_shape,)
 
@@ -433,6 +434,7 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
+        self.mixup_fn = mixup_fn
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
@@ -483,6 +485,7 @@ class AutoMMPredictor:
             ckpt_path=self._ckpt_path,
             resume=self._resume,
             enable_progress_bar=self._enable_progress_bar,
+            mixup_fn=self.mixup_fn,
         )
         return self
 
@@ -612,6 +615,7 @@ class AutoMMPredictor:
             ckpt_path: str,
             resume: bool,
             enable_progress_bar: bool,
+            mixup_fn: MixupModule,
     ):
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -663,6 +667,7 @@ class AutoMMPredictor:
                 model=model,
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
+                mixup_fn=mixup_fn,
                 mixup_off_epoch=config.data.mixup.mixup_off_epoch,
                 **metrics_kwargs,
                 **optimization_kwargs,
