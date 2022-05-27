@@ -30,6 +30,8 @@ class ForecastingLearner(AbstractLearner):
         self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.is_trainer_present = is_trainer_present
         self.trainer_type = trainer_type
+        
+        logger.log(30, f"Learner random seed set to {random_state}")
 
     def fit(self, train_data, freq, prediction_length, val_data=None, **kwargs):
         return self._fit(
