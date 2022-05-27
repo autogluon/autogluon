@@ -247,7 +247,6 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def __init__(
         self,
         path: str,
-        freq: Optional[str] = None,
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
         save_data: bool = True,
@@ -258,7 +257,6 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             path=path, save_data=save_data, low_memory=low_memory, **kwargs
         )
 
-        self.freq = freq
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get(
             "quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -430,7 +428,9 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         if models is None:
             models = self.construct_model_templates(
-                hyperparameters, hyperparameter_tune=hyperparameter_tune
+                hyperparameters=hyperparameters,
+                hyperparameter_tune=hyperparameter_tune,
+                freq=train_data.freq,
             )
 
         time_limit_model_split = time_limit

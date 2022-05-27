@@ -17,7 +17,7 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             path=path,
             eval_metric=eval_metric,
             prediction_length=self.prediction_length,
-            freq=self.freq,
+            freq=kwargs.get("freq"),
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
             quantiles=quantile_levels,
@@ -33,7 +33,6 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune: bool = False,
         time_limit: float = None,
-        infer_limit: float = None,  # todo: implement
     ):
         """
         Fit a set of forecasting models specified by the `hyperparameters`
