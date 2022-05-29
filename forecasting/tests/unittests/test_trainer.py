@@ -1,4 +1,5 @@
 """Unit tests for trainers"""
+import copy
 from collections import defaultdict
 from unittest import mock
 
@@ -15,7 +16,7 @@ from autogluon.forecasting.models.gluonts.models import GenericGluonTSModelFacto
 from autogluon.forecasting.models.presets import get_default_hps
 from autogluon.forecasting.trainer.auto_trainer import AutoForecastingTrainer
 
-from ..common import DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -33,7 +34,9 @@ def test_trainer_can_be_initialized(temp_model_path):
 # smoke test for the short 'happy path'
 def test_when_trainer_called_then_training_is_performed(temp_model_path):
     trainer = AutoForecastingTrainer(path=temp_model_path)
-    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS
+    )
 
     assert "SimpleFeedForward" in trainer.get_model_names()
 
@@ -61,9 +64,7 @@ def test_given_validation_data_when_trainer_called_then_training_is_performed(
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
-        path=temp_model_path, eval_metric=eval_metric
-    )
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -105,7 +106,10 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
     "hyperparameters",
     [
         {"DeepAR": {"epochs": 4}, "SimpleFeedForward": {"epochs": 1}},
-        {"SimpleFeedForward": {"context_length": 44, "epochs": 2}, "DeepAR": {"epochs": 3}},
+        {
+            "SimpleFeedForward": {"context_length": 44, "epochs": 2},
+            "DeepAR": {"epochs": 3},
+        },
     ],
 )
 def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
@@ -125,10 +129,13 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
     "hyperparameters",
     [
         {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"SimpleFeedForward": {"context_length": 44, "epochs": 1}, "DeepAR": {"epochs": 1}},
+        {
+            "SimpleFeedForward": {"context_length": 44, "epochs": 1},
+            "DeepAR": {"epochs": 1},
+        },
     ],
 )
-def test_given_hyperparameters_when_trainer_model_templates_called_then_freq_set_correctly(
+def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(
     temp_model_path, hyperparameters
 ):
     trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
@@ -179,9 +186,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
 def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
-        path=temp_model_path, eval_metric=eval_metric
-    )
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -258,9 +263,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
 def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
-        path=temp_model_path, eval_metric=eval_metric
-    )
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -469,3 +472,43 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
     config_history = next(iter(trainer.hpo_results.values()))["config_history"]
     assert len(config_history) == 4
     assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
+
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {
+            "SimpleFeedForward": {"context_length": 44, "epochs": 1},
+            "DeepAR": {"epochs": 1},
+        },
+    ],
+)
+@pytest.mark.parametrize("low_memory", [True, False])
+def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict(
+    temp_model_path, hyperparameters, low_memory
+):
+    trainer = AutoForecastingTrainer(
+        path=temp_model_path, eval_metric="MAPE", prediction_length=2
+    )
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+    model_names = copy.copy(trainer.get_model_names())
+    trainer.save()
+    del trainer
+
+    loaded_trainer = AutoForecastingTrainer.load(path=temp_model_path)
+
+    for m in model_names:
+        loaded_model = loaded_trainer.load_model(m)
+        predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
+
+        assert isinstance(predictions, TimeSeriesDataFrame)
+
+        predicted_item_index = predictions.index.levels[0]
+        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+        assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
+        assert not np.any(np.isnan(predictions))

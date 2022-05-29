@@ -132,8 +132,11 @@ class SimpleAbstractTrainer:
         try:
             save_pkl.save(path=self.path_pkl, object=self)
         except:  # noqa
+            for model in self.models.values():
+                model.save()
             self.models = {}
             save_pkl.save(path=self.path_pkl, object=self)
+
         if not self.models:
             self.models = models
 
@@ -149,9 +152,8 @@ class SimpleAbstractTrainer:
             return obj
 
     def save_model(self, model: AbstractModel, **kwargs) -> None:  # noqa: F841
-        if self.low_memory:
-            model.save()
-        else:
+        model.save()
+        if not self.low_memory:
             self.models[model.name] = model
 
     def load_model(

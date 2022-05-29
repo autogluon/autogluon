@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Type, Optional, Any, Dict, Tuple
+from typing import Type, Optional, Any, Dict, Tuple, Union
 
 import pandas as pd
 
@@ -44,12 +44,16 @@ class ForecastingLearner(AbstractLearner):
         train_data: TimeSeriesDataFrame,
         prediction_length: int,
         val_data: TimeSeriesDataFrame = None,
+        hyperparameters: Union[str, Dict] = None,
+        hyperparameter_tune: bool = False,
         **kwargs,
     ) -> None:
         return self._fit(
             train_data=train_data,
             prediction_length=prediction_length,
             val_data=val_data,
+            hyperparameters=hyperparameters,
+            hyperparameter_tune=hyperparameter_tune,
             **kwargs,
         )
 
@@ -58,7 +62,7 @@ class ForecastingLearner(AbstractLearner):
         train_data: TimeSeriesDataFrame,
         prediction_length: int,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameters: Dict = None,
+        hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune: bool = False,
         scheduler_options: Tuple[Type, Dict[str, Any]] = None,
         time_limit: Optional[int] = None,
@@ -73,24 +77,24 @@ class ForecastingLearner(AbstractLearner):
         )
         logger.info(f"AutoGluon will save models to {self.path}")
 
-        trainer = self.trainer_type(
+        self.trainer = self.trainer_type(
             path=self.model_context,
             prediction_length=prediction_length,
             eval_metric=self.eval_metric,
             scheduler_options=scheduler_options,
             **kwargs,
         )
-        self.trainer_path = trainer.path
+        self.trainer_path = self.trainer.path
         self.save()
 
-        trainer.fit(
+        self.trainer.fit(
             train_data=train_data,
             val_data=val_data,
             hyperparameter_tune=hyperparameter_tune,
             hyperparameters=hyperparameters,
             time_limit=time_limit,
         )
-        self.save_trainer(trainer=trainer)
+        self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
         logger.info(
