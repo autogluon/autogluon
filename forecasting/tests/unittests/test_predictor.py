@@ -1,17 +1,11 @@
 """Unit tests for learners"""
-from collections import defaultdict
-from unittest import mock
-
 import numpy as np
 import pytest
 from gluonts.model.seq2seq import MQRNNEstimator
 
-import autogluon.core as ag
 from autogluon.forecasting.dataset import TimeSeriesDataFrame
-from autogluon.forecasting.learner import ForecastingLearner
 from autogluon.forecasting.models import DeepARModel
 from autogluon.forecasting.models.gluonts.models import GenericGluonTSModelFactory
-from autogluon.forecasting.models.presets import get_default_hps
 from autogluon.forecasting.predictor import ForecastingPredictor
 
 from .common import DUMMY_TS_DATAFRAME
