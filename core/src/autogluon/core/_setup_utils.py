@@ -17,7 +17,7 @@ PYTHON_REQUIRES = '>=3.7, <3.10'
 DEPENDENT_PACKAGES = {
     # note: if python 3.7 is used, the open CVEs are present: CVE-2021-41496 | CVE-2021-34141; fixes are available in 1.22.x, but python 3.8 only
     'numpy': '>=1.21,<1.23',
-    'pandas': '>=1.2.5,<1.4',  # Capped version of pandas to 1.4.0 because of issue: https://github.com/pandas-dev/pandas/issues/45603
+    'pandas': '>=1.2.5,!=1.4.0',
     'scikit-learn': '>=1.0.0,<1.1',
     'scipy': '>=1.5.4,<1.8.0',
     'psutil': '>=5.7.3,<6',
