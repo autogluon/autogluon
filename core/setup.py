@@ -42,7 +42,7 @@ extras_require = {
         # https://github.com/protocolbuffers/protobuf/issues/10051
         # protobuf made breaking change and ray doesn't upper cap its version
         # need this hotfix for now until ray provides a new release
-        "protobuf==3.20.1"
+        "protobuf<4"
     ],
 }
 
