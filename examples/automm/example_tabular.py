@@ -1,11 +1,29 @@
 from autogluon.text.automm import AutoMMPredictor
 import argparse
 from dataset import (
-    AdultTabularDataset
+    AdultTabularDataset,
+    AloiTabularDataset,
+    CaliforniaHousingTabularDataset,
+    CovtypeTabularDataset,
+    HelenaTabularDataset,
+    HiggsSmallTabularDataset,
+    JannisTabularDataset,
+    MicrosoftTabularDataset,
+    YahooTabularDataset,
+    YearTabularDataset,
 )
 
 TABULAR_DATASETS = {
     'ad': AdultTabularDataset,
+    'al': AloiTabularDataset,
+    'ca': CaliforniaHousingTabularDataset,
+    'co': CovtypeTabularDataset,
+    'he': HelenaTabularDataset,
+    'hi': HiggsSmallTabularDataset,
+    'ja': JannisTabularDataset,
+    'mi': MicrosoftTabularDataset,
+    'ya': YahooTabularDataset,
+    'ye': YearTabularDataset,
 }
 
 hyperparameters = {
@@ -21,7 +39,7 @@ hyperparameters = {
 }
 
 def main(args):
-    assert args.dataset_name in TABULAR_DATASETS.keys()
+    assert args.dataset_name in TABULAR_DATASETS.keys(), 'Unsupported dataset name.'
     
     ### Dataset loading
     train_data = TABULAR_DATASETS[args.dataset_name](
