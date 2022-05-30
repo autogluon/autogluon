@@ -1,7 +1,9 @@
 import pytest
-from autogluon.text.automm.models import HFAutoModelForTextPrediction
-from autogluon.text.automm.models import TimmAutoModelForImagePrediction
-from autogluon.text.automm.models import NumericalTransformer
+from autogluon.text.automm.models import (
+    HFAutoModelForTextPrediction,
+    TimmAutoModelForImagePrediction,
+    NumericalTransformer,
+)
 
 
 @pytest.mark.parametrize(

@@ -39,6 +39,10 @@ install_requires = [
 extras_require = {
     'ray': [
         "ray>=1.10,<1.11",
+        # https://github.com/protocolbuffers/protobuf/issues/10051
+        # protobuf made breaking change and ray doesn't upper cap its version
+        # need this hotfix for now until ray provides a new release
+        "protobuf<4"
     ],
 }
 

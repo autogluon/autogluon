@@ -1,6 +1,7 @@
 from functools import partial
 
 import pytest
+from flaky import flaky
 from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.seq2seq import MQRNNEstimator
@@ -91,6 +92,7 @@ def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_ra
         pytest.fail("unexpected ValueError raised in fit")
 
 
+@flaky(max_runs=3)
 @pytest.mark.timeout(4)
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_low_time_limit_when_fit_called_then_model_training_does_not_exceed_time_limit(
