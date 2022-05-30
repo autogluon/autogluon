@@ -166,9 +166,10 @@ class ForecastingPredictor:
 
         Other Parameters
         ----------------
-        quantiles: List[float], default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        quantile_levels: List[float], default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
             List of increasing decimals that specifies which quantiles should be estimated
-            when making distributional forecasts.
+            when making distributional forecasts. Can alternatively be provided with the keyword
+            argument `quantiles`.
 
         References
         ----------
@@ -216,10 +217,11 @@ class ForecastingPredictor:
             val_data = train_data
             train_data = train_data.slice_by_timestep(slice(None, -prediction_length))
 
-        quantiles = kwargs.get(
-            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        quantile_levels = kwargs.get(
+            "quantile_levels",
+            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
-        logger.info(f"All models will be trained for quantiles {quantiles}.")
+        logger.info(f"All models will be trained for quantiles {quantile_levels}.")
 
         scheduler_options = self._get_scheduler_options(
             hyperparameter_tune_kwargs, time_limit=time_limit
@@ -234,7 +236,7 @@ class ForecastingPredictor:
             scheduler_options=scheduler_options,
             hyperparameters=hyperparameters,
             hyperparameter_tune=all(scheduler_options),
-            quantiles=quantiles,
+            quantile_levels=quantile_levels,
             time_limit=time_left,
         )
 

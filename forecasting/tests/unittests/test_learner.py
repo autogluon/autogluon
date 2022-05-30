@@ -23,8 +23,8 @@ TEST_HYPERPARAMETER_SETTINGS = [
 
 
 def test_learner_can_be_initialized(temp_model_path):
-    model = ForecastingLearner(path_context=temp_model_path)
-    assert isinstance(model, ForecastingLearner)
+    learner = ForecastingLearner(path_context=temp_model_path)
+    assert isinstance(learner, ForecastingLearner)
 
 
 # smoke test for the short 'happy path'
@@ -175,7 +175,7 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
 
 
 @pytest.mark.parametrize("random_seed", [None, 12, 23, 34])
-def test_given_random_seed_when_learner_called_and_loaded_back_then_all_models_can_predict(
+def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
     temp_model_path, random_seed
 ):
     init_kwargs = dict(path_context=temp_model_path, eval_metric="MAPE")

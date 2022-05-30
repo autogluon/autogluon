@@ -261,7 +261,8 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get(
-            "quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+            "quantile_levels",
+            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.is_data_saved = False
 
