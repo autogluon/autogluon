@@ -1268,31 +1268,31 @@ def get_mixup(
         num_classes: int,
 ):
     """
-        Get the mixup state for loss function choice.
-        Now the mixup can only support image data.
-        And the problem type can not support Regression.
-        Parameters
-        ----------
-        df_preprocessors
-            The MultiModalFeaturePreprocessor to check whether contains images
-        config
-            The mixup configs for mixup and cutmix.
-        num_classes
-            The number of classes in the task. Class <= 1 will cause faults.
+    Get the mixup state for loss function choice.
+    Now the mixup can only support image data.
+    And the problem type can not support Regression.
+    Parameters
+    ----------
+    df_preprocessors
+        The MultiModalFeaturePreprocessor to check whether contains images
+    config
+        The mixup configs for mixup and cutmix.
+    num_classes
+        The number of classes in the task. Class <= 1 will cause faults.
 
-        Returns
-        -------
-        The mixup is on or off.
+    Returns
+    -------
+    The mixup is on or off.
     """
-    mixup_active = config.mixup > 0 or \
-                   config.cutmix > 0. or \
+    mixup_active = config.mixup_alpha > 0 or \
+                   config.cutmix_alpha > 0. or \
                    config.cutmix_minmax is not None
     mixup_state = (len(df_preprocessor.image_path_names) > 0) & mixup_active & (num_classes > 1)
     mixup_fn = None
     if mixup_state:
         mixup_args = dict(
-            mixup_alpha=config.mixup,
-            cutmix_alpha=config.cutmix,
+            mixup_alpha=config.mixup_alpha,
+            cutmix_alpha=config.cutmix_alpha,
             cutmix_minmax=config.cutmix_minmax,
             prob=config.mixup_prob,
             switch_prob=config.mixup_switch_prob,

@@ -13,7 +13,7 @@ class MixupModule(Mixup):
 
     Returns
     -------
-        Ground-truth labels ready to compute metric scores.
+    Ground-truth labels ready to compute metric scores.
     """
     def __init__(self, mixup_alpha=1.,
                  cutmix_alpha=0.,
@@ -95,20 +95,20 @@ class MixupModule(Mixup):
 
 def mixup_others(x, lam):
     """
-        Mixup special types of data, espcially for tuple.
-        It is the simplest way of mixup for non image data.
-        If lam >=0.5: choose the origin, else: choose the other one.
+    Mixup special types of data, espcially for tuple.
+    It is the simplest way of mixup for non image data.
+    If lam >=0.5: choose the origin, else: choose the other one.
 
-        Parameters
-        -------
-        x
-            The target need to be mixed-up.
-        lam
-            The mixup lambda.
+    Parameters
+    -------
+    x
+        The target need to be mixed-up.
+    lam
+        The mixup lambda.
 
-        Returns
-        -------
-            The mixed-up batch data with specific model.
+    Returns
+    -------
+    The mixed-up batch data with specific model.
     """
     if lam is None:
         lam = 1
@@ -122,22 +122,22 @@ def mixup_others(x, lam):
 
 def multimodel_mixup(batch, model, mixup_fn):
     """
-        Mixup for different models.
-        For image data, use the mixup_fn from timm.
-        For other types of data, the simplest way as choosing will be used.
+    Mixup for different models.
+    For image data, use the mixup_fn from timm.
+    For other types of data, the simplest way as choosing will be used.
 
-        Parameters
-        -------
-        batch
-            The origin data need to be mixed-up.
-        model
-            The model used on the task.It is used to get the useful column in batch.
-        mixup_fn
-            The mixup_fn from timm. It can mixup image and produce target label with lambda.
+    Parameters
+    -------
+    batch
+        The origin data need to be mixed-up.
+    model
+        The model used on the task.It is used to get the useful column in batch.
+    mixup_fn
+        The mixup_fn from timm. It can mixup image and produce target label with lambda.
 
-        Returns
-        -------
-            The mixed-up batch.
+    Returns
+    -------
+    The mixed-up batch.
     """
     if hasattr(model, "image_key"):
         batch[model.image_key], batch[model.label_key] = mixup_fn(batch[model.image_key], batch[model.label_key])

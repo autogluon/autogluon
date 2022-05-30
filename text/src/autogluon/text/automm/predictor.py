@@ -416,7 +416,12 @@ class AutoMMPredictor:
 
         mixup_active, mixup_fn = get_mixup(df_preprocessor=df_preprocessor,
                                      config=config.data.mixup,
-                                     num_classes=output_shape,)
+                                     num_classes=output_shape,
+        )
+        if mixup_active and config.env.per_gpu_batch_size == 1:
+            warnings.warn("The mixup is done on the batch."
+                          "The per_gpu_batch_size should be >=1 for reasonable operation",
+                          UserWarning)
 
         loss_func = get_loss_func(problem_type, mixup_active)
 
