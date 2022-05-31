@@ -51,6 +51,8 @@ class MixupModule(Mixup):
         batch_size = len(x)
         if lam_batch is None:
             lam_batch, use_cutmix = self._params_per_elem(batch_size)
+        else:
+            _, use_cutmix = self._params_per_elem(batch_size)
         x_orig = x.clone()
         for i in range(batch_size):
             j = batch_size - i - 1
@@ -69,6 +71,8 @@ class MixupModule(Mixup):
         batch_size = len(x)
         if lam_batch is None:
             lam_batch, use_cutmix = self._params_per_elem(batch_size // 2)
+        else:
+            _, use_cutmix = self._params_per_elem(batch_size // 2)
         x_orig = x.clone()
         for i in range(batch_size // 2):
             j = batch_size - i - 1
@@ -89,6 +93,8 @@ class MixupModule(Mixup):
     def _mix_batch(self, x, lam):
         if lam is None:
             lam, use_cutmix = self._params_per_batch()
+        else:
+            _, use_cutmix = self._params_per_batch()
         if lam == 1.:
             return 1.
         if use_cutmix:
