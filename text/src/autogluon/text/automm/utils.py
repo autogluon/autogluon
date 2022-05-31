@@ -1295,10 +1295,13 @@ def get_mixup(
             model_active = True
             break
 
-    mixup_active = mixup_config.mixup_alpha > 0 or \
-                   mixup_config.cutmix_alpha > 0. or \
-                   mixup_config.cutmix_minmax is not None
-    mixup_state = mixup_config.turn_on & model_active & mixup_active & (num_classes > 1)
+    mixup_active = False
+    if mixup_config is not None and mixup_config.turn_on:
+        mixup_active = mixup_config.mixup_alpha > 0 or \
+                       mixup_config.cutmix_alpha > 0. or \
+                       mixup_config.cutmix_minmax is not None
+
+    mixup_state = model_active & mixup_active & (num_classes > 1)
     mixup_fn = None
     if mixup_state:
         mixup_args = dict(
