@@ -414,8 +414,8 @@ class AutoMMPredictor:
             pos_label=pos_label,
         )
 
-        mixup_active, mixup_fn = get_mixup(model_config=config.model,
-                                     mixup_config=config.data.mixup,
+        mixup_active, mixup_fn = get_mixup(model_config=OmegaConf.select(config,'model'),
+                                     mixup_config=OmegaConf.select(config,'data.mixup'),
                                      num_classes=output_shape,
         )
         if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
@@ -673,7 +673,7 @@ class AutoMMPredictor:
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
                 mixup_fn=mixup_fn,
-                mixup_off_epoch=config.data.mixup.mixup_off_epoch,
+                mixup_off_epoch=OmegaConf.select(config, 'data.mixup.mixup_off_epoch'),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
