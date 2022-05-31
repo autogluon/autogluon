@@ -37,15 +37,6 @@ def test_load_old_checkpoint():
         dataset.train_df,
         presets='multilingual',
         time_limit=10,
-        hyperparameters={'optimization.top_k_average_method': 'uniform_soup',
-                         'data.mixup.turn_on': 'True',
-                         'data.mixup.mixup_alpha': '0.8',
-                         'data.mixup.cutmix_alpha': '1.0',
-                         'data.mixup.cutmix_minmax': None,
-                         'data.mixup.mixup_prob': '1.0',
-                         'data.mixup.mixup_switch_prob': '0.5',
-                         'data.mixup.mixup_mode': 'batch',
-                         'data.mixup.mixup_off_epoch': '5',
-                         'data.mixup.smoothing': '0.1'}
+        hyperparameters={'optimization.top_k_average_method': 'uniform_soup'}
     )
     verify_predictor_save_load(predictor, dataset.test_df)
