@@ -12,7 +12,7 @@ data:
     scaler_with_std: True  # Whether to normalize with std.
   pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
   mixup:
-    turn_on: True # The total control of mixup.
+    turn_on: False # The total control of mixup.
     mixup_alpha: 0.8  # Mixup alpha.
     cutmix_alpha: 1.0  # Cutmix alpha.
     cutmix_minmax:  #Cutmix min/max ratio, it will override cutmix alpha if set, a list/tuple with size two.

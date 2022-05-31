@@ -10,10 +10,8 @@ class SoftTargetCrossEntropy(nn.Module):
     It works under the mixup.
     It can calculate the crossentropy of input and label with one-hot.
     """
-
     def __init__(self):
         super(SoftTargetCrossEntropy, self).__init__()
-
 
     def forward(self,
                 input: torch.Tensor,
