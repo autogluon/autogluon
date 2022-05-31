@@ -1274,9 +1274,9 @@ def get_mixup(
     And the problem type can not support Regression.
     Parameters
     ----------
-    df_preprocessors
-        The MultiModalFeaturePreprocessor to check whether contains images
-    config
+    model_config
+        The model configs to find image model for the necessity of mixup.
+    mixup_config
         The mixup configs for mixup and cutmix.
     num_classes
         The number of classes in the task. Class <= 1 will cause faults.
@@ -1291,7 +1291,7 @@ def get_mixup(
         names = [names]
     for model_name in names:
         permodel_config = getattr(model_config, model_name)
-        if permodel_config.data_types is not None and hasattr(permodel_config.data_types, IMAGE):
+        if hasattr(permodel_config.data_types, IMAGE):
             model_active = True
             break
 
