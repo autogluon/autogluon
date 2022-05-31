@@ -449,7 +449,7 @@ def test_model_configs():
                     'val_transform_types': ['resize_shorter_side', 'center_crop'], 
                     'image_norm': 'imagenet', 
                     'image_size': 224,
-                    'max_img_num_per_col': 2
+                    'max_img_num_per_col': 2,
                 },
                 'clip': {
                     'checkpoint_name': 'openai/clip-vit-base-patch32', 
@@ -563,3 +563,41 @@ def test_modifying_duplicate_model_names():
     for per_modality_processors in teacher_predictor._data_processors.values():
         for per_processor in per_modality_processors:
             assert per_processor.prefix in teacher_predictor._config.model.names
+
+
+def test_mixup():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "optimization.top_k_average_method": BEST,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
+        "data.mixup.turn_on": True,
+    }
+
+    with tempfile.TemporaryDirectory() as save_path:
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            time_limit=30,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+        )
+
+        score = predictor.evaluate(dataset.test_df)
+        verify_predictor_save_load(predictor, dataset.test_df)
