@@ -48,6 +48,7 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
+    get_general_hyperparameters,
     LogFilter,
     apply_log_filter,
     save_pretrained_models,
@@ -315,7 +316,7 @@ class AutoMMPredictor:
             
         config = get_config(
             config=config,
-            overrides=hyperparameters,
+            overrides=get_general_hyperparameters(hyperparameters),
         )
 
         if self._resume or save_path is None:
@@ -424,20 +425,6 @@ class AutoMMPredictor:
         self._column_types = column_types
         self._df_preprocessor = df_preprocessor
         
-
-        # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
-        self.save(save_path)
-
-        # need to assign the above attributes before setting up distillation
-        if teacher_predictor is not None:
-            teacher_model, critics, baseline_funcs, soft_label_loss_func, \
-                teacher_df_preprocessor, teacher_data_processors = \
-                self._setup_distillation(
-                    teacher_predictor=teacher_predictor,
-                )
-        else:
-            teacher_model, critics, baseline_funcs, soft_label_loss_func,\
-                teacher_df_preprocessor, teacher_data_processors = None, None, None, None, None, None
 
         _fit_args = dict(
             train_df=train_data,
@@ -690,6 +677,7 @@ class AutoMMPredictor:
                 overrides=hyperparameters,
             )
 
+        df_preprocessor = self._df_preprocessor
         config = select_model(
             config=config,
             df_preprocessor=df_preprocessor

@@ -105,6 +105,21 @@ def infer_metrics(
     return validation_metric_name, eval_metric_name
 
 
+def get_general_hyperparameters(hyperparameters: Union[dict, DictConfig]):
+    """
+    Get hyperparameters that are not search space
+    """
+    hyperparameters = copy.deepcopy(hyperparameters)
+    hyperparameters = parse_dotlist_conf(hyperparameters)  # convert to a dict
+    from autogluon.core.space import Space
+    from ray.tune.sample import Domain
+    general_hyperparameters = {}
+    for key, value in hyperparameters.items():
+        if not isinstance(value, (Space, Domain)):
+            general_hyperparameters[key] = value
+    return general_hyperparameters
+    
+
 def get_config(
         config: Union[dict, DictConfig],
         overrides: Optional[Union[str, List[str], Dict]] = None,
