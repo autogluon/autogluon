@@ -46,6 +46,11 @@ class RayTuneAdapter(ABC):
     Instance of this class should be passed to `run` to provide custom behavior
     """
     
+    presets = {
+        'auto': {'searcher': 'random', 'scheduler': 'FIFO'},
+        'bayes': {'searcher': 'bayes', 'scheduler': 'FIFO'},
+        'random': {'searcher': 'random', 'scheduler': 'FIFO'}
+    }
     supported_searchers = []
     supported_schedulers = []
     
@@ -91,7 +96,7 @@ def run(
     trainable: Callable,
     trainable_args: dict,
     search_space: dict,
-    hyperparameter_tune_kwargs: dict,
+    hyperparameter_tune_kwargs: Union[dict, str],
     metric: str,
     mode: str,
     save_dir: str,
@@ -154,6 +159,9 @@ def run(
         Additional args being passed to tune.run
     """
     assert mode in [MIN, MAX], f'mode is {mode}'
+    if isinstance(hyperparameter_tune_kwargs, str):
+        assert hyperparameter_tune_kwargs in ray_tune_adapter.presets, f'{hyperparameter_tune_kwargs} is not a valid option. Options are {ray_tune_adapter.presets.keys()}'
+        hyperparameter_tune_kwargs = ray_tune_adapter.presets.get(hyperparameter_tune_kwargs)
     num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
@@ -166,7 +174,7 @@ def run(
     if ray.is_initialized():
         # shutdown to reinitialize resources because different model might require different total resources
         ray.shutdown()
-        ray.init(log_to_driver=False, **total_resources)
+    ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     if resources_per_trial is None:

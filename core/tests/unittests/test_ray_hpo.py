@@ -195,6 +195,23 @@ def test_invalid_scheduler():
             )
             
             
+def test_invalid_preset():
+    hyperparameter_tune_kwargs = 'abc'
+    with tempfile.TemporaryDirectory() as root:
+        with pytest.raises(Exception) as e_info:
+            run(
+                trainable=_dummy_trainable,
+                trainable_args=dict(),
+                search_space=DUMMY_SEARCH_SPACE,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                metric='score',
+                mode='min',
+                save_dir=root,
+                ray_tune_adapter=DummyAdapter(),
+                stop={"training_iteration": 20},
+            )
+            
+            
 def test_empty_search_space():
     hyperparameter_tune_kwargs = dict(
         searcher='random',
