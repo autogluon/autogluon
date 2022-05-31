@@ -10,10 +10,6 @@ class MixupModule(Mixup):
     The mixup in timm only produce image mixup and cutmix with one-hot class target.
     This module helps to take the lambda from the Mixup.
     Lambda is added to the function to produce the mixup with specific lambda.
-
-    Returns
-    -------
-    Ground-truth labels ready to compute metric scores.
     """
     def __init__(self, mixup_alpha=1.,
                  cutmix_alpha=0.,
@@ -24,6 +20,28 @@ class MixupModule(Mixup):
                  correct_lam=True,
                  label_smoothing=0.1,
                  num_classes=1000):
+        """
+        Parameters
+        ----------
+        mixup_alpha
+            The mixup alpha value, it is active if > 0.
+        cutmix_alpha
+            The cutmix alpha value, cutmix is active if > 0.
+        cutmix_minmax
+            cutmix min/max image ratio. The para should be a list/tuple of float with size 2.
+        prob
+            The probability of conducting mixup/cutmix if enable.
+        switch_prob
+            The probability of switching mixup to cutmix if both enable.
+        mode
+            Perform mixup/cutmix on "batch" or "pair" or "elem".
+        correct_lam
+            Apply lambda correction when cutmix bbox clipped by image borders.
+        label_smoothing
+            Apply label smoothing to the mixed target.
+        num_classes
+            Number of classes for target.
+        """
         super().__init__(mixup_alpha,cutmix_alpha,cutmix_minmax,prob,switch_prob,mode,correct_lam,label_smoothing,num_classes)
         self.lam = None
         self.target_a = None

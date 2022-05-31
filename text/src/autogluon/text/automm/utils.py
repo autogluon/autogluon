@@ -1298,7 +1298,7 @@ def get_mixup(
             prob=config.mixup_prob,
             switch_prob=config.mixup_switch_prob,
             mode=config.mixup_mode,
-            label_smoothing=config.smoothing,
+            label_smoothing=config.label_smoothing,
             num_classes=num_classes,
         )
         mixup_fn = MixupModule(**mixup_args)

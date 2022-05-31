@@ -17,7 +17,7 @@ from ..constants import (
     PEARSONR, SPEARMANR,
 )
 import warnings
-from timm.loss import SoftTargetCrossEntropy
+from .soft_target_crossentropy import SoftTargetCrossEntropy
 
 
 def get_loss_func(
