@@ -10,13 +10,13 @@ from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
 )
-from ..constants import LOGITS, WEIGHT
+from ..constants import LOGITS, WEIGHT, AUTOMM
 from typing import Union, Optional, List, Dict, Callable
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator
 from torch.nn.modules.loss import _Loss
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class LitModule(pl.LightningModule):

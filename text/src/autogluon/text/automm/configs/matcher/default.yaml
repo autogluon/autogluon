@@ -1,5 +1,5 @@
 matcher:
-  match_class: 0
+  match_label: 0
   matches:
       - loss:
           type: "contrastive_loss"
@@ -16,19 +16,19 @@ matcher:
         pair:
           - "Previous Image"
           - "Current Image"
-      - loss:
-          type: "contrastive_loss"
-          pos_margin: 0.8
-          neg_margin: 0.2
-          weight: 1
-        distance:
-          type: "cosine_similarity"
-        miner:
-          type: "pair_margin_miner"
-          pos_margin: 0.6
-          neg_margin: 0.4
-        use_label: False
-        pair:
-          - "Previous Image"
-          - - "Product Title"
-            - "Product Type"
+#      - loss:
+#          type: "contrastive_loss"
+#          pos_margin: 0.8
+#          neg_margin: 0.2
+#          weight: 1
+#        distance:
+#          type: "cosine_similarity"
+#        miner:
+#          type: "pair_margin_miner"
+#          pos_margin: 0.6
+#          neg_margin: 0.4
+#        use_label: False
+#        pair:
+#          - "Previous Image"
+#          - - "Product Title"
+#            - "Product Type"

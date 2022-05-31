@@ -25,8 +25,10 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
-MASK = "mask"
+MASKS = "mask"
 PROBABILITY = "probability"
+COLUMN_FEATURES = "column_features"
+
 
 # Metric
 MAX = "max"

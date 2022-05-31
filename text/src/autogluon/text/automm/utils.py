@@ -1124,7 +1124,7 @@ def modify_duplicate_model_names(
 
     Returns
     -------
-    The predictor guaranteed has no duplicate model names with the backlist names.
+    The predictor guaranteed has no duplicate model names with the blacklist names.
     """
     model_names = []
     for n in predictor._config.model.names:
@@ -1260,4 +1260,5 @@ def try_to_infer_pos_label(
     else:
         pos_label = 1
 
+    logger.debug(f"pos_label: {pos_label}")
     return pos_label

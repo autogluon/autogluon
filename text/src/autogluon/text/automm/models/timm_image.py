@@ -11,6 +11,7 @@ from .utils import (
 from ..constants import (
     IMAGE, IMAGE_VALID_NUM, LABEL,
     LOGITS, FEATURES, AUTOMM, COLUMN,
+    COLUMN_FEATURES, MASKS,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -105,7 +106,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         """
         images = batch[self.image_key]
         image_valid_num = batch[self.image_valid_num_key]
-        ret = {}
+        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if self.mix_choice == "all_images":  # mix inputs
             mixed_images = images.sum(dim=1) / image_valid_num[:, None, None, None]  # mixed shape: (b, 3, h, w)
             features = self.model(mixed_images)
@@ -121,15 +122,15 @@ class TimmAutoModelForImagePrediction(nn.Module):
             logits = logits.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_classes)
 
             # collect features by image column names
-            ret.update(
-                get_column_features(
+            column_features, column_feature_masks = get_column_features(
                     batch=batch,
                     column_name_prefix=self.image_column_prefix,
                     features=features,
                     valid_lengths=image_valid_num,
                     has_cls_feature=False,
                 )
-            )
+            ret[COLUMN_FEATURES][FEATURES].update(column_features)
+            ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
             features = features.sum(dim=1)  # (b, num_features)
             logits = logits.sum(dim=1)  # (b, num_classes)

@@ -16,13 +16,13 @@ from .utils import (
     compute_probability,
 )
 from omegaconf import DictConfig
-from ..constants import LOGITS, WEIGHT, PROBABILITY
+from ..constants import LOGITS, WEIGHT, PROBABILITY, AUTOMM
 from typing import Union, Optional, List, Dict, Callable
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator
 from torch.nn.modules.loss import _Loss
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class MatcherLitModule(pl.LightningModule):
@@ -36,8 +36,8 @@ class MatcherLitModule(pl.LightningModule):
             self,
             model: nn.Module,
             matches: List[DictConfig],
-            reverse_prob: Optional[bool] = None,
             match_label: Optional[int] = None,
+            # reverse_prob: Optional[bool] = None,
             optim_type: Optional[str] = None,
             lr_choice: Optional[str] = None,
             lr_schedule: Optional[str] = None,
@@ -142,13 +142,24 @@ class MatcherLitModule(pl.LightningModule):
         assert len(matches) > 0
         self.matches = matches
         self.match_label = match_label
-        self.reverse_prob = reverse_prob
+        self.reverse_prob = match_label == 0
+        logger.debug(f"match num: {len(matches)}")
+        logger.debug(f"match label: {match_label}")
+        logger.debug(f"reverse probability: {self.reverse_prob}")
+        for per_match in matches:
+            logger.debug(f"per_match.pair[0]: {per_match.pair[0]}")
+            logger.debug(f"per_match.pair[1]: {per_match.pair[1]}")
+            # assert no duplicate column names
+            if isinstance(per_match.pair[0], list):
+                assert len(per_match.pair[0]) == len(set(per_match.pair[0]))
+            if isinstance(per_match.pair[1], list):
+                assert len(per_match.pair[1]) == len(set(per_match.pair[1]))
 
         self.metric_learning_loss_funcs = get_metric_learning_loss_funcs(matches)
         self.metric_learning_miner_funcs = get_metric_learning_miner_funcs(matches)
 
         # TODO: support validation metric on multiple matches
-        # TODO: each match should use an independent metric
+        # TODO: each match should use an independent torchmetric function
         assert sum([per_match.use_label for per_match in matches]) == 1,\
             f"We only support one match to have labels currently."
 
@@ -174,7 +185,7 @@ class MatcherLitModule(pl.LightningModule):
                 column_names=per_match.pair[1],
             )
             assert embeddings1.shape == embeddings2.shape
-            embeddings = torch.cat([embeddings1, embeddings2], dim=0)
+            embeddings = torch.cat([embeddings1, embeddings2], dim=0)  # (b*2, d)
 
             metric_learning_labels = generate_metric_learning_labels(
                 num_samples=len(embeddings1),
@@ -204,10 +215,10 @@ class MatcherLitModule(pl.LightningModule):
             embeddings2: Optional[torch.Tensor] = None,
             reverse_prob: Optional[bool] = False,
     ):
-        if logits:
+        if logits is not None:
             if isinstance(metric, torchmetrics.AUROC):
-                positive_prob = compute_probability(logits=logits)
-                metric.update(preds=positive_prob, target=label)  # only for binary classification
+                prob = compute_probability(logits=logits)
+                metric.update(preds=prob, target=label)  # only for binary classification
             elif isinstance(metric, BaseAggregator):
                 metric.update(custom_metric_func(logits, label))
             else:
@@ -295,7 +306,7 @@ class MatcherLitModule(pl.LightningModule):
                     reverse_prob=self.reverse_prob,
                 )
                 # TODO: support validation metric on multiple matches
-                # TODO: each match should use an independent metric
+                # TODO: each match should use an independent torchmetric function
                 break
 
         self.log(
@@ -341,9 +352,9 @@ class MatcherLitModule(pl.LightningModule):
                     embeddings2=embeddings2,
                 )
                 if self.match_label == 0:
-                    probability = torch.cat([match_prob, 1-match_prob])
+                    probability = torch.stack([match_prob, 1-match_prob]).t()
                 else:
-                    probability = torch.cat([1-match_prob, match_prob])
+                    probability = torch.stack([1-match_prob, match_prob], ).t()
                 break
 
         return {PROBABILITY: probability}

@@ -1,7 +1,7 @@
 from typing import Optional, Union, Tuple, List, Dict
 import torch
 from torch import nn
-from ..constants import MASK
+from ..constants import MASKS, COLUMN_FEATURES, FEATURES
 
 
 def init_weights(module: nn.Module):
@@ -332,27 +332,35 @@ def get_column_features(
     This function can be used to index both image and text features.
     The features have shape (b, n, d), where n can be the image number or
     text token number. One column corresponds to a subset of
-    the n images or text tokens.
+    the n images or text tokens. One column name can only appear once in the return.
 
     Parameters
     ----------
     batch
         The batch input containing the feature column information, i.e., indexes.
     column_name_prefix
-        The column name prefix in `batch` keys.
+        The column name prefix of one modality (image or text).
     features
-        A model's features containing the column features of interest.
+        The features of columns whose names starts with column_name_prefix.
     valid_lengths
         The valid image number or text token number of each sample in a batch.
+    has_cls_feature
+        Whether the features include the cls feature. If True, then the joined names of all
+        columns share the cls feature.
 
     Returns
     -------
     The column features with masks. If the column has no valid features, its
     mask is 0.
     """
-    ret = {}
-    all_column_names = []
+    column_features = {}
+    feature_masks = {}
+
     cut_idx = len(column_name_prefix) + 1
+    if has_cls_feature:
+        all_column_names = []
+        # creat a zero mask to do logical_or with each column's mask
+        joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
     for key in batch:
         if key.startswith(column_name_prefix):
             per_col_features = []
@@ -369,12 +377,20 @@ def get_column_features(
                     per_col_features.append(torch.zeros_like(features[0, 0]))
                     per_col_masks[i] = 0
             column_name = key[cut_idx:]
-            ret[column_name] = torch.stack(per_col_features, dim=0)  # (b, num_features)
-            ret[f"{column_name}_{MASK}"] = per_col_masks  # (b,)
-            all_column_names.append(column_name)
+            column_features[column_name] = torch.stack(per_col_features, dim=0)  # (b, num_features)
+            feature_masks[column_name] = per_col_masks  # (b,)
+            if has_cls_feature:
+                all_column_names.append(column_name)
+                joint_mask = torch.logical_or(joint_mask, per_col_masks)
 
     # all the columns of one model's input share the model's cls feature
     if has_cls_feature and len(all_column_names) > 0:  # some models', e.g, timm_image, output doesn't have the cls feature.
-        ret["_".join(all_column_names)] = features[:, 0, :]
+        joint_column_name = "_".join(all_column_names)
+        column_features[joint_column_name] = features[:, 0, :]
+        feature_masks[joint_column_name] = joint_mask.to(features)
+        # remove the individual column features since these column features not independent
+        for column_name in all_column_names:
+            column_features.pop(column_name)
+            feature_masks.pop(column_name)
 
-    return ret
+    return column_features, feature_masks

@@ -18,11 +18,12 @@ from ..constants import (
     BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
     ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
     ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY, PEARSONR, SPEARMANR,
-    CONTRASTIVE_LOSS, COSINE_SIMILARITY, PAIR_MARGIN_MINER,
+    CONTRASTIVE_LOSS, COSINE_SIMILARITY, PAIR_MARGIN_MINER, COLUMN_FEATURES,
+    FEATURES, MASKS, AUTOMM
 )
 import warnings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 def get_loss_func(problem_type: str):
@@ -485,21 +486,43 @@ def gather_column_features(
         output: Dict[str, Dict],
         column_names: Union[str, List[str]],
 ):
+    """
+    TODO: return masks.
+    Parameters
+    ----------
+    output
+    column_names
+
+    Returns
+    -------
+
+    """
     if isinstance(column_names, str):
         column_names = [column_names]
 
-    joint_column_name = "_".join(column_names)
     gathered_features = []
-
+    # logger.debug(f"gather features for columns: {column_names}")
     for per_model_name, per_model_output in output.items():
-        if joint_column_name in per_model_output:  # all provided columns are this model's input and the model has the cls feature.
-            # logger.debug(f"model: {per_model_name}, feature {joint_column_name}: {per_model_output[joint_column_name].shape}")
-            gathered_features.append(per_model_output[joint_column_name])
-        else:  # some or even no columns are this model's input
+        # logger.debug(f"gather column features from model: {per_model_name}")
+        columns_share_one_feature = []
+        for feature_name in per_model_output[COLUMN_FEATURES][FEATURES]:
+            # logger.debug(f"processing feature: {feature_name}")
             for col_name in column_names:
-                if col_name in per_model_output:
-                    # logger.debug(f"model: {per_model_name}, feature {col_name}: {per_model_output[col_name].shape}")
-                    gathered_features.append(per_model_output[col_name])
+                if col_name in feature_name:
+                    # this column feature is part of the cls feature
+                    if not (feature_name.startswith(col_name) and feature_name.endswith(col_name)):
+                        columns_share_one_feature.append(col_name)
+                        # logger.debug(f"column {col_name} is included in feature {feature_name}")
+                    else:  # this column's feature is independent of other columns'
+                        gathered_features.append(per_model_output[COLUMN_FEATURES][FEATURES][col_name])
+                        # logger.debug(f"col_name {col_name} has an independent feature in model: {per_model_name}")
+
+            # two or more columns share one cls feature, and no other columns share it.
+            if len(columns_share_one_feature) > 0:
+                assert len("_".join(columns_share_one_feature)) == len(feature_name), \
+                    f"model `{per_model_name}`'s cls feature name `{feature_name}` contains more columns than `{columns_share_one_feature}`" \
+                    f"Consider only forwarding `{columns_share_one_feature}` for model `{per_model_name}`"
+                gathered_features.append(per_model_output[COLUMN_FEATURES][FEATURES][feature_name])
 
     if len(gathered_features) > 1:
         # currently only support features of the same shape
@@ -508,7 +531,7 @@ def gather_column_features(
     if len(gathered_features) == 0:
         raise ValueError(f"No features are found for columns names {column_names}.")
 
-    gathered_features = torch.stack(gathered_features, dim=0).mean(dim=0)  # (b, num_features)
+    gathered_features = torch.stack(gathered_features, dim=0).mean(dim=0)  # (b, d)
 
     return gathered_features
 
@@ -536,7 +559,7 @@ def get_metric_learning_loss_funcs(
                 )
             )
         else:
-            raise ValueError(f"Unknown metric loss: {per_match.loss_type}")
+            raise ValueError(f"Unknown metric learning loss: {per_match.loss.type}")
 
     return metric_learning_loss_funcs
 
@@ -554,6 +577,8 @@ def get_metric_learning_miner_funcs(
                     distance=get_metric_learning_distance_func(per_match.distance.type),
                 )
             )
+        else:
+            raise ValueError(f"Unknown metric learning miner: {per_match.miner.type}")
 
     return metric_learning_miner_funcs
 
@@ -565,7 +590,7 @@ def generate_metric_learning_labels(
 ):
     labels_1 = torch.arange(num_samples)
 
-    if match_label:
+    if match_label is not None:
         labels_2 = torch.arange(num_samples, num_samples*2)
         # users need to specify the match_label based on the raw label's semantic meaning.
         mask = labels == match_label
@@ -592,7 +617,7 @@ def compute_probability(
         embeddings2: Optional[torch.Tensor] = None,
         reverse_prob: Optional[bool] = False,
 ):
-    if logits:
+    if logits is not None:
         prob = F.softmax(logits.float(), dim=1)[:, 1]
     else:
         cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)

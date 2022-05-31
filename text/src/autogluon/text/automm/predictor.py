@@ -430,11 +430,17 @@ class AutoMMPredictor:
         self._data_processors = data_processors
         self._model = model
 
-        if hasattr(config, MATCHER):
-            self._setup_matching()
-
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
+
+        if hasattr(config, MATCHER):
+            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
+            data_processors = turn_on_off_feature_column_info(
+                data_processors=data_processors,
+                flag=True,
+            )
+        else:
+            match_label = None
 
         if time_limit == timedelta(seconds=0):
             self._top_k_average(
@@ -477,6 +483,8 @@ class AutoMMPredictor:
             soft_label_loss_func=soft_label_loss_func,
             teacher_df_preprocessor=teacher_df_preprocessor,
             teacher_data_processors=teacher_data_processors,
+            match_label=match_label,
+            # reverse_prob=reverse_prob,
             max_time=time_limit,
             save_path=save_path,
             ckpt_path=self._ckpt_path,
@@ -484,18 +492,6 @@ class AutoMMPredictor:
             enable_progress_bar=self._enable_progress_bar,
         )
         return self
-
-    def _setup_matching(self):
-        match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_class]).item()
-        self._config.matcher.match_label = match_label
-
-        # If the match class and positive class are different, we need to reverse the cosine probability.
-        self._config.matcher.reverse_prob = self._config.matcher.match_class == self._config.matcher.positive_class
-
-        self._data_processors = turn_on_off_feature_column_info(
-            data_processors=self._data_processors,
-            flag=True,
-        )
 
     def _setup_distillation(
             self,
@@ -618,6 +614,8 @@ class AutoMMPredictor:
             soft_label_loss_func: _Loss,
             teacher_df_preprocessor: MultiModalFeaturePreprocessor,
             teacher_data_processors: dict,
+            match_label: int,
+            # reverse_prob: bool,
             max_time: timedelta,
             save_path: str,
             ckpt_path: str,
@@ -675,8 +673,8 @@ class AutoMMPredictor:
             task = MatcherLitModule(
                 model=model,
                 matches=config.matcher.matches,
-                reverse_prob=config.matcher.reverse_prob,
-                match_label=config.matcher.match_label,
+                match_label=match_label,
+                # reverse_prob=reverse_prob,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -982,6 +980,11 @@ class AutoMMPredictor:
         else:
             strategy = None
 
+        if hasattr(self._config, MATCHER):
+            data_processors = turn_on_off_feature_column_info(
+                data_processors=data_processors,
+                flag=True,
+            )
         predict_dm = BaseDataModule(
             df_preprocessor=self._df_preprocessor,
             data_processors=data_processors,
@@ -990,10 +993,11 @@ class AutoMMPredictor:
             predict_data=data,
         )
         if hasattr(self._config, MATCHER):
+            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
             task = MatcherLitModule(
                 model=self._model,
                 matches=self._config.matcher.matches,
-                match_label=self._config.matcher.match_label,
+                match_label=match_label,
             )
         else:
             task = LitModule(

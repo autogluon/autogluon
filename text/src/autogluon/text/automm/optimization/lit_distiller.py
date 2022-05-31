@@ -16,10 +16,10 @@ from .utils import (
     apply_single_lr,
 )
 from ..constants import (
-    LOGITS, WEIGHT,
+    LOGITS, WEIGHT, AUTOMM
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(AUTOMM)
 
 
 class DistillerLitModule(pl.LightningModule):
