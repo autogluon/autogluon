@@ -107,7 +107,6 @@ class MixupModule(Mixup):
         return lam
 
     def __call__(self, x, target, lam=None):
-        assert len(x) % 2 == 0, 'Batch size should be even when using this'
         if self.mode == 'elem':
             lam = self._mix_elem(x, lam)
         elif self.mode == 'pair':

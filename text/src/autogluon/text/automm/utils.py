@@ -1264,8 +1264,8 @@ def try_to_infer_pos_label(
 
 
 def get_mixup(
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        config: DictConfig,
+        model_config: DictConfig,
+        mixup_config: DictConfig,
         num_classes: int,
 ):
     """
@@ -1285,20 +1285,30 @@ def get_mixup(
     -------
     The mixup is on or off.
     """
-    mixup_active = config.mixup_alpha > 0 or \
-                   config.cutmix_alpha > 0. or \
-                   config.cutmix_minmax is not None
-    mixup_state = config.turn_on & (len(df_preprocessor.image_path_names) > 0) & mixup_active & (num_classes > 1)
+    model_active = False
+    names = model_config.names
+    if isinstance(names, str):
+        names = [names]
+    for model_name in names:
+        permodel_config = getattr(model_config, model_name)
+        if permodel_config.data_types is not None and hasattr(permodel_config.data_types, IMAGE):
+            model_active = True
+            break
+
+    mixup_active = mixup_config.mixup_alpha > 0 or \
+                   mixup_config.cutmix_alpha > 0. or \
+                   mixup_config.cutmix_minmax is not None
+    mixup_state = mixup_config.turn_on & model_active & mixup_active & (num_classes > 1)
     mixup_fn = None
     if mixup_state:
         mixup_args = dict(
-            mixup_alpha=config.mixup_alpha,
-            cutmix_alpha=config.cutmix_alpha,
-            cutmix_minmax=config.cutmix_minmax,
-            prob=config.mixup_prob,
-            switch_prob=config.mixup_switch_prob,
-            mode=config.mixup_mode,
-            label_smoothing=config.label_smoothing,
+            mixup_alpha=mixup_config.mixup_alpha,
+            cutmix_alpha=mixup_config.cutmix_alpha,
+            cutmix_minmax=mixup_config.cutmix_minmax,
+            prob=mixup_config.mixup_prob,
+            switch_prob=mixup_config.mixup_switch_prob,
+            mode=mixup_config.mixup_mode,
+            label_smoothing=mixup_config.label_smoothing,
             num_classes=num_classes,
         )
         mixup_fn = MixupModule(**mixup_args)
