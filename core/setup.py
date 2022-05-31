@@ -31,6 +31,7 @@ install_requires = [
     # https://ci.gluon.ai/blue/organizations/jenkins/autogluon/detail/master/702/pipeline/16
     'dask>=2021.09.1,<=2021.11.2',
     'distributed>=2021.09.1, <=2021.11.2',
+    'protobuf>=3.20,<3.21',
     'boto3',
 
     f'autogluon.common=={version}',
