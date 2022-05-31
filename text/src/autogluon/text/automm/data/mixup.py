@@ -169,9 +169,8 @@ def multimodel_mixup(batch, model, mixup_fn):
             if hasattr(permodel, "image_key"):
                 if lam is None:
                     batch[permodel.image_key], mixup_label, lam = mixup_fn(batch[permodel.image_key], batch[permodel.label_key])
-                    batch[model.label_key] = batch[permodel.label_key]
                 else:
-                    batch[permodel.image_key], batch[permodel.label_key], _ = mixup_fn(batch[permodel.image_key], batch[permodel.label_key], lam)
+                    batch[permodel.image_key], _, _ = mixup_fn(batch[permodel.image_key], batch[permodel.label_key], lam)
         for permodel in model.model:
             if hasattr(permodel, "categorical_key"):
                 mixup_others(batch[permodel.categorical_key], lam)
