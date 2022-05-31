@@ -37,6 +37,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from .data.mixup import MixupModule
 
 from .utils import (
     create_model,
@@ -57,6 +58,7 @@ from .utils import (
     assign_feature_column_names,
     turn_on_off_feature_column_info,
     try_to_infer_pos_label,
+    get_mixup,
 )
 from .optimization.utils import (
     get_metric,
@@ -307,6 +309,15 @@ class AutoMMPredictor:
         """
         pl.seed_everything(seed, workers=True)
 
+        # Generate config to gain general info. Hyperparameter specific config will override this config in `_fit()`
+        if self._config is not None:  # continuous training
+            config = self._config
+            
+        config = get_config(
+            config=config,
+            overrides=hyperparameters,
+        )
+
         if self._resume or save_path is None:
             save_path = self._save_path
         else:
@@ -368,6 +379,17 @@ class AutoMMPredictor:
             assert self._output_shape == output_shape, \
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
+                
+        if self._df_preprocessor is None:
+            df_preprocessor = init_df_preprocessor(
+                config=config.data,
+                column_types=column_types,
+                label_column=self._label_column,
+                train_df_x=train_data.drop(columns=self._label_column),
+                train_df_y=train_data[self._label_column],
+            )
+        else:  # continuing training
+            df_preprocessor = self._df_preprocessor
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
@@ -390,8 +412,6 @@ class AutoMMPredictor:
             pos_label=pos_label,
         )
 
-        loss_func = get_loss_func(problem_type)
-
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
 
@@ -402,11 +422,26 @@ class AutoMMPredictor:
         self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
+        self._df_preprocessor = df_preprocessor
+        
+
+        # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
+        self.save(save_path)
+
+        # need to assign the above attributes before setting up distillation
+        if teacher_predictor is not None:
+            teacher_model, critics, baseline_funcs, soft_label_loss_func, \
+                teacher_df_preprocessor, teacher_data_processors = \
+                self._setup_distillation(
+                    teacher_predictor=teacher_predictor,
+                )
+        else:
+            teacher_model, critics, baseline_funcs, soft_label_loss_func,\
+                teacher_df_preprocessor, teacher_data_processors = None, None, None, None, None, None
 
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
-            loss_func=loss_func,
             validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
@@ -629,7 +664,6 @@ class AutoMMPredictor:
             self,
             train_df: pd.DataFrame,
             val_df: pd.DataFrame,
-            loss_func: _Loss,
             validation_metric: torchmetrics.Metric,
             validation_metric_name: str,
             custom_metric_func: Callable,
@@ -655,17 +689,6 @@ class AutoMMPredictor:
                 config=self._config,
                 overrides=hyperparameters,
             )
-            
-        if self._df_preprocessor is None:
-            df_preprocessor = init_df_preprocessor(
-                config=config.data,
-                column_types=self._column_types,
-                label_column=self._label_column,
-                train_df_x=train_df.drop(columns=self._label_column),
-                train_df_y=train_df[self._label_column]
-            )
-        else:  # continuing training
-            df_preprocessor = self._df_preprocessor
 
         config = select_model(
             config=config,
@@ -693,10 +716,21 @@ class AutoMMPredictor:
         else:  # continuing training
             model = self._model
             
+        mixup_active, mixup_fn = get_mixup(model_config=OmegaConf.select(config,'model'),
+                                     mixup_config=OmegaConf.select(config,'data.mixup'),
+                                     num_classes=self._output_shape,
+        )
+        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
+            warnings.warn("The mixup is done on the batch."
+                          "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                          UserWarning)
+
+        loss_func = get_loss_func(self._problem_type, mixup_active)
+            
         self._config = config
-        self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
+        self.mixup_fn = mixup_fn
         
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path)
@@ -782,6 +816,8 @@ class AutoMMPredictor:
                 model=model,
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(config, 'data.mixup.mixup_off_epoch'),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
