@@ -25,7 +25,7 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
-MASKS = "mask"
+MASKS = "masks"
 PROBABILITY = "probability"
 COLUMN_FEATURES = "column_features"
 
