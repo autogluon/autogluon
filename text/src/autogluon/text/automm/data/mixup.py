@@ -155,16 +155,20 @@ def multimodel_mixup(batch, model, mixup_fn):
 
     Returns
     -------
-    The mixed-up batch.
+    batch
+        The mixed-up batch.
+    mixup_label
+        The mixed-up labels.
     """
+    mixup_label = batch[model.label_key]
     if hasattr(model, "image_key"):
-        batch[model.image_key], batch[model.label_key] = mixup_fn(batch[model.image_key], batch[model.label_key])
+        batch[model.image_key], mixup_label = mixup_fn(batch[model.image_key], batch[model.label_key])
     else:
         lam = None
         for permodel in model.model:
             if hasattr(permodel, "image_key"):
                 if lam is None:
-                    batch[permodel.image_key], batch[permodel.label_key], lam = mixup_fn(batch[permodel.image_key], batch[permodel.label_key])
+                    batch[permodel.image_key], mixup_label, lam = mixup_fn(batch[permodel.image_key], batch[permodel.label_key])
                     batch[model.label_key] = batch[permodel.label_key]
                 else:
                     batch[permodel.image_key], batch[permodel.label_key], _ = mixup_fn(batch[permodel.image_key], batch[permodel.label_key], lam)
@@ -176,4 +180,4 @@ def multimodel_mixup(batch, model, mixup_fn):
             if hasattr(permodel, "text_token_ids_key"):
                 mixup_others(batch[permodel.text_token_ids_key], lam)
 
-    return batch
+    return batch, mixup_label

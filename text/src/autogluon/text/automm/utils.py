@@ -1288,7 +1288,7 @@ def get_mixup(
     mixup_active = config.mixup_alpha > 0 or \
                    config.cutmix_alpha > 0. or \
                    config.cutmix_minmax is not None
-    mixup_state = config.mixup_turnon & (len(df_preprocessor.image_path_names) > 0) & mixup_active & (num_classes > 1)
+    mixup_state = config.turn_on & (len(df_preprocessor.image_path_names) > 0) & mixup_active & (num_classes > 1)
     mixup_fn = None
     if mixup_state:
         mixup_args = dict(

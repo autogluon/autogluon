@@ -156,11 +156,11 @@ class LitModule(pl.LightningModule):
             self,
             batch: Dict,
     ):
-        if self.training and self.mixup_fn is not None:
-            self.mixup_fn.mixup_enabled = self.current_epoch < self.hparams.mixup_off_epoch
-            batch = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
-        output = self.model(batch)
         label = batch[self.model.label_key]
+        if self.mixup_fn is not None:
+            self.mixup_fn.mixup_enabled = self.training & (self.current_epoch < self.hparams.mixup_off_epoch)
+            batch, label = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
+        output = self.model(batch)
         loss = self._compute_loss(output=output, label=label)
         return output, loss
 
