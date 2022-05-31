@@ -204,6 +204,12 @@ class TextProcessor:
         if(augment_types is None):
             return naf.Sequential()
         auglist = []
+
+        try:
+            nltk.data.find('tagger/averaged_perceptron_tagger')
+        except LookupError:
+            nltk.download('averaged_perceptron_tagger')
+
         for aug_type in augment_types:
             if '(' in aug_type:
                 trans_mode = aug_type[0:aug_type.find('(')]
@@ -213,6 +219,16 @@ class TextProcessor:
                 kwargs = {}
             if(trans_mode == "synonym_replacement"):
                 kwargs['aug_src'] = 'wordnet'
+
+                try:
+                    nltk.data.find('corpora/wordnet')
+                except LookupError:
+                    nltk.download('wordnet')
+                try:
+                    nltk.data.find('corpora/omw-1.4')
+                except LookupError:
+                    nltk.download('omw-1.4')
+                    
                 auglist.append(naw.SynonymAug(**kwargs))
             elif(trans_mode == "random_swap"):
                 kwargs['action'] = 'swap'

@@ -61,12 +61,12 @@ model:
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
     insert_sep: True
     text_segment_num: 2
-    text_detection_length: 10
     stochastic_chunk: False
+    text_detection_length: 10
     train_augment_types:
-      - "synonym_replacement({'aug_p': 0.1})"  # less than 0.1 based on eda paper
-      - "random_swap({'aug_p': 0.1})"          # less than 0.1 based on eda paper
-      - "random_delete({'aug_p': 0.1})"        # less than 0.1 based on eda paper
+      # - "synonym_replacement({'aug_p': 0.1})"  # less than 0.1 based on eda paper
+      # - "random_swap({'aug_p': 0.1})"          # less than 0.1 based on eda paper
+      # - "random_delete({'aug_p': 0.1})"        # less than 0.1 based on eda paper
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
@@ -100,6 +100,11 @@ model:
     insert_sep: False
     text_segment_num: 1
     stochastic_chunk: False
+    text_detection_length: 10
+    train_augment_types:
+      # - "synonym_replacement({'aug_p': 0.1})"  # less than 0.1 based on eda paper
+      # - "random_swap({'aug_p': 0.1})"          # less than 0.1 based on eda paper
+      # - "random_delete({'aug_p': 0.1})"        # less than 0.1 based on eda paper
   fusion_mlp:
     weight: 0.1
     adapt_in_features: "max"
