@@ -264,6 +264,42 @@ class TimeSeriesDataFrame(pd.DataFrame):
         data_after = self.loc[(slice(cutoff_item, None), slice(None)), :]
         return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
 
+    def slice_by_timestep(self, time_step_slice: slice):
+        """Return a slice of time steps (with no regards to the actual timestamp) from within
+        each item in a time series data frame. For example, if a data frame is constructed as::
+
+            item_id  timestamp  target
+                  0 2019-01-01       0
+                  0 2019-01-02       1
+                  0 2019-01-03       2
+                  1 2019-01-02       3
+                  1 2019-01-03       4
+                  1 2019-01-04       5
+                  2 2019-01-03       6
+                  2 2019-01-04       7
+                  2 2019-01-05       8
+
+        then `df.slice_by_timestep(time_step_slice=slice(-2, None)` would return the last two
+        time steps from each item::
+
+            item_id  timestamp  target
+                  0 2019-01-02       1
+                  0 2019-01-03       2
+                  1 2019-01-03       4
+                  1 2019-01-04       5
+                  2 2019-01-04       7
+                  2 2019-01-05       8
+
+        Note that this function returns a copy of the original data. This function is useful for
+        constructing holdout sets for validation.
+
+        Parameters
+        ----------
+        time_step_slice: slice
+            A python slice object representing the slices to return from each item
+        """
+        return pd.concat([self.loc[i].iloc[time_step_slice] for i in self.index.levels[0]])
+
     def subsequence(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> TimeSeriesDataFrame:

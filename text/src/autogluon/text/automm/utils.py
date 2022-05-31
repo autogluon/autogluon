@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
+from sklearn.preprocessing import LabelEncoder
 from autogluon.core.metrics import get_metric
 
 from .models import (
@@ -620,6 +621,7 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
+                embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )
@@ -901,6 +903,7 @@ def average_checkpoints(
 def compute_score(
         metric_data: dict,
         metric_name: str,
+        pos_label: Optional[int] = 1,
 ) -> float:
     """
     Use sklearn to compute the score of one metric.
@@ -912,6 +915,8 @@ def compute_score(
         The predicted class probabilities are required to compute the roc_auc score.
     metric_name
         The name of metric to compute.
+    pos_label
+        The encoded label (0 or 1) of binary classification's positive class.
 
     Returns
     -------
@@ -919,7 +924,7 @@ def compute_score(
     """
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, 1])
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
@@ -1220,3 +1225,39 @@ def turn_on_off_feature_column_info(
                 per_model_processor.requires_column_info = flag
 
     return data_processors
+
+
+def try_to_infer_pos_label(
+        data_config: DictConfig,
+        label_encoder: LabelEncoder,
+        problem_type: str,
+):
+    """
+    Try to infer positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
+    If positive class is not provided, then use pos_label=1 by default.
+    If the problem type is not binary classification, then return None.
+
+    Parameters
+    ----------
+    data_config
+        A DictConfig object containing only the data configurations.
+    label_encoder
+        The label encoder of classification tasks.
+    problem_type
+        Type of problem.
+
+    Returns
+    -------
+
+    """
+    if problem_type != BINARY:
+        return None
+
+    pos_label = OmegaConf.select(data_config, "pos_label", default=None)
+    if pos_label is not None:
+        print(f"pos_label: {pos_label}\n")
+        pos_label = label_encoder.transform([pos_label]).item()
+    else:
+        pos_label = 1
+
+    return pos_label

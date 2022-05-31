@@ -1,10 +1,10 @@
 import pytest
 import random
 import torch
-from autogluon.text.automm.optimization.utils import get_metric
-from autogluon.text.automm.constants import MULTICLASS
 from torchmetrics import MeanMetric
 from sklearn.metrics import log_loss
+from autogluon.text.automm.optimization.utils import get_metric
+from autogluon.text.automm.constants import MULTICLASS
 
 
 @pytest.mark.parametrize(

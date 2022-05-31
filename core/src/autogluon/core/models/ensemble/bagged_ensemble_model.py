@@ -398,8 +398,8 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             try:
                 try_import_ray()
-            except Exception:
-                warning_msg = 'Will use sequential fold fitting strategy because ray>=1.7.0,<1.8.0 is not installed.'
+            except Exception as e:
+                warning_msg = f'Will use sequential fold fitting strategy because import of ray failed. Reason: {str(e)}'
                 dup_filter.attach_filter_targets(warning_msg)
                 logger.warning(warning_msg)
                 fold_fitting_strategy = 'sequential_local'
