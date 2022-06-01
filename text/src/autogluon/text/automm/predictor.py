@@ -466,7 +466,7 @@ class AutoMMPredictor:
         return self
     
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
-        from autogluon.core.hpo import run, cleanup_trials, EmptySearchSpace, AutommRayTuneAdapter
+        from autogluon.core.hpo import run, cleanup_trials, cleanup_checkpoints, EmptySearchSpace, AutommRayTuneAdapter
         search_space = _fit_args.get('hyperparameters', dict())
         metric = 'val_' + _fit_args.get('validation_metric_name')
         mode = _fit_args.get('minmax_mode')
@@ -506,7 +506,6 @@ class AutoMMPredictor:
             best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
             predictor = AutoMMPredictor._load_metadata(predictor=self, path=best_trial_path)
-            predictor._save_path = best_trial_path
             # construct the model
             model = create_model(
                 config=predictor._config,
@@ -522,14 +521,14 @@ class AutoMMPredictor:
                 for checkpoint, score in analysis.get_trial_checkpoints_paths(best_trial, metric=metric)
             )
             # write checkpoint paths and scores to yaml file so that top_k_average could read it
-            best_k_model_path = os.path.join(predictor._save_path, BEST_K_MODELS_FILE)
+            best_k_model_path = os.path.join(best_trial_path, BEST_K_MODELS_FILE)
             with open(best_k_model_path, 'w') as yaml_file:
                 yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
 
             last_ckpt_path = analysis.get_last_checkpoint(best_trial)
             predictor._top_k_average(
                 model=predictor._model,
-                save_path=predictor._save_path,
+                save_path=best_trial_path,
                 last_ckpt_path=last_ckpt_path,
                 minmax_mode=mode,
                 is_distill=False,
@@ -537,6 +536,13 @@ class AutoMMPredictor:
                 val_df=_fit_args['val_df'],
                 validation_metric_name=predictor._validation_metric_name,
             )
+            cleanup_checkpoints(best_trial_path)
+            # move trial predictor one level up
+            contents = os.listdir(best_trial_path)
+            for content in contents:
+                shutil.move(os.path.join(best_trial_path, content), save_path)
+            shutil.rmtree(best_trial_path)
+            predictor._save_path = save_path
             
             return predictor
         
@@ -738,10 +744,7 @@ class AutoMMPredictor:
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
             )
-            
-            # remove the yaml file after cleaning the checkpoints
-            if os.path.isfile(best_k_models_yaml_path):
-                os.remove(best_k_models_yaml_path)
+
             return self
         
         # need to assign the above attributes before setting up distillation

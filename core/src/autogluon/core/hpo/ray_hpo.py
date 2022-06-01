@@ -242,6 +242,21 @@ def cleanup_trials(save_dir: str, trials_to_keep: Optional[List[str]]):
     for directory in directories:
         if directory not in trials_to_keep:
             shutil.rmtree(os.path.join(save_dir, directory))
+            
+            
+def cleanup_checkpoints(save_dir):
+    """
+    Cleanup trial artifacts and keep trials as specified
+    
+    Parameters
+    ----------
+    save_dir
+        The path to the root of all the saved checkpoints.
+        This should be the path of a specific trial.
+    """
+    directories = [dir for dir in os.listdir(save_dir) if os.path.isdir(os.path.join(save_dir, dir)) and dir.startswith('checkpoint')]
+    for directory in directories:
+        shutil.rmtree(os.path.join(save_dir, directory))
 
 
 def _trial_name_creator(trial):
