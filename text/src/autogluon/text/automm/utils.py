@@ -105,10 +105,12 @@ def infer_metrics(
     return validation_metric_name, eval_metric_name
 
 
-def get_general_hyperparameters(hyperparameters: Union[dict, DictConfig]):
+def get_general_hyperparameters(hyperparameters: Optional[Union[dict, DictConfig]]):
     """
     Get hyperparameters that are not search space
     """
+    if hyperparameters is None:
+        return None
     hyperparameters = copy.deepcopy(hyperparameters)
     hyperparameters = parse_dotlist_conf(hyperparameters)  # convert to a dict
     from autogluon.core.space import Space
