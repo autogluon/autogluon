@@ -100,3 +100,7 @@ NUMERICAL_TRANSFORMER = "numerical_transformer"
 CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
+
+# checkpoints
+RAY_TUNE_CHECKPOINT = 'ray_tune_checkpoint.ckpt'
+BEST_K_MODELS_FILE = 'best_k_models.yaml'

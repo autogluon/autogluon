@@ -31,7 +31,8 @@ from .constants import (
     LABEL, BINARY, MULTICLASS, REGRESSION, Y_PRED,
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
     AUTOMM_TUTORIAL_MODE, UNIFORM_SOUP, GREEDY_SOUP,
-    BEST, MIN, MAX, TEXT,
+    BEST, MIN, MAX, TEXT, RAY_TUNE_CHECKPOINT,
+    BEST_K_MODELS_FILE,
 )
 
 from .data.datamodule import BaseDataModule
@@ -71,8 +72,6 @@ from .optimization.lit_distiller import DistillerLitModule
 from .. import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
-
-RAY_TUNE_CHECKPOINT = 'ray_tune_checkpoint.ckpt'
 
 
 class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
@@ -308,6 +307,13 @@ class AutoMMPredictor:
         -------
         An "AutoMMPredictor" object (itself).
         """
+        if hyperparameter_tune_kwargs is not None:
+            if teacher_predictor is not None:
+                raise ValueError(
+                    'HPO does not support teacher predictor. Either remove `hyperparameter_tune_kwargs` to perform distillation'
+                    'or remove `teacher_predictor` to perform HPO'
+                    )
+        
         pl.seed_everything(seed, workers=True)
 
         # Generate config to gain general info. Hyperparameter specific config will override this config in `_fit()`
@@ -483,7 +489,7 @@ class AutoMMPredictor:
                 verbose=2
             )
         except EmptySearchSpace:
-            raise ValueError("Please provide a search space in order to do hyperparameter tune")
+            raise ValueError("Please provide a search space using `hyperparameters` in order to do hyperparameter tune")
         except Exception as e:
             raise e
         else:
@@ -499,7 +505,7 @@ class AutoMMPredictor:
             cleanup_trials(save_path, best_trial.trial_id)
             best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
-            predictor = self.__class__._load_metadata(path=best_trial_path)
+            predictor = AutoMMPredictor._load_metadata(predictor=self, path=best_trial_path)
             predictor._save_path = best_trial_path
             # construct the model
             model = create_model(
@@ -511,24 +517,23 @@ class AutoMMPredictor:
             )
             predictor._model = model
             # average checkpoint
-            top_k_model_paths = [
-                                    os.path.relpath(os.path.join(path, RAY_TUNE_CHECKPOINT))
-                                    for path, _ in
-                                    sorted(
-                                            list(analysis.get_trial_checkpoints_paths(best_trial, metric=metric)),
-                                            key=lambda ele: ele[1],
-                                            reverse=(mode == MAX)
-                                        )
-                                ]
+            checkpoints_paths_and_scores = dict(
+                (os.path.join(checkpoint, RAY_TUNE_CHECKPOINT), score)
+                for checkpoint, score in analysis.get_trial_checkpoints_paths(best_trial, metric=metric)
+            )
+            # write checkpoint paths and scores to yaml file so that top_k_average could read it
+            best_k_model_path = os.path.join(predictor._save_path, BEST_K_MODELS_FILE)
+            with open(best_k_model_path, 'w') as yaml_file:
+                yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
+
             last_ckpt_path = analysis.get_last_checkpoint(best_trial)
             predictor._top_k_average(
                 model=predictor._model,
                 save_path=predictor._save_path,
-                top_k_model_paths=top_k_model_paths,
                 last_ckpt_path=last_ckpt_path,
                 minmax_mode=mode,
                 is_distill=False,
-                config=predictor._config,
+                top_k_average_method=predictor._config.optimization.top_k_average_method,
                 val_df=_fit_args['val_df'],
                 validation_metric_name=predictor._validation_metric_name,
             )
@@ -724,16 +729,12 @@ class AutoMMPredictor:
         self.save(save_path)
         
         if max_time == timedelta(seconds=0):
-            top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(config, save_path, minmax_mode)
-
             self._top_k_average(
                 model=model,
                 save_path=save_path,
-                top_k_model_paths=top_k_model_paths,
-                last_ckpt_path=last_ckpt_path,
                 minmax_mode=minmax_mode,
                 is_distill=False,
-                config=config,
+                top_k_average_method=config.optimization.top_k_average_method,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
             )
@@ -934,36 +935,32 @@ class AutoMMPredictor:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only averaging the checkpoint of the best trial in the end in the master process
             if not hpo_mode:
-                top_k_model_paths, last_ckpt_path, best_k_models_yaml_path = self._prepare_checkpoint(config, save_path, minmax_mode)
-
                 self._top_k_average(
                     model=model,
                     save_path=save_path,
-                    top_k_model_paths=top_k_model_paths,
-                    last_ckpt_path=last_ckpt_path,
                     minmax_mode=minmax_mode,
                     is_distill=is_distill,
-                    config=config,
+                    top_k_average_method=config.optimization.top_k_average_method,
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
                 )
-                
-                # remove the yaml file after cleaning the checkpoints
-                if os.path.isfile(best_k_models_yaml_path):
-                    os.remove(best_k_models_yaml_path)
         else:
             sys.exit(
                 f"Training finished, exit the process with global_rank={trainer.global_rank}..."
             )
-            
-    def _prepare_checkpoint(
-        self,
-        config,
-        save_path,
-        minmax_mode,
+
+    def _top_k_average(
+            self,
+            model,
+            save_path,
+            minmax_mode,
+            is_distill,
+            top_k_average_method,
+            val_df,
+            validation_metric_name,
+            last_ckpt_path=None,
     ):
-        top_k_model_paths = []
-        best_k_models_yaml_path = os.path.join(save_path, "best_k_models.yaml")
+        best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
                 best_k_models = yaml.load(f, Loader=yaml.Loader)
@@ -971,9 +968,20 @@ class AutoMMPredictor:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
             best_k_models = None
-        if best_k_models is not None:
-            if config.optimization.top_k_average_method == UNIFORM_SOUP:
-                top_k_model_paths = list(best_k_models.keys())
+        if last_ckpt_path is None:
+            last_ckpt_path = os.path.join(save_path, "last.ckpt")
+        
+        if is_distill:
+            prefix = "student_model."
+        else:
+            prefix = "model."
+
+        if best_k_models:
+            if top_k_average_method == UNIFORM_SOUP:
+                logger.info(
+                    f"Start to fuse {len(best_k_models)} checkpoints via the uniform soup algorithm."
+                )
+                ingredients = top_k_model_paths = list(best_k_models.keys())
             else:
                 top_k_model_paths = [
                     v[0] for v in sorted(
@@ -982,35 +990,7 @@ class AutoMMPredictor:
                         reverse=(minmax_mode == MAX),
                     )
                 ]
-        last_ckpt_path = os.path.join(save_path, "last.ckpt")
-        
-        return top_k_model_paths, last_ckpt_path, best_k_models_yaml_path
-
-    def _top_k_average(
-            self,
-            model,
-            save_path,
-            top_k_model_paths,
-            last_ckpt_path,
-            minmax_mode,
-            is_distill,
-            config,
-            val_df,
-            validation_metric_name,
-    ):
-        if is_distill:
-            prefix = "student_model."
-        else:
-            prefix = "model."
-
-        if len(top_k_model_paths) > 0:
-            if config.optimization.top_k_average_method == UNIFORM_SOUP:
-                logger.info(
-                    f"Start to fuse {len(top_k_model_paths)} checkpoints via the uniform soup algorithm."
-                )
-                ingredients = top_k_model_paths
-            else:
-                if config.optimization.top_k_average_method == GREEDY_SOUP:
+                if top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
@@ -1041,13 +1021,13 @@ class AutoMMPredictor:
                             # Add new ingredient
                             ingredients.append(top_k_model_paths[i])
                             best_score = cand_score
-                elif config.optimization.top_k_average_method == BEST:
+                elif top_k_average_method == BEST:
                     ingredients = [top_k_model_paths[0]]
                 else:
                     raise ValueError(
                         f"The key for 'optimization.top_k_average_method' is not supported. "
                         f"We only support '{GREEDY_SOUP}', '{UNIFORM_SOUP}' and '{BEST}'. "
-                        f"The provided value is '{config.optimization.top_k_average_method}'."
+                        f"The provided value is '{top_k_average_method}'."
                     )
         else:
             # best_k_models is empty so we will manually save a checkpoint from the trainer
@@ -1081,6 +1061,9 @@ class AutoMMPredictor:
         for per_path in top_k_model_paths:
             if os.path.isfile(per_path):
                 os.remove(per_path)
+        # remove the yaml file after cleaning the checkpoints
+        if os.path.isfile(best_k_models_yaml_path):
+            os.remove(best_k_models_yaml_path)
         # clean the last checkpoint
         if os.path.isfile(last_ckpt_path):
             os.remove(last_ckpt_path)
@@ -1500,6 +1483,7 @@ class AutoMMPredictor:
                 
     @staticmethod
     def _load_metadata(
+        predictor: AutoMMPredictor,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -1539,12 +1523,16 @@ class AutoMMPredictor:
                 df_preprocessor=df_preprocessor,
             )
 
-        predictor = AutoMMPredictor(
-            label=assets["label_column"],
-            problem_type=assets["problem_type"],
-            eval_metric=assets["eval_metric_name"],
-            verbosity=verbosity,
-        )
+        # predictor = AutoMMPredictor(
+        #     label=assets["label_column"],
+        #     problem_type=assets["problem_type"],
+        #     eval_metric=assets["eval_metric_name"],
+        #     verbosity=verbosity,
+        # )
+        predictor._label_column = assets["label_column"]
+        predictor._problem_type = assets["problem_type"]
+        predictor._eval_metric_name = assets["eval_metric_name"]
+        predictor._verbosity = verbosity
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
         predictor._pretrain_path = path
@@ -1586,7 +1574,8 @@ class AutoMMPredictor:
         """
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        predictor = AutoMMPredictor._load_metadata(path=path, resume=resume, verbosity=verbosity)
+        predictor = AutoMMPredictor(label="dummy_label")
+        predictor = AutoMMPredictor._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
         model = create_model(
             config=predictor._config,
