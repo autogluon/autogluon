@@ -1,4 +1,6 @@
 """Unit tests for learners"""
+import copy
+
 import numpy as np
 import pytest
 from gluonts.model.seq2seq import MQRNNEstimator
@@ -28,8 +30,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-        val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=1,
+        tuning_data=DUMMY_TS_DATAFRAME,
     )
     assert "SimpleFeedForward" in predictor.get_model_names()
 
@@ -38,12 +39,61 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(path=temp_model_path, eval_metric="MAPE")
+    predictor = ForecastingPredictor(
+        path=temp_model_path, eval_metric="MAPE", prediction_length=3
+    )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
+        tuning_data=DUMMY_TS_DATAFRAME,
+    )
+    predictions = predictor.predict(DUMMY_TS_DATAFRAME)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions.index.levels[0]
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
+    assert not np.any(np.isnan(predictions))
+
+
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+def test_given_different_target_name_when_predictor_called_then_model_can_predict(
+    temp_model_path, hyperparameters
+):
+    df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
+    df.rename(columns={"target": "mytarget"}, inplace=True)
+
+    predictor = ForecastingPredictor(
+        target="mytarget",
+        path=temp_model_path,
+        eval_metric="MAPE",
         prediction_length=3,
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters=hyperparameters,
+    )
+    predictions = predictor.predict(df)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions.index.levels[0]
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
+    assert not np.any(np.isnan(predictions))
+
+
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(
+    temp_model_path, hyperparameters
+):
+    predictor = ForecastingPredictor(
+        path=temp_model_path, eval_metric="MAPE", prediction_length=3
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
     )
     predictions = predictor.predict(DUMMY_TS_DATAFRAME)
 
@@ -60,12 +110,13 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
 def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters, quantile_kwarg_name
 ):
-    predictor = ForecastingPredictor(path=temp_model_path, eval_metric="MAPE")
+    predictor = ForecastingPredictor(
+        path=temp_model_path, eval_metric="MAPE", prediction_length=3
+    )
     predictor_fit_kwargs = dict(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=3,
     )
     predictor_fit_kwargs[quantile_kwarg_name] = [0.1, 0.4, 0.9]
     predictor.fit(**predictor_fit_kwargs)
@@ -95,8 +146,7 @@ def test_given_hyperparameters_and_custom_models_when_predictor_called_then_lead
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=1,
+        tuning_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = predictor.leaderboard()
 
@@ -108,12 +158,11 @@ def test_given_hyperparameters_and_custom_models_when_predictor_called_then_lead
 def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(path=temp_model_path)
+    predictor = ForecastingPredictor(path=temp_model_path, prediction_length=2)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=2,
+        tuning_data=DUMMY_TS_DATAFRAME,
     )
     predictor.save()
     del predictor
@@ -135,12 +184,11 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded_learner_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(path=temp_model_path)
+    predictor = ForecastingPredictor(path=temp_model_path, prediction_length=2)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=2,
+        tuning_data=DUMMY_TS_DATAFRAME,
     )
     predictor.save()
     del predictor

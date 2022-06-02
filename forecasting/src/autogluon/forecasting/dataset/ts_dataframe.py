@@ -122,10 +122,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # check if timeseries are irregularly sampled
         timedeltas = set()
         for item_id in df[ITEMID].unique():
-            timedeltas = timedeltas.union(df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:])
+            timedeltas = timedeltas.union(
+                df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:]
+            )
             if len(timedeltas) > 1:
-                raise ValueError(f"Only a single uniformly sampled period is allowed for time series"
-                                 f" data sets. Found {len(timedeltas)}")
+                raise ValueError(
+                    f"Only a single uniformly sampled period is allowed for time series"
+                    f" data sets. Found {len(timedeltas)}"
+                )
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
@@ -279,7 +283,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                   2 2019-01-04       7
                   2 2019-01-05       8
 
-        then `df.slice_by_timestep(time_step_slice=slice(-2, None)` would return the last two
+        then `df.slice_by_timestep(time_step_slice=slice(-2, None))` would return the last two
         time steps from each item::
 
             item_id  timestamp  target
@@ -298,7 +302,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
         time_step_slice: slice
             A python slice object representing the slices to return from each item
         """
-        return pd.concat([self.loc[i].iloc[time_step_slice] for i in self.index.levels[0]])
+        slice_gen = (
+            (i, self.loc[i].iloc[time_step_slice]) for i in self.index.levels[0]
+        )
+        slices = []
+        for ix, data_slice in slice_gen:
+            idx = pd.MultiIndex.from_product(
+                [(ix,), data_slice.index], names=[ITEMID, TIMESTAMP]
+            )
+            data_slice.set_index(idx, inplace=True)
+            slices.append(data_slice)
+        return self.__class__(pd.concat(slices))
 
     def subsequence(
         self, start: pd.Timestamp, end: pd.Timestamp

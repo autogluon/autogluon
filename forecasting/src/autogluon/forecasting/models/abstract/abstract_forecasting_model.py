@@ -88,7 +88,9 @@ class AbstractForecastingModel(AbstractModel):
         self.stopping_metric = None
         self.problem_type = "forecasting"
         self.conformalize = False
+        self.target: str = kwargs.get("target", "target")
         self.metadata = metadata or get_prototype_metadata_dict()
+        self.metadata.update({"target": self.target})
 
         self.freq: str = freq
         self.prediction_length: int = prediction_length

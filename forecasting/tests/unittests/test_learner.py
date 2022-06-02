@@ -34,7 +34,6 @@ def test_when_learner_called_then_training_is_performed(temp_model_path):
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=1,
     )
     assert "SimpleFeedForward" in learner.load_trainer().get_model_names()
 
@@ -53,7 +52,6 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=1,
     )
     leaderboard = learner.leaderboard()
     print(temp_model_path)
@@ -68,12 +66,11 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
 def test_given_hyperparameters_when_learner_called_then_model_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE")
+    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=3)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=3,
     )
     predictions = learner.predict(DUMMY_TS_DATAFRAME)
 
@@ -101,7 +98,6 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
-            prediction_length=1,
             hyperparameter_tune=True,
         )
 
@@ -136,7 +132,6 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=1,
     )
     leaderboard = learner.leaderboard()
 
@@ -151,12 +146,11 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
 def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE")
+    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=2)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=2,
     )
     learner.save()
     del learner
@@ -187,7 +181,6 @@ def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters="toy",
         val_data=DUMMY_TS_DATAFRAME,
-        prediction_length=1,
     )
     if random_seed is None:
         random_seed = learner.random_state

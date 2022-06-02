@@ -22,6 +22,7 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             hyperparameter_tune=hyperparameter_tune,
             quantiles=quantile_levels,
             invalid_model_names=self._get_banned_model_names(),
+            target=self.target,
         )
 
     # todo: implement cross-validation / holdout strategy
@@ -53,8 +54,6 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             Whether to perform hyperparameter tuning when learning individual models.
         time_limit
             Time limit for training
-        infer_limit
-            Time limit for inference
         """
         self._train_multi(
             train_data,

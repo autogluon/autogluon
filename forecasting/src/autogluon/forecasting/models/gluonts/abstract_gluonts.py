@@ -81,7 +81,6 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         possible values.
     """
 
-    target_field_name: str = "target"
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
 
@@ -186,7 +185,7 @@ class AbstractGluonTSModel(AbstractForecastingModel):
         time_series_df: Optional[TimeSeriesDataFrame]
     ) -> Optional[GluonTSDataset]:
         return SimpleGluonTSDataset(
-            time_series_df, target_field_name=self.target_field_name
+            time_series_df, target_field_name=self.target
         ) if time_series_df is not None else None
 
     def _fit(

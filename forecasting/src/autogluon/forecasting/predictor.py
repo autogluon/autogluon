@@ -17,7 +17,7 @@ from .dataset import TimeSeriesDataFrame
 from .learner import AbstractLearner, ForecastingLearner
 from .trainer import AbstractForecastingTrainer
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class ForecastingPredictor:
@@ -32,6 +32,11 @@ class ForecastingPredictor:
 
     Parameters
     ----------
+    target: str, default = "target"
+        Name of column that contains the target values to forecast (ie. the numeric observations of the
+        time series). This column must contain numeric values, and missing target values
+        should be in a pandas compatible format:
+        https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html
     eval_metric: str, default = None
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
@@ -49,6 +54,10 @@ class ForecastingPredictor:
         If using `logging`, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements,
         opposite of verbosity levels).
+    prediction_length: int, default = 1
+        The forecast horizon, i.e., How many time points into the future forecasters should be trained to predict.
+        For example, if our time series contain daily observations, setting `prediction_length=3` will train
+        models that predict up to 3 days in the future from the most recent observation.
 
     Other Parameters
     ----------------
@@ -71,27 +80,34 @@ class ForecastingPredictor:
 
     def __init__(
         self,
+        target: str = "target",
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
+        prediction_length: int = 1,
         **kwargs,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
+        self.target = target
 
         learner_type = kwargs.pop("learner_type", ForecastingLearner)
         learner_kwargs = kwargs.pop("learner_kwargs", dict())
-
-        learner_kwargs.pop("eval_metric", None)
-        learner_kwargs.pop("path", None)
+        self.prediction_length = prediction_length
         self.eval_metric = eval_metric
-        self._learner: AbstractLearner = learner_type(
-            path_context=self.path, eval_metric=eval_metric, **learner_kwargs
-        )
-        self._learner_type = type(self._learner)
 
-        self.target_column = "target"
+        learner_kwargs = learner_kwargs.copy()
+        learner_kwargs.update(
+            dict(
+                path_context=self.path,
+                eval_metric=eval_metric,
+                target=self.target,
+                prediction_length=self.prediction_length,
+            )
+        )
+        self._learner: AbstractLearner = learner_type(**learner_kwargs)
+        self._learner_type = type(self._learner)
 
     @property
     def _trainer(self) -> AbstractForecastingTrainer:
@@ -101,13 +117,11 @@ class ForecastingPredictor:
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        prediction_length: int = 1,
-        target_column: str = "target",
-        val_data: Optional[TimeSeriesDataFrame] = None,
+        tuning_data: Optional[TimeSeriesDataFrame] = None,
+        time_limit: Optional[int] = None,
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
-        time_limit: Optional[int] = None,
         **kwargs,
     ) -> "ForecastingPredictor":
         """Fit models to predict (distributional) forecasts of multiple related time series
@@ -118,23 +132,16 @@ class ForecastingPredictor:
         train_data: TimeSeriesDataFrame
             Training data in the TimeSeriesDataFrame format. See documentation for `autogluon.forecasting.dataset` for
             further information.
-        prediction_length: int
-            The forecast horizon, i.e., How many time points into the future forecasters should be trained to predict.
-            For example, if our time series contain daily observations, setting `prediction_length=3` will train
-            models that predict up to 3 days in the future from the most recent observation.
-        target_column: str
-            Name of column that contains the target values to forecast (ie. the numeric observations of the
-            time series). This column must contain numeric values, and missing target values
-            should be in a pandas compatible format:
-            https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html
-            By default, `target_column="target"`.
-        val_data: TimeSeriesDataFrame
-            Validation data reserved for model selection or hyperparameter tuning, rather than training individual
-            models. If None, AutoGluon will reserve the most recent portion of `train_data` for validation. Validation
-            scores will by default be computed over the last `prediction_length` time points in the validation data.
+        tuning_data: TimeSeriesDataFrame, default = None
+            Data reserved for model selection or hyperparameter tuning, rather than training individual
+            models. If None, AutoGluon will reserve the most recent portion of `train_data` for tuning. Validation
+            scores will by default be computed over the last `prediction_length` time points in the tuning data.
+        time_limit: int, default = None
+            Approximately how long fit() will run for (wall-clock time in seconds). If not specified, `fit()` will
+            run until all models have completed training.
         presets: str, default = None
             Optional preset configurations for various arguments in `fit()`. Can significantly impact predictive
-            accuracy, memory-footprint, and inference latency of trained models, and various other properties of the
+            accuracy, memory footprint, inference latency of trained models, and various other properties of the
             returned predictor. It is recommended to specify presets and avoid specifying most other `fit()` arguments
             or model hyperparameters prior to becoming familiar with AutoGluon. For example, set
             `presets="best_quality"` to get a high-accuracy predictor, or set `presets="low_quality"` to get a
@@ -144,8 +151,6 @@ class ForecastingPredictor:
             Available presets are "best_quality", "high_quality", "good_quality", "medium_quality", "low_quality",
             and "low_quality_hpo". Details for these presets can be found in
             `autogluon/forecasting/configs/presets_configs.py`
-        hyperparameter_tune_kwargs: Optional, None by default, can be str or dict
-            # TODO
         hyperparameters: str or dict, default = None
             Determines the hyperparameters used by each model.
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
@@ -160,9 +165,8 @@ class ForecastingPredictor:
             hyperparameter-tuning is utilized). Any omitted hyperparameters not specified here will be set to default
             values which are given in`autogluon/forecasting/trainer/models/presets.py`. Specific hyperparameter
             choices for each of the recommended models can be found in the references.
-        time_limit: int, default=None
-            Approximately how long fit() will run for (wall-clock time in seconds). If not specified, `fit()` will
-            run until all models have completed training.
+        hyperparameter_tune_kwargs: str or dict, default = None
+            # TODO
 
         Other Parameters
         ----------------
@@ -177,10 +181,19 @@ class ForecastingPredictor:
             - MQCNN: https://ts.gluon.ai/api/gluonts/gluonts.model.seq2seq.html
             - SFF: https://ts.gluon.ai/api/gluonts/gluonts.model.simple_feedforward.html
         """
-        start_time = time.time()
+        time_start = time.time()
         if self._learner.is_fit:
             raise AssertionError(
                 "Predictor is already fit! To fit additional models create a new `Predictor`."
+            )
+
+        if self.target not in train_data.columns:
+            raise ValueError(
+                f"Target column `{self.target}` not found in the training data set."
+            )
+        if tuning_data is not None and self.target not in tuning_data.columns:
+            raise ValueError(
+                f"Target column `{self.target}` not found in the tuning data set."
             )
 
         verbosity = kwargs.get("verbosity", self.verbosity)
@@ -188,12 +201,10 @@ class ForecastingPredictor:
         if presets is not None:
             logger.info(f"presets is set to {presets}")
 
-        self.target_column = target_column
-
         if verbosity >= 3:
             fit_args = dict(
-                prediction_length=prediction_length,
-                target_column=target_column,
+                prediction_length=self.prediction_length,
+                target_column=self.target,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 presets=presets,
                 time_limit=time_limit,
@@ -205,17 +216,19 @@ class ForecastingPredictor:
             logger.info("=======================================")
 
         # Inform the user extra columns in dataset will not be used.
-        extra_columns = [c for c in train_data.columns.copy() if c != target_column]
+        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
         if len(extra_columns) > 0:
             logger.warning(f"Provided columns {extra_columns} will not be used.")
 
-        if val_data is None:
+        if tuning_data is None:
             logger.warning(
-                f"Validation data is None, will hold the last prediction_length {prediction_length} "
+                f"Validation data is None, will hold the last prediction_length {self.prediction_length} "
                 f"time steps out to use as validation set.",
             )
-            val_data = train_data
-            train_data = train_data.slice_by_timestep(slice(None, -prediction_length))
+            tuning_data = train_data
+            train_data = train_data.slice_by_timestep(
+                slice(None, -self.prediction_length)
+            )
 
         quantile_levels = kwargs.get(
             "quantile_levels",
@@ -227,12 +240,11 @@ class ForecastingPredictor:
             hyperparameter_tune_kwargs, time_limit=time_limit
         )
         time_left = (
-            None if time_limit is None else time_limit - (time.time() - start_time)
+            None if time_limit is None else time_limit - (time.time() - time_start)
         )
         self._learner.fit(
             train_data=train_data,
-            prediction_length=prediction_length,
-            val_data=val_data,
+            val_data=tuning_data,
             scheduler_options=scheduler_options,
             hyperparameters=hyperparameters,
             hyperparameter_tune=all(scheduler_options),
@@ -264,9 +276,9 @@ class ForecastingPredictor:
                 )
                 num_trials = 2
             else:
-                num_trials = hyperparameter_tune_kwargs.get("num_trials", 9999)
+                num_trials = hyperparameter_tune_kwargs.get("num_trials", 999)
         elif isinstance(hyperparameter_tune_kwargs, str):
-            num_trials = 9999
+            num_trials = 999
 
         scheduler_cls, scheduler_params = scheduler_factory(
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,

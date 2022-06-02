@@ -264,6 +264,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
+        self.target = kwargs.get("target", "target")
         self.is_data_saved = False
 
         # Dict of normal model -> FULL model. FULL models are produced by

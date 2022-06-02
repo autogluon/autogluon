@@ -26,13 +26,17 @@ class ForecastingLearner(AbstractLearner):
     def __init__(
         self,
         path_context: str,
+        target: str = "target",
         random_state: int = 0,
         trainer_type: Type[AbstractForecastingTrainer] = AutoForecastingTrainer,
         eval_metric: Optional[str] = None,
+        prediction_length: int = 1,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
         self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.trainer_type = trainer_type
+        self.target = target
+        self.prediction_length = prediction_length
         logger.info(f"Learner random seed set to {random_state}")
 
     def load_trainer(self) -> AbstractForecastingTrainer:
@@ -42,7 +46,6 @@ class ForecastingLearner(AbstractLearner):
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        prediction_length: int,
         val_data: TimeSeriesDataFrame = None,
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune: bool = False,
@@ -50,7 +53,6 @@ class ForecastingLearner(AbstractLearner):
     ) -> None:
         return self._fit(
             train_data=train_data,
-            prediction_length=prediction_length,
             val_data=val_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
@@ -60,7 +62,6 @@ class ForecastingLearner(AbstractLearner):
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
-        prediction_length: int,
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune: bool = False,
@@ -77,13 +78,17 @@ class ForecastingLearner(AbstractLearner):
         )
         logger.info(f"AutoGluon will save models to {self.path}")
 
-        self.trainer = self.trainer_type(
-            path=self.model_context,
-            prediction_length=prediction_length,
-            eval_metric=self.eval_metric,
-            scheduler_options=scheduler_options,
-            **kwargs,
+        trainer_init_kwargs = kwargs.copy()
+        trainer_init_kwargs.update(
+            dict(
+                path=self.model_context,
+                prediction_length=self.prediction_length,
+                eval_metric=self.eval_metric,
+                scheduler_options=scheduler_options,
+                target=self.target,
+            )
         )
+        self.trainer = self.trainer_type(**trainer_init_kwargs)
         self.trainer_path = self.trainer.path
         self.save()
 
