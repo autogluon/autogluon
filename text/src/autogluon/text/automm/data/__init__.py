@@ -10,3 +10,4 @@ from .process_text import TextProcessor
 from .process_categorical import CategoricalProcessor
 from .process_numerical import NumericalProcessor
 from .process_label import LabelProcessor
+from .mixup import MixupModule
