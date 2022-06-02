@@ -159,8 +159,10 @@ class ForecastingPredictor:
 
             Available presets are "best_quality", "high_quality", "good_quality", "medium_quality", "low_quality",
             and "low_quality_hpo". Details for these presets can be found in
-            `autogluon/forecasting/configs/presets_configs.py`
-        hyperparameters: str or dict, default = None
+            `autogluon/forecasting/configs/presets_configs.py`. If not provided, user-provided values for other
+            arguments (specifically, `hyperparameters` and `hyperparameter_tune_kwargs` will be used (defaulting
+            to their default values specified below).
+        hyperparameters: str or dict, default = "default"
             Determines the hyperparameters used by each model.
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
             "toy", or "toy_hpo", where "toy" settings correspond to models only intended for prototyping.
@@ -197,6 +199,8 @@ class ForecastingPredictor:
             raise ValueError(
                 f"Target column `{self.target}` not found in the tuning data set."
             )
+        if hyperparameters is None:
+            hyperparameters = "default"
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
