@@ -74,48 +74,32 @@ def get_metric(
     -------
     torchmetrics.Metric
         A torchmetrics.Metric object.
-    mode
-        The min/max mode used in selecting model checkpoints.
-        - min
-             Its means that smaller metric is better.
-        - max
-            It means that larger metric is better.
     custom_metric_func
         A customized metric function.
     """
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY]:
-        return torchmetrics.Accuracy(), MAX, None
+        return torchmetrics.Accuracy(), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
-        return torchmetrics.MeanSquaredError(squared=False), MIN, None
+        return torchmetrics.MeanSquaredError(squared=False), None
     elif metric_name == R2:
-        return torchmetrics.R2Score(), MAX, None
+        return torchmetrics.R2Score(), None
     elif metric_name == QUADRATIC_KAPPA:
         return torchmetrics.CohenKappa(num_classes=num_classes,
-                                       weights="quadratic"), MAX, None
+                                       weights="quadratic"), None
     elif metric_name == ROC_AUC:
-        return torchmetrics.AUROC(pos_label=pos_label), MAX, None
+        return torchmetrics.AUROC(pos_label=pos_label), None
     elif metric_name == AVERAGE_PRECISION:
-        return torchmetrics.AveragePrecision(pos_label=pos_label), MAX, None
+        return torchmetrics.AveragePrecision(pos_label=pos_label), None
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
-        return torchmetrics.MeanMetric(), MIN, \
+        return torchmetrics.MeanMetric(), \
                functools.partial(F.cross_entropy, reduction="none")
     elif metric_name == PEARSONR:
-        return torchmetrics.PearsonCorrCoef(), MAX, None
+        return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
-        return torchmetrics.SpearmanCorrCoef(), MAX, None
+        return torchmetrics.SpearmanCorrCoef(), None
     else:
-        warnings.warn(f"Currently, we cannot convert the metric: {metric_name} to a metric supported in torchmetrics. "
-                      f"Thus, we will fall-back to use accuracy for multi-class classification problems "
-                      f", ROC-AUC for binary classification problem, and MSE for regression problems.", UserWarning)
-        if problem_type == REGRESSION:
-            return torchmetrics.MeanSquaredError(squared=False), MIN, None
-        elif problem_type == MULTICLASS:
-            return torchmetrics.Accuracy(), MAX, None
-        elif problem_type == BINARY:
-            return torchmetrics.AUROC(pos_label=pos_label), MAX, None
-        else:
-            raise ValueError(f'The problem_type={problem_type} is currently not supported')
+        raise ValueError(f"Unknown metric {metric_name}")
 
 
 def get_optimizer(

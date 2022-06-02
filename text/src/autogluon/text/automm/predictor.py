@@ -49,7 +49,6 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_config,
-    get_general_hyperparameters,
     LogFilter,
     apply_log_filter,
     save_pretrained_models,
@@ -162,6 +161,7 @@ class AutoMMPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
+        self._minmax_mode = None
         self._output_shape = None
         self._save_path = path
         self._ckpt_path = None
@@ -316,15 +316,6 @@ class AutoMMPredictor:
         
         pl.seed_everything(seed, workers=True)
 
-        # Generate config to gain general info. Hyperparameter specific config will override this config in `_fit()`
-        if self._config is not None:  # continuous training
-            config = self._config
-            
-        config = get_config(
-            config=config,
-            overrides=get_general_hyperparameters(hyperparameters),
-        )
-
         if self._resume or save_path is None:
             save_path = self._save_path
         else:
@@ -386,38 +377,16 @@ class AutoMMPredictor:
             assert self._output_shape == output_shape, \
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
-                
-        if self._df_preprocessor is None:
-            df_preprocessor = init_df_preprocessor(
-                config=config.data,
-                column_types=column_types,
-                label_column=self._label_column,
-                train_df_x=train_data.drop(columns=self._label_column),
-                train_df_y=train_data[self._label_column],
-            )
-        else:  # continuing training
-            df_preprocessor = self._df_preprocessor
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
-            validation_metric_name, eval_metric_name = infer_metrics(
+            validation_metric_name, eval_metric_name, minmax_mode = infer_metrics(
                 problem_type=problem_type,
                 eval_metric_name=self._eval_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
-
-        pos_label = try_to_infer_pos_label(
-            data_config=config.data,
-            label_encoder=df_preprocessor.label_generator,
-            problem_type=problem_type,
-        )
-        validation_metric, minmax_mode, custom_metric_func = get_metric(
-            metric_name=validation_metric_name,
-            problem_type=problem_type,
-            num_classes=output_shape,
-            pos_label=pos_label,
-        )
+            minmax_mode = self._minmax_mode
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -426,18 +395,16 @@ class AutoMMPredictor:
         self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
+        self._minmax_mode = minmax_mode
         self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
-        self._df_preprocessor = df_preprocessor
         
 
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
-            validation_metric=validation_metric,
             validation_metric_name=validation_metric_name,
-            custom_metric_func=custom_metric_func,
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=os.path.abspath(save_path) if hyperparameter_tune_kwargs is not None else save_path,
@@ -540,7 +507,7 @@ class AutoMMPredictor:
             # move trial predictor one level up
             contents = os.listdir(best_trial_path)
             for content in contents:
-                shutil.move(os.path.join(best_trial_path, content), save_path)
+                shutil.move(os.path.join(best_trial_path, content), os.path.join(save_path, content))
             shutil.rmtree(best_trial_path)
             predictor._save_path = save_path
             
@@ -662,9 +629,7 @@ class AutoMMPredictor:
             self,
             train_df: pd.DataFrame,
             val_df: pd.DataFrame,
-            validation_metric: torchmetrics.Metric,
             validation_metric_name: str,
-            custom_metric_func: Callable,
             minmax_mode: str,
             max_time: timedelta,
             save_path: str,
@@ -688,7 +653,17 @@ class AutoMMPredictor:
                 overrides=hyperparameters,
             )
 
-        df_preprocessor = self._df_preprocessor
+        if self._df_preprocessor is None:
+            df_preprocessor = init_df_preprocessor(
+                config=config.data,
+                column_types=self._column_types,
+                label_column=self._label_column,
+                train_df_x=train_df.drop(columns=self._label_column),
+                train_df_y=train_df[self._label_column],
+            )
+        else:  # continuing training
+            df_preprocessor = self._df_preprocessor
+
         config = select_model(
             config=config,
             df_preprocessor=df_preprocessor
@@ -715,6 +690,18 @@ class AutoMMPredictor:
         else:  # continuing training
             model = self._model
             
+        pos_label = try_to_infer_pos_label(
+            data_config=config.data,
+            label_encoder=df_preprocessor.label_generator,
+            problem_type=self._problem_type,
+        )
+        validation_metric, custom_metric_func = get_metric(
+            metric_name=validation_metric_name,
+            problem_type=self._problem_type,
+            num_classes=self._output_shape,
+            pos_label=pos_label,
+        )
+            
         mixup_active, mixup_fn = get_mixup(model_config=OmegaConf.select(config,'model'),
                                      mixup_config=OmegaConf.select(config,'data.mixup'),
                                      num_classes=self._output_shape,
@@ -727,6 +714,7 @@ class AutoMMPredictor:
         loss_func = get_loss_func(self._problem_type, mixup_active)
             
         self._config = config
+        self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
         self.mixup_fn = mixup_fn

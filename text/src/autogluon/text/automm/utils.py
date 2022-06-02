@@ -38,7 +38,9 @@ from .data import (
     MixupModule,
 )
 from .constants import (
-    ACCURACY, RMSE, R2, PEARSONR, SPEARMANR, ALL_MODALITIES,
+    ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, 
+    R2, QUADRATIC_KAPPA, CROSS_ENTROPY,
+    PEARSONR, SPEARMANR, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
@@ -46,6 +48,7 @@ from .constants import (
     CATEGORICAL_MLP, FUSION_MLP, NUMERICAL_TRANSFORMER,
     CATEGORICAL_TRANSFORMER, FUSION_TRANSFORMER,
     ROC_AUC, AVERAGE_PRECISION, LOG_LOSS,
+    MAX, MIN
 )
 from .presets import (
     list_model_presets,
@@ -86,13 +89,39 @@ def infer_metrics(
         Name of validation metric.
     eval_metric_name
         Name of evaluation metric.
+    mode
+        The min/max mode used in selecting model checkpoints.
+        - min
+             Its means that smaller metric is better.
+        - max
+            It means that larger metric is better.
     """
+    metric_mode_map = {
+        ACC: MAX,
+        ACCURACY: MAX,
+        RMSE: MIN,
+        ROOT_MEAN_SQUARED_ERROR: MIN,
+        R2: MAX,
+        QUADRATIC_KAPPA: MAX,
+        ROC_AUC: MAX,
+        LOG_LOSS: MIN,
+        CROSS_ENTROPY: MIN,
+        PEARSONR: MAX,
+        SPEARMANR: MAX,
+    }
     if eval_metric_name is not None:
-        validation_metric_name = eval_metric_name
-        return validation_metric_name, eval_metric_name
+        if eval_metric_name in metric_mode_map:
+            validation_metric_name = eval_metric_name
+            mode = metric_mode_map.get(eval_metric_name)
+            return validation_metric_name, eval_metric_name, mode
+        warnings.warn(f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
+                      f"Thus, we will fall-back to use accuracy for multi-class classification problems "
+                      f", ROC-AUC for binary classification problem, and MSE for regression problems.", UserWarning)
 
-    if problem_type in [MULTICLASS, BINARY]:
+    if problem_type == MULTICLASS:
         eval_metric_name = ACCURACY
+    elif problem_type == BINARY:
+        eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
         eval_metric_name = RMSE
     else:
@@ -101,25 +130,9 @@ def infer_metrics(
         )
 
     validation_metric_name = eval_metric_name
+    mode = metric_mode_map.get(eval_metric_name)
 
-    return validation_metric_name, eval_metric_name
-
-
-def get_general_hyperparameters(hyperparameters: Optional[Union[dict, DictConfig]]):
-    """
-    Get hyperparameters that are not search space
-    """
-    if hyperparameters is None:
-        return None
-    hyperparameters = copy.deepcopy(hyperparameters)
-    hyperparameters = parse_dotlist_conf(hyperparameters)  # convert to a dict
-    from autogluon.core.space import Space
-    from ray.tune.sample import Domain
-    general_hyperparameters = {}
-    for key, value in hyperparameters.items():
-        if not isinstance(value, (Space, Domain)):
-            general_hyperparameters[key] = value
-    return general_hyperparameters
+    return validation_metric_name, eval_metric_name, mode
     
 
 def get_config(
