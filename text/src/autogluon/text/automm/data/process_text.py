@@ -50,7 +50,6 @@ class TextProcessor:
     def __init__(
             self,
             prefix: str,
-            train_augment_types: List[str],
             checkpoint_name: str,
             text_column_names: List[str],
             tokenizer_name: Optional[str] = "hf_auto",
@@ -59,7 +58,8 @@ class TextProcessor:
             text_segment_num: Optional[int] = 1,
             stochastic_chunk: Optional[bool] = False,
             requires_column_info: bool = False,
-            text_detection_length: int = 5,
+            text_detection_length: Optional[int] = None,
+            train_augment_types: List[str] = [],
     ):
         """
         Parameters
@@ -94,8 +94,6 @@ class TextProcessor:
             tokenizer_name=tokenizer_name,
             checkpoint_name=checkpoint_name,
         )
-        self.train_augment_types = train_augment_types
-        logger.debug(f"text train augment type: {train_augment_types}")
         if hasattr(self.tokenizer, 'deprecation_warnings'):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
             # See https://github.com/huggingface/transformers/blob/6ac77534bfe97c00e0127bb4fc846ae0faf1c9c5/src/transformers/tokenization_utils_base.py#L3362
@@ -142,8 +140,10 @@ class TextProcessor:
         self.stochastic_chunk = stochastic_chunk
 
         #construct augmentor
-        self.train_augmenter = self.construct_augmenter(self.train_augment_types)
+        self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
+        self.train_augmenter = self.construct_augmenter(train_augment_types)
+        print("===================self.train_augmenter",  self.train_augmenter)
        
     @property
     def text_token_ids_key(self):
@@ -202,10 +202,11 @@ class TextProcessor:
         A nlpaug sequantial flow.
         
         """
-        if(augment_types is None):
-            return naf.Sequential()
-        auglist = []
+        print("---------------------!!!!",augment_types)
+        if(augment_types is None or len(augment_types) == 0):
+            return None
 
+        auglist = []
         try:
             nltk.data.find('tagger/averaged_perceptron_tagger')
         except LookupError:
@@ -335,10 +336,17 @@ class TextProcessor:
             "Token indices sequence length is longer than.*result in indexing errors"
         )
         for col_name, col_text in text.items():
-            # augment text if specify in config
-            if (is_training and (len(col_text.split(' ')) >= self.text_detection_length)):
-                 # naive way detect text/categorical/numerical
-                col_text = self.train_augmenter.augment(col_text)
+
+            #if training
+            if(is_training):
+
+                #if augment
+                if( self.train_augmenter is not None  ):
+                
+                # naive way to detect categorical/numerical text:
+                    if(len(col_text.split(' ')) >= self.text_detection_length):
+                        col_text = self.train_augmenter.augment(col_text)
+
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,

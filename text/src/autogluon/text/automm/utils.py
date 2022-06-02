@@ -501,14 +501,14 @@ def init_data_processors(
                     TextProcessor(
                         prefix=model_name,
                         tokenizer_name=model_config.tokenizer_name,
-                        train_augment_types=model_config.train_augment_types,
                         checkpoint_name=model_config.checkpoint_name,
                         text_column_names=df_preprocessor.text_feature_names,
                         max_len=model_config.max_text_len,
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length = model_config.text_detection_length
+                        text_detection_length = OmegaConf.select(model_config, "text_detection_length"),
+                        train_augment_types= OmegaConf.select(model_config, "train_augment_types")
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -822,7 +822,6 @@ def load_text_tokenizers(
                 checkpoint_name=per_path)
             per_text_processor.train_augmenter = per_text_processor.construct_augmenter(
                 augment_types= per_text_processor.train_augment_types)
-
     return text_processors
 
 
