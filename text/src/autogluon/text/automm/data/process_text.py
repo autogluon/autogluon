@@ -5,6 +5,7 @@ from typing import Optional, List, Any, Dict
 import numpy as np
 from nptyping import NDArray
 import warnings
+import nltk
 from transformers import (
     BertTokenizer,
     CLIPTokenizer,
@@ -183,9 +184,9 @@ class TextProcessor:
         )
 
         return fn
-
+        
+    @staticmethod
     def construct_augmenter(
-            self,
             augment_types: List[str],
     ) -> naf.Sometimes:
         """

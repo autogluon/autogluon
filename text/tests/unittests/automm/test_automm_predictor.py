@@ -439,7 +439,9 @@ def test_model_configs():
                     'max_text_len': 512, 
                     'insert_sep': True, 
                     'text_segment_num': 2, 
-                    'stochastic_chunk': False
+                    'stochastic_chunk': False,
+                    'text_detection_length': 10,
+                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
                 }, 
                 'timm_image': {
                     'checkpoint_name': 'swin_base_patch4_window7_224', 
@@ -463,7 +465,9 @@ def test_model_configs():
                     'max_text_len': 77, 
                     'insert_sep': False, 
                     'text_segment_num': 1, 
-                    'stochastic_chunk': False
+                    'stochastic_chunk': False,
+                    'text_detection_length': 10,
+                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
                 }, 
                 'fusion_transformer': {
                     'hidden_size': 192, 
