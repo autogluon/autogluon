@@ -1455,6 +1455,7 @@ class AutoMMPredictor:
                     "problem_type": self._problem_type,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
+                    "minmax_mode": self._minmax_mode,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
@@ -1520,6 +1521,7 @@ class AutoMMPredictor:
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
         predictor._eval_metric_name = assets["eval_metric_name"]
+        predictor._minmax_mode = assets["minmax_mode"]
         predictor._verbosity = verbosity
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
