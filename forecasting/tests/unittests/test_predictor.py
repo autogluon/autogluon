@@ -110,16 +110,17 @@ def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(
 def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters, quantile_kwarg_name
 ):
-    predictor = ForecastingPredictor(
+    predictor_init_kwargs = dict(
         path=temp_model_path, eval_metric="MAPE", prediction_length=3
     )
-    predictor_fit_kwargs = dict(
+    predictor_init_kwargs[quantile_kwarg_name] = [0.1, 0.4, 0.9]
+    predictor = ForecastingPredictor(**predictor_init_kwargs)
+
+    predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
+        tuning_data=DUMMY_TS_DATAFRAME,
     )
-    predictor_fit_kwargs[quantile_kwarg_name] = [0.1, 0.4, 0.9]
-    predictor.fit(**predictor_fit_kwargs)
     predictions = predictor.predict(DUMMY_TS_DATAFRAME)
 
     assert tuple(predictions.columns) == ("mean", "0.1", "0.4", "0.9")

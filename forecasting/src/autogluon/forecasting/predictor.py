@@ -58,6 +58,10 @@ class ForecastingPredictor:
         The forecast horizon, i.e., How many time points into the future forecasters should be trained to predict.
         For example, if our time series contain daily observations, setting `prediction_length=3` will train
         models that predict up to 3 days in the future from the most recent observation.
+    quantile_levels: List[float], default = None
+        List of increasing decimals that specifies which quantiles should be estimated
+        when making distributional forecasts. Can alternatively be provided with the keyword
+        argument `quantiles`. If None, defaults to [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].
 
     Other Parameters
     ----------------
@@ -85,6 +89,7 @@ class ForecastingPredictor:
         path: Optional[str] = None,
         verbosity: int = 2,
         prediction_length: int = 1,
+        quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -92,11 +97,14 @@ class ForecastingPredictor:
         self.path = setup_outputdir(path)
         self.target = target
 
-        learner_type = kwargs.pop("learner_type", ForecastingLearner)
-        learner_kwargs = kwargs.pop("learner_kwargs", dict())
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
+        self.quantile_levels = quantile_levels or kwargs.get(
+            "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        )
 
+        learner_type = kwargs.pop("learner_type", ForecastingLearner)
+        learner_kwargs = kwargs.pop("learner_kwargs", dict())
         learner_kwargs = learner_kwargs.copy()
         learner_kwargs.update(
             dict(
@@ -104,6 +112,7 @@ class ForecastingPredictor:
                 eval_metric=eval_metric,
                 target=self.target,
                 prediction_length=self.prediction_length,
+                quantile_levels=self.quantile_levels,
             )
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
@@ -168,13 +177,6 @@ class ForecastingPredictor:
         hyperparameter_tune_kwargs: str or dict, default = None
             # TODO
 
-        Other Parameters
-        ----------------
-        quantile_levels: List[float], default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-            List of increasing decimals that specifies which quantiles should be estimated
-            when making distributional forecasts. Can alternatively be provided with the keyword
-            argument `quantiles`.
-
         References
         ----------
             - DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html
@@ -230,12 +232,6 @@ class ForecastingPredictor:
                 slice(None, -self.prediction_length)
             )
 
-        quantile_levels = kwargs.get(
-            "quantile_levels",
-            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
-        )
-        logger.info(f"All models will be trained for quantiles {quantile_levels}.")
-
         scheduler_options = self._get_scheduler_options(
             hyperparameter_tune_kwargs, time_limit=time_limit
         )
@@ -248,7 +244,6 @@ class ForecastingPredictor:
             scheduler_options=scheduler_options,
             hyperparameters=hyperparameters,
             hyperparameter_tune=all(scheduler_options),
-            quantile_levels=quantile_levels,
             time_limit=time_left,
         )
 

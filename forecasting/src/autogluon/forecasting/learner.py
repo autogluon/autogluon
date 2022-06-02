@@ -31,12 +31,17 @@ class ForecastingLearner(AbstractLearner):
         trainer_type: Type[AbstractForecastingTrainer] = AutoForecastingTrainer,
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
+        **kwargs,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
         self.eval_metric: str = check_get_evaluation_metric(eval_metric)
         self.trainer_type = trainer_type
         self.target = target
         self.prediction_length = prediction_length
+        self.quantile_levels = kwargs.get(
+            "quantile_levels",
+            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
+        )
         logger.info(f"Learner random seed set to {random_state}")
 
     def load_trainer(self) -> AbstractForecastingTrainer:
@@ -86,6 +91,7 @@ class ForecastingLearner(AbstractLearner):
                 eval_metric=self.eval_metric,
                 scheduler_options=scheduler_options,
                 target=self.target,
+                quantile_levels=self.quantile_levels,
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
