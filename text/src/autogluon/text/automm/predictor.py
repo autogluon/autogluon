@@ -642,16 +642,13 @@ class AutoMMPredictor:
             hpo_mode: bool = False,
             **hpo_kwargs
     ):
-        if self._config is None:
-            config = get_config(
-                config=config,
-                overrides=hyperparameters,
-            )
-        else:  # continuing training
-            config = get_config(
-                config=self._config,
-                overrides=hyperparameters,
-            )
+        if self._config is not None:  # continuous training
+            config = self._config
+
+        config = get_config(
+            config=config,
+            overrides=hyperparameters,
+        )
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
