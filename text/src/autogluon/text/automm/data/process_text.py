@@ -41,6 +41,60 @@ ALL_TOKENIZERS = {
 }
 
 
+def construct_augmenter(
+        augment_types: List[str],
+) -> naf.Sometimes:
+    """
+    Build up a text augmentor from the provided list of augmentation types
+    
+    Parameters
+    ----------
+    augment_types
+        A list of text augment types.
+
+    Returns
+    -------
+    A nlpaug sequantial flow.
+    
+    """
+    print("---------------------!!!!",augment_types)
+    if(augment_types is None or len(augment_types) == 0):
+        return None
+
+    auglist = []
+    try:
+        nltk.data.find('tagger/averaged_perceptron_tagger')
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger')
+    for aug_type in augment_types:
+        if '(' in aug_type:
+            trans_mode = aug_type[0:aug_type.find('(')]
+            kwargs = ast.literal_eval(aug_type[aug_type.find('('):])
+        else:
+            trans_mode = aug_type
+            kwargs = {}
+        if trans_mode == "synonym_replacement": 
+            kwargs['aug_src'] = 'wordnet'
+            try:
+                nltk.data.find('corpora/wordnet')
+            except LookupError:
+                nltk.download('wordnet')
+            try:
+                nltk.data.find('corpora/omw-1.4')
+            except LookupError:
+                nltk.download('omw-1.4')
+            auglist.append(naw.SynonymAug(**kwargs))
+        elif trans_mode == "random_swap":
+            kwargs['action'] = 'swap'
+            auglist.append(naw.RandomWordAug(**kwargs))
+        elif trans_mode == "random_delete" :
+            kwargs['action'] = 'delete'
+            auglist.append(naw.RandomWordAug(**kwargs))
+        else:
+            raise ValueError(f"unknown transform type: {trans_mode}")
+    return naf.Sometimes(auglist, aug_p = 0.5)
+
+
 class TextProcessor:
     """
     Prepare text data for the model specified by "prefix". For multiple models requiring text data,
@@ -142,7 +196,7 @@ class TextProcessor:
         #construct augmentor
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
-        self.train_augmenter = self.construct_augmenter(train_augment_types)
+        self.train_augmenter = construct_augmenter(self.train_augment_types)
        
     @property
     def text_token_ids_key(self):
@@ -183,60 +237,6 @@ class TextProcessor:
         )
 
         return fn
-
-    def construct_augmenter(
-            augment_types: List[str],
-    ) -> naf.Sometimes:
-        """
-        Build up a text augmentor from the provided list of augmentation types
-        
-        Parameters
-        ----------
-        augment_types
-            A list of text augment types.
-
-        Returns
-        -------
-        A nlpaug sequantial flow.
-        
-        """
-        print("---------------------!!!!",augment_types)
-        if(augment_types is None or len(augment_types) == 0):
-            return None
-
-        auglist = []
-        try:
-            nltk.data.find('tagger/averaged_perceptron_tagger')
-        except LookupError:
-            nltk.download('averaged_perceptron_tagger')
-
-        for aug_type in augment_types:
-            if '(' in aug_type:
-                trans_mode = aug_type[0:aug_type.find('(')]
-                kwargs = ast.literal_eval(aug_type[aug_type.find('('):])
-            else:
-                trans_mode = aug_type
-                kwargs = {}
-            if trans_mode == "synonym_replacement": 
-                kwargs['aug_src'] = 'wordnet'
-                try:
-                    nltk.data.find('corpora/wordnet')
-                except LookupError:
-                    nltk.download('wordnet')
-                try:
-                    nltk.data.find('corpora/omw-1.4')
-                except LookupError:
-                    nltk.download('omw-1.4')
-                auglist.append(naw.SynonymAug(**kwargs))
-            elif trans_mode == "random_swap":
-                kwargs['action'] = 'swap'
-                auglist.append(naw.RandomWordAug(**kwargs))
-            elif trans_mode == "random_delete" :
-                kwargs['action'] = 'delete'
-                auglist.append(naw.RandomWordAug(**kwargs))
-            else:
-                raise ValueError(f"unknown transform type: {trans_mode}")
-        return naf.Sometimes(auglist, aug_p = 0.5)
 
     def build_one_token_sequence(
             self,
@@ -479,16 +479,14 @@ class TextProcessor:
         }
         return self.build_one_token_sequence_from_text(per_sample_text, is_training)
 
-    #nlpaug couldn't be serialize, so not saving augmenter for now
     def __deepcopy__(self, memo):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         
         for k, v in self.__dict__.items():
-
             if(k!="train_augmenter"):
                 setattr(result, k, deepcopy(v, memo))
-            else:
-                result.train_augmenter = self.construct_augmenter(result.train_augment_types)
+        # manual recontruct augmenter
+        result.train_augmenter = construct_augmenter(result.train_augment_types)
         return result

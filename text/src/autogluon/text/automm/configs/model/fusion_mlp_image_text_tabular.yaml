@@ -65,7 +65,7 @@ model:
     text_detection_length: 10
     train_augment_types:
       # example
-      - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
+      # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
       # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
       # - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
   timm_image:
@@ -104,7 +104,7 @@ model:
     text_detection_length: 10
     train_augment_types:
       # example
-      - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
+      # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
       # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
       # - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
   fusion_mlp:
