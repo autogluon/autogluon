@@ -46,7 +46,7 @@ model:
     ffn_dropout: 0.1
     normalization: "layer_norm"
     ffn_activation: "reglu"
-    head_activation: "relu" 
+    head_activation: "relu"
     data_types:
       - "numerical"
     embedding_arch:
@@ -62,6 +62,9 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
+    adaptation: null # Select from options: Lora
+    lora_r: 8 #TODO: Hacky way of changing LoRA hyperparameter. Seperate config file for all adaptation approaches (e.g.. adapters, LoRA...)?
+    lora_alpha: 8
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
@@ -111,9 +114,9 @@ model:
     adapt_in_features: "max"
     attention_dropout: 0.2
     residual_dropout: 0.0
-    ffn_dropout: 0.1 
-    ffn_d_hidden: 192 
+    ffn_dropout: 0.1
+    ffn_d_hidden: 192
     normalization: "layer_norm"
     ffn_activation: "geglu"
-    head_activation: "relu" 
+    head_activation: "relu"
     data_types:
