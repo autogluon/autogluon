@@ -442,6 +442,9 @@ class AutoMMPredictor:
         mode = _fit_args.get('minmax_mode')
         save_path = _fit_args.get('save_path')
         time_budget_s = _fit_args.get('max_time')
+        is_distill = False
+        if _fit_args.get('teacher_predictor', None) is not  None:
+            is_distill = True
         try:
             analysis = run(
                 trainable=self._hpo_fit_wrapper,
@@ -505,7 +508,7 @@ class AutoMMPredictor:
                 save_path=best_trial_path,
                 last_ckpt_path=last_ckpt_path,
                 minmax_mode=mode,
-                is_distill=False,
+                is_distill=is_distill,
                 top_k_average_method=predictor._config.optimization.top_k_average_method,
                 val_df=_fit_args['val_df'],
                 validation_metric_name=predictor._validation_metric_name,
