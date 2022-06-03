@@ -698,14 +698,17 @@ class AutoMMPredictor:
             pos_label=pos_label,
         )
             
-        mixup_active, mixup_fn = get_mixup(model_config=OmegaConf.select(config,'model'),
-                                     mixup_config=OmegaConf.select(config,'data.mixup'),
-                                     num_classes=self._output_shape,
+        mixup_active, mixup_fn = get_mixup(
+            model_config=OmegaConf.select(config,'model'),
+            mixup_config=OmegaConf.select(config,'data.mixup'),
+            num_classes=self._output_shape,
         )
         if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
-            warnings.warn("The mixup is done on the batch."
-                          "The per_gpu_batch_size should be >1 and even for reasonable operation",
-                          UserWarning)
+            warnings.warn(
+                "The mixup is done on the batch."
+                "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                UserWarning
+            )
 
         loss_func = get_loss_func(self._problem_type, mixup_active)
             
@@ -713,7 +716,6 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
-        self.mixup_fn = mixup_fn
         
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path)
@@ -1510,12 +1512,6 @@ class AutoMMPredictor:
                 df_preprocessor=df_preprocessor,
             )
 
-        # predictor = AutoMMPredictor(
-        #     label=assets["label_column"],
-        #     problem_type=assets["problem_type"],
-        #     eval_metric=assets["eval_metric_name"],
-        #     verbosity=verbosity,
-        # )
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
         predictor._eval_metric_name = assets["eval_metric_name"]

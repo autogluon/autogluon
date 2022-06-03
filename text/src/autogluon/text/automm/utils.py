@@ -65,15 +65,6 @@ def infer_metrics(
     Validation metric is for early-stopping and selecting the best model checkpoints.
     Evaluation metric is to report performance to users.
 
-    If the evaluation metric is provided, then we use it as the validation metric.
-    But there are some exceptions that validation metric is different from evaluation metric.
-    For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`
-    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1. Another example is
-    that `torchmetrics.AUROC` requires that both positive and negative examples are available in a mini-batch.
-    When training a large model, the per gpu batch size is probably small, leading to an incorrect
-    roc_auc score.
-
-
     Parameters
     ----------
     problem_type
@@ -94,7 +85,7 @@ def infer_metrics(
             return validation_metric_name, eval_metric_name
         warnings.warn(f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
                       f"Thus, we will fall-back to use accuracy for multi-class classification problems "
-                      f", ROC-AUC for binary classification problem, and MSE for regression problems.", UserWarning)
+                      f", ROC-AUC for binary classification problem, and RMSE for regression problems.", UserWarning)
 
     if problem_type == MULTICLASS:
         eval_metric_name = ACCURACY

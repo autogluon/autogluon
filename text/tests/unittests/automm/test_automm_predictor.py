@@ -1,10 +1,12 @@
 import os
 import shutil
-from omegaconf import OmegaConf
 import pytest
 import numpy.testing as npt
 import tempfile
 import copy
+
+from omegaconf import OmegaConf
+from ray import tune
 from torch import nn
 
 from autogluon.core.hpo.ray_hpo import searcher_presets, scheduler_presets
@@ -654,3 +656,4 @@ def test_hpo(searcher, scheduler):
     
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
+    
