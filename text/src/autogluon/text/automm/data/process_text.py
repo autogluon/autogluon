@@ -484,7 +484,7 @@ class TextProcessor:
         memo[id(self)] = result
 
         for k, v in self.__dict__.items():
-            if(k!="train_augmenter"):
+            if k!="train_augmenter":
                 setattr(result, k, deepcopy(v, memo))
         # manual recontruct augmenter
         result.train_augmenter = construct_augmenter(result.train_augment_types)
