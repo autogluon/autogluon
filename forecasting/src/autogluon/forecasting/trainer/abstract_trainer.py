@@ -126,17 +126,15 @@ class SimpleAbstractTrainer:
         return path, model_paths
 
     def save(self) -> None:
+        # todo: remove / revise low_memory logic
         models = self.models
         if self.low_memory:
             self.models = {}
         try:
             save_pkl.save(path=self.path_pkl, object=self)
         except:  # noqa
-            for model in self.models.values():
-                model.save()
             self.models = {}
             save_pkl.save(path=self.path_pkl, object=self)
-
         if not self.models:
             self.models = models
 
@@ -252,11 +250,10 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
         save_data: bool = True,
-        low_memory: bool = False,
         **kwargs,
     ):
         super().__init__(
-            path=path, save_data=save_data, low_memory=low_memory, **kwargs
+            path=path, save_data=save_data, low_memory=True, **kwargs
         )
 
         self.prediction_length = prediction_length
@@ -296,6 +293,16 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         train_data = self.load_train_data()
         val_data = self.load_val_data()
         return train_data, val_data
+
+    def save(self) -> None:
+        models = self.models
+        self.models = {}
+
+        save_pkl.save(path=self.path_pkl, object=self)
+        for model in self.models.values():
+            model.save()
+
+        self.models = models
 
     def _add_model(self, model: AbstractForecastingModel):
         # TODO: also register predict time
@@ -392,19 +399,17 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
                 )
 
             self.save_model(model=model)
-
         except Exception as err:
             logger.error(
                 f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
             )
             logger.error(f"\t\t{err}")
             logger.exception("Detailed Traceback:")
-            del model
         else:
             self._add_model(model=model)  # noqa: F821
             model_names_trained.append(model.name)  # noqa: F821
-            if self.low_memory:
-                del model
+        finally:
+            del model
 
         return model_names_trained
 
