@@ -147,6 +147,8 @@ class AutoMMPredictor:
             eval_metric = eval_metric.name
 
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2", "pearsonr", "spearmanr"]:
+            if problem_type == BINARY:
+                bce_regression_state = True
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
@@ -173,6 +175,8 @@ class AutoMMPredictor:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
+        self._mixup_fn = None
+        self._bce = bce_regression_state if bce_regression_state is not None else False
 
     @property
     def path(self):
@@ -423,7 +427,7 @@ class AutoMMPredictor:
                           "The per_gpu_batch_size should be >1 and even for reasonable operation",
                           UserWarning)
 
-        loss_func = get_loss_func(problem_type, mixup_active)
+        loss_func = get_loss_func(problem_type, mixup_active, self._bce)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -439,7 +443,7 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
-        self.mixup_fn = mixup_fn
+        self._mixup_fn = mixup_fn
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
@@ -490,7 +494,7 @@ class AutoMMPredictor:
             ckpt_path=self._ckpt_path,
             resume=self._resume,
             enable_progress_bar=self._enable_progress_bar,
-            mixup_fn=self.mixup_fn,
+            mixup_fn=self._mixup_fn,
         )
         return self
 
@@ -1032,6 +1036,13 @@ class AutoMMPredictor:
         prob = prob.detach().cpu().float().numpy()
         return prob
 
+    @staticmethod
+    def _logits_to_sigmoid(logits: torch.Tensor):
+        assert logits.ndim == 2
+        prob = torch.sigmoid(logits.float())
+        prob = prob.detach().cpu().float().numpy()
+        return prob
+
     def evaluate(
             self,
             data: Union[pd.DataFrame, dict, list],
@@ -1064,6 +1075,9 @@ class AutoMMPredictor:
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
             y_pred_prob = self._logits_to_prob(logits)
+            metric_data[Y_PRED_PROB] = y_pred_prob
+        if self._bce:
+            y_pred_prob = self._logits_to_sigmoid(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False)
