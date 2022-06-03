@@ -10,3 +10,15 @@ data:
     convert_to_text: False  # Whether to convert the feature to text.
     scaler_with_mean: True  # Whether to normalize with mean.
     scaler_with_std: True  # Whether to normalize with std.
+  pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
+  mixup:
+    turn_on: False # The total control of mixup.
+    mixup_alpha: 0.8  # Mixup alpha.
+    cutmix_alpha: 1.0  # Cutmix alpha.
+    cutmix_minmax:  #Cutmix min/max ratio, it will override cutmix alpha if set, a list/tuple with size two.
+    mixup_prob: 1.0  # The probability of conducting mixup/cutmix if enable.
+    mixup_switch_prob: 0.5  # The probability of switching mixup to cutmix if both enable.
+    mixup_mode: "batch"  # Perform mixup/cutmix on "batch" or "pair" or "elem".
+    mixup_off_epoch: 5 # The epoch when the mixup will be turned off.
+    label_smoothing: 0.1  # Label smoothing.
+

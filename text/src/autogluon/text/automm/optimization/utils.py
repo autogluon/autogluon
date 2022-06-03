@@ -17,9 +17,13 @@ from ..constants import (
     PEARSONR, SPEARMANR,
 )
 import warnings
+from .soft_target_crossentropy import SoftTargetCrossEntropy
 
 
-def get_loss_func(problem_type: str):
+def get_loss_func(
+        problem_type: str,
+        mixup_active: bool,
+):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
 
@@ -33,7 +37,10 @@ def get_loss_func(problem_type: str):
     A Pytorch loss module.
     """
     if problem_type in [BINARY, MULTICLASS]:
-        loss_func = nn.CrossEntropyLoss()
+        if mixup_active:
+            loss_func = SoftTargetCrossEntropy()
+        else:
+            loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
         loss_func = nn.MSELoss()
     else:
@@ -46,6 +53,7 @@ def get_metric(
         metric_name: str,
         problem_type: str,
         num_classes: Optional[int] = None,
+        pos_label: Optional[int] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -59,6 +67,8 @@ def get_metric(
         The type of the problem.
     num_classes
         Number of classes, used in the quadratic_kappa metric for binary classification.
+    pos_label
+        The label (0 or 1) of binary classification's positive class, which is used in some metrics, e.g., AUROC.
 
     Returns
     -------
@@ -84,9 +94,9 @@ def get_metric(
         return torchmetrics.CohenKappa(num_classes=num_classes,
                                        weights="quadratic"), MAX, None
     elif metric_name == ROC_AUC:
-        return torchmetrics.AUROC(), MAX, None
+        return torchmetrics.AUROC(pos_label=pos_label), MAX, None
     elif metric_name == AVERAGE_PRECISION:
-        return torchmetrics.AveragePrecision(), MAX, None
+        return torchmetrics.AveragePrecision(pos_label=pos_label), MAX, None
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
         return torchmetrics.MeanMetric(), MIN, \
                functools.partial(F.cross_entropy, reduction="none")
@@ -103,7 +113,7 @@ def get_metric(
         elif problem_type == MULTICLASS:
             return torchmetrics.Accuracy(), MAX, None
         elif problem_type == BINARY:
-            return torchmetrics.AUROC(), MAX, None
+            return torchmetrics.AUROC(pos_label=pos_label), MAX, None
         else:
             raise ValueError(f'The problem_type={problem_type} is currently not supported')
 

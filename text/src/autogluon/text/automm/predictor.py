@@ -37,6 +37,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from .data.mixup import MixupModule
 
 from .utils import (
     create_model,
@@ -56,6 +57,8 @@ from .utils import (
     modify_duplicate_model_names,
     assign_feature_column_names,
     turn_on_off_feature_column_info,
+    try_to_infer_pos_label,
+    get_mixup,
 )
 from .optimization.utils import (
     get_metric,
@@ -399,13 +402,28 @@ class AutoMMPredictor:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
 
+        pos_label = try_to_infer_pos_label(
+            data_config=config.data,
+            label_encoder=df_preprocessor.label_generator,
+            problem_type=problem_type,
+        )
         validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
             problem_type=problem_type,
             num_classes=output_shape,
+            pos_label=pos_label,
         )
 
-        loss_func = get_loss_func(problem_type)
+        mixup_active, mixup_fn = get_mixup(model_config=OmegaConf.select(config,'model'),
+                                     mixup_config=OmegaConf.select(config,'data.mixup'),
+                                     num_classes=output_shape,
+        )
+        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
+            warnings.warn("The mixup is done on the batch."
+                          "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                          UserWarning)
+
+        loss_func = get_loss_func(problem_type, mixup_active)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -421,6 +439,7 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
+        self.mixup_fn = mixup_fn
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
@@ -471,6 +490,7 @@ class AutoMMPredictor:
             ckpt_path=self._ckpt_path,
             resume=self._resume,
             enable_progress_bar=self._enable_progress_bar,
+            mixup_fn=self.mixup_fn,
         )
         return self
 
@@ -600,6 +620,7 @@ class AutoMMPredictor:
             ckpt_path: str,
             resume: bool,
             enable_progress_bar: bool,
+            mixup_fn: MixupModule,
     ):
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -651,6 +672,8 @@ class AutoMMPredictor:
                 model=model,
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, 'optimization.efficient_finetune'),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(config, 'data.mixup.mixup_off_epoch'),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1061,9 +1084,15 @@ class AutoMMPredictor:
                 raise ValueError(
                     f"Metric {per_metric} is only supported for binary classification."
                 )
+            pos_label = try_to_infer_pos_label(
+                data_config=self._config.data,
+                label_encoder=self._df_preprocessor.label_generator,
+                problem_type=self._problem_type,
+            )
             score = compute_score(
                 metric_data=metric_data,
                 metric_name=per_metric.lower(),
+                pos_label=pos_label,
             )
             results[per_metric] = score
 

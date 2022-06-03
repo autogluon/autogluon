@@ -122,10 +122,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # check if timeseries are irregularly sampled
         timedeltas = set()
         for item_id in df[ITEMID].unique():
-            timedeltas = timedeltas.union(df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:])
+            timedeltas = timedeltas.union(
+                df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:]
+            )
             if len(timedeltas) > 1:
-                raise ValueError(f"Only a single uniformly sampled period is allowed for time series"
-                                 f" data sets. Found {len(timedeltas)}")
+                raise ValueError(
+                    f"Only a single uniformly sampled period is allowed for time series"
+                    f" data sets. Found {len(timedeltas)}"
+                )
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
@@ -263,6 +267,52 @@ class TimeSeriesDataFrame(pd.DataFrame):
         data_before = self.loc[(slice(None, cutoff_item - 1), slice(None)), :]
         data_after = self.loc[(slice(cutoff_item, None), slice(None)), :]
         return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
+
+    def slice_by_timestep(self, time_step_slice: slice):
+        """Return a slice of time steps (with no regards to the actual timestamp) from within
+        each item in a time series data frame. For example, if a data frame is constructed as::
+
+            item_id  timestamp  target
+                  0 2019-01-01       0
+                  0 2019-01-02       1
+                  0 2019-01-03       2
+                  1 2019-01-02       3
+                  1 2019-01-03       4
+                  1 2019-01-04       5
+                  2 2019-01-03       6
+                  2 2019-01-04       7
+                  2 2019-01-05       8
+
+        then `df.slice_by_timestep(time_step_slice=slice(-2, None))` would return the last two
+        time steps from each item::
+
+            item_id  timestamp  target
+                  0 2019-01-02       1
+                  0 2019-01-03       2
+                  1 2019-01-03       4
+                  1 2019-01-04       5
+                  2 2019-01-04       7
+                  2 2019-01-05       8
+
+        Note that this function returns a copy of the original data. This function is useful for
+        constructing holdout sets for validation.
+
+        Parameters
+        ----------
+        time_step_slice: slice
+            A python slice object representing the slices to return from each item
+        """
+        slice_gen = (
+            (i, self.loc[i].iloc[time_step_slice]) for i in self.index.levels[0]
+        )
+        slices = []
+        for ix, data_slice in slice_gen:
+            idx = pd.MultiIndex.from_product(
+                [(ix,), data_slice.index], names=[ITEMID, TIMESTAMP]
+            )
+            data_slice.set_index(idx, inplace=True)
+            slices.append(data_slice)
+        return self.__class__(pd.concat(slices))
 
     def subsequence(
         self, start: pd.Timestamp, end: pd.Timestamp

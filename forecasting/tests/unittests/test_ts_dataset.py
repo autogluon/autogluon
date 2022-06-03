@@ -319,3 +319,94 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_rai
 
     with pytest.raises(ValueError, match="uniformly sampled"):
         TimeSeriesDataFrame.from_data_frame(df)
+
+
+SAMPLE_ITERABLE_2 = [
+    {"target": [0, 1, 2, 3], "start": pd.Timestamp("2019-01-01", freq="D")},
+    {"target": [3, 4, 5, 4], "start": pd.Timestamp("2019-01-02", freq="D")},
+    {"target": [6, 7, 8, 5], "start": pd.Timestamp("2019-01-03", freq="D")},
+]
+
+
+@pytest.mark.parametrize(
+    "input_iterable, slice, expected_times, expected_values",
+    [
+        (
+            SAMPLE_ITERABLE,
+            slice(None, 2),
+            [
+                "2019-01-01",
+                "2019-01-02",
+                "2019-01-01",
+                "2019-01-02",
+                "2019-01-01",
+                "2019-01-02",
+            ],
+            [0, 1, 3, 4, 6, 7],
+        ),
+        (
+            SAMPLE_ITERABLE,
+            slice(1, 2),
+            ["2019-01-02", "2019-01-02", "2019-01-02"],
+            [1, 4, 7],
+        ),
+        (
+            SAMPLE_ITERABLE_2,
+            slice(None, 2),
+            [
+                "2019-01-01",
+                "2019-01-02",
+                "2019-01-02",
+                "2019-01-03",
+                "2019-01-03",
+                "2019-01-04",
+            ],
+            [0, 1, 3, 4, 6, 7],
+        ),
+        (
+            SAMPLE_ITERABLE_2,
+            slice(-2, None),
+            [
+                "2019-01-03",
+                "2019-01-04",
+                "2019-01-04",
+                "2019-01-05",
+                "2019-01-05",
+                "2019-01-06",
+            ],
+            [2, 3, 5, 4, 8, 5],
+        ),
+        (
+            SAMPLE_ITERABLE_2,
+            slice(-1000, 2),
+            [
+                "2019-01-01",
+                "2019-01-02",
+                "2019-01-02",
+                "2019-01-03",
+                "2019-01-03",
+                "2019-01-04",
+            ],
+            [0, 1, 3, 4, 6, 7],
+        ),
+        (
+            SAMPLE_ITERABLE_2,
+            slice(1000, 1002),
+            [],
+            [],
+        ),
+    ],
+)
+def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
+    input_iterable, slice, expected_times, expected_values
+):
+    df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
+    dfv = df.slice_by_timestep(slice)
+
+    if not expected_times:
+        assert len(dfv) == 0
+
+    assert np.allclose(dfv["target"], expected_values)
+    assert isinstance(dfv, TimeSeriesDataFrame)
+
+    assert all(ixval[1] == pd.Timestamp(expected_times[i]) for i, ixval in enumerate(dfv.index.values))

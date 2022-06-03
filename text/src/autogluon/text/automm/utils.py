@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
+from sklearn.preprocessing import LabelEncoder
 from autogluon.core.metrics import get_metric
 
 from .models import (
@@ -34,6 +35,7 @@ from .data import (
     NumericalProcessor,
     LabelProcessor,
     MultiModalFeaturePreprocessor,
+    MixupModule,
 )
 from .constants import (
     ACCURACY, RMSE, R2, PEARSONR, SPEARMANR, ALL_MODALITIES,
@@ -903,6 +905,7 @@ def average_checkpoints(
 def compute_score(
         metric_data: dict,
         metric_name: str,
+        pos_label: Optional[int] = 1,
 ) -> float:
     """
     Use sklearn to compute the score of one metric.
@@ -914,6 +917,8 @@ def compute_score(
         The predicted class probabilities are required to compute the roc_auc score.
     metric_name
         The name of metric to compute.
+    pos_label
+        The encoded label (0 or 1) of binary classification's positive class.
 
     Returns
     -------
@@ -921,7 +926,7 @@ def compute_score(
     """
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, 1])
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
@@ -1222,3 +1227,93 @@ def turn_on_off_feature_column_info(
                 per_model_processor.requires_column_info = flag
 
     return data_processors
+
+def try_to_infer_pos_label(
+        data_config: DictConfig,
+        label_encoder: LabelEncoder,
+        problem_type: str,
+):
+    """
+    Try to infer positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
+    If positive class is not provided, then use pos_label=1 by default.
+    If the problem type is not binary classification, then return None.
+
+    Parameters
+    ----------
+    data_config
+        A DictConfig object containing only the data configurations.
+    label_encoder
+        The label encoder of classification tasks.
+    problem_type
+        Type of problem.
+
+    Returns
+    -------
+
+    """
+    if problem_type != BINARY:
+        return None
+
+    pos_label = OmegaConf.select(data_config, "pos_label", default=None)
+    if pos_label is not None:
+        print(f"pos_label: {pos_label}\n")
+        pos_label = label_encoder.transform([pos_label]).item()
+    else:
+        pos_label = 1
+
+    return pos_label
+
+
+def get_mixup(
+        model_config: DictConfig,
+        mixup_config: DictConfig,
+        num_classes: int,
+):
+    """
+    Get the mixup state for loss function choice.
+    Now the mixup can only support image data.
+    And the problem type can not support Regression.
+    Parameters
+    ----------
+    model_config
+        The model configs to find image model for the necessity of mixup.
+    mixup_config
+        The mixup configs for mixup and cutmix.
+    num_classes
+        The number of classes in the task. Class <= 1 will cause faults.
+
+    Returns
+    -------
+    The mixup is on or off.
+    """
+    model_active = False
+    names = model_config.names
+    if isinstance(names, str):
+        names = [names]
+    for model_name in names:
+        permodel_config = getattr(model_config, model_name)
+        if hasattr(permodel_config.data_types, IMAGE):
+            model_active = True
+            break
+
+    mixup_active = False
+    if mixup_config is not None and mixup_config.turn_on:
+        mixup_active = mixup_config.mixup_alpha > 0 or \
+                       mixup_config.cutmix_alpha > 0. or \
+                       mixup_config.cutmix_minmax is not None
+
+    mixup_state = model_active & mixup_active & (num_classes > 1)
+    mixup_fn = None
+    if mixup_state:
+        mixup_args = dict(
+            mixup_alpha=mixup_config.mixup_alpha,
+            cutmix_alpha=mixup_config.cutmix_alpha,
+            cutmix_minmax=mixup_config.cutmix_minmax,
+            prob=mixup_config.mixup_prob,
+            switch_prob=mixup_config.mixup_switch_prob,
+            mode=mixup_config.mixup_mode,
+            label_smoothing=mixup_config.label_smoothing,
+            num_classes=num_classes,
+        )
+        mixup_fn = MixupModule(**mixup_args)
+    return mixup_state, mixup_fn
