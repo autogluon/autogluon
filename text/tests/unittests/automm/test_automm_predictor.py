@@ -640,6 +640,8 @@ def test_hpo(searcher, scheduler):
     )
     
     save_path = os.path.join(get_home_dir(), 'hpo', f'_{searcher}', f'_{scheduler}')
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
 
     predictor = predictor.fit(
         train_data=dataset.train_df,
