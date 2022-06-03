@@ -162,7 +162,6 @@ class AutoMMPredictor:
         self._problem_type = problem_type.lower() if problem_type is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
-        self._minmax_mode = None
         self._output_shape = None
         self._save_path = path
         self._ckpt_path = None
