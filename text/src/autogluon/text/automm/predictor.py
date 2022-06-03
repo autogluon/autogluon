@@ -146,6 +146,7 @@ class AutoMMPredictor:
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
+        bce_regression_state = False
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2", "pearsonr", "spearmanr"]:
             if problem_type == BINARY:
                 bce_regression_state = True
@@ -176,7 +177,7 @@ class AutoMMPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._mixup_fn = None
-        self._bce = bce_regression_state if bce_regression_state is not None else False
+        self._bce = bce_regression_state
 
     @property
     def path(self):
