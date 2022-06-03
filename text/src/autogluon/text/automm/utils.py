@@ -38,17 +38,15 @@ from .data import (
     MixupModule,
 )
 from .constants import (
-    ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, 
-    R2, QUADRATIC_KAPPA, CROSS_ENTROPY,
-    PEARSONR, SPEARMANR, ALL_MODALITIES,
+    ACCURACY, RMSE, ALL_MODALITIES,
     IMAGE, TEXT, CATEGORICAL, NUMERICAL,
     LABEL, MULTICLASS, BINARY, REGRESSION,
     Y_PRED_PROB, Y_PRED, Y_TRUE, AUTOMM,
     CLIP, TIMM_IMAGE, HF_TEXT, NUMERICAL_MLP,
     CATEGORICAL_MLP, FUSION_MLP, NUMERICAL_TRANSFORMER,
     CATEGORICAL_TRANSFORMER, FUSION_TRANSFORMER,
-    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS,
-    MAX, MIN
+    ROC_AUC, AVERAGE_PRECISION, METRIC_MODE_MAP,
+    VALID_METRICS,
 )
 from .presets import (
     list_model_presets,
@@ -89,31 +87,11 @@ def infer_metrics(
         Name of validation metric.
     eval_metric_name
         Name of evaluation metric.
-    mode
-        The min/max mode used in selecting model checkpoints.
-        - min
-             Its means that smaller metric is better.
-        - max
-            It means that larger metric is better.
     """
-    metric_mode_map = {
-        ACC: MAX,
-        ACCURACY: MAX,
-        RMSE: MIN,
-        ROOT_MEAN_SQUARED_ERROR: MIN,
-        R2: MAX,
-        QUADRATIC_KAPPA: MAX,
-        ROC_AUC: MAX,
-        LOG_LOSS: MIN,
-        CROSS_ENTROPY: MIN,
-        PEARSONR: MAX,
-        SPEARMANR: MAX,
-    }
     if eval_metric_name is not None:
-        if eval_metric_name in metric_mode_map:
+        if eval_metric_name in VALID_METRICS:
             validation_metric_name = eval_metric_name
-            mode = metric_mode_map.get(eval_metric_name)
-            return validation_metric_name, eval_metric_name, mode
+            return validation_metric_name, eval_metric_name
         warnings.warn(f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
                       f"Thus, we will fall-back to use accuracy for multi-class classification problems "
                       f", ROC-AUC for binary classification problem, and MSE for regression problems.", UserWarning)
@@ -130,10 +108,32 @@ def infer_metrics(
         )
 
     validation_metric_name = eval_metric_name
-    mode = metric_mode_map.get(eval_metric_name)
 
-    return validation_metric_name, eval_metric_name, mode
+    return validation_metric_name, eval_metric_name
+
+
+def get_minmax_mode(metric_name: str):
+    """
+    Get minmax mode based on metric name
     
+    Parameters
+    ----------
+    metric_name
+        A string representing metric
+        
+    Returns
+    -------
+    mode
+        The min/max mode used in selecting model checkpoints.
+        - min
+             Its means that smaller metric is better.
+        - max
+            It means that larger metric is better.
+    """
+    assert metric_name in METRIC_MODE_MAP, f'{metric_name} is not a supported metric. Options are: {VALID_METRICS}'
+    return METRIC_MODE_MAP.get(metric_name)
+    
+
 
 def get_config(
         config: Union[dict, DictConfig],

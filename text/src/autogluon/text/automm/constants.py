@@ -42,6 +42,20 @@ ROC_AUC = "roc_auc"
 AVERAGE_PRECISION = "average_precision"
 LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
+METRIC_MODE_MAP = {
+    ACC: MAX,
+    ACCURACY: MAX,
+    RMSE: MIN,
+    ROOT_MEAN_SQUARED_ERROR: MIN,
+    R2: MAX,
+    QUADRATIC_KAPPA: MAX,
+    ROC_AUC: MAX,
+    LOG_LOSS: MIN,
+    CROSS_ENTROPY: MIN,
+    PEARSONR: MAX,
+    SPEARMANR: MAX,
+}
+VALID_METRICS = METRIC_MODE_MAP.keys()
 
 # Training status
 TRAIN = "train"

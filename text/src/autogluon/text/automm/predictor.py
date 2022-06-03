@@ -48,6 +48,7 @@ from .utils import (
     compute_score,
     average_checkpoints,
     infer_metrics,
+    get_minmax_mode,
     get_config,
     LogFilter,
     apply_log_filter,
@@ -379,14 +380,14 @@ class AutoMMPredictor:
                 f"the previous {self._output_shape}"
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
-            validation_metric_name, eval_metric_name, minmax_mode = infer_metrics(
+            validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
                 eval_metric_name=self._eval_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
-            minmax_mode = self._minmax_mode
+        minmax_mode = get_minmax_mode(validation_metric_name)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -395,7 +396,6 @@ class AutoMMPredictor:
         self._problem_type = problem_type  # In case problem type isn't provided in __init__().
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
-        self._minmax_mode = minmax_mode
         self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
@@ -1455,7 +1455,6 @@ class AutoMMPredictor:
                     "problem_type": self._problem_type,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
-                    "minmax_mode": self._minmax_mode,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained_path": self._pretrained_path,
@@ -1521,7 +1520,6 @@ class AutoMMPredictor:
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
         predictor._eval_metric_name = assets["eval_metric_name"]
-        predictor._minmax_mode = assets["minmax_mode"]
         predictor._verbosity = verbosity
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
