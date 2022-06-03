@@ -593,6 +593,9 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
+                adaptation=model_config.adaptation,
+                lora_r=model_config.lora_r,
+                lora_alpha=model_config.lora_alpha
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
@@ -745,11 +748,11 @@ def save_pretrained_models(
 def convert_checkpoint_name(
         config: DictConfig,
         path: str
-) -> DictConfig:  
+) -> DictConfig:
     """
     Convert the checkpoint name from relative path to absolute path for
     loading the pretrained weights in offline deployment.
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
 
     Parameters
     ----------
@@ -765,7 +768,7 @@ def convert_checkpoint_name(
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len('local://'):])
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'config.json')) # guarantee the existence of local configs
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'pytorch_model.bin'))
-                
+
     return config
 
 

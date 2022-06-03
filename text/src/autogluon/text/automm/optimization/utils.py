@@ -11,13 +11,14 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import (
-    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
+    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT, LORA, LORA_BIAS,
     ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
     ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
     PEARSONR, SPEARMANR,
 )
 import warnings
 from .soft_target_crossentropy import SoftTargetCrossEntropy
+from ..models.lora_layers import LoRALayer
 
 
 def get_loss_func(
@@ -399,7 +400,6 @@ def apply_two_stages_lr(
 
     return optimizer_grouped_parameters
 
-
 def apply_layerwise_lr_decay(
         model: nn.Module,
         lr: float,
@@ -436,6 +436,7 @@ def apply_layerwise_lr_decay(
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
     norm_param_names = get_norm_layer_param_names(model)
+
     for name, param in model.named_parameters():
         if efficient_finetune == BIT_FIT:
             # For bit_fit, we disable tuning everything except the bias terms
@@ -444,6 +445,14 @@ def apply_layerwise_lr_decay(
         elif efficient_finetune == NORM_FIT:
             # For norm-fit, we finetune all the normalization layers and bias layers
             if name not in norm_param_names and 'bias' not in name:
+                param.requires_grad = False
+        elif efficient_finetune == LORA:
+            # For LoRA adaptation we only fine-tune LoRA weights
+            if 'lora_' not in name:
+                param.requires_grad = False
+        elif efficient_finetune == LORA_BIAS:
+            # For LoRA adapation we fine-tune LoRA and all bias weights
+            if 'lora_' not in name and "bias" not in name:
                 param.requires_grad = False
 
         if not param.requires_grad:

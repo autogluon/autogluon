@@ -14,10 +14,22 @@ from .utils import (
     init_weights,
     get_column_features,
 )
-
+from .lora_layers import LoRALinear
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
+
+
+def replace_layers_with_lora(model, old, lora_r, lora_alpha):
+    for n, module in model.named_children():
+        if len(list(module.children())) > 0:
+            replace_layers_with_lora(module, old, lora_r, lora_alpha)
+
+        if old in n:
+            lora_layer = LoRALinear(module.in_features, module.out_features, r= lora_r, lora_alpha=lora_alpha, merge_weights=False)
+            lora_layer.weight = module.weight
+            lora_layer.bias = module.bias
+            setattr(model, n, lora_layer)
 
 
 class HFAutoModelForTextPrediction(nn.Module):
@@ -31,6 +43,10 @@ class HFAutoModelForTextPrediction(nn.Module):
             prefix: str,
             checkpoint_name: str = 'microsoft/deberta-v3-base',
             num_classes: Optional[int] = 0,
+            adaptation: str = None,
+            lora_r : int = 8,
+            lora_alpha: int = 8,
+            **kwargs
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -53,12 +69,23 @@ class HFAutoModelForTextPrediction(nn.Module):
                     - 'xlm-roberta-base'
         num_classes
             The number of classes. 1 for a regression task.
+        adaptation
+            Whether to adapt the pre-trained model. Currently supports: LoRA
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
         self.model = AutoModel.from_pretrained(checkpoint_name)
+        self.adaptation = adaptation
+        self.lora_r = lora_r
+        self.lora_alpha = lora_alpha
+
+        if self.adaptation == 'lora':
+            print('Applying LoRA adaptation to attention layers...')
+            replace_layers_with_lora(self.model, "query", self.lora_r, self.lora_alpha)
+            replace_layers_with_lora(self.model, "value", self.lora_r, self.lora_alpha)
+
         self.out_features = self.model.config.hidden_size
 
         self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
