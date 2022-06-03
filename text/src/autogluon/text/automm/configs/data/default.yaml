@@ -11,7 +11,7 @@ data:
     scaler_with_mean: True  # Whether to normalize with mean.
     scaler_with_std: True  # Whether to normalize with std.
   label:
-    numerical_label_preprocessing:  #The mode of label preprocessing for . Support "standardscaler" or "minmaxscaler" or null.
+    numerical_label_preprocessing:  # The mode of label preprocessing for . Support "standardscaler" or "minmaxscaler" or null.
   pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
   mixup:
     turn_on: False # The total control of mixup.

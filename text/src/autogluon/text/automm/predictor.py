@@ -419,8 +419,8 @@ class AutoMMPredictor:
         )
 
         mixup_active, mixup_fn = get_mixup(
-            model_config=OmegaConf.select(config,'model'),
-            mixup_config=OmegaConf.select(config,'data.mixup'),
+            model_config=OmegaConf.select(config, 'model'),
+            mixup_config=OmegaConf.select(config, 'data.mixup'),
             num_classes=output_shape,
         )
         if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
