@@ -1,7 +1,7 @@
 AutoGluon: AutoML for Text, Image, and Tabular Data
 ====================================================
 
-.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.4.1-blue
+.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.4.2-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
 .. |StableVersion| image:: https://img.shields.io/github/v/release/awslabs/autogluon?color=blue&label=stable%20release&sort=semver

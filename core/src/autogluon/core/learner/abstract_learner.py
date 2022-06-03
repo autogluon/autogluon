@@ -62,6 +62,10 @@ class AbstractLearner:
             path_context
         )
 
+    @property
+    def is_fit(self):
+        return self.trainer_path is not None or self.trainer is not None
+
     def fit(self, *args, **kwargs):
         raise NotImplementedError
 

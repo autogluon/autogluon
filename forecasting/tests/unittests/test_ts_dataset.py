@@ -407,4 +407,6 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
         assert len(dfv) == 0
 
     assert np.allclose(dfv["target"], expected_values)
-    assert all(ts == pd.Timestamp(expected_times[i]) for i, ts in enumerate(dfv.index))
+    assert isinstance(dfv, TimeSeriesDataFrame)
+
+    assert all(ixval[1] == pd.Timestamp(expected_times[i]) for i, ixval in enumerate(dfv.index.values))

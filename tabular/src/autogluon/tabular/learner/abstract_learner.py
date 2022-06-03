@@ -92,10 +92,6 @@ class AbstractTabularLearner(AbstractLearner):
         return self.label_cleaner.ordered_class_labels
 
     @property
-    def is_fit(self):
-        return self.trainer_path is not None or self.trainer is not None
-
-    @property
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
