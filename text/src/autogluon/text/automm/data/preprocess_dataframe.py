@@ -6,10 +6,12 @@ import collections
 from typing import Callable, Iterator, Union, Optional, List, Any, Dict
 from nptyping import NDArray
 from autogluon.features import CategoryFeatureGenerator
+from omegaconf import OmegaConf
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import (
     StandardScaler,
+    MinMaxScaler,
     LabelEncoder,
 )
 from sklearn.base import (
@@ -58,7 +60,18 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_generator = LabelEncoder()
         else:
             self._label_generator = label_generator
-        self._label_scaler = StandardScaler()  # Scaler used for numerical labels
+
+        # Scaler used for numerical labels
+        numerical_label_preprocessing = OmegaConf.select(config,"label.numerical_label_preprocessing")
+        if numerical_label_preprocessing == "minmaxscaler":
+            self._label_scaler = MinMaxScaler()
+        elif numerical_label_preprocessing == "standardscaler":
+            self._label_scaler = StandardScaler()
+        elif numerical_label_preprocessing is None:
+            self._label_scaler = StandardScaler(with_mean=False, with_std=False)
+        else:
+            raise ValueError(f'The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported')
+
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
