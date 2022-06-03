@@ -498,5 +498,3 @@ class TextProcessor:
     def __setstate__(self, state):
         self.__dict__ = state
         self.train_augmenter = construct_augmenter(state['rain_augment_types'])
-        
-        
