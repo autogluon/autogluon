@@ -30,7 +30,6 @@ from datasets import (
     HatefulMeMesDataset,
     AEDataset,
 )
-from ray import tune
 from utils import get_home_dir
 
 ALL_DATASETS = {

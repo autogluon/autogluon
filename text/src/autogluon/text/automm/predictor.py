@@ -32,7 +32,7 @@ from .constants import (
     Y_PRED_PROB, Y_TRUE, LOGITS, FEATURES, AUTOMM,
     AUTOMM_TUTORIAL_MODE, UNIFORM_SOUP, GREEDY_SOUP,
     BEST, MIN, MAX, TEXT, RAY_TUNE_CHECKPOINT,
-    BEST_K_MODELS_FILE,
+    BEST_K_MODELS_FILE, LAST_CHECKPOINT, MODEL_CHECKPOINT,
 )
 
 from .data.datamodule import BaseDataModule
@@ -958,7 +958,7 @@ class AutoMMPredictor:
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
             best_k_models = None
         if last_ckpt_path is None:
-            last_ckpt_path = os.path.join(save_path, "last.ckpt")
+            last_ckpt_path = os.path.join(save_path, LAST_CHECKPOINT)
         
         if is_distill:
             prefix = "student_model."
@@ -1044,7 +1044,7 @@ class AutoMMPredictor:
                 new_prefix="model",
             )
         checkpoint = {"state_dict": avg_state_dict}
-        torch.save(checkpoint, os.path.join(save_path, "model.ckpt"))
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
         # clean old checkpoints + the intermediate files stored
         for per_path in top_k_model_paths:
@@ -1568,8 +1568,8 @@ class AutoMMPredictor:
             pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
 
-        resume_ckpt_path = os.path.join(path, "last.ckpt")
-        final_ckpt_path = os.path.join(path, "model.ckpt")
+        resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
+        final_ckpt_path = os.path.join(path, MODEL_CHECKPOINT)
         if resume:  # resume training which crashed before
             if not os.path.isfile(resume_ckpt_path):
                 if os.path.isfile(final_ckpt_path):
@@ -1602,7 +1602,7 @@ class AutoMMPredictor:
                         f"Consider starting training from scratch."
                     )
             load_path = final_ckpt_path
-            logger.info(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
+            logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
             ckpt_path = None  # must set None since we do not resume training
 
         model = AutoMMPredictor._load_state_dict(

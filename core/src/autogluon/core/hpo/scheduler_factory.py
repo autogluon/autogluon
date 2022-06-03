@@ -34,4 +34,3 @@ class SchedulerFactory:
         init_args.update(user_init_args)
         
         return SchedulerFactory.scheduler_presets[scheduler_name](**init_args)
-        

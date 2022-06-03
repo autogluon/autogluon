@@ -31,4 +31,3 @@ class SearcherFactory:
         init_args.update(user_init_args)
         
         return SearcherFactory.searcher_presets[searcher_name](**init_args)
-        
