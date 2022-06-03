@@ -4,7 +4,7 @@ from typing import Type
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
-from ..abstract.abstract_forecasting_model import AbstractForecastingModelFactory
+from ..abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
     from gluonts.model.deepar import DeepAREstimator
@@ -169,7 +169,7 @@ class GenericGluonTSModel(AbstractGluonTSModel):
         return params_dict
 
 
-class GenericGluonTSModelFactory(AbstractForecastingModelFactory):
+class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
     """Factory class for GenericGluonTSModel for convenience of use"""
 
     def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):

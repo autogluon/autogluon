@@ -7,18 +7,18 @@ import pandas as pd
 from autogluon.core.learner import AbstractLearner
 
 from .dataset import TimeSeriesDataFrame
-from .models.abstract import AbstractForecastingModel
+from .models.abstract import AbstractTimeSeriesModel
 from .trainer import (
-    AutoForecastingTrainer,
-    AbstractForecastingTrainer,
+    AutoTimeSeriesTrainer,
+    AbstractTimeSeriesTrainer,
 )
 from .utils.metric_utils import check_get_evaluation_metric
 
 logger = logging.getLogger(__name__)
 
 
-class ForecastingLearner(AbstractLearner):
-    """ForecastingLearner encompasses a full time series learning problem for a
+class TimeSeriesLearner(AbstractLearner):
+    """TimeSeriesLearner encompasses a full time series learning problem for a
     training run, and keeps track of datasets, features, random seeds, and the
     trainer object.
     """
@@ -28,7 +28,7 @@ class ForecastingLearner(AbstractLearner):
         path_context: str,
         target: str = "target",
         random_state: int = 0,
-        trainer_type: Type[AbstractForecastingTrainer] = AutoForecastingTrainer,
+        trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
         **kwargs,
@@ -44,7 +44,7 @@ class ForecastingLearner(AbstractLearner):
         )
         logger.info(f"Learner random seed set to {random_state}")
 
-    def load_trainer(self) -> AbstractForecastingTrainer:
+    def load_trainer(self) -> AbstractTimeSeriesTrainer:
         """Return the trainer object corresponding to the learner."""
         return super().load_trainer()  # noqa
 
@@ -78,7 +78,7 @@ class ForecastingLearner(AbstractLearner):
         time_start = time.time()
 
         logger.debug(
-            "Beginning AutoGluon training with ForecastingLearner "
+            "Beginning AutoGluon training with TimeSeriesLearner "
             + (f"Time limit = {time_limit}" if time_limit else "")
         )
         logger.info(f"AutoGluon will save models to {self.path}")
@@ -109,19 +109,19 @@ class ForecastingLearner(AbstractLearner):
 
         self._time_fit_training = time.time() - time_start
         logger.info(
-            f"AutoGluon ForecastingLearner complete, total runtime = {round(self._time_fit_training, 2)}s",
+            f"AutoGluon TimeSeriesLearner complete, total runtime = {round(self._time_fit_training, 2)}s",
         )
 
     def predict(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[AbstractForecastingModel] = None,
+        model: Optional[AbstractTimeSeriesModel] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         return self.load_trainer().predict(data=data, model=model, **kwargs)
 
     def score(
-        self, data: TimeSeriesDataFrame, model: AbstractForecastingModel = None
+        self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None
     ) -> float:
         return self.load_trainer().score(data=data, model=model)
 

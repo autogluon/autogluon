@@ -1,3 +1,3 @@
-from .presets_configs import FORECASTING_PRESETS_CONFIGS
+from .presets_configs import TIMESERIES_PRESETS_CONFIGS
 
-__all__ = ["FORECASTING_PRESETS_CONFIGS"]
+__all__ = ["TIMESERIES_PRESETS_CONFIGS"]

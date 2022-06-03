@@ -12,16 +12,16 @@ from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 
-from .configs import FORECASTING_PRESETS_CONFIGS
+from .configs import TIMESERIES_PRESETS_CONFIGS
 from .dataset import TimeSeriesDataFrame
-from .learner import AbstractLearner, ForecastingLearner
-from .trainer import AbstractForecastingTrainer
+from .learner import AbstractLearner, TimeSeriesLearner
+from .trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
 
 
-class ForecastingPredictor:
-    """autogluon.timeseries's ForecastingPredictor predicts future values of multiple related time-series by fitting
+class TimeSeriesPredictor:
+    """autogluon.timeseries's TimeSeriesPredictor predicts future values of multiple related time-series by fitting
     global timeseries models.
 
     autogluon.timeseries provides probabilistic (distributional) forecasts for univariate time series, where the
@@ -65,8 +65,8 @@ class ForecastingPredictor:
 
     Other Parameters
     ----------------
-    learner_type : AbstractLearner, default = ForecastingLearner
-        A class which inherits from `AbstractLearner`. The learner specifies the inner logic of the ForecastingPredictor
+    learner_type : AbstractLearner, default = TimeSeriesLearner
+        A class which inherits from `AbstractLearner`. The learner specifies the inner logic of the TimeSeriesPredictor
         for training models and preprocessing data.
     learner_kwargs : dict, default = None
         Keyword arguments to send to the learner (for advanced users only). Options include `trainer_type`, a
@@ -103,7 +103,7 @@ class ForecastingPredictor:
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
 
-        learner_type = kwargs.pop("learner_type", ForecastingLearner)
+        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
         learner_kwargs = kwargs.pop("learner_kwargs", dict())
         learner_kwargs = learner_kwargs.copy()
         learner_kwargs.update(
@@ -119,10 +119,10 @@ class ForecastingPredictor:
         self._learner_type = type(self._learner)
 
     @property
-    def _trainer(self) -> AbstractForecastingTrainer:
+    def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
-    @apply_presets(FORECASTING_PRESETS_CONFIGS)
+    @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -132,7 +132,7 @@ class ForecastingPredictor:
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         **kwargs,
-    ) -> "ForecastingPredictor":
+    ) -> "TimeSeriesPredictor":
         """Fit models to predict (distributional) forecasts of multiple related time series
         based on historical observations.
 
@@ -300,7 +300,7 @@ class ForecastingPredictor:
             and scheduler_ngpus > 1
         ):
             logger.warning(
-                f"Warning: ForecastingPredictor currently doesn't use >1 GPU per training run. "
+                f"Warning: TimeSeriesPredictor currently doesn't use >1 GPU per training run. "
                 f"Detected {scheduler_ngpus} GPUs."
             )
         return scheduler_cls, scheduler_params
@@ -337,8 +337,8 @@ class ForecastingPredictor:
         return self.evaluate(data, **kwargs)
 
     @classmethod
-    def load(cls, path: str) -> "ForecastingPredictor":
-        """Load an existing ForecastingPredictor from output_directory."""
+    def load(cls, path: str) -> "TimeSeriesPredictor":
+        """Load an existing TimeSeriesPredictor from output_directory."""
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
         path = setup_outputdir(path, warn_if_exist=False)

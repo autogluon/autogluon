@@ -4,8 +4,8 @@ from typing import Union, Dict, List
 
 import autogluon.core as ag
 
-from .abstract import AbstractForecastingModel
-from .abstract.abstract_forecasting_model import AbstractForecastingModelFactory
+from .abstract import AbstractTimeSeriesModel
+from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .gluonts import (
     DeepARModel,
     MQCNNModel,
@@ -141,11 +141,11 @@ def get_preset_models(
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")
             model_type = MODEL_TYPES[model]
-        elif isinstance(model, AbstractForecastingModelFactory):
+        elif isinstance(model, AbstractTimeSeriesModelFactory):
             model_type = model
-        elif not issubclass(model, AbstractForecastingModel):
+        elif not issubclass(model, AbstractTimeSeriesModel):
             logger.warning(
-                f"Customized model {model} does not inherit from {AbstractForecastingModel}"
+                f"Customized model {model} does not inherit from {AbstractTimeSeriesModel}"
             )
             model_type = model
         else:

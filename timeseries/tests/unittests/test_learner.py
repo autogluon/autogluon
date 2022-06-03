@@ -8,7 +8,7 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.learner import ForecastingLearner
+from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 from autogluon.timeseries.models.presets import get_default_hps
@@ -23,13 +23,13 @@ TEST_HYPERPARAMETER_SETTINGS = [
 
 
 def test_learner_can_be_initialized(temp_model_path):
-    learner = ForecastingLearner(path_context=temp_model_path)
-    assert isinstance(learner, ForecastingLearner)
+    learner = TimeSeriesLearner(path_context=temp_model_path)
+    assert isinstance(learner, TimeSeriesLearner)
 
 
 # smoke test for the short 'happy path'
 def test_when_learner_called_then_training_is_performed(temp_model_path):
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE")
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
@@ -47,7 +47,7 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
     print(temp_model_path)
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE")
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -66,7 +66,7 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
 def test_given_hyperparameters_when_learner_called_then_model_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=3)
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=3)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -93,7 +93,7 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
         "autogluon.timeseries.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE")
+        learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
         learner.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -127,7 +127,7 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
 def test_given_hyperparameters_and_custom_models_when_learner_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric=eval_metric)
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric=eval_metric)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -146,7 +146,7 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
 def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    learner = ForecastingLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=2)
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=2)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -155,7 +155,7 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
     learner.save()
     del learner
 
-    loaded_learner = ForecastingLearner.load(temp_model_path)
+    loaded_learner = TimeSeriesLearner.load(temp_model_path)
 
     for model_name in loaded_learner.load_trainer().get_model_names():
         predictions = loaded_learner.predict(DUMMY_TS_DATAFRAME, model=model_name)
@@ -176,7 +176,7 @@ def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
     if random_seed is not None:
         init_kwargs["random_state"] = random_seed
 
-    learner = ForecastingLearner(**init_kwargs)
+    learner = TimeSeriesLearner(**init_kwargs)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters="toy",
@@ -188,5 +188,5 @@ def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
     learner.save()
     del learner
 
-    loaded_learner = ForecastingLearner.load(temp_model_path)
+    loaded_learner = TimeSeriesLearner.load(temp_model_path)
     assert random_seed == loaded_learner.random_state

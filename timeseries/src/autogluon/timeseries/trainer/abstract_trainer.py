@@ -14,7 +14,7 @@ from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
 from ..dataset import TimeSeriesDataFrame
-from ..models.abstract import AbstractForecastingModel
+from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.metric_utils import check_get_evaluation_metric
 
@@ -243,7 +243,7 @@ class SimpleAbstractTrainer:
         return info
 
 
-class AbstractForecastingTrainer(SimpleAbstractTrainer):
+class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def __init__(
         self,
         path: str,
@@ -304,7 +304,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
-    def _add_model(self, model: AbstractForecastingModel):
+    def _add_model(self, model: AbstractTimeSeriesModel):
         # TODO: also register predict time
         node_attrs = dict(
             path=model.path,
@@ -317,10 +317,10 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def _train_single(
         self,
         train_data: TimeSeriesDataFrame,
-        model: AbstractForecastingModel,
+        model: AbstractTimeSeriesModel,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
-    ) -> AbstractForecastingModel:
+    ) -> AbstractTimeSeriesModel:
         """Train the single model and return the model object that was fitted. This method
         does not save the resulting model."""
         model.fit(train_data=train_data, val_data=val_data, time_limit=time_limit)
@@ -328,7 +328,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
     def tune_model_hyperparameters(
         self,
-        model: AbstractForecastingModel,
+        model: AbstractTimeSeriesModel,
         train_data: TimeSeriesDataFrame,
         time_limit: Optional[float] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
@@ -360,7 +360,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def _train_and_save(
         self,
         train_data: TimeSeriesDataFrame,
-        model: AbstractForecastingModel,
+        model: AbstractTimeSeriesModel,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
@@ -417,7 +417,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         self,
         train_data: TimeSeriesDataFrame,
         hyperparameters: Optional[Union[str, Dict]] = None,
-        models: Optional[List[AbstractForecastingModel]] = None,
+        models: Optional[List[AbstractTimeSeriesModel]] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune: bool = False,
         time_limit: Optional[float] = None,
@@ -523,8 +523,8 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         return df_sorted
 
     def _get_model_for_prediction(
-        self, model: Optional[Union[str, AbstractForecastingModel]] = None
-    ) -> AbstractForecastingModel:
+        self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None
+    ) -> AbstractTimeSeriesModel:
         """Given an optional identifier or model object, return the model to perform predictions
         with. If the model is not provided, this method will default to the best model according to
         the validation score."""
@@ -546,7 +546,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def predict(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[AbstractForecastingModel] = None,
+        model: Optional[AbstractTimeSeriesModel] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model = self._get_model_for_prediction(model)
@@ -571,7 +571,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def _predict_model(
         self,
         data: TimeSeriesDataFrame,
-        model: Union[str, AbstractForecastingModel],
+        model: Union[str, AbstractTimeSeriesModel],
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if isinstance(model, str):
@@ -596,7 +596,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             self.get_model_names()
 
         for model in models:
-            model: AbstractForecastingModel = self.load_model(model)
+            model: AbstractTimeSeriesModel = self.load_model(model)
             model_name = model.name
             model_full = model.convert_to_refit_full_template()  # FIXME: not available
             models_trained = self._train_multi(
@@ -652,7 +652,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
     def construct_model_templates(
         self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
-    ) -> List[AbstractForecastingModel]:
+    ) -> List[AbstractTimeSeriesModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 

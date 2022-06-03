@@ -2,12 +2,12 @@ import logging
 from typing import Dict, Union, Optional, Any
 
 from ..models.presets import get_preset_models
-from .abstract_trainer import AbstractForecastingTrainer, TimeSeriesDataFrame
+from .abstract_trainer import AbstractTimeSeriesTrainer, TimeSeriesDataFrame
 
 logger = logging.getLogger(__name__)
 
 
-class AutoForecastingTrainer(AbstractForecastingTrainer):
+class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
     def construct_model_templates(self, hyperparameters, **kwargs):
         path = kwargs.pop("path", self.path)
         eval_metric = kwargs.pop("eval_metric", self.eval_metric)

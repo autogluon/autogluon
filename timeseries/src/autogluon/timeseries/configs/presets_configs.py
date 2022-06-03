@@ -3,7 +3,7 @@
 # TODO: change default HPO settings when other HPO strategies (e.g., Ray tune) are available
 # TODO: add refit_full arguments once refitting is available
 
-FORECASTING_PRESETS_CONFIGS = dict(
+TIMESERIES_PRESETS_CONFIGS = dict(
     best_quality={
         "hyperparameters": "default_hpo",
         "hyperparameter_tune_kwargs": {

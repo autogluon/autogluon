@@ -1,3 +1,3 @@
-from .abstract_forecasting_model import AbstractForecastingModel
+from .abstract_timeseries_model import AbstractTimeSeriesModel
 
-__all__ = ["AbstractForecastingModel"]
+__all__ = ["AbstractTimeSeriesModel"]

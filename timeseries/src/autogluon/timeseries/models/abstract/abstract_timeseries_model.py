@@ -15,7 +15,7 @@ from .model_trial import skip_hpo, model_trial
 logger = logging.getLogger(__name__)
 
 
-class AbstractForecastingModel(AbstractModel):
+class AbstractTimeSeriesModel(AbstractModel):
     """Abstract class for all `Model` objects in autogluon.timeseries.
 
     Parameters
@@ -137,7 +137,7 @@ class AbstractForecastingModel(AbstractModel):
         )
         return info_dict
 
-    def fit(self, **kwargs) -> "AbstractForecastingModel":
+    def fit(self, **kwargs) -> "AbstractTimeSeriesModel":
         """Fit timeseries model.
 
         Models should not override the `fit` method, but instead override the `_fit` method which
@@ -173,7 +173,7 @@ class AbstractForecastingModel(AbstractModel):
 
         Returns
         -------
-        model: AbstractForecastingModel
+        model: AbstractTimeSeriesModel
             The fitted model object
         """
         return super().fit(**kwargs)
@@ -226,7 +226,7 @@ class AbstractForecastingModel(AbstractModel):
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
-        will be held out and used for computing the evaluation score. Forecasting
+        will be held out and used for computing the evaluation score. Time series
         models always return higher-is-better type scores.
 
         Parameters
@@ -262,7 +262,7 @@ class AbstractForecastingModel(AbstractModel):
         time_start = time.time()
         logger.log(
             15,
-            "Starting generic AbstractForecastingModel hyperparameter tuning for %s model..."
+            "Starting generic AbstractTimeSeriesModel hyperparameter tuning for %s model..."
             % self.name,
         )
         search_space = self._get_search_space()
@@ -334,7 +334,7 @@ class AbstractForecastingModel(AbstractModel):
     def convert_to_refit_full_template(self):
         params = copy.deepcopy(self.get_params())
 
-        # TODO: Forecasting models currently do not support incremental training
+        # TODO: Time series models currently do not support incremental training
         params["hyperparameters"].update(self.params_trained)
         params["name"] = params["name"] + ag.constants.REFIT_FULL_SUFFIX
 
@@ -343,8 +343,8 @@ class AbstractForecastingModel(AbstractModel):
         return template
 
 
-class AbstractForecastingModelFactory:
+class AbstractTimeSeriesModelFactory:
     """Factory class interface for callable objects that produce timeseries models"""
 
-    def __call__(self, *args, **kwargs) -> AbstractForecastingModel:
+    def __call__(self, *args, **kwargs) -> AbstractTimeSeriesModel:
         raise NotImplementedError

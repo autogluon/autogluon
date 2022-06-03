@@ -21,7 +21,7 @@ from ...dataset import TimeSeriesDataFrame
 from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
 from ...utils.metric_utils import METRIC_COEFFICIENTS
 from ...utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
-from ..abstract import AbstractForecastingModel
+from ..abstract import AbstractTimeSeriesModel
 from .callback import TimeLimitCallback
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             }
 
 
-class AbstractGluonTSModel(AbstractForecastingModel):
+class AbstractGluonTSModel(AbstractTimeSeriesModel):
     """Abstract class wrapping GluonTS estimators for use in autogluon.timeseries.
 
     Parameters

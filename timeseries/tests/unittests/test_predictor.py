@@ -8,7 +8,7 @@ from gluonts.model.seq2seq import MQRNNEstimator
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
-from autogluon.timeseries.predictor import ForecastingPredictor
+from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import DUMMY_TS_DATAFRAME
 
@@ -20,13 +20,13 @@ TEST_HYPERPARAMETER_SETTINGS = [
 
 
 def test_predictor_can_be_initialized(temp_model_path):
-    predictor = ForecastingPredictor(path=temp_model_path)
-    assert isinstance(predictor, ForecastingPredictor)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    assert isinstance(predictor, TimeSeriesPredictor)
 
 
 # smoke test for the short 'happy path'
 def test_when_predictor_called_then_training_is_performed(temp_model_path):
-    predictor = ForecastingPredictor(path=temp_model_path, eval_metric="MAPE")
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE")
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
@@ -39,7 +39,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(
+    predictor = TimeSeriesPredictor(
         path=temp_model_path, eval_metric="MAPE", prediction_length=3
     )
     predictor.fit(
@@ -64,7 +64,7 @@ def test_given_different_target_name_when_predictor_called_then_model_can_predic
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
 
-    predictor = ForecastingPredictor(
+    predictor = TimeSeriesPredictor(
         target="mytarget",
         path=temp_model_path,
         eval_metric="MAPE",
@@ -88,7 +88,7 @@ def test_given_different_target_name_when_predictor_called_then_model_can_predic
 def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(
+    predictor = TimeSeriesPredictor(
         path=temp_model_path, eval_metric="MAPE", prediction_length=3
     )
     predictor.fit(
@@ -114,7 +114,7 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
         path=temp_model_path, eval_metric="MAPE", prediction_length=3
     )
     predictor_init_kwargs[quantile_kwarg_name] = [0.1, 0.4, 0.9]
-    predictor = ForecastingPredictor(**predictor_init_kwargs)
+    predictor = TimeSeriesPredictor(**predictor_init_kwargs)
 
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
@@ -143,7 +143,7 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
 def test_given_hyperparameters_and_custom_models_when_predictor_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    predictor = ForecastingPredictor(path=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -159,7 +159,7 @@ def test_given_hyperparameters_and_custom_models_when_predictor_called_then_lead
 def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(path=temp_model_path, prediction_length=2)
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -168,7 +168,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
     predictor.save()
     del predictor
 
-    loaded_predictor = ForecastingPredictor.load(temp_model_path)
+    loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
 
     for model_name in loaded_predictor.get_model_names():
         predictions = loaded_predictor.predict(DUMMY_TS_DATAFRAME, model=model_name)
@@ -185,7 +185,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded_learner_can_predict(
     temp_model_path, hyperparameters
 ):
-    predictor = ForecastingPredictor(path=temp_model_path, prediction_length=2)
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -194,7 +194,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded
     predictor.save()
     del predictor
 
-    loaded_predictor = ForecastingPredictor.load(temp_model_path)
+    loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
 
     predictions = loaded_predictor._learner.predict(DUMMY_TS_DATAFRAME)
 

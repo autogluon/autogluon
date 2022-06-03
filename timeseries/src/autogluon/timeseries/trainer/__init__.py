@@ -1,4 +1,4 @@
-from .abstract_trainer import AbstractForecastingTrainer
-from .auto_trainer import AutoForecastingTrainer
+from .abstract_trainer import AbstractTimeSeriesTrainer
+from .auto_trainer import AutoTimeSeriesTrainer
 
-__all__ = ["AbstractForecastingTrainer", "AutoForecastingTrainer"]
+__all__ = ["AbstractTimeSeriesTrainer", "AutoTimeSeriesTrainer"]

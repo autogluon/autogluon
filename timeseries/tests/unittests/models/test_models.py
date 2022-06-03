@@ -3,7 +3,7 @@ import pytest
 
 import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.timeseries.models.abstract import AbstractForecastingModel
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.metric_utils import AVAILABLE_METRICS
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
@@ -16,7 +16,7 @@ TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_models_can_be_initialized(model_class, temp_model_path):
     model = model_class(path=temp_model_path, freq="H", prediction_length=24)
-    assert isinstance(model, AbstractForecastingModel)
+    assert isinstance(model, AbstractTimeSeriesModel)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

@@ -14,7 +14,7 @@ from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 from autogluon.timeseries.models.presets import get_default_hps
-from autogluon.timeseries.trainer.auto_trainer import AutoForecastingTrainer
+from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DUMMY_TS_DATAFRAME
 
@@ -27,13 +27,13 @@ TEST_HYPERPARAMETER_SETTINGS = [
 
 
 def test_trainer_can_be_initialized(temp_model_path):
-    model = AutoForecastingTrainer(path=temp_model_path, prediction_length=24)
-    assert isinstance(model, AutoForecastingTrainer)
+    model = AutoTimeSeriesTrainer(path=temp_model_path, prediction_length=24)
+    assert isinstance(model, AutoTimeSeriesTrainer)
 
 
 # smoke test for the short 'happy path'
 def test_when_trainer_called_then_training_is_performed(temp_model_path):
-    trainer = AutoForecastingTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS
     )
@@ -44,7 +44,7 @@ def test_when_trainer_called_then_training_is_performed(temp_model_path):
 def test_given_validation_data_when_trainer_called_then_training_is_performed(
     temp_model_path,
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS,
@@ -64,7 +64,7 @@ def test_given_validation_data_when_trainer_called_then_training_is_performed(
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -83,7 +83,7 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
 def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
+    trainer = AutoTimeSeriesTrainer(
         path=temp_model_path,
         prediction_length=3,
     )
@@ -115,7 +115,7 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -138,7 +138,7 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
 def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -161,7 +161,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         "autogluon.timeseries.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoForecastingTrainer(path=temp_model_path)
+        trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -186,7 +186,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
 def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -209,7 +209,7 @@ def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_i
 def test_given_hyperparameters_to_prophet_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -230,7 +230,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
         "autogluon.timeseries.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoForecastingTrainer(path=temp_model_path)
+        trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -263,7 +263,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
 def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -388,7 +388,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     expected_number_of_unique_names,
     expected_suffixes,
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path)
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
 
     # incrementally train with new hyperparameters
     for hp in hyperparameter_list:
@@ -427,7 +427,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -458,7 +458,7 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
         "autogluon.timeseries.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoForecastingTrainer(path=temp_model_path)
+        trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -488,7 +488,7 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
 def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict(
     temp_model_path, hyperparameters, low_memory
 ):
-    trainer = AutoForecastingTrainer(
+    trainer = AutoTimeSeriesTrainer(
         path=temp_model_path, eval_metric="MAPE", prediction_length=2
     )
     trainer.fit(
@@ -500,7 +500,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
     trainer.save()
     del trainer
 
-    loaded_trainer = AutoForecastingTrainer.load(path=temp_model_path)
+    loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
