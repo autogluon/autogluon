@@ -152,7 +152,7 @@ def test_given_hyperparameters_and_custom_models_when_predictor_called_then_lead
     leaderboard = predictor.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)

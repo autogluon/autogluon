@@ -367,13 +367,29 @@ class ForecastingPredictor:
         return self._trainer.get_model_best()
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
-        """Return a leaderboard showing the performance of every trained model
+        """Return a leaderboard showing the performance of every trained model, the output is a
+        pandas data frame containing the columns,
+        * 'model': The name of the model.
+        * 'score_val': The validation score of the model on the 'eval_metric'.
+            NOTE: Metrics scores always show in higher is better form.
+            This means that metrics such as RMSE or MAPE will have their signs FLIPPED, and values will be negative.
+            This is necessary to avoid the user needing to know the metric to understand if higher is better when
+            looking at leaderboard.
+        * 'fit_time_marginal': The fit time required to train the model (ignoring base models for ensembles).
+        * 'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth
+            model fit has `fit_order=N`.
 
         Parameters
         ----------
         data: TimeSeriesDataFrame
             dataset used for additional evaluation. If None, the validation set used during training will
             be used.
+
+        Returns
+        -------
+        leaderboard: pandas.DataFrame
+            The leaderboard containing information on all models and in order of best model to worst in terms of
+            validation performance.
         """
         return self._learner.leaderboard(data)
 

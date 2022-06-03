@@ -73,7 +73,7 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize(
@@ -195,7 +195,7 @@ def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_i
     leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
@@ -272,7 +272,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize(

@@ -492,7 +492,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         df = pd.DataFrame(
             data={
                 "model": model_names,
-                "val_score": score_val,
+                "score_val": score_val,
                 "fit_time_marginal": fit_time_marginal,
                 "fit_order": fit_order,
             }
@@ -501,11 +501,11 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             df["test_score"] = test_score
 
         df_sorted = df.sort_values(
-            by=["val_score", "model"], ascending=[False, False]
+            by=["score_val", "model"], ascending=[False, False]
         ).reset_index(drop=True)
 
         df_columns_lst = df_sorted.columns.tolist()
-        explicit_order = ["model", "val_score", "fit_time_marginal", "fit_order"]
+        explicit_order = ["model", "score_val", "fit_time_marginal", "fit_order"]
         explicit_order = [
             column for column in explicit_order if column in df_columns_lst
         ]

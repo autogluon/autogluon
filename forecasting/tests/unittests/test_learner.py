@@ -56,7 +56,7 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
     leaderboard = learner.leaderboard()
     print(temp_model_path)
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize(
@@ -136,7 +136,7 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
     leaderboard = learner.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize(
