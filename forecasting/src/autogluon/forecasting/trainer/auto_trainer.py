@@ -17,11 +17,12 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             path=path,
             eval_metric=eval_metric,
             prediction_length=self.prediction_length,
-            freq=self.freq,
+            freq=kwargs.get("freq"),
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
             quantiles=quantile_levels,
             invalid_model_names=self._get_banned_model_names(),
+            target=self.target,
         )
 
     # todo: implement cross-validation / holdout strategy
@@ -33,7 +34,6 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune: bool = False,
         time_limit: float = None,
-        infer_limit: float = None,  # todo: implement
     ):
         """
         Fit a set of forecasting models specified by the `hyperparameters`
@@ -54,8 +54,6 @@ class AutoForecastingTrainer(AbstractForecastingTrainer):
             Whether to perform hyperparameter tuning when learning individual models.
         time_limit
             Time limit for training
-        infer_limit
-            Time limit for inference
         """
         self._train_multi(
             train_data,

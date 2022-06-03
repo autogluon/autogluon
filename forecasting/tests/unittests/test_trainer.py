@@ -1,4 +1,5 @@
 """Unit tests for trainers"""
+import copy
 from collections import defaultdict
 from unittest import mock
 
@@ -15,25 +16,27 @@ from autogluon.forecasting.models.gluonts.models import GenericGluonTSModelFacto
 from autogluon.forecasting.models.presets import get_default_hps
 from autogluon.forecasting.trainer.auto_trainer import AutoForecastingTrainer
 
-from ..common import DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
     "toy",
     DUMMY_TRAINER_HYPERPARAMETERS,
-    {"DeepAR": {"epochs": 2}, "SimpleFeedForward": {"epochs": 1}},
+    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
 ]
 
 
 def test_trainer_can_be_initialized(temp_model_path):
-    model = AutoForecastingTrainer(path=temp_model_path, freq="H", prediction_length=24)
+    model = AutoForecastingTrainer(path=temp_model_path, prediction_length=24)
     assert isinstance(model, AutoForecastingTrainer)
 
 
 # smoke test for the short 'happy path'
 def test_when_trainer_called_then_training_is_performed(temp_model_path):
-    trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
-    trainer.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
+    trainer = AutoForecastingTrainer(path=temp_model_path)
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS
+    )
 
     assert "SimpleFeedForward" in trainer.get_model_names()
 
@@ -41,7 +44,7 @@ def test_when_trainer_called_then_training_is_performed(temp_model_path):
 def test_given_validation_data_when_trainer_called_then_training_is_performed(
     temp_model_path,
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
+    trainer = AutoForecastingTrainer(path=temp_model_path)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS,
@@ -61,9 +64,7 @@ def test_given_validation_data_when_trainer_called_then_training_is_performed(
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
-        path=temp_model_path, freq="H", eval_metric=eval_metric
-    )
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -72,7 +73,7 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize(
@@ -84,7 +85,6 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 ):
     trainer = AutoForecastingTrainer(
         path=temp_model_path,
-        freq="H",
         prediction_length=3,
     )
     trainer.fit(
@@ -105,14 +105,17 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"DeepAR": {"epochs": 4}, "SimpleFeedForward": {"epochs": 2}},
-        {"SimpleFeedForward": {"context_length": 44}, "DeepAR": {"epochs": 3}},
+        {"DeepAR": {"epochs": 4}, "SimpleFeedForward": {"epochs": 1}},
+        {
+            "SimpleFeedForward": {"context_length": 44, "epochs": 2},
+            "DeepAR": {"epochs": 3},
+        },
     ],
 )
 def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, freq="H", eval_metric="MAPE")
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -120,6 +123,31 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
     for model in models:
         for k, v in hyperparameters[model.name].items():
             assert model._user_params[k] == v
+
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {
+            "SimpleFeedForward": {"context_length": 44, "epochs": 1},
+            "DeepAR": {"epochs": 1},
+        },
+    ],
+)
+def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(
+    temp_model_path, hyperparameters
+):
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+
+    for model_name in trainer.get_model_names():
+        model = trainer.load_model(model_name)
+        assert model.freq == DUMMY_TS_DATAFRAME.freq
 
 
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward", "MQCNN"])
@@ -133,7 +161,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         "autogluon.forecasting.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
+        trainer = AutoForecastingTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -153,14 +181,12 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    [({"Prophet": {}, "DeepAR": {"epochs": 2}}, 2), ({"Prophet": {}}, 1)],
+    [({"Prophet": {}, "DeepAR": {"epochs": 1}}, 2), ({"Prophet": {}}, 1)],
 )
 def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
-        path=temp_model_path, freq="H", eval_metric=eval_metric
-    )
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -169,21 +195,21 @@ def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_i
     leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"Prophet": {"n_changepoints": 4}, "SimpleFeedForward": {"epochs": 2}},
+        {"Prophet": {"n_changepoints": 4}, "SimpleFeedForward": {"epochs": 1}},
         {"Prophet": {"mcmc_samples": 44}, "DeepAR": {"epochs": 3}},
     ],
 )
 def test_given_hyperparameters_to_prophet_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, freq="H", eval_metric="MAPE")
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -204,7 +230,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
         "autogluon.forecasting.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
+        trainer = AutoForecastingTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -224,11 +250,11 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 2}}, 1),
+        ({DeepARModel: {"epochs": 1}}, 1),
         (
             {
-                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-                DeepARModel: {"epochs": 2},
+                GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+                DeepARModel: {"epochs": 1},
             },
             2,
         ),
@@ -237,9 +263,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
 def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    trainer = AutoForecastingTrainer(
-        path=temp_model_path, freq="H", eval_metric=eval_metric
-    )
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric=eval_metric)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -248,7 +272,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == expected_board_length
-    assert np.all(leaderboard["val_score"] < 0)  # all MAPEs should be negative
+    assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
 @pytest.mark.parametrize(
@@ -364,7 +388,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
     expected_number_of_unique_names,
     expected_suffixes,
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
+    trainer = AutoForecastingTrainer(path=temp_model_path)
 
     # incrementally train with new hyperparameters
     for hp in hyperparameter_list:
@@ -390,20 +414,20 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
         {
             GenericGluonTSModelFactory(MQRNNEstimator): {
                 "context_length": 4,
-                "epochs": 2,
+                "epochs": 1,
             },
-            "SimpleFeedForward": {"epochs": 2},
+            "SimpleFeedForward": {"epochs": 1},
         },
         {
-            GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 4},
-            "DeepAR": {"epochs": 3},
+            GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
+            "DeepAR": {"epochs": 2},
         },
     ],
 )
 def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_called_then_hyperparameters_set_correctly(
     temp_model_path, hyperparameters
 ):
-    trainer = AutoForecastingTrainer(path=temp_model_path, freq="H", eval_metric="MAPE")
+    trainer = AutoForecastingTrainer(path=temp_model_path, eval_metric="MAPE")
     models = trainer.construct_model_templates(
         hyperparameters=hyperparameters,
     )
@@ -434,7 +458,7 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
         "autogluon.forecasting.models.presets.get_default_hps"
     ) as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
-        trainer = AutoForecastingTrainer(path=temp_model_path, freq="H")
+        trainer = AutoForecastingTrainer(path=temp_model_path)
         trainer.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
@@ -448,3 +472,43 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
     config_history = next(iter(trainer.hpo_results.values()))["config_history"]
     assert len(config_history) == 4
     assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
+
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {
+            "SimpleFeedForward": {"context_length": 44, "epochs": 1},
+            "DeepAR": {"epochs": 1},
+        },
+    ],
+)
+@pytest.mark.parametrize("low_memory", [True, False])
+def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict(
+    temp_model_path, hyperparameters, low_memory
+):
+    trainer = AutoForecastingTrainer(
+        path=temp_model_path, eval_metric="MAPE", prediction_length=2
+    )
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+    model_names = copy.copy(trainer.get_model_names())
+    trainer.save()
+    del trainer
+
+    loaded_trainer = AutoForecastingTrainer.load(path=temp_model_path)
+
+    for m in model_names:
+        loaded_model = loaded_trainer.load_model(m)
+        predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
+
+        assert isinstance(predictions, TimeSeriesDataFrame)
+
+        predicted_item_index = predictions.index.levels[0]
+        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+        assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
+        assert not np.any(np.isnan(predictions))
