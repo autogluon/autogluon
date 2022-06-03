@@ -49,7 +49,7 @@ aws s3 cp s3://autogluon-ci/$build_docs_path docs/_build/rst/tutorials/ --recurs
 setup_build_contrib_env
 install_all
 setup_mxnet_gpu
-setup_torch
+# setup_torch
 
 sed -i -e "s@###_PLACEHOLDER_WEB_CONTENT_ROOT_###@http://$site@g" docs/config.ini
 sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_LABEL_###@$other_doc_version_text@g" docs/config.ini

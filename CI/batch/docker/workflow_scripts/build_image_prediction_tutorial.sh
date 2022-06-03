@@ -9,7 +9,7 @@ source $(dirname "$0")/env_setup.sh
 
 setup_build_contrib_env
 setup_mxnet_gpu
-setup_torch
+# setup_torch
 export CUDA_VISIBLE_DEVICES=0
 bash docs/build_pip_install.sh
 # only build for docs/image_prediction

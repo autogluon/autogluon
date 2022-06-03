@@ -1,6 +1,5 @@
 FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.4.0-gpu-py38-cu112-ubuntu20.04
 
-ENV LD_LIBRARY_PATH=/usr/local/cuda/compat/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH
 ARG AWSCLI_VER=1.22.45
 
 # https://github.com/NVIDIA/nvidia-docker/issues/1632
