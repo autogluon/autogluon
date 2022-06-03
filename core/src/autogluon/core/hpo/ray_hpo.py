@@ -204,6 +204,7 @@ def run(
     tune_kwargs.update(kwargs)
     
     original_path = os.getcwd()
+    save_dir = os.path.normpath(save_dir)
     analysis = tune.run(
         tune.with_parameters(trainable, **trainable_args),
         config=search_space,

@@ -991,7 +991,7 @@ class AbstractModel:
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 metric='validation_performance',
                 mode='max',
-                save_dir=os.path.normpath(directory),  # get rid of the separator in the end
+                save_dir=directory,
                 ray_tune_adapter=TabularRayTuneAdapter(),
                 total_resources=resources,
                 minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),

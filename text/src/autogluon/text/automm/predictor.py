@@ -172,6 +172,7 @@ class AutoMMPredictor:
         self._data_processors = None
         self._model = None
         self._resume = False
+        self._continuous_training = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -309,10 +310,12 @@ class AutoMMPredictor:
         """
         if hyperparameter_tune_kwargs is not None:
             if teacher_predictor is not None:
-                raise ValueError(
-                    'HPO does not support teacher predictor. Either remove `hyperparameter_tune_kwargs` to perform distillation'
-                    'or remove `teacher_predictor` to perform HPO'
-                    )
+                assert isinstance(teacher_predictor, str), 'HPO with distillation only supports passing a path to the predictor'
+            if self._continuous_training:
+                warnings.warn(
+                    'HPO while continuous training.'
+                    'Hyperparameters related to Model and Data will NOT take effect'
+                )
         
         pl.seed_everything(seed, workers=True)
 
@@ -328,6 +331,7 @@ class AutoMMPredictor:
             )
         else:
             assert hyperparameter_tune_kwargs is None, 'You can not resume training with HPO'
+        save_path = os.path.abspath(save_path)
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
@@ -406,13 +410,13 @@ class AutoMMPredictor:
             validation_metric_name=validation_metric_name,
             minmax_mode=minmax_mode,
             max_time=time_limit,
-            save_path=os.path.abspath(save_path) if hyperparameter_tune_kwargs is not None else save_path,
+            save_path=save_path,
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
             config=config,
             hyperparameters=hyperparameters,
-            teacher_predictor=None if hyperparameter_tune_kwargs is not None else teacher_predictor,
+            teacher_predictor=teacher_predictor,
             hpo_mode=(hyperparameter_tune_kwargs is not None)  # skip average checkpoint if in hpo mode
         )
         
@@ -465,7 +469,11 @@ class AutoMMPredictor:
                 mode=mode,
             )
             if best_trial is None:
-                raise ValueError("AutoMMPredictor wasn't able to find the best trial. It's likely that the time is not enough to train a single epoch for trials.")
+                raise ValueError(
+                    "AutoMMPredictor wasn't able to find the best trial."
+                    "Either all trials failed or"
+                    "it's likely that the time is not enough to train a single epoch for trials."
+                )
             # clean up other trials
             logger.info('Removing non-optimal trials and only keep the best one.')
             cleanup_trials(save_path, best_trial.trial_id)
@@ -1612,6 +1620,8 @@ class AutoMMPredictor:
 
         predictor._ckpt_path = ckpt_path
         predictor._model = model
+        if not resume:
+            predictor._continuous_training = True
 
         return predictor
 

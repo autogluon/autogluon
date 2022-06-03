@@ -17,6 +17,7 @@ from autogluon.text.automm.constants import (
     DATA,
     OPTIMIZATION,
     ENVIRONMENT,
+    DISTILLER,
     BINARY,
     MULTICLASS,
     UNIFORM_SOUP,
@@ -621,9 +622,7 @@ def test_hpo(searcher, scheduler):
     hyperparameters = {
         "optimization.learning_rate": tune.uniform(0.0001, 0.01),
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
-        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -656,3 +655,84 @@ def test_hpo(searcher, scheduler):
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
     
+    # test for continuous training
+    predictor = predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=60,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+    )
+    
+    
+@pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
+@pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))
+def test_hpo_distillation(searcher, scheduler):
+    dataset = PetFinderDataset()
+
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+        DISTILLER: "default",
+    }
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+    }
+    
+    hyperparameter_tune_kwargs = {
+        'searcher': searcher,
+        'scheduler': scheduler,
+        'num_trials': 2,
+    }
+
+    teacher_predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+    
+    teacher_save_path = os.path.join(get_home_dir(), 'hpo_distillation_teacher', f'_{searcher}', f'_{scheduler}')
+    if os.path.exists(teacher_save_path):
+        shutil.rmtree(teacher_save_path)
+
+    teacher_predictor = teacher_predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=60,
+        save_path=teacher_save_path,
+    )
+    
+    hyperparameters = {
+        "optimization.learning_rate": tune.uniform(0.0001, 0.01),
+        "optimization.max_epochs": 1,
+        "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+    }
+    # test for distillation
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+    
+    student_save_path = os.path.join(get_home_dir(), 'hpo_distillation_student', f'_{searcher}', f'_{scheduler}')
+    if os.path.exists(student_save_path):
+        shutil.rmtree(student_save_path)
+
+    predictor = predictor.fit(
+        train_data=dataset.train_df,
+        teacher_predictor=teacher_save_path,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=60,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        save_path=student_save_path,
+    )
