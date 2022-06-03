@@ -569,7 +569,7 @@ def test_modifying_duplicate_model_names():
             assert per_processor.prefix in teacher_predictor._config.model.names
 
 def test_textagumentor_deepcopy():
-    dataset = ALL_DATASETS["prop"]()
+    dataset = ALL_DATASETS["ae"]()
     metric_name = dataset.metric
 
     predictor = AutoMMPredictor(
@@ -596,7 +596,7 @@ def test_textagumentor_deepcopy():
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            time_limit=30,
+            time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )

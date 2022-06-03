@@ -57,7 +57,6 @@ def construct_augmenter(
     A nlpaug sequantial flow.
     
     """
-    print("---------------------!!!!",augment_types)
     if(augment_types is None or len(augment_types) == 0):
         return None
 
@@ -483,10 +482,19 @@ class TextProcessor:
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        
+
         for k, v in self.__dict__.items():
             if(k!="train_augmenter"):
                 setattr(result, k, deepcopy(v, memo))
         # manual recontruct augmenter
         result.train_augmenter = construct_augmenter(result.train_augment_types)
         return result
+    
+    def __getstate__(self):
+        odict = self.__dict__.copy()  # get attribute dictionary
+        del odict['train_augmenter']  # remove textaugmenter to support pickle
+        return odict
+    
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.train_augmenter = construct_augmenter(state['rain_augment_types'])
