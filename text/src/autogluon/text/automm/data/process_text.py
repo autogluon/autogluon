@@ -43,7 +43,7 @@ ALL_TOKENIZERS = {
 
 def construct_augmenter(
         augment_types: List[str],
-) -> naf.Sometimes:
+) -> Optional[naf.Sometimes]:
     """
     Build up a text augmentor from the provided list of augmentation types
     
