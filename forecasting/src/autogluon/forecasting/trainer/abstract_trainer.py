@@ -126,6 +126,7 @@ class SimpleAbstractTrainer:
         return path, model_paths
 
     def save(self) -> None:
+        # todo: remove / revise low_memory logic
         models = self.models
         if self.low_memory:
             self.models = {}
@@ -149,9 +150,8 @@ class SimpleAbstractTrainer:
             return obj
 
     def save_model(self, model: AbstractModel, **kwargs) -> None:  # noqa: F841
-        if self.low_memory:
-            model.save()
-        else:
+        model.save()
+        if not self.low_memory:
             self.models[model.name] = model
 
     def load_model(
@@ -247,22 +247,21 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def __init__(
         self,
         path: str,
-        freq: Optional[str] = None,
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
         save_data: bool = True,
-        low_memory: bool = False,
         **kwargs,
     ):
         super().__init__(
-            path=path, save_data=save_data, low_memory=low_memory, **kwargs
+            path=path, save_data=save_data, low_memory=True, **kwargs
         )
 
-        self.freq = freq
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get(
-            "quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+            "quantile_levels",
+            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
+        self.target = kwargs.get("target", "target")
         self.is_data_saved = False
 
         # Dict of normal model -> FULL model. FULL models are produced by
@@ -294,6 +293,16 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         train_data = self.load_train_data()
         val_data = self.load_val_data()
         return train_data, val_data
+
+    def save(self) -> None:
+        models = self.models
+        self.models = {}
+
+        save_pkl.save(path=self.path_pkl, object=self)
+        for model in self.models.values():
+            model.save()
+
+        self.models = models
 
     def _add_model(self, model: AbstractForecastingModel):
         # TODO: also register predict time
@@ -390,19 +399,17 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
                 )
 
             self.save_model(model=model)
-
         except Exception as err:
             logger.error(
                 f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
             )
             logger.error(f"\t\t{err}")
             logger.exception("Detailed Traceback:")
-            del model
         else:
             self._add_model(model=model)  # noqa: F821
             model_names_trained.append(model.name)  # noqa: F821
-            if self.low_memory:
-                del model
+        finally:
+            del model
 
         return model_names_trained
 
@@ -430,7 +437,9 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         if models is None:
             models = self.construct_model_templates(
-                hyperparameters, hyperparameter_tune=hyperparameter_tune
+                hyperparameters=hyperparameters,
+                hyperparameter_tune=hyperparameter_tune,
+                freq=train_data.freq,
             )
 
         time_limit_model_split = time_limit
@@ -488,7 +497,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         df = pd.DataFrame(
             data={
                 "model": model_names,
-                "val_score": score_val,
+                "score_val": score_val,
                 "fit_time_marginal": fit_time_marginal,
                 "fit_order": fit_order,
             }
@@ -497,11 +506,11 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
             df["test_score"] = test_score
 
         df_sorted = df.sort_values(
-            by=["val_score", "model"], ascending=[False, False]
+            by=["score_val", "model"], ascending=[False, False]
         ).reset_index(drop=True)
 
         df_columns_lst = df_sorted.columns.tolist()
-        explicit_order = ["model", "val_score", "fit_time_marginal", "fit_order"]
+        explicit_order = ["model", "score_val", "fit_time_marginal", "fit_order"]
         explicit_order = [
             column for column in explicit_order if column in df_columns_lst
         ]
@@ -650,7 +659,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: dict,
+        hyperparameters: Dict[str, Any],
         val_data: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> None:
