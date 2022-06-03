@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import copy
 import itertools
 from typing import Any, Tuple
 from collections.abc import Iterable
 
 import pandas as pd
-
+from pandas._typing import FilePathOrBuffer
 
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
@@ -340,3 +341,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return TimeSeriesDataFrame(
             self.loc[(slice(None), slice(start, nanosecond_before_end)), :]
         )
+
+    def copy(self, deep: bool = True) -> "TimeSeriesDataFrame":  # noqa
+        """Convenience method to ensure type is preserved while copying. See
+        pandas.DataFrame.copy for further information.
+        """
+        copymethod = copy.deepcopy if deep else copy.copy
+        return self.__class__(copymethod(self))
+
+    def from_pickle(self, filepath_or_buffer: FilePathOrBuffer) -> "TimeSeriesDataFrame":
+        """Convenience method to read pickled time series data frames"""
+        data = pd.read_pickle(filepath_or_buffer)
+        if isinstance(data, self.__class__):
+            return data
+        else:
+            try:
+                return self.__class__(data)
+            except Exception as err:  # noqa
+                raise IOError(f"Could not load pickled data set due to error: {str(err)}")
