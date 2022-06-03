@@ -143,7 +143,6 @@ class TextProcessor:
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
         self.train_augmenter = self.construct_augmenter(train_augment_types)
-        print("===================self.train_augmenter",  self.train_augmenter)
        
     @property
     def text_token_ids_key(self):
@@ -184,8 +183,7 @@ class TextProcessor:
         )
 
         return fn
-        
-    @staticmethod
+
     def construct_augmenter(
             augment_types: List[str],
     ) -> naf.Sometimes:
@@ -219,9 +217,8 @@ class TextProcessor:
             else:
                 trans_mode = aug_type
                 kwargs = {}
-            if(trans_mode == "synonym_replacement"):
+            if trans_mode == "synonym_replacement": 
                 kwargs['aug_src'] = 'wordnet'
-
                 try:
                     nltk.data.find('corpora/wordnet')
                 except LookupError:
@@ -230,12 +227,11 @@ class TextProcessor:
                     nltk.data.find('corpora/omw-1.4')
                 except LookupError:
                     nltk.download('omw-1.4')
-                    
                 auglist.append(naw.SynonymAug(**kwargs))
-            elif(trans_mode == "random_swap"):
+            elif trans_mode == "random_swap":
                 kwargs['action'] = 'swap'
                 auglist.append(naw.RandomWordAug(**kwargs))
-            elif(trans_mode == "random_delete"):
+            elif trans_mode == "random_delete" :
                 kwargs['action'] = 'delete'
                 auglist.append(naw.RandomWordAug(**kwargs))
             else:
@@ -336,13 +332,10 @@ class TextProcessor:
             "Token indices sequence length is longer than.*result in indexing errors"
         )
         for col_name, col_text in text.items():
-
             #if training
             if(is_training):
-
                 #if augment
                 if( self.train_augmenter is not None  ):
-                
                 # naive way to detect categorical/numerical text:
                     if(len(col_text.split(' ')) >= self.text_detection_length):
                         col_text = self.train_augmenter.augment(col_text)
@@ -493,6 +486,9 @@ class TextProcessor:
         memo[id(self)] = result
         
         for k, v in self.__dict__.items():
+
             if(k!="train_augmenter"):
                 setattr(result, k, deepcopy(v, memo))
+            else:
+                result.train_augmenter = self.construct_augmenter(result.train_augment_types)
         return result

@@ -41,8 +41,8 @@ install_requires = [
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',
-    'nlpaug>=1.1.10',
-    'nltk>=3.4.5'
+    'nlpaug>=1.1.10,<2.0.0',
+    'nltk>=3.4.5,<4.0.0'
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
