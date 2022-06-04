@@ -63,7 +63,7 @@ model:
     text_segment_num: 2
     stochastic_chunk: False
     text_detection_length: 10
-    train_augment_types:
+    train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
       # example
       # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
       # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper

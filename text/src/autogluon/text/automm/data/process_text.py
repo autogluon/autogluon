@@ -332,7 +332,7 @@ class TextProcessor:
         )
         for col_name, col_text in text.items():
             #if training
-            if(is_training):
+            if is_training:
                 #if augment
                 if( self.train_augmenter is not None  ):
                 # naive way to detect categorical/numerical text:
