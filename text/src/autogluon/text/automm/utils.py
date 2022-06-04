@@ -821,7 +821,8 @@ def load_text_tokenizers(
             per_path = os.path.join(path, per_text_processor.tokenizer)
             per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
                 tokenizer_name=per_text_processor.tokenizer_name,
-                checkpoint_name=per_path)
+                checkpoint_name=per_path,
+                )
     return text_processors
 
 
