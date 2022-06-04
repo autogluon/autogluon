@@ -626,7 +626,7 @@ def test_textagumentor_deepcopy():
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
-        "model.hf_text.train_augment_types": ["synonym_replacement({'aug_p': 0.05})", "random_swap({'aug_p': 0.05})"]
+        "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})", "random_swap({'aug_p': 0.05})"]
     }
 
     with tempfile.TemporaryDirectory() as save_path:
@@ -638,7 +638,7 @@ def test_textagumentor_deepcopy():
             hyperparameters=hyperparameters,
         )
 
-    #deep copy data preprocessor
+    # Deep copy data preprocessor
     df_preprocessor_copy = copy.deepcopy(predictor._df_preprocessor)
     predictor._df_preprocessor = df_preprocessor_copy
 

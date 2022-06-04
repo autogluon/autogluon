@@ -62,8 +62,8 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
-    text_detection_length: 10
-    train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
+    text_detection_length: 10                          # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
+    text_train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
       # example
       # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
       # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
@@ -101,8 +101,8 @@ model:
     insert_sep: False
     text_segment_num: 1
     stochastic_chunk: False
-    text_detection_length: 10
-    train_augment_types:
+    text_detection_length: 10                     # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
+    text_train_augment_types:
       # example
       # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
       # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper

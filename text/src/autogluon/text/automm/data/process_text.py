@@ -41,7 +41,7 @@ ALL_TOKENIZERS = {
 }
 
 
-def construct_augmenter(
+def construct_text_augmenter(
         augment_types: List[str],
 ) -> Optional[naf.Sometimes]:
     """
@@ -57,7 +57,7 @@ def construct_augmenter(
     A nlpaug sequantial flow.
     
     """
-    if(augment_types is None or len(augment_types) == 0):
+    if augment_types is None or len(augment_types) == 0:
         return None
 
     auglist = []
@@ -195,7 +195,7 @@ class TextProcessor:
         #construct augmentor
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
-        self.train_augmenter = construct_augmenter(self.train_augment_types)
+        self.train_augmenter = construct_text_augmenter(self.train_augment_types)
        
     @property
     def text_token_ids_key(self):
@@ -317,8 +317,9 @@ class TextProcessor:
         ----------
         text
             The raw text data of one sample.
-        is_training: 
-            Only augment for training data
+        
+        is_training
+            Flag to apply augmentation only to training.
 
         Returns
         -------
@@ -331,12 +332,11 @@ class TextProcessor:
             "Token indices sequence length is longer than.*result in indexing errors"
         )
         for col_name, col_text in text.items():
-            #if training
+
             if is_training:
-                #if augment
-                if( self.train_augmenter is not None  ):
-                # naive way to detect categorical/numerical text:
-                    if(len(col_text.split(' ')) >= self.text_detection_length):
+                if self.train_augmenter is not None:
+                    # naive way to detect categorical/numerical text:
+                    if len(col_text.split(' ')) >= self.text_detection_length:
                         col_text = self.train_augmenter.augment(col_text)
 
             col_tokens = self.tokenizer.encode(
@@ -467,7 +467,7 @@ class TextProcessor:
         idx
             The sample index in a dataset.
         is_training
-            Whether to do processing in the training mode. This unused flag is for the API compatibility.
+            Whether to do processing in the training mode. 
 
         Returns
         -------
@@ -487,7 +487,7 @@ class TextProcessor:
             if k!="train_augmenter":
                 setattr(result, k, deepcopy(v, memo))
         # manual recontruct augmenter
-        result.train_augmenter = construct_augmenter(result.train_augment_types)
+        result.train_augmenter = construct_text_augmenter(result.train_augment_types)
         return result
     
     def __getstate__(self):
@@ -497,4 +497,4 @@ class TextProcessor:
     
     def __setstate__(self, state):
         self.__dict__ = state
-        self.train_augmenter = construct_augmenter(state['rain_augment_types'])
+        self.train_augmenter = construct_text_augmenter(state['rain_augment_types'])
