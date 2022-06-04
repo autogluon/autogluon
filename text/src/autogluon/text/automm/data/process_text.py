@@ -5,6 +5,7 @@ from typing import Optional, List, Any, Dict
 import numpy as np
 from nptyping import NDArray
 import warnings
+import nltk
 from transformers import (
     BertTokenizer,
     CLIPTokenizer,
@@ -21,6 +22,11 @@ from ..constants import (
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
 
+import ast
+from copy import copy, deepcopy
+import nlpaug.flow as naf
+import nlpaug.augmenter.word as naw
+
 logger = logging.getLogger(AUTOMM)
 
 # Disable tokenizer parallelism
@@ -33,6 +39,59 @@ ALL_TOKENIZERS = {
     "electra": ElectraTokenizer,
     'hf_auto': AutoTokenizer,
 }
+
+
+def construct_text_augmenter(
+        augment_types: List[str],
+) -> Optional[naf.Sometimes]:
+    """
+    Build up a text augmentor from the provided list of augmentation types
+    
+    Parameters
+    ----------
+    augment_types
+        A list of text augment types.
+
+    Returns
+    -------
+    A nlpaug sequantial flow.
+    
+    """
+    if augment_types is None or len(augment_types) == 0:
+        return None
+
+    auglist = []
+    try:
+        nltk.data.find('tagger/averaged_perceptron_tagger')
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger')
+    for aug_type in augment_types:
+        if '(' in aug_type:
+            trans_mode = aug_type[0:aug_type.find('(')]
+            kwargs = ast.literal_eval(aug_type[aug_type.find('('):])
+        else:
+            trans_mode = aug_type
+            kwargs = {}
+        if trans_mode == "synonym_replacement": 
+            kwargs['aug_src'] = 'wordnet'
+            try:
+                nltk.data.find('corpora/wordnet')
+            except LookupError:
+                nltk.download('wordnet')
+            try:
+                nltk.data.find('corpora/omw-1.4')
+            except LookupError:
+                nltk.download('omw-1.4')
+            auglist.append(naw.SynonymAug(**kwargs))
+        elif trans_mode == "random_swap":
+            kwargs['action'] = 'swap'
+            auglist.append(naw.RandomWordAug(**kwargs))
+        elif trans_mode == "random_delete" :
+            kwargs['action'] = 'delete'
+            auglist.append(naw.RandomWordAug(**kwargs))
+        else:
+            raise ValueError(f"unknown transform type: {trans_mode}")
+    return naf.Sometimes(auglist, aug_p = 0.5)
 
 
 class TextProcessor:
@@ -52,6 +111,8 @@ class TextProcessor:
             text_segment_num: Optional[int] = 1,
             stochastic_chunk: Optional[bool] = False,
             requires_column_info: bool = False,
+            text_detection_length: Optional[int] = None,
+            train_augment_types: List[str] = [],
     ):
         """
         Parameters
@@ -74,6 +135,8 @@ class TextProcessor:
             Whether to use stochastic chunking, which will randomly slice each individual text.
         requires_column_info
             Whether to require feature column information in dataloader.
+        text_detection_length
+            A naive way to detect text column versus tabular column that were treated as text
         """
         self.prefix = prefix
         self.tokenizer_name = tokenizer_name
@@ -129,6 +192,11 @@ class TextProcessor:
 
         self.stochastic_chunk = stochastic_chunk
 
+        #construct augmentor
+        self.train_augment_types = train_augment_types
+        self.text_detection_length = text_detection_length
+        self.train_augmenter = construct_text_augmenter(self.train_augment_types)
+       
     @property
     def text_token_ids_key(self):
         return f"{self.prefix}_{TEXT_TOKEN_IDS}"
@@ -239,6 +307,7 @@ class TextProcessor:
     def build_one_token_sequence_from_text(
             self,
             text: Dict[str, str],
+            is_training: bool,
     ) -> Dict:
         """
         Tokenize a sample's text data and build one token sequence. One sample may have
@@ -248,6 +317,9 @@ class TextProcessor:
         ----------
         text
             The raw text data of one sample.
+        
+        is_training
+            Flag to apply augmentation only to training.
 
         Returns
         -------
@@ -260,13 +332,20 @@ class TextProcessor:
             "Token indices sequence length is longer than.*result in indexing errors"
         )
         for col_name, col_text in text.items():
+
+            if is_training:
+                if self.train_augmenter is not None:
+                    # naive way to detect categorical/numerical text:
+                    if len(col_text.split(' ')) >= self.text_detection_length:
+                        col_text = self.train_augmenter.augment(col_text)
+
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
                 truncation=False,
             )
             tokens[col_name] = np.array(col_tokens, dtype=np.int32)
-
+            
         # build token sequence
         return self.build_one_token_sequence(tokens)
 
@@ -388,7 +467,7 @@ class TextProcessor:
         idx
             The sample index in a dataset.
         is_training
-            Whether to do processing in the training mode. This unused flag is for the API compatibility.
+            Whether to do processing in the training mode. 
 
         Returns
         -------
@@ -397,4 +476,25 @@ class TextProcessor:
         per_sample_text = {
             per_column_name: per_column_text[idx] for per_column_name, per_column_text in all_text.items()
         }
-        return self.build_one_token_sequence_from_text(per_sample_text)
+        return self.build_one_token_sequence_from_text(per_sample_text, is_training)
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        for k, v in self.__dict__.items():
+            if k!="train_augmenter":
+                setattr(result, k, deepcopy(v, memo))
+        # manual recontruct augmenter
+        result.train_augmenter = construct_text_augmenter(result.train_augment_types)
+        return result
+    
+    def __getstate__(self):
+        odict = self.__dict__.copy()  # get attribute dictionary
+        del odict['train_augmenter']  # remove textaugmenter to support pickle
+        return odict
+    
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.train_augmenter = construct_text_augmenter(state['rain_augment_types'])
