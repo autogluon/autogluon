@@ -16,10 +16,6 @@ RUN pip3 freeze | grep autogluon | xargs pip3 uninstall -y
 #  add autogluon_job script
 ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
-ADD submit-job.py .
-RUN chmod +x submit-job.py
-ADD cancel-job.py .
-RUN chmod +x cancel-job.py
 
 # add workflow scripts
 ADD workflow_scripts/ ./workflow_scripts
