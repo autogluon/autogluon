@@ -14,6 +14,8 @@ SAVED_OUTPUT=$4
 SAVE_PATH=$5
 REMOTE=$6
 
+cd autogluon
+
 if [ ! -z $REMOTE ]; then
     git remote set-url origin $REMOTE
 fi;
