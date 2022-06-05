@@ -22,7 +22,10 @@ git fetch origin $SOURCE_REF:working
 git checkout working
 
 mkdir -p .github/workflow_scripts
-mv workflow_scripts .github/
+mv ../workflow_scripts .github/
+mkdir -p CI/batch
+mv ../submit-job.py CI/batch
+mv ../cancel-job.py CI/batch
 
 cd $WORK_DIR
 /bin/bash -o pipefail -c "$COMMAND"

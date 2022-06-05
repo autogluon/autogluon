@@ -19,13 +19,19 @@ RUN pip install --no-cache-dir -U \
 RUN pip3 freeze | grep autogluon | xargs pip3 uninstall -y
 RUN pip3 uninstall -y mxnet-cu112
 
-# setup git repo and add autogluon_job script
-RUN git clone https://github.com/awslabs/autogluon.git
-WORKDIR /autogluon
+#  add autogluon_job script
 ADD autogluon_job.sh .
 RUN chmod +x autogluon_job.sh
+ADD submit-job.py .
+RUN chmod +x submit-job.py
+ADD cancel-job.py .
+RUN chmod +x cancel-job.py
 
 # add workflow scripts
 ADD workflow_scripts/ ./workflow_scripts
+
+# setup git repo
+RUN git clone https://github.com/awslabs/autogluon.git
+WORKDIR /autogluon
 
 CMD ["/bin/bash"]
