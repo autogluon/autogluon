@@ -33,7 +33,7 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
     )
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    score = model.score(DUMMY_TS_DATAFRAME)
+    score = model.score(DUMMY_TS_DATAFRAME, metric)
 
     assert isinstance(score, float)
 
