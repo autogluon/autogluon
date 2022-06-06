@@ -63,6 +63,7 @@ from .utils import (
 from .optimization.utils import (
     get_metric,
     get_loss_func,
+    modify_config_with_loss_func,
 )
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
@@ -146,10 +147,7 @@ class AutoMMPredictor:
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
 
-        bce_regression_state = False
         if eval_metric is not None and eval_metric.lower() in ["rmse", "r2", "pearsonr", "spearmanr"]:
-            if problem_type == BINARY:
-                bce_regression_state = True
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
@@ -177,7 +175,6 @@ class AutoMMPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._mixup_fn = None
-        self._bce = bce_regression_state
 
     @property
     def path(self):
@@ -361,6 +358,11 @@ class AutoMMPredictor:
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
 
+        config = modify_config_with_loss_func(
+            problem_type=problem_type,
+            config=config,
+        )
+
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
                 config=config.data,
@@ -429,7 +431,11 @@ class AutoMMPredictor:
                           "The per_gpu_batch_size should be >1 and even for reasonable operation",
                           UserWarning)
 
-        loss_func = get_loss_func(problem_type, mixup_active, self._bce)
+        loss_func = get_loss_func(
+            problem_type,
+            mixup_active,
+            OmegaConf.select(config, 'optimization.loss_func_for_regression')
+        )
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)

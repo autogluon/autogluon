@@ -5,6 +5,7 @@ from torch import optim
 from torch.nn import functional as F
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
+from omegaconf import OmegaConf
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
@@ -23,7 +24,7 @@ from .soft_target_crossentropy import SoftTargetCrossEntropy
 def get_loss_func(
         problem_type: str,
         mixup_active: bool,
-        bce_type: bool,
+        loss_func_for_regression: str,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -43,8 +44,8 @@ def get_loss_func(
         else:
             loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
-        if bce_type:
-            loss_func = nn.BCEWithLogitsLoss()
+        if loss_func_for_regression is not None:
+            loss_func = eval(loss_func_for_regression)()
         else:
             loss_func = nn.MSELoss()
     else:
@@ -481,3 +482,30 @@ def apply_layerwise_lr_decay(
         parameter_group_names[group_name]["params"].append(name)
 
     return list(parameter_group_vars.values())
+
+
+def modify_config_with_loss_func(
+        problem_type,
+        config,
+):
+    """
+    Modify configs based on the need of loss func.
+    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
+
+    Parameters
+    ----------
+    loss_func
+        The loss function used in the project.
+    config
+        The config of the project.
+
+    Returns
+    -------
+    The modified config.
+    """
+    if problem_type == REGRESSION and OmegaConf.select(config, 'optimization.loss_func_for_regression') is not None:
+        loss_func = config.optimization.loss_func_for_regression
+        if "BCELoss" in loss_func or "BCEWithLogitsLoss" in loss_func:
+            config.data.label.numerical_label_preprocessing = "minmaxscaler"
+
+    return config
