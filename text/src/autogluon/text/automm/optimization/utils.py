@@ -504,9 +504,16 @@ def modify_config_with_loss_func(
     -------
     The modified config.
     """
-    if problem_type == REGRESSION and OmegaConf.select(config, 'optimization.loss_func_for_regression') is not None:
-        loss_func = config.optimization.loss_func_for_regression
-        if "BCELoss" in loss_func or "BCEWithLogitsLoss" in loss_func:
+    if OmegaConf.select(config, "data.label.predict_heads") is not None and isinstance(config.data.label.predict_heads, str):
+        config.data.label.predict_heads = [config.data.label.predict_heads]
+    if problem_type == REGRESSION and OmegaConf.select(config, 'optimization.loss_function') is not None:
+        loss_func = config.optimization.loss_function
+        if "bceloss" in loss_func.lower() or "bcewithlogitsloss" in loss_func.lower():
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
+        if "bcewithlogitsloss" in loss_func.lower():
+            if config.data.label.predict_heads is None:
+                config.data.label.predict_heads = ["sigmoid"]
+            elif "sigmoid" not in config.data.label.predict_heads:
+                config.data.label.predict_heads.insert(0, "sigmoid")
 
     return config
