@@ -20,7 +20,7 @@ from ..constants import (
     AUTOMM, COLUMN,
 )
 from .collator import Stack, Pad
-from .utils import extract_value_from_config
+from .utils import extract_value_from_config, InsertPunctuation
 
 import ast
 from copy import copy, deepcopy
@@ -89,9 +89,13 @@ def construct_text_augmenter(
         elif trans_mode == "random_delete" :
             kwargs['action'] = 'delete'
             auglist.append(naw.RandomWordAug(**kwargs))
+        elif trans_mode == "insert_punctuation":
+            auglist.append(InsertPunctuation(**kwargs))
         else:
             raise ValueError(f"unknown transform type: {trans_mode}")
-    return naf.Sometimes(auglist, aug_p = 0.5)
+    print(auglist)
+    #return naf.Sometimes(auglist, aug_p = 1.0)
+    return naf.Sequential(auglist)
 
 
 class TextProcessor:
@@ -338,14 +342,12 @@ class TextProcessor:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(' ')) >= self.text_detection_length:
                         col_text = self.train_augmenter.augment(col_text)
-
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
                 truncation=False,
             )
             tokens[col_name] = np.array(col_tokens, dtype=np.int32)
-            
         # build token sequence
         return self.build_one_token_sequence(tokens)
 
