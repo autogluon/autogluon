@@ -190,7 +190,7 @@ stage("Unit Test") {
           # launch different process for each test to make sure memory is released
           python3 -m pip install --upgrade pytest-xdist
 
-          pip install 'black~=22.0,>=22.3'
+          python3 -m install 'black~=22.0,>=22.3'
           export AUTOMM_LINT_DIRS=text/src/autogluon/text/automm tests/unittests/automm
           black --check --preview $(AUTOMM_LINT_DIRS)
           cd text/
