@@ -24,7 +24,7 @@ from .soft_target_crossentropy import SoftTargetCrossEntropy
 def get_loss_func(
         problem_type: str,
         mixup_active: bool,
-        loss_func_for_regression: str,
+        loss_func_replaced: str,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -44,8 +44,8 @@ def get_loss_func(
         else:
             loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
-        if loss_func_for_regression is not None:
-            if "BCEWithLogitsLoss" in loss_func_for_regression:
+        if loss_func_replaced is not None:
+            if "bcewithlogitsloss" in loss_func_replaced.lower():
                 loss_func = nn.BCEWithLogitsLoss()
         else:
             loss_func = nn.MSELoss()

@@ -434,7 +434,7 @@ class AutoMMPredictor:
         loss_func = get_loss_func(
             problem_type,
             mixup_active,
-            OmegaConf.select(config, 'optimization.loss_func_for_regression')
+            OmegaConf.select(config, 'optimization.loss_function')
         )
 
         if time_limit is not None:
