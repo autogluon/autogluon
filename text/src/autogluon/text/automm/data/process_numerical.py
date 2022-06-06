@@ -13,11 +13,11 @@ class NumericalProcessor:
     """
 
     def __init__(
-            self,
-            prefix: str,
-            numerical_column_names: List[str],
-            merge: Optional[str] = "concat",
-            requires_column_info: bool = False,
+        self,
+        prefix: str,
+        numerical_column_names: List[str],
+        merge: Optional[str] = "concat",
+        requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -66,8 +66,8 @@ class NumericalProcessor:
         return fn
 
     def process_one_sample(
-            self,
-            numerical_features: Dict[str, float],
+        self,
+        numerical_features: Dict[str, float],
     ) -> Dict:
         """
         Process one sample's numerical features.
@@ -96,10 +96,10 @@ class NumericalProcessor:
         return ret
 
     def __call__(
-            self,
-            all_numerical_features: Dict[str, NDArray[(Any,), np.float32]],
-            idx: int,
-            is_training: bool,
+        self,
+        all_numerical_features: Dict[str, NDArray[(Any,), np.float32]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Extract one sample's numerical features and customize it for a specific model.

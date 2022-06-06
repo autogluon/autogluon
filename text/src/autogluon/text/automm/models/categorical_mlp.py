@@ -14,15 +14,15 @@ class CategoricalMLP(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            num_categories: List[int],
-            out_features: Optional[int] = None,
-            num_layers: Optional[int] = 1,
-            activation: Optional[str] = "gelu",
-            dropout_prob: Optional[float] = 0.5,
-            normalization: Optional[str] = "layer_norm",
-            num_classes: Optional[int] = 0,
+        self,
+        prefix: str,
+        num_categories: List[int],
+        out_features: Optional[int] = None,
+        num_layers: Optional[int] = 1,
+        activation: Optional[str] = "gelu",
+        dropout_prob: Optional[float] = 0.5,
+        normalization: Optional[str] = "layer_norm",
+        num_classes: Optional[int] = 0,
     ):
         """
         Parameters
@@ -55,10 +55,7 @@ class CategoricalMLP(nn.Module):
 
         for num_categories_per_col in num_categories:
             embedding_dim_per_col = int(
-                size_factor * max(2, min(
-                    max_embedding_dim,
-                    1.6 * num_categories_per_col ** embed_exponent
-                ))
+                size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col**embed_exponent))
             )
             self.column_embeddings.append(
                 nn.Embedding(
@@ -107,8 +104,8 @@ class CategoricalMLP(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         """
 
@@ -136,7 +133,9 @@ class CategoricalMLP(nn.Module):
             }
         }
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         All layers have the same id 0 since there is no pre-trained models used here.
 
