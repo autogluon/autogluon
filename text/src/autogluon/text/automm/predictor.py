@@ -63,7 +63,7 @@ from .utils import (
 from .optimization.utils import (
     get_metric,
     get_loss_func,
-    modify_config_with_loss_func,
+    config_update_loss_func,
 )
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
@@ -358,7 +358,7 @@ class AutoMMPredictor:
                 f"Inferred output shape {output_shape} is different from " \
                 f"the previous {self._output_shape}"
 
-        config = modify_config_with_loss_func(
+        config = config_update_loss_func(
             problem_type=problem_type,
             config=config,
         )

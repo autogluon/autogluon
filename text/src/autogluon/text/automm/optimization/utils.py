@@ -24,7 +24,7 @@ from .soft_target_crossentropy import SoftTargetCrossEntropy
 def get_loss_func(
         problem_type: str,
         mixup_active: bool,
-        loss_func_replaced: str,
+        loss_func_replaced: Optional[str] = None,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -485,7 +485,7 @@ def apply_layerwise_lr_decay(
     return list(parameter_group_vars.values())
 
 
-def modify_config_with_loss_func(
+def config_update_loss_func(
         problem_type,
         config,
 ):
@@ -495,8 +495,8 @@ def modify_config_with_loss_func(
 
     Parameters
     ----------
-    loss_func
-        The loss function used in the project.
+    problem_type
+        The type of the problem of the project.
     config
         The config of the project.
 
