@@ -191,7 +191,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade pytest-xdist
 
           python3 -m pip install 'black~=22.0,>=22.3'
-          black --check --preview text/src/autogluon/text/automm
+          black --check --preview --diff text/src/autogluon/text/automm
           cd text/
           python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
