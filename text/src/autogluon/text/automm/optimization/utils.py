@@ -45,7 +45,8 @@ def get_loss_func(
             loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
         if loss_func_for_regression is not None:
-            loss_func = eval(loss_func_for_regression)()
+            if "BCEWithLogitsLoss" in loss_func_for_regression:
+                loss_func = nn.BCEWithLogitsLoss()
         else:
             loss_func = nn.MSELoss()
     else:
