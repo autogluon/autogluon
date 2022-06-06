@@ -46,7 +46,7 @@ from .constants import (
     CATEGORICAL_MLP, FUSION_MLP, NUMERICAL_TRANSFORMER,
     CATEGORICAL_TRANSFORMER, FUSION_TRANSFORMER,
     ROC_AUC, AVERAGE_PRECISION, METRIC_MODE_MAP,
-    VALID_METRICS,
+    VALID_METRICS, VALID_CONFIG_KEYS,
 )
 from .presets import (
     list_model_presets,
@@ -124,6 +124,40 @@ def get_minmax_mode(metric_name: str):
     assert metric_name in METRIC_MODE_MAP, f'{metric_name} is not a supported metric. Options are: {VALID_METRICS}'
     return METRIC_MODE_MAP.get(metric_name)
     
+    
+def filter_search_space(
+    hyperparameters: dict,
+    keys_to_filter: Union[str, List[str]]
+):
+    """
+    Filter search space within hyperparameters without the given keys as prefixes.
+    Hyperparameters that are not search space will not be filtered.
+    
+    Parameters
+    ----------
+    hyperparameters
+        A dictionary containing search space and overrides to config.
+    keys_to_filter
+        Keys that needs to be filtered out
+        
+    Returns
+    -------
+        hyperparameters being filtered
+    """
+    assert any(key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter), \
+        f'Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}'
+    from autogluon.core.space import Space
+    from ray.tune.sample import Domain
+    hyperparameters = copy.deepcopy(hyperparameters)
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+    for hyperparameter, value in hyperparameters.copy().items():
+        if not isinstance(value, (Space, Domain)):
+            continue
+        for key in keys_to_filter:
+            if hyperparameter.startswith(key):
+                del hyperparameters[hyperparameter]
+    return hyperparameters
 
 
 def get_config(

@@ -33,6 +33,7 @@ from .constants import (
     AUTOMM_TUTORIAL_MODE, UNIFORM_SOUP, GREEDY_SOUP,
     BEST, MIN, MAX, TEXT, RAY_TUNE_CHECKPOINT,
     BEST_K_MODELS_FILE, LAST_CHECKPOINT, MODEL_CHECKPOINT,
+    MODEL, DATA,
 )
 
 from .data.datamodule import BaseDataModule
@@ -49,6 +50,7 @@ from .utils import (
     average_checkpoints,
     infer_metrics,
     get_minmax_mode,
+    filter_search_space,
     get_config,
     LogFilter,
     apply_log_filter,
@@ -309,13 +311,18 @@ class AutoMMPredictor:
         An "AutoMMPredictor" object (itself).
         """
         if hyperparameter_tune_kwargs is not None:
+            # TODO: can we support hyperparameters being the same format as regular training?
+            # currently the string format would make it very hard to get search space, which is an object
+            assert isinstance(hyperparameters, dict), 'Please provide hyperparameters as a dictionary if you want to do HPO'
             if teacher_predictor is not None:
                 assert isinstance(teacher_predictor, str), 'HPO with distillation only supports passing a path to the predictor'
             if self._continuous_training:
                 warnings.warn(
                     'HPO while continuous training.'
-                    'Hyperparameters related to Model and Data will NOT take effect'
+                    'Hyperparameters related to Model and Data will NOT take effect.'
+                    'We will filter them out from the search space.'
                 )
+                hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
         
         pl.seed_everything(seed, workers=True)
 

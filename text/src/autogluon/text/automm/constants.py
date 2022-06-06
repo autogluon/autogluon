@@ -81,6 +81,7 @@ DATA = "data"
 OPTIMIZATION = "optimization"
 ENVIRONMENT = "environment"
 DISTILLER = "distiller"
+VALID_CONFIG_KEYS = [MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER]
 
 # Image normalization mean and std. This is only to normalize images for the CLIP model.
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
