@@ -192,7 +192,7 @@ stage("Unit Test") {
 
           python3 -m pip install 'black~=22.0,>=22.3'
           export AUTOMM_LINT_DIRS=text/src/autogluon/text/automm tests/unittests/automm
-          black --check --preview $(AUTOMM_LINT_DIRS)
+          black --check --preview ${AUTOMM_LINT_DIRS}
           cd text/
           python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
