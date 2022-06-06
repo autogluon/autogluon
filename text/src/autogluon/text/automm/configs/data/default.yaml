@@ -12,7 +12,6 @@ data:
     scaler_with_std: True  # Whether to normalize with std.
   label:
     numerical_label_preprocessing:  # The mode of label preprocessing for . Support "standardscaler" or "minmaxscaler" or null.
-    predict_heads:  # The projecting head for prediction. It is used for loss functions like BCEWithLogitsLoss which contain projection.
   pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
   mixup:
     turn_on: False  # The total control of mixup.

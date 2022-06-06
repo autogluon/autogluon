@@ -448,11 +448,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Predicted labels ready to compute metric scores.
         """
-        if OmegaConf.select(self.config, "label.predict_heads") is not None:
-            predict_heads = self.config.label.predict_heads
-            for per_head in predict_heads:
-                if "sigmoid" in per_head:
-                    y_pred = torch.sigmoid(y_pred)
+        if OmegaConf.select(self.config, "label.sigmoid"):
+            y_pred = torch.sigmoid(y_pred)
 
         y_pred = y_pred.detach().cpu().float().numpy()
 
