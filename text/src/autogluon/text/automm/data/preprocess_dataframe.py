@@ -452,7 +452,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             predict_heads = self.config.label.predict_heads
             for per_head in predict_heads:
                 if "sigmoid" in per_head:
-                    y_pred = y_pred.sigmoid()
+                    y_pred = torch.sigmoid(y_pred)
 
         y_pred = y_pred.detach().cpu().float().numpy()
 
