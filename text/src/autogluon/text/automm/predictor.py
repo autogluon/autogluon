@@ -1044,13 +1044,6 @@ class AutoMMPredictor:
         prob = prob.detach().cpu().float().numpy()
         return prob
 
-    @staticmethod
-    def _logits_to_sigmoid(logits: torch.Tensor):
-        assert logits.ndim == 2
-        prob = torch.sigmoid(logits.float())
-        prob = prob.detach().cpu().float().numpy()
-        return prob
-
     def evaluate(
             self,
             data: Union[pd.DataFrame, dict, list],
@@ -1083,9 +1076,6 @@ class AutoMMPredictor:
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
             y_pred_prob = self._logits_to_prob(logits)
-            metric_data[Y_PRED_PROB] = y_pred_prob
-        if self._bce:
-            y_pred_prob = self._logits_to_sigmoid(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False)
