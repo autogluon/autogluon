@@ -21,11 +21,11 @@ from ..constants import (
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config, InsertPunctuation
-
 import ast
 from copy import copy, deepcopy
 import nlpaug.flow as naf
 import nlpaug.augmenter.word as naw
+from .trivial_augmenter import TrivialAugment
 
 logger = logging.getLogger(AUTOMM)
 
@@ -117,6 +117,7 @@ class TextProcessor:
             requires_column_info: bool = False,
             text_detection_length: Optional[int] = None,
             train_augment_types: List[str] = [],
+            trivial_augment_maxscale: Optional[int] = 0
     ):
         """
         Parameters
@@ -141,6 +142,10 @@ class TextProcessor:
             Whether to require feature column information in dataloader.
         text_detection_length
             A naive way to detect text column versus tabular column that were treated as text
+        trivial_augment_maxscale
+            Used in trival augment as the maximum scale that can be random generated
+            A value of 0 means turn off trivial augment
+            https://arxiv.org/pdf/2103.10158.pdf
         """
         self.prefix = prefix
         self.tokenizer_name = tokenizer_name
@@ -196,6 +201,10 @@ class TextProcessor:
 
         self.stochastic_chunk = stochastic_chunk
 
+        self.trivial_augment_maxscale = trivial_augment_maxscale
+        if self.trivial_augment_maxscale != 0:
+            print("construct augmenter")
+            self.trivial_augmenter = TrivialAugment("text", self.trivial_augment_maxscale)
         #construct augmentor
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
@@ -336,8 +345,13 @@ class TextProcessor:
             "Token indices sequence length is longer than.*result in indexing errors"
         )
         for col_name, col_text in text.items():
-
+            
             if is_training:
+                #trivial augmenter
+                if self.trivial_augment_maxscale != 0:
+                    if len(col_text.split(' ')) >= self.text_detection_length:
+                        col_text = self.trivial_augmenter(col_text)
+                #user defined augmentation operation
                 if self.train_augmenter is not None:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(' ')) >= self.text_detection_length:
