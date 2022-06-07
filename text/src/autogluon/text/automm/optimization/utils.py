@@ -39,7 +39,7 @@ from .soft_target_crossentropy import SoftTargetCrossEntropy
 def get_loss_func(
     problem_type: str,
     mixup_active: bool,
-    loss_func_replaced: Optional[str] = None,
+    loss_func_name: Optional[str] = None,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -48,6 +48,10 @@ def get_loss_func(
     ----------
     problem_type
         Type of problem.
+    mixup_active
+        The activation determining whether to use mixup.
+    loss_func_name
+        The name of the function the user wants to use.
 
     Returns
     -------
@@ -59,8 +63,8 @@ def get_loss_func(
         else:
             loss_func = nn.CrossEntropyLoss()
     elif problem_type == REGRESSION:
-        if loss_func_replaced is not None:
-            if "bcewithlogitsloss" in loss_func_replaced.lower():
+        if loss_func_name is not None:
+            if "bcewithlogitsloss" in loss_func_name.lower():
                 loss_func = nn.BCEWithLogitsLoss()
             else:
                 loss_func = nn.MSELoss()
