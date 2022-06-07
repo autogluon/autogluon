@@ -513,17 +513,16 @@ def update_config_by_rules(
     -------
     The modified config.
     """
-    if problem_type == REGRESSION and OmegaConf.select(config, "optimization.loss_function") is not None:
-        loss_func = config.optimization.loss_function
-        if "bcewithlogitsloss" in loss_func.lower():
+    loss_func = OmegaConf.select(config, "optimization.loss_function")
+    if loss_func is not None:
+        if problem_type == REGRESSION and "bce" in loss_func.lower():
+            # We are using BCELoss for regression problems. Need to first scale the labels.
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
-
-    if problem_type in [MULTICLASS, BINARY] and OmegaConf.select(config, "optimization.loss_function") is not None:
-        if "bcewithlogitsloss" in loss_func.lower():
+        elif loss_func != 'auto':
             warnings.warn(
-                "The BCE loss can only support for regression currently. "
-                "The loss_function will be chosen automatically. ",
+                f"Received loss function={loss_func} for problem={problem_type}. "
+                "Currently, we only support using BCE loss for regression problems and choose "
+                "the loss_function automatically otherwise.",
                 UserWarning,
             )
-
     return config
