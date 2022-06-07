@@ -121,9 +121,9 @@ class TimeSeriesLearner(AbstractLearner):
         return self.load_trainer().predict(data=data, model=model, **kwargs)
 
     def score(
-        self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None
+        self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
     ) -> float:
-        return self.load_trainer().score(data=data, model=model)
+        return self.load_trainer().score(data=data, model=model, metric=metric)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
         return self.load_trainer().leaderboard(data)

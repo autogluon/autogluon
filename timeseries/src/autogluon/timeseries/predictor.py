@@ -67,11 +67,15 @@ class TimeSeriesPredictor:
     ----------------
     learner_type : AbstractLearner, default = TimeSeriesLearner
         A class which inherits from `AbstractLearner`. The learner specifies the inner logic of the TimeSeriesPredictor
+    label: str
+        Alias for `target`.
         for training models and preprocessing data.
     learner_kwargs : dict, default = None
         Keyword arguments to send to the learner (for advanced users only). Options include `trainer_type`, a
         class inheriting from `AbstractTrainer` which controls training of multiple models. If `path` and `eval_metric`
         are re-specified within `learner_kwargs`, these are ignored.
+    quantiles: List[float]
+        Alias for `quantile_levels`.
 
     Attributes
     ----------
@@ -84,7 +88,7 @@ class TimeSeriesPredictor:
 
     def __init__(
         self,
-        target: str = "target",
+        target: Optional[str] = None,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
@@ -95,7 +99,13 @@ class TimeSeriesPredictor:
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
-        self.target = target
+
+        if target is not None and kwargs.get("label") is not None:
+            raise ValueError(
+                "Both `label` and `target` are specified. Please specify at most one of these. "
+                "arguments."
+            )
+        self.target = target or kwargs.get("label", "target")
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric

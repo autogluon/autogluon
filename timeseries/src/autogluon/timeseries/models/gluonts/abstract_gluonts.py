@@ -343,11 +343,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         forecasts, tss = self._predict_for_scoring(data, num_samples=num_samples)
         num_series = len(tss)
 
+        eval_metric = self.eval_metric if metric is None else metric
+
         with evaluator_warning_filter():
             agg_metrics, item_metrics = evaluator(
                 iter(tss), iter(forecasts), num_series=num_series
             )
-        return agg_metrics[self.eval_metric] * METRIC_COEFFICIENTS[self.eval_metric]
+        return agg_metrics[eval_metric] * METRIC_COEFFICIENTS[eval_metric]
 
     def __repr__(self) -> str:
         return self.name
