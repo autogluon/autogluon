@@ -99,6 +99,12 @@ class ForecastingPredictor:
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
+
+        if target is not None and kwargs.get("label") is not None:
+            raise ValueError(
+                "Both `label` and `target` are specified. Please specify at most one of these. "
+                "arguments."
+            )
         self.target = target or kwargs.get("label", "target")
 
         self.prediction_length = prediction_length
