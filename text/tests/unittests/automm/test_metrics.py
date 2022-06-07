@@ -72,8 +72,8 @@ def test_bce_with_logits_loss(problem_type, loss_func_replaced):
     score1 = mean_metric.compute()
     preds = torch.cat(preds).sigmoid()
     targets = torch.cat(targets)
-    score2 = log_loss(
-        y_true=targets,
-        y_pred=preds,
+    score2 = torch.nn.BCELoss(
+        input=targets,
+        target=preds,
     )
     assert pytest.approx(score1, 1e-6) == score2

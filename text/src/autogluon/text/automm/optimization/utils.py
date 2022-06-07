@@ -47,6 +47,8 @@ def get_loss_func(
         if loss_func_replaced is not None:
             if "bcewithlogitsloss" in loss_func_replaced.lower():
                 loss_func = nn.BCEWithLogitsLoss()
+            else:
+                loss_func = nn.MSELoss()
         else:
             loss_func = nn.MSELoss()
     else:
