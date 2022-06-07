@@ -58,7 +58,12 @@ FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 |
 AutoMM FT-Transformer + Const Lr=1e-4 | 0.404 | 0.863 | 0.388 | 0.727 | 0.729 | 0.954 | OverflowError | 0.781 | 0.964 | AttributeError | 0.904
 AutoMM FT-Transformer + Cosine Lr=1e-4| 0.401 | 0.864 | 0.388 | 0.728 | 0.729 | 0.952 | OverflowError | 0.780 | 0.964 | 0.765 | 0.924
 
-The trained weights and configs are accessible at https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/results.zip or s3://autogluon/results/tabular/results.zip.
+The trained weights and configs are accessible at https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/results.zip or s3://autogluon/results/tabular/results.zip. Use
+```
+wget https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/results.zip 
+unzip results.zip
+```
+to download the results.
 
 
 ### Reference
