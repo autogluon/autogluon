@@ -494,7 +494,7 @@ def apply_layerwise_lr_decay(
     return list(parameter_group_vars.values())
 
 
-def update_config_loss_func(
+def update_config_by_rules(
     problem_type: str,
     config: DictConfig,
 ):
