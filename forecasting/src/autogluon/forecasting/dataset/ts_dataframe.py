@@ -5,7 +5,6 @@ from typing import Any, Tuple, Type
 from collections.abc import Iterable
 
 import pandas as pd
-from pandas._typing import FilePathOrBuffer  # noqa
 from pandas.core.internals import ArrayManager, BlockManager
 
 ITEMID = "item_id"
@@ -353,7 +352,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         )
 
     @classmethod
-    def from_pickle(cls, filepath_or_buffer: FilePathOrBuffer) -> "TimeSeriesDataFrame":
+    def from_pickle(cls, filepath_or_buffer: Any) -> "TimeSeriesDataFrame":
         """Convenience method to read pickled time series data frames. If the read pickle
         file refers to a plain pandas DataFrame, it will be cast to a TimeSeriesDataFrame.
         """
