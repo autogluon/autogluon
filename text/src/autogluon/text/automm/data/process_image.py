@@ -19,6 +19,7 @@ from ..constants import (
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
+from .trivial_augmenter import TrivialAugment
 
 logger = logging.getLogger(AUTOMM)
 
@@ -41,6 +42,7 @@ class ImageProcessor:
             max_img_num_per_col: Optional[int] = 1,
             missing_value_strategy: Optional[str] = "skip",
             requires_column_info: bool = False,
+            trivial_augment_maxscale: Optional[int] = 0
     ):
         """
         Parameters
@@ -77,6 +79,10 @@ class ImageProcessor:
                 Use an image with zero pixels.
         requires_column_info
             Whether to require feature column information in dataloader.
+        trivial_augment_maxscale
+            Used in trival augment as the maximum scale that can be random generated
+            A value of 0 means turn off trivial augment
+            https://arxiv.org/pdf/2103.10158.pdf
         """
         self.checkpoint_name = checkpoint_name
         self.prefix = prefix
@@ -116,6 +122,11 @@ class ImageProcessor:
             max_img_num_per_col = 1
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
+
+        self.trivial_augment_maxscale = trivial_augment_maxscale
+        if self.trivial_augment_maxscale != 0:
+            print("construct augmenter")
+            self.trivial_augmenter = TrivialAugment("img", self.trivial_augment_maxscale)
 
         self.train_processor = self.construct_processor(self.train_transform_types)
         self.val_processor = self.construct_processor(self.val_transform_types)
@@ -345,6 +356,8 @@ class ImageProcessor:
                         else:
                             raise e
 
+                if self.trivial_augment_maxscale!= 0:
+                    img = self.trivial_augmenter(img)
                 if is_training:
                     img = self.train_processor(img)
                 else:
@@ -394,3 +407,13 @@ class ImageProcessor:
             per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
         }
         return self.process_one_sample(per_sample_paths, is_training)
+    
+    def __getstate__(self):
+        odict = self.__dict__.copy()    # get attribute dictionary
+        del odict['trivial_augmenter']  # remove augmenter to support pickle
+        return odict
+    
+    def __setstate__(self, state):
+        self.__dict__ = state
+        if state['trivial_augment_maxscale'] != 0:
+            self.trivial_augmenter = TrivialAugment('img',state['trivial_augment_maxscale'])

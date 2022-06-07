@@ -496,6 +496,7 @@ def init_data_processors(
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
                         missing_value_strategy=config.data.image.missing_value_strategy,
+                        trivial_augment_maxscale = OmegaConf.select(model_config, "trivial_augment_maxscale")
                     )
                 )
             elif d_type == TEXT:
@@ -510,7 +511,8 @@ def init_data_processors(
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
                         text_detection_length = OmegaConf.select(model_config, "text_detection_length"),
-                        train_augment_types= OmegaConf.select(model_config, "text_train_augment_types")
+                        train_augment_types= OmegaConf.select(model_config, "text_train_augment_types"),
+                        trivial_augment_maxscale = OmegaConf.select(model_config, "trivial_augment_maxscale")
                     )
                 )
             elif d_type == CATEGORICAL:

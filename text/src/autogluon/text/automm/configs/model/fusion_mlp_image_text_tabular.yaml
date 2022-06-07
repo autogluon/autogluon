@@ -62,13 +62,14 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
+    trivial_augment_maxscale: 0.2      # 0 means no augment 
     text_detection_length: 10                          # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
     text_train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
       # example
-      - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
-      - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
-      - "insert_punctuation({'aug_p': 0.3})"     # 0.3 based on aeda paper
-      - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
+      # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
+      # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
+      # - "insert_punctuation({'aug_p': 0.3})"     # 0.3 based on aeda paper
+      # - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
@@ -83,6 +84,7 @@ model:
     image_norm: "imagenet"
     image_size: 224
     max_img_num_per_col: 2
+    trivial_augment_maxscale: 30    # 0 means no augment 
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:
@@ -102,6 +104,7 @@ model:
     insert_sep: False
     text_segment_num: 1
     stochastic_chunk: False
+    trivial_augment_maxscale: 0.2    # 0 means no augment 
     text_detection_length: 10                     # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
     text_train_augment_types:
       # example
