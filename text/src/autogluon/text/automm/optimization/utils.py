@@ -5,7 +5,7 @@ from torch import optim
 from torch.nn import functional as F
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
@@ -495,8 +495,8 @@ def apply_layerwise_lr_decay(
 
 
 def config_update_loss_func(
-    problem_type,
-    config,
+    problem_type: str,
+    config: DictConfig,
 ):
     """
     Modify configs based on the need of loss func.
