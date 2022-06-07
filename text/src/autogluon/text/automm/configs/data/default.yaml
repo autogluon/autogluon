@@ -17,7 +17,7 @@ data:
     turn_on: False  # The total control of mixup.
     mixup_alpha: 0.8  # Mixup alpha.
     cutmix_alpha: 1.0  # Cutmix alpha.
-    cutmix_minmax:  #Cutmix min/max ratio, it will override cutmix alpha if set, a list/tuple with size two.
+    cutmix_minmax:  # Cutmix min/max ratio, it will override cutmix alpha if set, a list/tuple with size two.
     mixup_prob: 1.0  # The probability of conducting mixup/cutmix if enable.
     mixup_switch_prob: 0.5  # The probability of switching mixup to cutmix if both enable.
     mixup_mode: "batch"  # Perform mixup/cutmix on "batch" or "pair" or "elem".
