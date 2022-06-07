@@ -280,58 +280,58 @@ jobs:
   #         python ./CI/batch/cancel-job.py --region us-east-1 \
   #                                          --job-type CI-GPU \
   #                                          --name AutoGluon-Text-PR#${{ github.event.number }}
-  test_vision:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-          role-duration-seconds: 7200
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Test Vision on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-Vision-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
-                                          --wait
-      - name: Test Vision on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-Vision-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
-                                          --wait
-      - name: Cancel Batch Job if Action Cancelled(For push)
-        if: ${{ cancelled() && github.event_name == 'push' }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-Vision-${{ github.ref }}
-      - name: Cancel Batch Job if Action Cancelled(For pull request)
-        if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-Vision-PR#${{ github.event.number }}
+  # test_vision:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+  #         role-duration-seconds: 7200
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Test Vision on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-Vision-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
+  #                                         --wait
+  #     - name: Test Vision on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-Vision-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
+  #                                         --wait
+  #     - name: Cancel Batch Job if Action Cancelled(For push)
+  #       if: ${{ cancelled() && github.event_name == 'push' }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-Vision-${{ github.ref }}
+  #     - name: Cancel Batch Job if Action Cancelled(For pull request)
+  #       if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-Vision-PR#${{ github.event.number }}
   # test_forecasting:
   #   runs-on: ubuntu-latest
   #   steps:
@@ -696,204 +696,204 @@ jobs:
   #         python ./CI/batch/cancel-job.py --region us-east-1 \
   #                                          --job-type CI-GPU \
   #                                          --name AutoGluon-BuildTextPrediction-PR#${{ github.event.number }}
-  build_cloud_fit_deploy_tutorial:
-    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-    needs: [test_common, test_vision]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-          role-duration-seconds: 7200
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Get Commit SHA(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          SHA=${{ github.sha }}
-          short_sha=$(git rev-parse --short "$SHA")
-          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
-      - name: Get Commit SHA(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          SHA=${{ github.event.pull_request.head.sha }}
-          short_sha=$(git rev-parse --short "$SHA")
-          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-CPU \
-                                          --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
-                                          --wait
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-CPU \
-                                          --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
-                                          --wait
-      - name: Cancel Batch Job if Action Cancelled(For push)
-        if: ${{ cancelled() && github.event_name == 'push' }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-CPU \
-                                           --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }}
-      - name: Cancel Batch Job if Action Cancelled(For pull request)
-        if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-CPU \
-                                           --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }}
-  build_forecasting_tutorial:
-    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-    needs: [test_common, test_vision]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-          role-duration-seconds: 7200
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Get Commit SHA(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          SHA=${{ github.sha }}
-          short_sha=$(git rev-parse --short "$SHA")
-          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
-      - name: Get Commit SHA(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          SHA=${{ github.event.pull_request.head.sha }}
-          short_sha=$(git rev-parse --short "$SHA")
-          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
-      - name: Build Forecasting Tutorial on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildForecasting-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
-                                          --wait
-      - name: Build Forecasting Tutorial on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildForecasting-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
-                                          --wait
-      - name: Cancel Batch Job if Action Cancelled(For push)
-        if: ${{ cancelled() && github.event_name == 'push' }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-BuildForecasting-${{ github.ref }}
-      - name: Cancel Batch Job if Action Cancelled(For pull request)
-        if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-BuildForecasting-PR#${{ github.event.number }}
-  build_all_docs:
-    # needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
-    needs: [build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-          role-duration-seconds: 7200
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Get Commit SHA(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          SHA=${{ github.sha }}
-          short_sha=$(git rev-parse --short "$SHA")
-          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
-      - name: Get Commit SHA(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          SHA=${{ github.event.pull_request.head.sha }}
-          short_sha=$(git rev-parse --short "$SHA")
-          echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
-      - name: Build All Docs on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildAllDocs-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}" \
-                                          --wait
-      - name: Build All Docs on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-BuildAllDocs-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}" \
-                                          --wait
-      - name: Cancel Batch Job if Action Cancelled(For push)
-        if: ${{ cancelled() && github.event_name == 'push' }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-BuildAllDocs-${{ github.ref }}
-      - name: Cancel Batch Job if Action Cancelled(For pull request)
-        if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-BuildAllDocs-PR#${{ github.event.number }}
+  # build_cloud_fit_deploy_tutorial:
+  #   # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+  #   needs: [test_common, test_vision]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+  #         role-duration-seconds: 7200
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Get Commit SHA(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         SHA=${{ github.sha }}
+  #         short_sha=$(git rev-parse --short "$SHA")
+  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+  #     - name: Get Commit SHA(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         SHA=${{ github.event.pull_request.head.sha }}
+  #         short_sha=$(git rev-parse --short "$SHA")
+  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
+  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-CPU \
+  #                                         --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
+  #                                         --wait
+  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-CPU \
+  #                                         --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
+  #                                         --wait
+  #     - name: Cancel Batch Job if Action Cancelled(For push)
+  #       if: ${{ cancelled() && github.event_name == 'push' }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-CPU \
+  #                                          --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }}
+  #     - name: Cancel Batch Job if Action Cancelled(For pull request)
+  #       if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-CPU \
+  #                                          --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }}
+  # build_forecasting_tutorial:
+  #   # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+  #   needs: [test_common, test_vision]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+  #         role-duration-seconds: 7200
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Get Commit SHA(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         SHA=${{ github.sha }}
+  #         short_sha=$(git rev-parse --short "$SHA")
+  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+  #     - name: Get Commit SHA(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         SHA=${{ github.event.pull_request.head.sha }}
+  #         short_sha=$(git rev-parse --short "$SHA")
+  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
+  #     - name: Build Forecasting Tutorial on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildForecasting-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
+  #                                         --wait
+  #     - name: Build Forecasting Tutorial on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildForecasting-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
+  #                                         --wait
+  #     - name: Cancel Batch Job if Action Cancelled(For push)
+  #       if: ${{ cancelled() && github.event_name == 'push' }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-BuildForecasting-${{ github.ref }}
+  #     - name: Cancel Batch Job if Action Cancelled(For pull request)
+  #       if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-BuildForecasting-PR#${{ github.event.number }}
+  # build_all_docs:
+  #   # needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
+  #   needs: [build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+  #         role-duration-seconds: 7200
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Get Commit SHA(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         SHA=${{ github.sha }}
+  #         short_sha=$(git rev-parse --short "$SHA")
+  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+  #     - name: Get Commit SHA(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         SHA=${{ github.event.pull_request.head.sha }}
+  #         short_sha=$(git rev-parse --short "$SHA")
+  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
+  #     - name: Build All Docs on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildAllDocs-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}" \
+  #                                         --wait
+  #     - name: Build All Docs on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-BuildAllDocs-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}" \
+  #                                         --wait
+  #     - name: Cancel Batch Job if Action Cancelled(For push)
+  #       if: ${{ cancelled() && github.event_name == 'push' }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-BuildAllDocs-${{ github.ref }}
+  #     - name: Cancel Batch Job if Action Cancelled(For pull request)
+  #       if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-BuildAllDocs-PR#${{ github.event.number }}
   # copy-docs:
   #   needs: build_all_docs
   #   runs-on: ubuntu-latest
