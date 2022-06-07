@@ -2,8 +2,8 @@ from typing import Tuple
 
 
 def extract_value_from_config(
-        config: dict,
-        keys: Tuple[str, ...],
+    config: dict,
+    keys: Tuple[str, ...],
 ):
     """
     Traverse a config dictionary to get some hyper-parameter's value.

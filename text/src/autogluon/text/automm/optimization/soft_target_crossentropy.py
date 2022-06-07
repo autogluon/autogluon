@@ -10,12 +10,10 @@ class SoftTargetCrossEntropy(nn.Module):
     It works under the mixup.
     It can calculate the crossentropy of input and label with one-hot.
     """
+
     def __init__(self):
         super(SoftTargetCrossEntropy, self).__init__()
 
-    def forward(self,
-                input: torch.Tensor,
-                target: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         loss = torch.sum(-target * F.log_softmax(input, dim=-1), dim=-1)
         return loss.mean()
