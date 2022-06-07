@@ -41,6 +41,7 @@ from .data import (
     NumericalProcessor,
     LabelProcessor,
     MultiModalFeaturePreprocessor,
+    MixupModule,
 )
 from .constants import (
     ACCURACY, RMSE, R2, PEARSONR, SPEARMANR, ALL_MODALITIES,
@@ -514,6 +515,8 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
+                        text_detection_length = OmegaConf.select(model_config, "text_detection_length"),
+                        train_augment_types= OmegaConf.select(model_config, "text_train_augment_types")
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -627,7 +630,6 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
-                embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )
@@ -826,8 +828,7 @@ def load_text_tokenizers(
             per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
                 tokenizer_name=per_text_processor.tokenizer_name,
                 checkpoint_name=per_path,
-            )
-
+                )
     return text_processors
 
 
@@ -1232,7 +1233,6 @@ def turn_on_off_feature_column_info(
 
     return data_processors
 
-
 def try_to_infer_pos_label(
         data_config: DictConfig,
         label_encoder: LabelEncoder,
@@ -1268,6 +1268,60 @@ def try_to_infer_pos_label(
 
     return pos_label
 
+
+def get_mixup(
+        model_config: DictConfig,
+        mixup_config: DictConfig,
+        num_classes: int,
+):
+    """
+    Get the mixup state for loss function choice.
+    Now the mixup can only support image data.
+    And the problem type can not support Regression.
+    Parameters
+    ----------
+    model_config
+        The model configs to find image model for the necessity of mixup.
+    mixup_config
+        The mixup configs for mixup and cutmix.
+    num_classes
+        The number of classes in the task. Class <= 1 will cause faults.
+
+    Returns
+    -------
+    The mixup is on or off.
+    """
+    model_active = False
+    names = model_config.names
+    if isinstance(names, str):
+        names = [names]
+    for model_name in names:
+        permodel_config = getattr(model_config, model_name)
+        if hasattr(permodel_config.data_types, IMAGE):
+            model_active = True
+            break
+
+    mixup_active = False
+    if mixup_config is not None and mixup_config.turn_on:
+        mixup_active = mixup_config.mixup_alpha > 0 or \
+                       mixup_config.cutmix_alpha > 0. or \
+                       mixup_config.cutmix_minmax is not None
+
+    mixup_state = model_active & mixup_active & (num_classes > 1)
+    mixup_fn = None
+    if mixup_state:
+        mixup_args = dict(
+            mixup_alpha=mixup_config.mixup_alpha,
+            cutmix_alpha=mixup_config.cutmix_alpha,
+            cutmix_minmax=mixup_config.cutmix_minmax,
+            prob=mixup_config.mixup_prob,
+            switch_prob=mixup_config.mixup_switch_prob,
+            mode=mixup_config.mixup_mode,
+            label_smoothing=mixup_config.label_smoothing,
+            num_classes=num_classes,
+        )
+        mixup_fn = MixupModule(**mixup_args)
+    return mixup_state, mixup_fn
 
 def sha1sum(filename):
     """Calculate the sha1sum of a file

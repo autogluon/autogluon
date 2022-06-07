@@ -251,12 +251,16 @@ class ImageProcessor:
         """
         processor = []
         for trans_type in transform_types:
+            args = None
+            kargs = None
             if '(' in trans_type:
                 trans_mode = trans_type[0:trans_type.find('(')]
-                args = ast.literal_eval(trans_type[trans_type.find('('):])
+                if '{' in trans_type:
+                    kargs = ast.literal_eval(trans_type[trans_type.find('{'):trans_type.rfind(')')])
+                else:
+                    args = ast.literal_eval(trans_type[trans_type.find('('):])
             else:
                 trans_mode = trans_type
-                args = None
 
             if trans_mode == "resize_to_square":
                 processor.append(transforms.Resize((self.size, self.size)))
@@ -269,17 +273,23 @@ class ImageProcessor:
             elif trans_mode == "vertical_flip":
                 processor.append(transforms.RandomVerticalFlip())
             elif trans_mode == "color_jitter":
-                if args is not None:
+                if kargs is not None:
+                    processor.append(transforms.ColorJitter(**kargs))
+                elif args is not None:
                     processor.append(transforms.ColorJitter(*args))
                 else:
                     processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
             elif trans_mode == "affine":
-                if args is not None:
+                if kargs is not None:
+                    processor.append(transforms.RandomAffine(**kargs))
+                elif args is not None:
                     processor.append(transforms.RandomAffine(*args))
                 else:
-                    processor.append(transforms.RandomAffine(15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+                    processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
             elif trans_mode == "randaug":
-                if args is not None:
+                if kargs is not None:
+                    processor.append(RandAugment(**kargs))
+                elif args is not None:
                     processor.append(RandAugment(*args))
                 else:
                     processor.append(RandAugment(2, 9))
