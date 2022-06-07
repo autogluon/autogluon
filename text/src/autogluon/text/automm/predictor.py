@@ -442,11 +442,7 @@ class AutoMMPredictor:
                 UserWarning,
             )
 
-        loss_func = get_loss_func(
-            problem_type,
-            mixup_active,
-            OmegaConf.select(config, 'optimization.loss_function')
-        )
+        loss_func = get_loss_func(problem_type,mixup_active, OmegaConf.select(config, "optimization.loss_function"))
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)

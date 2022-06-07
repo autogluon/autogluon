@@ -491,8 +491,8 @@ def apply_layerwise_lr_decay(
 
 
 def config_update_loss_func(
-        problem_type,
-        config,
+    problem_type,
+    config,
 ):
     """
     Modify configs based on the need of loss func.
@@ -509,7 +509,7 @@ def config_update_loss_func(
     -------
     The modified config.
     """
-    if problem_type == REGRESSION and OmegaConf.select(config, 'optimization.loss_function') is not None:
+    if problem_type == REGRESSION and OmegaConf.select(config, "optimization.loss_function") is not None:
         loss_func = config.optimization.loss_function
         if "bceloss" in loss_func.lower() or "bcewithlogitsloss" in loss_func.lower():
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
