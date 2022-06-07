@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import itertools
-from typing import Any, Tuple
+from typing import Any, Tuple, Type
 from collections.abc import Iterable
 
 import pandas as pd
-
+from pandas.core.internals import ArrayManager, BlockManager
 
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
@@ -60,14 +60,24 @@ class TimeSeriesDataFrame(pd.DataFrame):
     index: pd.MultiIndex
 
     def __init__(self, data: Any, *args, **kwargs):
-        if isinstance(data, pd.DataFrame):
+        if isinstance(data, (BlockManager, ArrayManager)):
+            # necessary for copy constructor to work. see _constructor
+            # and pandas.DataFrame
+            pass
+        elif isinstance(data, pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
                 self._validate_multi_index_data_frame(data)
             else:
                 data = self.from_data_frame(data)
-        else:
+        elif isinstance(data, Iterable):
             data = self.from_iterable_dataset(data)
+        else:
+            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
         super().__init__(data=data, *args, **kwargs)
+
+    @property
+    def _constructor(self) -> Type[TimeSeriesDataFrame]:
+        return TimeSeriesDataFrame
 
     @property
     def freq(self):
@@ -340,3 +350,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return TimeSeriesDataFrame(
             self.loc[(slice(None), slice(start, nanosecond_before_end)), :]
         )
+
+    @classmethod
+    def from_pickle(cls, filepath_or_buffer: Any) -> "TimeSeriesDataFrame":
+        """Convenience method to read pickled time series data frames. If the read pickle
+        file refers to a plain pandas DataFrame, it will be cast to a TimeSeriesDataFrame.
+        """
+        try:
+            data = pd.read_pickle(filepath_or_buffer)
+            return data if isinstance(data, cls) else cls(data)
+        except Exception as err:  # noqa
+            raise IOError(f"Could not load pickled data set due to error: {str(err)}")
