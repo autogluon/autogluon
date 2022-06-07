@@ -1,6 +1,7 @@
 import abc
 import os 
 import pandas as pd
+from autogluon.text.automm.utils import download
 from autogluon.text.automm.constants import (
     BINARY,
     MULTICLASS,
@@ -10,7 +11,6 @@ from autogluon.text.automm.constants import (
     CATEGORICAL,
     NUMERICAL,
 )
-from utils import download
 
 
 class BaseTabularDataset(abc.ABC):
@@ -218,6 +218,51 @@ class CovtypeTabularDataset(BaseTabularDataset):
     @property
     def problem_type(self):
         return MULTICLASS
+
+
+class EpsilonTabularDataset(BaseTabularDataset):
+    _INFO = {
+        'train': {
+            'url': 's3://autogluon/datasets/tabular/epsilon/train.csv',
+            'sha1sum': '8444901bdb20d42359b85ca076eff7f16a34b94c'
+        },
+        'val': {
+            'url': 's3://autogluon/datasets/tabular/epsilon/val.csv',
+            'sha1sum': '9d607e0db43979d3d9a6034dc7603ef09934b5c8'
+        },
+        'test': {
+            'url': 's3://autogluon/datasets/tabular/epsilon/test.csv',
+            'sha1sum': '0a33633875a87a8c9f316e78d225ddfb41c54718'
+        },
+    }
+    def __init__(self, split='train', path='./dataset/'):
+        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+        self._split = split
+        self._path = os.path.join(path,'epsilon',f'{split}.csv')
+        download(self._INFO[split]['url'],
+                 path=self._path,
+                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._data = pd.read_csv(self._path)
+    
+    @property  
+    def data(self):
+        return self._data
+    
+    @property
+    def label_column(self):
+        return 'target'
+    
+    @property
+    def label_type(self):
+        return CATEGORICAL
+    
+    @property
+    def metric(self):
+        return ACC
+    
+    @property
+    def problem_type(self):
+        return BINARY
 
 
 class HelenaTabularDataset(BaseTabularDataset):

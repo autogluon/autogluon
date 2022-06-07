@@ -14,8 +14,12 @@ To run the example:
    - `exp_dir` is the output path to store the weights and loggings. 
    - `seed` determines the random seed. Default is 0.
 
+
 ### 1.2 Datasets
-We borrow the datasets provided by [1], and use identically the same abbreviation as Table 1 in [1]. The original datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). We pre-processed them in to .csv format. Data will be automatically downloaded from s3 (thus online connection is necessary) if it does not exisit with the given dataset path. 
+We borrow 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in [1] to name each datasets. 
+The original datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
+Data in `Numpy.darray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to AutoMMPredictor. 
+All Data will be automatically downloaded from s3 (thus online connection is necessary) if it does not exisit with the given dataset path. 
 
 
 ### 1.3 FT_Transformer
@@ -28,7 +32,8 @@ We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, na
    - `ffn_activation` determines the activation fuction in feadforward layer. We support `relu`, `gelu`, `reglu` and `leaky_relu`.
    - `attention_dropout` is the dropout rate in attention layer.
 `numerical_transformer` supports an additional feature:
-   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently support the following embedding layers: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}. 
+   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently we support the following embedding layers: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
+  
 These features can be tuned using `hyperparameters` in `AutoMMPredictor. For example: 
 ```
 hyperparameters = {
@@ -37,6 +42,22 @@ hyperparameters = {
    'ffn_dropout': 0.0,
 }
 ```
+
+
+### 1.4 Results
+Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | ml 
+----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
+metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
+problem_type | regression | binary | multiclass | multiclass | binary | multiclass | binary | regression | multiclass | regression | regression
+#objects | 20640 | 48842 | 65196 | 83733 | 98050 | 108000 | 500000 | 515345 | 581012 | 709877 | 1200192
+#num. | 8 | 6 | 27 | 54 | 28 | 128 | 2000 | 90 | 54 | 699 | 136
+#cat. | 0 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0
+#classes | - | 2 | 100 | 4 | 2 | 1000 | 2 | - | 7 | - | -
+Best in [1] | 0.459 | 0.859 | 0.396 | 0.732 | 0.729 | 0.963 | 0.8982 | 8.794 | 0.970 | 0.753 | 0.745
+FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 | 8.855 | 0.970 | 0.756 | 0.746
+AutoMM FT-Transformer + Const Lr=1e-4 | 0.404 | 0.863 | 0.388 | 0.727 | 0.729 | 0.954 | OverflowError | 0.781 | 0.964 | AttributeError | 0.904
+AutoMM FT-Transformer + Cosine Lr=1e-4| 0.401 | 0.864 | 0.388 | 0.728 | 0.729 | 0.952 | OverflowError | 0.780 | 0.964 | 0.765 | 0.924
+
 
 ### Reference
 [1]: Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko, 

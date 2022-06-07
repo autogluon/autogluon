@@ -5,6 +5,7 @@ from dataset import (
     AloiTabularDataset,
     CaliforniaHousingTabularDataset,
     CovtypeTabularDataset,
+    EpsilonTabularDataset,
     HelenaTabularDataset,
     HiggsSmallTabularDataset,
     JannisTabularDataset,
@@ -18,6 +19,7 @@ TABULAR_DATASETS = {
     'al': AloiTabularDataset,
     'ca': CaliforniaHousingTabularDataset,
     'co': CovtypeTabularDataset,
+    'ep': EpsilonTabularDataset,
     'he': HelenaTabularDataset,
     'hi': HiggsSmallTabularDataset,
     'ja': JannisTabularDataset,
@@ -28,14 +30,25 @@ TABULAR_DATASETS = {
 
 hyperparameters = {
     'data.categorical.convert_to_text': False,
-    'model.names': ["categorical_transformer","numerical_transformer","fusion_transformer"],
-    'env.batch_size': 512,
-    'env.per_gpu_batch_size': 512,
+    'model.names': [
+        "categorical_transformer",
+        "numerical_transformer",
+        "fusion_transformer"
+    ],
+    'model.numerical_transformer.embedding_arch': ['linear'],
+    'env.batch_size': 128,
+    'env.per_gpu_batch_size': 128,
     'env.num_workers': 12,
     'env.num_workers_evaluation': 12,
+    'env.num_gpus': 1,
     'optimization.max_epochs': 1000,
     'optimization.weight_decay': 1.0e-5,
-    'env.num_gpus': 1,
+    'optimization.lr_choice': None,
+    'optimization.lr_schedule': "polynomial_decay",
+    'optimization.warmup_steps': 0.,
+    'optimization.patience': 16,
+    'optimization.top_k': 1,
+    'data.categorical.convert_to_text': False,
 }
 
 def main(args):

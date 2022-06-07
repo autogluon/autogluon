@@ -100,3 +100,6 @@ NUMERICAL_TRANSFORMER = "numerical_transformer"
 CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
+
+# S3 dataset downloading
+S3_PREFIX = 's3://'
