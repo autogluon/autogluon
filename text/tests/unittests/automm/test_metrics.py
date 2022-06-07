@@ -72,7 +72,8 @@ def test_bce_with_logits_loss(problem_type, loss_func_replaced):
     score1 = mean_metric.compute()
     preds = torch.cat(preds).sigmoid()
     targets = torch.cat(targets)
-    score2 = torch.nn.BCELoss(
+    bceloss = torch.nn.BCELoss()
+    score2 = bceloss(
         input=targets,
         target=preds,
     )
