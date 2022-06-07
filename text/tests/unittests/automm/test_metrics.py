@@ -64,12 +64,8 @@ def test_bce_with_logits_loss(problem_type, loss_func_replaced):
         mixup_active=False,
         loss_func_replaced=loss_func_replaced,
     )
-    mean_metric = MeanMetric()
 
-    for per_pred, per_target in zip(preds, targets):
-        mean_metric.update(loss_func(per_pred, per_target))
-
-    score1 = mean_metric.compute()
+    score1 = loss_func(targets,preds)
     preds = torch.cat(preds).sigmoid()
     targets = torch.cat(targets)
     bceloss = torch.nn.BCELoss()
