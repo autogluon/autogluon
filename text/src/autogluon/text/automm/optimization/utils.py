@@ -515,7 +515,7 @@ def update_config_by_rules(
     """
     if problem_type == REGRESSION and OmegaConf.select(config, "optimization.loss_function") is not None:
         loss_func = config.optimization.loss_function
-        if "bceloss" in loss_func.lower() or "bcewithlogitsloss" in loss_func.lower():
+        if "bcewithlogitsloss" in loss_func.lower():
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
 
     return config
