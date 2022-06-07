@@ -507,7 +507,7 @@ def config_update_loss_func(
     problem_type
         The type of the problem of the project.
     config
-        The config of the project.
+        The config of the project. It is a Dictconfig object.
 
     Returns
     -------
