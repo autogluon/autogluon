@@ -3,10 +3,7 @@ import torch
 from torch import nn
 from typing import List, Optional
 from .utils import init_weights
-from ..constants import (
-    LABEL, LOGITS, FEATURES,
-    WEIGHT, AUTOMM
-)
+from ..constants import LABEL, LOGITS, FEATURES, WEIGHT, AUTOMM
 from .mlp import MLP
 from .ft_transformer import FT_Transformer, CLSToken
 
@@ -21,16 +18,16 @@ class MultimodalFusionMLP(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            models: list,
-            hidden_features: List[int],
-            num_classes: int,
-            adapt_in_features: Optional[str] = None,
-            activation: Optional[str] = "gelu",
-            dropout_prob: Optional[float] = 0.5,
-            normalization: Optional[str] = "layer_norm",
-            loss_weight: Optional[float] = None,
+        self,
+        prefix: str,
+        models: list,
+        hidden_features: List[int],
+        num_classes: int,
+        adapt_in_features: Optional[str] = None,
+        activation: Optional[str] = "gelu",
+        dropout_prob: Optional[float] = 0.5,
+        normalization: Optional[str] = "layer_norm",
+        loss_weight: Optional[float] = None,
     ):
         """
         Parameters
@@ -82,15 +79,11 @@ class MultimodalFusionMLP(nn.Module):
             else:
                 raise ValueError(f"unknown adapt_in_features: {adapt_in_features}")
 
-            self.adapter = nn.ModuleList(
-                [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
-            )
+            self.adapter = nn.ModuleList([nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features])
 
             in_features = base_in_feat * len(raw_in_features)
         else:
-            self.adapter = nn.ModuleList(
-                [nn.Identity() for _ in range(len(raw_in_features))]
-            )
+            self.adapter = nn.ModuleList([nn.Identity() for _ in range(len(raw_in_features))])
             in_features = sum(raw_in_features)
 
         assert len(self.adapter) == len(self.model)
@@ -127,8 +120,8 @@ class MultimodalFusionMLP(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         """
 
@@ -169,7 +162,9 @@ class MultimodalFusionMLP(nn.Module):
         else:
             return fusion_output
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to
@@ -200,9 +195,7 @@ class MultimodalFusionMLP(nn.Module):
         for i, per_model in enumerate(self.model):
             per_model_prefix = f"{model_prefix}.{i}"
             if not hasattr(per_model, "name_to_id"):
-                raise ValueError(
-                    f"name_to_id attribute is missing in model: {per_model.__class__.__name__}"
-                )
+                raise ValueError(f"name_to_id attribute is missing in model: {per_model.__class__.__name__}")
             for n, layer_id in per_model.name_to_id.items():
                 full_n = f"{per_model_prefix}.{n}"
                 name_to_id[full_n] = layer_id
@@ -222,29 +215,29 @@ class MultimodalFusionTransformer(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            models: list,
-            hidden_features: int,
-            num_classes: int,
-            n_blocks: Optional[int] = 0,
-            attention_n_heads: Optional[int] = 8,
-            attention_initialization: Optional[str] = 'kaiming',
-            attention_normalization: Optional[str] = 'layer_norm',
-            attention_dropout: Optional[str] = 0.2, 
-            residual_dropout: Optional[str] = 0.0,
-            ffn_activation: Optional[str] = 'reglu',
-            ffn_normalization: Optional[str] = 'layer_norm',
-            ffn_d_hidden: Optional[str] = 192,
-            ffn_dropout: Optional[str] = 0.0,
-            prenormalization: Optional[bool] = True,
-            first_prenormalization: Optional[bool] = False,
-            kv_compression_ratio: Optional[float] = None,
-            kv_compression_sharing: Optional[str] = None,
-            head_activation: Optional[str] =  'relu',
-            head_normalization: Optional[str] = 'layer_norm',
-            adapt_in_features: Optional[str] = None,
-            loss_weight: Optional[float] = None,
+        self,
+        prefix: str,
+        models: list,
+        hidden_features: int,
+        num_classes: int,
+        n_blocks: Optional[int] = 0,
+        attention_n_heads: Optional[int] = 8,
+        attention_initialization: Optional[str] = "kaiming",
+        attention_normalization: Optional[str] = "layer_norm",
+        attention_dropout: Optional[str] = 0.2,
+        residual_dropout: Optional[str] = 0.0,
+        ffn_activation: Optional[str] = "reglu",
+        ffn_normalization: Optional[str] = "layer_norm",
+        ffn_d_hidden: Optional[str] = 192,
+        ffn_dropout: Optional[str] = 0.0,
+        prenormalization: Optional[bool] = True,
+        first_prenormalization: Optional[bool] = False,
+        kv_compression_ratio: Optional[float] = None,
+        kv_compression_sharing: Optional[str] = None,
+        head_activation: Optional[str] = "relu",
+        head_normalization: Optional[str] = "layer_norm",
+        adapt_in_features: Optional[str] = None,
+        loss_weight: Optional[float] = None,
     ):
         super().__init__()
         logger.debug("initializing MultimodalFusionTransformer")
@@ -263,9 +256,7 @@ class MultimodalFusionTransformer(nn.Module):
         else:
             raise ValueError(f"unknown adapt_in_features: {adapt_in_features}")
 
-        self.adapter = nn.ModuleList(
-            [nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features]
-        )
+        self.adapter = nn.ModuleList([nn.Linear(in_feat, base_in_feat) for in_feat in raw_in_features])
 
         in_features = base_in_feat
 
@@ -292,20 +283,20 @@ class MultimodalFusionTransformer(nn.Module):
             head_activation=head_activation,
             head_normalization=head_normalization,
             d_out=hidden_features,
-            projection=False
+            projection=False,
         )
 
         self.head = FT_Transformer.Head(
             d_in=in_features,
             d_out=num_classes,
             bias=True,
-            activation=head_activation, 
+            activation=head_activation,
             normalization=head_normalization,
         )
-        
+
         self.cls_token = CLSToken(
-            d_token=in_features, 
-            initialization='uniform',
+            d_token=in_features,
+            initialization="uniform",
         )
 
         # init weights
@@ -322,8 +313,8 @@ class MultimodalFusionTransformer(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         multimodal_features = []
         output = {}
@@ -331,9 +322,8 @@ class MultimodalFusionTransformer(nn.Module):
             per_output = per_model(batch)
             multimodal_feature = per_adapter(per_output[per_model.prefix][FEATURES])
             if multimodal_feature.ndim == 2:
-                multimodal_feature = torch.unsqueeze(multimodal_feature,dim=1)
+                multimodal_feature = torch.unsqueeze(multimodal_feature, dim=1)
             multimodal_features.append(multimodal_feature)
-
 
             if self.loss_weight is not None:
                 per_output[per_model.prefix].update({WEIGHT: self.loss_weight})
@@ -357,7 +347,9 @@ class MultimodalFusionTransformer(nn.Module):
         else:
             return fusion_output
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to
@@ -388,9 +380,7 @@ class MultimodalFusionTransformer(nn.Module):
         for i, per_model in enumerate(self.model):
             per_model_prefix = f"{model_prefix}.{i}"
             if not hasattr(per_model, "name_to_id"):
-                raise ValueError(
-                    f"name_to_id attribute is missing in model: {per_model.__class__.__name__}"
-                )
+                raise ValueError(f"name_to_id attribute is missing in model: {per_model.__class__.__name__}")
             for n, layer_id in per_model.name_to_id.items():
                 full_n = f"{per_model_prefix}.{n}"
                 name_to_id[full_n] = layer_id

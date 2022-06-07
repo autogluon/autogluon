@@ -12,8 +12,8 @@ class LabelProcessor:
     """
 
     def __init__(
-            self,
-            prefix: str,
+        self,
+        prefix: str,
     ):
         """
         Parameters
@@ -40,8 +40,8 @@ class LabelProcessor:
         return fn
 
     def process_one_sample(
-            self,
-            labels: Dict[str, Union[int, float]],
+        self,
+        labels: Dict[str, Union[int, float]],
     ) -> Dict:
         """
         Process one sample's labels. Here it only picks the first label.
@@ -60,10 +60,10 @@ class LabelProcessor:
         }
 
     def __call__(
-            self,
-            all_labels: Dict[str, NDArray[(Any,), Any]],
-            idx: int,
-            is_training: bool,
+        self,
+        all_labels: Dict[str, NDArray[(Any,), Any]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Extract one sample's labels and customize them for a specific model.

@@ -16,7 +16,8 @@ from .utils import (
     apply_single_lr,
 )
 from ..constants import (
-    LOGITS, WEIGHT,
+    LOGITS,
+    WEIGHT,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,30 +31,30 @@ class DistillerLitModule(pl.LightningModule):
     """
 
     def __init__(
-            self,
-            student_model: nn.Module,
-            teacher_model: nn.Module,
-            matches: List[DictConfig],
-            critics: nn.ModuleList,
-            baseline_funcs: nn.ModuleList,
-            hard_label_weight: float,
-            soft_label_weight: float,
-            temperature: float,
-            optim_type: Optional[str] = None,
-            lr_choice: Optional[str] = None,
-            lr_schedule: Optional[str] = None,
-            lr: Optional[float] = None,
-            lr_decay: Optional[float] = None,
-            end_lr: Optional[Union[float, int]] = None,
-            lr_mult: Optional[Union[float, int]] = None,
-            weight_decay: Optional[float] = None,
-            warmup_steps: Optional[int] = None,
-            hard_label_loss_func: Optional[_Loss] = None,
-            soft_label_loss_func: Optional[_Loss] = None,
-            validation_metric: Optional[torchmetrics.Metric] = None,
-            validation_metric_name: Optional[str] = None,
-            custom_metric_func: Callable = None,
-            test_metric: Optional[torchmetrics.Metric] = None,
+        self,
+        student_model: nn.Module,
+        teacher_model: nn.Module,
+        matches: List[DictConfig],
+        critics: nn.ModuleList,
+        baseline_funcs: nn.ModuleList,
+        hard_label_weight: float,
+        soft_label_weight: float,
+        temperature: float,
+        optim_type: Optional[str] = None,
+        lr_choice: Optional[str] = None,
+        lr_schedule: Optional[str] = None,
+        lr: Optional[float] = None,
+        lr_decay: Optional[float] = None,
+        end_lr: Optional[Union[float, int]] = None,
+        lr_mult: Optional[Union[float, int]] = None,
+        weight_decay: Optional[float] = None,
+        warmup_steps: Optional[int] = None,
+        hard_label_loss_func: Optional[_Loss] = None,
+        soft_label_loss_func: Optional[_Loss] = None,
+        validation_metric: Optional[torchmetrics.Metric] = None,
+        validation_metric_name: Optional[str] = None,
+        custom_metric_func: Callable = None,
+        test_metric: Optional[torchmetrics.Metric] = None,
     ):
         """
         Parameters
@@ -127,10 +128,16 @@ class DistillerLitModule(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(
             ignore=[
-                "student_model", "teacher_model", "validation_metric",
-                "hard_label_loss_func", "soft_label_loss_func",
-                "custom_metric_func", "test_metric",
-                "matches", "critics", "baseline_funcs",
+                "student_model",
+                "teacher_model",
+                "validation_metric",
+                "hard_label_loss_func",
+                "soft_label_loss_func",
+                "custom_metric_func",
+                "test_metric",
+                "matches",
+                "critics",
+                "baseline_funcs",
             ]
         )
         if matches:
@@ -151,28 +158,31 @@ class DistillerLitModule(pl.LightningModule):
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
-                f"which must be used with a customized metric function."
+                "which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
 
     def _compute_hard_label_loss(
-            self,
-            output: dict,
-            label: torch.Tensor,
+        self,
+        output: dict,
+        label: torch.Tensor,
     ):
         loss = 0
         for per_output in output.values():
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            loss += self.hard_label_loss_func(
-                input=per_output[LOGITS].squeeze(dim=1),
-                target=label,
-            ) * weight
+            loss += (
+                self.hard_label_loss_func(
+                    input=per_output[LOGITS].squeeze(dim=1),
+                    target=label,
+                )
+                * weight
+            )
         return loss
 
     def _compute_soft_label_loss(
-            self,
-            student_output: dict,
-            teacher_output: dict,
+        self,
+        student_output: dict,
+        teacher_output: dict,
     ):
         student_logits = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
         soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
@@ -189,10 +199,10 @@ class DistillerLitModule(pl.LightningModule):
         return loss
 
     def _compute_loss(
-            self,
-            student_output: dict,
-            teacher_output: dict,
-            label: torch.Tensor,
+        self,
+        student_output: dict,
+        teacher_output: dict,
+        label: torch.Tensor,
     ):
         loss = 0
         hard_label_loss = self._compute_hard_label_loss(
@@ -210,9 +220,9 @@ class DistillerLitModule(pl.LightningModule):
         return loss
 
     def _compute_metric(
-            self,
-            logits: torch.Tensor,
-            label: torch.Tensor,
+        self,
+        logits: torch.Tensor,
+        label: torch.Tensor,
     ):
         if isinstance(self.validation_metric, torchmetrics.AUROC):
             prob = F.softmax(logits.float(), dim=1)
@@ -223,8 +233,8 @@ class DistillerLitModule(pl.LightningModule):
             return self.validation_metric(logits.squeeze(dim=1), label)
 
     def _shared_step(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         student_output = self.student_model(batch)
         self.teacher_model.eval()
@@ -353,13 +363,12 @@ class DistillerLitModule(pl.LightningModule):
         logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:
             max_steps = (
-                    len(self.trainer.datamodule.train_dataloader())
-                    * self.trainer.max_epochs
-                    // self.trainer.accumulate_grad_batches
+                len(self.trainer.datamodule.train_dataloader())
+                * self.trainer.max_epochs
+                // self.trainer.accumulate_grad_batches
             )
             logger.debug(
-                f"len(trainer.datamodule.train_dataloader()): "
-                f"{len(self.trainer.datamodule.train_dataloader())}"
+                f"len(trainer.datamodule.train_dataloader()): {len(self.trainer.datamodule.train_dataloader())}"
             )
             logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
             logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
