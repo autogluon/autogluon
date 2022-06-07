@@ -69,7 +69,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_scaler = StandardScaler(with_mean=False, with_std=False)
         else:
             raise ValueError(
-                f'The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported'
+                f"The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported"
             )
 
         for col_name, col_type in self._column_types.items():
