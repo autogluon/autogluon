@@ -518,7 +518,7 @@ def update_config_by_rules(
         if problem_type == REGRESSION and "bce" in loss_func.lower():
             # We are using BCELoss for regression problems. Need to first scale the labels.
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
-        elif loss_func != 'auto':
+        elif loss_func != "auto":
             warnings.warn(
                 f"Received loss function={loss_func} for problem={problem_type}. "
                 "Currently, we only support using BCE loss for regression problems and choose "
