@@ -181,9 +181,7 @@ class BaseDataModule(LightningDataModule):
         )
         return loader
 
-    def get_collate_fn(
-        self,
-    ):
+    def get_collate_fn(self):
         """
         Collect collator functions for each modality input of every model.
         These collator functions are wrapped by the "Dict" collator function,
