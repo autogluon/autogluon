@@ -190,7 +190,7 @@ stage("Unit Test") {
           # launch different process for each test to make sure memory is released
           python3 -m pip install --upgrade pytest-xdist
 
-          black --check --preview --diff text/src/autogluon/text/automm
+          black --check --diff text/src/autogluon/text/automm
           cd text/
           python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
