@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 import numpy as np
 import torch
+from torch.nn.modules.loss import _Loss
 import collections
 from typing import Callable, Iterator, Union, Optional, List, Any, Dict
 from nptyping import NDArray
@@ -432,6 +433,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self,
             y_pred: torch.Tensor,
             inverse_categorical: bool = True,
+            loss_func: Optional[_Loss] = None,
     ) -> NDArray[(Any,), Any]:
         """
         Transform model's output logits into class labels for classification
@@ -443,12 +445,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             The model's output logits.
         inverse_categorical
             Whether to transform categorical value back to the original space, e.g., string values.
+        loss_func
+            The loss function of the model.
 
         Returns
         -------
         Predicted labels ready to compute metric scores.
         """
-        if OmegaConf.select(self.config, "label.sigmoid"):
+        if loss_func is not None and isinstance(loss_func, torch.nn.BCEWithLogitsLoss):
             y_pred = torch.sigmoid(y_pred)
 
         y_pred = y_pred.detach().cpu().float().numpy()

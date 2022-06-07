@@ -508,9 +508,5 @@ def config_update_loss_func(
         loss_func = config.optimization.loss_function
         if "bceloss" in loss_func.lower() or "bcewithlogitsloss" in loss_func.lower():
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
-        if "bcewithlogitsloss" in loss_func.lower():
-            config.data.label.update(
-                {"sigmoid": True}
-            )
 
     return config

@@ -174,7 +174,6 @@ class AutoMMPredictor:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-        self._mixup_fn = None
 
     @property
     def path(self):
@@ -452,6 +451,7 @@ class AutoMMPredictor:
         self._data_processors = data_processors
         self._model = model
         self._mixup_fn = mixup_fn
+        self._loss_func = loss_func
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
@@ -1078,8 +1078,8 @@ class AutoMMPredictor:
             y_pred_prob = self._logits_to_prob(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
-        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False)
-        y_pred_transformed = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=True)
+        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False, loss_func=self._loss_func)
+        y_pred_transformed = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=True, loss_func=self._loss_func)
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update({
@@ -1139,7 +1139,7 @@ class AutoMMPredictor:
             ret_type=LOGITS,
             requires_label=False,
         )
-        pred = self._df_preprocessor.transform_prediction(y_pred=logits)
+        pred = self._df_preprocessor.transform_prediction(y_pred=logits, loss_func=self._loss_func)
         if as_pandas:
             pred = self.as_pandas(data=data, to_be_converted=pred)
         return pred
