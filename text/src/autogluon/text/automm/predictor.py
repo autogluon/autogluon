@@ -458,7 +458,6 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
-        self._mixup_fn = mixup_fn
         self._loss_func = loss_func
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
@@ -521,7 +520,7 @@ class AutoMMPredictor:
             ckpt_path=self._ckpt_path,
             resume=self._resume,
             enable_progress_bar=self._enable_progress_bar,
-            mixup_fn=self._mixup_fn,
+            mixup_fn=mixup_fn,
         )
         return self
 
