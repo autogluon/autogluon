@@ -1,7 +1,6 @@
 import abc
 import os 
 import pandas as pd
-from autogluon.text.automm.utils import download
 from autogluon.text.automm.constants import (
     BINARY,
     MULTICLASS,
@@ -11,7 +10,7 @@ from autogluon.text.automm.constants import (
     CATEGORICAL,
     NUMERICAL,
 )
-
+from utils import download
 
 class BaseTabularDataset(abc.ABC):
     @property
