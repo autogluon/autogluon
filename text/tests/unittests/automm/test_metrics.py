@@ -58,6 +58,8 @@ def test_bce_with_logits_loss(problem_type, loss_func_replaced):
         bs = random.randint(1, 16)
         preds.append(torch.randn(bs, 1))
         targets.append(torch.rand(bs, 1))
+    preds = torch.cat(preds)
+    targets = torch.cat(targets)
 
     loss_func = get_loss_func(
         problem_type=problem_type,
@@ -65,12 +67,8 @@ def test_bce_with_logits_loss(problem_type, loss_func_replaced):
         loss_func_replaced=loss_func_replaced,
     )
 
-    score1 = loss_func(targets,preds)
-    preds = torch.cat(preds).sigmoid()
-    targets = torch.cat(targets)
+    score1 = loss_func(input=preds, target=targets)
+    preds = preds.sigmoid()
     bceloss = torch.nn.BCELoss()
-    score2 = bceloss(
-        input=targets,
-        target=preds,
-    )
+    score2 = bceloss(input=preds, target=targets)
     assert pytest.approx(score1, 1e-6) == score2
