@@ -518,4 +518,12 @@ def update_config_by_rules(
         if "bcewithlogitsloss" in loss_func.lower():
             config.data.label.numerical_label_preprocessing = "minmaxscaler"
 
+    if problem_type in [MULTICLASS, BINARY] and OmegaConf.select(config,"optimization.loss_function") is not None:
+        if "bcewithlogitsloss" in loss_func.lower():
+            warnings.warn(
+                "The BCE loss can only support for regression currently. "
+                "The loss_function will be chosen automatically. ",
+                UserWarning,
+            )
+
     return config
