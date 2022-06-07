@@ -52,8 +52,7 @@ def get_preset(model_preset: str):
     model_config_path = os.path.join(model_config_dir, f"{model_preset}.yaml")
     if not os.path.isfile(model_config_path):
         raise ValueError(
-            f"Model preset '{model_preset}' is not supported yet. "
-            f"Consider one of these: {list_model_presets()}"
+            f"Model preset '{model_preset}' is not supported yet. Consider one of these: {list_model_presets()}"
         )
 
     return preset

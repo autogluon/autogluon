@@ -36,13 +36,18 @@ def get_cosine_schedule_with_warmup(
     Return:
         `torch.optim.lr_scheduler.LambdaLR` with the appropriate schedule.
     """
-    lr_lambda = functools.partial(_cosine_decay_lr_lambda, num_warmup_steps=num_warmup_steps,
-                                  num_training_steps=num_training_steps, num_cycles=num_cycles)
+    lr_lambda = functools.partial(
+        _cosine_decay_lr_lambda,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+        num_cycles=num_cycles,
+    )
     return LambdaLR(optimizer, lr_lambda, last_epoch)
 
 
-def _poly_decay_lr_lambda(current_step: int, num_warmup_steps: int, num_training_steps: int,
-                          lr_init: float, lr_end: float, power: float):
+def _poly_decay_lr_lambda(
+    current_step: int, num_warmup_steps: int, num_training_steps: int, lr_init: float, lr_end: float, power: float
+):
     if current_step < num_warmup_steps:
         return float(current_step) / float(max(1, num_warmup_steps))
     elif current_step > num_training_steps:
@@ -51,7 +56,7 @@ def _poly_decay_lr_lambda(current_step: int, num_warmup_steps: int, num_training
         lr_range = lr_init - lr_end
         decay_steps = num_training_steps - num_warmup_steps
         pct_remaining = 1 - (current_step - num_warmup_steps) / decay_steps
-        decay = lr_range * pct_remaining ** power + lr_end
+        decay = lr_range * pct_remaining**power + lr_end
         return decay / lr_init  # as LambdaLR multiplies by lr_init
 
 
@@ -91,21 +96,21 @@ def get_polynomial_decay_schedule_with_warmup(
     lr_init = optimizer.defaults["lr"]
     if not (lr_init >= lr_end):
         raise ValueError(f"lr_end ({lr_end}) must not be larger than initial lr ({lr_init})")
-    lr_lambda = functools.partial(_poly_decay_lr_lambda,
-                                  num_warmup_steps=num_warmup_steps,
-                                  num_training_steps=num_training_steps,
-                                  lr_init=lr_init,
-                                  lr_end=lr_end,
-                                  power=power)
+    lr_lambda = functools.partial(
+        _poly_decay_lr_lambda,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+        lr_init=lr_init,
+        lr_end=lr_end,
+        power=power,
+    )
     return LambdaLR(optimizer, lr_lambda, last_epoch)
 
 
 def _linear_warmup_lr_lambda(current_step: int, num_warmup_steps: int, num_training_steps: int):
     if current_step < num_warmup_steps:
         return float(current_step) / float(max(1, num_warmup_steps))
-    return max(
-        0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
-    )
+    return max(0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps)))
 
 
 def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
@@ -124,7 +129,7 @@ def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
     Return:
         `torch.optim.lr_scheduler.LambdaLR` with the appropriate schedule.
     """
-    lr_lambda = functools.partial(_linear_warmup_lr_lambda,
-                                  num_warmup_steps=num_warmup_steps,
-                                  num_training_steps=num_training_steps)
+    lr_lambda = functools.partial(
+        _linear_warmup_lr_lambda, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps
+    )
     return LambdaLR(optimizer, lr_lambda, last_epoch)

@@ -3,9 +3,8 @@ import torch
 import pandas as pd
 from typing import List
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
-from ..constants import (
-    GET_ITEM_ERROR_RETRY, AUTOMM
-)
+from ..constants import GET_ITEM_ERROR_RETRY, AUTOMM
+
 logger = logging.getLogger(AUTOMM)
 
 

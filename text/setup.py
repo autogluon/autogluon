@@ -41,9 +41,18 @@ install_requires = [
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',
+    'nlpaug>=1.1.10,<2.0.0',
+    'nltk>=3.4.5,<4.0.0'
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
+
+extras_require = {
+    'tests': [
+            'black~=22.0,>=22.3',
+        ]
+}
+
 
 if __name__ == '__main__':
     ag.create_version_file(version=version, submodule=submodule)
@@ -56,5 +65,6 @@ if __name__ == '__main__':
     ]
     setup(
         install_requires=install_requires,
+        extras_require=extras_require,
         **setup_args,
     )

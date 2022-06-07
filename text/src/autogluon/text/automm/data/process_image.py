@@ -9,13 +9,19 @@ import ast
 from .randaug import RandAugment
 from timm import create_model
 from timm.data.constants import (
-    IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD,
-    IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD,
+    IMAGENET_DEFAULT_MEAN,
+    IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN,
+    IMAGENET_INCEPTION_STD,
 )
 from transformers import AutoConfig
 from ..constants import (
-    IMAGE, IMAGE_VALID_NUM, CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD, AUTOMM, COLUMN,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    AUTOMM,
+    COLUMN,
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
@@ -30,17 +36,17 @@ class ImageProcessor:
     """
 
     def __init__(
-            self,
-            prefix: str,
-            train_transform_types: List[str],
-            val_transform_types: List[str],
-            image_column_names: List[str],
-            checkpoint_name: Optional[str] = None,
-            norm_type: Optional[str] = None,
-            size: Optional[int] = None,
-            max_img_num_per_col: Optional[int] = 1,
-            missing_value_strategy: Optional[str] = "skip",
-            requires_column_info: bool = False,
+        self,
+        prefix: str,
+        train_transform_types: List[str],
+        val_transform_types: List[str],
+        image_column_names: List[str],
+        checkpoint_name: Optional[str] = None,
+        norm_type: Optional[str] = None,
+        size: Optional[int] = None,
+        max_img_num_per_col: Optional[int] = 1,
+        missing_value_strategy: Optional[str] = "skip",
+        requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -223,9 +229,7 @@ class ImageProcessor:
                     if isinstance(image_size, tuple):
                         image_size = image_size[-1]
                 else:
-                    raise ValueError(
-                        f" more than one image_size values are detected: {extracted}"
-                    )
+                    raise ValueError(f" more than one image_size values are detected: {extracted}")
                 mean = None
                 std = None
             except Exception as exp2:
@@ -234,8 +238,8 @@ class ImageProcessor:
         return image_size, mean, std
 
     def construct_processor(
-            self,
-            transform_types: List[str],
+        self,
+        transform_types: List[str],
     ) -> transforms.Compose:
         """
         Build up an image processor from the provided list of transform types.
@@ -253,12 +257,12 @@ class ImageProcessor:
         for trans_type in transform_types:
             args = None
             kargs = None
-            if '(' in trans_type:
-                trans_mode = trans_type[0:trans_type.find('(')]
-                if '{' in trans_type:
-                    kargs = ast.literal_eval(trans_type[trans_type.find('{'):trans_type.rfind(')')])
+            if "(" in trans_type:
+                trans_mode = trans_type[0 : trans_type.find("(")]
+                if "{" in trans_type:
+                    kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
                 else:
-                    args = ast.literal_eval(trans_type[trans_type.find('('):])
+                    args = ast.literal_eval(trans_type[trans_type.find("(") :])
             else:
                 trans_mode = trans_type
 
@@ -301,9 +305,9 @@ class ImageProcessor:
         return transforms.Compose(processor)
 
     def process_one_sample(
-            self,
-            image_paths: Dict[str, List[str]],
-            is_training: bool,
+        self,
+        image_paths: Dict[str, List[str]],
+        is_training: bool,
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -326,13 +330,13 @@ class ImageProcessor:
         ret = {}
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
-            for img_path in per_col_image_paths[:self.max_img_num_per_col]:
+            for img_path in per_col_image_paths[: self.max_img_num_per_col]:
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
-                        message="Palette images with Transparency "
-                                "expressed in bytes should be "
-                                "converted to RGBA images"
+                        message=(
+                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                        ),
                     )
                     is_zero_img = False
                     try:
@@ -357,7 +361,9 @@ class ImageProcessor:
 
             if self.requires_column_info:
                 # only count the valid images since they are put ahead of the zero images in the below returning
-                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array([column_start, len(images)], dtype=np.int64)
+                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
+                    [column_start, len(images)], dtype=np.int64
+                )
                 column_start = len(images)
 
         ret.update(
@@ -369,10 +375,10 @@ class ImageProcessor:
         return ret
 
     def __call__(
-            self,
-            all_image_paths: Dict[str, List[List[str]]],
-            idx: int,
-            is_training: bool,
+        self,
+        all_image_paths: Dict[str, List[List[str]]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Obtain one sample's images and customized them for a specific model.

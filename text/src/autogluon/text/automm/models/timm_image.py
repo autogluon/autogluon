@@ -9,8 +9,13 @@ from .utils import (
     get_column_features,
 )
 from ..constants import (
-    IMAGE, IMAGE_VALID_NUM, LABEL,
-    LOGITS, FEATURES, AUTOMM, COLUMN,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
+    FEATURES,
+    AUTOMM,
+    COLUMN,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -23,12 +28,12 @@ class TimmAutoModelForImagePrediction(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            checkpoint_name: str,
-            num_classes: Optional[int] = 0,
-            mix_choice: Optional[str] = "all_logits",
-            pretrained: Optional[bool] = True,
+        self,
+        prefix: str,
+        checkpoint_name: str,
+        num_classes: Optional[int] = 0,
+        mix_choice: Optional[str] = "all_logits",
+        pretrained: Optional[bool] = True,
     ):
         """
         Load a pretrained image backbone from TIMM.
@@ -89,8 +94,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
         return self.model.num_features
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         """
         Parameters
@@ -145,7 +150,9 @@ class TimmAutoModelForImagePrediction(nn.Module):
 
         return {self.prefix: ret}
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to
