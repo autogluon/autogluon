@@ -5,6 +5,7 @@ Code is partically adapted from it official implementation https://github.com/au
 """
 
 import random
+from selectors import EpollSelector
 from PIL import ImageOps, ImageEnhance, ImageFilter, Image, ImageDraw
 import nlpaug.augmenter.word as naw
 from .utils import InsertPunctuation
@@ -267,6 +268,8 @@ class TrivialAugment:
             op = naw.RandomWordAug(action = "swap", aug_p = scale, aug_max = None)
         elif op_str == "random_delete" :
             op = naw.RandomWordAug(action = "delete", aug_p = scale, aug_max = None )
-        elif op_str == "insert_punctuation":
+        elif op_str == "insert_punc":
             op = InsertPunctuation(aug_p = scale, aug_max = None)
+        else:
+            raise NotImplementedError
         return op.augment(data)
