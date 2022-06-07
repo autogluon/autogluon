@@ -556,6 +556,7 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractModel]] = None,
+        metric: Optional[str] = None
     ) -> float:
         model = self._get_model_for_prediction(model)
 
@@ -566,7 +567,8 @@ class AbstractForecastingTrainer(SimpleAbstractTrainer):
 
         # FIXME: when ensembling is implemented, score logic will have to be revised
         # FIXME: in order to enable prior model predictions in the ensemble
-        return model.score(data, metric=self.eval_metric)
+        eval_metric = self.eval_metric if metric is None else metric
+        return model.score(data, metric=eval_metric)
 
     def _predict_model(
         self,
