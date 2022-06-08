@@ -11,18 +11,33 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import (
-    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
-    ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
-    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
-    PEARSONR, SPEARMANR,
+    BINARY,
+    MULTICLASS,
+    REGRESSION,
+    MAX,
+    MIN,
+    NORM_FIT,
+    BIT_FIT,
+    ACC,
+    ACCURACY,
+    RMSE,
+    ROOT_MEAN_SQUARED_ERROR,
+    R2,
+    QUADRATIC_KAPPA,
+    ROC_AUC,
+    AVERAGE_PRECISION,
+    LOG_LOSS,
+    CROSS_ENTROPY,
+    PEARSONR,
+    SPEARMANR,
 )
 import warnings
 from .soft_target_crossentropy import SoftTargetCrossEntropy
 
 
 def get_loss_func(
-        problem_type: str,
-        mixup_active: bool,
+    problem_type: str,
+    mixup_active: bool,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -50,10 +65,10 @@ def get_loss_func(
 
 
 def get_metric(
-        metric_name: str,
-        problem_type: str,
-        num_classes: Optional[int] = None,
-        pos_label: Optional[int] = None,
+    metric_name: str,
+    problem_type: str,
+    num_classes: Optional[int] = None,
+    pos_label: Optional[int] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -85,15 +100,18 @@ def get_metric(
     elif metric_name == R2:
         return torchmetrics.R2Score(), None
     elif metric_name == QUADRATIC_KAPPA:
-        return torchmetrics.CohenKappa(num_classes=num_classes,
-                                       weights="quadratic"), None
+        return (
+            torchmetrics.CohenKappa(num_classes=num_classes, weights="quadratic"),
+            None,
+        )
     elif metric_name == ROC_AUC:
         return torchmetrics.AUROC(pos_label=pos_label), None
     elif metric_name == AVERAGE_PRECISION:
         return torchmetrics.AveragePrecision(pos_label=pos_label), None
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
-        return torchmetrics.MeanMetric(), \
-               functools.partial(F.cross_entropy, reduction="none")
+        return torchmetrics.MeanMetric(), functools.partial(
+            F.cross_entropy, reduction="none"
+        )
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
@@ -103,13 +121,13 @@ def get_metric(
 
 
 def get_optimizer(
-        optim_type: str,
-        optimizer_grouped_parameters,
-        lr: float,
-        weight_decay: float,
-        eps: Optional[float] = 1e-6,
-        betas: Optional[Tuple[float, float]] = (0.9, 0.999),
-        momentum: Optional[float] = 0.9,
+    optim_type: str,
+    optimizer_grouped_parameters,
+    lr: float,
+    weight_decay: float,
+    eps: Optional[float] = 1e-6,
+    betas: Optional[Tuple[float, float]] = (0.9, 0.999),
+    momentum: Optional[float] = 0.9,
 ):
     """
     Choose a Pytorch optimizer based on its name.
@@ -163,11 +181,11 @@ def get_optimizer(
 
 
 def get_lr_scheduler(
-        optimizer: optim.Optimizer,
-        num_max_steps: int,
-        num_warmup_steps: int,
-        lr_schedule: str,
-        end_lr: Union[float, int],
+    optimizer: optim.Optimizer,
+    num_max_steps: int,
+    num_warmup_steps: int,
+    lr_schedule: str,
+    end_lr: Union[float, int],
 ):
     """
     Get the learning rate scheduler from its name. Here we use our defined learning rate
@@ -209,7 +227,7 @@ def get_lr_scheduler(
         scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_max_steps
+            num_training_steps=num_max_steps,
         )
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
@@ -231,9 +249,10 @@ def get_weight_decay_param_names(model: nn.Module):
     A list of parameter names not using weight decay.
     """
     # By default, we should not apply weight decay for all the norm layers
-    decay_param_names = get_parameter_names(model,
-                                            [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
-                                             nn.GroupNorm])
+    decay_param_names = get_parameter_names(
+        model,
+        [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm],
+    )
     decay_param_names = [name for name in decay_param_names if "bias" not in name]
     return decay_param_names
 
@@ -254,16 +273,22 @@ def get_norm_layer_param_names(model: nn.Module):
     """
     all_param_names = [name for name, _ in model.named_parameters()]
     all_param_names_except_norm_names = get_parameter_names(
-        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm])
-    norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
+        model,
+        [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm],
+    )
+    norm_param_names = [
+        name
+        for name in all_param_names
+        if name not in all_param_names_except_norm_names
+    ]
     return norm_param_names
 
 
 def apply_single_lr(
-        model: nn.Module,
-        lr: float,
-        weight_decay: float,
-        return_params: Optional[bool] = True,
+    model: nn.Module,
+    lr: float,
+    weight_decay: float,
+    return_params: Optional[bool] = True,
 ):
     """
     Set to use a single learning rate for all parameters. Layer normalization parameters and other
@@ -290,12 +315,20 @@ def apply_single_lr(
     decay_param_names = get_weight_decay_param_names(model)
     optimizer_grouped_parameters = [
         {
-            "params": [p if return_params else n for n, p in model.named_parameters() if n in decay_param_names],
+            "params": [
+                p if return_params else n
+                for n, p in model.named_parameters()
+                if n in decay_param_names
+            ],
             "weight_decay": weight_decay,
             "lr": lr,
         },
         {
-            "params": [p if return_params else n for n, p in model.named_parameters() if n not in decay_param_names],
+            "params": [
+                p if return_params else n
+                for n, p in model.named_parameters()
+                if n not in decay_param_names
+            ],
             "weight_decay": 0.0,
             "lr": lr,
         },
@@ -304,11 +337,11 @@ def apply_single_lr(
 
 
 def apply_two_stages_lr(
-        model: nn.Module,
-        lr: float,
-        lr_mult: Union[float, int],
-        weight_decay: float,
-        return_params: Optional[bool] = True,
+    model: nn.Module,
+    lr: float,
+    lr_mult: Union[float, int],
+    weight_decay: float,
+    return_params: Optional[bool] = True,
 ):
     """
     Set up the pretrained backbone to use a smaller learning rate (lr * lr_mult).
@@ -344,7 +377,7 @@ def apply_two_stages_lr(
                 p if return_params else n
                 for n, p in model.named_parameters()
                 if n in decay_param_names
-                   and not any(bb in n for bb in model.head_layer_names)
+                and not any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": weight_decay,
             "lr": lr,
@@ -354,7 +387,7 @@ def apply_two_stages_lr(
                 p if return_params else n
                 for n, p in model.named_parameters()
                 if n not in decay_param_names
-                   and not any(bb in n for bb in model.head_layer_names)
+                and not any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": 0.0,
             "lr": lr,
@@ -364,7 +397,7 @@ def apply_two_stages_lr(
                 p if return_params else n
                 for n, p in model.named_parameters()
                 if n in decay_param_names
-                   and any(bb in n for bb in model.head_layer_names)
+                and any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": weight_decay,
             "lr": lr * lr_mult,
@@ -374,7 +407,7 @@ def apply_two_stages_lr(
                 p if return_params else n
                 for n, p in model.named_parameters()
                 if n not in decay_param_names
-                   and any(bb in n for bb in model.head_layer_names)
+                and any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": 0.0,
             "lr": lr * lr_mult,
@@ -385,11 +418,11 @@ def apply_two_stages_lr(
 
 
 def apply_layerwise_lr_decay(
-        model: nn.Module,
-        lr: float,
-        lr_decay: float,
-        weight_decay: float,
-        efficient_finetune: Optional[str] = None,
+    model: nn.Module,
+    lr: float,
+    lr_decay: float,
+    weight_decay: float,
+    efficient_finetune: Optional[str] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -423,11 +456,11 @@ def apply_layerwise_lr_decay(
     for name, param in model.named_parameters():
         if efficient_finetune == BIT_FIT:
             # For bit_fit, we disable tuning everything except the bias terms
-            if 'bias' not in name:
+            if "bias" not in name:
                 param.requires_grad = False
         elif efficient_finetune == NORM_FIT:
             # For norm-fit, we finetune all the normalization layers and bias layers
-            if name not in norm_param_names and 'bias' not in name:
+            if name not in norm_param_names and "bias" not in name:
                 param.requires_grad = False
 
         if not param.requires_grad:
@@ -438,23 +471,23 @@ def apply_layerwise_lr_decay(
             this_weight_decay = weight_decay
         else:
             group_name = "no_decay"
-            this_weight_decay = 0.
+            this_weight_decay = 0.0
 
         layer_id = model.name_to_id[name]
         group_name = "layer_%d_%s" % (layer_id, group_name)
 
         if group_name not in parameter_group_names:
-            scale = lr_decay ** layer_id
+            scale = lr_decay**layer_id
 
             parameter_group_names[group_name] = {
                 "weight_decay": this_weight_decay,
                 "params": [],
-                "lr": scale * lr
+                "lr": scale * lr,
             }
             parameter_group_vars[group_name] = {
                 "weight_decay": this_weight_decay,
                 "params": [],
-                "lr": scale * lr
+                "lr": scale * lr,
             }
 
         parameter_group_vars[group_name]["params"].append(param)
