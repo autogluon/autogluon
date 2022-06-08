@@ -11,6 +11,7 @@ import nlpaug.augmenter.word as naw
 from .utils import InsertPunctuation
 import nltk
 
+
 def scale_parameter(level, maxval, type):
     """Helper function to scale `val` between 0 and maxval .
     Args:
@@ -34,29 +35,34 @@ class TransformT(object):
         self.xform = xform_fn
 
     def __repr__(self):
-        return '<' + self.name + '>'
+        return "<" + self.name + ">"
 
     def augment(self, level, data):
         return self.xform(data, level)
 
+
 """Transform functions"""
-identity = TransformT('identity', lambda data, level: data)
+identity = TransformT("identity", lambda data, level: data)
 
 
-auto_contrast = TransformT('AutoContrast', lambda pil_img, level: ImageOps.autocontrast(pil_img))
+auto_contrast = TransformT(
+    "AutoContrast", lambda pil_img, level: ImageOps.autocontrast(pil_img)
+)
 
 
-equalize = TransformT('Equalize', lambda pil_img, level: ImageOps.equalize(pil_img))
+equalize = TransformT("Equalize", lambda pil_img, level: ImageOps.equalize(pil_img))
 
 
 def _rotate_impl(pil_img, level):
     """Rotates `pil_img` from -30 to 30 degrees depending on `level`."""
     max = 30
-    degrees = scale_parameter(level, max,"int")
+    degrees = scale_parameter(level, max, "int")
     if random.random() > 0.5:
         degrees = -degrees
     return pil_img.rotate(degrees)
-rotate = TransformT('Rotate', _rotate_impl)
+
+
+rotate = TransformT("Rotate", _rotate_impl)
 
 
 def _solarize_impl(pil_img, level):
@@ -69,35 +75,45 @@ def _solarize_impl(pil_img, level):
         A PIL Image that has had Solarize applied to it.
     """
     max = 256
-    level = scale_parameter(level, max,"int")
+    level = scale_parameter(level, max, "int")
     return ImageOps.solarize(pil_img, max - level)
-solarize = TransformT('Solarize', _solarize_impl)
+
+
+solarize = TransformT("Solarize", _solarize_impl)
+
 
 def _posterize_impl(pil_img, level):
     """Applies PIL Posterize to `pil_img`."""
     max = 4
     min = 0
-    level = scale_parameter(level, max - min,"int")
+    level = scale_parameter(level, max - min, "int")
     return ImageOps.posterize(pil_img, max - level)
-posterize = TransformT('Posterize', _posterize_impl)
+
+
+posterize = TransformT("Posterize", _posterize_impl)
+
 
 def _enhancer_impl(enhancer):
     """Sets level to be between 0.1 and 1.8 for ImageEnhance transforms of PIL."""
     min = 0.1
     max = 1.8
+
     def impl(pil_img, level):
-        v = scale_parameter(level, max - min, "float") + min  # going to 0 just destroys it
+        v = (
+            scale_parameter(level, max - min, "float") + min
+        )  # going to 0 just destroys it
         return enhancer(pil_img).enhance(v)
 
     return impl
 
-color = TransformT('Color', _enhancer_impl(ImageEnhance.Color))
 
-contrast = TransformT('Contrast', _enhancer_impl(ImageEnhance.Contrast))
+color = TransformT("Color", _enhancer_impl(ImageEnhance.Color))
 
-brightness = TransformT('Brightness', _enhancer_impl(ImageEnhance.Brightness))
+contrast = TransformT("Contrast", _enhancer_impl(ImageEnhance.Contrast))
 
-sharpness = TransformT('Sharpness', _enhancer_impl(ImageEnhance.Sharpness))
+brightness = TransformT("Brightness", _enhancer_impl(ImageEnhance.Brightness))
+
+sharpness = TransformT("Sharpness", _enhancer_impl(ImageEnhance.Sharpness))
 
 
 def _shear_x_impl(pil_img, level):
@@ -116,7 +132,9 @@ def _shear_x_impl(pil_img, level):
     if random.random() > 0.5:
         level = -level
     return pil_img.transform(pil_img.size, Image.AFFINE, (1, level, 0, 0, 1, 0))
-shear_x = TransformT('ShearX', _shear_x_impl)
+
+
+shear_x = TransformT("ShearX", _shear_x_impl)
 
 
 def _shear_y_impl(pil_img, level):
@@ -136,7 +154,8 @@ def _shear_y_impl(pil_img, level):
         level = -level
     return pil_img.transform(pil_img.size, Image.AFFINE, (1, 0, 0, level, 1, 0))
 
-shear_y = TransformT('ShearY', _shear_y_impl)
+
+shear_y = TransformT("ShearY", _shear_y_impl)
 
 
 def _translate_x_impl(pil_img, level):
@@ -156,7 +175,8 @@ def _translate_x_impl(pil_img, level):
         level = -level
     return pil_img.transform(pil_img.size, Image.AFFINE, (1, 0, level, 0, 1, 0))
 
-translate_x = TransformT('TranslateX', _translate_x_impl)
+
+translate_x = TransformT("TranslateX", _translate_x_impl)
 
 
 def _translate_y_impl(pil_img, level):
@@ -176,7 +196,8 @@ def _translate_y_impl(pil_img, level):
         level = -level
     return pil_img.transform(pil_img.size, Image.AFFINE, (1, 0, 0, 0, 1, level))
 
-translate_y = TransformT('TranslateY', _translate_y_impl)
+
+translate_y = TransformT("TranslateY", _translate_y_impl)
 
 
 def set_image_augmentation_space(max_strength):
@@ -196,7 +217,7 @@ def set_image_augmentation_space(max_strength):
         shear_x,  # extra coin-flip
         shear_y,  # extra coin-flip
         translate_x,  # extra coin-flip
-        translate_y  # extra coin-flip
+        translate_y,  # extra coin-flip
     ]
     return image_all_transform
 
@@ -210,23 +231,24 @@ def set_text_augmentation_space(max_strength):
         "syn_replacement",
         "random_delete",
         "random_swap",
-        "insert_punc"
+        "insert_punc",
     ]
 
     try:
-        nltk.data.find('tagger/averaged_perceptron_tagger')
+        nltk.data.find("tagger/averaged_perceptron_tagger")
     except LookupError:
-        nltk.download('averaged_perceptron_tagger')
+        nltk.download("averaged_perceptron_tagger")
     try:
-        nltk.data.find('corpora/wordnet')
+        nltk.data.find("corpora/wordnet")
     except LookupError:
-        nltk.download('wordnet')
+        nltk.download("wordnet")
     try:
-        nltk.data.find('corpora/omw-1.4')
+        nltk.data.find("corpora/omw-1.4")
     except LookupError:
-        nltk.download('omw-1.4')
+        nltk.download("omw-1.4")
 
     return text_all_transform
+
 
 class TrivialAugment:
     """
@@ -235,7 +257,7 @@ class TrivialAugment:
     """
 
     def __init__(self, datatype, max_strength) -> None:
-        assert max_strength > 0, "Invalid maximum strength. Must > 0" 
+        assert max_strength > 0, "Invalid maximum strength. Must > 0"
         self.max_strength = max_strength
         self.data_type = datatype
         if datatype == "img":
@@ -249,27 +271,26 @@ class TrivialAugment:
         if self.data_type == "img":
             return self.augment_image(data)
         elif self.data_type == "text":
-            return self.augment_text(data)
-    
+            return self.augment(data)
+
     def augment_image(self, data):
         op = random.choice(self.all_transform)
         scale = random.randint(0, self.max_strength)
         return op.augment(scale, data)
-    
-    def augment_text(self, data):
-        op_str= random.choice(self.all_transform)
-        scale = random.uniform(0, self.max_strength)
 
+    def augment(self, data):
+        op_str = random.choice(self.all_transform)
+        scale = random.uniform(0, self.max_strength)
         if op_str == "identity":
             return data
-        elif op_str == "syn_replacement": 
-            op = naw.SynonymAug(aug_src = "wordnet", aug_p = scale, aug_max = None)
-        elif op_str ==  "random_swap":
-            op = naw.RandomWordAug(action = "swap", aug_p = scale, aug_max = None)
-        elif op_str == "random_delete" :
-            op = naw.RandomWordAug(action = "delete", aug_p = scale, aug_max = None )
+        elif op_str == "syn_replacement":
+            op = naw.SynonymAug(aug_src="wordnet", aug_p=scale, aug_max=None)
+        elif op_str == "random_swap":
+            op = naw.RandomWordAug(action="swap", aug_p=scale, aug_max=None)
+        elif op_str == "random_delete":
+            op = naw.RandomWordAug(action="delete", aug_p=scale, aug_max=None)
         elif op_str == "insert_punc":
-            op = InsertPunctuation(aug_p = scale, aug_max = None)
+            op = InsertPunctuation(aug_p=scale, aug_max=None)
         else:
             raise NotImplementedError
         return op.augment(data)
