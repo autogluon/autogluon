@@ -43,12 +43,12 @@ def test_cross_entropy(metric_name, class_num):
 
 
 @pytest.mark.parametrize(
-    "problem_type,loss_func_replaced",
+    "problem_type,loss_func_name",
     [
         ("regression", "bcewithlogitsloss"),
     ]
 )
-def test_bce_with_logits_loss(problem_type, loss_func_replaced):
+def test_bce_with_logits_loss(problem_type, loss_func_name):
     preds = []
     targets = []
     random.seed(123)
@@ -64,7 +64,7 @@ def test_bce_with_logits_loss(problem_type, loss_func_replaced):
     loss_func = get_loss_func(
         problem_type=problem_type,
         mixup_active=False,
-        loss_func_replaced=loss_func_replaced,
+        loss_func_name=loss_func_name,
     )
 
     score1 = loss_func(input=preds, target=targets)
