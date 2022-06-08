@@ -76,6 +76,7 @@ from .utils import (
 from .optimization.utils import (
     get_metric,
     get_loss_func,
+    update_config_by_rules,
 )
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
@@ -367,6 +368,11 @@ class AutoMMPredictor:
                 self._output_shape == output_shape
             ), f"Inferred output shape {output_shape} is different from the previous {self._output_shape}"
 
+        config = update_config_by_rules(
+            problem_type=problem_type,
+            config=config,
+        )
+
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
                 config=config.data,
@@ -436,7 +442,7 @@ class AutoMMPredictor:
                 UserWarning,
             )
 
-        loss_func = get_loss_func(problem_type, mixup_active)
+        loss_func = get_loss_func(problem_type, mixup_active, OmegaConf.select(config, "optimization.loss_function"))
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -452,7 +458,7 @@ class AutoMMPredictor:
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
-        self.mixup_fn = mixup_fn
+        self._loss_func = loss_func
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in _fit()
         self.save(save_path)
@@ -514,7 +520,7 @@ class AutoMMPredictor:
             ckpt_path=self._ckpt_path,
             resume=self._resume,
             enable_progress_bar=self._enable_progress_bar,
-            mixup_fn=self.mixup_fn,
+            mixup_fn=mixup_fn,
         )
         return self
 
@@ -1070,8 +1076,16 @@ class AutoMMPredictor:
             y_pred_prob = self._logits_to_prob(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
-        y_pred = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=False)
-        y_pred_transformed = self._df_preprocessor.transform_prediction(y_pred=logits, inverse_categorical=True)
+        y_pred = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            inverse_categorical=False,
+            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
+        )
+        y_pred_transformed = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            inverse_categorical=True,
+            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
+        )
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update(
@@ -1131,7 +1145,10 @@ class AutoMMPredictor:
             ret_type=LOGITS,
             requires_label=False,
         )
-        pred = self._df_preprocessor.transform_prediction(y_pred=logits)
+        pred = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
+        )
         if as_pandas:
             pred = self.as_pandas(data=data, to_be_converted=pred)
         return pred
