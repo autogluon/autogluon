@@ -22,7 +22,7 @@ autogluon_extras_dict = {
     'autogluon.core': ('all',),
     'autogluon.common': (),
     'autogluon.features': (),
-    'autogluon.forecasting': (),
+    'autogluon.timeseries': (),
     'autogluon.tabular': ('all',),
     'autogluon.text': (),
     'autogluon.vision': (),

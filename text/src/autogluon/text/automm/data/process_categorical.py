@@ -13,10 +13,10 @@ class CategoricalProcessor:
     """
 
     def __init__(
-            self,
-            prefix: str,
-            categorical_column_names: List[str],
-            requires_column_info: bool = False,
+        self,
+        prefix: str,
+        categorical_column_names: List[str],
+        requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -55,17 +55,13 @@ class CategoricalProcessor:
             for col_name in self.categorical_column_names:
                 fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
 
-        fn[self.categorical_key] = Tuple(
-            [
-                Stack() for _ in range(len(self.categorical_column_names))
-            ]
-        )
+        fn[self.categorical_key] = Tuple([Stack() for _ in range(len(self.categorical_column_names))])
 
         return fn
 
     def process_one_sample(
-            self,
-            categorical_features: Dict[str, int],
+        self,
+        categorical_features: Dict[str, int],
     ) -> Dict:
         """
         Process one sample's categorical features. Assume the categorical features
@@ -91,10 +87,10 @@ class CategoricalProcessor:
         return ret
 
     def __call__(
-            self,
-            all_categorical_features: Dict[str, NDArray[(Any,), np.int32]],
-            idx: int,
-            is_training: bool,
+        self,
+        all_categorical_features: Dict[str, NDArray[(Any,), np.int32]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Extract one sample's categorical features and customize it for a specific model.

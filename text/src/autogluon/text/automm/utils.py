@@ -398,9 +398,7 @@ def customize_model_names(
             setattr(new_config, per_name, copy.deepcopy(per_config))
             new_config.names.append(per_name)
         else:
-            logger.debug(
-                f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}."
-            )
+            logger.debug(f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}.")
 
     if len(new_config.names) == 0:
         raise ValueError(
@@ -591,6 +589,8 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
+                        text_detection_length=OmegaConf.select(model_config, "text_detection_length"),
+                        train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -704,7 +704,6 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
-                embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )
@@ -914,7 +913,6 @@ def load_text_tokenizers(
                 tokenizer_name=per_text_processor.tokenizer_name,
                 checkpoint_name=per_path,
             )
-
     return text_processors
 
 

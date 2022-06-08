@@ -443,7 +443,9 @@ def test_model_configs():
                     'max_text_len': 512, 
                     'insert_sep': True, 
                     'text_segment_num': 2, 
-                    'stochastic_chunk': False
+                    'stochastic_chunk': False,
+                    'text_detection_length': 10,
+                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
                 }, 
                 'timm_image': {
                     'checkpoint_name': 'swin_base_patch4_window7_224', 
@@ -467,7 +469,9 @@ def test_model_configs():
                     'max_text_len': 77, 
                     'insert_sep': False, 
                     'text_segment_num': 1, 
-                    'stochastic_chunk': False
+                    'stochastic_chunk': False,
+                    'text_detection_length': 10,
+                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
                 }, 
                 'fusion_transformer': {
                     'hidden_size': 192, 
@@ -568,7 +572,6 @@ def test_modifying_duplicate_model_names():
         for per_processor in per_modality_processors:
             assert per_processor.prefix in teacher_predictor._config.model.names
 
-
 def test_mixup():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
@@ -606,6 +609,50 @@ def test_mixup():
         score = predictor.evaluate(dataset.test_df)
         verify_predictor_save_load(predictor, dataset.test_df)
 
+def test_textagumentor_deepcopy():
+    dataset = ALL_DATASETS["ae"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
+        "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})", "random_swap({'aug_p': 0.05})"]
+    }
+
+    with tempfile.TemporaryDirectory() as save_path:
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            time_limit=10,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+        )
+
+    # Deep copy data preprocessor
+    df_preprocessor_copy = copy.deepcopy(predictor._df_preprocessor)
+    predictor._df_preprocessor = df_preprocessor_copy
+
+    # Test for copied preprocessor 
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
 
 @pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
 @pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))

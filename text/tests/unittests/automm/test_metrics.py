@@ -3,7 +3,7 @@ import random
 import torch
 from torchmetrics import MeanMetric
 from sklearn.metrics import log_loss
-from autogluon.text.automm.optimization.utils import get_metric
+from autogluon.text.automm.optimization.utils import get_metric, get_loss_func
 from autogluon.text.automm.constants import MULTICLASS
 
 
@@ -39,4 +39,36 @@ def test_cross_entropy(metric_name, class_num):
         y_true=targets,
         y_pred=preds,
     )
+    assert pytest.approx(score1, 1e-6) == score2
+
+
+@pytest.mark.parametrize(
+    "problem_type,loss_func_name",
+    [
+        ("regression", "bcewithlogitsloss"),
+    ]
+)
+def test_bce_with_logits_loss(problem_type, loss_func_name):
+    preds = []
+    targets = []
+    random.seed(123)
+    torch.manual_seed(123)
+
+    for i in range(100):
+        bs = random.randint(1, 16)
+        preds.append(torch.randn(bs, 1))
+        targets.append(torch.rand(bs, 1))
+    preds = torch.cat(preds)
+    targets = torch.cat(targets)
+
+    loss_func = get_loss_func(
+        problem_type=problem_type,
+        mixup_active=False,
+        loss_func_name=loss_func_name,
+    )
+
+    score1 = loss_func(input=preds, target=targets)
+    preds = preds.sigmoid()
+    bceloss = torch.nn.BCELoss()
+    score2 = bceloss(input=preds, target=targets)
     assert pytest.approx(score1, 1e-6) == score2

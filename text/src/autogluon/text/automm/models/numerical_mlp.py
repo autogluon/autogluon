@@ -13,16 +13,16 @@ class NumericalMLP(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            in_features: int,
-            hidden_features: Optional[int] = None,
-            out_features: Optional[int] = None,
-            num_layers: Optional[int] = 1,
-            activation: Optional[str] = "leaky_relu",
-            dropout_prob: Optional[float] = 0.5,
-            normalization: Optional[str] = "layer_norm",
-            num_classes: Optional[int] = 0,
+        self,
+        prefix: str,
+        in_features: int,
+        hidden_features: Optional[int] = None,
+        out_features: Optional[int] = None,
+        num_layers: Optional[int] = 1,
+        activation: Optional[str] = "leaky_relu",
+        dropout_prob: Optional[float] = 0.5,
+        normalization: Optional[str] = "layer_norm",
+        num_classes: Optional[int] = 0,
     ):
         """
         Parameters
@@ -75,8 +75,8 @@ class NumericalMLP(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         """
 
@@ -100,7 +100,9 @@ class NumericalMLP(nn.Module):
             }
         }
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         All layers have the same id 0 since there is no pre-trained models used here.
 
