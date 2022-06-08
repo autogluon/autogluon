@@ -45,9 +45,7 @@ class TransformT(object):
 identity = TransformT("identity", lambda data, level: data)
 
 
-auto_contrast = TransformT(
-    "AutoContrast", lambda pil_img, level: ImageOps.autocontrast(pil_img)
-)
+auto_contrast = TransformT("AutoContrast", lambda pil_img, level: ImageOps.autocontrast(pil_img))
 
 
 equalize = TransformT("Equalize", lambda pil_img, level: ImageOps.equalize(pil_img))
@@ -99,9 +97,7 @@ def _enhancer_impl(enhancer):
     max = 1.8
 
     def impl(pil_img, level):
-        v = (
-            scale_parameter(level, max - min, "float") + min
-        )  # going to 0 just destroys it
+        v = scale_parameter(level, max - min, "float") + min  # going to 0 just destroys it
         return enhancer(pil_img).enhance(v)
 
     return impl

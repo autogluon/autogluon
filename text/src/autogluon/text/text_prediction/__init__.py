@@ -6,7 +6,10 @@ from . import presets
 from .predictor import TextPredictor
 
 __all__ = [
-    'constants', 'infer_types', 'metrics',
-    'predictor', 'presets',
-    'TextPredictor',
+    "constants",
+    "infer_types",
+    "metrics",
+    "predictor",
+    "presets",
+    "TextPredictor",
 ]

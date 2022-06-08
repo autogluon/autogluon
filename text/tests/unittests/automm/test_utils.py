@@ -17,32 +17,31 @@ from autogluon.text.automm.constants import (
 )
 
 
-@pytest.mark.parametrize('data,expected',
-                         [
-                             ('aaa=a bbb=b ccc=c', {'aaa': 'a', 'bbb': 'b', 'ccc': 'c'}),
-                             ('a.a.aa=b b.b.bb=c', {'a.a.aa': 'b', 'b.b.bb': 'c'}),
-                             ('a.a.aa=1 b.b.bb=100', {'a.a.aa': '1', 'b.b.bb': '100'}),
-                             (['a.a.aa=1', 'b.b.bb=100'], {'a.a.aa': '1', 'b.b.bb': '100'})
-                         ])
+@pytest.mark.parametrize(
+    "data,expected",
+    [
+        ("aaa=a bbb=b ccc=c", {"aaa": "a", "bbb": "b", "ccc": "c"}),
+        ("a.a.aa=b b.b.bb=c", {"a.a.aa": "b", "b.b.bb": "c"}),
+        ("a.a.aa=1 b.b.bb=100", {"a.a.aa": "1", "b.b.bb": "100"}),
+        (["a.a.aa=1", "b.b.bb=100"], {"a.a.aa": "1", "b.b.bb": "100"}),
+    ],
+)
 def test_parse_dotlist_conf(data, expected):
     assert parse_dotlist_conf(data) == expected
 
 
 def test_apply_omegaconf_overrides():
-    conf = OmegaConf.from_dotlist(["a.aa.aaa=[1, 2, 3, 4]",
-                                   "a.aa.bbb=2",
-                                   "a.bb.aaa='100'",
-                                   "a.bb.bbb=4"])
-    overrides = 'a.aa.aaa=[1, 3, 5] a.aa.bbb=3'
+    conf = OmegaConf.from_dotlist(["a.aa.aaa=[1, 2, 3, 4]", "a.aa.bbb=2", "a.bb.aaa='100'", "a.bb.bbb=4"])
+    overrides = "a.aa.aaa=[1, 3, 5] a.aa.bbb=3"
     new_conf = apply_omegaconf_overrides(conf, overrides.split())
     assert new_conf.a.aa.aaa == [1, 3, 5]
     assert new_conf.a.aa.bbb == 3
-    new_conf2 = apply_omegaconf_overrides(conf, {'a.aa.aaa': [1, 3, 5, 7], 'a.aa.bbb': 4})
+    new_conf2 = apply_omegaconf_overrides(conf, {"a.aa.aaa": [1, 3, 5, 7], "a.aa.bbb": 4})
     assert new_conf2.a.aa.aaa == [1, 3, 5, 7]
     assert new_conf2.a.aa.bbb == 4
 
     with pytest.raises(KeyError):
-        new_conf3 = apply_omegaconf_overrides(conf, {'a.aa.aaaaaa': [1, 3, 5, 7], 'a.aa.bbb': 4})
+        new_conf3 = apply_omegaconf_overrides(conf, {"a.aa.aaaaaa": [1, 3, 5, 7], "a.aa.bbb": 4})
 
 
 @pytest.mark.parametrize(
@@ -56,7 +55,7 @@ def test_apply_omegaconf_overrides():
         (["b", "d", "b", "d"], "d", BINARY, 1),
         (["a", "d", "e", "b"], "d", MULTICLASS, None),
         ([3, 2, 1, 0], 2, MULTICLASS, None),
-    ]
+    ],
 )
 def test_inferring_pos_label(labels, pos_label, problem_type, true_pos_label):
     config = {
@@ -68,19 +67,12 @@ def test_inferring_pos_label(labels, pos_label, problem_type, true_pos_label):
     overrides = {}
     if pos_label is not None:
         overrides.update(
-            {
-                "data.pos_label": pos_label,
-            }
+            {"data.pos_label": pos_label,}
         )
-    config = get_config(
-        config=config,
-        overrides=overrides,
-    )
+    config = get_config(config=config, overrides=overrides,)
     label_encoder = LabelEncoder()
     label_encoder.fit(labels)
     pos_label = try_to_infer_pos_label(
-        data_config=config.data,
-        label_encoder=label_encoder,
-        problem_type=problem_type,
+        data_config=config.data, label_encoder=label_encoder, problem_type=problem_type,
     )
     assert pos_label == true_pos_label

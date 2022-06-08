@@ -55,13 +55,10 @@ class CategoricalMLP(nn.Module):
 
         for num_categories_per_col in num_categories:
             embedding_dim_per_col = int(
-                size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col**embed_exponent))
+                size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col ** embed_exponent))
             )
             self.column_embeddings.append(
-                nn.Embedding(
-                    num_embeddings=num_categories_per_col,
-                    embedding_dim=embedding_dim_per_col,
-                )
+                nn.Embedding(num_embeddings=num_categories_per_col, embedding_dim=embedding_dim_per_col,)
             )
 
             self.column_mlps.append(
@@ -104,8 +101,7 @@ class CategoricalMLP(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-        self,
-        batch: dict,
+        self, batch: dict,
     ):
         """
 
@@ -126,16 +122,9 @@ class CategoricalMLP(nn.Module):
         cat_features = torch.cat(features, dim=1)
         features = self.aggregator_mlp(cat_features)
         logits = self.head(features)
-        return {
-            self.prefix: {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        }
+        return {self.prefix: {LOGITS: logits, FEATURES: features,}}
 
-    def get_layer_ids(
-        self,
-    ):
+    def get_layer_ids(self,):
         """
         All layers have the same id 0 since there is no pre-trained models used here.
 

@@ -1,5 +1,6 @@
 import yacs.config
 
+
 class CfgNode(yacs.config.CfgNode):
     def clone_merge(self, cfg_filename_or_other_cfg):
         """Create a new cfg by cloning and mering with the given cfg
@@ -22,7 +23,7 @@ class CfgNode(yacs.config.CfgNode):
         elif cfg_filename_or_other_cfg is None:
             return ret
         else:
-            raise TypeError('Type of config path is not supported!')
+            raise TypeError("Type of config path is not supported!")
 
     def to_flat_dict(self):
         """Dump the config to a dictionary that is not nested.
@@ -53,8 +54,9 @@ class CfgNode(yacs.config.CfgNode):
                     sub_dict = convert_to_dict(v, key_list + [k])
                     if isinstance(sub_dict, dict):
                         for ck, cv in sub_dict.items():
-                            new_dict[f'{k}.{ck}'] = cv
+                            new_dict[f"{k}.{ck}"] = cv
                     else:
                         new_dict[k] = sub_dict
                 return new_dict
+
         return convert_to_dict(self, [])

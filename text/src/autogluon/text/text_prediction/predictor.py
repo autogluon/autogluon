@@ -17,14 +17,7 @@ class TextPredictor:
     """
 
     def __init__(
-            self,
-            label,
-            problem_type=None,
-            eval_metric=None,
-            path=None,
-            backend=PYTORCH,
-            verbosity=3,
-            warn_if_exist=True,
+        self, label, problem_type=None, eval_metric=None, path=None, backend=PYTORCH, verbosity=3, warn_if_exist=True,
     ):
         """
         Parameters
@@ -70,6 +63,7 @@ class TextPredictor:
             predictor_cls = AutoMMPredictor
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
+
             predictor_cls = MXTextPredictor
         else:
             raise ValueError(f"Unknown backend: {backend}")
@@ -150,20 +144,22 @@ class TextPredictor:
             return None
         return {k: v for k, v in zip(self.class_labels, self.class_labels_internal)}
 
-    def fit(self,
-            train_data,
-            tuning_data=None,
-            time_limit=None,
-            presets=None,
-            hyperparameters=None,
-            column_types=None,
-            num_cpus=None,
-            num_gpus=None,
-            num_trials=None,
-            plot_results=None,
-            holdout_frac=None,
-            save_path=None,
-            seed=123):
+    def fit(
+        self,
+        train_data,
+        tuning_data=None,
+        time_limit=None,
+        presets=None,
+        hyperparameters=None,
+        column_types=None,
+        num_cpus=None,
+        num_gpus=None,
+        num_trials=None,
+        plot_results=None,
+        holdout_frac=None,
+        save_path=None,
+        seed=123,
+    ):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
 
@@ -247,8 +243,12 @@ class TextPredictor:
                 seed=seed,
             )
         else:
-            warnings.warn(f'MXNet backend will be deprecated in AutoGluon 0.5. '
-                          f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
+            warnings.warn(
+                f"MXNet backend will be deprecated in AutoGluon 0.5. "
+                f'You may try to switch to use backend="{PYTORCH}".',
+                DeprecationWarning,
+                stacklevel=1,
+            )
             self._predictor.fit(
                 train_data=train_data,
                 tuning_data=tuning_data,
@@ -283,10 +283,7 @@ class TextPredictor:
         metrics_values : float or dict
             The metrics computed on the data. This is a single value if there is only one metric and is a dictionary of {metric_name --> value} if there are multiple metrics.
         """
-        return self._predictor.evaluate(
-            data=data,
-            metrics=metrics,
-        )
+        return self._predictor.evaluate(data=data, metrics=metrics,)
 
     def predict(self, data, as_pandas=True):
         """
@@ -304,10 +301,7 @@ class TextPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        return self._predictor.predict(
-            data=data,
-            as_pandas=as_pandas,
-        )
+        return self._predictor.predict(data=data, as_pandas=as_pandas,)
 
     def predict_proba(self, data, as_pandas=True, as_multiclass=True):
         """
@@ -330,11 +324,7 @@ class TextPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        return self._predictor.predict_proba(
-            data=data,
-            as_pandas=as_pandas,
-            as_multiclass=as_multiclass,
-        )
+        return self._predictor.predict_proba(data=data, as_pandas=as_pandas, as_multiclass=as_multiclass,)
 
     def extract_embedding(self, data, as_pandas=False):
         """
@@ -353,10 +343,7 @@ class TextPredictor:
         Array of embeddings, corresponding to each row in the given data.
         It will have shape (#samples, D) where the embedding dimension D is determined by the neural network's architecture.
         """
-        return self._predictor.extract_embedding(
-            data=data,
-            as_pandas=as_pandas,
-        )
+        return self._predictor.extract_embedding(data=data, as_pandas=as_pandas,)
 
     def save(self, path, standalone=False):
         """
@@ -381,14 +368,11 @@ class TextPredictor:
             Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
-        self._predictor.save(path=path,standalone=standalone)
+        self._predictor.save(path=path, standalone=standalone)
 
     @staticmethod
     def load(
-            path: str,
-            verbosity: int = None,
-            backend: str = PYTORCH,
-            resume: bool = False,
+        path: str, verbosity: int = None, backend: str = PYTORCH, resume: bool = False,
     ):
         """
         Load a TextPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
@@ -408,22 +392,15 @@ class TextPredictor:
 
         """
         if backend == PYTORCH:
-            _predictor = AutoMMPredictor.load(
-                path=path,
-                resume=resume,
-            )
+            _predictor = AutoMMPredictor.load(path=path, resume=resume,)
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
-            _predictor = MXTextPredictor.load(
-                path=path,
-                verbosity=verbosity,
-            )
+
+            _predictor = MXTextPredictor.load(path=path, verbosity=verbosity,)
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-        predictor = TextPredictor(
-            label=_predictor.label,
-        )
+        predictor = TextPredictor(label=_predictor.label,)
         predictor._backend = backend
         predictor._predictor = _predictor
 

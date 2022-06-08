@@ -180,19 +180,11 @@ class CategoricalTransformer(nn.Module):
         self.out_features = out_features
 
         self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
-            num_categories=num_categories,
-            d_token=d_token,
-            bias=token_bias,
-            initialization=token_initialization,
+            num_categories=num_categories, d_token=d_token, bias=token_bias, initialization=token_initialization,
         )
 
         self.cls_token = (
-            CLSToken(
-                d_token=d_token,
-                initialization=token_initialization,
-            )
-            if cls_token
-            else nn.Identity()
+            CLSToken(d_token=d_token, initialization=token_initialization,) if cls_token else nn.Identity()
         )
 
         if kv_compression_ratio is not None:
@@ -266,16 +258,9 @@ class CategoricalTransformer(nn.Module):
 
         logits = self.head(features)
 
-        return {
-            self.prefix: {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        }
+        return {self.prefix: {LOGITS: logits, FEATURES: features,}}
 
-    def get_layer_ids(
-        self,
-    ):
+    def get_layer_ids(self,):
         """
         All layers have the same id 0 since there is no pre-trained models used here.
 

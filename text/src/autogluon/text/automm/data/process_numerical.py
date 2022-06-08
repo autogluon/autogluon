@@ -65,10 +65,7 @@ class NumericalProcessor:
 
         return fn
 
-    def process_one_sample(
-        self,
-        numerical_features: Dict[str, float],
-    ) -> Dict:
+    def process_one_sample(self, numerical_features: Dict[str, float],) -> Dict:
         """
         Process one sample's numerical features.
         Here it converts numerical features to a NumPy array.
@@ -96,10 +93,7 @@ class NumericalProcessor:
         return ret
 
     def __call__(
-        self,
-        all_numerical_features: Dict[str, NDArray[(Any,), np.float32]],
-        idx: int,
-        is_training: bool,
+        self, all_numerical_features: Dict[str, NDArray[(Any,), np.float32]], idx: int, is_training: bool,
     ) -> Dict:
         """
         Extract one sample's numerical features and customize it for a specific model.

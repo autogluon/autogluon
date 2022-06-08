@@ -37,9 +37,7 @@ from .soft_target_crossentropy import SoftTargetCrossEntropy
 
 
 def get_loss_func(
-    problem_type: str,
-    mixup_active: bool,
-    loss_func_name: Optional[str] = None,
+    problem_type: str, mixup_active: bool, loss_func_name: Optional[str] = None,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -77,10 +75,7 @@ def get_loss_func(
 
 
 def get_metric(
-    metric_name: str,
-    problem_type: str,
-    num_classes: Optional[int] = None,
-    pos_label: Optional[int] = None,
+    metric_name: str, problem_type: str, num_classes: Optional[int] = None, pos_label: Optional[int] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -180,26 +175,11 @@ def get_optimizer(
     A Pytorch optimizer.
     """
     if optim_type == "adamw":
-        optimizer = optim.AdamW(
-            optimizer_grouped_parameters,
-            lr=lr,
-            weight_decay=weight_decay,
-            eps=eps,
-            betas=betas,
-        )
+        optimizer = optim.AdamW(optimizer_grouped_parameters, lr=lr, weight_decay=weight_decay, eps=eps, betas=betas,)
     elif optim_type == "adam":
-        optimizer = optim.Adam(
-            optimizer_grouped_parameters,
-            lr=lr,
-            weight_decay=weight_decay,
-        )
+        optimizer = optim.Adam(optimizer_grouped_parameters, lr=lr, weight_decay=weight_decay,)
     elif optim_type == "sgd":
-        optimizer = optim.SGD(
-            optimizer_grouped_parameters,
-            lr=lr,
-            weight_decay=weight_decay,
-            momentum=momentum,
-        )
+        optimizer = optim.SGD(optimizer_grouped_parameters, lr=lr, weight_decay=weight_decay, momentum=momentum,)
     else:
         raise ValueError(f"unknown optimizer: {optim_type}")
 
@@ -207,11 +187,7 @@ def get_optimizer(
 
 
 def get_lr_scheduler(
-    optimizer: optim.Optimizer,
-    num_max_steps: int,
-    num_warmup_steps: int,
-    lr_schedule: str,
-    end_lr: Union[float, int],
+    optimizer: optim.Optimizer, num_max_steps: int, num_warmup_steps: int, lr_schedule: str, end_lr: Union[float, int],
 ):
     """
     Get the learning rate scheduler from its name. Here we use our defined learning rate
@@ -237,9 +213,7 @@ def get_lr_scheduler(
     """
     if lr_schedule == "cosine_decay":
         scheduler = get_cosine_schedule_with_warmup(
-            optimizer=optimizer,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_max_steps,
+            optimizer=optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_max_steps,
         )
     elif lr_schedule == "polynomial_decay":
         scheduler = get_polynomial_decay_schedule_with_warmup(
@@ -303,10 +277,7 @@ def get_norm_layer_param_names(model: nn.Module):
 
 
 def apply_single_lr(
-    model: nn.Module,
-    lr: float,
-    weight_decay: float,
-    return_params: Optional[bool] = True,
+    model: nn.Module, lr: float, weight_decay: float, return_params: Optional[bool] = True,
 ):
     """
     Set to use a single learning rate for all parameters. Layer normalization parameters and other
@@ -347,11 +318,7 @@ def apply_single_lr(
 
 
 def apply_two_stages_lr(
-    model: nn.Module,
-    lr: float,
-    lr_mult: Union[float, int],
-    weight_decay: float,
-    return_params: Optional[bool] = True,
+    model: nn.Module, lr: float, lr_mult: Union[float, int], weight_decay: float, return_params: Optional[bool] = True,
 ):
     """
     Set up the pretrained backbone to use a smaller learning rate (lr * lr_mult).
@@ -424,11 +391,7 @@ def apply_two_stages_lr(
 
 
 def apply_layerwise_lr_decay(
-    model: nn.Module,
-    lr: float,
-    lr_decay: float,
-    weight_decay: float,
-    efficient_finetune: Optional[str] = None,
+    model: nn.Module, lr: float, lr_decay: float, weight_decay: float, efficient_finetune: Optional[str] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -483,7 +446,7 @@ def apply_layerwise_lr_decay(
         group_name = "layer_%d_%s" % (layer_id, group_name)
 
         if group_name not in parameter_group_names:
-            scale = lr_decay**layer_id
+            scale = lr_decay ** layer_id
 
             parameter_group_names[group_name] = {"weight_decay": this_weight_decay, "params": [], "lr": scale * lr}
             parameter_group_vars[group_name] = {"weight_decay": this_weight_decay, "params": [], "lr": scale * lr}
@@ -495,8 +458,7 @@ def apply_layerwise_lr_decay(
 
 
 def update_config_by_rules(
-    problem_type: str,
-    config: DictConfig,
+    problem_type: str, config: DictConfig,
 ):
     """
     Modify configs based on the need of loss func.

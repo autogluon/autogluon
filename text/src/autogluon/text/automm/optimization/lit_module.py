@@ -124,28 +124,16 @@ class LitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
 
     def _compute_loss(
-        self,
-        output: Dict,
-        label: torch.Tensor,
+        self, output: Dict, label: torch.Tensor,
     ):
         loss = 0
         for _, per_output in output.items():
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            loss += (
-                self.loss_func(
-                    input=per_output[LOGITS].squeeze(dim=1),
-                    target=label,
-                )
-                * weight
-            )
+            loss += self.loss_func(input=per_output[LOGITS].squeeze(dim=1), target=label,) * weight
         return loss
 
     def _compute_metric_score(
-        self,
-        metric: torchmetrics.Metric,
-        custom_metric_func: Callable,
-        logits: torch.Tensor,
-        label: torch.Tensor,
+        self, metric: torchmetrics.Metric, custom_metric_func: Callable, logits: torch.Tensor, label: torch.Tensor,
     ):
         if isinstance(self.loss_func, nn.BCEWithLogitsLoss):
             logits = torch.sigmoid(logits)
@@ -158,8 +146,7 @@ class LitModule(pl.LightningModule):
             metric.update(logits.squeeze(dim=1), label)
 
     def _shared_step(
-        self,
-        batch: Dict,
+        self, batch: Dict,
     ):
         label = batch[self.model.label_key]
         if self.mixup_fn is not None:
@@ -218,10 +205,7 @@ class LitModule(pl.LightningModule):
             label=batch[self.model.label_key],
         ),
         self.log(
-            self.validation_metric_name,
-            self.validation_metric,
-            on_step=False,
-            on_epoch=True,
+            self.validation_metric_name, self.validation_metric, on_step=False, on_epoch=True,
         )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
@@ -258,30 +242,18 @@ class LitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
-        kwargs = dict(
-            model=self.model,
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
-        )
+        kwargs = dict(model=self.model, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay,)
         if self.hparams.lr_choice == "two_stages":
             logger.debug("applying 2-stage learning rate...")
-            grouped_parameters = apply_two_stages_lr(
-                lr_mult=self.hparams.lr_mult,
-                return_params=True,
-                **kwargs,
-            )
+            grouped_parameters = apply_two_stages_lr(lr_mult=self.hparams.lr_mult, return_params=True, **kwargs,)
         elif self.hparams.lr_choice == "layerwise_decay":
             logger.debug("applying layerwise learning rate decay...")
             grouped_parameters = apply_layerwise_lr_decay(
-                lr_decay=self.hparams.lr_decay,
-                efficient_finetune=self.hparams.efficient_finetune,
-                **kwargs,
+                lr_decay=self.hparams.lr_decay, efficient_finetune=self.hparams.efficient_finetune, **kwargs,
             )
         else:
             logger.debug("applying single learning rate...")
-            grouped_parameters = apply_single_lr(
-                **kwargs,
-            )
+            grouped_parameters = apply_single_lr(**kwargs,)
 
         optimizer = get_optimizer(
             optim_type=self.hparams.optim_type,

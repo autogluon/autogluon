@@ -117,11 +117,7 @@ class NumericalFeatureTokenizer(nn.Module):
     """
 
     def __init__(
-        self,
-        in_features: int,
-        d_token: int,
-        bias: Optional[bool] = True,
-        initialization: Optional[str] = "normal",
+        self, in_features: int, d_token: int, bias: Optional[bool] = True, initialization: Optional[str] = "normal",
     ):
         """
         Parameters
@@ -161,10 +157,7 @@ class NumericalFeatureTokenizer(nn.Module):
         """The size of one token."""
         return self.weight.shape[1]
 
-    def forward(
-        self,
-        x: Tensor,
-    ) -> Tensor:
+    def forward(self, x: Tensor,) -> Tensor:
         x = self.weight[None] * x[..., None]
         if self.bias is not None:
             x = x + self.bias[None]
@@ -186,18 +179,11 @@ class AutoDis(nn.Module):
     """
 
     def __init__(
-        self,
-        in_features: int,
-        d_embedding: int,
-        n_meta_embeddings: int,
-        temperature: Optional[float] = 3.0,
+        self, in_features: int, d_embedding: int, n_meta_embeddings: int, temperature: Optional[float] = 3.0,
     ):
         super().__init__()
         self.first_layer = NumericalFeatureTokenizer(
-            in_features=in_features,
-            d_token=n_meta_embeddings,
-            bias=False,
-            initialization="uniform",
+            in_features=in_features, d_token=n_meta_embeddings, bias=False, initialization="uniform",
         )
         self.leaky_relu = nn.LeakyReLU()
         self.second_layer = NLinear(in_features, n_meta_embeddings, n_meta_embeddings, False)
@@ -299,16 +285,11 @@ class NumEmbeddings(nn.Module):
         elif embedding_arch[0] == "autodis":
             layers.append(
                 AutoDis(
-                    in_features=in_features,
-                    d_embedding=d_embedding,
-                    n_meta_embeddings=d_embedding,
-                    temperature=3.0,
+                    in_features=in_features, d_embedding=d_embedding, n_meta_embeddings=d_embedding, temperature=3.0,
                 )
             )
         else:
-            layers.append(
-                nn.Identity(),
-            )
+            layers.append(nn.Identity(),)
 
         for x in embedding_arch[1:]:
 
@@ -453,18 +434,11 @@ class NumericalTransformer(nn.Module):
         self.out_features = out_features
 
         self.numerical_feature_tokenizer = NumEmbeddings(
-            in_features=in_features,
-            d_embedding=d_token,
-            embedding_arch=embedding_arch,
+            in_features=in_features, d_embedding=d_token, embedding_arch=embedding_arch,
         )
 
         self.cls_token = (
-            CLSToken(
-                d_token=d_token,
-                initialization=token_initialization,
-            )
-            if cls_token
-            else nn.Identity()
+            CLSToken(d_token=d_token, initialization=token_initialization,) if cls_token else nn.Identity()
         )
 
         if kv_compression_ratio is not None:
@@ -536,16 +510,9 @@ class NumericalTransformer(nn.Module):
 
         logits = self.head(features)
 
-        return {
-            self.prefix: {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        }
+        return {self.prefix: {LOGITS: logits, FEATURES: features,}}
 
-    def get_layer_ids(
-        self,
-    ):
+    def get_layer_ids(self,):
         """
         All layers have the same id 0 since there is no pre-trained models used here.
 

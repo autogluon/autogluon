@@ -163,26 +163,16 @@ class DistillerLitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
 
     def _compute_hard_label_loss(
-        self,
-        output: dict,
-        label: torch.Tensor,
+        self, output: dict, label: torch.Tensor,
     ):
         loss = 0
         for per_output in output.values():
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            loss += (
-                self.hard_label_loss_func(
-                    input=per_output[LOGITS].squeeze(dim=1),
-                    target=label,
-                )
-                * weight
-            )
+            loss += self.hard_label_loss_func(input=per_output[LOGITS].squeeze(dim=1), target=label,) * weight
         return loss
 
     def _compute_soft_label_loss(
-        self,
-        student_output: dict,
-        teacher_output: dict,
+        self, student_output: dict, teacher_output: dict,
     ):
         student_logits = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
         soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
@@ -192,37 +182,23 @@ class DistillerLitModule(pl.LightningModule):
         if isinstance(self.soft_label_loss_func, nn.CrossEntropyLoss):
             soft_labels = F.softmax(soft_labels, dim=-1)
 
-        loss = self.soft_label_loss_func(
-            input=student_logits,
-            target=soft_labels,
-        )
+        loss = self.soft_label_loss_func(input=student_logits, target=soft_labels,)
         return loss
 
     def _compute_loss(
-        self,
-        student_output: dict,
-        teacher_output: dict,
-        label: torch.Tensor,
+        self, student_output: dict, teacher_output: dict, label: torch.Tensor,
     ):
         loss = 0
-        hard_label_loss = self._compute_hard_label_loss(
-            output=student_output,
-            label=label,
-        )
+        hard_label_loss = self._compute_hard_label_loss(output=student_output, label=label,)
         loss += hard_label_loss * self.hard_label_weight
 
-        soft_label_loss = self._compute_soft_label_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
+        soft_label_loss = self._compute_soft_label_loss(student_output=student_output, teacher_output=teacher_output,)
         loss += soft_label_loss * self.soft_label_weight
 
         return loss
 
     def _compute_metric(
-        self,
-        logits: torch.Tensor,
-        label: torch.Tensor,
+        self, logits: torch.Tensor, label: torch.Tensor,
     ):
         if isinstance(self.validation_metric, torchmetrics.AUROC):
             prob = F.softmax(logits.float(), dim=1)
@@ -233,19 +209,14 @@ class DistillerLitModule(pl.LightningModule):
             return self.validation_metric(logits.squeeze(dim=1), label)
 
     def _shared_step(
-        self,
-        batch: dict,
+        self, batch: dict,
     ):
         student_output = self.student_model(batch)
         self.teacher_model.eval()
         with torch.no_grad():
             teacher_output = self.teacher_model(batch)
         label = batch[self.student_model.label_key]
-        loss = self._compute_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-            label=label,
-        )
+        loss = self._compute_loss(student_output=student_output, teacher_output=teacher_output, label=label,)
         return student_output, loss
 
     def training_step(self, batch, batch_idx):
@@ -293,8 +264,7 @@ class DistillerLitModule(pl.LightningModule):
         self.log(
             self.validation_metric_name,
             self._compute_metric(
-                logits=student_output[self.student_model.prefix][LOGITS],
-                label=batch[self.student_model.label_key],
+                logits=student_output[self.student_model.prefix][LOGITS], label=batch[self.student_model.label_key],
             ),
         )
 
@@ -309,37 +279,22 @@ class DistillerLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
-        kwargs = dict(
-            model=self.student_model,
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
-        )
+        kwargs = dict(model=self.student_model, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay,)
         if self.hparams.lr_choice == "two_stages":
             logger.debug("applying 2-stage learning rate...")
-            grouped_parameters = apply_two_stages_lr(
-                lr_mult=self.hparams.lr_mult,
-                return_params=True,
-                **kwargs,
-            )
+            grouped_parameters = apply_two_stages_lr(lr_mult=self.hparams.lr_mult, return_params=True, **kwargs,)
         elif self.hparams.lr_choice == "layerwise_decay":
             logger.debug("applying layerwise learning rate decay...")
-            grouped_parameters = apply_layerwise_lr_decay(
-                lr_decay=self.hparams.lr_decay,
-                **kwargs,
-            )
+            grouped_parameters = apply_layerwise_lr_decay(lr_decay=self.hparams.lr_decay, **kwargs,)
         else:
             logger.debug("applying single learning rate...")
-            grouped_parameters = apply_single_lr(
-                **kwargs,
-            )
+            grouped_parameters = apply_single_lr(**kwargs,)
 
         if self.critics:  # to handle None
             for per_model_critics in self.critics:
                 for per_critic in per_model_critics:
                     critics_parameters = apply_single_lr(
-                        model=per_critic,
-                        lr=self.hparams.lr,
-                        weight_decay=self.hparams.weight_decay,
+                        model=per_critic, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay,
                     )
                     grouped_parameters.extend(critics_parameters)
 
@@ -347,9 +302,7 @@ class DistillerLitModule(pl.LightningModule):
             for per_model_baseline_funcs in self.baseline_funcs:
                 for per_baseline_func in per_model_baseline_funcs:
                     baseline_func_params = apply_single_lr(
-                        model=per_baseline_func,
-                        lr=self.hparams.lr,
-                        weight_decay=self.hparams.weight_decay,
+                        model=per_baseline_func, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay,
                     )
                     grouped_parameters.extend(baseline_func_params)
 

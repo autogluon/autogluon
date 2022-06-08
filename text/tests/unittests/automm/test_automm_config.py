@@ -16,9 +16,7 @@ def test_config():
         cur_path, "../../../src/autogluon/text/automm/configs/model/fusion_mlp_image_text_tabular.yaml"
     )
     model_config = OmegaConf.load(model_config_path)
-    data_config_path = os.path.join(
-        cur_path, "../../../src/autogluon/text/automm/configs/data/default.yaml"
-    )
+    data_config_path = os.path.join(cur_path, "../../../src/autogluon/text/automm/configs/data/default.yaml")
     data_config = OmegaConf.load(data_config_path)
     optimization_config_path = os.path.join(
         cur_path, "../../../src/autogluon/text/automm/configs/optimization/adamw.yaml"
@@ -93,7 +91,7 @@ def test_config():
         ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
         ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
         ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-    ]
+    ],
 )
 def test_model_selection(model_names):
     config = {
@@ -103,25 +101,14 @@ def test_model_selection(model_names):
         ENVIRONMENT: "default",
     }
     overrides = {"model.names": model_names}
-    config = get_config(
-        config=config,
-        overrides=overrides,
-    )
+    config = get_config(config=config, overrides=overrides,)
     assert sorted(config.model.names) == sorted(model_names)
     names2 = list(config.model.keys())
     names2.remove("names")
     assert sorted(config.model.names) == sorted(names2)
 
 
-@pytest.mark.parametrize(
-    "model_names,",
-    [
-        ["image"],
-        ["text"],
-        ["numerical"],
-        ["categorical"],
-    ]
-)
+@pytest.mark.parametrize("model_names,", [["image"], ["text"], ["numerical"], ["categorical"],])
 def test_invalid_model_selection(model_names):
     config = {
         MODEL: f"fusion_mlp_image_text_tabular",
@@ -132,7 +119,4 @@ def test_invalid_model_selection(model_names):
     overrides = {"model.names": model_names}
 
     with pytest.raises(ValueError):
-        config = get_config(
-            config=config,
-            overrides=overrides,
-        )
+        config = get_config(config=config, overrides=overrides,)

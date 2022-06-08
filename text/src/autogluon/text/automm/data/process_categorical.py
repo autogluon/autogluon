@@ -13,10 +13,7 @@ class CategoricalProcessor:
     """
 
     def __init__(
-        self,
-        prefix: str,
-        categorical_column_names: List[str],
-        requires_column_info: bool = False,
+        self, prefix: str, categorical_column_names: List[str], requires_column_info: bool = False,
     ):
         """
         Parameters
@@ -59,10 +56,7 @@ class CategoricalProcessor:
 
         return fn
 
-    def process_one_sample(
-        self,
-        categorical_features: Dict[str, int],
-    ) -> Dict:
+    def process_one_sample(self, categorical_features: Dict[str, int],) -> Dict:
         """
         Process one sample's categorical features. Assume the categorical features
         are the encoded labels from sklearn' LabelEncoder().
@@ -87,10 +81,7 @@ class CategoricalProcessor:
         return ret
 
     def __call__(
-        self,
-        all_categorical_features: Dict[str, NDArray[(Any,), np.int32]],
-        idx: int,
-        is_training: bool,
+        self, all_categorical_features: Dict[str, NDArray[(Any,), np.int32]], idx: int, is_training: bool,
     ) -> Dict:
         """
         Extract one sample's categorical features and customize it for a specific model.

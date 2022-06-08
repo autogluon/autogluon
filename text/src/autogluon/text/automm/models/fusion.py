@@ -120,8 +120,7 @@ class MultimodalFusionMLP(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-        self,
-        batch: dict,
+        self, batch: dict,
     ):
         """
 
@@ -149,12 +148,7 @@ class MultimodalFusionMLP(nn.Module):
 
         features = self.fusion_mlp(torch.cat(multimodal_features, dim=1))
         logits = self.head(features)
-        fusion_output = {
-            self.prefix: {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        }
+        fusion_output = {self.prefix: {LOGITS: logits, FEATURES: features,}}
         if self.loss_weight is not None:
             fusion_output[self.prefix].update({WEIGHT: 1})
             output.update(fusion_output)
@@ -162,9 +156,7 @@ class MultimodalFusionMLP(nn.Module):
         else:
             return fusion_output
 
-    def get_layer_ids(
-        self,
-    ):
+    def get_layer_ids(self,):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to
@@ -294,10 +286,7 @@ class MultimodalFusionTransformer(nn.Module):
             normalization=head_normalization,
         )
 
-        self.cls_token = CLSToken(
-            d_token=in_features,
-            initialization="uniform",
-        )
+        self.cls_token = CLSToken(d_token=in_features, initialization="uniform",)
 
         # init weights
         self.adapter.apply(init_weights)
@@ -313,8 +302,7 @@ class MultimodalFusionTransformer(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-        self,
-        batch: dict,
+        self, batch: dict,
     ):
         multimodal_features = []
         output = {}
@@ -334,12 +322,7 @@ class MultimodalFusionTransformer(nn.Module):
         features = self.fusion_transformer(multimodal_features)
 
         logits = self.head(features)
-        fusion_output = {
-            self.prefix: {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        }
+        fusion_output = {self.prefix: {LOGITS: logits, FEATURES: features,}}
         if self.loss_weight is not None:
             fusion_output[self.prefix].update({WEIGHT: 1})
             output.update(fusion_output)
@@ -347,9 +330,7 @@ class MultimodalFusionTransformer(nn.Module):
         else:
             return fusion_output
 
-    def get_layer_ids(
-        self,
-    ):
+    def get_layer_ids(self,):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to

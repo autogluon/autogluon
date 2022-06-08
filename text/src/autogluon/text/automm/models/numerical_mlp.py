@@ -75,8 +75,7 @@ class NumericalMLP(nn.Module):
         return f"{self.prefix}_{LABEL}"
 
     def forward(
-        self,
-        batch: dict,
+        self, batch: dict,
     ):
         """
 
@@ -93,16 +92,9 @@ class NumericalMLP(nn.Module):
         features = self.mlp(batch[self.numerical_key])
         logits = self.head(features)
 
-        return {
-            self.prefix: {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        }
+        return {self.prefix: {LOGITS: logits, FEATURES: features,}}
 
-    def get_layer_ids(
-        self,
-    ):
+    def get_layer_ids(self,):
         """
         All layers have the same id 0 since there is no pre-trained models used here.
 
