@@ -33,6 +33,11 @@ from copy import copy, deepcopy
 import nlpaug.flow as naf
 import nlpaug.augmenter.word as naw
 
+import ast
+from copy import copy, deepcopy
+import nlpaug.flow as naf
+import nlpaug.augmenter.word as naw
+
 logger = logging.getLogger(AUTOMM)
 
 # Disable tokenizer parallelism
@@ -61,7 +66,6 @@ def construct_text_augmenter(
     Returns
     -------
     A nlpaug sequantial flow.
-    
     """
     if augment_types is None or len(augment_types) == 0:
         return None
@@ -345,20 +349,19 @@ class TextProcessor:
         is_training
             Flag to apply augmentation only to training.
 
+        is_training
+            Flag to apply augmentation only to training.
+
         Returns
         -------
         A dictionary containing one sample's text tokens, valid length, and segment ids.
         """
         # tokenize text
         tokens = {}
-        warnings.filterwarnings(
-            "ignore",
-            "Token indices sequence length is longer than.*result in indexing errors",
-        )
+        warnings.filterwarnings("ignore", "Token indices sequence length is longer than.*result in indexing errors")
         for col_name, col_text in text.items():
 
             if is_training:
-                # user defined augmentation operation
                 if self.train_augmenter is not None:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
@@ -394,11 +397,7 @@ class TextProcessor:
         if cls_id is None or sep_id is None:
             # CLIP uses eos_token's feature as the pooled output.
             # See https://github.com/huggingface/transformers/blob/v4.14.1/src/transformers/models/clip/modeling_clip.py#L657
-            cls_id, sep_id, eos_id = (
-                tokenizer.bos_token_id,
-                tokenizer.bos_token_id,
-                tokenizer.eos_token_id,
-            )
+            cls_id, sep_id, eos_id = tokenizer.bos_token_id, tokenizer.bos_token_id, tokenizer.eos_token_id
         if cls_id is None or sep_id is None or eos_id is None:
             raise ValueError(f"tokenizer class: {tokenizer.__class__.__name__} has no valid cls, sep, and eos ids.")
         return cls_id, sep_id, eos_id
