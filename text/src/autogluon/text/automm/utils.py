@@ -78,7 +78,8 @@ logger = logging.getLogger(AUTOMM)
 
 
 def infer_metrics(
-    problem_type: Optional[str] = None, eval_metric_name: Optional[str] = None,
+    problem_type: Optional[str] = None,
+    eval_metric_name: Optional[str] = None,
 ):
     """
     Infer the validation metric and the evaluation metric if not provided.
@@ -249,21 +250,18 @@ def verify_model_names(config: DictConfig):
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
-    assert set(config.names).issubset(
-        set(keys)
-    ), f"`{config.names}` do not match config keys {keys}"
+    assert set(config.names).issubset(set(keys)), f"`{config.names}` do not match config keys {keys}"
 
     # verify that no name starts with another one
     names = sorted(config.names, key=lambda ele: len(ele), reverse=True)
     for i in range(len(names)):
         if names[i].startswith(tuple(names[i + 1 :])):
-            raise ValueError(
-                f"name {names[i]} starts with one of another name: {names[i+1:]}"
-            )
+            raise ValueError(f"name {names[i]} starts with one of another name: {names[i+1:]}")
 
 
 def get_name_prefix(
-    name: str, prefixes: List[str],
+    name: str,
+    prefixes: List[str],
 ):
     """
     Get a name's prefix from some available candidates.
@@ -292,7 +290,8 @@ def get_name_prefix(
 
 
 def customize_model_names(
-    config: DictConfig, customized_names: Union[str, List[str]],
+    config: DictConfig,
+    customized_names: Union[str, List[str]],
 ):
     """
     Customize attribute names of `config` with the provided names.
@@ -332,9 +331,7 @@ def customize_model_names(
             setattr(new_config, per_name, copy.deepcopy(per_config))
             new_config.names.append(per_name)
         else:
-            logger.debug(
-                f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}."
-            )
+            logger.debug(f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}.")
 
     if len(new_config.names) == 0:
         raise ValueError(
@@ -345,7 +342,8 @@ def customize_model_names(
 
 
 def select_model(
-    config: DictConfig, df_preprocessor: MultiModalFeaturePreprocessor,
+    config: DictConfig,
+    df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
     Filter model config through the detected modalities in the training data.
@@ -454,7 +452,8 @@ def init_df_preprocessor(
 
 
 def init_data_processors(
-    config: DictConfig, df_preprocessor: MultiModalFeaturePreprocessor,
+    config: DictConfig,
+    df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -520,12 +519,8 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(
-                            model_config, "text_detection_length"
-                        ),
-                        train_augment_types=OmegaConf.select(
-                            model_config, "text_train_augment_types"
-                        ),
+                        text_detection_length=OmegaConf.select(model_config, "text_detection_length"),
+                        train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -725,7 +720,9 @@ def create_model(
 
 
 def save_pretrained_models(
-    model: nn.Module, config: DictConfig, path: str,
+    model: nn.Module,
+    config: DictConfig,
+    path: str,
 ) -> DictConfig:
     """
     Save the pretrained models and configs to local to make future loading not dependent on Internet access.
@@ -741,12 +738,7 @@ def save_pretrained_models(
     path
         The path to save pretrained checkpoints.
     """
-    requires_saving = any(
-        [
-            model_name.lower().startswith((CLIP, HF_TEXT))
-            for model_name in config.model.names
-        ]
-    )
+    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names])
     if not requires_saving:
         return config
 
@@ -767,7 +759,7 @@ def convert_checkpoint_name(config: DictConfig, path: str) -> DictConfig:
     """
     Convert the checkpoint name from relative path to absolute path for
     loading the pretrained weights in offline deployment.
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
 
     Parameters
     ----------
@@ -780,21 +772,18 @@ def convert_checkpoint_name(config: DictConfig, path: str) -> DictConfig:
         if model_name.lower().startswith((CLIP, HF_TEXT)):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
-                model_config.checkpoint_name = os.path.join(
-                    path, model_config.checkpoint_name[len("local://") :]
-                )
+                model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
                 assert os.path.exists(
                     os.path.join(model_config.checkpoint_name, "config.json")
                 )  # guarantee the existence of local configs
-                assert os.path.exists(
-                    os.path.join(model_config.checkpoint_name, "pytorch_model.bin")
-                )
+                assert os.path.exists(os.path.join(model_config.checkpoint_name, "pytorch_model.bin"))
 
     return config
 
 
 def save_text_tokenizers(
-    text_processors: List[TextProcessor], path: str,
+    text_processors: List[TextProcessor],
+    path: str,
 ) -> List[TextProcessor]:
     """
     Save all the text tokenizers and record their relative paths, which are
@@ -820,7 +809,8 @@ def save_text_tokenizers(
 
 
 def load_text_tokenizers(
-    text_processors: List[TextProcessor], path: str,
+    text_processors: List[TextProcessor],
+    path: str,
 ) -> List[TextProcessor]:
     """
     Load saved text tokenizers. If text processors already have tokenizers,
@@ -848,7 +838,9 @@ def load_text_tokenizers(
 
 
 def make_exp_dir(
-    root_path: str, job_name: str, create: Optional[bool] = True,
+    root_path: str,
+    job_name: str,
+    create: Optional[bool] = True,
 ):
     """
     Creates the exp dir of format e.g.,: root_path/2022_01_01/job_name_12_00_00/
@@ -885,7 +877,9 @@ def make_exp_dir(
     return exp_dir
 
 
-def average_checkpoints(checkpoint_paths: List[str],):
+def average_checkpoints(
+    checkpoint_paths: List[str],
+):
     """
     Average a list of checkpoints' state_dicts.
 
@@ -923,7 +917,9 @@ def average_checkpoints(checkpoint_paths: List[str],):
 
 
 def compute_score(
-    metric_data: dict, metric_name: str, pos_label: Optional[int] = 1,
+    metric_data: dict,
+    metric_name: str,
+    pos_label: Optional[int] = 1,
 ) -> float:
     """
     Use sklearn to compute the score of one metric.
@@ -1037,9 +1033,7 @@ def apply_omegaconf_overrides(
                     f'"{ele[0]}" is not found in the config. You may need to check the overrides. '
                     f"overrides={overrides}"
                 )
-    override_conf = OmegaConf.from_dotlist(
-        [f"{ele[0]}={ele[1]}" for ele in overrides.items()]
-    )
+    override_conf = OmegaConf.from_dotlist([f"{ele[0]}={ele[1]}" for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
 
@@ -1132,7 +1126,9 @@ def apply_log_filter(log_filter):
 
 
 def modify_duplicate_model_names(
-    predictor, postfix: str, blacklist: List[str],
+    predictor,
+    postfix: str,
+    blacklist: List[str],
 ):
     """
     Modify a predictor's model names if they exist in a blacklist.
@@ -1186,7 +1182,8 @@ def modify_duplicate_model_names(
 
 
 def assign_feature_column_names(
-    data_processors: Dict, df_preprocessor: MultiModalFeaturePreprocessor,
+    data_processors: Dict,
+    df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
     Assign feature column names to data processors.
@@ -1232,7 +1229,8 @@ def assign_feature_column_names(
 
 
 def turn_on_off_feature_column_info(
-    data_processors: Dict, flag: bool,
+    data_processors: Dict,
+    flag: bool,
 ):
     """
     Turn on or off returning feature column information in data processors.
@@ -1260,7 +1258,9 @@ def turn_on_off_feature_column_info(
 
 
 def try_to_infer_pos_label(
-    data_config: DictConfig, label_encoder: LabelEncoder, problem_type: str,
+    data_config: DictConfig,
+    label_encoder: LabelEncoder,
+    problem_type: str,
 ):
     """
     Try to infer positive label for binary classification, which is used in computing some metrics, e.g., roc_auc.
@@ -1294,7 +1294,9 @@ def try_to_infer_pos_label(
 
 
 def get_mixup(
-    model_config: DictConfig, mixup_config: DictConfig, num_classes: int,
+    model_config: DictConfig,
+    mixup_config: DictConfig,
+    num_classes: int,
 ):
     """
     Get the mixup state for loss function choice.
@@ -1326,9 +1328,7 @@ def get_mixup(
     mixup_active = False
     if mixup_config is not None and mixup_config.turn_on:
         mixup_active = (
-            mixup_config.mixup_alpha > 0
-            or mixup_config.cutmix_alpha > 0.0
-            or mixup_config.cutmix_minmax is not None
+            mixup_config.mixup_alpha > 0 or mixup_config.cutmix_alpha > 0.0 or mixup_config.cutmix_minmax is not None
         )
 
     mixup_state = model_active & mixup_active & (num_classes > 1)

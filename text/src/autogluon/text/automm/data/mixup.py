@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from timm.data.mixup import Mixup, mixup_target, cutmix_bbox_and_lam
 
+
 class MixupModule(Mixup):
     """
     Mixup class from timm.
@@ -11,15 +12,19 @@ class MixupModule(Mixup):
     This module helps to take the lambda from the Mixup.
     Lambda is added to the function to produce the mixup with specific lambda.
     """
-    def __init__(self, mixup_alpha=1.,
-                 cutmix_alpha=0.,
-                 cutmix_minmax=None,
-                 prob=1.0,
-                 switch_prob=0.5,
-                 mode='batch',
-                 correct_lam=True,
-                 label_smoothing=0.1,
-                 num_classes=1000):
+
+    def __init__(
+        self,
+        mixup_alpha=1.0,
+        cutmix_alpha=0.0,
+        cutmix_minmax=None,
+        prob=1.0,
+        switch_prob=0.5,
+        mode="batch",
+        correct_lam=True,
+        label_smoothing=0.1,
+        num_classes=1000,
+    ):
         """
         Parameters
         ----------
@@ -42,7 +47,17 @@ class MixupModule(Mixup):
         num_classes
             Number of classes for target.
         """
-        super().__init__(mixup_alpha,cutmix_alpha,cutmix_minmax,prob,switch_prob,mode,correct_lam,label_smoothing,num_classes)
+        super().__init__(
+            mixup_alpha,
+            cutmix_alpha,
+            cutmix_minmax,
+            prob,
+            switch_prob,
+            mode,
+            correct_lam,
+            label_smoothing,
+            num_classes,
+        )
         self.lam = None
         self.target_a = None
         self.target_b = None
@@ -57,10 +72,11 @@ class MixupModule(Mixup):
         for i in range(batch_size):
             j = batch_size - i - 1
             lam = lam_batch[i]
-            if lam != 1.:
+            if lam != 1.0:
                 if use_cutmix[i]:
                     (yl, yh, xl, xh), lam = cutmix_bbox_and_lam(
-                        x[i].shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam)
+                        x[i].shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam
+                    )
                     x[i][:, yl:yh, xl:xh] = x_orig[j][:, yl:yh, xl:xh]
                     lam_batch[i] = lam
                 else:
@@ -77,10 +93,11 @@ class MixupModule(Mixup):
         for i in range(batch_size // 2):
             j = batch_size - i - 1
             lam = lam_batch[i]
-            if lam != 1.:
+            if lam != 1.0:
                 if use_cutmix[i]:
                     (yl, yh, xl, xh), lam = cutmix_bbox_and_lam(
-                        x[i].shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam)
+                        x[i].shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam
+                    )
                     x[i][:, yl:yh, xl:xh] = x_orig[j][:, yl:yh, xl:xh]
                     x[j][:, yl:yh, xl:xh] = x_orig[i][:, yl:yh, xl:xh]
                     lam_batch[i] = lam
@@ -95,26 +112,28 @@ class MixupModule(Mixup):
             lam, use_cutmix = self._params_per_batch()
         else:
             _, use_cutmix = self._params_per_batch()
-        if lam == 1.:
-            return 1.
+        if lam == 1.0:
+            return 1.0
         if use_cutmix:
             (yl, yh, xl, xh), lam = cutmix_bbox_and_lam(
-                x.shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam)
+                x.shape, lam, ratio_minmax=self.cutmix_minmax, correct_lam=self.correct_lam
+            )
             x[:, :, yl:yh, xl:xh] = x.flip(0)[:, :, yl:yh, xl:xh]
         else:
-            x_flipped = x.flip(0).mul_(1. - lam)
+            x_flipped = x.flip(0).mul_(1.0 - lam)
             x.mul_(lam).add_(x_flipped)
         return lam
 
     def __call__(self, x, target, lam=None):
-        if self.mode == 'elem':
+        if self.mode == "elem":
             lam = self._mix_elem(x, lam)
-        elif self.mode == 'pair':
+        elif self.mode == "pair":
             lam = self._mix_pair(x, lam)
         else:
             lam = self._mix_batch(x, lam)
         target = mixup_target(target, self.num_classes, lam, self.label_smoothing, x.device)
         return x, target, lam
+
 
 def mixup_others(x, lam):
     """
@@ -138,10 +157,11 @@ def mixup_others(x, lam):
     else:
         lam = round(lam)
     if isinstance(x, tuple):
-        target = (pertarget * lam + pertarget.flip(0) * (1. - lam) for pertarget in x)
+        target = (pertarget * lam + pertarget.flip(0) * (1.0 - lam) for pertarget in x)
     else:
-        target = x * lam + x.flip(0) * (1. - lam)
+        target = x * lam + x.flip(0) * (1.0 - lam)
     return target
+
 
 def multimodel_mixup(batch, model, mixup_fn):
     """
@@ -173,9 +193,13 @@ def multimodel_mixup(batch, model, mixup_fn):
         for permodel in model.model:
             if hasattr(permodel, "image_key"):
                 if lam is None:
-                    batch[permodel.image_key], mixup_label, lam = mixup_fn(batch[permodel.image_key], batch[permodel.label_key])
+                    batch[permodel.image_key], mixup_label, lam = mixup_fn(
+                        batch[permodel.image_key], batch[permodel.label_key]
+                    )
                 else:
-                    batch[permodel.image_key], _, _ = mixup_fn(batch[permodel.image_key], batch[permodel.label_key], lam)
+                    batch[permodel.image_key], _, _ = mixup_fn(
+                        batch[permodel.image_key], batch[permodel.label_key], lam
+                    )
         for permodel in model.model:
             if hasattr(permodel, "categorical_key"):
                 mixup_others(batch[permodel.categorical_key], lam)

@@ -228,9 +228,7 @@ class ImageProcessor:
                     if isinstance(image_size, tuple):
                         image_size = image_size[-1]
                 else:
-                    raise ValueError(
-                        f" more than one image_size values are detected: {extracted}"
-                    )
+                    raise ValueError(f" more than one image_size values are detected: {extracted}")
                 mean = None
                 std = None
             except Exception as exp2:
@@ -240,7 +238,10 @@ class ImageProcessor:
 
         return image_size, mean, std
 
-    def construct_processor(self, transform_types: List[str],) -> transforms.Compose:
+    def construct_processor(
+        self,
+        transform_types: List[str],
+    ) -> transforms.Compose:
         """
         Build up an image processor from the provided list of transform types.
 
@@ -260,9 +261,7 @@ class ImageProcessor:
             if "(" in trans_type:
                 trans_mode = trans_type[0 : trans_type.find("(")]
                 if "{" in trans_type:
-                    kargs = ast.literal_eval(
-                        trans_type[trans_type.find("{") : trans_type.rfind(")")]
-                    )
+                    kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
                 else:
                     args = ast.literal_eval(trans_type[trans_type.find("(") :])
             else:
@@ -317,7 +316,9 @@ class ImageProcessor:
         return transforms.Compose(processor)
 
     def process_one_sample(
-        self, image_paths: Dict[str, List[str]], is_training: bool,
+        self,
+        image_paths: Dict[str, List[str]],
+        is_training: bool,
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -344,9 +345,9 @@ class ImageProcessor:
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
-                        message="Palette images with Transparency "
-                        "expressed in bytes should be "
-                        "converted to RGBA images",
+                        message=(
+                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                        ),
                     )
                     is_zero_img = False
                     try:
@@ -385,7 +386,10 @@ class ImageProcessor:
         return ret
 
     def __call__(
-        self, all_image_paths: Dict[str, List[List[str]]], idx: int, is_training: bool,
+        self,
+        all_image_paths: Dict[str, List[List[str]]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Obtain one sample's images and customized them for a specific model.
