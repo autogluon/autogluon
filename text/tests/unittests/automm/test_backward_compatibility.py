@@ -25,7 +25,9 @@ def test_load_old_checkpoint():
         sha1_hash=sha1sum_id,
     )
     protected_zip_extraction(
-        file_path, sha1_hash=sha1sum_id, folder=save_path,
+        file_path,
+        sha1_hash=sha1sum_id,
+        folder=save_path,
     )
     predictor = TextPredictor.load(checkpoint_path)
     verify_predictor_save_load(predictor, dataset.test_df)
@@ -33,8 +35,8 @@ def test_load_old_checkpoint():
     # continuous training
     predictor.fit(
         dataset.train_df,
-        presets="multilingual",
+        presets='multilingual',
         time_limit=10,
-        hyperparameters={"optimization.top_k_average_method": "uniform_soup"},
+        hyperparameters={'optimization.top_k_average_method': 'uniform_soup'}
     )
     verify_predictor_save_load(predictor, dataset.test_df)

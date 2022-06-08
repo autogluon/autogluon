@@ -156,7 +156,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_called
 
     def fit(
-        self, X: pd.DataFrame, y: pd.Series,
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
     ):
         """
         Fit the pd.DataFrame by grouping column names by their modality types. For example, all the
@@ -232,7 +234,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
 
-    def transform_text(self, df: pd.DataFrame,) -> Dict[str, List[str]]:
+    def transform_text(
+        self,
+        df: pd.DataFrame,
+    ) -> Dict[str, List[str]]:
         """
         Preprocess text data by collecting them together. May need to format
         the categorical and numerical data into strings if using them so.
@@ -265,7 +270,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return text_features
 
-    def transform_image(self, df: pd.DataFrame,) -> Dict[str, List[List[str]]]:
+    def transform_image(
+        self,
+        df: pd.DataFrame,
+    ) -> Dict[str, List[List[str]]]:
         """
         Preprocess image data by collecting their paths together. If one sample has multiple images
         in an image column, assume that their image paths are separated by ";".
@@ -287,7 +295,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             image_paths[col_name] = processed_data
         return image_paths
 
-    def transform_numerical(self, df: pd.DataFrame,) -> Dict[str, NDArray[(Any,), np.float32]]:
+    def transform_numerical(
+        self,
+        df: pd.DataFrame,
+    ) -> Dict[str, NDArray[(Any,), np.float32]]:
         """
         Preprocess numerical data by using SimpleImputer to fill possible missing values
         and StandardScaler to standardize the values (z = (x - mean) / std).
@@ -312,7 +323,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return numerical_features
 
-    def transform_categorical(self, df: pd.DataFrame,) -> Dict[str, NDArray[(Any,), np.int32]]:
+    def transform_categorical(
+        self,
+        df: pd.DataFrame,
+    ) -> Dict[str, NDArray[(Any,), np.int32]]:
         """
         Preprocess categorical data by using CategoryFeatureGenerator to generate
         categorical encodings, i.e., integers. This function needs to be called
@@ -341,7 +355,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return categorical_features
 
-    def transform_label(self, df: pd.DataFrame,) -> Dict[str, NDArray[(Any,), Any]]:
+    def transform_label(
+        self,
+        df: pd.DataFrame,
+    ) -> Dict[str, NDArray[(Any,), Any]]:
         """
         Preprocess ground-truth labels by using LabelEncoder to generate class labels for
         classification tasks or using StandardScaler to standardize numerical values
@@ -369,7 +386,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return {self._label_column: y}
 
-    def transform_label_for_metric(self, df: pd.DataFrame,) -> NDArray[(Any,), Any]:
+    def transform_label_for_metric(
+        self,
+        df: pd.DataFrame,
+    ) -> NDArray[(Any,), Any]:
         """
         Prepare ground-truth labels to compute metric scores in evaluation. Note that
         numerical values are not normalized since we want to evaluate the model performance
@@ -398,7 +418,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return y
 
     def transform_prediction(
-        self, y_pred: torch.Tensor, inverse_categorical: bool = True, loss_func: Optional[_Loss] = None,
+        self,
+        y_pred: torch.Tensor,
+        inverse_categorical: bool = True,
+        loss_func: Optional[_Loss] = None,
     ) -> NDArray[(Any,), Any]:
         """
         Transform model's output logits into class labels for classification

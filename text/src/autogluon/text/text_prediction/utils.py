@@ -8,7 +8,9 @@ from typing import List, Optional
 import inspect
 
 
-def parallel_transform(df, chunk_processor, num_process=None, fallback_threshold=1000):
+def parallel_transform(df, chunk_processor,
+                       num_process=None,
+                       fallback_threshold=1000):
     """Apply the function to each row of the pandas dataframe and store the results
     in a python list.
 
@@ -42,7 +44,9 @@ def parallel_transform(df, chunk_processor, num_process=None, fallback_threshold
     return out
 
 
-def get_trimmed_lengths(lengths: List[int], max_length: int, do_merge: bool = False) -> np.ndarray:
+def get_trimmed_lengths(lengths: List[int],
+                        max_length: int,
+                        do_merge: bool = False) -> np.ndarray:
     """Get the trimmed lengths of multiple text data. It will make sure that
     the trimmed length is smaller than or equal to the max_length
 
@@ -91,15 +95,13 @@ def get_trimmed_lengths(lengths: List[int], max_length: int, do_merge: bool = Fa
         return np.minimum(lengths, max_length)
 
 
-def logging_config(
-    folder: Optional[str] = None,
-    name: Optional[str] = None,
-    logger: logging.Logger = logging.root,
-    level: int = logging.INFO,
-    console_level: int = logging.INFO,
-    console: bool = True,
-    overwrite_handler: bool = False,
-) -> str:
+def logging_config(folder: Optional[str] = None,
+                   name: Optional[str] = None,
+                   logger: logging.Logger = logging.root,
+                   level: int = logging.INFO,
+                   console_level: int = logging.INFO,
+                   console: bool = True,
+                   overwrite_handler: bool = False) -> str:
     """Config the logging module. It will set the logger to save to the specified file path.
     Parameters
     ----------
@@ -123,7 +125,7 @@ def logging_config(
         The folder to save the log file.
     """
     if name is None:
-        name = inspect.stack()[-1][1].split(".")[0]
+        name = inspect.stack()[-1][1].split('.')[0]
     if folder is None:
         folder = os.path.join(os.getcwd(), name)
     if not os.path.exists(folder):
@@ -139,7 +141,7 @@ def logging_config(
                 need_console_handler = False
     logpath = os.path.join(folder, name + ".log")
     print("All Logs will be saved to {}".format(logpath))
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     if need_file_handler:
         logfile = logging.FileHandler(logpath)
         logfile.setLevel(level)

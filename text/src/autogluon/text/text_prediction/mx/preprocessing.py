@@ -24,29 +24,25 @@ logger = logging.getLogger(__name__)
 def base_preprocess_cfg():
     cfg = CfgNode()
     cfg.text = CfgNode()
-    cfg.text.merge = True  # Whether we will merge different text columns
-    # or treat them independently.
-    cfg.text.max_length = 512  # The maximum possible length.
-    cfg.text.auto_max_length = True  # Try to automatically shrink the maximal length
-    # based on the statistics of the dataset.
-    cfg.text.auto_max_length_quantile = (
-        0.95  # We will ensure that the new max_length is around the quantile of the lengths of all samples
-    )
-    cfg.text.auto_max_length_round_to = (
-        32  # We will ensure that the automatically determined max length will be divisible by round_to
-    )
+    cfg.text.merge = True                     # Whether we will merge different text columns
+                                              # or treat them independently.
+    cfg.text.max_length = 512                 # The maximum possible length.
+    cfg.text.auto_max_length = True           # Try to automatically shrink the maximal length
+                                              # based on the statistics of the dataset.
+    cfg.text.auto_max_length_quantile = 0.95  # We will ensure that the new max_length is around the quantile of the lengths of all samples
+    cfg.text.auto_max_length_round_to = 32    # We will ensure that the automatically determined max length will be divisible by round_to
     cfg.categorical = CfgNode()
-    cfg.categorical.minimum_cat_count = 100  # The minimal number of data per categorical group
-    cfg.categorical.maximum_num_cat = 20  # The minimal number of data per categorical group
-    cfg.categorical.convert_to_text = False  # Whether to convert the feature to text
+    cfg.categorical.minimum_cat_count = 100   # The minimal number of data per categorical group
+    cfg.categorical.maximum_num_cat = 20      # The minimal number of data per categorical group
+    cfg.categorical.convert_to_text = False   # Whether to convert the feature to text
 
     cfg.numerical = CfgNode()
-    cfg.numerical.convert_to_text = False  # Whether to convert the feature to text
-    cfg.numerical.impute_strategy = "mean"  # Whether to use mean to fill in the missing values.
-    # We use the imputer in sklearn: https://scikit-learn.org/stable/modules/generated/sklearn.impute.SimpleImputer.html
-    # The strategies can thus be "mean", "median", "most_frequent".
-    cfg.numerical.scaler_with_mean = True  # Whether to normalize with mean
-    cfg.numerical.scaler_with_std = True  # Whether to normalize with std
+    cfg.numerical.convert_to_text = False     # Whether to convert the feature to text
+    cfg.numerical.impute_strategy = 'mean'    # Whether to use mean to fill in the missing values.
+                                              # We use the imputer in sklearn: https://scikit-learn.org/stable/modules/generated/sklearn.impute.SimpleImputer.html
+                                              # The strategies can thus be "mean", "median", "most_frequent".
+    cfg.numerical.scaler_with_mean = True     # Whether to normalize with mean
+    cfg.numerical.scaler_with_std = True      # Whether to normalize with std
     cfg.freeze()
     return cfg
 
@@ -68,19 +64,17 @@ def get_tokenizer(backbone_name):
 
 
 class MultiModalTextBatchify:
-    def __init__(
-        self,
-        num_text_inputs,
-        num_categorical_inputs,
-        num_numerical_inputs,
-        cls_token_id,
-        sep_token_id,
-        max_length,
-        num_segments=2,
-        mode="train",
-        stochastic_chunk=True,
-        insert_sep=True,
-    ):
+    def __init__(self,
+                 num_text_inputs,
+                 num_categorical_inputs,
+                 num_numerical_inputs,
+                 cls_token_id,
+                 sep_token_id,
+                 max_length,
+                 num_segments=2,
+                 mode='train',
+                 stochastic_chunk=True,
+                 insert_sep=True):
         """Batchify function for the multimodal text column
 
         Parameters
@@ -116,7 +110,8 @@ class MultiModalTextBatchify:
         self._pad_batchify = Pad()
         self._stack_batchify = Stack()
         if self._num_categorical_inputs > 0:
-            self._categorical_batchify = Tuple([Stack() for _ in range(self._num_categorical_inputs)])
+            self._categorical_batchify = Tuple([Stack()
+                                                for _ in range(self._num_categorical_inputs)])
         else:
             self._categorical_batchify = None
         assert self._num_numerical_inputs == 0 or self._num_numerical_inputs == 1
@@ -152,9 +147,10 @@ class MultiModalTextBatchify:
                 max_length = self._max_length - (self._num_text_inputs + 1)
             else:
                 max_length = self._max_length - 2
-            trimmed_lengths = get_trimmed_lengths(
-                [len(ele[i]) for i in range(self._num_text_inputs)], max_length, do_merge=True
-            )
+            trimmed_lengths = get_trimmed_lengths([len(ele[i])
+                                                   for i in range(self._num_text_inputs)],
+                                                  max_length,
+                                                  do_merge=True)
             seg = 0
             token_ids = [self._cls_token_id]
             segment_ids = [seg]
@@ -163,7 +159,7 @@ class MultiModalTextBatchify:
                     start_ptr = np.random.randint(0, len(ele[i]) - trim_length + 1)
                 else:
                     start_ptr = 0
-                token_ids.extend(ele[i][start_ptr : (start_ptr + trim_length)].tolist())
+                token_ids.extend(ele[i][start_ptr:(start_ptr + trim_length)].tolist())
                 segment_ids.extend([seg] * trim_length)
                 if self._insert_sep or i == len(trimmed_lengths) - 1:
                     token_ids.append(self._sep_token_id)
@@ -175,37 +171,35 @@ class MultiModalTextBatchify:
             # Get categorical features
             ptr = self._num_text_inputs
             if self._num_categorical_inputs > 0:
-                categorical_features.append(ele[ptr : (ptr + self._num_categorical_inputs)])
+                categorical_features.append(ele[ptr:(ptr + self._num_categorical_inputs)])
             ptr += self._num_categorical_inputs
 
             # Get numerical features
             if self._num_numerical_inputs > 0:
                 numerical_features.append(ele[ptr].astype(np.float32))
             ptr += self._num_numerical_inputs
-            if self._mode == "train":
+            if self._mode == 'train':
                 labels.append(ele[ptr])
         features = []
-        features.append(
-            (
-                self._pad_batchify(text_token_ids),
-                self._stack_batchify(text_valid_length),
-                self._pad_batchify(text_segment_ids),
-            )
-        )
+        features.append((self._pad_batchify(text_token_ids),
+                         self._stack_batchify(text_valid_length),
+                         self._pad_batchify(text_segment_ids)))
         if self._num_categorical_inputs > 0:
             features.extend(self._categorical_batchify(categorical_features))
         if self._num_numerical_inputs > 0:
             features.append(self._stack_batchify(numerical_features))
-        if self._mode == "train":
+        if self._mode == 'train':
             labels = self._stack_batchify(labels)
             return features, labels
         else:
             return features
 
 
-def auto_shrink_max_length(
-    train_dataset, insert_sep, num_text_features, auto_max_length_quantile, round_to, max_length
-):
+def auto_shrink_max_length(train_dataset, insert_sep,
+                           num_text_features,
+                           auto_max_length_quantile,
+                           round_to,
+                           max_length):
     """Automatically shrink the max length based on the training data
 
     Parameters
@@ -225,7 +219,8 @@ def auto_shrink_max_length(
     lengths = []
     for sample in train_dataset:
         if insert_sep:
-            lengths.append(num_text_features + 1 + sum([len(sample[i]) for i in range(num_text_features)]))
+            lengths.append(num_text_features + 1 + sum([len(sample[i])
+                                                        for i in range(num_text_features)]))
         else:
             lengths.append(2 + sum([len(sample[i]) for i in range(num_text_features)]))
     real_data_max_length = max(lengths)
@@ -238,33 +233,34 @@ def auto_shrink_max_length(
 
 
 def get_stats_string(processor, dataset, is_train=False):
-    ret = "Features:\n"
-    ret += "   Text Column:\n"
+    ret = 'Features:\n'
+    ret += '   Text Column:\n'
     for i, col_name in enumerate(processor.text_feature_names):
         lengths = [len(ele[i]) for ele in dataset]
-        ret += (
-            '      - "{}":'
-            " Tokenized Length Min/Avg/Max="
-            "{}/{:.2f}/{}\n".format(col_name, np.min(lengths), np.mean(lengths), np.max(lengths))
-        )
-    ret += "   Categorical Column:\n"
-    for col_name, num_category in zip(processor.categorical_feature_names, processor.categorical_num_categories):
+        ret += '      - "{}":' \
+               ' Tokenized Length Min/Avg/Max=' \
+               '{}/{:.2f}/{}\n'.format(col_name, np.min(lengths),
+                                       np.mean(lengths),
+                                       np.max(lengths))
+    ret += '   Categorical Column:\n'
+    for col_name, num_category in zip(processor.categorical_feature_names,
+                                      processor.categorical_num_categories):
         ret += f'      - "{col_name}": Num Class={num_category}\n'
-    ret += f"   Numerical Columns: \n"
+    ret += f'   Numerical Columns: \n'
     for col_name in processor.numerical_feature_names:
         ret += f'      - "{col_name}"\n'
     if is_train:
         ret += f'Label: "{processor.label_column}"'
         if processor._column_types[processor.label_column] == _C.CATEGORICAL:
-            ret += f", Classes={processor.label_generator.classes_}\n"
+            ret += f', Classes={processor.label_generator.classes_}\n'
     return ret
 
 
 def get_cls_sep_id(tokenizer):
-    if hasattr(tokenizer.vocab, "cls_id"):
+    if hasattr(tokenizer.vocab, 'cls_id'):
         cls_id = tokenizer.vocab.cls_id
         sep_id = tokenizer.vocab.sep_id
-    elif hasattr(tokenizer.vocab, "bos_id"):
+    elif hasattr(tokenizer.vocab, 'bos_id'):
         cls_id = tokenizer.vocab.bos_id
         sep_id = tokenizer.vocab.eos_id
     else:
@@ -280,7 +276,7 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
         self._cfg = cfg
         self._feature_generators = dict()
         self._label_generator = label_generator
-        self._label_scaler = StandardScaler()  # Scaler used for numerical labels
+        self._label_scaler = StandardScaler()   # Scaler used for numerical labels
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
@@ -288,23 +284,16 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 continue
             elif col_type == _C.CATEGORICAL:
                 generator = CategoryFeatureGenerator(
-                    cat_order="count",
+                    cat_order='count',
                     minimum_cat_count=cfg.categorical.minimum_cat_count,
                     maximum_num_cat=cfg.categorical.maximum_num_cat,
-                    verbosity=0,
-                )
+                    verbosity=0)
                 self._feature_generators[col_name] = generator
             elif col_type == _C.NUMERICAL:
                 generator = Pipeline(
-                    [
-                        ("imputer", SimpleImputer()),
-                        (
-                            "scaler",
-                            StandardScaler(
-                                with_mean=cfg.numerical.scaler_with_mean, with_std=cfg.numerical.scaler_with_std
-                            ),
-                        ),
-                    ]
+                    [('imputer', SimpleImputer()),
+                     ('scaler', StandardScaler(with_mean=cfg.numerical.scaler_with_mean,
+                                               with_std=cfg.numerical.scaler_with_std))]
                 )
                 self._feature_generators[col_name] = generator
 
@@ -378,7 +367,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             The processed Y data
         """
         if self._fit_called:
-            raise RuntimeError("Fit has been called. Please create a new preprocessor and call " "fit again!")
+            raise RuntimeError('Fit has been called. Please create a new preprocessor and call '
+                               'fit again!')
         self._fit_called = True
         text_features = []
         categorical_features = []
@@ -391,30 +381,31 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                 self._ignore_columns_set.add(col_name)
                 continue
             elif col_type == _C.TEXT:
-                col_value = col_value.apply(lambda ele: "" if ele is None else str(ele))
+                col_value = col_value.apply(lambda ele: '' if ele is None else str(ele))
                 processed_col_value = parallel_transform(
-                    df=col_value, chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer)
-                )
+                    df=col_value,
+                    chunk_processor=functools.partial(tokenize_data,
+                                                      tokenizer=self._tokenizer))
                 text_features.append(processed_col_value)
                 self._text_feature_names.append(col_name)
             elif col_type == _C.CATEGORICAL:
                 if self.cfg.categorical.convert_to_text:
                     # Convert categorical column as text column
-                    processed_data = col_value.apply(lambda ele: "" if ele is None else str(ele))
+                    processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
                     if len(np.unique(processed_data)) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
                     processed_data = parallel_transform(
-                        df=processed_data, chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer)
-                    )
+                        df=processed_data,
+                        chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer))
                     text_features.append(processed_data)
                     self._text_feature_names.append(col_name)
                 else:
-                    processed_data = col_value.astype("category")
+                    processed_data = col_value.astype('category')
                     generator = self._feature_generators[col_name]
-                    processed_data = generator.fit_transform(pd.DataFrame({col_name: processed_data}))[
-                        col_name
-                    ].cat.codes.to_numpy(np.int32, copy=True)
+                    processed_data = generator.fit_transform(
+                        pd.DataFrame({col_name: processed_data}))[col_name]\
+                        .cat.codes.to_numpy(np.int32, copy=True)
                     if len(np.unique(processed_data)) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
@@ -429,21 +420,21 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
                     self._ignore_columns_set.add(col_name)
                     continue
                 if self.cfg.numerical.convert_to_text:
-                    processed_data = processed_data.apply("{:.3f}".format)
+                    processed_data = processed_data.apply('{:.3f}'.format)
                     processed_data = parallel_transform(
-                        df=processed_data, chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer)
-                    )
+                        df=processed_data,
+                        chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer))
                     text_features.append(processed_data)
                     self._text_feature_names.append(col_name)
                 else:
                     generator = self._feature_generators[col_name]
-                    processed_data = generator.fit_transform(np.expand_dims(processed_data.to_numpy(), axis=-1))[:, 0]
+                    processed_data = generator.fit_transform(
+                        np.expand_dims(processed_data.to_numpy(), axis=-1))[:, 0]
                     numerical_features.append(processed_data.astype(np.float32))
                     self._numerical_feature_names.append(col_name)
             else:
-                raise NotImplementedError(
-                    f"Type of the column is not supported currently. " f"Received {col_name}={col_type}."
-                )
+                raise NotImplementedError(f'Type of the column is not supported currently. '
+                                          f'Received {col_name}={col_type}.')
         if len(numerical_features) > 0:
             numerical_features = [np.stack(numerical_features, axis=-1)]
         if self.label_type == _C.CATEGORICAL:
@@ -456,9 +447,8 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             y = pd.to_numeric(y).to_numpy()
             y = self._label_scaler.fit_transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         else:
-            raise NotImplementedError(
-                f"Type of label column is not supported. " f"Label column type={self._label_column}"
-            )
+            raise NotImplementedError(f'Type of label column is not supported. '
+                                      f'Label column type={self._label_column}')
         # Wrap the processed features and labels into a training dataset
         all_data = text_features + categorical_features + numerical_features + [y]
         dataset = ArrayDataset(*all_data)
@@ -466,9 +456,9 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
 
     def transform(self, X_df, y_df=None):
         """"Transform the columns"""
-        assert self._fit_called, (
-            "You will need to first call " "preprocessor.fit_transform before calling " "preprocessor.transform."
-        )
+        assert self._fit_called, 'You will need to first call ' \
+                                 'preprocessor.fit_transform before calling ' \
+                                 'preprocessor.transform.'
         text_features = []
         categorical_features = []
         numerical_features = []
@@ -476,23 +466,25 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
             col_value = X_df[col_name]
             col_type = self._column_types[col_name]
             if col_type == _C.TEXT or col_type == _C.CATEGORICAL:
-                processed_data = col_value.apply(lambda ele: "" if ele is None else str(ele))
+                processed_data = col_value.apply(lambda ele: '' if ele is None else str(ele))
             elif col_type == _C.NUMERICAL:
-                processed_data = pd.to_numeric(col_value).apply("{:.3f}".format)
+                processed_data = pd.to_numeric(col_value).apply('{:.3f}'.format)
             else:
-                raise NotImplementedError
+                raise  NotImplementedError
             processed_data = parallel_transform(
-                df=processed_data, chunk_processor=functools.partial(tokenize_data, tokenizer=self._tokenizer)
-            )
+                df=processed_data,
+                chunk_processor=functools.partial(tokenize_data,
+                                                  tokenizer=self._tokenizer))
             text_features.append(processed_data)
 
-        for col_name, num_category in zip(self._categorical_feature_names, self._categorical_num_categories):
+        for col_name, num_category in zip(self._categorical_feature_names,
+                                          self._categorical_num_categories):
             col_value = X_df[col_name]
-            processed_data = col_value.astype("category")
+            processed_data = col_value.astype('category')
             generator = self._feature_generators[col_name]
-            processed_data = generator.transform(pd.DataFrame({col_name: processed_data}))[
-                col_name
-            ].cat.codes.to_numpy(np.int32, copy=True)
+            processed_data = generator.transform(
+                pd.DataFrame({col_name: processed_data}))[col_name] \
+                .cat.codes.to_numpy(np.int32, copy=True)
             processed_data[processed_data < 0] = num_category - 1
             categorical_features.append(processed_data)
 
@@ -519,15 +511,15 @@ class MultiModalTextFeatureProcessor(TransformerMixin, BaseEstimator):
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        state["_cfg"] = self._cfg.dump()
-        state["_tokenizer"] = None
-        state["_logger"] = None
+        state['_cfg'] = self._cfg.dump()
+        state['_tokenizer'] = None
+        state['_logger'] = None
         return state
 
     def __setstate__(self, state):
-        tokenizer_name = state["_tokenizer_name"]
+        tokenizer_name = state['_tokenizer_name']
         tokenizer = get_tokenizer(tokenizer_name)
-        state["_tokenizer"] = tokenizer
-        state["_logger"] = logging
-        state["_cfg"] = CfgNode.load_cfg(state["_cfg"])
+        state['_tokenizer'] = tokenizer
+        state['_logger'] = logging
+        state['_cfg'] = CfgNode.load_cfg(state['_cfg'])
         self.__dict__ = state

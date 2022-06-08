@@ -10,22 +10,18 @@ from ..config import CfgNode
 
 @use_np
 class BasicMLP(HybridBlock):
-    def __init__(
-        self,
-        in_units,
-        mid_units,
-        out_units,
-        num_layers=1,
-        normalization="layer_norm",
-        norm_eps=1e-5,
-        dropout=0.1,
-        data_dropout=False,
-        activation="leaky",
-        weight_initializer=None,
-        bias_initializer=None,
-        prefix=None,
-        params=None,
-    ):
+    def __init__(self, in_units,
+                 mid_units,
+                 out_units,
+                 num_layers=1,
+                 normalization='layer_norm',
+                 norm_eps=1E-5,
+                 dropout=0.1,
+                 data_dropout=False,
+                 activation='leaky',
+                 weight_initializer=None,
+                 bias_initializer=None,
+                 prefix=None, params=None):
         """
         data -> [dropout] * (0/1) -> [Dense -> Normalization -> ACT] * N -> dropout -> Dense -> out
 
@@ -52,29 +48,24 @@ class BasicMLP(HybridBlock):
                 if num_layers > 0 and data_dropout:
                     self.proj.add(nn.Dropout(dropout))
                 for i in range(num_layers):
-                    self.proj.add(
-                        nn.Dense(
-                            units=mid_units,
-                            in_units=in_units,
-                            flatten=False,
-                            weight_initializer=weight_initializer,
-                            bias_initializer=bias_initializer,
-                            use_bias=False,
-                        )
-                    )
-                    self.proj.add(get_norm_layer(normalization, axis=-1, epsilon=norm_eps, in_channels=mid_units))
+                    self.proj.add(nn.Dense(units=mid_units,
+                                           in_units=in_units,
+                                           flatten=False,
+                                           weight_initializer=weight_initializer,
+                                           bias_initializer=bias_initializer,
+                                           use_bias=False))
+                    self.proj.add(get_norm_layer(normalization,
+                                                 axis=-1,
+                                                 epsilon=norm_eps,
+                                                 in_channels=mid_units))
                     self.proj.add(get_activation(activation))
                     in_units = mid_units
                 self.proj.add(nn.Dropout(dropout))
-                self.proj.add(
-                    nn.Dense(
-                        units=out_units,
-                        in_units=in_units,
-                        weight_initializer=weight_initializer,
-                        bias_initializer=bias_initializer,
-                        flatten=False,
-                    )
-                )
+                self.proj.add(nn.Dense(units=out_units,
+                                       in_units=in_units,
+                                       weight_initializer=weight_initializer,
+                                       bias_initializer=bias_initializer,
+                                       flatten=False))
 
     def hybrid_forward(self, F, x):
         return self.proj(x)
@@ -83,7 +74,6 @@ class BasicMLP(HybridBlock):
 @use_np
 class CategoricalFeatureNet(HybridBlock):
     """Embedding of the categories."""
-
     def __init__(self, num_class, out_units, cfg=None, prefix=None, params=None):
         super().__init__(prefix=prefix, params=params)
         self.cfg = cfg = CategoricalFeatureNet.get_cfg().clone_merge(cfg)
@@ -91,22 +81,20 @@ class CategoricalFeatureNet(HybridBlock):
         weight_initializer = mx.init.create(*cfg.initializer.weight)
         bias_initializer = mx.init.create(*cfg.initializer.bias)
         with self.name_scope():
-            self.embedding = nn.Embedding(
-                input_dim=num_class, output_dim=cfg.emb_units, weight_initializer=embed_initializer
-            )
-            self.proj = BasicMLP(
-                in_units=cfg.emb_units,
-                mid_units=cfg.mid_units,
-                out_units=out_units,
-                num_layers=cfg.num_layers,
-                normalization=cfg.normalization,
-                norm_eps=cfg.norm_eps,
-                data_dropout=cfg.data_dropout,
-                dropout=cfg.dropout,
-                activation=cfg.activation,
-                weight_initializer=weight_initializer,
-                bias_initializer=bias_initializer,
-            )
+            self.embedding = nn.Embedding(input_dim=num_class,
+                                          output_dim=cfg.emb_units,
+                                          weight_initializer=embed_initializer)
+            self.proj = BasicMLP(in_units=cfg.emb_units,
+                                 mid_units=cfg.mid_units,
+                                 out_units=out_units,
+                                 num_layers=cfg.num_layers,
+                                 normalization=cfg.normalization,
+                                 norm_eps=cfg.norm_eps,
+                                 data_dropout=cfg.data_dropout,
+                                 dropout=cfg.dropout,
+                                 activation=cfg.activation,
+                                 weight_initializer=weight_initializer,
+                                 bias_initializer=bias_initializer)
 
     @staticmethod
     def get_cfg(key=None):
@@ -117,13 +105,13 @@ class CategoricalFeatureNet(HybridBlock):
             cfg.num_layers = 1
             cfg.data_dropout = False
             cfg.dropout = 0.1
-            cfg.activation = "leaky"
-            cfg.normalization = "layer_norm"
+            cfg.activation = 'leaky'
+            cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
             cfg.initializer = CfgNode()
-            cfg.initializer.embed = ["xavier", "gaussian", "in", 1.0]
-            cfg.initializer.weight = ["xavier", "uniform", "avg", 3.0]
-            cfg.initializer.bias = ["zeros"]
+            cfg.initializer.embed = ['xavier', 'gaussian', 'in', 1.0]
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
             return cfg
         else:
             raise NotImplementedError
@@ -147,34 +135,30 @@ class NumericalFeatureNet(HybridBlock):
             if self.cfg.input_centering:
                 self.data_bn = nn.BatchNorm(in_channels=self.in_units)
             if self.cfg.gated_activation:
-                self.gate_proj = BasicMLP(
-                    in_units=self.in_units,
-                    mid_units=cfg.mid_units,
-                    out_units=out_units,
-                    num_layers=cfg.num_layers,
-                    normalization=cfg.normalization,
-                    norm_eps=cfg.norm_eps,
-                    data_dropout=cfg.data_dropout,
-                    dropout=cfg.dropout,
-                    activation=cfg.activation,
-                    weight_initializer=weight_initializer,
-                    bias_initializer=bias_initializer,
-                )
+                self.gate_proj = BasicMLP(in_units=self.in_units,
+                                          mid_units=cfg.mid_units,
+                                          out_units=out_units,
+                                          num_layers=cfg.num_layers,
+                                          normalization=cfg.normalization,
+                                          norm_eps=cfg.norm_eps,
+                                          data_dropout=cfg.data_dropout,
+                                          dropout=cfg.dropout,
+                                          activation=cfg.activation,
+                                          weight_initializer=weight_initializer,
+                                          bias_initializer=bias_initializer)
             else:
                 self.gate_proj = None
-            self.proj = BasicMLP(
-                in_units=self.in_units,
-                mid_units=cfg.mid_units,
-                out_units=out_units,
-                num_layers=cfg.num_layers,
-                normalization=cfg.normalization,
-                norm_eps=cfg.norm_eps,
-                data_dropout=cfg.data_dropout,
-                dropout=cfg.dropout,
-                activation=cfg.activation,
-                weight_initializer=weight_initializer,
-                bias_initializer=bias_initializer,
-            )
+            self.proj = BasicMLP(in_units=self.in_units,
+                                 mid_units=cfg.mid_units,
+                                 out_units=out_units,
+                                 num_layers=cfg.num_layers,
+                                 normalization=cfg.normalization,
+                                 norm_eps=cfg.norm_eps,
+                                 data_dropout=cfg.data_dropout,
+                                 dropout=cfg.dropout,
+                                 activation=cfg.activation,
+                                 weight_initializer=weight_initializer,
+                                 bias_initializer=bias_initializer)
 
     @staticmethod
     def get_cfg(key=None):
@@ -186,12 +170,12 @@ class NumericalFeatureNet(HybridBlock):
             cfg.num_layers = 1
             cfg.data_dropout = False
             cfg.dropout = 0.1
-            cfg.activation = "leaky"
-            cfg.normalization = "layer_norm"
+            cfg.activation = 'leaky'
+            cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
             cfg.initializer = CfgNode()
-            cfg.initializer.weight = ["xavier", "uniform", "avg", 3.0]
-            cfg.initializer.bias = ["zeros"]
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
         else:
             raise NotImplementedError
         return cfg
@@ -209,7 +193,8 @@ class NumericalFeatureNet(HybridBlock):
 
 @use_np
 class FeatureAggregator(HybridBlock):
-    def __init__(self, num_fields, out_shape, in_units, cfg=None, get_embedding=False, prefix=None, params=None):
+    def __init__(self, num_fields, out_shape, in_units,
+                 cfg=None, get_embedding=False, prefix=None, params=None):
         """
 
         Parameters
@@ -243,22 +228,21 @@ class FeatureAggregator(HybridBlock):
         out_units = int(np.prod(out_shape))
         with self.name_scope():
             if num_fields > 1:
-                if cfg.agg_type == "attention" or cfg.agg_type == "attention_token":
+                if cfg.agg_type == 'attention' or cfg.agg_type == 'attention_token':
                     if cfg.attention_net.hidden_size < 0:
                         hidden_size = 4 * cfg.attention_net.units
                     if cfg.attention_net.units != self.in_units:
-                        self.attention_net_pre_proj = nn.Dense(
-                            units=cfg.attention_net.units,
-                            in_units=in_units,
-                            use_bias=False,
-                            weight_initializer=weight_initializer,
-                            bias_initializer=bias_initializer,
-                            flatten=False,
-                            prefix="attention_net_pre_proj_",
-                        )
+                        self.attention_net_pre_proj = nn.Dense(units=cfg.attention_net.units,
+                                                               in_units=in_units,
+                                                               use_bias=False,
+                                                               weight_initializer=weight_initializer,
+                                                               bias_initializer=bias_initializer,
+                                                               flatten=False,
+                                                               prefix='attention_net_pre_proj_')
                     else:
                         self.attention_net_pre_proj = None
-                    self.attention_agg_ln = nn.LayerNorm(in_channels=in_units, epsilon=self.cfg.norm_eps)
+                    self.attention_agg_ln = nn.LayerNorm(in_channels=in_units,
+                                                         epsilon=self.cfg.norm_eps)
                     self.attention_agg_dropout = nn.Dropout(self.cfg.dropout)
                     self.attention_transformer_enc = TransformerEncoder(
                         num_layers=cfg.attention_net.num_layers,
@@ -268,37 +252,34 @@ class FeatureAggregator(HybridBlock):
                         dropout=cfg.dropout,
                         activation=cfg.attention_net.activation,
                         weight_initializer=weight_initializer,
-                        bias_initializer=bias_initializer,
-                    )
+                        bias_initializer=bias_initializer)
                 # Construct out proj
-                if cfg.agg_type == "mean" or cfg.agg_type == "max":
+                if cfg.agg_type == 'mean' or cfg.agg_type == 'max':
                     in_units = in_units
-                elif cfg.agg_type == "concat":
+                elif cfg.agg_type == 'concat':
                     in_units = in_units * num_fields
-                elif cfg.agg_type == "attention" or cfg.agg_type == "attention_token":
+                elif cfg.agg_type == 'attention' or cfg.agg_type == 'attention_token':
                     in_units = cfg.attention_net.units
                 else:
                     raise NotImplementedError
             mid_units = in_units if cfg.mid_units < 0 else cfg.mid_units
-            self.out_proj = BasicMLP(
-                in_units=in_units,
-                mid_units=mid_units,
-                out_units=out_units,
-                num_layers=cfg.out_proj_num_layers,
-                data_dropout=cfg.data_dropout,
-                normalization=cfg.normalization,
-                norm_eps=cfg.norm_eps,
-                dropout=cfg.dropout,
-                activation=cfg.activation,
-                weight_initializer=weight_initializer,
-                bias_initializer=bias_initializer,
-            )
+            self.out_proj = BasicMLP(in_units=in_units,
+                                     mid_units=mid_units,
+                                     out_units=out_units,
+                                     num_layers=cfg.out_proj_num_layers,
+                                     data_dropout=cfg.data_dropout,
+                                     normalization=cfg.normalization,
+                                     norm_eps=cfg.norm_eps,
+                                     dropout=cfg.dropout,
+                                     activation=cfg.activation,
+                                     weight_initializer=weight_initializer,
+                                     bias_initializer=bias_initializer)
 
     @staticmethod
     def get_cfg(key=None):
         if key is None:
             cfg = CfgNode()
-            cfg.agg_type = "concat"
+            cfg.agg_type = 'concat'
 
             # Attention Aggregator
             cfg.attention_net = CfgNode()
@@ -306,7 +287,7 @@ class FeatureAggregator(HybridBlock):
             cfg.attention_net.units = 64
             cfg.attention_net.num_heads = 4
             cfg.attention_net.hidden_size = -1  # Size of the FFN network used in attention
-            cfg.attention_net.activation = "gelu"  # Activation of the attention
+            cfg.attention_net.activation = 'gelu'   # Activation of the attention
 
             # Other parameters
             cfg.mid_units = 128
@@ -314,12 +295,12 @@ class FeatureAggregator(HybridBlock):
             cfg.out_proj_num_layers = 1
             cfg.data_dropout = False
             cfg.dropout = 0.1
-            cfg.activation = "leaky"
-            cfg.normalization = "layer_norm"
+            cfg.activation = 'leaky'
+            cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
             cfg.initializer = CfgNode()
-            cfg.initializer.weight = ["xavier", "uniform", "avg", 3.0]
-            cfg.initializer.bias = ["zeros"]
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
         else:
             raise NotImplementedError
         return cfg
@@ -343,7 +324,7 @@ class FeatureAggregator(HybridBlock):
         if len(features) == 1:
             agg_features = features[0]
         else:
-            if self.cfg.agg_type == "attention_token":
+            if self.cfg.agg_type == 'attention_token':
                 # Features[0] will have shape (B, T, C)
                 other_features = F.np.stack(features[1:], axis=1)
                 agg_features = F.np.concatenate([other_features, features[0]], axis=1)
@@ -351,17 +332,18 @@ class FeatureAggregator(HybridBlock):
                 agg_features = self.attention_agg_dropout(agg_features)
                 if self.attention_net_pre_proj is not None:
                     agg_features = self.attention_net_pre_proj(agg_features)
-                agg_features = self.attention_transformer_enc(agg_features, valid_length + len(features) - 1)
+                agg_features = self.attention_transformer_enc(agg_features,
+                                                              valid_length + len(features) - 1)
                 agg_features = agg_features[:, len(features) - 1, :]
             else:
                 agg_features = F.np.stack(features, axis=1)
-                if self.cfg.agg_type == "mean":
+                if self.cfg.agg_type == 'mean':
                     agg_features = F.np.mean(agg_features, axis=1)
-                elif self.cfg.agg_type == "max":
+                elif self.cfg.agg_type == 'max':
                     agg_features = F.np.max(agg_features, axis=1)
-                elif self.cfg.agg_type == "concat":
+                elif self.cfg.agg_type == 'concat':
                     agg_features = F.npx.reshape(agg_features, (-2, -1))
-                elif self.cfg.agg_type == "attention":
+                elif self.cfg.agg_type == 'attention':
                     if self.attention_net_pre_proj is not None:
                         agg_features = self.attention_net_pre_proj(agg_features)
                     agg_features = self.attention_transformer_enc(agg_features, None)
@@ -412,21 +394,17 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         and fuse it jointly with the other embeddings.
     -
     """
-
-    def __init__(
-        self,
-        text_backbone,
-        num_text_features,
-        num_categorical_features,
-        num_numerical_features,
-        numerical_input_units,
-        num_categories,
-        out_shape,
-        cfg=None,
-        get_embedding=False,
-        prefix=None,
-        params=None,
-    ):
+    def __init__(self, text_backbone,
+                 num_text_features,
+                 num_categorical_features,
+                 num_numerical_features,
+                 numerical_input_units,
+                 num_categories,
+                 out_shape,
+                 cfg=None,
+                 get_embedding=False,
+                 prefix=None,
+                 params=None):
         """
 
         Parameters
@@ -455,7 +433,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         """
         super().__init__(prefix=prefix, params=params)
         self.cfg = cfg = MultiModalWithPretrainedTextNN.get_cfg().clone_merge(cfg)
-        assert self.cfg.text_net.pool_type == "cls"
+        assert self.cfg.text_net.pool_type == 'cls'
         base_feature_units = self.cfg.base_feature_units
         if not isinstance(out_shape, (list, tuple)):
             out_shape = (out_shape,)
@@ -477,24 +455,21 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         weight_initializer = mx.init.create(*cfg.initializer.weight)
         bias_initializer = mx.init.create(*cfg.initializer.bias)
         self.agg_type = cfg.agg_net.agg_type
-        if self.agg_type == "attention_token":
-            assert self.num_text_features == 1, "Only supports a single text input if use token-level attention"
+        if self.agg_type == 'attention_token':
+            assert self.num_text_features == 1, \
+                'Only supports a single text input if use token-level attention'
         with self.name_scope():
             self.text_backbone = text_backbone
             if base_feature_units != text_backbone.units:
                 self.text_proj = nn.HybridSequential()
                 for i in range(self.num_text_features):
                     with self.text_proj.name_scope():
-                        self.text_proj.add(
-                            nn.Dense(
-                                in_units=text_backbone.units,
-                                units=base_feature_units,
-                                use_bias=False,
-                                weight_initializer=weight_initializer,
-                                bias_initializer=bias_initializer,
-                                flatten=False,
-                            )
-                        )
+                        self.text_proj.add(nn.Dense(in_units=text_backbone.units,
+                                                    units=base_feature_units,
+                                                    use_bias=False,
+                                                    weight_initializer=weight_initializer,
+                                                    bias_initializer=bias_initializer,
+                                                    flatten=False))
             else:
                 self.text_proj = None
             if self.num_categorical_features > 0:
@@ -502,10 +477,9 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                 for i in range(self.num_categorical_features):
                     with self.categorical_networks.name_scope():
                         self.categorical_networks.add(
-                            CategoricalFeatureNet(
-                                num_class=self.num_categories[i], out_units=base_feature_units, cfg=cfg.categorical_net
-                            )
-                        )
+                            CategoricalFeatureNet(num_class=self.num_categories[i],
+                                                  out_units=base_feature_units,
+                                                  cfg=cfg.categorical_net))
             else:
                 self.categorical_networks = None
             if self.cfg.aggregate_categorical and self.num_categorical_features > 1:
@@ -518,7 +492,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                     dropout=cfg.categorical_agg.dropout,
                     num_layers=cfg.categorical_agg.num_layers,
                     weight_initializer=weight_initializer,
-                    bias_initializer=bias_initializer,
+                    bias_initializer=bias_initializer
                 )
                 if self.cfg.categorical_agg.gated_activation:
                     self.categorical_agg_gate = BasicMLP(
@@ -529,7 +503,7 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                         dropout=cfg.categorical_agg.dropout,
                         num_layers=cfg.categorical_agg.num_layers,
                         weight_initializer=weight_initializer,
-                        bias_initializer=bias_initializer,
+                        bias_initializer=bias_initializer
                     )
                 else:
                     self.categorical_agg_gate = None
@@ -542,21 +516,16 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
                 for i in range(self.num_numerical_features):
                     with self.numerical_networks.name_scope():
                         self.numerical_networks.add(
-                            NumericalFeatureNet(
-                                input_shape=self.numerical_input_units[i],
-                                out_units=base_feature_units,
-                                cfg=cfg.numerical_net,
-                            )
-                        )
+                            NumericalFeatureNet(input_shape=self.numerical_input_units[i],
+                                                out_units=base_feature_units,
+                                                cfg=cfg.numerical_net))
             else:
                 self.numerical_networks = None
-            self.agg_layer = FeatureAggregator(
-                num_fields=self.num_fields,
-                out_shape=out_shape,
-                in_units=base_feature_units,
-                cfg=cfg.agg_net,
-                get_embedding=get_embedding,
-            )
+            self.agg_layer = FeatureAggregator(num_fields=self.num_fields,
+                                               out_shape=out_shape,
+                                               in_units=base_feature_units,
+                                               cfg=cfg.agg_net,
+                                               get_embedding=get_embedding)
 
     @staticmethod
     def get_cfg(key=None):
@@ -565,10 +534,10 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.base_feature_units = -1  # -1 means not given and we will use the units of BERT
             cfg.text_net = CfgNode()
             cfg.text_net.use_segment_id = True
-            cfg.text_net.pool_type = "cls"
+            cfg.text_net.pool_type = 'cls'
             cfg.aggregate_categorical = True  # Whether to use one network to aggregate the categorical columns.
             cfg.categorical_agg = CfgNode()
-            cfg.categorical_agg.activation = "leaky"
+            cfg.categorical_agg.activation = 'leaky'
             cfg.categorical_agg.mid_units = 128
             cfg.categorical_agg.num_layers = 1
             cfg.categorical_agg.dropout = 0.1
@@ -577,8 +546,8 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             cfg.categorical_net = CategoricalFeatureNet.get_cfg()
             cfg.numerical_net = NumericalFeatureNet.get_cfg()
             cfg.initializer = CfgNode()
-            cfg.initializer.weight = ["xavier", "uniform", "avg", 3.0]
-            cfg.initializer.bias = ["zeros"]
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
             return cfg
         else:
             raise NotImplementedError
@@ -630,11 +599,13 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
         for i in range(self.num_text_features):
             batch_token_ids, batch_valid_length, batch_segment_ids = features[i]
             if self.cfg.text_net.use_segment_id:
-                contextual_embedding, _ = self.text_backbone(batch_token_ids, batch_segment_ids, batch_valid_length)
+                contextual_embedding, _ = self.text_backbone(batch_token_ids,
+                                                             batch_segment_ids,
+                                                             batch_valid_length)
             else:
                 _, all_hidden_states = self.text_backbone(batch_token_ids, batch_valid_length)
                 contextual_embedding = all_hidden_states[-1]
-            if self.agg_type == "attention_token" and self.num_fields > 1:
+            if self.agg_type == 'attention_token' and self.num_fields > 1:
                 if self.text_proj is not None:
                     contextual_embedding = self.text_proj[i](contextual_embedding)
                 text_valid_length = batch_valid_length
@@ -656,15 +627,15 @@ class MultiModalWithPretrainedTextNN(HybridBlock):
             all_cat_features = F.np.concatenate(all_cat_features, axis=-1)
             if self.cfg.categorical_agg.gated_activation:
                 field_features.append(
-                    F.npx.sigmoid(self.categorical_agg_gate(all_cat_features)) * self.categorical_agg(all_cat_features)
-                )
+                    F.npx.sigmoid(self.categorical_agg_gate(all_cat_features))
+                    * self.categorical_agg(all_cat_features))
             else:
                 field_features.append(self.categorical_agg(all_cat_features))
         ptr += self.num_categorical_features
         for i in range(ptr, ptr + self.num_numerical_features):
             numerical_features = self.numerical_networks[i - ptr](features[i])
             field_features.append(numerical_features)
-        if self.agg_type == "attention_token":
+        if self.agg_type == 'attention_token':
             return self.agg_layer(field_features, text_valid_length)
         else:
             return self.agg_layer(field_features)

@@ -14,7 +14,12 @@ class Unit(nn.Module):
     """
 
     def __init__(
-        self, normalization: str, in_features: int, out_features: int, activation: str, dropout_prob: float,
+        self,
+        normalization: str,
+        in_features: int,
+        out_features: int,
+        activation: str,
+        dropout_prob: float,
     ):
         """
         Parameters

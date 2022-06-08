@@ -76,7 +76,10 @@ def is_categorical_column(
         return False
 
 
-def is_numerical_column(data: pd.Series, valid_data: Optional[pd.Series] = None,) -> bool:
+def is_numerical_column(
+    data: pd.Series,
+    valid_data: Optional[pd.Series] = None,
+) -> bool:
     """
     Identify if a column is a numerical column.
     Here it uses a very simple rule to verify if this is a numerical column.
@@ -101,7 +104,10 @@ def is_numerical_column(data: pd.Series, valid_data: Optional[pd.Series] = None,
         return False
 
 
-def is_imagepath_column(data: pd.Series, col_name: str,) -> bool:
+def is_imagepath_column(
+    data: pd.Series,
+    col_name: str,
+) -> bool:
     """
     Identify if a column is one image-path column.
     Here it counts the failures when trying PIL.Image.open() on a sampled subset.
@@ -281,13 +287,19 @@ def infer_column_problem_types(
         else:
             column_types[col_name] = CATEGORICAL
     problem_type, output_shape = infer_problem_type_output_shape(
-        column_types=column_types, label_column=label_columns[0], data_df=train_df, provided_problem_type=problem_type,
+        column_types=column_types,
+        label_column=label_columns[0],
+        data_df=train_df,
+        provided_problem_type=problem_type,
     )
     return column_types, problem_type, output_shape
 
 
 def infer_problem_type_output_shape(
-    column_types: dict, label_column: str, data_df: pd.DataFrame, provided_problem_type=None,
+    column_types: dict,
+    label_column: str,
+    data_df: pd.DataFrame,
+    provided_problem_type=None,
 ) -> Tuple[str, int]:
     """
     Infer the problem type and output shape based on the label column type and training data.

@@ -7,7 +7,14 @@ from autogluon.text.automm.optimization.utils import get_metric, get_loss_func
 from autogluon.text.automm.constants import MULTICLASS
 
 
-@pytest.mark.parametrize("metric_name,class_num", [("log_loss", 5), ("log_loss", 10), ("cross_entropy", 100),])
+@pytest.mark.parametrize(
+    "metric_name,class_num",
+    [
+        ("log_loss", 5),
+        ("log_loss", 10),
+        ("cross_entropy", 100),
+    ]
+)
 def test_cross_entropy(metric_name, class_num):
     preds = []
     targets = []
@@ -28,11 +35,19 @@ def test_cross_entropy(metric_name, class_num):
     score1 = mean_metric.compute()
     preds = torch.cat(preds).softmax(dim=1)
     targets = torch.cat(targets)
-    score2 = log_loss(y_true=targets, y_pred=preds,)
+    score2 = log_loss(
+        y_true=targets,
+        y_pred=preds,
+    )
     assert pytest.approx(score1, 1e-6) == score2
 
 
-@pytest.mark.parametrize("problem_type,loss_func_name", [("regression", "bcewithlogitsloss"),])
+@pytest.mark.parametrize(
+    "problem_type,loss_func_name",
+    [
+        ("regression", "bcewithlogitsloss"),
+    ]
+)
 def test_bce_with_logits_loss(problem_type, loss_func_name):
     preds = []
     targets = []
@@ -46,7 +61,11 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
     preds = torch.cat(preds)
     targets = torch.cat(targets)
 
-    loss_func = get_loss_func(problem_type=problem_type, mixup_active=False, loss_func_name=loss_func_name,)
+    loss_func = get_loss_func(
+        problem_type=problem_type,
+        mixup_active=False,
+        loss_func_name=loss_func_name,
+    )
 
     score1 = loss_func(input=preds, target=targets)
     preds = preds.sigmoid()

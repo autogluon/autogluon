@@ -1,11 +1,7 @@
 import torch
 
 from autogluon.text.automm.data.collator import (
-    Stack,
-    Pad,
-    Tuple,
-    List,
-    Dict,
+    Stack, Pad, Tuple, List, Dict,
 )
 
 
@@ -76,5 +72,7 @@ def test_dict():
     collate_fn = Dict({"data": Pad(), "label": Stack()})
     sample = collate_fn((a, b, c))
 
-    assert torch.all(sample["data"] == torch.as_tensor([[1, 2, 3, 4, 5], [5, 7, 0, 0, 0], [1, 2, 3, 0, 0]]))
+    assert torch.all(
+        sample["data"] == torch.as_tensor([[1, 2, 3, 4, 5], [5, 7, 0, 0, 0], [1, 2, 3, 0, 0]])
+    )
     assert torch.all(sample["label"] == torch.as_tensor([0, 1, 0]))

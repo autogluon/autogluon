@@ -188,7 +188,15 @@ class MultiheadAttention(nn.Module):
     [2] Sinong Wang, Belinda Z. Li, Madian Khabsa, Han Fang, Hao Ma "Linformer: Self-Attention with Linear Complexity", 2020
     """
 
-    def __init__(self, *, d_token: int, n_heads: int, dropout: float, bias: bool, initialization: str,) -> None:
+    def __init__(
+        self,
+        *,
+        d_token: int,
+        n_heads: int,
+        dropout: float,
+        bias: bool,
+        initialization: str,
+    ) -> None:
         """
         Parameters
         ----------
@@ -246,7 +254,11 @@ class MultiheadAttention(nn.Module):
         )
 
     def forward(
-        self, x_q: Tensor, x_kv: Tensor, key_compression: Optional[nn.Linear], value_compression: Optional[nn.Linear],
+        self,
+        x_q: Tensor,
+        x_kv: Tensor,
+        key_compression: Optional[nn.Linear],
+        value_compression: Optional[nn.Linear],
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
         """Perform the forward pass.
 
@@ -294,7 +306,10 @@ class MultiheadAttention(nn.Module):
         )
         if self.W_out is not None:
             x = self.W_out(x)
-        return x, {"attention_logits": attention_logits, "attention_probs": attention_probs,}
+        return x, {
+            "attention_logits": attention_logits,
+            "attention_probs": attention_probs,
+        }
 
 
 class FT_Transformer(nn.Module):
@@ -319,7 +334,9 @@ class FT_Transformer(nn.Module):
         ):
             super().__init__()
             self.linear_first = nn.Linear(
-                d_token, d_hidden * (2 if _is_glu_activation(activation) else 1), bias_first,
+                d_token,
+                d_hidden * (2 if _is_glu_activation(activation) else 1),
+                bias_first,
             )
             self.activation = _make_nn_module(activation)
             self.dropout = nn.Dropout(dropout)
@@ -336,7 +353,13 @@ class FT_Transformer(nn.Module):
         """The final module of the `Transformer` that performs BERT-like inference."""
 
         def __init__(
-            self, *, d_in: int, bias: bool, activation: ModuleType, normalization: ModuleType, d_out: int,
+            self,
+            *,
+            d_in: int,
+            bias: bool,
+            activation: ModuleType,
+            normalization: ModuleType,
+            d_out: int,
         ):
             super().__init__()
             self.normalization = _make_nn_module(normalization, d_in)

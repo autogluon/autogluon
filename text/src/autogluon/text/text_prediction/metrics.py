@@ -1,19 +1,13 @@
-__all__ = ["calculate_metric_by_expr", "infer_eval_log_metrics"]
+__all__ = ['calculate_metric_by_expr', 'infer_eval_log_metrics']
 
 import ast
 import operator as op
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 
 # supported operators
-operators = {
-    ast.Add: op.add,
-    ast.Sub: op.sub,
-    ast.Mult: op.mul,
-    ast.Div: op.truediv,
-    ast.Pow: op.pow,
-    ast.BitXor: op.xor,
-    ast.USub: op.neg,
-}
+operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
+             ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
+             ast.USub: op.neg}
 
 
 def infer_eval_log_metrics(problem_type, eval_metric=None):
@@ -35,18 +29,18 @@ def infer_eval_log_metrics(problem_type, eval_metric=None):
     """
     if problem_type == MULTICLASS:
         if eval_metric is None:
-            eval_metric = "acc"
-        log_metrics = ["acc", "log_loss"]
+            eval_metric = 'acc'
+        log_metrics = ['acc', 'log_loss']
     elif problem_type == BINARY:
         if eval_metric is None:
-            eval_metric = "acc"
-        log_metrics = ["f1", "mcc", "roc_auc", "acc", "log_loss"]
+            eval_metric = 'acc'
+        log_metrics = ['f1', 'mcc', 'roc_auc', 'acc', 'log_loss']
     elif problem_type == REGRESSION:
         if eval_metric is None:
-            eval_metric = "rmse"
-        log_metrics = ["r2", "rmse", "mae"]
+            eval_metric = 'rmse'
+        log_metrics = ['r2', 'rmse', 'mae']
     else:
-        raise NotImplementedError("The problem type is not supported yet!")
+        raise NotImplementedError('The problem type is not supported yet!')
     if eval_metric not in log_metrics:
         log_metrics.append(eval_metric)
     return eval_metric, log_metrics
@@ -74,7 +68,7 @@ def eval_math_expr(expr):
     >>> eval_math_expr('1 + 2*3**(4^5) / (6 + -7)')
     -5.0
     """
-    return eval_(ast.parse(expr, mode="eval").body)
+    return eval_(ast.parse(expr, mode='eval').body)
 
 
 def eval_(node):
@@ -123,14 +117,13 @@ def calculate_metric_by_expr(label_metric_scores: dict, label_names: list, expr:
     original_expr = expr
     possible_metric_names = set()
     for label_name in label_names:
-        assert label_name in label_metric_scores, (
-            "Invalid label_metric_scores,"
-            " all provided labels should be in the aggregated label metric scores. "
-            "label_names={}, label_metric_scores={}".format(label_names, label_metric_scores)
-        )
+        assert label_name in label_metric_scores,\
+            'Invalid label_metric_scores,' \
+            ' all provided labels should be in the aggregated label metric scores. ' \
+            'label_names={}, label_metric_scores={}'.format(label_names, label_metric_scores)
         metric_scores = label_metric_scores[label_name]
         for metric_name, value, in metric_scores.items():
-            expr = expr.replace("{}.{}".format(label_name, metric_name), str(value))
+            expr = expr.replace('{}.{}'.format(label_name, metric_name), str(value))
             possible_metric_names.add(metric_name)
     for metric_name in possible_metric_names:
         if metric_name in expr:
@@ -142,9 +135,7 @@ def calculate_metric_by_expr(label_metric_scores: dict, label_names: list, expr:
     try:
         ret = eval_math_expr(expr)
     except Exception:
-        raise ValueError(
-            "Cannot successfully parse the given expression. "
-            'The original expression = "{}". After the parsing, it becomes {} but '
-            "still cannot be evalauted.".format(original_expr, expr)
-        )
+        raise ValueError('Cannot successfully parse the given expression. '
+                         'The original expression = "{}". After the parsing, it becomes {} but '
+                         'still cannot be evalauted.'.format(original_expr, expr))
     return ret

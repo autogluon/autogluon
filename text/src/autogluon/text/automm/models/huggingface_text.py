@@ -33,7 +33,10 @@ class HFAutoModelForTextPrediction(nn.Module):
     """
 
     def __init__(
-        self, prefix: str, checkpoint_name: str = "microsoft/deberta-v3-base", num_classes: Optional[int] = 0,
+        self,
+        prefix: str,
+        checkpoint_name: str = "microsoft/deberta-v3-base",
+        num_classes: Optional[int] = 0,
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -103,7 +106,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         return self.model.config.hidden_size
 
     def forward(
-        self, batch: dict,
+        self,
+        batch: dict,
     ):
         """
         Parameters
@@ -126,7 +130,11 @@ class HFAutoModelForTextPrediction(nn.Module):
         steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
         text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
 
-        outputs = self.model(input_ids=text_token_ids, token_type_ids=text_segment_ids, attention_mask=text_masks,)
+        outputs = self.model(
+            input_ids=text_token_ids,
+            token_type_ids=text_segment_ids,
+            attention_mask=text_masks,
+        )
         cls_features = outputs.last_hidden_state[:, 0, :]
 
         logits = self.head(cls_features)
@@ -139,7 +147,10 @@ class HFAutoModelForTextPrediction(nn.Module):
         )
 
         ret.update(
-            {LOGITS: logits, FEATURES: cls_features,}
+            {
+                LOGITS: logits,
+                FEATURES: cls_features,
+            }
         )
 
         return {self.prefix: ret}

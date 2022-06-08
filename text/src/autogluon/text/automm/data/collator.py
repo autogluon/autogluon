@@ -155,7 +155,11 @@ class Pad:
         """
         if isinstance(data[0], (torch.Tensor, np.ndarray, list, tuple)):
             padded_arr, original_length = _pad_arrs_to_max_length(
-                data, pad_axis=self._axis, pad_val=self._pad_val, round_to=self._round_to, max_length=self._max_length,
+                data,
+                pad_axis=self._axis,
+                pad_val=self._pad_val,
+                round_to=self._round_to,
+                max_length=self._max_length,
             )
             if self._ret_length:
                 return padded_arr, original_length

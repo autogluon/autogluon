@@ -305,7 +305,10 @@ class AutoMMPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
-        config = get_config(config=config, overrides=hyperparameters,)
+        config = get_config(
+            config=config,
+            overrides=hyperparameters,
+        )
 
         if self._resume or save_path is None:
             save_path = self._save_path
@@ -313,7 +316,10 @@ class AutoMMPredictor:
             save_path = os.path.expanduser(save_path)
 
         if not self._resume:
-            save_path = setup_outputdir(path=save_path, warn_if_exist=self._warn_if_exist,)
+            save_path = setup_outputdir(
+                path=save_path,
+                warn_if_exist=self._warn_if_exist,
+            )
         logger.debug(f"save path: {save_path}")
 
         if tuning_data is None:
@@ -326,7 +332,10 @@ class AutoMMPredictor:
             else:
                 val_frac = holdout_frac
             train_data, tuning_data = train_test_split(
-                train_data, test_size=val_frac, stratify=stratify, random_state=np.random.RandomState(seed),
+                train_data,
+                test_size=val_frac,
+                stratify=stratify,
+                random_state=np.random.RandomState(seed),
             )
 
         column_types, problem_type, output_shape = infer_column_problem_types(
@@ -359,7 +368,10 @@ class AutoMMPredictor:
                 self._output_shape == output_shape
             ), f"Inferred output shape {output_shape} is different from the previous {self._output_shape}"
 
-        config = update_config_by_rules(problem_type=problem_type, config=config,)
+        config = update_config_by_rules(
+            problem_type=problem_type,
+            config=config,
+        )
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
@@ -372,10 +384,16 @@ class AutoMMPredictor:
         else:  # continuing training
             df_preprocessor = self._df_preprocessor
 
-        config = select_model(config=config, df_preprocessor=df_preprocessor,)
+        config = select_model(
+            config=config,
+            df_preprocessor=df_preprocessor,
+        )
 
         if self._data_processors is None:
-            data_processors = init_data_processors(config=config, df_preprocessor=df_preprocessor,)
+            data_processors = init_data_processors(
+                config=config,
+                df_preprocessor=df_preprocessor,
+            )
         else:  # continuing training
             data_processors = self._data_processors
 
@@ -394,14 +412,17 @@ class AutoMMPredictor:
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=problem_type, eval_metric_name=self._eval_metric_name,
+                problem_type=problem_type,
+                eval_metric_name=self._eval_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
 
         pos_label = try_to_infer_pos_label(
-            data_config=config.data, label_encoder=df_preprocessor.label_generator, problem_type=problem_type,
+            data_config=config.data,
+            label_encoder=df_preprocessor.label_generator,
+            problem_type=problem_type,
         )
         validation_metric, minmax_mode, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
@@ -463,7 +484,9 @@ class AutoMMPredictor:
                 soft_label_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = self._setup_distillation(teacher_predictor=teacher_predictor,)
+            ) = self._setup_distillation(
+                teacher_predictor=teacher_predictor,
+            )
         else:
             (
                 teacher_model,
@@ -502,7 +525,8 @@ class AutoMMPredictor:
         return self
 
     def _setup_distillation(
-        self, teacher_predictor: Union[str, AutoMMPredictor],
+        self,
+        teacher_predictor: Union[str, AutoMMPredictor],
     ):
         """
         Prepare for distillation. It verifies whether the student and teacher predictors have consistent
@@ -542,7 +566,9 @@ class AutoMMPredictor:
         # if teacher and student have duplicate model names, change teacher's model names
         # we don't change student's model names to avoid changing the names back when saving the model.
         teacher_predictor = modify_duplicate_model_names(
-            predictor=teacher_predictor, postfix="teacher", blacklist=self._config.model.names,
+            predictor=teacher_predictor,
+            postfix="teacher",
+            blacklist=self._config.model.names,
         )
 
         critics, baseline_funcs = None, None
@@ -554,9 +580,13 @@ class AutoMMPredictor:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
         # turn on returning column information in data processors
-        self._data_processors = turn_on_off_feature_column_info(data_processors=self._data_processors, flag=True,)
+        self._data_processors = turn_on_off_feature_column_info(
+            data_processors=self._data_processors,
+            flag=True,
+        )
         teacher_predictor._data_processors = turn_on_off_feature_column_info(
-            data_processors=teacher_predictor._data_processors, flag=True,
+            data_processors=teacher_predictor._data_processors,
+            flag=True,
         )
 
         logger.debug(
@@ -688,7 +718,11 @@ class AutoMMPredictor:
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
         callbacks = [checkpoint_callback, early_stopping_callback, lr_callback, model_summary]
 
-        tb_logger = pl.loggers.TensorBoardLogger(save_dir=save_path, name="", version="",)
+        tb_logger = pl.loggers.TensorBoardLogger(
+            save_dir=save_path,
+            name="",
+            version="",
+        )
 
         num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
@@ -779,7 +813,14 @@ class AutoMMPredictor:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
     def _top_k_average(
-        self, model, save_path, minmax_mode, is_distill, config, val_df, validation_metric_name,
+        self,
+        model,
+        save_path,
+        minmax_mode,
+        is_distill,
+        config,
+        val_df,
+        validation_metric_name,
     ):
         best_k_models_yaml_path = os.path.join(save_path, "best_k_models.yaml")
         if os.path.exists(best_k_models_yaml_path):
@@ -803,7 +844,11 @@ class AutoMMPredictor:
             else:
                 top_k_model_paths = [
                     v[0]
-                    for v in sorted(list(best_k_models.items()), key=lambda ele: ele[1], reverse=(minmax_mode == MAX),)
+                    for v in sorted(
+                        list(best_k_models.items()),
+                        key=lambda ele: ele[1],
+                        reverse=(minmax_mode == MAX),
+                    )
                 ]
                 if config.optimization.top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
@@ -814,14 +859,20 @@ class AutoMMPredictor:
                     logger.info(f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm.")
 
                     ingredients = [top_k_model_paths[0]]
-                    self._model = self._load_state_dict(model=model, path=top_k_model_paths[0], prefix=prefix,)
+                    self._model = self._load_state_dict(
+                        model=model,
+                        path=top_k_model_paths[0],
+                        prefix=prefix,
+                    )
                     best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
                         )
                         self._model = self._load_state_dict(
-                            model=self._model, state_dict=cand_avg_state_dict, prefix=prefix,
+                            model=self._model,
+                            state_dict=cand_avg_state_dict,
+                            prefix=prefix,
                         )
                         cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                         if monitor_op(cand_score, best_score):
@@ -846,12 +897,20 @@ class AutoMMPredictor:
                 return
 
         # Average all the ingredients
-        avg_state_dict = average_checkpoints(checkpoint_paths=ingredients,)
-        self._model = self._load_state_dict(model=model, state_dict=avg_state_dict, prefix=prefix,)
+        avg_state_dict = average_checkpoints(
+            checkpoint_paths=ingredients,
+        )
+        self._model = self._load_state_dict(
+            model=model,
+            state_dict=avg_state_dict,
+            prefix=prefix,
+        )
 
         if is_distill:
             avg_state_dict = self._replace_model_name_prefix(
-                state_dict=avg_state_dict, old_prefix="student_model", new_prefix="model",
+                state_dict=avg_state_dict,
+                old_prefix="student_model",
+                new_prefix="model",
             )
         checkpoint = {"state_dict": avg_state_dict}
         torch.save(checkpoint, os.path.join(save_path, "model.ckpt"))
@@ -867,7 +926,12 @@ class AutoMMPredictor:
         if os.path.isfile(last_ckpt_path):
             os.remove(last_ckpt_path)
 
-    def _predict(self, data: Union[pd.DataFrame, dict, list], ret_type: str, requires_label: bool,) -> torch.Tensor:
+    def _predict(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        ret_type: str,
+        requires_label: bool,
+    ) -> torch.Tensor:
 
         data = self._data_to_df(data)
 
@@ -924,7 +988,9 @@ class AutoMMPredictor:
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-        task = LitModule(model=self._model,)
+        task = LitModule(
+            model=self._model,
+        )
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
@@ -954,7 +1020,10 @@ class AutoMMPredictor:
                     "Consider increasing the value of the `num_workers` argument` "
                     ".* in the `DataLoader` init to improve performance.*",
                 )
-                outputs = evaluator.predict(task, datamodule=predict_dm,)
+                outputs = evaluator.predict(
+                    task,
+                    datamodule=predict_dm,
+                )
         if ret_type == LOGITS:
             logits = [ele[LOGITS] for ele in outputs]
             ret = torch.cat(logits)
@@ -997,7 +1066,11 @@ class AutoMMPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        logits = self._predict(data=data, ret_type=LOGITS, requires_label=True,)
+        logits = self._predict(
+            data=data,
+            ret_type=LOGITS,
+            requires_label=True,
+        )
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
             y_pred_prob = self._logits_to_prob(logits)
@@ -1016,7 +1089,10 @@ class AutoMMPredictor:
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update(
-            {Y_PRED: y_pred, Y_TRUE: y_true,}
+            {
+                Y_PRED: y_pred,
+                Y_TRUE: y_true,
+            }
         )
 
         if metrics is None:
@@ -1031,7 +1107,11 @@ class AutoMMPredictor:
                 label_encoder=self._df_preprocessor.label_generator,
                 problem_type=self._problem_type,
             )
-            score = compute_score(metric_data=metric_data, metric_name=per_metric.lower(), pos_label=pos_label,)
+            score = compute_score(
+                metric_data=metric_data,
+                metric_name=per_metric.lower(),
+                pos_label=pos_label,
+            )
             results[per_metric] = score
 
         if return_pred:
@@ -1040,7 +1120,9 @@ class AutoMMPredictor:
             return results
 
     def predict(
-        self, data: Union[pd.DataFrame, dict, list], as_pandas: Optional[bool] = True,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        as_pandas: Optional[bool] = True,
     ):
         """
         Predict values for the label column of new data.
@@ -1058,9 +1140,14 @@ class AutoMMPredictor:
         Array of predictions, one corresponding to each row in given dataset.
         """
 
-        logits = self._predict(data=data, ret_type=LOGITS, requires_label=False,)
+        logits = self._predict(
+            data=data,
+            ret_type=LOGITS,
+            requires_label=False,
+        )
         pred = self._df_preprocessor.transform_prediction(
-            y_pred=logits, loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
+            y_pred=logits,
+            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
         if as_pandas:
             pred = self.as_pandas(data=data, to_be_converted=pred)
@@ -1095,7 +1182,11 @@ class AutoMMPredictor:
         """
         assert self._problem_type in [BINARY, MULTICLASS], f"Problem {self._problem_type} has no probability output."
 
-        logits = self._predict(data=data, ret_type=LOGITS, requires_label=False,)
+        logits = self._predict(
+            data=data,
+            ret_type=LOGITS,
+            requires_label=False,
+        )
         prob = self._logits_to_prob(logits)
 
         if not as_multiclass:
@@ -1106,7 +1197,9 @@ class AutoMMPredictor:
         return prob
 
     def extract_embedding(
-        self, data: Union[pd.DataFrame, dict, list], as_pandas: Optional[bool] = False,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        as_pandas: Optional[bool] = False,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1125,7 +1218,11 @@ class AutoMMPredictor:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        features = self._predict(data=data, ret_type=FEATURES, requires_label=False,)
+        features = self._predict(
+            data=data,
+            ret_type=FEATURES,
+            requires_label=False,
+        )
         features = features.detach().cpu().numpy()
         if as_pandas:
             features = pd.DataFrame(features, index=data.index)
@@ -1147,7 +1244,9 @@ class AutoMMPredictor:
         return data
 
     def as_pandas(
-        self, data: Union[pd.DataFrame, dict, list], to_be_converted: np.ndarray,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        to_be_converted: np.ndarray,
     ):
         if isinstance(data, pd.DataFrame):
             index = data.index
@@ -1168,7 +1267,9 @@ class AutoMMPredictor:
 
     @staticmethod
     def _replace_model_name_prefix(
-        state_dict: dict, old_prefix: str, new_prefix: str,
+        state_dict: dict,
+        old_prefix: str,
+        new_prefix: str,
     ):
         start_idx = len(old_prefix)
         state_dict_processed = {
@@ -1203,7 +1304,10 @@ class AutoMMPredictor:
         # Save text tokenizers before saving data processors
         data_processors = copy.deepcopy(self._data_processors)
         if TEXT in data_processors:
-            data_processors[TEXT] = save_text_tokenizers(text_processors=data_processors[TEXT], path=path,)
+            data_processors[TEXT] = save_text_tokenizers(
+                text_processors=data_processors[TEXT],
+                path=path,
+            )
 
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -1230,7 +1334,9 @@ class AutoMMPredictor:
 
     @staticmethod
     def load(
-        path: str, resume: Optional[bool] = False, verbosity: Optional[int] = 3,
+        path: str,
+        resume: Optional[bool] = False,
+        verbosity: Optional[int] = 3,
     ):
         """
         Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
@@ -1272,16 +1378,23 @@ class AutoMMPredictor:
                 data_processors = pickle.load(fp)
             # Load text tokenizers after loading data processors.
             if TEXT in data_processors:
-                data_processors[TEXT] = load_text_tokenizers(text_processors=data_processors[TEXT], path=path,)
+                data_processors[TEXT] = load_text_tokenizers(
+                    text_processors=data_processors[TEXT],
+                    path=path,
+                )
             # backward compatibility. Add feature column names in each data processor.
             data_processors = assign_feature_column_names(
-                data_processors=data_processors, df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                df_preprocessor=df_preprocessor,
             )
 
             # Only keep the modalities with non-empty processors.
             data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
-            data_processors = init_data_processors(config=config, df_preprocessor=df_preprocessor,)
+            data_processors = init_data_processors(
+                config=config,
+                df_preprocessor=df_preprocessor,
+            )
 
         predictor = AutoMMPredictor(
             label=assets["label_column"],
@@ -1344,7 +1457,10 @@ class AutoMMPredictor:
             logger.info(f"Load pretrained checkpoint: {os.path.join(path, 'model.ckpt')}")
             ckpt_path = None  # must set None since we do not resume training
 
-        model = AutoMMPredictor._load_state_dict(model=model, path=load_path,)
+        model = AutoMMPredictor._load_state_dict(
+            model=model,
+            path=load_path,
+        )
 
         predictor._ckpt_path = ckpt_path
         predictor._model = model

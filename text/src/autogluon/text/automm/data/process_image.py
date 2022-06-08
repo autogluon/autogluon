@@ -119,7 +119,9 @@ class ImageProcessor:
             else:
                 raise ValueError("image normalization mean and std are missing")
         else:
-            logger.debug(f"using detected image normalization: {self.mean} and {self.std}")
+            logger.debug(
+                f"using detected image normalization: {self.mean} and {self.std}"
+            )
         self.normalization = transforms.Normalize(self.mean, self.std)
         self.max_img_num_per_col = max_img_num_per_col
         if max_img_num_per_col <= 0:
@@ -216,7 +218,9 @@ class ImageProcessor:
         except Exception as exp1:
             try:  # huggingface checkpoint
                 config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-                extracted = extract_value_from_config(config=config, keys=("image_size",),)
+                extracted = extract_value_from_config(
+                    config=config, keys=("image_size",),
+                )
                 if len(extracted) == 0:
                     image_size = None
                 elif len(extracted) == 1:
@@ -228,11 +232,16 @@ class ImageProcessor:
                 mean = None
                 std = None
             except Exception as exp2:
-                raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp2
+                raise ValueError(
+                    f"cann't load checkpoint_name {checkpoint_name}"
+                ) from exp2
 
         return image_size, mean, std
 
-    def construct_processor(self, transform_types: List[str],) -> transforms.Compose:
+    def construct_processor(
+        self,
+        transform_types: List[str],
+    ) -> transforms.Compose:
         """
         Build up an image processor from the provided list of transform types.
 
@@ -274,14 +283,22 @@ class ImageProcessor:
                 elif args is not None:
                     processor.append(transforms.ColorJitter(*args))
                 else:
-                    processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
+                    processor.append(
+                        transforms.ColorJitter(
+                            brightness=0.1, contrast=0.1, saturation=0.1
+                        )
+                    )
             elif trans_mode == "affine":
                 if kargs is not None:
                     processor.append(transforms.RandomAffine(**kargs))
                 elif args is not None:
                     processor.append(transforms.RandomAffine(*args))
                 else:
-                    processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+                    processor.append(
+                        transforms.RandomAffine(
+                            degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)
+                        )
+                    )
             elif trans_mode == "randaug":
                 if kargs is not None:
                     processor.append(RandAugment(**kargs))
@@ -298,7 +315,11 @@ class ImageProcessor:
         processor.append(self.normalization)
         return transforms.Compose(processor)
 
-    def process_one_sample(self, image_paths: Dict[str, List[str]], is_training: bool,) -> Dict:
+    def process_one_sample(
+        self,
+        image_paths: Dict[str, List[str]],
+        is_training: bool,
+    ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
         resulting in a tensor of (n, 3, size, size), where n <= max_img_num_per_col is the available image number.
@@ -357,11 +378,19 @@ class ImageProcessor:
                 column_start = len(images)
 
         ret.update(
-            {self.image_key: torch.stack(images + zero_images, dim=0), self.image_valid_num_key: len(images),}
+            {
+                self.image_key: torch.stack(images + zero_images, dim=0),
+                self.image_valid_num_key: len(images),
+            }
         )
         return ret
 
-    def __call__(self, all_image_paths: Dict[str, List[List[str]]], idx: int, is_training: bool,) -> Dict:
+    def __call__(
+        self,
+        all_image_paths: Dict[str, List[List[str]]],
+        idx: int,
+        is_training: bool,
+    ) -> Dict:
         """
         Obtain one sample's images and customized them for a specific model.
 
@@ -379,7 +408,8 @@ class ImageProcessor:
         A dictionary containing one sample's processed images and their number.
         """
         per_sample_paths = {
-            per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
+            per_column_name: per_column_paths[idx]
+            for per_column_name, per_column_paths in all_image_paths.items()
         }
         return self.process_one_sample(per_sample_paths, is_training)
 
@@ -392,3 +422,4 @@ class ImageProcessor:
         self.__dict__ = state
         if len(state["train_transform_types"]) > 0:
             self.train_processor = self.construct_processor(self.train_transform_types)
+

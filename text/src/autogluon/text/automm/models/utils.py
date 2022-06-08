@@ -25,7 +25,9 @@ def init_weights(module: nn.Module):
         module.weight.data.fill_(1.0)
 
 
-def assign_encoder_layer_ids(encoder_names: List[List[str]],):
+def assign_encoder_layer_ids(
+    encoder_names: List[List[str]],
+):
     """
     Assign ids to encoder layers. The encoder may contain several blocks e.g., block1 and block2.
     This function iterates through all the layers of each block from the input end towards the output end.
@@ -75,7 +77,8 @@ def assign_encoder_layer_ids(encoder_names: List[List[str]],):
 
 
 def assign_non_encoder_layer_ids(
-    non_encoder_names: List[str], layer_id: int,
+    non_encoder_names: List[str],
+    layer_id: int,
 ):
     """
     Assign the provided id to non-encoder layers.
@@ -212,7 +215,9 @@ def group_param_names(
 
 
 def reverse_layer_ids(
-    encoder_name_to_id: dict, pre_enocder_name_to_id: dict, post_enocder_name_to_id: dict,
+    encoder_name_to_id: dict,
+    pre_enocder_name_to_id: dict,
+    post_enocder_name_to_id: dict,
 ):
     """
     The layer ids need to increase when going from the output end to the input end.
@@ -287,7 +292,9 @@ def assign_layer_ids(
     if len(encoder_names) == 0 and len(pre_encoder_names) != 0:
         raise ValueError(f"encoder_names is empty, but pre_encoder_names has values: {pre_encoder_names}")
 
-    encoder_name_to_id, encoder_layer_num = assign_encoder_layer_ids(encoder_names=encoder_names,)
+    encoder_name_to_id, encoder_layer_num = assign_encoder_layer_ids(
+        encoder_names=encoder_names,
+    )
 
     pre_encoder_name_to_id = assign_non_encoder_layer_ids(non_encoder_names=pre_encoder_names, layer_id=0)
 
@@ -304,7 +311,10 @@ def assign_layer_ids(
 
 
 def get_column_features(
-    batch: Dict[str, torch.Tensor], column_name_prefix: str, features: torch.Tensor, valid_lengths: torch.Tensor,
+    batch: Dict[str, torch.Tensor],
+    column_name_prefix: str,
+    features: torch.Tensor,
+    valid_lengths: torch.Tensor,
 ):
     """
     Index the features of one column defined by `column_name_prefix`.

@@ -2,10 +2,9 @@ from typing import Tuple
 from nlpaug import Augmenter
 from nlpaug.util import Method
 import random
-
-
 def extract_value_from_config(
-    config: dict, keys: Tuple[str, ...],
+    config: dict,
+    keys: Tuple[str, ...],
 ):
     """
     Traverse a config dictionary to get some hyper-parameter's value.
@@ -32,7 +31,6 @@ def extract_value_from_config(
 
     return result
 
-
 class InsertPunctuation(Augmenter):
     """
     Inherit nlpaug basic augmenter to support insert random punction at random location https://arxiv.org/pdf/2108.13230.pdf
@@ -43,31 +41,10 @@ class InsertPunctuation(Augmenter):
     a healthy ,clean , sweet little girl in Mantin . send me message if you can give her a nice home
     ? a ! healthy ,clean , sweet little : girl , in Mantin . send me message . if you ; can give her ? a nice home
     """
-
-    def __init__(
-        self,
-        name="Insert_Punc",
-        action="insert",
-        aug_min=1,
-        aug_max=50,
-        aug_p=0.3,
-        device="cpu",
-        include_detail=False,
-        verbose=0,
-    ):
-        super().__init__(
-            name=name,
-            method=Method.WORD,
-            action=action,
-            aug_min=aug_min,
-            aug_max=aug_max,
-            aug_p=aug_p,
-            device=device,
-            include_detail=include_detail,
-            verbose=verbose,
-        )
-        self.punc_list = [".", ",", "!", "?", ";", ":"]
-
+    def __init__(self, name = "Insert_Punc", action='insert', aug_min = 1, aug_max = 50, aug_p=0.3, device='cpu', include_detail=False, verbose=0):
+        super().__init__(name = name, method = Method.WORD, action = action, aug_min = aug_min, aug_max = aug_max, aug_p = aug_p, device = device, include_detail = include_detail, verbose=verbose)
+        self.punc_list = ['.', ',', '!', '?', ';', ':']
+    
     def insert(self, data):
         """
         Random insert random punctuation at random location https://arxiv.org/pdf/2108.13230.pdf
@@ -82,29 +59,31 @@ class InsertPunctuation(Augmenter):
         The augmented text
 
         """
-        words = data.split(" ")
+        words = data.split(' ')
         new = []
         loc = self.generate_aug_idxes(words)
 
         for i, word in enumerate(words):
             if i in loc:
-                new.append(self.punc_list[random.randint(0, len(self.punc_list) - 1)])
+                new.append(self.punc_list[ random.randint(0, len(self.punc_list)-1)])
                 new.append(word)
             else:
                 new.append(word)
-
-        new = " ".join(new)
+        
+        new = ' '.join(new)
         return new
-
+    
     @classmethod
     def clean(cls, data):
-        if isinstance(data, list):
+        if isinstance(data, list) :
             return [d.strip() if d else d for d in data]
         return data.strip()
-
+    
     @classmethod
     def is_duplicate(cls, dataset, data):
         for d in dataset:
             if d == data:
                 return True
         return False
+    
+

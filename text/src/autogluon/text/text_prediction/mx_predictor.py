@@ -69,7 +69,15 @@ class MXTextPredictor:
         Whether to raise warning if the specified path already exists.
     """
 
-    def __init__(self, label, problem_type=None, eval_metric=None, path=None, verbosity=3, warn_if_exist=True):
+    def __init__(
+            self,
+            label,
+            problem_type=None,
+            eval_metric=None,
+            path=None,
+            verbosity=3,
+            warn_if_exist=True
+    ):
         self.verbosity = verbosity
         if self.verbosity is not None:
             set_logger_verbosity(self.verbosity)
@@ -123,9 +131,7 @@ class MXTextPredictor:
         The positive class name in binary classification or None if the problem is not binary classification.
         """
         if self.problem_type != BINARY:
-            logger.warning(
-                f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'."
-            )
+            logger.warning(f"Warning: Attempted to retrieve positive class label in a non-binary problem. Positive class labels only exist in binary classification. Returning None instead. self.problem_type is '{self.problem_type}' but positive_class only exists for '{BINARY}'.")
             return None
         else:
             return self.class_labels[1]
@@ -179,22 +185,20 @@ class MXTextPredictor:
             return None
         return {k: v for k, v in zip(self.class_labels, self.class_labels_internal)}
 
-    def fit(
-        self,
-        train_data,
-        tuning_data=None,
-        time_limit=None,
-        presets=None,
-        hyperparameters=None,
-        column_types=None,
-        num_cpus=None,
-        num_gpus=None,
-        num_trials=None,
-        plot_results=None,
-        holdout_frac=None,
-        save_path=None,
-        seed=0,
-    ):
+    def fit(self,
+            train_data,
+            tuning_data=None,
+            time_limit=None,
+            presets=None,
+            hyperparameters=None,
+            column_types=None,
+            num_cpus=None,
+            num_gpus=None,
+            num_trials=None,
+            plot_results=None,
+            holdout_frac=None,
+            save_path=None,
+            seed=0):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
 
@@ -262,33 +266,32 @@ class MXTextPredictor:
             self._path = setup_outputdir(save_path, warn_if_exist=True)
         if is_continue_training:
             # We have entered the continue training / transfer learning setting because the model is not None.
-            logger.info("Continue training the existing model...")
-            assert presets is None, "presets is not supported in the continue training setting."
+            logger.info('Continue training the existing model...')
+            assert presets is None, 'presets is not supported in the continue training setting.'
             flat_dict = self._model.config.to_flat_dict()
-            flat_dict["optimization.lr"] = space.Categorical(flat_dict["optimization.lr"])
-            existing_hparams = {"models": {"MultimodalTextModel": {"search_space": flat_dict}}}
-            existing_hparams = merge_params(ag_text_presets.create("default"), existing_hparams)
+            flat_dict['optimization.lr'] = space.Categorical(flat_dict['optimization.lr'])
+            existing_hparams = {'models': {'MultimodalTextModel': {'search_space': flat_dict}}}
+            existing_hparams = merge_params(ag_text_presets.create('default'), existing_hparams)
             hyperparameters = merge_params(existing_hparams, hyperparameters)
             # Check that the merged hyperparameters matches with the existing hyperparameters.
             # Here, we ensure that the model configurations remain the same.
-            for key in hyperparameters["models"]["MultimodalTextModel"]["search_space"]:
-                if key in existing_hparams and (key.startswith("model.") or key.startswith("preprocessing.")):
-                    new_value = hyperparameters["models"]["MultimodalTextModel"]["search_space"][key]
-                    old_value = existing_hparams["models"]["MultimodalTextModel"]["search_space"][key]
-                    assert new_value == old_value, (
-                        f"The model architecture / preprocessing logic is not allowed to change in the "
-                        f"continue training mode. "
-                        f'"{key}" is changed to be "{new_value}" from "{old_value}". '
-                        f"Please check the specified hyperparameters = {hyperparameters}"
-                    )
+            for key in hyperparameters['models']['MultimodalTextModel']['search_space']:
+                if key in existing_hparams and (key.startswith('model.') or key.startswith('preprocessing.')):
+                    new_value = hyperparameters['models']['MultimodalTextModel']['search_space'][key]
+                    old_value = existing_hparams['models']['MultimodalTextModel']['search_space'][key]
+                    assert new_value == old_value,\
+                        f'The model architecture / preprocessing logic is not allowed to change in the ' \
+                        f'continue training mode. ' \
+                        f'"{key}" is changed to be "{new_value}" from "{old_value}". ' \
+                        f'Please check the specified hyperparameters = {hyperparameters}'
         else:
             if presets is not None:
                 preset_hparams = ag_text_presets.create(presets)
             else:
-                preset_hparams = ag_text_presets.create("default")
+                preset_hparams = ag_text_presets.create('default')
             hyperparameters = merge_params(preset_hparams, hyperparameters)
         if num_trials is not None:
-            hyperparameters["tune_kwargs"]["num_trials"] = num_trials
+            hyperparameters['tune_kwargs']['num_trials'] = num_trials
         if isinstance(self._label, str):
             label_columns = [self._label]
         else:
@@ -297,9 +300,7 @@ class MXTextPredictor:
         if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
         if not isinstance(train_data, pd.DataFrame):
-            raise AssertionError(
-                f"train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}"
-            )
+            raise AssertionError(f'train_data is required to be a pandas DataFrame, but was instead: {type(train_data)}')
         all_columns = list(train_data.columns)
         feature_columns = [ele for ele in all_columns if ele not in label_columns]
         train_data = train_data[all_columns]
@@ -308,124 +309,100 @@ class MXTextPredictor:
             if isinstance(tuning_data, str):
                 tuning_data = load_pd.load(tuning_data)
             if not isinstance(tuning_data, pd.DataFrame):
-                raise AssertionError(
-                    f"tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}"
-                )
+                raise AssertionError(f'tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}')
             tuning_data = tuning_data[all_columns]
         else:
             if holdout_frac is None:
-                num_trials = hyperparameters["tune_kwargs"]["num_trials"]
+                num_trials = hyperparameters['tune_kwargs']['num_trials']
                 if num_trials == 1:
                     holdout_frac = default_holdout_frac(len(train_data), False)
                 else:
                     # For HPO, we will need to use a larger held-out ratio
                     holdout_frac = default_holdout_frac(len(train_data), True)
-            train_data, tuning_data = train_test_split(
-                train_data, test_size=holdout_frac, random_state=np.random.RandomState(seed)
-            )
+            train_data, tuning_data = train_test_split(train_data,
+                                                       test_size=holdout_frac,
+                                                       random_state=np.random.RandomState(seed))
         if is_continue_training:
-            assert set(label_columns) == set(self._model.label_columns), (
-                f"Label columns do not match. Inferred label column from data = {set(label_columns)}."
-                f" Label column in model = {set(self._model.label_columns)}"
-            )
+            assert set(label_columns) == set(self._model.label_columns),\
+                f'Label columns do not match. Inferred label column from data = {set(label_columns)}.' \
+                f' Label column in model = {set(self._model.label_columns)}'
             for col_name in self._model.feature_columns:
-                assert col_name in feature_columns, (
-                    f'In the loaded model, "{col_name}" is a feature column,'
-                    f" but there is "
-                    f"no such column in the DataFrame."
-                )
-            model_hparams = hyperparameters["models"]["MultimodalTextModel"]
+                assert col_name in feature_columns, f'In the loaded model, "{col_name}" is a feature column,' \
+                                                    f' but there is ' \
+                                                    f'no such column in the DataFrame.'
+            model_hparams = hyperparameters['models']['MultimodalTextModel']
             if plot_results is None:
                 plot_results = in_ipynb()
-            self._model.train(
-                train_data=train_data,
-                tuning_data=tuning_data,
-                num_cpus=num_cpus,
-                num_gpus=num_gpus,
-                search_space=model_hparams["search_space"],
-                tune_kwargs=hyperparameters["tune_kwargs"],
-                time_limit=time_limit,
-                continue_training=True,
-                seed=seed,
-                plot_results=plot_results,
-                verbosity=verbosity,
-            )
+            self._model.train(train_data=train_data,
+                              tuning_data=tuning_data,
+                              num_cpus=num_cpus,
+                              num_gpus=num_gpus,
+                              search_space=model_hparams['search_space'],
+                              tune_kwargs=hyperparameters['tune_kwargs'],
+                              time_limit=time_limit,
+                              continue_training=True,
+                              seed=seed,
+                              plot_results=plot_results,
+                              verbosity=verbosity)
         else:
-            column_types, problem_type = infer_column_problem_types(
-                train_data,
-                tuning_data,
-                label_columns=label_columns,
-                problem_type=self._problem_type,
-                provided_column_types=column_types,
-            )
-            self._eval_metric, log_metrics = infer_eval_log_metrics(
-                problem_type=problem_type, eval_metric=self._eval_metric
-            )
+            column_types, problem_type = infer_column_problem_types(train_data, tuning_data,
+                                                                    label_columns=label_columns,
+                                                                    problem_type=self._problem_type,
+                                                                    provided_column_types=column_types)
+            self._eval_metric, log_metrics = infer_eval_log_metrics(problem_type=problem_type,
+                                                                    eval_metric=self._eval_metric)
             has_text_column = False
             for k, v in column_types.items():
                 if v == _C.TEXT:
                     has_text_column = True
                     break
             if not has_text_column:
-                raise AssertionError(
-                    "No Text Column is found! This is currently not supported by "
-                    "the TextPredictor. You may try to use "
-                    "autogluon.tabular.TabularPredictor.\n"
-                    "The inferred column properties of the training data is {}".format(column_types)
-                )
+                raise AssertionError('No Text Column is found! This is currently not supported by '
+                                     'the TextPredictor. You may try to use '
+                                     'autogluon.tabular.TabularPredictor.\n'
+                                     'The inferred column properties of the training data is {}'
+                                     .format(column_types))
             logger.info('Problem Type="{}"'.format(problem_type))
             logger.info(printable_column_type_string(column_types))
             self._problem_type = problem_type
-            if "models" not in hyperparameters or "MultimodalTextModel" not in hyperparameters["models"]:
-                raise ValueError(
-                    'The current TextPredictor only supports "MultimodalTextModel" '
-                    "and you must ensure that "
-                    'hyperparameters["models"]["MultimodalTextModel"] can be accessed.'
-                )
-            model_hparams = hyperparameters["models"]["MultimodalTextModel"]
-            self._backend = model_hparams["backend"]
+            if 'models' not in hyperparameters or 'MultimodalTextModel' not in hyperparameters['models']:
+                raise ValueError('The current TextPredictor only supports "MultimodalTextModel" '
+                                 'and you must ensure that '
+                                 'hyperparameters["models"]["MultimodalTextModel"] can be accessed.')
+            model_hparams = hyperparameters['models']['MultimodalTextModel']
+            self._backend = model_hparams['backend']
             if plot_results is None:
                 plot_results = in_ipynb()
 
-            if self._backend == "gluonnlp_v0":
+            if self._backend == 'gluonnlp_v0':
                 import warnings
-
-                warnings.filterwarnings("ignore", module="mxnet")
+                warnings.filterwarnings('ignore', module='mxnet')
                 from .mx.models import MultiModalTextModel
-
-                self._model = MultiModalTextModel(
-                    column_types=column_types,
-                    feature_columns=feature_columns,
-                    label_columns=label_columns,
-                    problem_type=self._problem_type,
-                    eval_metric=self._eval_metric,
-                    log_metrics=log_metrics,
-                    output_directory=self._path,
-                )
-                self._model.train(
-                    train_data=train_data,
-                    tuning_data=tuning_data,
-                    num_cpus=num_cpus,
-                    num_gpus=num_gpus,
-                    search_space=model_hparams["search_space"],
-                    tune_kwargs=hyperparameters["tune_kwargs"],
-                    time_limit=time_limit,
-                    seed=seed,
-                    plot_results=plot_results,
-                    verbosity=verbosity,
-                )
+                self._model = MultiModalTextModel(column_types=column_types,
+                                                  feature_columns=feature_columns,
+                                                  label_columns=label_columns,
+                                                  problem_type=self._problem_type,
+                                                  eval_metric=self._eval_metric,
+                                                  log_metrics=log_metrics,
+                                                  output_directory=self._path)
+                self._model.train(train_data=train_data,
+                                  tuning_data=tuning_data,
+                                  num_cpus=num_cpus,
+                                  num_gpus=num_gpus,
+                                  search_space=model_hparams['search_space'],
+                                  tune_kwargs=hyperparameters['tune_kwargs'],
+                                  time_limit=time_limit,
+                                  seed=seed,
+                                  plot_results=plot_results,
+                                  verbosity=verbosity)
             else:
-                raise NotImplementedError(
-                    "Currently, we only support using "
-                    "the autogluon-contrib-nlp and MXNet "
-                    "as the backend of AutoGluon-Text. In the future, "
-                    "we will support other models."
-                )
-        logger.info(
-            f'Training completed. Auto-saving to "{self.path}". '
-            f"For loading the model, you can use"
-            f' `predictor = TextPredictor.load("{self.path}")`'
-        )
+                raise NotImplementedError("Currently, we only support using "
+                                          "the autogluon-contrib-nlp and MXNet "
+                                          "as the backend of AutoGluon-Text. In the future, "
+                                          "we will support other models.")
+        logger.info(f'Training completed. Auto-saving to "{self.path}". '
+                       f'For loading the model, you can use'
+                       f' `predictor = TextPredictor.load("{self.path}")`')
         self.save(self.path)
         return self
 
@@ -464,9 +441,7 @@ class MXTextPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        assert (
-            self._model is not None
-        ), "Model does not seem to have been constructed. Have you called fit(), or load()?"
+        assert self._model is not None, 'Model does not seem to have been constructed. Have you called fit(), or load()?'
         output = self._model.predict(data)
         if as_pandas:
             if isinstance(data, pd.DataFrame):
@@ -497,9 +472,9 @@ class MXTextPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        assert self._model is not None, (
-            "Model does not seem to have been constructed. " "Have you called fit(), or load()?"
-        )
+        assert self._model is not None,\
+            'Model does not seem to have been constructed. ' \
+            'Have you called fit(), or load()?'
         output = self._model.predict_proba(data)
         if not as_multiclass:
             if self.problem_type == BINARY:
@@ -532,9 +507,8 @@ class MXTextPredictor:
         Array of embeddings, corresponding to each row in the given data.
         It will have shape (#samples, D) where the embedding dimension D is determined by the neural network's architecture.
         """
-        assert self._model is not None, (
-            "Model does not seem to have been constructed. " "Have you called fit(), or load()?"
-        )
+        assert self._model is not None, 'Model does not seem to have been constructed. ' \
+                                        'Have you called fit(), or load()?'
         output = self._model.extract_embedding(data)
         if as_pandas:
             if isinstance(data, pd.DataFrame):
@@ -544,7 +518,7 @@ class MXTextPredictor:
             output = pd.DataFrame(output, index=index)
         return output
 
-    def save(self, path, standalone=False):
+    def save(self, path, standalone = False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -561,15 +535,15 @@ class MXTextPredictor:
         path, str
             The path to directory in which to save this Predictor.
         """
-        assert self._model is not None, (
-            "Model does not seem to have been constructed." " Have you called fit(), or load()?"
-        )
-        if standalone:
-            logger.info("Standalone=True only works for backen=pytorch, and does nothing with backen=mxnet.")
+        assert self._model is not None, 'Model does not seem to have been constructed.' \
+                                        ' Have you called fit(), or load()?'
+        if standalone: logger.info('Standalone=True only works for backen=pytorch, and does nothing with backen=mxnet.')
         os.makedirs(path, exist_ok=True)
-        with open(os.path.join(path, "text_predictor_assets.json"), "w") as of:
-            json.dump({"backend": self._backend, "label": self._label, "version": version.__version__,}, of)
-        self._model.save(os.path.join(path, "saved_model"))
+        with open(os.path.join(path, 'text_predictor_assets.json'), 'w') as of:
+            json.dump({'backend': self._backend,
+                       'label': self._label,
+                       'version': version.__version__,}, of)
+        self._model.save(os.path.join(path, 'saved_model'))
 
     @classmethod
     def load(cls, path: str, verbosity: int = None):
@@ -589,24 +563,21 @@ class MXTextPredictor:
 
         """
         assert os.path.exists(path), f'"{path}" does not exist. You may check the path again.'
-        with open(os.path.join(path, "text_predictor_assets.json"), "r") as in_f:
+        with open(os.path.join(path, 'text_predictor_assets.json'), 'r') as in_f:
             assets = json.load(in_f)
-        backend = assets["backend"]
-        label = assets["label"]
-        if backend == "gluonnlp_v0":
+        backend = assets['backend']
+        label = assets['label']
+        if backend == 'gluonnlp_v0':
             from .mx.models import MultiModalTextModel
-
-            model = MultiModalTextModel.load(os.path.join(path, "saved_model"))
+            model = MultiModalTextModel.load(os.path.join(path, 'saved_model'))
         else:
             raise NotImplementedError(f'Backend = "{backend}" is not supported.')
-        predictor: MXTextPredictor = cls(
-            label=label,
-            problem_type=model._problem_type,
-            eval_metric=model._eval_metric,
-            path=path,
-            verbosity=verbosity,
-            warn_if_exist=False,
-        )
+        predictor: MXTextPredictor = cls(label=label,
+                                         problem_type=model._problem_type,
+                                         eval_metric=model._eval_metric,
+                                         path=path,
+                                         verbosity=verbosity,
+                                         warn_if_exist=False)
         predictor._backend = backend
         predictor._model = model
         return predictor

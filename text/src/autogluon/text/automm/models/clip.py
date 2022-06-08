@@ -30,7 +30,10 @@ class CLIPForImageText(nn.Module):
     """
 
     def __init__(
-        self, prefix: str, checkpoint_name: str, num_classes: Optional[int] = 0,
+        self,
+        prefix: str,
+        checkpoint_name: str,
+        num_classes: Optional[int] = 0,
     ):
         """
         Load the pretrained CLIP from huggingface transformers.
@@ -96,7 +99,8 @@ class CLIPForImageText(nn.Module):
         return self.model.config.vision_config.hidden_size
 
     def forward(
-        self, batch: dict,
+        self,
+        batch: dict,
     ):
         """
         Parameters
@@ -167,12 +171,17 @@ class CLIPForImageText(nn.Module):
         )
 
         ret.update(
-            {LOGITS: logits, FEATURES: features,}
+            {
+                LOGITS: logits,
+                FEATURES: features,
+            }
         )
 
         return {self.prefix: ret}
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to

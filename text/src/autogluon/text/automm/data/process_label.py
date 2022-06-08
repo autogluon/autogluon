@@ -12,7 +12,8 @@ class LabelProcessor:
     """
 
     def __init__(
-        self, prefix: str,
+        self,
+        prefix: str,
     ):
         """
         Parameters
@@ -38,7 +39,10 @@ class LabelProcessor:
         fn = {self.label_key: Stack()}
         return fn
 
-    def process_one_sample(self, labels: Dict[str, Union[int, float]],) -> Dict:
+    def process_one_sample(
+        self,
+        labels: Dict[str, Union[int, float]],
+    ) -> Dict:
         """
         Process one sample's labels. Here it only picks the first label.
         New rules can be added if necessary.
@@ -55,7 +59,12 @@ class LabelProcessor:
             self.label_key: labels[next(iter(labels))],  # get the first key's value
         }
 
-    def __call__(self, all_labels: Dict[str, NDArray[(Any,), Any]], idx: int, is_training: bool,) -> Dict:
+    def __call__(
+        self,
+        all_labels: Dict[str, NDArray[(Any,), Any]],
+        idx: int,
+        is_training: bool,
+    ) -> Dict:
         """
         Extract one sample's labels and customize them for a specific model.
 
