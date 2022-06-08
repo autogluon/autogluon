@@ -162,7 +162,10 @@ class ImageProcessor:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
         fn.update(
-            {self.image_key: Pad(pad_val=0), self.image_valid_num_key: Stack(),}
+            {
+                self.image_key: Pad(pad_val=0),
+                self.image_valid_num_key: Stack(),
+            }
         )
 
         return fn
@@ -211,7 +214,11 @@ class ImageProcessor:
             Image normalizaiton std.
         """
         try:  # timm checkpoint
-            model = create_model(checkpoint_name, pretrained=True, num_classes=0,)
+            model = create_model(
+                checkpoint_name,
+                pretrained=True,
+                num_classes=0,
+            )
             image_size = model.default_cfg["input_size"][-1]
             mean = model.default_cfg["mean"]
             std = model.default_cfg["std"]
@@ -219,7 +226,8 @@ class ImageProcessor:
             try:  # huggingface checkpoint
                 config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
                 extracted = extract_value_from_config(
-                    config=config, keys=("image_size",),
+                    config=config,
+                    keys=("image_size",),
                 )
                 if len(extracted) == 0:
                     image_size = None
@@ -240,7 +248,10 @@ class ImageProcessor:
 
         return image_size, mean, std
 
-    def construct_processor(self, transform_types: List[str],) -> transforms.Compose:
+    def construct_processor(
+        self,
+        transform_types: List[str],
+    ) -> transforms.Compose:
         """
         Build up an image processor from the provided list of transform types.
 
@@ -317,7 +328,9 @@ class ImageProcessor:
         return transforms.Compose(processor)
 
     def process_one_sample(
-        self, image_paths: Dict[str, List[str]], is_training: bool,
+        self,
+        image_paths: Dict[str, List[str]],
+        is_training: bool,
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
@@ -385,7 +398,10 @@ class ImageProcessor:
         return ret
 
     def __call__(
-        self, all_image_paths: Dict[str, List[List[str]]], idx: int, is_training: bool,
+        self,
+        all_image_paths: Dict[str, List[List[str]]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Obtain one sample's images and customized them for a specific model.
@@ -418,4 +434,3 @@ class ImageProcessor:
         self.__dict__ = state
         if len(state["train_transform_types"]) > 0:
             self.train_processor = self.construct_processor(self.train_transform_types)
-

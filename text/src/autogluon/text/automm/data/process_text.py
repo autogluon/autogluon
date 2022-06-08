@@ -42,10 +42,12 @@ ALL_TOKENIZERS = {
 }
 
 
-def construct_text_augmenter(augment_types: List[str],) -> Optional[naf.Sometimes]:
+def construct_text_augmenter(
+    augment_types: List[str],
+) -> Optional[naf.Sometimes]:
     """
     Build up a text augmentor from the provided list of augmentation types
-    
+
     Parameters
     ----------
     augment_types
@@ -54,7 +56,7 @@ def construct_text_augmenter(augment_types: List[str],) -> Optional[naf.Sometime
     Returns
     -------
     A nlpaug sequantial flow.
-    
+
     """
     if augment_types is None or len(augment_types) == 0:
         return None
@@ -152,7 +154,8 @@ class TextProcessor:
         self.text_column_names = text_column_names
         self.requires_column_info = requires_column_info
         self.tokenizer = self.get_pretrained_tokenizer(
-            tokenizer_name=tokenizer_name, checkpoint_name=checkpoint_name,
+            tokenizer_name=tokenizer_name,
+            checkpoint_name=checkpoint_name,
         )
         if hasattr(self.tokenizer, "deprecation_warnings"):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
@@ -250,7 +253,8 @@ class TextProcessor:
         return fn
 
     def build_one_token_sequence(
-        self, text_tokens: Dict[str, NDArray[(Any,), np.int32]],
+        self,
+        text_tokens: Dict[str, NDArray[(Any,), np.int32]],
     ) -> Dict:
         """
         Construct one token sequence based on multiple token sequences coming from different
@@ -320,7 +324,9 @@ class TextProcessor:
         return ret
 
     def build_one_token_sequence_from_text(
-        self, text: Dict[str, str], is_training: bool,
+        self,
+        text: Dict[str, str],
+        is_training: bool,
     ) -> Dict:
         """
         Tokenize a sample's text data and build one token sequence. One sample may have
@@ -330,7 +336,7 @@ class TextProcessor:
         ----------
         text
             The raw text data of one sample.
-        
+
         is_training
             Flag to apply augmentation only to training.
 
@@ -353,7 +359,9 @@ class TextProcessor:
                     if len(col_text.split(" ")) >= self.text_detection_length:
                         col_text = self.train_augmenter.augment(col_text)
             col_tokens = self.tokenizer.encode(
-                col_text, add_special_tokens=False, truncation=False,
+                col_text,
+                add_special_tokens=False,
+                truncation=False,
             )
             tokens[col_name] = np.array(col_tokens, dtype=np.int32)
         # build token sequence
@@ -396,7 +404,8 @@ class TextProcessor:
 
     @staticmethod
     def get_pretrained_tokenizer(
-        tokenizer_name: str, checkpoint_name: str,
+        tokenizer_name: str,
+        checkpoint_name: str,
     ):
         """
         Load the tokenizer for a pre-trained huggingface checkpoint.
@@ -417,7 +426,9 @@ class TextProcessor:
 
     @staticmethod
     def get_trimmed_lengths(
-        lengths: List[int], max_length: int, do_merge: bool = False,
+        lengths: List[int],
+        max_length: int,
+        do_merge: bool = False,
     ) -> np.ndarray:
         """
         Get the trimmed lengths of multiple text token sequences. It will make sure that
@@ -467,7 +478,10 @@ class TextProcessor:
             return np.minimum(lengths, max_length)
 
     def __call__(
-        self, all_text: Dict[str, List[str]], idx: int, is_training: bool,
+        self,
+        all_text: Dict[str, List[str]],
+        idx: int,
+        is_training: bool,
     ) -> Dict:
         """
         Extract one sample's text data, tokenize them, and build one token sequence.
@@ -479,7 +493,7 @@ class TextProcessor:
         idx
             The sample index in a dataset.
         is_training
-            Whether to do processing in the training mode. 
+            Whether to do processing in the training mode.
 
         Returns
         -------
@@ -511,4 +525,3 @@ class TextProcessor:
     def __setstate__(self, state):
         self.__dict__ = state
         self.train_augmenter = construct_text_augmenter(state["rain_augment_types"])
-

@@ -16,7 +16,7 @@ def scale_parameter(level, maxval, type):
     """Helper function to scale `val` between 0 and maxval .
     Args:
         level: Level of the operation that will be between [0, image_parameter_max].
-        maxval: Maximum value that the operation can have. 
+        maxval: Maximum value that the operation can have.
         type: return float or int
     Returns:
         An adjust scale
@@ -259,6 +259,7 @@ class TrivialAugment:
     def __init__(self, datatype, max_strength) -> None:
         assert max_strength > 0, "Invalid maximum strength. Must > 0"
         self.max_strength = max_strength
+        print(f"{datatype} max: {max_strength}")
         self.data_type = datatype
         if datatype == "img":
             self.all_transform = set_image_augmentation_space(self.max_strength)
