@@ -746,7 +746,7 @@ class AutoMMPredictor:
         )
 
         config = update_config_by_rules(
-            problem_type=problem_type,
+            problem_type=self._problem_type,
             config=config,
         )
 
