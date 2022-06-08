@@ -109,10 +109,7 @@ model:
     text_detection_length: 10                     # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
     text_train_augment_types:
       # example
-<<<<<<< HEAD
       - "trivial_augment({'max':0.1})"            # max is the maximum percent of word can be changed for a text
-=======
->>>>>>> upstream/master
       # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
       # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
       # - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
