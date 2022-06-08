@@ -142,9 +142,7 @@ def get_minmax_mode(metric_name: str):
         - max
             It means that larger metric is better.
     """
-    assert (
-        metric_name in METRIC_MODE_MAP
-    ), f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
+    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
     return METRIC_MODE_MAP.get(metric_name)
 
 
@@ -165,9 +163,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
         hyperparameters being filtered
     """
     assert any(
-        key.startswith(valid_keys)
-        for valid_keys in VALID_CONFIG_KEYS
-        for key in keys_to_filter
+        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
     from autogluon.core.space import Space
     from ray.tune.sample import Domain
@@ -285,9 +281,7 @@ def get_config(
         # remove `model.names` from overrides since it's already applied.
         overrides.pop("model.names", None)
         # apply all the overrides
-        config = apply_omegaconf_overrides(
-            config, overrides=overrides, check_key_exist=True
-        )
+        config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
     verify_model_names(config.model)
     return config
 
@@ -310,17 +304,13 @@ def verify_model_names(config: DictConfig):
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
-    assert set(config.names).issubset(
-        set(keys)
-    ), f"`{config.names}` do not match config keys {keys}"
+    assert set(config.names).issubset(set(keys)), f"`{config.names}` do not match config keys {keys}"
 
     # verify that no name starts with another one
     names = sorted(config.names, key=lambda ele: len(ele), reverse=True)
     for i in range(len(names)):
         if names[i].startswith(tuple(names[i + 1 :])):
-            raise ValueError(
-                f"name {names[i]} starts with one of another name: {names[i+1:]}"
-            )
+            raise ValueError(f"name {names[i]} starts with one of another name: {names[i+1:]}")
 
 
 def get_name_prefix(
@@ -747,9 +737,7 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
-                loss_weight=model_config.weight
-                if hasattr(model_config, "weight")
-                else None,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
         elif model_name.lower().startswith(FUSION_TRANSFORMER):
@@ -770,9 +758,7 @@ def create_model(
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
                 adapt_in_features=model_config.adapt_in_features,
-                loss_weight=model_config.weight
-                if hasattr(model_config, "weight")
-                else None,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
         else:
@@ -808,12 +794,7 @@ def save_pretrained_models(
     path
         The path to save pretrained checkpoints.
     """
-    requires_saving = any(
-        [
-            model_name.lower().startswith((CLIP, HF_TEXT))
-            for model_name in config.model.names
-        ]
-    )
+    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names])
     if not requires_saving:
         return config
 
@@ -847,15 +828,11 @@ def convert_checkpoint_name(config: DictConfig, path: str) -> DictConfig:
         if model_name.lower().startswith((CLIP, HF_TEXT)):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
-                model_config.checkpoint_name = os.path.join(
-                    path, model_config.checkpoint_name[len("local://") :]
-                )
+                model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
                 assert os.path.exists(
                     os.path.join(model_config.checkpoint_name, "config.json")
                 )  # guarantee the existence of local configs
-                assert os.path.exists(
-                    os.path.join(model_config.checkpoint_name, "pytorch_model.bin")
-                )
+                assert os.path.exists(os.path.join(model_config.checkpoint_name, "pytorch_model.bin"))
 
     return config
 
@@ -974,9 +951,7 @@ def average_checkpoints(
     if len(checkpoint_paths) > 1:
         avg_state_dict = {}
         for per_path in checkpoint_paths:
-            state_dict = torch.load(per_path, map_location=torch.device("cpu"))[
-                "state_dict"
-            ]
+            state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
             for key in state_dict:
                 if key in avg_state_dict:
                     avg_state_dict[key] += state_dict[key]
@@ -988,9 +963,7 @@ def average_checkpoints(
         for key in avg_state_dict:
             avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
     else:
-        avg_state_dict = torch.load(
-            checkpoint_paths[0], map_location=torch.device("cpu")
-        )["state_dict"]
+        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]
 
     return avg_state_dict
 
@@ -1019,9 +992,7 @@ def compute_score(
     """
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(
-            metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label]
-        )
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
@@ -1112,9 +1083,7 @@ def apply_omegaconf_overrides(
                     f'"{ele[0]}" is not found in the config. You may need to check the overrides. '
                     f"overrides={overrides}"
                 )
-    override_conf = OmegaConf.from_dotlist(
-        [f"{ele[0]}={ele[1]}" for ele in overrides.items()]
-    )
+    override_conf = OmegaConf.from_dotlist([f"{ele[0]}={ele[1]}" for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
 
@@ -1248,9 +1217,7 @@ def modify_duplicate_model_names(
                     if n == per_processor.prefix:
                         per_processor.prefix = new_name
             # modify model config keys
-            setattr(
-                predictor._config.model, new_name, getattr(predictor._config.model, n)
-            )
+            setattr(predictor._config.model, new_name, getattr(predictor._config.model, n))
             delattr(predictor._config.model, n)
 
             model_names.append(new_name)
@@ -1288,21 +1255,13 @@ def assign_feature_column_names(
             # requires_column_info=True is used for feature column distillation.
             per_model_processor.requires_column_info = False
             if per_modality == IMAGE:
-                per_model_processor.image_column_names = (
-                    df_preprocessor.image_path_names
-                )
+                per_model_processor.image_column_names = df_preprocessor.image_path_names
             elif per_modality == TEXT:
-                per_model_processor.text_column_names = (
-                    df_preprocessor.text_feature_names
-                )
+                per_model_processor.text_column_names = df_preprocessor.text_feature_names
             elif per_modality == NUMERICAL:
-                per_model_processor.numerical_column_names = (
-                    df_preprocessor.numerical_feature_names
-                )
+                per_model_processor.numerical_column_names = df_preprocessor.numerical_feature_names
             elif per_modality == CATEGORICAL:
-                per_model_processor.categorical_column_names = (
-                    df_preprocessor.categorical_feature_names
-                )
+                per_model_processor.categorical_column_names = df_preprocessor.categorical_feature_names
             else:
                 raise ValueError(f"Unknown modality: {per_modality}")
 
@@ -1409,9 +1368,7 @@ def get_mixup(
     mixup_active = False
     if mixup_config is not None and mixup_config.turn_on:
         mixup_active = (
-            mixup_config.mixup_alpha > 0
-            or mixup_config.cutmix_alpha > 0.0
-            or mixup_config.cutmix_minmax is not None
+            mixup_config.mixup_alpha > 0 or mixup_config.cutmix_alpha > 0.0 or mixup_config.cutmix_minmax is not None
         )
 
     mixup_state = model_active & mixup_active & (num_classes > 1)

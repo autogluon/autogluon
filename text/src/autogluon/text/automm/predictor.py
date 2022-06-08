@@ -179,9 +179,7 @@ class AutoMMPredictor:
             problem_type = REGRESSION
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
-            verbosity = (
-                1  # don't use 3, which doesn't suppress logger.info() in .load().
-            )
+            verbosity = 1  # don't use 3, which doesn't suppress logger.info() in .load().
             enable_progress_bar = False
 
         if verbosity is not None:
@@ -204,9 +202,7 @@ class AutoMMPredictor:
         self._continuous_training = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
-        self._enable_progress_bar = (
-            enable_progress_bar if enable_progress_bar is not None else True
-        )
+        self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
     @property
     def path(self):
@@ -370,9 +366,7 @@ class AutoMMPredictor:
                 warn_if_exist=self._warn_if_exist,
             )
         else:
-            assert (
-                hyperparameter_tune_kwargs is None
-            ), "You can not resume training with HPO"
+            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
         save_path = os.path.abspath(save_path)
         logger.debug(f"save path: {save_path}")
 
@@ -383,9 +377,7 @@ class AutoMMPredictor:
             else:
                 stratify = None
             if holdout_frac is None:
-                val_frac = default_holdout_frac(
-                    len(train_data), hyperparameter_tune=False
-                )
+                val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
             else:
                 val_frac = holdout_frac
             train_data, tuning_data = train_test_split(
@@ -404,9 +396,7 @@ class AutoMMPredictor:
         )
 
         logger.debug(f"column_types: {column_types}")
-        logger.debug(
-            f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}"
-        )
+        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
 
         if self._column_types is not None and self._column_types != column_types:
             warnings.warn(
@@ -419,14 +409,12 @@ class AutoMMPredictor:
 
         if self._problem_type is not None:
             assert self._problem_type == problem_type, (
-                f"Inferred problem type {problem_type} is different from "
-                f"the previous {self._problem_type}"
+                f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
             )
 
         if self._output_shape is not None:
             assert self._output_shape == output_shape, (
-                f"Inferred output shape {output_shape} is different from "
-                f"the previous {self._output_shape}"
+                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
             )
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
@@ -443,12 +431,8 @@ class AutoMMPredictor:
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._problem_type = (
-            problem_type  # In case problem type isn't provided in __init__().
-        )
-        self._eval_metric_name = (
-            eval_metric_name  # In case eval_metric isn't provided in __init__().
-        )
+        self._problem_type = problem_type  # In case problem type isn't provided in __init__().
+        self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._save_path = save_path
         self._output_shape = output_shape
@@ -461,28 +445,20 @@ class AutoMMPredictor:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
-            ckpt_path=None
-            if hyperparameter_tune_kwargs is not None
-            else self._ckpt_path,
+            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False
-            if hyperparameter_tune_kwargs is not None
-            else self._enable_progress_bar,
+            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
-            hpo_mode=(
-                hyperparameter_tune_kwargs is not None
-            ),  # skip average checkpoint if in hpo mode
+            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
         )
 
         if hyperparameter_tune_kwargs is not None:
             # TODO: allow custom gpu
             resources = dict(num_gpus=torch.cuda.device_count())
             if _fit_args["max_time"] is not None:
-                _fit_args[
-                    "max_time"
-                ] *= 0.95  # give some buffer time to ray lightning trainer
+                _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
             predictor = self._hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
@@ -549,16 +525,12 @@ class AutoMMPredictor:
             cleanup_trials(save_path, best_trial.trial_id)
             best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
-            predictor = AutoMMPredictor._load_metadata(
-                predictor=self, path=best_trial_path
-            )
+            predictor = AutoMMPredictor._load_metadata(predictor=self, path=best_trial_path)
             # construct the model
             model = create_model(
                 config=predictor._config,
                 num_classes=predictor._output_shape,
-                num_numerical_columns=len(
-                    predictor._df_preprocessor.numerical_feature_names
-                ),
+                num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
                 num_categories=predictor._df_preprocessor.categorical_num_categories,
                 pretrained=False,  # set "pretrain=False" to prevent downloading online models
             )
@@ -566,16 +538,12 @@ class AutoMMPredictor:
             # average checkpoint
             checkpoints_paths_and_scores = dict(
                 (os.path.join(checkpoint, RAY_TUNE_CHECKPOINT), score)
-                for checkpoint, score in analysis.get_trial_checkpoints_paths(
-                    best_trial, metric=metric
-                )
+                for checkpoint, score in analysis.get_trial_checkpoints_paths(best_trial, metric=metric)
             )
             # write checkpoint paths and scores to yaml file so that top_k_average could read it
             best_k_model_path = os.path.join(best_trial_path, BEST_K_MODELS_FILE)
             with open(best_k_model_path, "w") as yaml_file:
-                yaml.dump(
-                    checkpoints_paths_and_scores, yaml_file, default_flow_style=False
-                )
+                yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
 
             last_ckpt_path = analysis.get_last_checkpoint(best_trial)
             predictor._top_k_average(
@@ -601,17 +569,13 @@ class AutoMMPredictor:
 
             return predictor
 
-    def _hpo_fit_wrapper(
-        self, sampled_hyperparameters, checkpoint_dir=None, **_fit_args
-    ):
+    def _hpo_fit_wrapper(self, sampled_hyperparameters, checkpoint_dir=None, **_fit_args):
         from ray import tune
 
         _fit_args[
             "hyperparameters"
         ] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
-        _fit_args[
-            "save_path"
-        ] = tune.get_trial_dir()  # We want to save each trial to a separate directory
+        _fit_args["save_path"] = tune.get_trial_dir()  # We want to save each trial to a separate directory
         logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
         if checkpoint_dir is not None:
             _fit_args["resume"] = True
@@ -671,9 +635,7 @@ class AutoMMPredictor:
         elif self._config.distiller.soft_label_loss_type == "cross_entropy":
             soft_label_loss_func = nn.CrossEntropyLoss()
         else:
-            raise ValueError(
-                f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}"
-            )
+            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
         # turn on returning column information in data processors
         self._data_processors = turn_on_off_feature_column_info(
@@ -688,9 +650,7 @@ class AutoMMPredictor:
         logger.debug(
             f"teacher preprocessor text_feature_names: {teacher_predictor._df_preprocessor._text_feature_names}"
         )
-        logger.debug(
-            f"teacher preprocessor image_path_names: {teacher_predictor._df_preprocessor._image_path_names}"
-        )
+        logger.debug(f"teacher preprocessor image_path_names: {teacher_predictor._df_preprocessor._image_path_names}")
         logger.debug(
             f"teacher preprocessor categorical_feature_names: {teacher_predictor._df_preprocessor._categorical_feature_names}"
         )
@@ -698,18 +658,12 @@ class AutoMMPredictor:
             f"teacher preprocessor numerical_feature_names: {teacher_predictor._df_preprocessor._numerical_feature_names}"
         )
 
-        logger.debug(
-            f"student preprocessor text_feature_names: {self._df_preprocessor._text_feature_names}"
-        )
-        logger.debug(
-            f"student preprocessor image_path_names: {self._df_preprocessor._image_path_names}"
-        )
+        logger.debug(f"student preprocessor text_feature_names: {self._df_preprocessor._text_feature_names}")
+        logger.debug(f"student preprocessor image_path_names: {self._df_preprocessor._image_path_names}")
         logger.debug(
             f"student preprocessor categorical_feature_names: {self._df_preprocessor._categorical_feature_names}"
         )
-        logger.debug(
-            f"student preprocessor numerical_feature_names: {self._df_preprocessor._numerical_feature_names}"
-        )
+        logger.debug(f"student preprocessor numerical_feature_names: {self._df_preprocessor._numerical_feature_names}")
 
         return (
             teacher_predictor._model,
@@ -801,9 +755,7 @@ class AutoMMPredictor:
             mixup_config=OmegaConf.select(config, "data.mixup"),
             num_classes=self._output_shape,
         )
-        if mixup_active and (
-            config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1
-        ):
+        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
             warnings.warn(
                 "The mixup is done on the batch."
                 "The per_gpu_batch_size should be >1 and even for reasonable operation",
@@ -909,9 +861,7 @@ class AutoMMPredictor:
             task = LitModule(
                 model=model,
                 loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(
-                    config, "optimization.efficient_finetune"
-                ),
+                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.mixup_off_epoch"),
                 **metrics_kwargs,
@@ -963,11 +913,7 @@ class AutoMMPredictor:
             version="",
         )
 
-        num_gpus = (
-            config.env.num_gpus
-            if isinstance(config.env.num_gpus, int)
-            else len(config.env.num_gpus)
-        )
+        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
 
@@ -980,16 +926,14 @@ class AutoMMPredictor:
                 UserWarning,
             )
             grad_steps = max(
-                config.env.batch_size
-                // (config.env.per_gpu_batch_size * config.env.num_nodes),
+                config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
                 1,
             )
             precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU.
             # Try to check the status of bf16 training later.
         else:
             grad_steps = max(
-                config.env.batch_size
-                // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
+                config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
                 1,
             )
             precision = config.env.precision
@@ -1016,12 +960,8 @@ class AutoMMPredictor:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus
-                if not hpo_mode
-                else None,  # ray lightning requires not specifying gpus
-                auto_select_gpus=config.env.auto_select_gpus
-                if num_gpus != 0
-                else False,
+                gpus=num_gpus if not hpo_mode else None,  # ray lightning requires not specifying gpus
+                auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1048,15 +988,11 @@ class AutoMMPredictor:
                 "Consider increasing the value of the `num_workers` argument` "
                 ".* in the `DataLoader` init to improve performance.*",
             )
-            warnings.filterwarnings(
-                "ignore", "Checkpoint directory .* exists and is not empty."
-            )
+            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
             trainer.fit(
                 task,
                 datamodule=train_dm,
-                ckpt_path=ckpt_path
-                if resume
-                else None,  # this is to resume training that was broken accidentally
+                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
             )
 
         if trainer.global_rank == 0:
@@ -1073,9 +1009,7 @@ class AutoMMPredictor:
                     validation_metric_name=validation_metric_name,
                 )
         else:
-            sys.exit(
-                f"Training finished, exit the process with global_rank={trainer.global_rank}..."
-            )
+            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
     def _top_k_average(
         self,
@@ -1106,9 +1040,7 @@ class AutoMMPredictor:
 
         if best_k_models:
             if top_k_average_method == UNIFORM_SOUP:
-                logger.info(
-                    f"Start to fuse {len(best_k_models)} checkpoints via the uniform soup algorithm."
-                )
+                logger.info(f"Start to fuse {len(best_k_models)} checkpoints via the uniform soup algorithm.")
                 ingredients = top_k_model_paths = list(best_k_models.keys())
             else:
                 top_k_model_paths = [
@@ -1125,9 +1057,7 @@ class AutoMMPredictor:
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
                     monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
 
-                    logger.info(
-                        f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm."
-                    )
+                    logger.info(f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm.")
 
                     ingredients = [top_k_model_paths[0]]
                     self._model = self._load_state_dict(
@@ -1135,9 +1065,7 @@ class AutoMMPredictor:
                         path=top_k_model_paths[0],
                         prefix=prefix,
                     )
-                    best_score = self.evaluate(val_df, [validation_metric_name])[
-                        validation_metric_name
-                    ]
+                    best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1147,9 +1075,7 @@ class AutoMMPredictor:
                             state_dict=cand_avg_state_dict,
                             prefix=prefix,
                         )
-                        cand_score = self.evaluate(val_df, [validation_metric_name])[
-                            validation_metric_name
-                        ]
+                        cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
                             ingredients.append(top_k_model_paths[i])
@@ -1218,9 +1144,7 @@ class AutoMMPredictor:
             data_processors = self._data_processors
 
         num_gpus = (
-            self._config.env.num_gpus
-            if isinstance(self._config.env.num_gpus, int)
-            else len(self._config.env.num_gpus)
+            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
         )
         if num_gpus < 0:
             num_gpus = torch.cuda.device_count()
@@ -1248,10 +1172,7 @@ class AutoMMPredictor:
         if self._config.env.per_gpu_batch_size_evaluation:
             batch_size = self._config.env.per_gpu_batch_size_evaluation
         else:
-            batch_size = (
-                self._config.env.per_gpu_batch_size
-                * self._config.env.eval_batch_size_ratio
-            )
+            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
 
         if num_gpus > 1:
             strategy = "dp"
@@ -1283,9 +1204,7 @@ class AutoMMPredictor:
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 gpus=num_gpus,
-                auto_select_gpus=self._config.env.auto_select_gpus
-                if num_gpus != 0
-                else False,
+                auto_select_gpus=self._config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1386,9 +1305,7 @@ class AutoMMPredictor:
                 "roc_auc",
                 "average_precision",
             ]:
-                raise ValueError(
-                    f"Metric {per_metric} is only supported for binary classification."
-                )
+                raise ValueError(f"Metric {per_metric} is only supported for binary classification.")
             pos_label = try_to_infer_pos_label(
                 data_config=self._config.data,
                 label_encoder=self._df_preprocessor.label_generator,
@@ -1402,9 +1319,7 @@ class AutoMMPredictor:
             results[per_metric] = score
 
         if return_pred:
-            return results, self.as_pandas(
-                data=data, to_be_converted=y_pred_transformed
-            )
+            return results, self.as_pandas(data=data, to_be_converted=y_pred_transformed)
         else:
             return results
 
@@ -1557,14 +1472,8 @@ class AutoMMPredictor:
         prefix: str = "model.",
     ):
         if state_dict is None:
-            state_dict = torch.load(path, map_location=torch.device("cpu"))[
-                "state_dict"
-            ]
-        state_dict = {
-            k.partition(prefix)[2]: v
-            for k, v in state_dict.items()
-            if k.startswith(prefix)
-        }
+            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+        state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
         model.load_state_dict(state_dict)
         return model
 
@@ -1576,9 +1485,7 @@ class AutoMMPredictor:
     ):
         start_idx = len(old_prefix)
         state_dict_processed = {
-            new_prefix + k[start_idx:]: v
-            for k, v in state_dict.items()
-            if k.startswith(old_prefix)
+            new_prefix + k[start_idx:]: v for k, v in state_dict.items() if k.startswith(old_prefix)
         }
         return state_dict_processed
 
@@ -1598,9 +1505,7 @@ class AutoMMPredictor:
         """
 
         if standalone:
-            self._config = save_pretrained_models(
-                model=self._model, config=self._config, path=path
-            )
+            self._config = save_pretrained_models(model=self._model, config=self._config, path=path)
 
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
@@ -1690,9 +1595,7 @@ class AutoMMPredictor:
         predictor._eval_metric_name = assets["eval_metric_name"]
         predictor._verbosity = verbosity
         predictor._resume = resume
-        predictor._save_path = (
-            path  # in case the original exp dir is copied to somewhere else
-        )
+        predictor._save_path = path  # in case the original exp dir is copied to somewhere else
         predictor._pretrain_path = path
         predictor._config = config
         predictor._output_shape = assets["output_shape"]
@@ -1733,16 +1636,12 @@ class AutoMMPredictor:
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = AutoMMPredictor(label="dummy_label")
-        predictor = AutoMMPredictor._load_metadata(
-            predictor=predictor, path=path, resume=resume, verbosity=verbosity
-        )
+        predictor = AutoMMPredictor._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
         model = create_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
-            num_numerical_columns=len(
-                predictor._df_preprocessor.numerical_feature_names
-            ),
+            num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
@@ -1781,9 +1680,7 @@ class AutoMMPredictor:
                         f"Consider starting training from scratch."
                     )
             load_path = final_ckpt_path
-            logger.info(
-                f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}"
-            )
+            logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
             ckpt_path = None  # must set None since we do not resume training
 
         model = AutoMMPredictor._load_state_dict(
@@ -1814,9 +1711,7 @@ class AutoMMPredictor:
         if self._problem_type == MULTICLASS or self._problem_type == BINARY:
             return self._df_preprocessor.label_generator.classes_
         else:
-            warnings.warn(
-                "Accessing class names for a non-classification problem. Return None."
-            )
+            warnings.warn("Accessing class names for a non-classification problem. Return None.")
             return None
 
     @property

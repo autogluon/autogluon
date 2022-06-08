@@ -117,7 +117,7 @@ FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
 
 # checkpoints
-RAY_TUNE_CHECKPOINT = 'ray_tune_checkpoint.ckpt'
-BEST_K_MODELS_FILE = 'best_k_models.yaml'
-LAST_CHECKPOINT='last.ckpt'
-MODEL_CHECKPOINT= 'model.ckpt'
+RAY_TUNE_CHECKPOINT = "ray_tune_checkpoint.ckpt"
+BEST_K_MODELS_FILE = "best_k_models.yaml"
+LAST_CHECKPOINT = "last.ckpt"
+MODEL_CHECKPOINT = "model.ckpt"

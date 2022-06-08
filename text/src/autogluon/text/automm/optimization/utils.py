@@ -121,9 +121,7 @@ def get_metric(
     elif metric_name == AVERAGE_PRECISION:
         return torchmetrics.AveragePrecision(pos_label=pos_label), None
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
-        return torchmetrics.MeanMetric(), functools.partial(
-            F.cross_entropy, reduction="none"
-        )
+        return torchmetrics.MeanMetric(), functools.partial(F.cross_entropy, reduction="none")
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
@@ -288,11 +286,7 @@ def get_norm_layer_param_names(model: nn.Module):
         model,
         [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm],
     )
-    norm_param_names = [
-        name
-        for name in all_param_names
-        if name not in all_param_names_except_norm_names
-    ]
+    norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
     return norm_param_names
 
 
@@ -327,20 +321,12 @@ def apply_single_lr(
     decay_param_names = get_weight_decay_param_names(model)
     optimizer_grouped_parameters = [
         {
-            "params": [
-                p if return_params else n
-                for n, p in model.named_parameters()
-                if n in decay_param_names
-            ],
+            "params": [p if return_params else n for n, p in model.named_parameters() if n in decay_param_names],
             "weight_decay": weight_decay,
             "lr": lr,
         },
         {
-            "params": [
-                p if return_params else n
-                for n, p in model.named_parameters()
-                if n not in decay_param_names
-            ],
+            "params": [p if return_params else n for n, p in model.named_parameters() if n not in decay_param_names],
             "weight_decay": 0.0,
             "lr": lr,
         },
