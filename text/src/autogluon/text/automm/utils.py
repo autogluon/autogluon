@@ -509,7 +509,7 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_detection_length"),
+                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
