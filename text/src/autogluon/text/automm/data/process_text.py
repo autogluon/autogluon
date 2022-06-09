@@ -28,15 +28,6 @@ import nlpaug.flow as naf
 import nlpaug.augmenter.word as naw
 from .trivial_augmenter import TrivialAugment
 
-import ast
-from copy import copy, deepcopy
-import nlpaug.flow as naf
-import nlpaug.augmenter.word as naw
-
-import ast
-from copy import copy, deepcopy
-import nlpaug.flow as naf
-import nlpaug.augmenter.word as naw
 
 logger = logging.getLogger(AUTOMM)
 
