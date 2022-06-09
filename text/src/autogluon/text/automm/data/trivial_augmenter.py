@@ -215,7 +215,6 @@ class TrivialAugment:
     def __init__(self, datatype, max_strength) -> None:
         assert max_strength > 0, "Invalid maximum strength. Must > 0"
         self.max_strength = max_strength
-        print(f"{datatype} max: {max_strength}")
         self.data_type = datatype
         if datatype == "img":
             self.all_transform = set_image_augmentation_space(self.max_strength)
