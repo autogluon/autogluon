@@ -62,7 +62,7 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
-    text_aug_detect_length: 10                          # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
+    text_aug_detect_length: 10                          # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
       # example
       - "trivial_augment({'max':0.1})"            # max is the maximum percent of word can be changed for a text
@@ -85,7 +85,6 @@ model:
     image_norm: "imagenet"
     image_size: 224
     max_img_num_per_col: 2
-    trivial_augment_maxscale: 30    # 0 means no augment 
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:
@@ -106,7 +105,7 @@ model:
     insert_sep: False
     text_segment_num: 1
     stochastic_chunk: False
-    text_aug_detect_length: 10                     # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
+    text_aug_detect_length: 10                     # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_train_augment_types:
       # example
       - "trivial_augment({'max':0.1})"            # max is the maximum percent of word can be changed for a text
