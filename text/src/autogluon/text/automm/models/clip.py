@@ -8,9 +8,15 @@ from .utils import (
     get_column_features,
 )
 from ..constants import (
-    IMAGE, IMAGE_VALID_NUM, TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH, LABEL, LOGITS, FEATURES,
-    AUTOMM, COLUMN,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
+    LABEL,
+    LOGITS,
+    FEATURES,
+    AUTOMM,
+    COLUMN,
 )
 from typing import Optional
 
@@ -24,10 +30,10 @@ class CLIPForImageText(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            checkpoint_name: str,
-            num_classes: Optional[int] = 0,
+        self,
+        prefix: str,
+        checkpoint_name: str,
+        num_classes: Optional[int] = 0,
     ):
         """
         Load the pretrained CLIP from huggingface transformers.
@@ -93,8 +99,8 @@ class CLIPForImageText(nn.Module):
         return self.model.config.vision_config.hidden_size
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         """
         Parameters
@@ -173,7 +179,9 @@ class CLIPForImageText(nn.Module):
 
         return {self.prefix: ret}
 
-    def get_layer_ids(self,):
+    def get_layer_ids(
+        self,
+    ):
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to
@@ -186,11 +194,10 @@ class CLIPForImageText(nn.Module):
         model_prefixes = ["model.text_model", "model.vision_model", "model"]
         # later model prefixes can't starts with the early ones
         for i, model_pre in enumerate(model_prefixes):
-            for model_pre2 in model_prefixes[i+1:]:
+            for model_pre2 in model_prefixes[i + 1 :]:
                 if model_pre2.startswith(model_pre):
                     raise ValueError(
-                        f"{model_pre} is a substring of {model_pre2}. "
-                        f"Need to swap them in {model_prefixes}."
+                        f"{model_pre} is a substring of {model_pre2}. Need to swap them in {model_prefixes}."
                     )
 
         pre_encoder_patterns = ("embeddings", "pre")

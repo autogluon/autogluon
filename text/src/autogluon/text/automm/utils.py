@@ -126,8 +126,7 @@ def infer_metrics(
 
 
 def get_config(
-    config: Union[dict, DictConfig],
-    overrides: Optional[Union[str, List[str], Dict]] = None,
+    config: Union[dict, DictConfig], overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
     """
     Construct configurations for model, data, optimization, and environment.
@@ -226,9 +225,7 @@ def get_config(
         # remove `model.names` from overrides since it's already applied.
         overrides.pop("model.names", None)
         # apply all the overrides
-        config = apply_omegaconf_overrides(
-            config, overrides=overrides, check_key_exist=True
-        )
+        config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
     verify_model_names(config.model)
     return config
 
@@ -251,17 +248,13 @@ def verify_model_names(config: DictConfig):
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
-    assert set(config.names).issubset(
-        set(keys)
-    ), f"`{config.names}` do not match config keys {keys}"
+    assert set(config.names).issubset(set(keys)), f"`{config.names}` do not match config keys {keys}"
 
     # verify that no name starts with another one
     names = sorted(config.names, key=lambda ele: len(ele), reverse=True)
     for i in range(len(names)):
         if names[i].startswith(tuple(names[i + 1 :])):
-            raise ValueError(
-                f"name {names[i]} starts with one of another name: {names[i+1:]}"
-            )
+            raise ValueError(f"name {names[i]} starts with one of another name: {names[i+1:]}")
 
 
 def get_name_prefix(
@@ -339,9 +332,7 @@ def customize_model_names(
             setattr(new_config, per_name, copy.deepcopy(per_config))
             new_config.names.append(per_name)
         else:
-            logger.debug(
-                f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}."
-            )
+            logger.debug(f"Removing {per_name}, which doesn't start with any of these prefixes: {available_prefixes}.")
 
     if len(new_config.names) == 0:
         raise ValueError(
@@ -532,19 +523,14 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(
-                            model_config, "text_detection_length"
-                        ),
-                        train_augment_types=OmegaConf.select(
-                            model_config, "text_train_augment_types"
-                        ),
+                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+                        train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
             elif d_type == CATEGORICAL:
                 data_processors[CATEGORICAL].append(
                     CategoricalProcessor(
-                        prefix=model_name,
-                        categorical_column_names=df_preprocessor.categorical_feature_names,
+                        prefix=model_name, categorical_column_names=df_preprocessor.categorical_feature_names,
                     )
                 )
             elif d_type == NUMERICAL:
@@ -605,9 +591,7 @@ def create_model(
         model_config = getattr(config.model, model_name)
         if model_name.lower().startswith(CLIP):
             model = CLIPForImageText(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-                num_classes=num_classes,
+                prefix=model_name, checkpoint_name=model_config.checkpoint_name, num_classes=num_classes,
             )
         elif model_name.lower().startswith(TIMM_IMAGE):
             model = TimmAutoModelForImagePrediction(
@@ -619,9 +603,7 @@ def create_model(
             )
         elif model_name.lower().startswith(HF_TEXT):
             model = HFAutoModelForTextPrediction(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-                num_classes=num_classes,
+                prefix=model_name, checkpoint_name=model_config.checkpoint_name, num_classes=num_classes,
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
@@ -694,9 +676,7 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
-                loss_weight=model_config.weight
-                if hasattr(model_config, "weight")
-                else None,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
         elif model_name.lower().startswith(FUSION_TRANSFORMER):
@@ -717,9 +697,7 @@ def create_model(
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
                 adapt_in_features=model_config.adapt_in_features,
-                loss_weight=model_config.weight
-                if hasattr(model_config, "weight")
-                else None,
+                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
             )
             continue
         else:
@@ -755,12 +733,7 @@ def save_pretrained_models(
     path
         The path to save pretrained checkpoints.
     """
-    requires_saving = any(
-        [
-            model_name.lower().startswith((CLIP, HF_TEXT))
-            for model_name in config.model.names
-        ]
-    )
+    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names])
     if not requires_saving:
         return config
 
@@ -794,15 +767,11 @@ def convert_checkpoint_name(config: DictConfig, path: str) -> DictConfig:
         if model_name.lower().startswith((CLIP, HF_TEXT)):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
-                model_config.checkpoint_name = os.path.join(
-                    path, model_config.checkpoint_name[len("local://") :]
-                )
+                model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
                 assert os.path.exists(
                     os.path.join(model_config.checkpoint_name, "config.json")
                 )  # guarantee the existence of local configs
-                assert os.path.exists(
-                    os.path.join(model_config.checkpoint_name, "pytorch_model.bin")
-                )
+                assert os.path.exists(os.path.join(model_config.checkpoint_name, "pytorch_model.bin"))
 
     return config
 
@@ -857,8 +826,7 @@ def load_text_tokenizers(
         if isinstance(per_text_processor.tokenizer, str):
             per_path = os.path.join(path, per_text_processor.tokenizer)
             per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
-                tokenizer_name=per_text_processor.tokenizer_name,
-                checkpoint_name=per_path,
+                tokenizer_name=per_text_processor.tokenizer_name, checkpoint_name=per_path,
             )
     return text_processors
 
@@ -921,9 +889,7 @@ def average_checkpoints(
     if len(checkpoint_paths) > 1:
         avg_state_dict = {}
         for per_path in checkpoint_paths:
-            state_dict = torch.load(per_path, map_location=torch.device("cpu"))[
-                "state_dict"
-            ]
+            state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
             for key in state_dict:
                 if key in avg_state_dict:
                     avg_state_dict[key] += state_dict[key]
@@ -935,9 +901,7 @@ def average_checkpoints(
         for key in avg_state_dict:
             avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
     else:
-        avg_state_dict = torch.load(
-            checkpoint_paths[0], map_location=torch.device("cpu")
-        )["state_dict"]
+        avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]
 
     return avg_state_dict
 
@@ -966,9 +930,7 @@ def compute_score(
     """
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(
-            metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label]
-        )
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
@@ -1018,9 +980,7 @@ def parse_dotlist_conf(conf):
 
 
 def apply_omegaconf_overrides(
-    conf: DictConfig,
-    overrides: Union[List, Tuple, str, Dict, DictConfig],
-    check_key_exist=True,
+    conf: DictConfig, overrides: Union[List, Tuple, str, Dict, DictConfig], check_key_exist=True,
 ):
     """
     Apply omegaconf overrides.
@@ -1059,9 +1019,7 @@ def apply_omegaconf_overrides(
                     f'"{ele[0]}" is not found in the config. You may need to check the overrides. '
                     f"overrides={overrides}"
                 )
-    override_conf = OmegaConf.from_dotlist(
-        [f"{ele[0]}={ele[1]}" for ele in overrides.items()]
-    )
+    override_conf = OmegaConf.from_dotlist([f"{ele[0]}={ele[1]}" for ele in overrides.items()])
     conf = OmegaConf.merge(conf, override_conf)
     return conf
 
@@ -1195,9 +1153,7 @@ def modify_duplicate_model_names(
                     if n == per_processor.prefix:
                         per_processor.prefix = new_name
             # modify model config keys
-            setattr(
-                predictor._config.model, new_name, getattr(predictor._config.model, n)
-            )
+            setattr(predictor._config.model, new_name, getattr(predictor._config.model, n))
             delattr(predictor._config.model, n)
 
             model_names.append(new_name)
@@ -1235,21 +1191,13 @@ def assign_feature_column_names(
             # requires_column_info=True is used for feature column distillation.
             per_model_processor.requires_column_info = False
             if per_modality == IMAGE:
-                per_model_processor.image_column_names = (
-                    df_preprocessor.image_path_names
-                )
+                per_model_processor.image_column_names = df_preprocessor.image_path_names
             elif per_modality == TEXT:
-                per_model_processor.text_column_names = (
-                    df_preprocessor.text_feature_names
-                )
+                per_model_processor.text_column_names = df_preprocessor.text_feature_names
             elif per_modality == NUMERICAL:
-                per_model_processor.numerical_column_names = (
-                    df_preprocessor.numerical_feature_names
-                )
+                per_model_processor.numerical_column_names = df_preprocessor.numerical_feature_names
             elif per_modality == CATEGORICAL:
-                per_model_processor.categorical_column_names = (
-                    df_preprocessor.categorical_feature_names
-                )
+                per_model_processor.categorical_column_names = df_preprocessor.categorical_feature_names
             else:
                 raise ValueError(f"Unknown modality: {per_modality}")
 
@@ -1356,9 +1304,7 @@ def get_mixup(
     mixup_active = False
     if mixup_config is not None and mixup_config.turn_on:
         mixup_active = (
-            mixup_config.mixup_alpha > 0
-            or mixup_config.cutmix_alpha > 0.0
-            or mixup_config.cutmix_minmax is not None
+            mixup_config.mixup_alpha > 0 or mixup_config.cutmix_alpha > 0.0 or mixup_config.cutmix_minmax is not None
         )
 
     mixup_state = model_active & mixup_active & (num_classes > 1)

@@ -4,21 +4,18 @@ import pandas as pd
 import warnings
 import PIL
 from typing import Union, Optional, List, Dict, Tuple
-from ..constants import (
-    NULL, CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH,
-    MULTICLASS, BINARY, REGRESSION, AUTOMM
-)
+from ..constants import NULL, CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH, MULTICLASS, BINARY, REGRESSION, AUTOMM
 
 logger = logging.getLogger(AUTOMM)
 
 
 def is_categorical_column(
-        data: pd.Series,
-        valid_data: pd.Series,
-        threshold: int = None,
-        ratio: Optional[float] = None,
-        oov_ratio_threshold: Optional[float] = None,
-        is_label: bool = False,
+    data: pd.Series,
+    valid_data: pd.Series,
+    threshold: int = None,
+    ratio: Optional[float] = None,
+    oov_ratio_threshold: Optional[float] = None,
+    is_label: bool = False,
 ) -> bool:
     """
     Identify whether a column is one categorical column.
@@ -49,7 +46,7 @@ def is_categorical_column(
     -------
     Whether the column is a categorical column.
     """
-    if data.dtype.name == 'category':
+    if data.dtype.name == "category":
         return True
     else:
         if threshold is None:
@@ -80,8 +77,8 @@ def is_categorical_column(
 
 
 def is_numerical_column(
-        data: pd.Series,
-        valid_data: Optional[pd.Series] = None,
+    data: pd.Series,
+    valid_data: Optional[pd.Series] = None,
 ) -> bool:
     """
     Identify if a column is a numerical column.
@@ -129,7 +126,7 @@ def is_imagepath_column(
     """
     sample_num = min(len(data), 500)
     data = data.sample(n=sample_num, random_state=0)
-    data = data.apply(lambda ele: str(ele).split(';')).tolist()
+    data = data.apply(lambda ele: str(ele).split(";")).tolist()
     failure_count = 0
     for image_paths in data:
         success = False
@@ -150,10 +147,10 @@ def is_imagepath_column(
             logger.warning(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
-                f"You may need to thoroughly check your data to see the percentage of missing images, "
-                f"and estimate the potential influence. By default, we skip the samples with missing images. "
-                f"You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                f"which uses a zero image to replace any missing image."
+                "You may need to thoroughly check your data to see the percentage of missing images, "
+                "and estimate the potential influence. By default, we skip the samples with missing images. "
+                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
+                "which uses a zero image to replace any missing image."
             )
         return True
     else:
@@ -193,11 +190,11 @@ def check_if_nlp_feature(X: pd.Series) -> bool:
 
 
 def infer_column_problem_types(
-        train_df: pd.DataFrame,
-        valid_df: pd.DataFrame,
-        label_columns: Union[str, List[str]],
-        problem_type: Optional[str] = None,
-        provided_column_types: Optional[Dict] = None,
+    train_df: pd.DataFrame,
+    valid_df: pd.DataFrame,
+    label_columns: Union[str, List[str]],
+    problem_type: Optional[str] = None,
+    provided_column_types: Optional[Dict] = None,
 ) -> Tuple[collections.OrderedDict, str, int]:
     """
     Infer the column types of a multimodal pd.DataFrame and the problem type.
@@ -231,9 +228,9 @@ def infer_column_problem_types(
     elif isinstance(label_columns, (list, tuple)):
         pass
     else:
-        raise NotImplementedError(f'label_columns is not supported. label_columns={label_columns}.')
+        raise NotImplementedError(f"label_columns is not supported. label_columns={label_columns}.")
     label_set = set(label_columns)
-    assert len(label_set) == 1, 'Currently, only a single label column is supported.'
+    assert len(label_set) == 1, "Currently, only a single label column is supported."
     column_types = collections.OrderedDict()
     # Process all feature columns
 
@@ -248,14 +245,14 @@ def infer_column_problem_types(
             if num_train_missing > 0:
                 raise ValueError(
                     f"Label column '{col_name}' contains missing values in the "
-                    f"training data frame. You may want to filter your data because "
-                    f"missing label is currently not supported."
+                    "training data frame. You may want to filter your data because "
+                    "missing label is currently not supported."
                 )
             if num_valid_missing > 0:
                 raise ValueError(
                     f"Label column '{col_name}' contains missing values in the "
-                    f"validation data frame. You may want to filter your data because "
-                    f"missing label is currently not supported."
+                    "validation data frame. You may want to filter your data because "
+                    "missing label is currently not supported."
                 )
             if problem_type == MULTICLASS or problem_type == BINARY:
                 column_types[col_name] = CATEGORICAL
@@ -271,8 +268,7 @@ def infer_column_problem_types(
                 column_types[col_name] = NULL
             else:
                 warnings.warn(
-                    f"Label column '{col_name}' contains only one label. "
-                    f"You may need to check your dataset again."
+                    f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
                 )
         # Use the following way for type inference
         # 1) Infer categorical column
@@ -280,8 +276,7 @@ def infer_column_problem_types(
         # 3) Infer image-path column
         # 4) Infer text column
         # 4) All the other columns are treated as categorical
-        if is_categorical_column(train_df[col_name], valid_df[col_name],
-                                 is_label=is_label):
+        if is_categorical_column(train_df[col_name], valid_df[col_name], is_label=is_label):
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(train_df[col_name], valid_df[col_name]):
             column_types[col_name] = NUMERICAL
@@ -301,10 +296,10 @@ def infer_column_problem_types(
 
 
 def infer_problem_type_output_shape(
-        column_types: dict,
-        label_column: str,
-        data_df: pd.DataFrame,
-        provided_problem_type=None,
+    column_types: dict,
+    label_column: str,
+    data_df: pd.DataFrame,
+    provided_problem_type=None,
 ) -> Tuple[str, int]:
     """
     Infer the problem type and output shape based on the label column type and training data.
@@ -332,8 +327,10 @@ def infer_problem_type_output_shape(
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
             class_num = len(data_df[label_column].unique())
-            err_msg = f"Provided problem type is '{provided_problem_type}' while the number of " \
-                      f"unique values in the label column is {class_num}."
+            err_msg = (
+                f"Provided problem type is '{provided_problem_type}' while the number of "
+                f"unique values in the label column is {class_num}."
+            )
             if provided_problem_type == BINARY and class_num != 2:
                 raise AssertionError(err_msg)
             elif provided_problem_type == MULTICLASS and class_num <= 2:

@@ -3,7 +3,7 @@ python3 -m pip uninstall -y autogluon
 python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text
 python3 -m pip uninstall -y autogluon.tabular
-python3 -m pip uninstall -y autogluon.forecasting
+python3 -m pip uninstall -y autogluon.timeseries
 python3 -m pip uninstall -y autogluon.features
 python3 -m pip uninstall -y autogluon.core
 python3 -m pip uninstall -y autogluon.common
@@ -35,7 +35,7 @@ cd vision/
 python3 -m pip install -e .
 cd ..
 
-cd forecasting/
+cd timeseries/
 python3 -m pip install -e .
 cd ..
 

@@ -2,45 +2,39 @@ import torch
 from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
-import math 
+import math
 import enum
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast
 import warnings
 
 ModuleType = Union[str, Callable[..., nn.Module]]
-_INTERNAL_ERROR_MESSAGE = 'Internal error. Please, open an issue.'
+_INTERNAL_ERROR_MESSAGE = "Internal error. Please, open an issue."
 
 
 def _is_glu_activation(activation: ModuleType):
-    return (
-        isinstance(activation, str)
-        and activation.endswith('glu')
-        or activation in [ReGLU, GEGLU]
-    )
+    return isinstance(activation, str) and activation.endswith("glu") or activation in [ReGLU, GEGLU]
 
 
 def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
     if isinstance(module_type, str):
-        if module_type == 'reglu':
+        if module_type == "reglu":
             return ReGLU()
-        elif module_type == 'geglu':
+        elif module_type == "geglu":
             return GEGLU()
-        elif module_type == 'gelu':
+        elif module_type == "gelu":
             return nn.GELU()
-        elif module_type == 'relu':
+        elif module_type == "relu":
             return nn.ReLU()
-        elif module_type == 'leaky_relu':
+        elif module_type == "leaky_relu":
             return nn.LeakyReLU()
-        elif module_type == 'layer_norm':
+        elif module_type == "layer_norm":
             return nn.LayerNorm(*args)
         else:
             try:
                 cls = getattr(nn, module_type)
             except AttributeError as err:
-                raise ValueError(
-                    f'Failed to construct the module {module_type} with the arguments {args}'
-                ) from err
+                raise ValueError(f"Failed to construct the module {module_type} with the arguments {args}") from err
             return cls(*args)
     else:
         return module_type(*args)
@@ -64,7 +58,7 @@ def reglu(x: Tensor) -> Tensor:
 
 def geglu(x: Tensor) -> Tensor:
     """The GEGLU activation function from [1].
-    
+
     References:
     ----------
     [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
@@ -77,7 +71,7 @@ def geglu(x: Tensor) -> Tensor:
 class ReGLU(nn.Module):
     """
     The ReGLU activation function from [1].
-    
+
     References:
     ----------
     [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
@@ -90,7 +84,7 @@ class ReGLU(nn.Module):
 class GEGLU(nn.Module):
     """
     The GEGLU activation function from [1].
-    
+
     References:
     ----------
     [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
@@ -159,16 +153,16 @@ class CLSToken(nn.Module):
 
 
 class _TokenInitialization(enum.Enum):
-    UNIFORM = 'uniform'
-    NORMAL = 'normal'
+    UNIFORM = "uniform"
+    NORMAL = "normal"
 
     @classmethod
-    def from_str(cls, initialization: str) -> '_TokenInitialization':
+    def from_str(cls, initialization: str) -> "_TokenInitialization":
         try:
             return cls(initialization)
         except ValueError:
             valid_values = [x.value for x in _TokenInitialization]
-            raise ValueError(f'initialization must be one of {valid_values}')
+            raise ValueError(f"initialization must be one of {valid_values}")
 
     def apply(self, x: Tensor, d: int) -> None:
         d_sqrt_inv = 1 / math.sqrt(d)
@@ -206,18 +200,18 @@ class MultiheadAttention(nn.Module):
         """
         Parameters
         ----------
-        d_token: 
+        d_token:
             the token size. Must be a multiple of :code:`n_heads`.
-        n_heads: 
+        n_heads:
             the number of heads. If greater than 1, then the module will have
             an addition output layer (so called "mixing" layer).
-        dropout: 
+        dropout:
             dropout rate for the attention map. The dropout is applied to
             *probabilities* and do not affect logits.
-        bias: 
+        bias:
             if `True`, then input (and output, if presented) layers also have bias.
             `True` is a reasonable default choice.
-        initialization: 
+        initialization:
             initialization for input projection layers. Must be one of
             :code:`['kaiming', 'xavier']`. `kaiming` is a reasonable default choice.
 
@@ -227,8 +221,8 @@ class MultiheadAttention(nn.Module):
         """
         super().__init__()
         if n_heads > 1:
-            assert d_token % n_heads == 0, 'd_token must be a multiple of n_heads'
-        assert initialization in ['kaiming', 'xavier']
+            assert d_token % n_heads == 0, "d_token must be a multiple of n_heads"
+        assert initialization in ["kaiming", "xavier"]
 
         self.W_q = nn.Linear(d_token, d_token, bias)
         self.W_k = nn.Linear(d_token, d_token, bias)
@@ -241,9 +235,7 @@ class MultiheadAttention(nn.Module):
             # the "xavier" branch tries to follow torch.nn.MultiheadAttention;
             # the second condition checks if W_v plays the role of W_out; the latter one
             # is initialized with Kaiming in torch
-            if initialization == 'xavier' and (
-                m is not self.W_v or self.W_out is not None
-            ):
+            if initialization == "xavier" and (m is not self.W_v or self.W_out is not None):
                 # gain is needed since W_qkv is represented with 3 separate layers (it
                 # implies different fan_out)
                 nn.init.xavier_uniform_(m.weight, gain=1 / math.sqrt(2))
@@ -272,13 +264,13 @@ class MultiheadAttention(nn.Module):
 
         Parameters
         ----------
-        x_q: 
+        x_q:
             query tokens
-        x_kv: 
+        x_kv:
             key-value tokens
-        key_compression: 
+        key_compression:
             Linformer-style compression for keys
-        value_compression: 
+        value_compression:
             Linformer-style compression for values
 
         Returns:
@@ -287,7 +279,7 @@ class MultiheadAttention(nn.Module):
         """
         assert _all_or_none(
             [key_compression, value_compression]
-        ), 'If key_compression is (not) None, then value_compression must (not) be None'
+        ), "If key_compression is (not) None, then value_compression must (not) be None"
         q, k, v = self.W_q(x_q), self.W_k(x_kv), self.W_v(x_kv)
         for tensor in [q, k, v]:
             assert tensor.shape[-1] % self.n_heads == 0, _INTERNAL_ERROR_MESSAGE
@@ -315,8 +307,8 @@ class MultiheadAttention(nn.Module):
         if self.W_out is not None:
             x = self.W_out(x)
         return x, {
-            'attention_logits': attention_logits,
-            'attention_probs': attention_probs,
+            "attention_logits": attention_logits,
+            "attention_probs": attention_probs,
         }
 
 
@@ -325,7 +317,7 @@ class FT_Transformer(nn.Module):
 
     This module is the backbone of `FTTransformer`."""
 
-    WARNINGS = {'first_prenormalization': True, 'prenormalization': True}
+    WARNINGS = {"first_prenormalization": True, "prenormalization": True}
 
     class FFN(nn.Module):
         """The Feed-Forward Network module used in every `Transformer` block."""
@@ -409,55 +401,47 @@ class FT_Transformer(nn.Module):
         super().__init__()
         if isinstance(last_layer_query_idx, int):
             raise ValueError(
-                'last_layer_query_idx must be None, list[int] or slice. '
-                f'Do you mean last_layer_query_idx=[{last_layer_query_idx}] ?'
+                "last_layer_query_idx must be None, list[int] or slice. "
+                f"Do you mean last_layer_query_idx=[{last_layer_query_idx}] ?"
             )
         if not prenormalization:
             assert (
                 not first_prenormalization
-            ), 'If `prenormalization` is False, then `first_prenormalization` must be False'
+            ), "If `prenormalization` is False, then `first_prenormalization` must be False"
         assert _all_or_none([n_tokens, kv_compression_ratio, kv_compression_sharing]), (
-            'If any of the following arguments is (not) None, then all of them must (not) be None: '
-            'n_tokens, kv_compression_ratio, kv_compression_sharing'
+            "If any of the following arguments is (not) None, then all of them must (not) be None: "
+            "n_tokens, kv_compression_ratio, kv_compression_sharing"
         )
-        assert kv_compression_sharing in [None, 'headwise', 'key-value', 'layerwise']
+        assert kv_compression_sharing in [None, "headwise", "key-value", "layerwise"]
         if not prenormalization:
-            if self.WARNINGS['prenormalization']:
+            if self.WARNINGS["prenormalization"]:
                 warnings.warn(
-                    'prenormalization is set to False. Are you sure about this? '
-                    'The training can become less stable. '
-                    'You can turn off this warning by tweaking the '
-                    'rtdl.Transformer.WARNINGS dictionary.',
+                    "prenormalization is set to False. Are you sure about this? "
+                    "The training can become less stable. "
+                    "You can turn off this warning by tweaking the "
+                    "rtdl.Transformer.WARNINGS dictionary.",
                     UserWarning,
                 )
             assert (
                 not first_prenormalization
-            ), 'If prenormalization is False, then first_prenormalization is ignored and must be set to False'
-        if (
-            prenormalization
-            and first_prenormalization
-            and self.WARNINGS['first_prenormalization']
-        ):
+            ), "If prenormalization is False, then first_prenormalization is ignored and must be set to False"
+        if prenormalization and first_prenormalization and self.WARNINGS["first_prenormalization"]:
             warnings.warn(
-                'first_prenormalization is set to True. Are you sure about this? '
-                'For example, the vanilla FTTransformer with '
-                'first_prenormalization=True performs SIGNIFICANTLY worse. '
-                'You can turn off this warning by tweaking the '
-                'rtdl.Transformer.WARNINGS dictionary.',
+                "first_prenormalization is set to True. Are you sure about this? "
+                "For example, the vanilla FTTransformer with "
+                "first_prenormalization=True performs SIGNIFICANTLY worse. "
+                "You can turn off this warning by tweaking the "
+                "rtdl.Transformer.WARNINGS dictionary.",
                 UserWarning,
             )
 
         def make_kv_compression():
-            assert (
-                n_tokens and kv_compression_ratio
-            ), _INTERNAL_ERROR_MESSAGE  # for mypy
+            assert n_tokens and kv_compression_ratio, _INTERNAL_ERROR_MESSAGE  # for mypy
             # https://github.com/pytorch/fairseq/blob/1bba712622b8ae4efb3eb793a8a40da386fe11d0/examples/linformer/linformer_src/modules/multihead_linear_attention.py#L83
             return nn.Linear(n_tokens, int(n_tokens * kv_compression_ratio), bias=False)
 
         self.shared_kv_compression = (
-            make_kv_compression()
-            if kv_compression_ratio and kv_compression_sharing == 'layerwise'
-            else None
+            make_kv_compression() if kv_compression_ratio and kv_compression_sharing == "layerwise" else None
         )
 
         self.prenormalization = prenormalization
@@ -467,14 +451,14 @@ class FT_Transformer(nn.Module):
         for layer_idx in range(n_blocks):
             layer = nn.ModuleDict(
                 {
-                    'attention': MultiheadAttention(
+                    "attention": MultiheadAttention(
                         d_token=d_token,
                         n_heads=attention_n_heads,
                         dropout=attention_dropout,
                         bias=True,
                         initialization=attention_initialization,
                     ),
-                    'ffn': FT_Transformer.FFN(
+                    "ffn": FT_Transformer.FFN(
                         d_token=d_token,
                         d_hidden=ffn_d_hidden,
                         bias_first=True,
@@ -482,88 +466,83 @@ class FT_Transformer(nn.Module):
                         dropout=ffn_dropout,
                         activation=ffn_activation,
                     ),
-                    'attention_residual_dropout': nn.Dropout(residual_dropout),
-                    'ffn_residual_dropout': nn.Dropout(residual_dropout),
-                    'output': nn.Identity(),  # for hooks-based introspection
+                    "attention_residual_dropout": nn.Dropout(residual_dropout),
+                    "ffn_residual_dropout": nn.Dropout(residual_dropout),
+                    "output": nn.Identity(),  # for hooks-based introspection
                 }
             )
             if layer_idx or not prenormalization or first_prenormalization:
-                layer['attention_normalization'] = _make_nn_module(
-                    attention_normalization, d_token
-                )
-            layer['ffn_normalization'] = _make_nn_module(ffn_normalization, d_token)
+                layer["attention_normalization"] = _make_nn_module(attention_normalization, d_token)
+            layer["ffn_normalization"] = _make_nn_module(ffn_normalization, d_token)
             if kv_compression_ratio and self.shared_kv_compression is None:
-                layer['key_compression'] = make_kv_compression()
-                if kv_compression_sharing == 'headwise':
-                    layer['value_compression'] = make_kv_compression()
+                layer["key_compression"] = make_kv_compression()
+                if kv_compression_sharing == "headwise":
+                    layer["value_compression"] = make_kv_compression()
                 else:
-                    assert (
-                        kv_compression_sharing == 'key-value'
-                    ), _INTERNAL_ERROR_MESSAGE
+                    assert kv_compression_sharing == "key-value", _INTERNAL_ERROR_MESSAGE
             self.blocks.append(layer)
 
-         
-        self.head = FT_Transformer.Head(
-            d_in=d_token,
-            d_out=d_out,
-            bias=True,
-            activation=head_activation,  # type: ignore
-            normalization=head_normalization if prenormalization else 'Identity',
-        ) if projection else nn.Identity()
+        self.head = (
+            FT_Transformer.Head(
+                d_in=d_token,
+                d_out=d_out,
+                bias=True,
+                activation=head_activation,  # type: ignore
+                normalization=head_normalization if prenormalization else "Identity",
+            )
+            if projection
+            else nn.Identity()
+        )
 
     def _get_kv_compressions(self, layer):
         return (
             (self.shared_kv_compression, self.shared_kv_compression)
             if self.shared_kv_compression is not None
-            else (layer['key_compression'], layer['value_compression'])
-            if 'key_compression' in layer and 'value_compression' in layer
-            else (layer['key_compression'], layer['key_compression'])
-            if 'key_compression' in layer
+            else (layer["key_compression"], layer["value_compression"])
+            if "key_compression" in layer and "value_compression" in layer
+            else (layer["key_compression"], layer["key_compression"])
+            if "key_compression" in layer
             else (None, None)
         )
 
     def _start_residual(self, layer, stage, x):
-        assert stage in ['attention', 'ffn'], _INTERNAL_ERROR_MESSAGE
+        assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
         x_residual = x
         if self.prenormalization:
-            norm_key = f'{stage}_normalization'
+            norm_key = f"{stage}_normalization"
             if norm_key in layer:
                 x_residual = layer[norm_key](x_residual)
         return x_residual
 
     def _end_residual(self, layer, stage, x, x_residual):
-        assert stage in ['attention', 'ffn'], _INTERNAL_ERROR_MESSAGE
-        x_residual = layer[f'{stage}_residual_dropout'](x_residual)
+        assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
+        x_residual = layer[f"{stage}_residual_dropout"](x_residual)
         x = x + x_residual
         if not self.prenormalization:
-            x = layer[f'{stage}_normalization'](x)
+            x = layer[f"{stage}_normalization"](x)
         return x
 
     def forward(self, x: Tensor) -> Tensor:
-        assert (
-            x.ndim == 3
-        ), 'The input must have 3 dimensions: (n_objects, n_tokens, d_token)'
+        assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
         for layer_idx, layer in enumerate(self.blocks):
             layer = cast(nn.ModuleDict, layer)
 
-            query_idx = (
-                self.last_layer_query_idx if layer_idx + 1 == len(self.blocks) else None
-            )
-            x_residual = self._start_residual(layer, 'attention', x)
-            x_residual, _ = layer['attention'](
+            query_idx = self.last_layer_query_idx if layer_idx + 1 == len(self.blocks) else None
+            x_residual = self._start_residual(layer, "attention", x)
+            x_residual, _ = layer["attention"](
                 x_residual if query_idx is None else x_residual[:, query_idx],
                 x_residual,
                 *self._get_kv_compressions(layer),
             )
             if query_idx is not None:
                 x = x[:, query_idx]
-            x = self._end_residual(layer, 'attention', x, x_residual)
+            x = self._end_residual(layer, "attention", x, x_residual)
 
-            x_residual = self._start_residual(layer, 'ffn', x)
-            x_residual = layer['ffn'](x_residual)
-            x = self._end_residual(layer, 'ffn', x, x_residual)
-            x = layer['output'](x)
+            x_residual = self._start_residual(layer, "ffn", x)
+            x_residual = layer["ffn"](x_residual)
+            x = self._end_residual(layer, "ffn", x, x_residual)
+            x = layer["output"](x)
 
-        x =  self.head(x)
-        
+        x = self.head(x)
+
         return x

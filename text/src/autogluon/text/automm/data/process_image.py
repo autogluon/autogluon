@@ -119,9 +119,7 @@ class ImageProcessor:
             else:
                 raise ValueError("image normalization mean and std are missing")
         else:
-            logger.debug(
-                f"using detected image normalization: {self.mean} and {self.std}"
-            )
+            logger.debug(f"using detected image normalization: {self.mean} and {self.std}")
         self.normalization = transforms.Normalize(self.mean, self.std)
         self.max_img_num_per_col = max_img_num_per_col
         if max_img_num_per_col <= 0:
@@ -236,15 +234,11 @@ class ImageProcessor:
                     if isinstance(image_size, tuple):
                         image_size = image_size[-1]
                 else:
-                    raise ValueError(
-                        f" more than one image_size values are detected: {extracted}"
-                    )
+                    raise ValueError(f" more than one image_size values are detected: {extracted}")
                 mean = None
                 std = None
             except Exception as exp2:
-                raise ValueError(
-                    f"cann't load checkpoint_name {checkpoint_name}"
-                ) from exp2
+                raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp2
 
         return image_size, mean, std
 
@@ -271,9 +265,7 @@ class ImageProcessor:
             if "(" in trans_type:
                 trans_mode = trans_type[0 : trans_type.find("(")]
                 if "{" in trans_type:
-                    kargs = ast.literal_eval(
-                        trans_type[trans_type.find("{") : trans_type.rfind(")")]
-                    )
+                    kargs = ast.literal_eval(trans_type[trans_type.find("{") : trans_type.rfind(")")])
                 else:
                     args = ast.literal_eval(trans_type[trans_type.find("(") :])
             else:
@@ -295,22 +287,14 @@ class ImageProcessor:
                 elif args is not None:
                     processor.append(transforms.ColorJitter(*args))
                 else:
-                    processor.append(
-                        transforms.ColorJitter(
-                            brightness=0.1, contrast=0.1, saturation=0.1
-                        )
-                    )
+                    processor.append(transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1))
             elif trans_mode == "affine":
                 if kargs is not None:
                     processor.append(transforms.RandomAffine(**kargs))
                 elif args is not None:
                     processor.append(transforms.RandomAffine(*args))
                 else:
-                    processor.append(
-                        transforms.RandomAffine(
-                            degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)
-                        )
-                    )
+                    processor.append(transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)))
             elif trans_mode == "randaug":
                 if kargs is not None:
                     processor.append(RandAugment(**kargs))
@@ -357,9 +341,9 @@ class ImageProcessor:
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
-                        message="Palette images with Transparency "
-                        "expressed in bytes should be "
-                        "converted to RGBA images",
+                        message=(
+                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                        ),
                     )
                     is_zero_img = False
                     try:
@@ -390,10 +374,7 @@ class ImageProcessor:
                 column_start = len(images)
 
         ret.update(
-            {
-                self.image_key: torch.stack(images + zero_images, dim=0),
-                self.image_valid_num_key: len(images),
-            }
+            {self.image_key: torch.stack(images + zero_images, dim=0), self.image_valid_num_key: len(images),}
         )
         return ret
 
@@ -420,8 +401,7 @@ class ImageProcessor:
         A dictionary containing one sample's processed images and their number.
         """
         per_sample_paths = {
-            per_column_name: per_column_paths[idx]
-            for per_column_name, per_column_paths in all_image_paths.items()
+            per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
         }
         return self.process_one_sample(per_sample_paths, is_training)
 
