@@ -374,7 +374,10 @@ class ImageProcessor:
                 column_start = len(images)
 
         ret.update(
-            {self.image_key: torch.stack(images + zero_images, dim=0), self.image_valid_num_key: len(images),}
+            {
+                self.image_key: torch.stack(images + zero_images, dim=0),
+                self.image_valid_num_key: len(images),
+            }
         )
         return ret
 

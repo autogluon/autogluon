@@ -171,7 +171,7 @@ class TextProcessor:
             # See https://github.com/huggingface/transformers/blob/6ac77534bfe97c00e0127bb4fc846ae0faf1c9c5/src/transformers/tokenization_utils_base.py#L3362
             self.tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
-        (self.cls_token_id, self.sep_token_id, self.eos_token_id,) = self.get_special_tokens(tokenizer=self.tokenizer)
+            self.cls_token_id,self.sep_token_id, self.eos_token_id = self.get_special_tokens(tokenizer=self.tokenizer)
         if max_len is None or max_len <= 0:
             self.max_len = self.tokenizer.model_max_length
         else:
@@ -276,7 +276,9 @@ class TextProcessor:
         else:
             max_length = self.max_len - 2
         trimmed_lengths = self.get_trimmed_lengths(
-            [len(txt_token) for txt_token in text_tokens.values()], max_length, do_merge=True,
+            [len(txt_token) for txt_token in text_tokens.values()],
+            max_length,
+            do_merge=True,
         )
         seg = 0
         token_ids = [self.cls_token_id]
@@ -335,12 +337,6 @@ class TextProcessor:
         is_training
             Flag to apply augmentation only to training.
 
-        is_training
-            Flag to apply augmentation only to training.
-
-        is_training
-            Flag to apply augmentation only to training.
-
         Returns
         -------
         A dictionary containing one sample's text tokens, valid length, and segment ids.
@@ -380,11 +376,7 @@ class TextProcessor:
         -------
         The cls, sep, and eos token ids.
         """
-        cls_id, sep_id, eos_id = (
-            tokenizer.cls_token_id,
-            tokenizer.sep_token_id,
-            tokenizer.sep_token_id,
-        )
+        cls_id, sep_id, eos_id = tokenizer.cls_token_id, tokenizer.sep_token_id, tokenizer.sep_token_id
         if cls_id is None or sep_id is None:
             # CLIP uses eos_token's feature as the pooled output.
             # See https://github.com/huggingface/transformers/blob/v4.14.1/src/transformers/models/clip/modeling_clip.py#L657
