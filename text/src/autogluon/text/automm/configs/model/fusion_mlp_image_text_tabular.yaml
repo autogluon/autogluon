@@ -62,7 +62,7 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
-    text_detection_length: 10                          # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
+    text_aug_detect_length: 10                          # for augmentation purpose: naive way to different text column versus tabular column that are treated as text
     text_train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
       # example
       - "trivial_augment({'max':0.1})"            # max is the maximum percent of word can be changed for a text
@@ -76,9 +76,9 @@ model:
     data_types:
       - "image"
     train_transform_types:
-      - "trivial_augment"
       - "resize_shorter_side"
       - "center_crop"
+      - "trivial_augment"
     val_transform_types:
       - "resize_shorter_side"
       - "center_crop"
@@ -92,9 +92,9 @@ model:
       - "image"
       - "text"
     train_transform_types:
-      - "trivial_augment"
       - "resize_shorter_side"
       - "center_crop"
+      - "trivial_augment"
     val_transform_types:
       - "resize_shorter_side"
       - "center_crop"

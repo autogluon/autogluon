@@ -1,7 +1,7 @@
 """
 This file implements TrivialAugment.(https://arxiv.org/abs/2103.10158) We extend it for multi-modality setting. 
 
-Code is partically adapted from it official implementation https://github.com/automl/trivialaugment
+Code is partically adapted from its official implementation https://github.com/automl/trivialaugment
 """
 
 import random
@@ -14,12 +14,15 @@ import nltk
 
 def scale_parameter(level, maxval, type):
     """Helper function to scale `val` between 0 and maxval .
-    Args:
-        level: Level of the operation that will be between [0, image_parameter_max].
-        maxval: Maximum value that the operation can have.
-        type: return float or int
-    Returns:
-        An adjust scale
+    Parameters
+    ----------
+    level: Level of the operation that will be between [0, image_parameter_max].
+    maxval: Maximum value that the operation can have.
+    type: return float or int
+
+    Returns
+    -------
+    An adjust scale
     """
     if type == "float":
         return float(level) * maxval / image_parameter_max
@@ -41,7 +44,6 @@ class TransformT(object):
         return self.xform(data, level)
 
 
-"""Transform functions"""
 identity = TransformT("identity", lambda data, level: data)
 
 
@@ -64,14 +66,7 @@ rotate = TransformT("Rotate", _rotate_impl)
 
 
 def _solarize_impl(pil_img, level):
-    """Applies PIL Solarize to `pil_img`.
-    Translate the image in the vertical direction by `level` number of pixels.
-    Args:
-        pil_img: Image in PIL object.
-        level: Strength of the operation specified as an Integer from [0, max].
-    Returns:
-        A PIL Image that has had Solarize applied to it.
-    """
+    """Applies PIL Solarize to `pil_img` with strength level."""
     max = 256
     level = scale_parameter(level, max, "int")
     return ImageOps.solarize(pil_img, max - level)
@@ -81,7 +76,7 @@ solarize = TransformT("Solarize", _solarize_impl)
 
 
 def _posterize_impl(pil_img, level):
-    """Applies PIL Posterize to `pil_img`."""
+    """Applies PIL Posterize to `pil_img` with strength level."""
     max = 4
     min = 0
     level = scale_parameter(level, max - min, "int")
@@ -113,16 +108,7 @@ sharpness = TransformT("Sharpness", _enhancer_impl(ImageEnhance.Sharpness))
 
 
 def _shear_x_impl(pil_img, level):
-    """Applies PIL ShearX to `pil_img`.
-    The ShearX operation shears the image along the horizontal axis with `level`
-    magnitude.
-    Args:
-        pil_img: Image in PIL object.
-        level: Strength of the operation specified as an Integer from
-        [0, `PARAMETER_MAX`].
-    Returns:
-        A PIL Image that has had ShearX applied to it.
-    """
+    """Shears the image along the horizontal axis with `level` magnitude."""
     max = 0.3
     level = scale_parameter(level, max, "float")
     if random.random() > 0.5:
@@ -134,16 +120,7 @@ shear_x = TransformT("ShearX", _shear_x_impl)
 
 
 def _shear_y_impl(pil_img, level):
-    """Applies PIL ShearY to `pil_img`.
-    The ShearY operation shears the image along the vertical axis with `level`
-    magnitude.
-    Args:
-        pil_img: Image in PIL object.
-        level: Strength of the operation specified as an Integer from
-        [0, `PARAMETER_MAX`].
-    Returns:
-        A PIL Image that has had ShearX applied to it.
-    """
+    """Shear the image along the vertical axis with `level` magnitude."""
     max = 0.3
     level = scale_parameter(level, max, "float")
     if random.random() > 0.5:
@@ -155,16 +132,7 @@ shear_y = TransformT("ShearY", _shear_y_impl)
 
 
 def _translate_x_impl(pil_img, level):
-    """Applies PIL TranslateX to `pil_img`.
-    Translate the image in the horizontal direction by `level`
-    number of pixels.
-    Args:
-        pil_img: Image in PIL object.
-        level: Strength of the operation specified as an Integer from
-        [0, `PARAMETER_MAX`].
-    Returns:
-        A PIL Image that has had TranslateX applied to it.
-    """
+    """Translate the image in the horizontal direction by `level` number of pixels."""
     max = 10
     level = scale_parameter(level, max, "int")
     if random.random() > 0.5:
@@ -176,16 +144,7 @@ translate_x = TransformT("TranslateX", _translate_x_impl)
 
 
 def _translate_y_impl(pil_img, level):
-    """Applies PIL TranslateY to `pil_img`.
-    Translate the image in the vertical direction by `level`
-    number of pixels.
-    Args:
-        pil_img: Image in PIL object.
-        level: Strength of the operation specified as an Integer from
-        [0, `PARAMETER_MAX`].
-    Returns:
-        A PIL Image that has had TranslateY applied to it.
-    """
+    """Translate the image in the vertical direction by `level` number of pixels."""
     max = 10
     level = scale_parameter(level, max, "int")
     if random.random() > 0.5:
@@ -249,7 +208,8 @@ def set_text_augmentation_space(max_strength):
 class TrivialAugment:
     """
     Implementation for TrivialAugment (https://arxiv.org/abs/2103.10158)
-    Use datatype to get all avalibale augmentation operation
+    Random sample one operation from all_transform
+    Random a strength between [0, max_strength]
     """
 
     def __init__(self, datatype, max_strength) -> None:
