@@ -96,6 +96,7 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
     ):
         # TODO: for cpu case, is it better to have more workers or more cpus per worker?
         cpu_per_job = max(minimum_cpu_per_trial, total_num_cpus // num_samples)
+        max_jobs_in_parallel_memory = num_samples
         if model_estimate_memory_usage is not None:
             mem_available = psutil.virtual_memory().available
             # calculate how many jobs can run in parallel given memory available
