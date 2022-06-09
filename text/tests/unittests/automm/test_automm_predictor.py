@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 from ray import tune
 from torch import nn
 
-from autogluon.core.hpo.ray_hpo import searcher_presets, scheduler_presets
+from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from autogluon.text.automm import AutoMMPredictor
 from autogluon.text.automm.utils import modify_duplicate_model_names
 from autogluon.text.automm.constants import (
@@ -654,8 +654,8 @@ def test_textagumentor_deepcopy():
         time_limit=10,
     )
 
-@pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
-@pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))
+@pytest.mark.parametrize('searcher', list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize('scheduler', list(SCHEDULER_PRESETS.keys()))
 def test_hpo(searcher, scheduler):
     dataset = PetFinderDataset()
 
@@ -712,8 +712,8 @@ def test_hpo(searcher, scheduler):
     )
     
     
-@pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
-@pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))
+@pytest.mark.parametrize('searcher', list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize('scheduler', list(SCHEDULER_PRESETS.keys()))
 def test_hpo_distillation(searcher, scheduler):
     dataset = PetFinderDataset()
 

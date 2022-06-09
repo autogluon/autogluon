@@ -4,14 +4,14 @@ import tempfile
 
 from autogluon.core.hpo import RayTuneAdapter, TabularRayTuneAdapter, AutommRayTuneAdapter, run
 from autogluon.core.utils import get_cpu_count, get_gpu_count_all
-from autogluon.core.hpo.ray_hpo import searcher_presets, scheduler_presets
+from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from ray import tune
 
 
 class DummyAdapter(RayTuneAdapter):
     
-    supported_searchers = list(searcher_presets.keys())
-    supported_schedulers = list(scheduler_presets.keys())
+    supported_searchers = list(SEARCHER_PRESETS.keys())
+    supported_schedulers = list(SCHEDULER_PRESETS.keys())
     
     def get_resources_per_trial(self, total_resources, num_samples, **kwargs):
         return {'cpu':1}
@@ -233,8 +233,8 @@ def test_empty_search_space():
             )
 
 
-@pytest.mark.parametrize('searcher', list(searcher_presets.keys()))
-@pytest.mark.parametrize('scheduler', list(scheduler_presets.keys()))
+@pytest.mark.parametrize('searcher', list(SEARCHER_PRESETS.keys()))
+@pytest.mark.parametrize('scheduler', list(SCHEDULER_PRESETS.keys()))
 def test_run(searcher, scheduler):
     hyperparameter_tune_kwargs = dict(
         searcher=searcher,
