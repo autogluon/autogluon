@@ -10,9 +10,16 @@ import ray
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Union, List
 
+from .constants import (
+    MIN,
+    MAX,
+    SEARCHER_PRESETS,
+    SCHEDULER_PRESETS
+)
 from .resources_calculator import ResourceCalculatorFactory
 from .scheduler_factory import SchedulerFactory
 from .searcher_factory import SearcherFactory
+from .space_converter import RaySpaceConverterFactory
 from .. import Space
 
 from ray import tune
@@ -28,12 +35,6 @@ from ray_lightning.tune import get_tune_resources
 
 
 logger = logging.getLogger(__name__)
-
-MIN = 'min'
-MAX = 'max'
-
-searcher_presets = SearcherFactory.searcher_presets
-scheduler_presets = SchedulerFactory.scheduler_presets
 
 
 class EmptySearchSpace(Exception):
@@ -77,7 +78,12 @@ class RayTuneAdapter(ABC):
         return self.supported_schedulers
     
     @abstractmethod
-    def get_resources_per_trial(total_resources: dict, num_samples: int, **kwargs) -> Union[dict, PlacementGroupFactory]:
+    def get_resources_per_trial(
+        total_resources: dict,
+        num_samples: int,
+        resources_per_trial: Optional[dict] = None,
+        **kwargs
+    ) -> Union[dict, PlacementGroupFactory]:
         """
         Calculate resources per trial if not specified by the user
         """
@@ -158,11 +164,11 @@ def run(
     **kwargs
         Additional args being passed to tune.run
     """
-    assert mode in [MIN, MAX], f'mode is {mode}'
+    assert mode in [MIN, MAX], f'mode {mode} is not a valid option. Options are {[MIN, MAX]}'
     if isinstance(hyperparameter_tune_kwargs, str):
         assert hyperparameter_tune_kwargs in ray_tune_adapter.presets, f'{hyperparameter_tune_kwargs} is not a valid option. Options are {ray_tune_adapter.presets.keys()}'
         hyperparameter_tune_kwargs = ray_tune_adapter.presets.get(hyperparameter_tune_kwargs)
-    num_samples = hyperparameter_tune_kwargs.get('num_trials', hyperparameter_tune_kwargs.get('num_samples', None))
+    num_samples = hyperparameter_tune_kwargs.get('num_trials', None)
     if num_samples is None:
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
     if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
@@ -177,26 +183,14 @@ def run(
     ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
-    if resources_per_trial is None:
-        resources_per_trial = ray_tune_adapter.get_resources_per_trial(
-            total_resources=total_resources,
-            num_samples=num_samples,
-            minimum_gpu_per_trial=minimum_gpu_per_trial,
-            minimum_cpu_per_trial=minimum_cpu_per_trial,
-            model_estimate_memory_usage=model_estimate_memory_usage
-        )
-    else:
-        if isinstance(ray_tune_adapter, AutommRayTuneAdapter):
-            # Ray Lightning provides a way to get the resources_per_trial because of the complexity of head process and worker process.
-            # It's non-trivial to let the user to specify it. Hence we disable such option
-            logger.warning('AutoMM does not support customized resources_per_trial. We will calculate it for you instead.')
-            resources_per_trial = ray_tune_adapter.get_resources_per_trial(
-                total_resources=total_resources,
-                num_samples=num_samples,
-                minimum_gpu_per_trial=minimum_gpu_per_trial,
-                minimum_cpu_per_trial=minimum_cpu_per_trial,
-                model_estimate_memory_usage=model_estimate_memory_usage
-            )
+    resources_per_trial = ray_tune_adapter.get_resources_per_trial(
+        total_resources=total_resources,
+        num_samples=num_samples,
+        resources_per_trial=resources_per_trial,
+        minimum_gpu_per_trial=minimum_gpu_per_trial,
+        minimum_cpu_per_trial=minimum_cpu_per_trial,
+        model_estimate_memory_usage=model_estimate_memory_usage
+    )
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
     ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
@@ -292,7 +286,7 @@ def _convert_search_space(search_space: dict, searcher: Union[SearchAlgorithm, S
     tune_search_space = search_space.copy()
     for hyperparmaeter, space in search_space.items():
         if isinstance(space, Space):
-            tune_search_space[hyperparmaeter] = space.convert_to_ray()
+            tune_search_space[hyperparmaeter] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
         # This is a hack
         # nested list are not correctly converted to hyperopt space by ray https://github.com/ray-project/ray/issues/24050
         # convert list to tuple instead. models need to check for tuple and convert it back to list
@@ -310,7 +304,7 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
     searcher = hyperparameter_tune_kwargs.get('searcher')
     user_init_args = hyperparameter_tune_kwargs.get('searcher_init_args', dict())
     if isinstance(searcher, str):
-        assert searcher in searcher_presets, f'{searcher} is not a valid option. Options are {searcher_presets.keys()}'
+        assert searcher in SEARCHER_PRESETS, f'{searcher} is not a valid option. Options are {SEARCHER_PRESETS.keys()}'
         # Check supported schedulers for str input
         if supported_searchers is not None:
             if searcher not in supported_searchers:
@@ -321,10 +315,10 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
             metric=metric,
             mode=mode
         )
-    assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in searcher_presets.values()
+    assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in SEARCHER_PRESETS.values()
     # Check supported schedulers for obj input
     if supported_searchers is not None:
-        supported_searchers_cls = [searcher_presets[searchers] for searchers in supported_searchers]
+        supported_searchers_cls = [SEARCHER_PRESETS[searchers] for searchers in supported_searchers]
         if searcher.__class__ not in supported_searchers_cls:
             logger.warning(f'{searcher.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers_cls}')
     return searcher
@@ -335,7 +329,7 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
     scheduler = hyperparameter_tune_kwargs.get('scheduler')
     user_init_args = hyperparameter_tune_kwargs.get('scheduler_init_args', dict())
     if isinstance(scheduler, str):
-        assert scheduler in scheduler_presets, f'{scheduler} is not a valid option. Options are {scheduler_presets.keys()}'
+        assert scheduler in SCHEDULER_PRESETS, f'{scheduler} is not a valid option. Options are {SCHEDULER_PRESETS.keys()}'
         # Check supported schedulers for str input
         if supported_schedulers is not None:
             if scheduler not in supported_schedulers:
@@ -344,10 +338,10 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
             scheduler_name=scheduler,
             user_init_args=user_init_args,
         )
-    assert isinstance(scheduler, TrialScheduler) and scheduler.__class__ in scheduler_presets.values()
+    assert isinstance(scheduler, TrialScheduler) and scheduler.__class__ in SCHEDULER_PRESETS.values()
     # Check supported schedulers for obj input
     if supported_schedulers is not None:
-        supported_schedulers_cls = [scheduler_presets[scheduler] for scheduler in supported_schedulers]
+        supported_schedulers_cls = [SCHEDULER_PRESETS[scheduler] for scheduler in supported_schedulers]
         if scheduler.__class__ not in supported_schedulers_cls:
             logger.warning(f'{scheduler.__class__} is not supported yet. Using it might behave unexpected. Supported options are {supported_schedulers_cls}')
     return scheduler
@@ -362,11 +356,15 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         self,
         total_resources: dict,
         num_samples: int,
+        resources_per_trial: Optional[dict] = None,
         minimum_cpu_per_trial: int = 1,
         minimum_gpu_per_trial: float = 1.0,
         model_estimate_memory_usage: Optional[int] = None,
         **kwargs,
-        ) -> dict:
+    ) -> dict:
+        if resources_per_trial is not None:
+            return resources_per_trial
+
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
         assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
@@ -410,11 +408,17 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         self,
         total_resources: dict,
         num_samples: int,
+        resources_per_trial: Optional[dict] = None,
         minimum_cpu_per_trial: int = 1,
         minimum_gpu_per_trial: float = 1.0,
         model_estimate_memory_usage: Optional[int] = None,
         **kwargs,
-        ) -> PlacementGroupFactory:
+    ) -> PlacementGroupFactory:
+        if resources_per_trial is not None:
+            # Ray Lightning provides a way to get the resources_per_trial because of the complexity of head process and worker process.
+            # It's non-trivial to let the user to specify it. Hence we disable such option
+            logger.warning('AutoMM does not support customized resources_per_trial. We will calculate it for you instead.')
+            
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
         assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())

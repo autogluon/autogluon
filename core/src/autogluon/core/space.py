@@ -78,10 +78,6 @@ class Categorical(DiscreteSpace):
     def convert_to_sklearn(self):
         return self.data
 
-    def convert_to_ray(self):
-        from ray.tune import choice
-        return choice(self.data)
-
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
@@ -127,14 +123,6 @@ class Real(SimpleSpace):
             sampler = uniform(self.lower, self.upper - self.lower)
         return sampler
 
-    def convert_to_ray(self):
-        from ray.tune import loguniform, uniform
-
-        if self.log:
-            sampler = loguniform(self.lower, self.upper)
-        else:
-            sampler = uniform(self.lower, self.upper)
-        return sampler
 
 class Int(DiscreteSpace):
     """Search space for numeric hyperparameter that takes integer values.
@@ -166,10 +154,6 @@ class Int(DiscreteSpace):
 
     def __len__(self):
         return self.upper - self.lower + 1
-
-    def convert_to_ray(self):
-        from ray.tune import randint
-        return randint(self.lower, self.upper+1)
 
 
 class Bool(Int):

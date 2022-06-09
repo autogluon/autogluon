@@ -8,9 +8,9 @@ class ResourceCalculator(ABC):
     
     @property
     @abstractmethod
-    def type(self):
+    def calc_type(self):
         """Type of the resource calculator"""
-        return NotImplementedError
+        raise NotImplementedError
     
     @abstractmethod
     def get_resources_per_trial(self, **kwargs) -> dict:
@@ -21,7 +21,7 @@ class ResourceCalculator(ABC):
 class CpuResourceCalculator(ResourceCalculator):
     
     @property
-    def type(self):
+    def calc_type(self):
         return 'cpu'
     
     def get_resources_per_trial(
@@ -29,7 +29,7 @@ class CpuResourceCalculator(ResourceCalculator):
         total_num_cpus,
         num_samples,
         minimum_cpu_per_trial,
-        model_estimate_memory_usage,
+        model_estimate_memory_usage=None,
         **kwargs,
     ):
         cpu_per_job = max(minimum_cpu_per_trial, int(total_num_cpus // num_samples))
@@ -53,7 +53,7 @@ class CpuResourceCalculator(ResourceCalculator):
 class GpuResourceCalculator(ResourceCalculator):
     
     @property
-    def type(self):
+    def calc_type(self):
         return 'gpu'
     
     def get_resources_per_trial(
@@ -83,7 +83,7 @@ class GpuResourceCalculator(ResourceCalculator):
 class RayLightningCpuResourceCalculator(ResourceCalculator):
     
     @property
-    def type(self):
+    def calc_type(self):
         return 'ray_lightning_cpu'
     
     def get_resources_per_trial(
@@ -91,11 +91,16 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
         total_num_cpus,
         num_samples,
         minimum_cpu_per_trial,
+        model_estimate_memory_usage=None,
         **kwargs,
     ):
         # TODO: for cpu case, is it better to have more workers or more cpus per worker?
         cpu_per_job = max(minimum_cpu_per_trial, total_num_cpus // num_samples)
-        num_parallel_jobs = min(num_samples, total_num_cpus // cpu_per_job)
+        if model_estimate_memory_usage is not None:
+            mem_available = psutil.virtual_memory().available
+            # calculate how many jobs can run in parallel given memory available
+            max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
+        num_parallel_jobs = min(num_samples, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
         num_workers = max(minimum_cpu_per_trial, cpu_per_job - 1)  # 1 cpu for master process
         cpu_per_worker = 1
         resources_per_trial = get_tune_resources(
@@ -115,7 +120,7 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
 class RayLightningGpuResourceCalculator(ResourceCalculator):
     
     @property
-    def type(self):
+    def calc_type(self):
         return 'ray_lightning_gpu'
     
     def get_resources_per_trial(
@@ -163,7 +168,7 @@ class ResourceCalculatorFactory:
         RayLightningCpuResourceCalculator,
         RayLightningGpuResourceCalculator
     ]
-    __type_to_calculator = {cls().type: cls for cls in __supported_calculators}
+    __type_to_calculator = {cls().calc_type: cls for cls in __supported_calculators}
 
     @staticmethod
     def get_resource_calculator(calculator_type: str) -> ResourceCalculator:
