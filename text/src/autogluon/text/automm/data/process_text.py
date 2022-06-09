@@ -171,7 +171,7 @@ class TextProcessor:
             # See https://github.com/huggingface/transformers/blob/6ac77534bfe97c00e0127bb4fc846ae0faf1c9c5/src/transformers/tokenization_utils_base.py#L3362
             self.tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
-            self.cls_token_id,self.sep_token_id, self.eos_token_id = self.get_special_tokens(tokenizer=self.tokenizer)
+        self.cls_token_id,self.sep_token_id, self.eos_token_id = self.get_special_tokens(tokenizer=self.tokenizer)
         if max_len is None or max_len <= 0:
             self.max_len = self.tokenizer.model_max_length
         else:
@@ -351,12 +351,14 @@ class TextProcessor:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
                         col_text = self.train_augmenter.augment(col_text)
+
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
                 truncation=False,
             )
             tokens[col_name] = np.array(col_tokens, dtype=np.int32)
+            
         # build token sequence
         return self.build_one_token_sequence(tokens)
 

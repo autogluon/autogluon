@@ -126,7 +126,7 @@ def infer_metrics(
 
 
 def get_config(
-    config: Union[dict, DictConfig], 
+    config: Union[dict, DictConfig],
     overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
     """
@@ -531,7 +531,7 @@ def init_data_processors(
             elif d_type == CATEGORICAL:
                 data_processors[CATEGORICAL].append(
                     CategoricalProcessor(
-                        prefix=model_name, 
+                        prefix=model_name,
                         categorical_column_names=df_preprocessor.categorical_feature_names,
                     )
                 )
@@ -593,8 +593,8 @@ def create_model(
         model_config = getattr(config.model, model_name)
         if model_name.lower().startswith(CLIP):
             model = CLIPForImageText(
-                prefix=model_name, 
-                checkpoint_name=model_config.checkpoint_name, 
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(TIMM_IMAGE):
@@ -607,8 +607,8 @@ def create_model(
             )
         elif model_name.lower().startswith(HF_TEXT):
             model = HFAutoModelForTextPrediction(
-                prefix=model_name, 
-                checkpoint_name=model_config.checkpoint_name, 
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
@@ -832,7 +832,7 @@ def load_text_tokenizers(
         if isinstance(per_text_processor.tokenizer, str):
             per_path = os.path.join(path, per_text_processor.tokenizer)
             per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
-                tokenizer_name=per_text_processor.tokenizer_name, 
+                tokenizer_name=per_text_processor.tokenizer_name,
                 checkpoint_name=per_path,
             )
     return text_processors
@@ -987,8 +987,8 @@ def parse_dotlist_conf(conf):
 
 
 def apply_omegaconf_overrides(
-    conf: DictConfig, 
-    overrides: Union[List, Tuple, str, Dict, DictConfig], 
+    conf: DictConfig,
+    overrides: Union[List, Tuple, str, Dict, DictConfig],
     check_key_exist=True,
 ):
     """
