@@ -38,12 +38,18 @@ install_requires = [
 
 extras_require = {
     'ray': [
-        "ray>=1.10,<1.11",
+        "ray>=1.12,<1.13",
         # https://github.com/protocolbuffers/protobuf/issues/10051
         # protobuf made breaking change and ray doesn't upper cap its version
         # need this hotfix for now until ray provides a new release
         "protobuf<4"
     ],
+    'ray_tune': [
+        'ray[tune]>=1.12,<1.13',
+        'ray_lightning>=0.2.0,<0.3.0',
+        'hyperopt>=0.2.7,<0.2.8',
+        # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
+    ]
 }
 
 tests_require = [
@@ -52,7 +58,7 @@ tests_require = [
 
 all_requires = []
 
-for extra_package in ['ray']:
+for extra_package in ['ray', 'ray_tune']:
     all_requires += extras_require[extra_package]
 tests_require = list(set(tests_require))
 all_requires = list(set(all_requires))
