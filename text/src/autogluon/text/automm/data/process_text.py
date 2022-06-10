@@ -19,6 +19,7 @@ from ..constants import (
     TEXT_SEGMENT_IDS,
     AUTOMM,
     COLUMN,
+    TEXT
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config, InsertPunctuation
@@ -74,7 +75,7 @@ def construct_text_augmenter(
             trans_mode = aug_type
             kwargs = {}
         if trans_mode == "trivial_augment":
-            return TrivialAugment("text", kwargs["max"])
+            return TrivialAugment(TEXT, kwargs["max"])
         elif trans_mode == "synonym_replacement":
             kwargs["aug_src"] = "wordnet"
             try:

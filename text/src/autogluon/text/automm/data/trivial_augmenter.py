@@ -10,6 +10,7 @@ from PIL import ImageOps, ImageEnhance, ImageFilter, Image, ImageDraw
 import nlpaug.augmenter.word as naw
 from .utils import InsertPunctuation
 import nltk
+from ..constants import (IMAGE, TEXT)
 
 
 def scale_parameter(level, maxval, type):
@@ -203,10 +204,7 @@ def set_image_augmentation_space(max_strength):
     return image_all_transform
 
 
-def set_text_augmentation_space(max_strength):
-    assert max_strength <= 1.0, "Invalid maximum strength. Must <= 1.0"
-    global text_parameter_max
-    text_parameter_max = max_strength
+def set_text_augmentation_space():
     text_all_transform = [
         "identity",
         "syn_replacement",
@@ -250,17 +248,17 @@ class TrivialAugment:
         assert max_strength > 0, "Invalid maximum strength. Must > 0"
         self.max_strength = max_strength
         self.data_type = datatype
-        if datatype == "img":
+        if datatype == IMAGE:
             self.all_transform = set_image_augmentation_space(self.max_strength)
-        elif datatype == "text":
+        elif datatype == TEXT:
             self.all_transform = set_text_augmentation_space(self.max_strength)
         else:
             raise NotImplementedError
 
     def __call__(self, data):
-        if self.data_type == "img":
+        if self.data_type == IMAGE:
             return self.augment_image(data)
-        elif self.data_type == "text":
+        elif self.data_type == TEXT:
             return self.augment(data)
 
     def augment_image(self, data):

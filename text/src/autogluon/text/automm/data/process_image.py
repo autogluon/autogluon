@@ -303,7 +303,7 @@ class ImageProcessor:
                 else:
                     processor.append(RandAugment(2, 9))
             elif trans_mode == "trivial_augment":
-                processor.append(TrivialAugment("img", 30))
+                processor.append(TrivialAugment(IMAGE, 30))
             else:
                 raise ValueError(f"unknown transform type: {trans_mode}")
 
