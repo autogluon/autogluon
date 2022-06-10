@@ -1,6 +1,7 @@
 import inspect
 import logging
 import time
+from typing import Dict
 
 import numpy as np
 
@@ -279,6 +280,13 @@ class WideDeepNNModel(AbstractModel):
 
     def _merge_params(self, params):
         return {**params, **self.params.get('model_args', {})}
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        # Overriding this method becuase num_cpus = 0 is a valid value in data loaders.
+        # 0 == don't use multi-processing. See comments in _get_default_resources().
+        return {
+            'num_cpus': 0,
+        }
 
 
 class WideDeepTabMlp(WideDeepNNModel):
