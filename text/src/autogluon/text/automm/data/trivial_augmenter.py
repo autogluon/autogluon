@@ -13,7 +13,9 @@ import nltk
 
 
 def scale_parameter(level, maxval, type):
-    """Helper function to scale `val` between 0 and maxval .
+    """
+    Helper function to scale `val` between 0 and maxval .
+
     Parameters
     ----------
     level: Level of the operation that will be between [0, image_parameter_max].
@@ -31,9 +33,17 @@ def scale_parameter(level, maxval, type):
 
 
 class TransformT(object):
-    """Each instance of this class represents a specific transform."""
+    """
+    Each instance of this class represents a specific transform.
+    """
 
     def __init__(self, name, xform_fn):
+        """
+        Parameters
+        ----------
+        name: name of the operation
+        xform_fn: augmentation operation function
+        """
         self.name = name
         self.xform = xform_fn
 
@@ -54,7 +64,9 @@ equalize = TransformT("Equalize", lambda pil_img, level: ImageOps.equalize(pil_i
 
 
 def _rotate_impl(pil_img, level):
-    """Rotates `pil_img` from -30 to 30 degrees depending on `level`."""
+    """
+    Rotates `pil_img` from -30 to 30 degrees depending on `level`.
+    """
     max = 30
     degrees = scale_parameter(level, max, "int")
     if random.random() > 0.5:
@@ -66,7 +78,9 @@ rotate = TransformT("Rotate", _rotate_impl)
 
 
 def _solarize_impl(pil_img, level):
-    """Applies PIL Solarize to `pil_img` with strength level."""
+    """
+    Applies PIL Solarize to `pil_img` with strength level.
+    """
     max = 256
     level = scale_parameter(level, max, "int")
     return ImageOps.solarize(pil_img, max - level)
@@ -76,7 +90,9 @@ solarize = TransformT("Solarize", _solarize_impl)
 
 
 def _posterize_impl(pil_img, level):
-    """Applies PIL Posterize to `pil_img` with strength level."""
+    """
+    Applies PIL Posterize to `pil_img` with strength level.
+    """
     max = 4
     min = 0
     level = scale_parameter(level, max - min, "int")
@@ -87,7 +103,9 @@ posterize = TransformT("Posterize", _posterize_impl)
 
 
 def _enhancer_impl(enhancer):
-    """Sets level to be between 0.1 and 1.8 for ImageEnhance transforms of PIL."""
+    """
+    Sets level to be between 0.1 and 1.8 for ImageEnhance transforms of PIL.
+    """
     min = 0.1
     max = 1.8
 
@@ -108,7 +126,9 @@ sharpness = TransformT("Sharpness", _enhancer_impl(ImageEnhance.Sharpness))
 
 
 def _shear_x_impl(pil_img, level):
-    """Shears the image along the horizontal axis with `level` magnitude."""
+    """
+    Shears the image along the horizontal axis with `level` magnitude.
+    """
     max = 0.3
     level = scale_parameter(level, max, "float")
     if random.random() > 0.5:
@@ -120,7 +140,9 @@ shear_x = TransformT("ShearX", _shear_x_impl)
 
 
 def _shear_y_impl(pil_img, level):
-    """Shear the image along the vertical axis with `level` magnitude."""
+    """
+    Shear the image along the vertical axis with `level` magnitude.
+    """
     max = 0.3
     level = scale_parameter(level, max, "float")
     if random.random() > 0.5:
@@ -132,7 +154,9 @@ shear_y = TransformT("ShearY", _shear_y_impl)
 
 
 def _translate_x_impl(pil_img, level):
-    """Translate the image in the horizontal direction by `level` number of pixels."""
+    """
+    Translate the image in the horizontal direction by `level` number of pixels.
+    """
     max = 10
     level = scale_parameter(level, max, "int")
     if random.random() > 0.5:
@@ -144,7 +168,9 @@ translate_x = TransformT("TranslateX", _translate_x_impl)
 
 
 def _translate_y_impl(pil_img, level):
-    """Translate the image in the vertical direction by `level` number of pixels."""
+    """
+    Translate the image in the vertical direction by `level` number of pixels.
+    """
     max = 10
     level = scale_parameter(level, max, "int")
     if random.random() > 0.5:
@@ -213,6 +239,14 @@ class TrivialAugment:
     """
 
     def __init__(self, datatype, max_strength) -> None:
+        """
+        Parameters
+        ----------
+        datatype
+            Modality type, currently support "text" and "img"
+        max_strength
+            Max strength for augmentation operation. 
+        """
         assert max_strength > 0, "Invalid maximum strength. Must > 0"
         self.max_strength = max_strength
         self.data_type = datatype
