@@ -1,6 +1,6 @@
-﻿Take Petfinder Pawpularity competition as an example showing how to use AutoMMPredictor to complete a competition.
+﻿Take [Petfinder Pawpularity competition](https://www.kaggle.com/competitions/petfinder-pawpularity-score/overview) as an example showing how to use AutoMMPredictor to complete a competition.
 
-## 1. Kaggle Competition with AutoGluon
+## 1. Kaggle Kernel-only Competition with AutoGluon
 
 In a kaggle competition, especially a code competition, users cannot obtain AutoGluon resources through the network. 
 To solve the problem, there are two key points:
