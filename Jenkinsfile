@@ -1,6 +1,17 @@
 max_time = 180
 
 setup_mxnet_gpu = """
+
+    export OS=ubuntu1804
+    wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/cuda-${OS}.pin
+
+    sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
+    sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/7fa2af80.pub
+    sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
+    sudo apt-get update
+
+    sudo apt-get install libcudnn8=8.4.1.50-1+cuda10.2
+
     python3 -m pip install mxnet-cu102==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
@@ -79,8 +90,6 @@ stage("Unit Test") {
           conda env update -n autogluon-timeseries-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-timeseries-py3-v3
           conda list
-
-          cat /etc/os-release
 
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
