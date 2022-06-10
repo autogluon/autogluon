@@ -16,7 +16,7 @@ from .constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
-from .resources_calculator import ResourceCalculatorFactory
+from .resources_calculator import ResourceCalculator, ResourceCalculatorFactory
 from .scheduler_factory import SchedulerFactory
 from .searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
@@ -77,17 +77,54 @@ class RayTuneAdapter(ABC):
         """
         return self.supported_schedulers
     
+    def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
+        """Do checks or warnings on user provided resources here"""
+        pass
+    
     @abstractmethod
+    def get_resource_calculator(self, **kwargs) -> ResourceCalculator:
+        """Get resource calculator"""
+        raise NotImplementedError
+    
+    def update_resource_info(self, resources_info: dict):
+        """Get necessary info given resources_info"""
+        self.num_parallel_jobs = resources_info.get('num_parallel_jobs', None)
+        self.cpu_per_job = resources_info.get('cpu_per_job', None)
+        self.gpu_per_job = resources_info.get('gpu_per_job', None)
+        self.resources_per_trial = resources_info.get('resources_per_trial', None)
+    
     def get_resources_per_trial(
+        self,
         total_resources: dict,
         num_samples: int,
         resources_per_trial: Optional[dict] = None,
+        minimum_cpu_per_trial: int = 1,
+        minimum_gpu_per_trial: float = 1.0,
+        model_estimate_memory_usage: Optional[int] = None,
         **kwargs
     ) -> Union[dict, PlacementGroupFactory]:
         """
         Calculate resources per trial if not specified by the user
         """
-        raise NotImplementedError
+        self.check_user_provided_resources_per_trial(resources_per_trial)
+        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
+        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
+        num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
+        num_gpus = total_resources.get('num_gpus', 0)
+        
+        resources_calculator = self.get_resource_calculator(num_gpus=num_gpus)
+        resources_info = resources_calculator.get_resources_per_trial(
+            total_num_cpus=num_cpus,
+            total_num_gpus=num_gpus,
+            num_samples=num_samples,
+            minimum_cpu_per_trial=minimum_cpu_per_trial,
+            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            model_estimate_memory_usage=model_estimate_memory_usage,
+            **kwargs,
+        )
+        
+        self.update_resource_info(resources_info)
+        return self.resources_per_trial
     
     @abstractmethod
     def trainable_args_update_method(trainable_args: dict) -> dict:
@@ -352,41 +389,12 @@ class TabularRayTuneAdapter(RayTuneAdapter):
     supported_searchers = ['random', 'bayes']
     supported_schedulers = ['FIFO']
     
-    def get_resources_per_trial(
-        self,
-        total_resources: dict,
-        num_samples: int,
-        resources_per_trial: Optional[dict] = None,
-        minimum_cpu_per_trial: int = 1,
-        minimum_gpu_per_trial: float = 1.0,
-        model_estimate_memory_usage: Optional[int] = None,
-        **kwargs,
-    ) -> dict:
+    def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
-            return resources_per_trial
-
-        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
-        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
-        num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
-        num_gpus = total_resources.get('num_gpus', 0)
-        
-        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu')
-        resources_info = resources_calculator.get_resources_per_trial(
-            total_num_cpus=num_cpus,
-            total_num_gpus=num_gpus,
-            num_samples=num_samples,
-            minimum_cpu_per_trial=minimum_cpu_per_trial,
-            minimum_gpu_per_trial=minimum_gpu_per_trial,
-            model_estimate_memory_usage=model_estimate_memory_usage,
-            **kwargs,
-        )
-        
-        self.num_parallel_jobs = resources_info.get('num_parallel_jobs', None)
-        self.cpu_per_job = resources_info.get('cpu_per_job', None)
-        self.gpu_per_job = resources_info.get('gpu_per_job', None)
-        self.resources_per_trial = resources_info.get('resources_per_trial', None)
-        
-        return self.resources_per_trial
+            return resources_per_trial 
+    
+    def get_resource_calculator(self, num_gpus, **kwargs) -> ResourceCalculator:
+        return ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu')
     
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args['fit_kwargs']['num_cpus'] = self.resources_per_trial.get('cpu', 1)
@@ -401,47 +409,52 @@ class AutommRayTuneAdapter(RayTuneAdapter):
     
     def __init__(self):
         super().__init__()
+        
+    def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
+        if resources_per_trial is not None:
+            # We do not support a single trial running on multiple GPUs without ray_lightning for now.
+            num_gpus = resources_per_trial.get('num_gpus', None)
+            if num_gpus is not None and num_gpus > 1:
+                resources_per_trial['num_gpus'] = 1
+                logger.warning('We do not support a single trial running on multiple GPUs yet')
+            return resources_per_trial
+        
+    def get_resource_calculator(self, num_gpus: float):
+        return ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu_no_parallel')
+        
+    def trainable_args_update_method(self, trainable_args: dict) -> dict:
+        trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job
+        trainable_args['hyperparameters']['env.num_workers'] = self.cpu_per_job
+        
+        return trainable_args
+    
+    
+class AutommRayTuneLightningAdapter(RayTuneAdapter):
+    
+    supported_searchers = ['random', 'bayes']
+    supported_schedulers = ['FIFO', 'ASHA']
+    
+    def __init__(self):
+        super().__init__()
         self.num_workers = None
         self.cpu_per_worker = None
-    
-    def get_resources_per_trial(
-        self,
-        total_resources: dict,
-        num_samples: int,
-        resources_per_trial: Optional[dict] = None,
-        minimum_cpu_per_trial: int = 1,
-        minimum_gpu_per_trial: float = 1.0,
-        model_estimate_memory_usage: Optional[int] = None,
-        **kwargs,
-    ) -> PlacementGroupFactory:
+        
+    def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
             # Ray Lightning provides a way to get the resources_per_trial because of the complexity of head process and worker process.
             # It's non-trivial to let the user to specify it. Hence we disable such option
             logger.warning('AutoMM does not support customized resources_per_trial. We will calculate it for you instead.')
-            
-        assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
-        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
-        num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
-        num_gpus = total_resources.get('num_gpus', 0)
-        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='ray_lightning_cpu' if num_gpus == 0 else 'ray_lightning_gpu')
-        resources_info = resources_calculator.get_resources_per_trial(
-            total_num_cpus=num_cpus,
-            total_num_gpus=num_gpus,
-            num_samples=num_samples,
-            minimum_cpu_per_trial=minimum_cpu_per_trial,
-            minimum_gpu_per_trial=minimum_gpu_per_trial,
-            model_estimate_memory_usage=model_estimate_memory_usage,
-            **kwargs,
-        )
-        
+
+    def get_resource_calculator(self, num_gpus):
+        return ResourceCalculatorFactory.get_resource_calculator(calculator_type='ray_lightning_cpu' if num_gpus == 0 else 'ray_lightning_gpu')
+    
+    def update_resource_info(self, resources_info: dict): 
         self.num_parallel_jobs = resources_info.get('num_parallel_jobs', None)
         self.cpu_per_job = resources_info.get('cpu_per_job', None)
         self.gpu_per_job = resources_info.get('gpu_per_job', None)
         self.num_workers = resources_info.get('num_workers', None)
         self.cpu_per_worker = resources_info.get('cpu_per_worker', None)
         self.resources_per_trial = resources_info.get('resources_per_trial', None)
-        
-        return self.resources_per_trial
         
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job
