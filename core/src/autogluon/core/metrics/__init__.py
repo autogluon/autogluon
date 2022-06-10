@@ -1,6 +1,6 @@
-import copy
 from abc import ABCMeta, abstractmethod
 from functools import partial
+import json
 
 import scipy
 import scipy.stats
@@ -8,7 +8,7 @@ import sklearn.metrics
 
 from . import classification_metrics
 from .util import sanitize_array
-from ..constants import PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION, QUANTILE
+from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 from ..utils.miscs import warning_filter
 from .classification_metrics import *
 from . import quantile_metrics
@@ -311,6 +311,18 @@ class _QuantileScorer(Scorer):
         return True
 
 
+def _add_scorer_to_metric_dict(metric_dict, scorer):
+    if scorer.name in metric_dict:
+        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
+                         f'Consider to register with a different name.')
+    metric_dict[scorer.name] = scorer
+    for alias in scorer.alias:
+        if alias in metric_dict:
+            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
+                             f'Consider to use a different alias.')
+        metric_dict[alias] = scorer
+
+
 def make_scorer(name, score_func, optimum=1, greater_is_better=True,
                 needs_proba=False, needs_threshold=False, needs_quantile=False, **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
@@ -512,79 +524,107 @@ pac_score = make_scorer('pac_score',
                         needs_proba=True)
 
 REGRESSION_METRICS = dict()
-for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
-                   median_absolute_error, mean_absolute_percentage_error, spearmanr, pearsonr]:
-    if scorer.name in REGRESSION_METRICS:
-        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
-                         f'Consider to register with a different name.')
-    REGRESSION_METRICS[scorer.name] = scorer
-    for alias in scorer.alias:
-        if alias in REGRESSION_METRICS:
-            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
-                             f'Consider to use a different alias.')
-        REGRESSION_METRICS[alias] = scorer
+for scorer in [
+    r2,
+    mean_squared_error,
+    root_mean_squared_error,
+    mean_absolute_error,
+    median_absolute_error,
+    mean_absolute_percentage_error,
+    spearmanr,
+    pearsonr,
+]:
+    _add_scorer_to_metric_dict(metric_dict=REGRESSION_METRICS, scorer=scorer)
 
 QUANTILE_METRICS = dict()
 for scorer in [pinball_loss]:
-    if scorer.name in QUANTILE_METRICS:
-        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
-                         f'Consider to register with a different name.')
-    QUANTILE_METRICS[scorer.name] = scorer
-    for alias in scorer.alias:
-        if alias in QUANTILE_METRICS:
-            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
-                             f'Consider to use a different alias.')
-        QUANTILE_METRICS[alias] = scorer
+    _add_scorer_to_metric_dict(metric_dict=QUANTILE_METRICS, scorer=scorer)
 
-CLASSIFICATION_METRICS = dict()
-for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, average_precision,
-               log_loss, pac_score, quadratic_kappa]:
-    CLASSIFICATION_METRICS[scorer.name] = scorer
-    for alias in scorer.alias:
-        CLASSIFICATION_METRICS[alias] = scorer
+BINARY_METRICS = dict()
+MULTICLASS_METRICS = dict()
+for scorer in [
+    accuracy,
+    balanced_accuracy,
+    mcc,
+    roc_auc_ovo_macro,
+    log_loss,
+    pac_score,
+    quadratic_kappa,
+]:
+    for metric_dict in [BINARY_METRICS, MULTICLASS_METRICS]:
+        _add_scorer_to_metric_dict(metric_dict=metric_dict, scorer=scorer)
+
+for scorer in [
+    roc_auc,
+    average_precision,
+]:
+    _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 
 
 for name, metric in [('precision', sklearn.metrics.precision_score),
                      ('recall', sklearn.metrics.recall_score),
                      ('f1', sklearn.metrics.f1_score)]:
     globals()[name] = make_scorer(name, metric)
-    CLASSIFICATION_METRICS[name] = globals()[name]
-    for average in ['macro', 'micro', 'samples', 'weighted']:
+    _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[name])
+    for average in ['macro', 'micro', 'weighted']:
         qualified_name = '{0}_{1}'.format(name, average)
         globals()[qualified_name] = make_scorer(qualified_name,
                                                 partial(metric, pos_label=None, average=average))
-        CLASSIFICATION_METRICS[qualified_name] = globals()[qualified_name]
+        _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
+        _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
+METRICS = {
+    BINARY: BINARY_METRICS,
+    MULTICLASS: MULTICLASS_METRICS,
+    REGRESSION: REGRESSION_METRICS,
+    QUANTILE: QUANTILE_METRICS,
+}
+
+
+def _get_valid_metric_problem_types(metric: str):
+    problem_types_valid = []
+    for problem_type in METRICS:
+        if metric in METRICS[problem_type]:
+            problem_types_valid.append(problem_type)
+    return problem_types_valid
 
 
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
-    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + list(QUANTILE_METRICS.keys()) + ['soft_log_loss']
 
     if metric is not None and isinstance(metric, str):
-        if metric in CLASSIFICATION_METRICS:
-            if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
-                raise ValueError(f"{metric_type}={metric} can only be used for classification problems")
-            return CLASSIFICATION_METRICS[metric]
-        elif metric in REGRESSION_METRICS:
-            if problem_type is not None and problem_type not in PROBLEM_TYPES_REGRESSION:
-                raise ValueError(f"{metric_type}={metric} can only be used for regression problems")
-            return REGRESSION_METRICS[metric]
-        elif metric in QUANTILE_METRICS:
-            if problem_type is not None and problem_type != QUANTILE:
-                raise ValueError(f"{metric_type}={metric} can only be used for quantile problems")
-            return QUANTILE_METRICS[metric]
-        elif metric == 'soft_log_loss':
+        if metric == 'soft_log_loss':
             if problem_type == QUANTILE:
                 raise ValueError(f"{metric_type}={metric} can not be used for quantile problems")
             # Requires mxnet
             from .softclass_metrics import soft_log_loss
             return soft_log_loss
-        else:
-            raise ValueError(
-                f"{metric} is an unknown metric, all available metrics are "
-                f"'{all_available_metric_names}'. You can also refer to "
-                f"autogluon.core.metrics to see how to define your own {metric_type} function"
-            )
+        if problem_type is not None:
+            if problem_type not in METRICS:
+                raise ValueError(f"Invalid problem_type '{problem_type}'. Valid problem types: {list(METRICS.keys())}")
+            if metric not in METRICS[problem_type]:
+                valid_problem_types = _get_valid_metric_problem_types(metric)
+                if valid_problem_types:
+                    raise ValueError(f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. Valid problem_types for this metric: {valid_problem_types}")
+                else:
+                    raise ValueError(f"Unknown metric '{metric}'. "
+                                     f"Valid metrics for problem_type='{problem_type}':\n"
+                                     f"{list(METRICS[problem_type].keys())}")
+            return METRICS[problem_type][metric]
+        for pt in METRICS:
+            if metric in METRICS[pt]:
+                return METRICS[pt][metric]
+        all_available_metrics = dict()
+        for pt in METRICS:
+            all_available_metrics[pt] = list(METRICS[pt].keys())
+        all_available_metrics[SOFTCLASS] = ['soft_log_loss']
+
+        raise ValueError(
+            f"{metric_type}='{metric}' is an unknown metric, all available metrics by problem_type are:\n"
+            f"{json.dumps(all_available_metrics, indent=2)}\n"
+            f"You can also refer to "
+            f"autogluon.core.metrics to see how to define your own {metric_type} function"
+        )
     else:
         return metric
