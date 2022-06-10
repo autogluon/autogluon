@@ -97,7 +97,7 @@ def construct_text_augmenter(
             auglist.append(InsertPunctuation(**kwargs))
         else:
             raise ValueError(f"unknown transform type: {trans_mode}")
-    # return naf.Sometimes(auglist, aug_p = 1.0)
+
     return naf.Sequential(auglist)
 
 
