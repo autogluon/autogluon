@@ -10,7 +10,9 @@ To solve the problem, there are two key points:
 
 ### 1.1 Get AluoGluon in Kaggle
 
-You can upload the installed AutoGluon to kaggle as a dataset and import the dataset into codes. In this way, autogluon is introduced without network support in submission. 
+You can download [AutoGluon](https://github.com/awslabs/autogluon) and use the tools to train your own model locally.
+For using AutoGluon in kaggle submission, it should be uploaded to kaggle as a dataset. You can create a new dataset called "auotgluon" in kaggle. After that, finding AutoGluon at the installation path and upload it into the dataset. 
+In this way, AutoGluon is introduced without network support in submission. 
 Through the code follow, you can import AutoGluon in your work.
 
     import sys
@@ -55,7 +57,6 @@ You can build the predictor as follow.
 ### 2.2 Train the AutoMMPredictor
 
  Then, you can train the AutoMMPredictor with `.fit()`.
- 
 
     predictor.fit(  
 	    train_data=training_df,
