@@ -385,6 +385,12 @@ median_absolute_error = make_scorer('median_absolute_error',
                                     optimum=0,
                                     greater_is_better=False)
 
+mean_absolute_percentage_error = make_scorer('mean_absolute_percentage_error',
+                                    sklearn.metrics.mean_absolute_percentage_error,
+                                    optimum=0,
+                                    greater_is_better=False)
+mean_absolute_percentage_error.add_alias('mape')
+
 
 def local_spearmanr(y_true, y_pred):
     return float(scipy.stats.spearmanr(y_true, y_pred)[0])
@@ -507,7 +513,7 @@ pac_score = make_scorer('pac_score',
 
 REGRESSION_METRICS = dict()
 for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
-                   median_absolute_error, spearmanr, pearsonr]:
+                   median_absolute_error, mean_absolute_percentage_error, spearmanr, pearsonr]:
     if scorer.name in REGRESSION_METRICS:
         raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
                          f'Consider to register with a different name.')
