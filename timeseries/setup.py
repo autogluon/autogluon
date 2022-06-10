@@ -37,11 +37,12 @@ install_requires = [
 try:
     from mxnet import __version__ as mxnet_version
 
-    assert vparse("2.0") > vparse(mxnet_version) >= vparse("1.7")
+    assert vparse("2.0") > vparse(mxnet_version) >= vparse("1.9")
 except (ImportError, AssertionError):
     warnings.warn(
-        "autogluon.forecasting depends on Apache MxNet v1.7 or greater (below v2.0). "
-        "Please install a suitable version of MxNet in order to use autogluon.forecasting."
+        "autogluon.forecasting depends on Apache MxNet v1.9 or greater (below v2.0). "
+        "Please install a suitable version of MxNet in order to use autogluon.forecasting using "
+        "`pip install mxnet==1.9` or `pip install mxnet-cu112==1.9` for GPU support."
     )
 
 extras_require = {
