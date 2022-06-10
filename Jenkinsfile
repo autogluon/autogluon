@@ -65,9 +65,9 @@ install_autogluon = """
 """
 
 stage("Lint Check") {
-  parallel 'mm': {
+  parallel 'lint': {
     node('linux-cpu') {
-      ws('workspace/autogluon-mm-lint-py3-v3') {
+      ws('workspace/autogluon-lint-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -75,18 +75,10 @@ stage("Lint Check") {
           set -ex
           # conda create allows overwrite the existing env with -y flag, but does not take file as input
           # hence create the new env and update it with file
-          conda create -n autogluon-text-py3-v3 -y
-          conda env update -n autogluon-text-py3-v3 -f docs/build_gpu.yml
-          conda activate autogluon-text-py3-v3
+          conda create -n autogluon-lint-py3-v3 -y
+          conda env update -n autogluon-lint-py3-v3 -f docs/build.yml
+          conda activate autogluon-lint-py3-v3
           conda list
-
-          ${install_core_all_tests}
-          ${install_features}
-          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
-          python3 -m pip uninstall -y typing
-
-          ${install_text}
-
           # Perform lint check
           black --check --diff text/src/autogluon/text/automm
           """
