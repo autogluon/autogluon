@@ -7,11 +7,13 @@ import autogluon.core as ag
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 from .gluonts import (
+    AutoTabularModel,
     DeepARModel,
     MQCNNModel,
+    MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
-    AutoTabularModel,
+    TransformerModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -19,15 +21,19 @@ logger = logging.getLogger(__name__)
 
 MODEL_TYPES = dict(
     MQCNN=MQCNNModel,
+    MQRNN=MQRNNModel,
     SimpleFeedForward=SimpleFeedForwardModel,
     DeepAR=DeepARModel,
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
+    Transformer=TransformerModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
     MQCNN=50,
+    MQRNN=50,
     SimpleFeedForward=30,
+    Transformer=50,
     DeepAR=50,
     Prophet=50,
     AutoTabular=10,
@@ -66,7 +72,9 @@ def get_default_hps(key, prediction_length):
         "default": {
             "SimpleFeedForward": {},
             "MQCNN": {},
+            "MQRNN": {},
             "DeepAR": {},
+            "Transformer": {},
             # "AutoTabular": {} # AutoTabular model is experimental.
         },
         "default_hpo": {
