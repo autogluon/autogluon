@@ -2,7 +2,13 @@ import psutil
 import pytest
 import tempfile
 
-from autogluon.core.hpo import RayTuneAdapter, TabularRayTuneAdapter, AutommRayTuneAdapter, run
+from autogluon.core.hpo import (
+    RayTuneAdapter,
+    TabularRayTuneAdapter,
+    AutommRayTuneAdapter,
+    AutommRayTuneLightningAdapter,
+    run,
+)
 from autogluon.core.utils import get_cpu_count, get_gpu_count_all
 from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from ray import tune
@@ -128,14 +134,37 @@ def test_tabular_resource_allocation_with_gpu_cpu_bottleneck():
 
     assert expected_resources_per_trial == resources_per_trial
     assert expected_num_parallel_jobs ==  adapter.num_parallel_jobs
+    
+    
+def test_automm_lightning_resource_allocation():
+    num_cpus = get_cpu_count()
+    num_gpus = get_gpu_count_all()
+    num_trials = 2
+    
+    adapter = AutommRayTuneAdapter()
+    total_resources = dict(num_cpus=num_cpus, num_gpus=num_gpus,)
+    resources_per_trial = adapter.get_resources_per_trial(
+        total_resources=total_resources,
+        num_samples=num_trials,
+    )
+    
+    expected_num_parallel_jobs = 1
+    # For cpu, each trial uses 1 cpu for the master process, and worker process can split the rest
+    expected_resources_per_trial = dict(
+        cpu = num_cpus,
+        gpu = 1,
+    )
+    
+    expected_resources_per_trial == resources_per_trial
+    assert expected_num_parallel_jobs ==  adapter.num_parallel_jobs
 
 
-def test_automm_resource_allocation():
+def test_automm_lightning_resource_allocation():
     num_cpus = get_cpu_count()
     num_gpus = get_gpu_count_all()
     num_trials = 1  # TODO: update to more trials when CI supports multiple GPUs
     
-    adapter = AutommRayTuneAdapter()
+    adapter = AutommRayTuneLightningAdapter()
     total_resources = dict(num_cpus=num_cpus, num_gpus=num_gpus,)
     resources_per_trial = adapter.get_resources_per_trial(
         total_resources=total_resources,

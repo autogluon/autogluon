@@ -476,6 +476,7 @@ class AutoMMPredictor:
             cleanup_checkpoints,
             EmptySearchSpace,
             AutommRayTuneAdapter,
+            AutommRayTuneLightningAdapter,
         )
 
         search_space = _fit_args.get("hyperparameters", dict())
@@ -893,9 +894,12 @@ class AutoMMPredictor:
             model_summary,
         ]
 
+        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
         if hpo_mode:
-            from ray_lightning.tune import TuneReportCheckpointCallback
-
+            if use_ray_lightning:
+                from ray_lightning.tune import TuneReportCheckpointCallback
+            else:
+                from ray.tune import TuneReportCheckpointCallback
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
@@ -954,13 +958,18 @@ class AutoMMPredictor:
             else:
                 strategy = config.env.strategy
         else:
-            strategy = hpo_kwargs.get("_ray_lightning_plugin")
+            # we don't support running each trial in parallel without ray lightning
+            if use_ray_lightning:
+                strategy = hpo_kwargs.get("_ray_lightning_plugin")
+            else:
+                strategy = None
+                num_gpus = min(num_gpus, 1)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus if not hpo_mode else None,  # ray lightning requires not specifying gpus
+                gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
