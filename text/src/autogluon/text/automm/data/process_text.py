@@ -204,6 +204,8 @@ class TextProcessor:
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
         self.train_augmenter = construct_text_augmenter(self.train_augment_types)
+        print(self.train_augmenter)
+        #print(self.train_augmenter.all_transform)
 
     @property
     def text_token_ids_key(self):
@@ -336,14 +338,18 @@ class TextProcessor:
         # tokenize text
         tokens = {}
         warnings.filterwarnings("ignore", "Token indices sequence length is longer than.*result in indexing errors")
-        for col_name, col_text in text.items():
 
+        for col_name, col_text in text.items():
             if is_training:
+                # print("col_name", col_name)
+                # print("col_text", col_text)
                 if self.train_augmenter is not None:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
+                        # print("augment")
                         col_text = self.train_augmenter.augment(col_text)
-
+                        # print(col_text)
+                        # print()
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
