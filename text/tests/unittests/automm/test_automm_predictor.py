@@ -4,6 +4,7 @@ import pytest
 import numpy.testing as npt
 import tempfile
 import copy
+import pickle
 
 from omegaconf import OmegaConf
 from ray import tune
@@ -630,7 +631,9 @@ def test_textagumentor_deepcopy():
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
-        "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})", "random_swap({'aug_p': 0.05})"]
+        "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})",
+                                                   "random_swap({'aug_p': 0.05})"],
+        "optimization.top_k_average_method": "uniform",
     }
 
     with tempfile.TemporaryDirectory() as save_path:
@@ -647,6 +650,18 @@ def test_textagumentor_deepcopy():
     predictor._df_preprocessor = df_preprocessor_copy
 
     # Test for copied preprocessor 
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+
+    # Copy data preprocessor via pickle + load
+    df_preprocessor_copy_via_pickle = pickle.loads(pickle.dumps(predictor._df_preprocessor))
+    predictor._df_preprocessor = df_preprocessor_copy_via_pickle
+
+    # Test for copied preprocessor
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
