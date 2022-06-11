@@ -675,7 +675,7 @@ def test_trivialaugment():
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
         "data.mixup.turn_on": True,
-        "model.hf_text.text_train_augment_types": ["trivial_augment({'max':0.1})"],
+        "model.hf_text.text_train_augment_types": ["trivial_augment(0.1)"],
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
     }
 

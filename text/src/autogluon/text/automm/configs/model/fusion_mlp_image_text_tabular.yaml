@@ -63,13 +63,16 @@ model:
     text_segment_num: 2
     stochastic_chunk: False
     text_aug_detect_length: 10                          # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
-    text_train_augment_types:                          # https://arxiv.org/abs/1901.11196; 
-      # example
+    text_train_augment_types:
+      #- "trivial_augment(0.1)"                     # use default augmentation space; each time randomly select one operation
+      ##example##
+      # use default augmentation space; each time randomly select one operation
       - "trivial_augment({'max':0.1})"            # max is the maximum percent of word can be changed for a text
-      # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
-      # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
-      # - "insert_punctuation({'aug_p': 0.3})"     # 0.3 based on aeda paper
-      # - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
+
+      # specify augmentation space manually, will randomly select one from the folloing
+      # - "synonym_replacement(0.05)"  # less than 0.1 based on eda paper
+      # - "random_swap(0.05)"          # less than 0.1 based on eda paper
+      # - "random_delete(0.05)"        # less than 0.1 based on eda paper
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
@@ -107,11 +110,15 @@ model:
     stochastic_chunk: False
     text_aug_detect_length: 10                     # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_train_augment_types:
-      # example
+      #- "trivial_augment(0.1)"                     # use default augmentation space; each time randomly select one operation
+      ##example##
+      # use default augmentation space; each time randomly select one operation
       - "trivial_augment({'max':0.1})"            # max is the maximum percent of word can be changed for a text
-      # - "synonym_replacement({'aug_p': 0.05})"  # less than 0.1 based on eda paper
-      # - "random_swap({'aug_p': 0.05})"          # less than 0.1 based on eda paper
-      # - "random_delete({'aug_p': 0.05})"        # less than 0.1 based on eda paper
+
+      # specify augmentation space manually, will randomly select one from the folloing
+      # - "synonym_replacement(0.05)"  # less than 0.1 based on eda paper
+      # - "random_swap(0.05)"          # less than 0.1 based on eda paper
+      # - "random_delete(0.05)"        # less than 0.1 based on eda paper
   fusion_mlp:
     weight: 0.1
     adapt_in_features: "max"

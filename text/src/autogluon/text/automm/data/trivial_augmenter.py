@@ -19,7 +19,7 @@ def scale_parameter(level, maxval, type):
 
     Parameters
     ----------
-    level: Level of the operation that will be between [0, image_parameter_max].
+    level: Level of the operation.
     maxval: Maximum value that the operation can have.
     type: return float or int
 
@@ -28,9 +28,9 @@ def scale_parameter(level, maxval, type):
     An adjust scale
     """
     if type == "float":
-        return float(level) * maxval / image_parameter_max
+        return float(level) * maxval
     elif type == "int":
-        return int(level * maxval / image_parameter_max)
+        return int(level * maxval)
 
 
 class TransformT(object):
@@ -182,9 +182,7 @@ def _translate_y_impl(pil_img, level):
 translate_y = TransformT("TranslateY", _translate_y_impl)
 
 
-def set_image_augmentation_space(max_strength):
-    global image_parameter_max
-    image_parameter_max = max_strength
+def set_image_augmentation_space():
     image_all_transform = [
         identity,
         auto_contrast,
@@ -249,9 +247,9 @@ class TrivialAugment:
         self.max_strength = max_strength
         self.data_type = datatype
         if datatype == IMAGE:
-            self.all_transform = set_image_augmentation_space(self.max_strength)
+            self.all_transform = set_image_augmentation_space()
         elif datatype == TEXT:
-            self.all_transform = set_text_augmentation_space(self.max_strength)
+            self.all_transform = set_text_augmentation_space()
         else:
             raise NotImplementedError
 
@@ -263,12 +261,13 @@ class TrivialAugment:
 
     def augment_image(self, data):
         op = random.choice(self.all_transform)
-        scale = random.randint(0, self.max_strength)
+        scale = float(random.randint(0, self.max_strength) / self.max_strength)
         return op.augment(scale, data)
 
     def augment(self, data):
         op_str = random.choice(self.all_transform)
         scale = random.uniform(0, self.max_strength)
+        # print(op_str, scale)
         if op_str == "identity":
             return data
         elif op_str == "syn_replacement":
@@ -278,7 +277,7 @@ class TrivialAugment:
         elif op_str == "random_delete":
             op = naw.RandomWordAug(action="delete", aug_p=scale, aug_max=None)
         elif op_str == "insert_punc":
-            op = InsertPunctuation(aug_p=scale, aug_max=None)
+            op = InsertPunctuation()   #scale will be randomized inside function
         else:
             raise NotImplementedError
         return op.augment(data)
