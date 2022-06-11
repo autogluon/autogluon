@@ -123,6 +123,7 @@ train/*
 tutorials/checkpoint/*
 tutorials/train/*
 examples/image_classification/*.csv
+examples/few_shot/*
 tests/unittests/*.zip
 tabular/tests/unittests/datasets
 
