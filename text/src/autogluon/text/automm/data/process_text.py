@@ -113,7 +113,7 @@ class TextProcessor:
         stochastic_chunk: Optional[bool] = False,
         requires_column_info: bool = False,
         text_detection_length: Optional[int] = None,
-        train_augment_types: List[str] = [],
+        train_augment_types: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -490,4 +490,4 @@ class TextProcessor:
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self.train_augmenter = construct_text_augmenter(state["rain_augment_types"])
+        self.train_augmenter = construct_text_augmenter(state["train_augment_types"])
