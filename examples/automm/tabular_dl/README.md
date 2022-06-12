@@ -1,10 +1,10 @@
 Examples showing how to use AutoMMPredictor.
 
 
-## 1. Tabular Data
+## 1. Advanced Tabular Deep Learning
 
 ### 1.1 Example
-[`example_tabular.py`](./example_tabular.py) : This example provide a use case for the pure *tabular* data, including numerical and categorical, with FT_Transformer [1].
+[`example_tabular.py`](example_tabular.py) : This example provide a use case for the pure *tabular* data, including numerical and categorical, with FT_Transformer [1].
 
 To run the example: 
 
@@ -22,8 +22,8 @@ Data in `Numpy.darray` was first pre-processedin into `.csv` format, which can b
 All Data will be automatically downloaded from s3 (thus online connection is necessary) if it does not exisit with the given dataset path. 
 
 
-### 1.3 FT_Transformer
-We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
+### 1.3 FT-Transformer
+We categorize the original FT-Transformer to two models in `AutoMMPRedictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
    - `out_features` is the output feature size.
    - `d_token` is the dimension of the embedding tokens.
    - `num_trans_blocks` is the number of transformer blocks.

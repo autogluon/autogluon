@@ -11,7 +11,7 @@ from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
     ImagePredictorModel, VowpalWabbitModel, \
-    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
+    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel, AutoMMPredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     FASTTEXT=0,
     AG_TEXT_NN=0,
     AG_IMAGE_NN=0,
+    AG_AUTOMM_NN=0,
     TRANSF=0,
     custom=0,
 
@@ -76,6 +77,7 @@ MODEL_TYPES = dict(
     TRANSF=TabTransformerModel,
     AG_TEXT_NN=TextPredictorModel,
     AG_IMAGE_NN=ImagePredictorModel,
+    AG_AUTOMM_NN=AutoMMPredictorModel,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
@@ -104,6 +106,7 @@ DEFAULT_MODEL_NAMES = {
     TabTransformerModel: 'Transformer',
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
+    AutoMMPredictorModel: 'AutoMMPredictor',
     FastTextModel: 'FastText',
     VowpalWabbitModel: 'VowpalWabbit',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
@@ -204,7 +207,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
-                if model_type == 'AG_TEXT_NN':
+                if model_type == 'AG_TEXT_NN' or model_type == 'AG_AUTOMM_NN':
                     model_cfgs_to_process.append({})
                 else:
                     model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)

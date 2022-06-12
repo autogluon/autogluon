@@ -16,3 +16,4 @@ from .image_prediction.image_predictor import ImagePredictorModel
 from .imodels.imodels_models import RuleFitModel, BoostedRulesModel, GreedyTreeModel, OptimalRuleListModel, \
     BayesianRuleSetModel, OptimalTreeModel, _IModelsModel
 from .vowpalwabbit.vowpalwabbit_model import VowpalWabbitModel
+from .automm.automm_model import AutoMMPredictorModel
