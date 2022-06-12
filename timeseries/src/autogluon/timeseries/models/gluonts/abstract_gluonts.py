@@ -22,7 +22,7 @@ from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
 from ...utils.metric_utils import METRIC_COEFFICIENTS
 from ...utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
 from ..abstract import AbstractTimeSeriesModel
-from .callback import TimeLimitCallback, EarlyStoppingCallback
+from .callback import TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 
@@ -205,9 +205,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             )
 
         # update auxiliary parameters
-        # todo: add patience parameter
         self._deferred_init_params_aux(
-            dataset=train_data, callbacks=[TimeLimitCallback(time_limit), EarlyStoppingCallback()], **kwargs
+            dataset=train_data, callbacks=[TimeLimitCallback(time_limit)], **kwargs
         )
 
         estimator = self._get_estimator()
