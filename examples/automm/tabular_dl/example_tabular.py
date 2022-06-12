@@ -44,13 +44,13 @@ hyperparameters = {
     'env.num_workers': 12,
     'env.num_workers_evaluation': 12,
     'env.num_gpus': 1,
-    'optimization.max_epochs': 1000,
+    'optimization.max_epochs': 1000,  # Specify a large value to train until convergence
     'optimization.weight_decay': 1.0e-5,
     'optimization.lr_choice': None,
     'optimization.lr_schedule': "polynomial_decay",
     'optimization.warmup_steps': 0.,
-    'optimization.patience': 16,
-    'optimization.top_k': 1,
+    'optimization.patience': 32,
+    'optimization.top_k': 3,
 }
 
 def main(args):
