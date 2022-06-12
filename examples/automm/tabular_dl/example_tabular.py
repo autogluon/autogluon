@@ -49,7 +49,7 @@ hyperparameters = {
     'optimization.lr_choice': None,
     'optimization.lr_schedule': "polynomial_decay",
     'optimization.warmup_steps': 0.,
-    'optimization.patience': 32,
+    'optimization.patience': 20,
     'optimization.top_k': 3,
 }
 
