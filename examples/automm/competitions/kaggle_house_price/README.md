@@ -8,6 +8,7 @@ unzip california-house-prices.zip -d california-house-prices
 
 Run experiments:
 
+```
 # Single AutoMMPredictor
 python3 example_kaggle_house.py --mode single 2>&1 | tee -a automm_single/log.txt
 
@@ -19,4 +20,4 @@ python3 example_kaggle_house.py --mode weighted 2>&1 | tee -a automm_weighted/lo
 
 # AutoMMPredictor + other Tree Models (Stack Ensemble) 
 python3 example_kaggle_house.py --mode stack5 2>&1 | tee -a automm_stack5/log.txt
-
+```
