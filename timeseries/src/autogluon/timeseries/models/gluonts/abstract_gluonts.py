@@ -21,7 +21,7 @@ from ...dataset import TimeSeriesDataFrame
 from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
 from ...utils.warning_filters import disable_root_logger
 from ..abstract import AbstractTimeSeriesModel
-from .callback import TimeLimitCallback, EarlyStoppingCallback
+from .callback import TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
@@ -211,9 +211,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._check_fit_params()
 
         # update auxiliary parameters
-        # todo: add patience parameter
         self._deferred_init_params_aux(
-            dataset=train_data, callbacks=[TimeLimitCallback(time_limit), EarlyStoppingCallback()], **kwargs
+            dataset=train_data, callbacks=[TimeLimitCallback(time_limit)], **kwargs
         )
 
         estimator = self._get_estimator()
