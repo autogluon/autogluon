@@ -47,8 +47,7 @@ hyperparameters = {
 ### 1.4 Results
 
 ```bash
-
-
+bash run_all.sh
 ```
 
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | ml 

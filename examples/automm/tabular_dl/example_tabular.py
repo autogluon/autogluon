@@ -44,11 +44,11 @@ hyperparameters = {
     'env.num_workers': 12,
     'env.num_workers_evaluation': 12,
     'env.num_gpus': 1,
-    'optimization.max_epochs': 1000,  # Specify a large value to train until convergence
+    'optimization.max_epochs': 200,  # Specify a large value to train until convergence
     'optimization.weight_decay': 1.0e-5,
     'optimization.lr_choice': None,
     'optimization.lr_schedule': "polynomial_decay",
-    'optimization.warmup_steps': 0.,
+    'optimization.warmup_steps': 0.05,
     'optimization.patience': 20,
     'optimization.top_k': 3,
 }
@@ -68,7 +68,9 @@ def main(args):
     test_data = TABULAR_DATASETS[args.dataset_name](
         'test', args.dataset_dir
     )
-    
+
+    hyperparameters['optimization.learning_rate'] = args.lr
+
     ### model initalization
     predictor = AutoMMPredictor(
         label=train_data.label_column, 
@@ -93,6 +95,7 @@ def main(args):
     )
     with open(os.path.join(args.exp_dir, 'scores.json'), 'w') as f:
         json.dump(scores, f)
+    print(scores)
 
 
 if __name__ == '__main__':
@@ -100,6 +103,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', default='ad', type=str)
     parser.add_argument('--dataset_dir', default='./dataset', type=str)
     parser.add_argument('--exp_dir', default=None, type=str)
+    parser.add_argument('--lr', default=1e-04, type=float)
+    parser.add_argument('--mode', choices=['single', 'weighted', 'single_bag5', 'stack5'])
     parser.add_argument('--seed', default=0, type=int)
     args = parser.parse_args()
 
