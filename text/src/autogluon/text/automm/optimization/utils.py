@@ -11,14 +11,13 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import (
-    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT, LORA, LORA_BIAS,
+    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT, LORA, LORA_BIAS, LORA_NORM,
     ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
     ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY,
     PEARSONR, SPEARMANR,
 )
 import warnings
 from .soft_target_crossentropy import SoftTargetCrossEntropy
-from ..models.lora_layers import LoRALayer
 
 
 def get_loss_func(
@@ -453,6 +452,10 @@ def apply_layerwise_lr_decay(
         elif efficient_finetune == LORA_BIAS:
             # For LoRA adapation we fine-tune LoRA and all bias weights
             if 'lora_' not in name and "bias" not in name:
+                param.requires_grad = False
+        elif efficient_finetune == LORA_NORM:
+            # For LoRA adapation we fine-tune LoRA and normalization and bias layers
+            if 'lora_' not in name and name not in norm_param_names and 'bias' not in name:
                 param.requires_grad = False
 
         if not param.requires_grad:

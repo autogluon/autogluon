@@ -62,9 +62,6 @@ model:
     insert_sep: True
     text_segment_num: 2
     stochastic_chunk: False
-    adaptation: null # Select from options: Lora
-    lora_r: 8 #TODO: Hacky way of changing LoRA hyperparameter. Seperate config file for all adaptation approaches (e.g.. adapters, LoRA...)?
-    lora_alpha: 8
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"

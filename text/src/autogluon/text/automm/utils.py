@@ -52,6 +52,8 @@ from .presets import (
     get_preset,
 )
 
+from .models.utils import inject_lora_to_linear_layer
+
 logger = logging.getLogger(AUTOMM)
 
 
@@ -593,9 +595,6 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
-                adaptation=model_config.adaptation,
-                lora_r=model_config.lora_r,
-                lora_alpha=model_config.lora_alpha
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
@@ -696,6 +695,9 @@ def create_model(
         else:
             raise ValueError(f"unknown model name: {model_name}")
 
+        if config.optimization.efficient_finetune:
+            model = apply_model_adaptation(model, config)
+
         all_models.append(model)
 
     if len(all_models) > 1:
@@ -706,6 +708,31 @@ def create_model(
     else:
         raise ValueError(f"No available models for {names}")
 
+def apply_model_adaptation(
+        model: nn.Module,
+        config: DictConfig
+) -> nn.Module:
+    """
+    Apply an adaptation to the model for efficient fine-tuning.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    config:
+        A DictConfig object. The optimization config should be accessible by "config.optimization".
+    """
+    if 'lora' in config.optimization.efficient_finetune:
+        model = inject_lora_to_linear_layer(
+            model = model,
+            lora_r = config.optimization.lora.r,
+            lora_alpha = config.optimization.lora.alpha,
+            filter = ['query', 'value'] # Fine-tune only Query And Value Attention, recommended in https://arxiv.org/abs/2106.09685
+        )
+
+    model.name_to_id = model.get_layer_ids() # Need to update name to id dictionary.
+
+    return model
 
 def save_pretrained_models(
         model: nn.Module,
