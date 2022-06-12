@@ -633,7 +633,7 @@ def test_textagumentor_deepcopy():
         "data.numerical.convert_to_text": False,
         "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})",
                                                    "random_swap({'aug_p': 0.05})"],
-        "optimization.top_k_average_method": "uniform",
+        "optimization.top_k_average_method": "uniform_soup",
     }
 
     with tempfile.TemporaryDirectory() as save_path:
