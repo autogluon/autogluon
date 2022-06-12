@@ -20,7 +20,7 @@ def get_parser():
                              ' "single" means use a single model.'
                              ' "automm_bag5" means 5-fold bagging via the AutoMM model.')
     parser.add_argument('--automm-mode', choices=['ft-transformer', 'mlp'],
-                        default='mlp', help='Fusion model in AutoMM.')
+                        default='ft-transformer', help='Fusion model in AutoMM.')
     parser.add_argument('--text-backbone', default='google/electra-small-discriminator')
     parser.add_argument('--data_path', type=str, default='california-house-prices')
     parser.add_argument('--seed', type=int, default=123)
