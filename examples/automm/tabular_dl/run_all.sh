@@ -16,7 +16,7 @@ DATASETS=(
 )
 
 
-for name in ${DATASETS}
+for dataset_name in ${DATASETS}
 do
-  python3 example_tabular.py --dataset_name ${name} --dataset_dir ./dataset/${name} --exp_dir ./result/${name} --lr 2E-4 --seed 0
+  python3 example_tabular.py --dataset_name ${dataset_name} --dataset_dir ./dataset/${dataset_name} --exp_dir ./result/${dataset_name} --lr 1E-4 --seed 0
 done
