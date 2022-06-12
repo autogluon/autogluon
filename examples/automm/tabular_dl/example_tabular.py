@@ -1,5 +1,8 @@
-from autogluon.text.automm import AutoMMPredictor
+import os
 import argparse
+import json
+from autogluon.text.automm import AutoMMPredictor
+
 from dataset import (
     AdultTabularDataset,
     AloiTabularDataset,
@@ -48,7 +51,6 @@ hyperparameters = {
     'optimization.warmup_steps': 0.,
     'optimization.patience': 16,
     'optimization.top_k': 1,
-    'data.categorical.convert_to_text': False,
 }
 
 def main(args):
@@ -56,15 +58,15 @@ def main(args):
     
     ### Dataset loading
     train_data = TABULAR_DATASETS[args.dataset_name](
-        'train',args.dataset_dir
+        'train', args.dataset_dir
     )
     
     val_data = TABULAR_DATASETS[args.dataset_name](
-        'val',args.dataset_dir
+        'val', args.dataset_dir
     )
     
     test_data = TABULAR_DATASETS[args.dataset_name](
-        'test',args.dataset_dir
+        'test', args.dataset_dir
     )
     
     ### model initalization
@@ -85,18 +87,23 @@ def main(args):
     )
 
     ### model inference
-    predictor.evaluate(
+    scores = predictor.evaluate(
         data=test_data.data,
         metrics=[test_data.metric]
     )
-    
+    with open(os.path.join(args.exp_dir, 'scores.json'), 'w') as f:
+        json.dump(scores, f)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_name', default='ad', type=str)
-    parser.add_argument('--dataset_dir', default='/home/ubuntu/dataset', type=str)
-    parser.add_argument('--exp_dir', default='/home/ubuntu/result/test', type=str)
+    parser.add_argument('--dataset_dir', default='./dataset', type=str)
+    parser.add_argument('--exp_dir', default=None, type=str)
     parser.add_argument('--seed', default=0, type=int)
     args = parser.parse_args()
+
+    if args.exp_dir is None:
+        args.exp_dir = f'./results/{args.dataset_name}'
 
     main(args)

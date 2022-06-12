@@ -8,7 +8,7 @@ Examples showing how to use AutoMMPredictor.
 
 To run the example: 
 
-```python example_tabular.py --dataset_name ad --dataset_dir ./dataset --exp_dir ./result```
+```python example_tabular.py --dataset_name ad --dataset_dir ./dataset --exp_dir ./result/ad --seed 123```
    - `dataset_name` determines which dataset to run the experinments, refers to [Dataset Section](###1.2-Datasets).
    - `dataset_dir` is the path to the dataset(s). If the datasets do not present in this path, it will be automatically downloaded.
    - `exp_dir` is the output path to store the weights and loggings. 
