@@ -48,7 +48,7 @@ hyperparameters = {
     'optimization.weight_decay': 1.0e-5,
     'optimization.lr_choice': None,
     'optimization.lr_schedule': "polynomial_decay",
-    'optimization.warmup_steps': 0.05,
+    'optimization.warmup_steps': 0.,
     'optimization.patience': 20,
     'optimization.top_k': 3,
 }
@@ -70,6 +70,7 @@ def main(args):
     )
 
     hyperparameters['optimization.learning_rate'] = args.lr
+    hyperparameters['optimization.end_lr'] = args.lr
 
     ### model initalization
     predictor = AutoMMPredictor(
