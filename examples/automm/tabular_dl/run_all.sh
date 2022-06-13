@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DATASETS=(
+DATASETS=$(
 "ad"
 "al"
 "ca"
