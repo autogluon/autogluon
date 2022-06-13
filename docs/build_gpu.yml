@@ -4,7 +4,6 @@ channels:
 - defaults
 dependencies:
 - cudatoolkit=10.2
-- cudnn=8.2
 - python=3.9
 - pip
 - pip:
