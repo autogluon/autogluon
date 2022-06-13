@@ -142,9 +142,7 @@ class AutoMMPredictorModel(AbstractModel):
                                      eval_metric=self.eval_metric,
                                      verbosity=verbosity_text)
         params = self._get_model_params()
-        print('params=', params)
-        # TODO(?) Support presets
-        # presets = params.pop('presets', None)
+
         if num_gpus is not None:
             params['env.num_gpus'] = num_gpus
 

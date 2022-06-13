@@ -14,11 +14,11 @@ def get_parser():
                         choices=['stack5',
                                  'weighted',
                                  'single',
-                                 'automm_bag5'],
+                                 'single_bag5'],
                         default='weighted',
                         help='"stack5" means 5-fold stacking. "weighted" means weighted ensemble.'
                              ' "single" means use a single model.'
-                             ' "automm_bag5" means 5-fold bagging via the AutoMM model.')
+                             ' "single_bag5" means 5-fold bagging via the AutoMM model.')
     parser.add_argument('--automm-mode', choices=['ft-transformer', 'mlp'],
                         default='ft-transformer', help='Fusion model in AutoMM.')
     parser.add_argument('--text-backbone', default='google/electra-small-discriminator')
@@ -90,6 +90,7 @@ def train(args):
     eval_metric = 'r2'
 
     automm_hyperparameters = get_automm_hyperparameters(args.automm_mode, args.text_backbone)
+    ag_args_ensemble = {'_disable_parallel_fitting': True}
 
     tabular_hyperparameters = {
         'GBM': [
@@ -99,30 +100,30 @@ def train(args):
         'CAT': {},
         'AG_AUTOMM_NN': automm_hyperparameters,
     }
-
-    if args.mode == 'weighted':
-        predictor = TabularPredictor(eval_metric=eval_metric, label=label_column, path=args.exp_path)
-        predictor.fit(train_df,
-                      hyperparameters=tabular_hyperparameters)
-        leaderboard = predictor.leaderboard()
-        leaderboard.to_csv(os.path.join(args.exp_path, 'leaderboard.csv'))
-    elif args.mode == 'single':
+    if args.mode == 'single':
         predictor = AutoMMPredictor(eval_metric=eval_metric, label=label_column, path=args.exp_path)
         predictor.fit(train_df, hyperparameters=automm_hyperparameters, seed=args.seed)
-    elif args.ensemble_mode == 'stack5':
-        predictor = TabularPredictor(eval_metric=eval_metric, label=label_column,
-                                     path=args.exp_path)
+    elif args.mode == 'weighted' or args.mode == 'stack5' or args.mode == 'single_bag5':
+        predictor = TabularPredictor(eval_metric=eval_metric, label=label_column, path=args.exp_path)
+
+        if args.mode == 'single_bag5':
+            tabular_hyperparameters = {
+                'AG_AUTOMM_NN': automm_hyperparameters,
+            }
+            num_bag_folds, num_stack_levels = 5, 0
+        elif args.mode == 'weighted':
+            num_bag_folds, num_stack_levels = None, None
+        elif args.mode == 'stack5':
+            num_bag_folds, num_stack_levels = 5, 1
+        else:
+            raise NotImplementedError
         predictor.fit(train_df,
                       hyperparameters=tabular_hyperparameters,
-                      num_bag_folds=5, num_stack_levels=1)
+                      num_bag_folds=num_bag_folds,
+                      num_stack_levels=num_stack_levels,
+                      ag_args_ensemble=ag_args_ensemble)
         leaderboard = predictor.leaderboard()
         leaderboard.to_csv(os.path.join(args.exp_path, 'leaderboard.csv'))
-    elif args.mode == 'automm_bag5':
-        predictor = TabularPredictor(eval_metric=eval_metric, label=label_column,
-                                     path=args.exp_path)
-        predictor.fit(train_df,
-                      hyperparameters={'AG_AUTOMM_NN': automm_hyperparameters},
-                      num_bag_folds=5, num_stack_levels=0)
     else:
         raise NotImplementedError
     predictions = np.exp(predictor.predict(test_df))
@@ -134,6 +135,6 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     if args.exp_path is None:
-        args.exp_path = f'automm_kaggle_house_{args.ensemble_mode}_{args.mode}_{args.text_backbone}'
+        args.exp_path = f'automm_kaggle_house_{args.mode}_{args.automm_mode}_{args.text_backbone}'
     th.manual_seed(args.seed)
     train(args)
