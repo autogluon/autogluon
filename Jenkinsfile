@@ -1,18 +1,11 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin
-
-    mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
-    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
-    apt-get update
-
-    apt-get install libcudnn8=8.4.1.50-1+cuda10.2
+    export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+    export USE_CUDNN=0
 
     python3 -m pip install mxnet-cu102==1.9.*
-    export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+
     nvidia-smi
     ls -1a /usr/local | grep cuda
     pip freeze
@@ -98,39 +91,6 @@ stage("Unit Test") {
           ${install_timeseries}
           cd timeseries/
           python3 -m pytest --junitxml=results.xml --runslow tests
-          """
-        }
-      }
-    }
-  },
-  'install': {
-    node('linux-cpu') {
-      ws('workspace/autogluon-install-py3-v3') {
-        timeout(time: max_time, unit: 'MINUTES') {
-          checkout scm
-          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
-          sh """#!/bin/bash
-          set -ex
-          # conda create allows overwrite the existing env with -y flag, but does not take file as input
-          # hence create the new env and update it with file
-          conda create -n autogluon-install-py3-v3 -y
-          conda env update -n autogluon-install-py3-v3 -f docs/build.yml
-          conda activate autogluon-install-py3-v3
-          conda list
-
-          python3 -m pip install 'mxnet==1.9.*'
-
-          ${install_core_all_tests}
-          ${install_features}
-          ${install_tabular_all}
-
-          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
-          python3 -m pip uninstall -y typing
-
-          ${install_text}
-          ${install_vision}
-          ${install_timeseries}
-          ${install_autogluon}
           """
         }
       }
