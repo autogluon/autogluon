@@ -80,7 +80,6 @@ def main(args):
         ],
         'CAT': {},
         'XGB': {},
-        'NN': {},
         'AG_AUTOMM_NN': automm_hyperparameters,
     }
     ag_args_ensemble = {
