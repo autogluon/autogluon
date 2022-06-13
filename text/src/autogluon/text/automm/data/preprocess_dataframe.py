@@ -2,24 +2,24 @@ import logging
 import pandas as pd
 import numpy as np
 import torch
+from torch.nn.modules.loss import _Loss
 import collections
 from typing import Callable, Iterator, Union, Optional, List, Any, Dict
 from nptyping import NDArray
 from autogluon.features import CategoryFeatureGenerator
+from omegaconf import OmegaConf
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import (
     StandardScaler,
+    MinMaxScaler,
     LabelEncoder,
 )
 from sklearn.base import (
     TransformerMixin,
     BaseEstimator,
 )
-from ..constants import (
-    CATEGORICAL, NUMERICAL, TEXT,
-    IMAGE_PATH, NULL, AUTOMM
-)
+from ..constants import CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH, NULL, AUTOMM
 
 logger = logging.getLogger(AUTOMM)
 
@@ -32,11 +32,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     """
 
     def __init__(
-            self,
-            config: dict,
-            column_types: collections.OrderedDict,
-            label_column: str,
-            label_generator: Optional[LabelEncoder] = None,
+        self,
+        config: dict,
+        column_types: collections.OrderedDict,
+        label_column: str,
+        label_generator: Optional[LabelEncoder] = None,
     ):
         """
         Parameters
@@ -58,7 +58,20 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_generator = LabelEncoder()
         else:
             self._label_generator = label_generator
-        self._label_scaler = StandardScaler()  # Scaler used for numerical labels
+
+        # Scaler used for numerical labels
+        numerical_label_preprocessing = OmegaConf.select(config, "label.numerical_label_preprocessing")
+        if numerical_label_preprocessing == "minmaxscaler":
+            self._label_scaler = MinMaxScaler()
+        elif numerical_label_preprocessing == "standardscaler":
+            self._label_scaler = StandardScaler()
+        elif numerical_label_preprocessing is None or numerical_label_preprocessing.lower() == "none":
+            self._label_scaler = StandardScaler(with_mean=False, with_std=False)
+        else:
+            raise ValueError(
+                f"The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported"
+            )
+
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
@@ -66,16 +79,24 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
-                    cat_order='count',
+                    cat_order="count",
                     minimum_cat_count=config["categorical"]["minimum_cat_count"],
                     maximum_num_cat=config["categorical"]["maximum_num_cat"],
-                    verbosity=0)
+                    verbosity=0,
+                )
                 self._feature_generators[col_name] = generator
             elif col_type == NUMERICAL:
                 generator = Pipeline(
-                    [('imputer', SimpleImputer()),
-                     ('scaler', StandardScaler(with_mean=config["numerical"]["scaler_with_mean"],
-                                               with_std=config["numerical"]["scaler_with_std"]))]
+                    [
+                        ("imputer", SimpleImputer()),
+                        (
+                            "scaler",
+                            StandardScaler(
+                                with_mean=config["numerical"]["scaler_with_mean"],
+                                with_std=config["numerical"]["scaler_with_std"],
+                            ),
+                        ),
+                    ]
                 )
                 self._feature_generators[col_name] = generator
 
@@ -135,9 +156,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_called
 
     def fit(
-            self,
-            X: pd.DataFrame,
-            y: pd.Series,
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
     ):
         """
         Fit the pd.DataFrame by grouping column names by their modality types. For example, all the
@@ -152,9 +173,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             The label pd.Series.
         """
         if self._fit_called:
-            raise RuntimeError(
-                "Fit has been called. Please create a new preprocessor and call fit again!"
-            )
+            raise RuntimeError("Fit has been called. Please create a new preprocessor and call fit again!")
         self._fit_called = True
         for col_name in sorted(X.columns):
             # Just in case X accidentally contains the label column
@@ -172,17 +191,17 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 if self._config["categorical"]["convert_to_text"]:
                     # Convert categorical column as text column
                     col_value = col_value.astype("object")
-                    processed_data = col_value.apply(lambda ele: '' if pd.isnull(ele) else str(ele))
+                    processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
                     if len(processed_data.unique()) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
                     self._text_feature_names.append(col_name)
                 else:
-                    processed_data = col_value.astype('category')
+                    processed_data = col_value.astype("category")
                     generator = self._feature_generators[col_name]
-                    processed_data = generator.fit_transform(
-                        pd.DataFrame({col_name: processed_data}))[col_name] \
-                        .cat.codes.to_numpy(np.int32, copy=True)
+                    processed_data = generator.fit_transform(pd.DataFrame({col_name: processed_data}))[
+                        col_name
+                    ].cat.codes.to_numpy(np.int32, copy=True)
                     if len(np.unique(processed_data)) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
@@ -205,8 +224,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 self._image_path_names.append(col_name)
             else:
                 raise NotImplementedError(
-                    f"Type of the column is not supported currently. "
-                    f"Received {col_name}={col_type}."
+                    f"Type of the column is not supported currently. Received {col_name}={col_type}."
                 )
         if self.label_type == CATEGORICAL:
             self._label_generator.fit(y)
@@ -214,14 +232,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = pd.to_numeric(y).to_numpy()
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
         else:
-            raise NotImplementedError(
-                f"Type of label column is not supported. "
-                f"Label column type={self._label_column}"
-            )
+            raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
 
     def transform_text(
-            self,
-            df: pd.DataFrame,
+        self,
+        df: pd.DataFrame,
     ) -> Dict[str, List[str]]:
         """
         Preprocess text data by collecting them together. May need to format
@@ -237,9 +252,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the text data stored in a dictionary.
         """
-        assert self._fit_called, 'You will need to first call ' \
-                                 'preprocessor.fit before calling ' \
-                                 'preprocessor.transform.'
+        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform."
         text_features = {}
         for col_name in self._text_feature_names:
             col_value = df[col_name]
@@ -247,9 +260,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             if col_type == TEXT or col_type == CATEGORICAL:
                 # TODO: do we need to consider whether categorical values are valid text?
                 col_value = col_value.astype("object")
-                processed_data = col_value.apply(lambda ele: '' if pd.isnull(ele) else str(ele))
+                processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
             elif col_type == NUMERICAL:
-                processed_data = pd.to_numeric(col_value).apply('{:.3f}'.format)
+                processed_data = pd.to_numeric(col_value).apply("{:.3f}".format)
             else:
                 raise NotImplementedError
 
@@ -258,8 +271,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return text_features
 
     def transform_image(
-            self,
-            df: pd.DataFrame,
+        self,
+        df: pd.DataFrame,
     ) -> Dict[str, List[List[str]]]:
         """
         Preprocess image data by collecting their paths together. If one sample has multiple images
@@ -275,18 +288,16 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the image paths stored in a dictionary.
         """
-        assert self._fit_called, 'You will need to first call ' \
-                                 'preprocessor.fit before calling ' \
-                                 'preprocessor.transform.'
+        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform."
         image_paths = {}
         for col_name in self._image_path_names:
-            processed_data = df[col_name].apply(lambda ele: ele.split(';')).tolist()
+            processed_data = df[col_name].apply(lambda ele: ele.split(";")).tolist()
             image_paths[col_name] = processed_data
         return image_paths
 
     def transform_numerical(
-            self,
-            df: pd.DataFrame,
+        self,
+        df: pd.DataFrame,
     ) -> Dict[str, NDArray[(Any,), np.float32]]:
         """
         Preprocess numerical data by using SimpleImputer to fill possible missing values
@@ -302,9 +313,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the numerical features (a dictionary of np.ndarray).
         """
-        assert self._fit_called, 'You will need to first call ' \
-                                 'preprocessor.fit before calling ' \
-                                 'preprocessor.transform.'
+        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform."
         numerical_features = {}
         for col_name in self._numerical_feature_names:
             generator = self._feature_generators[col_name]
@@ -315,8 +324,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return numerical_features
 
     def transform_categorical(
-            self,
-            df: pd.DataFrame,
+        self,
+        df: pd.DataFrame,
     ) -> Dict[str, NDArray[(Any,), np.int32]]:
         """
         Preprocess categorical data by using CategoryFeatureGenerator to generate
@@ -332,26 +341,23 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the categorical encodings (a dictionary of np.ndarray).
         """
-        assert self._fit_called, 'You will need to first call ' \
-                                 'preprocessor.fit before calling ' \
-                                 'preprocessor.transform.'
+        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform."
         categorical_features = {}
-        for col_name, num_category in zip(self._categorical_feature_names,
-                                          self._categorical_num_categories):
+        for col_name, num_category in zip(self._categorical_feature_names, self._categorical_num_categories):
             col_value = df[col_name]
-            processed_data = col_value.astype('category')
+            processed_data = col_value.astype("category")
             generator = self._feature_generators[col_name]
-            processed_data = generator.transform(
-                pd.DataFrame({col_name: processed_data}))[col_name] \
-                .cat.codes.to_numpy(np.int32, copy=True)
+            processed_data = generator.transform(pd.DataFrame({col_name: processed_data}))[
+                col_name
+            ].cat.codes.to_numpy(np.int32, copy=True)
             processed_data[processed_data < 0] = num_category - 1
             categorical_features[col_name] = processed_data
 
         return categorical_features
 
     def transform_label(
-            self,
-            df: pd.DataFrame,
+        self,
+        df: pd.DataFrame,
     ) -> Dict[str, NDArray[(Any,), Any]]:
         """
         Preprocess ground-truth labels by using LabelEncoder to generate class labels for
@@ -368,9 +374,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the labels (a dictionary of np.ndarray).
         """
-        assert self._fit_called, 'You will need to first call ' \
-                                 'preprocessor.fit before calling ' \
-                                 'preprocessor.transform.'
+        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             y = self._label_generator.transform(y_df)
@@ -383,8 +387,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return {self._label_column: y}
 
     def transform_label_for_metric(
-            self,
-            df: pd.DataFrame,
+        self,
+        df: pd.DataFrame,
     ) -> NDArray[(Any,), Any]:
         """
         Prepare ground-truth labels to compute metric scores in evaluation. Note that
@@ -400,9 +404,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Ground-truth labels ready to compute metric scores.
         """
-        assert self._fit_called, 'You will need to first call ' \
-                                 'preprocessor.fit before calling ' \
-                                 'preprocessor.transform.'
+        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             # need to encode to integer labels
@@ -416,9 +418,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return y
 
     def transform_prediction(
-            self,
-            y_pred: torch.Tensor,
-            inverse_categorical: bool = True,
+        self,
+        y_pred: torch.Tensor,
+        inverse_categorical: bool = True,
+        loss_func: Optional[_Loss] = None,
     ) -> NDArray[(Any,), Any]:
         """
         Transform model's output logits/probability into class labels for classification
@@ -430,11 +433,16 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             The model's output logits/probability.
         inverse_categorical
             Whether to transform categorical value back to the original space, e.g., string values.
+        loss_func
+            The loss function of the model.
 
         Returns
         -------
         Predicted labels ready to compute metric scores.
         """
+        if loss_func is not None and isinstance(loss_func, torch.nn.BCEWithLogitsLoss):
+            y_pred = torch.sigmoid(y_pred)
+
         y_pred = y_pred.detach().cpu().float().numpy()
 
         if self.label_type == CATEGORICAL:

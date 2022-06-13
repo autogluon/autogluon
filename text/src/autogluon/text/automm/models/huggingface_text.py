@@ -5,9 +5,16 @@ import warnings
 from transformers import AutoModel, AutoTokenizer
 from transformers import logging as hf_logging
 from ..constants import (
-    TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS,
-    LABEL, LOGITS, FEATURES, AUTOMM, COLUMN,
-    COLUMN_FEATURES, MASKS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
+    TEXT_SEGMENT_IDS,
+    LABEL,
+    LOGITS,
+    FEATURES,
+    AUTOMM,
+    COLUMN,
+    COLUMN_FEATURES,
+    MASKS,
 )
 from typing import Optional, List, Tuple
 from .utils import (
@@ -28,10 +35,10 @@ class HFAutoModelForTextPrediction(nn.Module):
     """
 
     def __init__(
-            self,
-            prefix: str,
-            checkpoint_name: str = 'microsoft/deberta-v3-base',
-            num_classes: Optional[int] = 0,
+        self,
+        prefix: str,
+        checkpoint_name: str = "microsoft/deberta-v3-base",
+        num_classes: Optional[int] = 0,
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -70,7 +77,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-        if hasattr(self.model.config, 'type_vocab_size') and self.model.config.type_vocab_size <= 1:
+        if hasattr(self.model.config, "type_vocab_size") and self.model.config.type_vocab_size <= 1:
             # Disable segment ids for models like RoBERTa
             self.disable_seg_ids = True
         else:
@@ -101,8 +108,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         return self.model.config.hidden_size
 
     def forward(
-            self,
-            batch: dict,
+        self,
+        batch: dict,
     ):
         """
         Parameters

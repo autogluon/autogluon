@@ -370,10 +370,10 @@ class AbstractModel:
         error_if_no_features = self.params_aux.get('error_if_no_features', True)
         if error_if_no_features and not self.features:
             raise NoValidFeatures
-        # FIXME: Consider counting NaNs as unique values, if unique_counts == 2 (including NaN), then treat as boolean
+        # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         if self.params_aux.get('drop_unique', True):
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
-            unique_counts = X[self.features].nunique(axis=0)
+            unique_counts = X[self.features].nunique(axis=0, dropna=False)
             columns_to_drop = list(unique_counts[unique_counts < 2].index)
             features_to_drop_internal = columns_to_drop
             if not features_to_drop_internal:

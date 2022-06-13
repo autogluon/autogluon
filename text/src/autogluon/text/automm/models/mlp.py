@@ -14,12 +14,12 @@ class Unit(nn.Module):
     """
 
     def __init__(
-            self,
-            normalization: str,
-            in_features: int,
-            out_features: int,
-            activation: str,
-            dropout_prob: float,
+        self,
+        normalization: str,
+        in_features: int,
+        out_features: int,
+        activation: str,
+        dropout_prob: float,
     ):
         """
         Parameters
@@ -60,14 +60,14 @@ class MLP(nn.Module):
     """
 
     def __init__(
-            self,
-            in_features: int,
-            hidden_features: Optional[int] = None,
-            out_features: Optional[int] = None,
-            num_layers: Optional[int] = 1,
-            activation: Optional[str] = "gelu",
-            dropout_prob: Optional[float] = 0.5,
-            normalization: Optional[str] = "layer_norm",
+        self,
+        in_features: int,
+        hidden_features: Optional[int] = None,
+        out_features: Optional[int] = None,
+        num_layers: Optional[int] = 1,
+        activation: Optional[str] = "gelu",
+        dropout_prob: Optional[float] = 0.5,
+        normalization: Optional[str] = "layer_norm",
     ):
         """
         Parameters
@@ -98,7 +98,7 @@ class MLP(nn.Module):
                 in_features=in_features,
                 out_features=hidden_features,
                 activation=activation,
-                dropout_prob=dropout_prob
+                dropout_prob=dropout_prob,
             )
             in_features = hidden_features
             layers.append(per_unit)
