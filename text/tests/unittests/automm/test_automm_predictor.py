@@ -445,8 +445,9 @@ def test_model_configs():
                     'insert_sep': True, 
                     'text_segment_num': 2, 
                     'stochastic_chunk': False,
-                    'text_detection_length': 10,
-                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
+                    'text_aug_detect_length': 10,
+                    'text_trivial_aug_maxscale': 0.05,
+                    'test_train_augment_types' : ["synonym_replacement(0.1)"],
                 }, 
                 'timm_image': {
                     'checkpoint_name': 'swin_base_patch4_window7_224', 
@@ -471,8 +472,9 @@ def test_model_configs():
                     'insert_sep': False, 
                     'text_segment_num': 1, 
                     'stochastic_chunk': False,
-                    'text_detection_length': 10,
-                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
+                    'text_aug_detect_length': 10,
+                    'text_trivial_aug_maxscale': 0.05,
+                    'test_train_augment_types' : ["synonym_replacement(0.1)"],
                 }, 
                 'fusion_transformer': {
                     'hidden_size': 192, 
@@ -823,7 +825,8 @@ def test_trivialaugment():
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
         "data.mixup.turn_on": True,
-        "model.hf_text.text_trivial_aug_maxscale: 0.1"
+        "model.hf_text.text_trivial_aug_maxscale":0.1,
+        "model.hf_text.text_aug_detect_length":10,
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
     }
 

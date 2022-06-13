@@ -55,7 +55,7 @@ def construct_text_augmenter(
     -------
     A trivial augment instance.
     """
-    if augment_maxscale == 0.0:
+    if augment_maxscale == 0.0 or augment_maxscale is None:
         return None
 
     if augment_types is None or len(augment_types) == 0:
