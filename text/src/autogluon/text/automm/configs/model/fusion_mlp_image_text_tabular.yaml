@@ -67,7 +67,7 @@ model:
     text_train_augment_types:        # specify augmentation space manually, will randomly select one from the following and identity
       # - "random_swap(0.05)"          # less than 0.1 based on eda paper
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
-      # - "synonym_replacement(0.05)"  # less than 0.1 based on eda paper
+      # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
 
   timm_image:
@@ -110,7 +110,7 @@ model:
     text_train_augment_types:        # specify augmentation space manually, will randomly select one from the following and identity
       # - "random_swap(0.05)"          # less than 0.1 based on eda paper
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
-      # - "synonym_replacement(0.05)"  # less than 0.1 based on eda paper
+      # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
   fusion_mlp:
     weight: 0.1
