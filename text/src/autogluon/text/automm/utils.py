@@ -764,7 +764,7 @@ def create_model(
         else:
             raise ValueError(f"unknown model name: {model_name}")
 
-        if config.optimization.efficient_finetune:
+        if OmegaConf.select(config, "optimization.efficient_finetune"):
             model = apply_model_adaptation(model, config)
 
         all_models.append(model)
@@ -788,7 +788,7 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     config:
         A DictConfig object. The optimization config should be accessible by "config.optimization".
     """
-    if "lora" in config.optimization.efficient_finetune:
+    if "lora" in OmegaConf.select(config, "optimization.efficient_finetune"):
         model = inject_lora_to_linear_layer(
             model=model,
             lora_r=config.optimization.lora.r,
