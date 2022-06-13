@@ -92,7 +92,7 @@ def train(args):
     label_column = 'Sold Price'
     eval_metric = 'r2'
 
-    automm_hyperparameters = get_automm_hyperparameters(args.automm_mode, args.text_backbone)
+    automm_hyperparameters = get_automm_hyperparameters(args.automm_mode, args.text_backbone, args.cat_as_text)
     ag_args_ensemble = {'_disable_parallel_fitting': True}
 
     tabular_hyperparameters = {
@@ -143,6 +143,6 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     if args.exp_path is None:
-        args.exp_path = f'automm_kaggle_house_{args.mode}_{args.automm_mode}_cat_to_text{args.cat_to_text}_{args.text_backbone}'
+        args.exp_path = f'automm_kaggle_house_{args.mode}_{args.automm_mode}_cat_to_text{args.cat_as_text}_{args.text_backbone}'
     th.manual_seed(args.seed)
     train(args)
