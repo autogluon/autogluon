@@ -1,8 +1,16 @@
 max_time = 180
 
 setup_mxnet_gpu = """
+    wget https://developer.nvidia.com/compute/cudnn/secure/8.4.0/local_installers/10.2/cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive.tar.xz
+
+    tar -xvf cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive.tar.xz
+
+    ls cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive/include/
+    ls cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive/lib64/
+
+    echo $LD_LIBRARY_PATH
+
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-    export USE_CUDNN=0
 
     python3 -m pip install mxnet-cu102==1.9.*
 
