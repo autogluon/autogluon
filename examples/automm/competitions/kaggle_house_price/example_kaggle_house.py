@@ -14,6 +14,7 @@ def get_parser():
                         choices=['stack5',
                                  'weighted',
                                  'single',
+                                 'single_bag4',
                                  'single_bag5'],
                         default='weighted',
                         help='"stack5" means 5-fold stacking. "weighted" means weighted ensemble.'
@@ -113,6 +114,11 @@ def train(args):
                 'AG_AUTOMM_NN': automm_hyperparameters,
             }
             num_bag_folds, num_stack_levels = 5, 0
+        elif args.mode == 'single_bag4':
+            tabular_hyperparameters = {
+                'AG_AUTOMM_NN': automm_hyperparameters,
+            }
+            num_bag_folds, num_stack_levels = 4, 0
         elif args.mode == 'weighted':
             num_bag_folds, num_stack_levels = None, None
         elif args.mode == 'stack5':
