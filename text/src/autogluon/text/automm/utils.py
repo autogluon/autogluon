@@ -727,7 +727,7 @@ def apply_model_adaptation(
             model = model,
             lora_r = config.optimization.lora.r,
             lora_alpha = config.optimization.lora.alpha,
-            filter = ['query', 'value'] # Fine-tune only Query And Value Attention, recommended in https://arxiv.org/abs/2106.09685
+            filter = config.optimization.lora.filter
         )
 
     model.name_to_id = model.get_layer_ids() # Need to update name to id dictionary.
