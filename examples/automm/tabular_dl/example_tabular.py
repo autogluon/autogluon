@@ -147,7 +147,7 @@ def main(args):
     predictions = predictor.predict(
         data=test_data.data
     )
-    predictions.to_csv(args.exp_dir, 'predictions.csv')
+    predictions.to_csv(os.path.join(args.exp_dir, 'predictions.csv'))
 
 
 if __name__ == '__main__':
