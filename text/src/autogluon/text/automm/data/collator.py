@@ -32,10 +32,8 @@ def _pad_arrs_to_max_length(arrs, pad_axis, pad_val, round_to=None, max_length=N
     elif max_length is not None:
         if max_length < max_arr_len:
             raise ValueError(
-                "If max_length is specified, max_length={} must be larger "
-                "than the maximum length {} of the given arrays at axis={}.".format(
-                    max_length, max_arr_len, pad_axis
-                )
+                f"If max_length is specified, max_length={max_length} must be larger "
+                f"than the maximum length {max_arr_len} of the given arrays at axis={pad_axis}"
             )
         max_arr_len = max_length
 
@@ -116,18 +114,10 @@ class Pad:
     def __init__(self, axis=0, pad_val=0, round_to=None, max_length=None, ret_length=False):
         self._axis = axis
         if not isinstance(axis, int):
-            raise ValueError(
-                "axis must be an integer! Received axis={}, type={}.".format(
-                    str(axis), str(type(axis))
-                )
-            )
+            raise ValueError(f"axis must be an integer! Received axis={axis}, type={type(axis)}.")
 
         if round_to is not None and max_length is not None:
-            raise ValueError(
-                "Only either round_to={} or max_length={} can be specified.".format(
-                    round_to, max_length
-                )
-            )
+            raise ValueError(f"Only either round_to={round_to} or max_length={max_length} can be specified.")
 
         self._pad_val = 0 if pad_val is None else pad_val
         self._round_to = round_to
@@ -203,17 +193,14 @@ class Tuple:
                     "Input pattern not understood. "
                     "The input of Tuple can be Tuple(A, B, C) "
                     "or Tuple([A, B, C]) or Tuple((A, B, C)). "
-                    "Received fn={}, args={}".format(str(fn), str(args))
+                    f"Received fn={str(fn)}, args={str(args)}"
                 )
             self._fn = fn
         else:
             self._fn = (fn,) + args
         for i, ele_fn in enumerate(self._fn):
             if not hasattr(ele_fn, "__call__"):
-                raise ValueError(
-                    "Collate functions must be callable! "
-                    "type(fn[{}])={}".format(i, str(type(ele_fn)))
-                )
+                raise ValueError(f"Collate functions must be callable! type(fn[{i}])={type(ele_fn)}")
 
     def __call__(self, data):
         """
@@ -229,10 +216,7 @@ class Tuple:
                 A tuple of length N. Contains the collated result of each attribute in the input.
         """
         if len(data[0]) != len(self._fn):
-            raise ValueError(
-                "The number of attributes in each data sample "
-                "should contains {} elements".format(len(self._fn))
-            )
+            raise ValueError(f"The number of attributes in each data sample should contains {len(self._fn)} elements")
         ret = []
         for i, ele_fn in enumerate(self._fn):
             ret.append(ele_fn([ele[i] for ele in data]))
@@ -282,7 +266,7 @@ class Dict:
     def __init__(self, fn_dict):
         self._fn_dict = fn_dict
         if not isinstance(fn_dict, dict):
-            raise ValueError("Input must be a dictionary! type of input={}".format(type(fn_dict)))
+            raise ValueError(f"Input must be a dictionary! type of input={type(fn_dict)}")
         for fn in fn_dict.values():
             if not hasattr(fn, "__call__"):
                 raise ValueError("Elements of the dictionary must be callable!")
