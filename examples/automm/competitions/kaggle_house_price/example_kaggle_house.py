@@ -106,7 +106,7 @@ def train(args):
     if args.mode == 'single':
         predictor = AutoMMPredictor(eval_metric=eval_metric, label=label_column, path=args.exp_path)
         predictor.fit(train_df, hyperparameters=automm_hyperparameters, seed=args.seed)
-    elif args.mode == 'weighted' or args.mode == 'stack5' or args.mode == 'single_bag5':
+    elif args.mode == 'weighted' or args.mode == 'stack5' or args.mode == 'single_bag5' or args.mode == 'single_bag4':
         predictor = TabularPredictor(eval_metric=eval_metric, label=label_column, path=args.exp_path)
 
         if args.mode == 'single_bag5':
