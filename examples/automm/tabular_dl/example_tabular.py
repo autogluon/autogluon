@@ -82,10 +82,10 @@ def main(args):
         'XGB': {},
         'NN': {},
         'AG_AUTOMM_NN': automm_hyperparameters,
-        'ag_args_ensemble': {
+    }
+    ag_args_ensemble = {
             '_disable_parallel_fitting': True
         }
-    }
 
     if args.mode == 'single':
         ### model initalization
@@ -117,9 +117,6 @@ def main(args):
         if args.mode == 'single_bag5':
             tabular_hyperparameters = {
                 'AG_AUTOMM_NN': automm_hyperparameters,
-                'ag_args_ensemble': {
-                    '_disable_parallel_fitting': True
-                }
             }
             num_bag_folds, num_stack_levels = 5, 0
         elif args.mode == 'weighted':
@@ -135,7 +132,8 @@ def main(args):
         predictor.fit(train_data.data,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
-                      num_stack_levels=num_stack_levels)
+                      num_stack_levels=num_stack_levels,
+                      ag_args_ensemble=ag_args_ensemble)
         leaderboard = predictor.leaderboard()
         leaderboard.to_csv(os.path.join(args.exp_dir, 'leaderboard.csv'))
     else:
