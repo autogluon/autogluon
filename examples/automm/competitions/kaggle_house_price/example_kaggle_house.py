@@ -22,6 +22,7 @@ def get_parser():
     parser.add_argument('--automm-mode', choices=['ft-transformer', 'mlp'],
                         default='ft-transformer', help='Fusion model in AutoMM.')
     parser.add_argument('--text-backbone', default='google/electra-small-discriminator')
+    parser.add_argument('--cat-as-text', default=False)
     parser.add_argument('--data_path', type=str, default='california-house-prices')
     parser.add_argument('--seed', type=int, default=123)
     parser.add_argument('--exp_path', default=None)
@@ -29,19 +30,21 @@ def get_parser():
     return parser
 
 
-def get_automm_hyperparameters(mode, text_backbone):
+def get_automm_hyperparameters(mode, text_backbone, cat_as_text):
     if mode == "ft-transformer":
         hparams = {"model.names": ["categorical_transformer",
                                    "numerical_transformer",
                                    "hf_text",
                                    "fusion_transformer"],
-                   "model.hf_text.checkpoint_name": text_backbone}
+                   "model.hf_text.checkpoint_name": text_backbone,
+                   "data.categorical.convert_to_text": cat_as_text}
     elif mode == "mlp":
         hparams = {"model.names": ["categorical_mlp",
                                    "numerical_mlp",
                                    "hf_text",
                                    "fusion_mlp"],
-                   "model.hf_text.checkpoint_name": text_backbone}
+                   "model.hf_text.checkpoint_name": text_backbone,
+                   "data.categorical.convert_to_text": cat_as_text}
     else:
         raise NotImplementedError(f"mode={mode} is not supported!")
     return hparams
@@ -86,7 +89,6 @@ def train(args):
     test_df = preprocess(test_df,
                          with_tax_values=args.with_tax_values, has_label=False)
     label_column = 'Sold Price'
-    feature_columns = [ele for ele in train_df.columns if ele != label_column]
     eval_metric = 'r2'
 
     automm_hyperparameters = get_automm_hyperparameters(args.automm_mode, args.text_backbone)
