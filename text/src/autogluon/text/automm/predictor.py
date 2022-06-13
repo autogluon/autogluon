@@ -447,6 +447,7 @@ class AutoMMPredictor:
         self.save(save_path)
 
         if hasattr(config, MATCHER):
+            warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
             data_processors = turn_on_off_feature_column_info(
                 data_processors=data_processors,

@@ -45,6 +45,7 @@ ROC_AUC = "roc_auc"
 AVERAGE_PRECISION = "average_precision"
 LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
+COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 
 # Training status
 TRAIN = "train"

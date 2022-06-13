@@ -15,11 +15,33 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
 )
 from ..constants import (
-    BINARY, MULTICLASS, REGRESSION, MAX, MIN, NORM_FIT, BIT_FIT,
-    ACC, ACCURACY, RMSE, ROOT_MEAN_SQUARED_ERROR, R2, QUADRATIC_KAPPA,
-    ROC_AUC, AVERAGE_PRECISION, LOG_LOSS, CROSS_ENTROPY, PEARSONR, SPEARMANR,
-    CONTRASTIVE_LOSS, COSINE_SIMILARITY, PAIR_MARGIN_MINER, COLUMN_FEATURES,
-    FEATURES, MASKS, AUTOMM
+    BINARY,
+    MULTICLASS,
+    REGRESSION,
+    MAX,
+    MIN,
+    NORM_FIT,
+    BIT_FIT,
+    ACC,
+    ACCURACY,
+    RMSE,
+    ROOT_MEAN_SQUARED_ERROR,
+    R2,
+    QUADRATIC_KAPPA,
+    ROC_AUC,
+    AVERAGE_PRECISION,
+    LOG_LOSS,
+    CROSS_ENTROPY,
+    PEARSONR,
+    SPEARMANR,
+    CONTRASTIVE_LOSS,
+    COSINE_SIMILARITY,
+    PAIR_MARGIN_MINER,
+    COLUMN_FEATURES,
+    FEATURES,
+    MASKS,
+    AUTOMM,
+    COSINE_EMBEDDING_LOSS,
 )
 import warnings
 
@@ -50,10 +72,10 @@ def get_loss_func(problem_type: str):
 
 
 def get_metric(
-        metric_name: str,
-        problem_type: str,
-        num_classes: Optional[int] = None,
-        pos_label: Optional[int] = None,
+    metric_name: str,
+    problem_type: str,
+    num_classes: Optional[int] = None,
+    pos_label: Optional[int] = None,
 ):
     """
     Obtain a torchmerics.Metric from its name.
@@ -91,26 +113,26 @@ def get_metric(
     elif metric_name == R2:
         return torchmetrics.R2Score(), MAX, None
     elif metric_name == QUADRATIC_KAPPA:
-        return torchmetrics.CohenKappa(num_classes=num_classes,
-                                       weights="quadratic"), MAX, None
+        return torchmetrics.CohenKappa(num_classes=num_classes, weights="quadratic"), MAX, None
     elif metric_name == ROC_AUC:
         return torchmetrics.AUROC(pos_label=pos_label), MAX, None
     elif metric_name == AVERAGE_PRECISION:
         return torchmetrics.AveragePrecision(pos_label=pos_label), MAX, None
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
-        return torchmetrics.MeanMetric(), MIN, \
-               functools.partial(F.cross_entropy, reduction="none")
-    elif metric_name == "cosine_embedding_loss":
-        return torchmetrics.MeanMetric(), MIN, \
-               functools.partial(F.cosine_embedding_loss, reduction="none")
+        return torchmetrics.MeanMetric(), MIN, functools.partial(F.cross_entropy, reduction="none")
+    elif metric_name == COSINE_EMBEDDING_LOSS:
+        return torchmetrics.MeanMetric(), MIN, functools.partial(F.cosine_embedding_loss, reduction="none")
     elif metric_name == PEARSONR:
         return torchmetrics.PearsonCorrCoef(), MAX, None
     elif metric_name == SPEARMANR:
         return torchmetrics.SpearmanCorrCoef(), MAX, None
     else:
-        warnings.warn(f"Currently, we cannot convert the metric: {metric_name} to a metric supported in torchmetrics. "
-                      f"Thus, we will fall-back to use accuracy for multi-class classification problems "
-                      f", ROC-AUC for binary classification problem, and MSE for regression problems.", UserWarning)
+        warnings.warn(
+            f"Currently, we cannot convert the metric: {metric_name} to a metric supported in torchmetrics. "
+            f"Thus, we will fall-back to use accuracy for multi-class classification problems "
+            f", ROC-AUC for binary classification problem, and MSE for regression problems.",
+            UserWarning,
+        )
         if problem_type == REGRESSION:
             return torchmetrics.MeanSquaredError(squared=False), MIN, None
         elif problem_type == MULTICLASS:
@@ -118,17 +140,17 @@ def get_metric(
         elif problem_type == BINARY:
             return torchmetrics.AUROC(pos_label=pos_label), MAX, None
         else:
-            raise ValueError(f'The problem_type={problem_type} is currently not supported')
+            raise ValueError(f"The problem_type={problem_type} is currently not supported")
 
 
 def get_optimizer(
-        optim_type: str,
-        optimizer_grouped_parameters,
-        lr: float,
-        weight_decay: float,
-        eps: Optional[float] = 1e-6,
-        betas: Optional[Tuple[float, float]] = (0.9, 0.999),
-        momentum: Optional[float] = 0.9,
+    optim_type: str,
+    optimizer_grouped_parameters,
+    lr: float,
+    weight_decay: float,
+    eps: Optional[float] = 1e-6,
+    betas: Optional[Tuple[float, float]] = (0.9, 0.999),
+    momentum: Optional[float] = 0.9,
 ):
     """
     Choose a Pytorch optimizer based on its name.
@@ -182,11 +204,11 @@ def get_optimizer(
 
 
 def get_lr_scheduler(
-        optimizer: optim.Optimizer,
-        num_max_steps: int,
-        num_warmup_steps: int,
-        lr_schedule: str,
-        end_lr: Union[float, int],
+    optimizer: optim.Optimizer,
+    num_max_steps: int,
+    num_warmup_steps: int,
+    lr_schedule: str,
+    end_lr: Union[float, int],
 ):
     """
     Get the learning rate scheduler from its name. Here we use our defined learning rate
@@ -226,9 +248,7 @@ def get_lr_scheduler(
         )
     elif lr_schedule == "linear_decay":
         scheduler = get_linear_schedule_with_warmup(
-            optimizer=optimizer,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_max_steps
+            optimizer=optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_max_steps
         )
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
@@ -250,9 +270,9 @@ def get_weight_decay_param_names(model: nn.Module):
     A list of parameter names not using weight decay.
     """
     # By default, we should not apply weight decay for all the norm layers
-    decay_param_names = get_parameter_names(model,
-                                            [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
-                                             nn.GroupNorm])
+    decay_param_names = get_parameter_names(
+        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm]
+    )
     decay_param_names = [name for name in decay_param_names if "bias" not in name]
     return decay_param_names
 
@@ -273,16 +293,17 @@ def get_norm_layer_param_names(model: nn.Module):
     """
     all_param_names = [name for name, _ in model.named_parameters()]
     all_param_names_except_norm_names = get_parameter_names(
-        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm])
+        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm]
+    )
     norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
     return norm_param_names
 
 
 def apply_single_lr(
-        model: nn.Module,
-        lr: float,
-        weight_decay: float,
-        return_params: Optional[bool] = True,
+    model: nn.Module,
+    lr: float,
+    weight_decay: float,
+    return_params: Optional[bool] = True,
 ):
     """
     Set to use a single learning rate for all parameters. Layer normalization parameters and other
@@ -323,11 +344,11 @@ def apply_single_lr(
 
 
 def apply_two_stages_lr(
-        model: nn.Module,
-        lr: float,
-        lr_mult: Union[float, int],
-        weight_decay: float,
-        return_params: Optional[bool] = True,
+    model: nn.Module,
+    lr: float,
+    lr_mult: Union[float, int],
+    weight_decay: float,
+    return_params: Optional[bool] = True,
 ):
     """
     Set up the pretrained backbone to use a smaller learning rate (lr * lr_mult).
@@ -362,8 +383,7 @@ def apply_two_stages_lr(
             "params": [
                 p if return_params else n
                 for n, p in model.named_parameters()
-                if n in decay_param_names
-                   and not any(bb in n for bb in model.head_layer_names)
+                if n in decay_param_names and not any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": weight_decay,
             "lr": lr,
@@ -372,8 +392,7 @@ def apply_two_stages_lr(
             "params": [
                 p if return_params else n
                 for n, p in model.named_parameters()
-                if n not in decay_param_names
-                   and not any(bb in n for bb in model.head_layer_names)
+                if n not in decay_param_names and not any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": 0.0,
             "lr": lr,
@@ -382,8 +401,7 @@ def apply_two_stages_lr(
             "params": [
                 p if return_params else n
                 for n, p in model.named_parameters()
-                if n in decay_param_names
-                   and any(bb in n for bb in model.head_layer_names)
+                if n in decay_param_names and any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": weight_decay,
             "lr": lr * lr_mult,
@@ -392,8 +410,7 @@ def apply_two_stages_lr(
             "params": [
                 p if return_params else n
                 for n, p in model.named_parameters()
-                if n not in decay_param_names
-                   and any(bb in n for bb in model.head_layer_names)
+                if n not in decay_param_names and any(bb in n for bb in model.head_layer_names)
             ],
             "weight_decay": 0.0,
             "lr": lr * lr_mult,
@@ -404,11 +421,11 @@ def apply_two_stages_lr(
 
 
 def apply_layerwise_lr_decay(
-        model: nn.Module,
-        lr: float,
-        lr_decay: float,
-        weight_decay: float,
-        efficient_finetune: Optional[str] = None,
+    model: nn.Module,
+    lr: float,
+    lr_decay: float,
+    weight_decay: float,
+    efficient_finetune: Optional[str] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -442,11 +459,11 @@ def apply_layerwise_lr_decay(
     for name, param in model.named_parameters():
         if efficient_finetune == BIT_FIT:
             # For bit_fit, we disable tuning everything except the bias terms
-            if 'bias' not in name:
+            if "bias" not in name:
                 param.requires_grad = False
         elif efficient_finetune == NORM_FIT:
             # For norm-fit, we finetune all the normalization layers and bias layers
-            if name not in norm_param_names and 'bias' not in name:
+            if name not in norm_param_names and "bias" not in name:
                 param.requires_grad = False
 
         if not param.requires_grad:
@@ -457,24 +474,16 @@ def apply_layerwise_lr_decay(
             this_weight_decay = weight_decay
         else:
             group_name = "no_decay"
-            this_weight_decay = 0.
+            this_weight_decay = 0.0
 
         layer_id = model.name_to_id[name]
         group_name = "layer_%d_%s" % (layer_id, group_name)
 
         if group_name not in parameter_group_names:
-            scale = lr_decay ** layer_id
+            scale = lr_decay**layer_id
 
-            parameter_group_names[group_name] = {
-                "weight_decay": this_weight_decay,
-                "params": [],
-                "lr": scale * lr
-            }
-            parameter_group_vars[group_name] = {
-                "weight_decay": this_weight_decay,
-                "params": [],
-                "lr": scale * lr
-            }
+            parameter_group_names[group_name] = {"weight_decay": this_weight_decay, "params": [], "lr": scale * lr}
+            parameter_group_vars[group_name] = {"weight_decay": this_weight_decay, "params": [], "lr": scale * lr}
 
         parameter_group_vars[group_name]["params"].append(param)
         parameter_group_names[group_name]["params"].append(name)
@@ -483,19 +492,26 @@ def apply_layerwise_lr_decay(
 
 
 def gather_column_features(
-        output: Dict[str, Dict],
-        column_names: Union[str, List[str]],
+    output: Dict[str, Dict],
+    column_names: Union[str, List[str]],
 ):
     """
-    TODO: return masks.
+    Gather column features from models' outputs.
+    For each feature name in one model's output, we enumerate the provided column names to see
+    whether (partial) the provided columns share one cls feature or they have independent features.
+
+    TODO: return features' masks and use them to filter the losses.
+
     Parameters
     ----------
     output
+        The models' outputs.
     column_names
+        The columns whose features we want to get.
 
     Returns
     -------
-
+    The gathered feature vectors. Each sample should only have one feature vector.
     """
     if isinstance(column_names, str):
         column_names = [column_names]
@@ -504,9 +520,9 @@ def gather_column_features(
     # logger.debug(f"gather features for columns: {column_names}")
     for per_model_name, per_model_output in output.items():
         # logger.debug(f"gather column features from model: {per_model_name}")
-        columns_share_one_feature = []
         for feature_name in per_model_output[COLUMN_FEATURES][FEATURES]:
             # logger.debug(f"processing feature: {feature_name}")
+            columns_share_one_feature = []
             for col_name in column_names:
                 if col_name in feature_name:
                     # this column feature is part of the cls feature
@@ -519,14 +535,16 @@ def gather_column_features(
 
             # two or more columns share one cls feature, and no other columns share it.
             if len(columns_share_one_feature) > 0:
-                assert len("_".join(columns_share_one_feature)) == len(feature_name), \
-                    f"model `{per_model_name}`'s cls feature name `{feature_name}` contains more columns than `{columns_share_one_feature}`" \
-                    f"Consider only forwarding `{columns_share_one_feature}` for model `{per_model_name}`"
+                assert len("_".join(columns_share_one_feature)) == len(
+                    feature_name
+                ), f"model `{per_model_name}`'s cls feature name `{feature_name}` doesn't match `{columns_share_one_feature}`"
                 gathered_features.append(per_model_output[COLUMN_FEATURES][FEATURES][feature_name])
 
     if len(gathered_features) > 1:
         # currently only support features of the same shape
-        assert all(per_features.shape == gathered_features[0].shape for per_features in gathered_features)
+        assert all(
+            per_features.shape == gathered_features[0].shape for per_features in gathered_features
+        ), "Currently we only support gathering features of the same dimension."
 
     if len(gathered_features) == 0:
         raise ValueError(f"No features are found for columns names {column_names}.")
@@ -537,8 +555,20 @@ def gather_column_features(
 
 
 def get_metric_learning_distance_func(
-        name: str,
+    name: str,
 ):
+    """
+    Return one pytorch metric learning's distance function based on its name.
+
+    Parameters
+    ----------
+    name
+        distance function name
+
+    Returns
+    -------
+    A distance function from the pytorch metric learning package.
+    """
     if name.lower() == COSINE_SIMILARITY:
         return distances.CosineSimilarity()
     else:
@@ -546,8 +576,20 @@ def get_metric_learning_distance_func(
 
 
 def get_metric_learning_loss_funcs(
-        matches: List[DictConfig],
+    matches: List[DictConfig],
 ):
+    """
+    Return a list of pytorch metric learning's loss functions based on their names.
+
+    Parameters
+    ----------
+    matches
+        A list of matches from the matcher config.
+
+    Returns
+    -------
+    A list of loss functions from the pytorch metric learning package.
+    """
     metric_learning_loss_funcs = []
     for per_match in matches:
         if per_match.loss.type.lower() == CONTRASTIVE_LOSS:
@@ -565,8 +607,21 @@ def get_metric_learning_loss_funcs(
 
 
 def get_metric_learning_miner_funcs(
-        matches: List[DictConfig],
+    matches: List[DictConfig],
 ):
+    """
+    Return a list of pytorch metric learning's miner functions based on their names.
+    The miners are used to mine the positive and negative examples.
+
+    Parameters
+    ----------
+    matches
+        A list of matches from the matcher config.
+
+    Returns
+    -------
+    A list of miner functions from the pytorch metric learning package.
+    """
     metric_learning_miner_funcs = []
     for per_match in matches:
         if per_match.miner.type.lower() == PAIR_MARGIN_MINER:
@@ -584,14 +639,34 @@ def get_metric_learning_miner_funcs(
 
 
 def generate_metric_learning_labels(
-        num_samples: int,
-        match_label: int,
-        labels: torch.Tensor,
+    num_samples: int,
+    match_label: int,
+    labels: torch.Tensor,
 ):
+    """
+    Generate labels to compute the metric learning loss of one mini-batch.
+    For n samples, it generates 2*n labels since each match has two sides, each of which
+    has one label. If we know the matching label, then it determines the two sides' labels
+    according to whether their label is the matching label. If the matching label is None,
+    it assigns a unique label for each side.
+
+    Parameters
+    ----------
+    num_samples
+        number of samples.
+    match_label
+        The matching label, which can be None.
+    labels
+        The sample labels used in the supervised setting. It's required only when match_label is not None.
+
+    Returns
+    -------
+    The labels used in computing the metric learning loss.
+    """
     labels_1 = torch.arange(num_samples)
 
     if match_label is not None:
-        labels_2 = torch.arange(num_samples, num_samples*2)
+        labels_2 = torch.arange(num_samples, num_samples * 2)
         # users need to specify the match_label based on the raw label's semantic meaning.
         mask = labels == match_label
         labels_2[mask] = labels_1[mask]
@@ -603,20 +678,30 @@ def generate_metric_learning_labels(
     return metric_learning_labels
 
 
-def compute_cosine_probability(
-        embeddings1: torch.Tensor,
-        embeddings2: torch.Tensor,
-):
-    cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
-    return 0.5 * (cosine_similarity + 1)
-
-
 def compute_probability(
-        logits: Optional[torch.Tensor] = None,
-        embeddings1: Optional[torch.Tensor] = None,
-        embeddings2: Optional[torch.Tensor] = None,
-        reverse_prob: Optional[bool] = False,
+    logits: Optional[torch.Tensor] = None,
+    embeddings1: Optional[torch.Tensor] = None,
+    embeddings2: Optional[torch.Tensor] = None,
+    reverse_prob: Optional[bool] = False,
 ):
+    """
+    Compute probabilities from logits or embedding pairs.
+
+    Parameters
+    ----------
+    logits
+        The output of a model's head layer.
+    embeddings1
+        Feature embeddings of one side in matching.
+    embeddings2
+        Feature embeddings 2 of the other side in matching.
+    reverse_prob
+        Whether to reverse the probability.
+
+    Returns
+    -------
+    Probabilities.
+    """
     if logits is not None:
         prob = F.softmax(logits.float(), dim=1)[:, 1]
     else:

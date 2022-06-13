@@ -16,6 +16,7 @@ matcher:
         pair:
           - "Previous Image"
           - "Current Image"
+# TODO: temporarily keep the commented config for more experiments.
 #      - loss:
 #          type: "contrastive_loss"
 #          pos_margin: 0.8

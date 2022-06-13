@@ -33,26 +33,25 @@ class MatcherLitModule(pl.LightningModule):
     """
 
     def __init__(
-            self,
-            model: nn.Module,
-            matches: List[DictConfig],
-            match_label: Optional[int] = None,
-            # reverse_prob: Optional[bool] = None,
-            optim_type: Optional[str] = None,
-            lr_choice: Optional[str] = None,
-            lr_schedule: Optional[str] = None,
-            lr: Optional[float] = None,
-            lr_decay: Optional[float] = None,
-            end_lr: Optional[Union[float, int]] = None,
-            lr_mult: Optional[Union[float, int]] = None,
-            weight_decay: Optional[float] = None,
-            warmup_steps: Optional[int] = None,
-            loss_func: Optional[_Loss] = None,
-            validation_metric: Optional[torchmetrics.Metric] = None,
-            validation_metric_name: Optional[str] = None,
-            custom_metric_func: Callable = None,
-            test_metric: Optional[torchmetrics.Metric] = None,
-            efficient_finetune: Optional[str] = None,
+        self,
+        model: nn.Module,
+        matches: List[DictConfig],
+        match_label: Optional[int] = None,
+        optim_type: Optional[str] = None,
+        lr_choice: Optional[str] = None,
+        lr_schedule: Optional[str] = None,
+        lr: Optional[float] = None,
+        lr_decay: Optional[float] = None,
+        end_lr: Optional[Union[float, int]] = None,
+        lr_mult: Optional[Union[float, int]] = None,
+        weight_decay: Optional[float] = None,
+        warmup_steps: Optional[int] = None,
+        loss_func: Optional[_Loss] = None,
+        validation_metric: Optional[torchmetrics.Metric] = None,
+        validation_metric_name: Optional[str] = None,
+        custom_metric_func: Callable = None,
+        test_metric: Optional[torchmetrics.Metric] = None,
+        efficient_finetune: Optional[str] = None,
     ):
         """
         Parameters
@@ -62,9 +61,6 @@ class MatcherLitModule(pl.LightningModule):
         matches
             A list of DictConfigs, each of which defines one pair of feature column match and the configs
             to compute the matching loss.
-        reverse_prob
-            Whether to reverse the probability, which is proportional to the cosine similarity of two embeddings.
-            If the match class and positive class are different, then reverse_prob is True.
         match_label
             The label of match class.
         optim_type
@@ -125,7 +121,10 @@ class MatcherLitModule(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(
             ignore=[
-                "model", "validation_metric", "test_metric", "loss_func",
+                "model",
+                "validation_metric",
+                "test_metric",
+                "loss_func",
                 "matches",
             ]
         )
@@ -160,19 +159,20 @@ class MatcherLitModule(pl.LightningModule):
 
         # TODO: support validation metric on multiple matches
         # TODO: each match should use an independent torchmetric function
-        assert sum([per_match.use_label for per_match in matches]) == 1,\
-            f"We only support one match to have labels currently."
+        assert (
+            sum([per_match.use_label for per_match in matches]) == 1
+        ), f"We only support one match to have labels currently."
 
     def _compute_loss(
-            self,
-            output: Dict,
-            label: torch.Tensor,
+        self,
+        output: Dict,
+        label: torch.Tensor,
     ):
         loss = 0
         for per_match, per_loss_func, per_miner_func in zip(
-                self.matches,
-                self.metric_learning_loss_funcs,
-                self.metric_learning_miner_funcs,
+            self.matches,
+            self.metric_learning_loss_funcs,
+            self.metric_learning_miner_funcs,
         ):
 
             assert len(per_match.pair) == 2
@@ -190,7 +190,7 @@ class MatcherLitModule(pl.LightningModule):
             metric_learning_labels = generate_metric_learning_labels(
                 num_samples=len(embeddings1),
                 match_label=self.match_label if per_match.use_label else None,
-                labels=label,
+                labels=label if per_match.use_label else None,
             )
             indices_tuple = per_miner_func(
                 embeddings=embeddings,
@@ -207,13 +207,13 @@ class MatcherLitModule(pl.LightningModule):
 
     @staticmethod
     def _compute_metric_score(
-            metric: torchmetrics.Metric,
-            custom_metric_func: Callable,
-            label: torch.Tensor,
-            logits: Optional[torch.Tensor] = None,
-            embeddings1: Optional[torch.Tensor] = None,
-            embeddings2: Optional[torch.Tensor] = None,
-            reverse_prob: Optional[bool] = False,
+        metric: torchmetrics.Metric,
+        custom_metric_func: Callable,
+        label: torch.Tensor,
+        logits: Optional[torch.Tensor] = None,
+        embeddings1: Optional[torch.Tensor] = None,
+        embeddings2: Optional[torch.Tensor] = None,
+        reverse_prob: Optional[bool] = False,
     ):
         if logits is not None:
             if isinstance(metric, torchmetrics.AUROC):
@@ -237,8 +237,8 @@ class MatcherLitModule(pl.LightningModule):
                 )
 
     def _shared_step(
-            self,
-            batch: Dict,
+        self,
+        batch: Dict,
     ):
         output = self.model(batch)
         label = batch[self.model.label_key]
@@ -352,9 +352,9 @@ class MatcherLitModule(pl.LightningModule):
                     embeddings2=embeddings2,
                 )
                 if self.match_label == 0:
-                    probability = torch.stack([match_prob, 1-match_prob]).t()
+                    probability = torch.stack([match_prob, 1 - match_prob]).t()
                 else:
-                    probability = torch.stack([1-match_prob, match_prob], ).t()
+                    probability = torch.stack([1 - match_prob, match_prob]).t()
                 break
 
         return {PROBABILITY: probability}
@@ -405,13 +405,12 @@ class MatcherLitModule(pl.LightningModule):
         logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:
             max_steps = (
-                    len(self.trainer.datamodule.train_dataloader())
-                    * self.trainer.max_epochs
-                    // self.trainer.accumulate_grad_batches
+                len(self.trainer.datamodule.train_dataloader())
+                * self.trainer.max_epochs
+                // self.trainer.accumulate_grad_batches
             )
             logger.debug(
-                f"len(trainer.datamodule.train_dataloader()): "
-                f"{len(self.trainer.datamodule.train_dataloader())}"
+                f"len(trainer.datamodule.train_dataloader()): " f"{len(self.trainer.datamodule.train_dataloader())}"
             )
             logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
             logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
