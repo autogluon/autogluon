@@ -1,7 +1,7 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    python3 -m pip install mxnet-cu102==1.8.*
+    python3 -m pip install mxnet-cu102==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
     ls -1a /usr/local | grep cuda
@@ -262,10 +262,10 @@ stage("Unit Test") {
           # conda create allows overwrite the existing env with -y flag, but does not take file as input
           # hence create the new env and update it with file
           conda create -n autogluon-timeseries-py3-v3 -y
-          conda env update -n autogluon-timeseries-py3-v3 -f docs/build_gpu_cu102.yml
+          conda env update -n autogluon-timeseries-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-timeseries-py3-v3
           conda list
-          python3 -m pip install mxnet-cu102==1.9.*
+          ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           ${install_core_all_tests}
           ${install_features}
@@ -476,10 +476,10 @@ stage("Build Tutorials") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon-tutorial-timeseries-v3 -y
-        conda env update -n autogluon-tutorial-timeseries-v3 -f docs/build_contrib_gpu_cu102.yml
+        conda env update -n autogluon-tutorial-timeseries-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-timeseries-v3
         conda list
-        python3 -m pip install mxnet-cu102==1.9.*
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 
@@ -549,10 +549,10 @@ stage("Build Docs") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon_docs -y
-        conda env update -n autogluon_docs -f docs/build_contrib_gpu_cu102.yml
+        conda env update -n autogluon_docs -f docs/build_contrib_gpu.yml
         conda activate autogluon_docs
         conda list
-        python3 -m pip install mxnet-cu102==1.9.*
+        ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 
