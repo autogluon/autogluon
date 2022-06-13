@@ -35,13 +35,13 @@ def get_automm_hyperparameters(mode, text_backbone):
                                    "numerical_transformer",
                                    "hf_text",
                                    "fusion_transformer"],
-                   "hf_text.checkpoint_name": text_backbone}
+                   "model.hf_text.checkpoint_name": text_backbone}
     elif mode == "mlp":
         hparams = {"model.names": ["categorical_mlp",
                                    "numerical_mlp",
                                    "hf_text",
                                    "fusion_mlp"],
-                   "hf_text.checkpoint_name": text_backbone}
+                   "model.hf_text.checkpoint_name": text_backbone}
     else:
         raise NotImplementedError(f"mode={mode} is not supported!")
     return hparams
