@@ -535,7 +535,7 @@ def update_config_by_rules(
                 "the loss_function automatically otherwise.",
                 UserWarning,
             )
-    return config 
+    return config
 
 
 def gather_column_features(

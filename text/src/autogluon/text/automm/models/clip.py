@@ -140,12 +140,12 @@ class CLIPForImageText(nn.Module):
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         # collect image features by image column names
         image_column_features, image_column_feature_masks = get_column_features(
-                batch=batch,
-                column_name_prefix=self.image_column_prefix,
-                features=image_features,
-                valid_lengths=image_valid_num,
-                has_cls_feature=False,
-            )
+            batch=batch,
+            column_name_prefix=self.image_column_prefix,
+            features=image_features,
+            valid_lengths=image_valid_num,
+            has_cls_feature=False,
+        )
         ret[COLUMN_FEATURES][FEATURES].update(image_column_features)
         ret[COLUMN_FEATURES][MASKS].update(image_column_feature_masks)
 
@@ -165,12 +165,12 @@ class CLIPForImageText(nn.Module):
 
         # collect text features by text column names
         text_column_features, text_column_feature_masks = get_column_features(
-                batch=batch,
-                column_name_prefix=self.text_column_prefix,
-                features=self.model.text_projection(text_outputs.last_hidden_state),
-                valid_lengths=text_valid_length,
-                has_cls_feature=True,
-            )
+            batch=batch,
+            column_name_prefix=self.text_column_prefix,
+            features=self.model.text_projection(text_outputs.last_hidden_state),
+            valid_lengths=text_valid_length,
+            has_cls_feature=True,
+        )
         ret[COLUMN_FEATURES][FEATURES].update(text_column_features)
         ret[COLUMN_FEATURES][MASKS].update(text_column_feature_masks)
 

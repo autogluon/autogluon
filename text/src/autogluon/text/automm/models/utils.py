@@ -374,7 +374,9 @@ def get_column_features(
                 joint_mask = torch.logical_or(joint_mask, per_col_masks)
 
     # all the columns of one model's input share the model's cls feature
-    if has_cls_feature and len(all_column_names) > 0:  # some models', e.g, timm_image, output doesn't have the cls feature.
+    if (
+        has_cls_feature and len(all_column_names) > 0
+    ):  # some models', e.g, timm_image, output doesn't have the cls feature.
         joint_column_name = "_".join(all_column_names)
         column_features[joint_column_name] = features[:, 0, :]
         feature_masks[joint_column_name] = joint_mask.to(features)

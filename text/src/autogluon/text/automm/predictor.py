@@ -779,7 +779,7 @@ class AutoMMPredictor:
 
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path)
-        
+
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
@@ -802,7 +802,7 @@ class AutoMMPredictor:
             )
 
             return self
-          
+
         # need to assign the above attributes before setting up distillation
         if teacher_predictor is not None:
             (
