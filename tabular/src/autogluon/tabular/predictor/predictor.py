@@ -1340,7 +1340,7 @@ class TabularPredictor:
                                             fit_ensemble=fit_ensemble, fit_ensemble_every_iter=fit_ensemble_every_iter,
                                             **fit_extra_kwargs)
 
-    def predict(self, data, model=None, as_pandas=True):
+    def predict(self, data, model=None, as_pandas=True, transform_features=True):
         """
         Use trained models to produce predictions of `label` column values for new data.
 
@@ -1355,6 +1355,10 @@ class TabularPredictor:
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
         as_pandas : bool, default = True
             Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False).
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
 
         Returns
         -------
@@ -1362,9 +1366,9 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict')
         data = self.__get_dataset(data)
-        return self._learner.predict(X=data, model=model, as_pandas=as_pandas)
+        return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
 
-    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True):
+    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
@@ -1388,6 +1392,10 @@ class TabularPredictor:
                 The columns will be the same order as `predictor.class_labels`.
             If False, output will contain only 1 column for the positive class (get positive_class name via `predictor.positive_class`).
             Only impacts output for binary classification problems.
+        transform_features : bool, default = True
+            If True, preprocesses data before predicting with models.
+            If False, skips global feature preprocessing.
+                This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
 
         Returns
         -------
@@ -1397,7 +1405,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict_proba')
         data = self.__get_dataset(data)
-        return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
+        return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
     def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """

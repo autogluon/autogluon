@@ -18,15 +18,15 @@ class BaseDataModule(LightningDataModule):
     """
 
     def __init__(
-            self,
-            df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
-            data_processors: Union[dict, List[dict]],
-            per_gpu_batch_size: int,
-            num_workers: int,
-            train_data: Optional[pd.DataFrame] = None,
-            val_data: Optional[pd.DataFrame] = None,
-            test_data: Optional[pd.DataFrame] = None,
-            predict_data: Optional[pd.DataFrame] = None,
+        self,
+        df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+        data_processors: Union[dict, List[dict]],
+        per_gpu_batch_size: int,
+        num_workers: int,
+        train_data: Optional[pd.DataFrame] = None,
+        val_data: Optional[pd.DataFrame] = None,
+        test_data: Optional[pd.DataFrame] = None,
+        predict_data: Optional[pd.DataFrame] = None,
     ):
         """
         Parameters
@@ -181,7 +181,7 @@ class BaseDataModule(LightningDataModule):
         )
         return loader
 
-    def get_collate_fn(self,):
+    def get_collate_fn(self):
         """
         Collect collator functions for each modality input of every model.
         These collator functions are wrapped by the "Dict" collator function,
