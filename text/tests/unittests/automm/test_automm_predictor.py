@@ -631,8 +631,9 @@ def test_textagumentor_deepcopy():
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
-        "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})",
-                                                   "random_swap({'aug_p': 0.05})"],
+        "model.hf_text.text_trivial_aug_maxscale": 0.05,
+        "model.hf_text.text_train_augment_types": ["synonym_replacement(0.05)",
+                                                   "random_swap(0.05)"],
         "optimization.top_k_average_method": "uniform_soup",
     }
 
@@ -798,3 +799,42 @@ def test_hpo_distillation(searcher, scheduler):
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         save_path=student_save_path,
     )
+
+def test_trivialaugment():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "optimization.top_k_average_method": BEST,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
+        "data.mixup.turn_on": True,
+        "model.hf_text.text_trivial_aug_maxscale: 0.1"
+        "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
+    }
+
+    with tempfile.TemporaryDirectory() as save_path:
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            time_limit=30,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+        )
+
+        score = predictor.evaluate(dataset.test_df)
+        verify_predictor_save_load(predictor, dataset.test_df)

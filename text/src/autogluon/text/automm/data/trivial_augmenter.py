@@ -5,13 +5,15 @@ Code is partically adapted from its official implementation https://github.com/a
 """
 
 import random
+import logging
 from selectors import EpollSelector
 from PIL import ImageOps, ImageEnhance, ImageFilter, Image, ImageDraw
 import nlpaug.augmenter.word as naw
 from .utils import InsertPunctuation
 import nltk
-from ..constants import (IMAGE, TEXT)
+from ..constants import (IMAGE, TEXT, AUTOMM)
 
+logger = logging.getLogger(AUTOMM)
 
 def scale_parameter(level, maxval, type):
     """
@@ -201,28 +203,33 @@ def set_image_augmentation_space():
     ]
     return image_all_transform
 
-
-def set_text_augmentation_space():
-    text_all_transform = [
-        "identity",
-        "syn_replacement",
-        "random_delete",
-        "random_swap",
-        "insert_punc",
-    ]
-
+def download_nltk():
     try:
         nltk.data.find("tagger/averaged_perceptron_tagger")
     except LookupError:
-        nltk.download("averaged_perceptron_tagger")
+        nltk.download("averaged_perceptron_tagger", quiet=True)
     try:
         nltk.data.find("corpora/wordnet")
     except LookupError:
-        nltk.download("wordnet")
+        nltk.download("wordnet", quiet=True)
     try:
         nltk.data.find("corpora/omw-1.4")
     except LookupError:
-        nltk.download("omw-1.4")
+        nltk.download("omw-1.4", quiet=True)
+
+
+def set_text_augmentation_space(space):
+    if space == None:
+        text_all_transform = [
+            "identity",
+            "syn_replacement",
+            "random_delete",
+            "random_swap",
+            "insert_punc",
+        ]
+    else:
+        text_all_transform = ["identity"]
+        text_all_transform += space
 
     return text_all_transform
 
@@ -234,49 +241,56 @@ class TrivialAugment:
     Random a strength between [0, max_strength]
     """
 
-    def __init__(self, datatype, max_strength) -> None:
+    def __init__(self, datatype, max_strength, space=None) -> None:
         """
         Parameters
         ----------
         datatype
             Modality type, currently support "text" and "img"
         max_strength
-            Max strength for augmentation operation. 
+            Max strength for augmentation operation.
+        space
+            Use to set augmentation space if specified in config. Text only for now. 
         """
-        assert max_strength > 0, "Invalid maximum strength. Must > 0"
         self.max_strength = max_strength
         self.data_type = datatype
         if datatype == IMAGE:
             self.all_transform = set_image_augmentation_space()
         elif datatype == TEXT:
-            self.all_transform = set_text_augmentation_space()
+            self.all_transform = set_text_augmentation_space(space)
         else:
             raise NotImplementedError
+        logger.debug(f"{self.data_type} augmentation space {self.all_transform}")
 
     def __call__(self, data):
         if self.data_type == IMAGE:
             return self.augment_image(data)
         elif self.data_type == TEXT:
-            return self.augment(data)
+            return self.augment_text(data)
 
     def augment_image(self, data):
         op = random.choice(self.all_transform)
         scale = float(random.randint(0, self.max_strength) / self.max_strength)
         return op.augment(scale, data)
 
-    def augment(self, data):
-        op_str = random.choice(self.all_transform)
-        scale = random.uniform(0, self.max_strength)
-        # print(op_str, scale)
-        if op_str == "identity":
+    def augment_text(self, data):
+        op = random.choice(self.all_transform)
+        
+        # use specified operation magnitude if avalible
+        if isinstance(op, tuple):
+            op, scale = op
+        else:
+            scale = random.uniform(0, self.max_strength)
+
+        if op == "identity":
             return data
-        elif op_str == "syn_replacement":
+        elif op == "syn_replacement":
             op = naw.SynonymAug(aug_src="wordnet", aug_p=scale, aug_max=None)
-        elif op_str == "random_swap":
+        elif op == "random_swap":
             op = naw.RandomWordAug(action="swap", aug_p=scale, aug_max=None)
-        elif op_str == "random_delete":
+        elif op == "random_delete":
             op = naw.RandomWordAug(action="delete", aug_p=scale, aug_max=None)
-        elif op_str == "insert_punc":
+        elif op == "insert_punc":
             op = InsertPunctuation()   #scale will be randomized inside function
         else:
             raise NotImplementedError

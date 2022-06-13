@@ -45,60 +45,42 @@ ALL_TOKENIZERS = {
 
 
 def construct_text_augmenter(
+    augment_maxscale: float,
     augment_types: List[str],
-) -> Optional[naf.Sometimes]:
+) -> Optional[TrivialAugment]:
     """
     Build up a text augmentor from the provided list of augmentation types
 
     Parameters
     ----------
+    augment_maxscale:
+        maximum scale for text augmentation
     augment_types
         A list of text augment types.
 
     Returns
     -------
-    A nlpaug sequantial flow.
+    A trivial augment instance.
     """
-    if augment_types is None or len(augment_types) == 0:
+    if augment_maxscale == 0.0:
         return None
 
-    auglist = []
-    try:
-        nltk.data.find("tagger/averaged_perceptron_tagger")
-    except LookupError:
-        nltk.download("averaged_perceptron_tagger")
-    for aug_type in augment_types:
-        if "(" in aug_type:
-            trans_mode = aug_type[0 : aug_type.find("(")]
-            kwargs = ast.literal_eval(aug_type[aug_type.find("(") :])
-        else:
-            trans_mode = aug_type
-            kwargs = {}
-        if trans_mode == "trivial_augment":
-            return TrivialAugment(TEXT, kwargs["max"])
-        elif trans_mode == "synonym_replacement":
-            kwargs["aug_src"] = "wordnet"
-            try:
-                nltk.data.find("corpora/wordnet")
-            except LookupError:
-                nltk.download("wordnet")
-            try:
-                nltk.data.find("corpora/omw-1.4")
-            except LookupError:
-                nltk.download("omw-1.4")
-            auglist.append(naw.SynonymAug(**kwargs))
-        elif trans_mode == "random_swap":
-            kwargs["action"] = "swap"
-            auglist.append(naw.RandomWordAug(**kwargs))
-        elif trans_mode == "random_delete":
-            kwargs["action"] = "delete"
-            auglist.append(naw.RandomWordAug(**kwargs))
-        elif trans_mode == "insert_punctuation":
-            auglist.append(InsertPunctuation(**kwargs))
-        else:
-            raise ValueError(f"unknown transform type: {trans_mode}")
+    if augment_types is None or len(augment_types) == 0:
+        return TrivialAugment(TEXT, max_strength = augment_maxscale) 
+    else:
+        auglist = []
+        for aug_type in augment_types:
 
-    return naf.Sequential(auglist)
+            if "(" in aug_type:
+                trans_mode = aug_type[0 : aug_type.find("(")]
+                args = ast.literal_eval(aug_type[aug_type.find("(") :])
+            else:
+                trans_mode = aug_type
+                args = None
+            
+            auglist.append((trans_mode, args))
+        
+        return TrivialAugment(TEXT, augment_maxscale, auglist)
 
 
 class TextProcessor:
@@ -119,6 +101,7 @@ class TextProcessor:
         stochastic_chunk: Optional[bool] = False,
         requires_column_info: bool = False,
         text_detection_length: Optional[int] = None,
+        text_trivial_aug_maxscale: Optional[float] = 0.0,
         train_augment_types: Optional[List[str]] = None,
     ):
         """
@@ -144,10 +127,12 @@ class TextProcessor:
             Whether to require feature column information in dataloader.
         text_detection_length
             A naive way to detect text column versus tabular column that were treated as text
-        trivial_augment_maxscale
+        text_trivial_aug_maxscale
             Used in trival augment as the maximum scale that can be random generated
             A value of 0 means turn off trivial augment
             https://arxiv.org/pdf/2103.10158.pdf
+        train_augment_types
+            All possible augmentation operations
         """
         self.prefix = prefix
         self.tokenizer_name = tokenizer_name
@@ -203,9 +188,9 @@ class TextProcessor:
         # construct augmentor
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
-        self.train_augmenter = construct_text_augmenter(self.train_augment_types)
-        print(self.train_augmenter)
-        #print(self.train_augmenter.all_transform)
+        self.text_trivial_aug_maxscale = text_trivial_aug_maxscale
+        self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
+
 
     @property
     def text_token_ids_key(self):
@@ -341,15 +326,11 @@ class TextProcessor:
 
         for col_name, col_text in text.items():
             if is_training:
-                # print("col_name", col_name)
-                # print("col_text", col_text)
                 if self.train_augmenter is not None:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
-                        # print("augment")
-                        col_text = self.train_augmenter.augment(col_text)
-                        # print(col_text)
-                        # print()
+                        col_text = self.train_augmenter(col_text)
+
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
@@ -495,7 +476,7 @@ class TextProcessor:
             if k != "train_augmenter":
                 setattr(result, k, deepcopy(v, memo))
         # manual recontruct augmenter
-        result.train_augmenter = construct_text_augmenter(result.train_augment_types)
+        result.train_augmenter = construct_text_augmenter(result.text_trivial_aug_maxscale, result.train_augment_types)
         return result
 
     def __getstate__(self):
@@ -505,4 +486,4 @@ class TextProcessor:
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self.train_augmenter = construct_text_augmenter(state["train_augment_types"])
+        self.train_augmenter = construct_text_augmenter(state["text_trivial_aug_maxscale"] ,state["train_augment_types"])
