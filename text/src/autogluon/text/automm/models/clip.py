@@ -197,7 +197,7 @@ class CLIPForImageText(nn.Module):
             for model_pre2 in model_prefixes[i + 1 :]:
                 if model_pre2.startswith(model_pre):
                     raise ValueError(
-                        f"{model_pre} is a substring of {model_pre2}. " f"Need to swap them in {model_prefixes}."
+                        f"{model_pre} is a substring of {model_pre2}. Need to swap them in {model_prefixes}."
                     )
 
         pre_encoder_patterns = ("embeddings", "pre")

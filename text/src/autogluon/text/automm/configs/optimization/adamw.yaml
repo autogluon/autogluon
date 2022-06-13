@@ -22,3 +22,6 @@ optimization:
     filter: # Default fine-tune only query and value attention weights, recommended in https://arxiv.org/abs/2106.09685
       - "query"
       - "value"
+  loss_function: "auto" # The replaced loss for regresssion. Can only support loss function in torch.nn.
+    # example
+    # "BCEWithLogitsLoss" or "nn.BCEWithLogitsloss"

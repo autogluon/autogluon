@@ -147,10 +147,10 @@ def is_imagepath_column(
             logger.warning(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
-                f"You may need to thoroughly check your data to see the percentage of missing images, "
-                f"and estimate the potential influence. By default, we skip the samples with missing images. "
-                f"You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                f"which uses a zero image to replace any missing image."
+                "You may need to thoroughly check your data to see the percentage of missing images, "
+                "and estimate the potential influence. By default, we skip the samples with missing images. "
+                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
+                "which uses a zero image to replace any missing image."
             )
         return True
     else:
@@ -245,14 +245,14 @@ def infer_column_problem_types(
             if num_train_missing > 0:
                 raise ValueError(
                     f"Label column '{col_name}' contains missing values in the "
-                    f"training data frame. You may want to filter your data because "
-                    f"missing label is currently not supported."
+                    "training data frame. You may want to filter your data because "
+                    "missing label is currently not supported."
                 )
             if num_valid_missing > 0:
                 raise ValueError(
                     f"Label column '{col_name}' contains missing values in the "
-                    f"validation data frame. You may want to filter your data because "
-                    f"missing label is currently not supported."
+                    "validation data frame. You may want to filter your data because "
+                    "missing label is currently not supported."
                 )
             if problem_type == MULTICLASS or problem_type == BINARY:
                 column_types[col_name] = CATEGORICAL
@@ -268,7 +268,7 @@ def infer_column_problem_types(
                 column_types[col_name] = NULL
             else:
                 warnings.warn(
-                    f"Label column '{col_name}' contains only one label. " f"You may need to check your dataset again."
+                    f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
                 )
         # Use the following way for type inference
         # 1) Infer categorical column

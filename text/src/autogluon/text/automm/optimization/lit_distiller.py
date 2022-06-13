@@ -158,7 +158,7 @@ class DistillerLitModule(pl.LightningModule):
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
-                f"which must be used with a customized metric function."
+                "which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
 
@@ -368,7 +368,7 @@ class DistillerLitModule(pl.LightningModule):
                 // self.trainer.accumulate_grad_batches
             )
             logger.debug(
-                f"len(trainer.datamodule.train_dataloader()): " f"{len(self.trainer.datamodule.train_dataloader())}"
+                f"len(trainer.datamodule.train_dataloader()): {len(self.trainer.datamodule.train_dataloader())}"
             )
             logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
             logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")

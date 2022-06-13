@@ -334,9 +334,9 @@ class ImageProcessor:
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
-                        message="Palette images with Transparency "
-                        "expressed in bytes should be "
-                        "converted to RGBA images",
+                        message=(
+                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                        ),
                     )
                     is_zero_img = False
                     try:
