@@ -16,7 +16,7 @@ from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from sklearn.preprocessing import LabelEncoder
 from autogluon.core.metrics import get_metric
-
+from .models.utils import inject_lora_to_linear_layer
 from .models import (
     HFAutoModelForTextPrediction,
     TimmAutoModelForImagePrediction,
@@ -693,6 +693,9 @@ def create_model(
         else:
             raise ValueError(f"unknown model name: {model_name}")
 
+        if config.optimization.efficient_finetune:
+            model = apply_model_adaptation(model, config)
+
         all_models.append(model)
 
     if len(all_models) > 1:
@@ -702,6 +705,29 @@ def create_model(
         return all_models[0]
     else:
         raise ValueError(f"No available models for {names}")
+
+
+def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
+    """
+    Apply an adaptation to the model for efficient fine-tuning.
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    config:
+        A DictConfig object. The optimization config should be accessible by "config.optimization".
+    """
+    if "lora" in config.optimization.efficient_finetune:
+        model = inject_lora_to_linear_layer(
+            model=model,
+            lora_r=config.optimization.lora.r,
+            lora_alpha=config.optimization.lora.alpha,
+            filter=config.optimization.lora.filter,
+        )
+
+    model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
+
+    return model
 
 
 def save_pretrained_models(
@@ -745,11 +771,11 @@ def save_pretrained_models(
 def convert_checkpoint_name(
         config: DictConfig,
         path: str
-) -> DictConfig:  
+) -> DictConfig:
     """
     Convert the checkpoint name from relative path to absolute path for
     loading the pretrained weights in offline deployment.
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()". 
+    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
 
     Parameters
     ----------
@@ -765,7 +791,7 @@ def convert_checkpoint_name(
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len('local://'):])
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'config.json')) # guarantee the existence of local configs
                 assert os.path.exists(os.path.join(model_config.checkpoint_name, 'pytorch_model.bin'))
-                
+
     return config
 
 

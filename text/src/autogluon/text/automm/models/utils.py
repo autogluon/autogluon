@@ -2,6 +2,7 @@ from typing import Optional, Union, Tuple, List, Dict
 import torch
 from torch import nn
 from ..constants import MASK
+from .lora_layers import LoRALinear
 
 
 def init_weights(module: nn.Module):
@@ -371,3 +372,41 @@ def get_column_features(
             ret[f"{key[cut_idx:]}_{MASK}"] = per_col_masks  # (b,)
 
     return ret
+
+
+def inject_lora_to_linear_layer(
+    model: nn.Module, lora_r: int, lora_alpha: int, filter: Optional[List[str]] = None
+) -> nn.Module:
+    """
+    Injects trainable Low-Rank decomposition matrices (LoRA) into linear
+    layers of a PyTorch model. Used for efficient fine-tuning of large
+    pre-trained models.
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    lora_r
+        The rank r of the low-rank decomposition.
+    lora_alpha
+        The scaling factor. Can be set to same value as r in
+        most cases, as initialization is scaled already.
+    filter
+        Apply LoRa only to linear layers filtered by name.
+        If None, LoRA is applied to all linear Layers in Model.
+    Returns
+    -------
+    Model with injected LoRA modules.
+    """
+    for n, module in model.named_children():
+        if len(list(module.children())) > 0:
+            inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
+
+        if isinstance(module, nn.Linear) and (not filter or any(x in n for x in filter)):
+            lora_layer = LoRALinear(
+                module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
+            )
+            lora_layer.weight = module.weight
+            lora_layer.bias = module.bias
+            setattr(model, n, lora_layer)
+
+    return model  # return model to enable method chaining
