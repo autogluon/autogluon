@@ -27,7 +27,7 @@ def init_weights(module: nn.Module):
 
 
 def assign_encoder_layer_ids(
-        encoder_names: List[List[str]],
+    encoder_names: List[List[str]],
 ):
     """
     Assign ids to encoder layers. The encoder may contain several blocks e.g., block1 and block2.
@@ -52,7 +52,7 @@ def assign_encoder_layer_ids(
         last_inferred_id = -1
         for n in group_names:
             detect_id = False
-            n_splits = n.split('.')
+            n_splits = n.split(".")
 
             for split in n_splits:
                 # the first digit encountered is used to infer layer id
@@ -78,8 +78,8 @@ def assign_encoder_layer_ids(
 
 
 def assign_non_encoder_layer_ids(
-        non_encoder_names: List[str],
-        layer_id: int,
+    non_encoder_names: List[str],
+    layer_id: int,
 ):
     """
     Assign the provided id to non-encoder layers.
@@ -136,10 +136,10 @@ def split_encoder_non_encoder(names: List[str]):
 
 
 def group_param_names(
-        names: List[str],
-        pre_encoder_patterns: Tuple[str, ...],
-        post_encoder_patterns: Tuple[str, ...],
-        model_prefix: Optional[str] = None,
+    names: List[str],
+    pre_encoder_patterns: Tuple[str, ...],
+    post_encoder_patterns: Tuple[str, ...],
+    model_prefix: Optional[str] = None,
 ):
     """
     Group layer names into three types: pre-encoder, encoder, and post-encoder.
@@ -188,7 +188,7 @@ def group_param_names(
     # split blocks at the first level
     children_prefix = []
     for n in selected_names:
-        child_name = n[len(model_prefix)+1:].split(".")[0]
+        child_name = n[len(model_prefix) + 1 :].split(".")[0]
         child_prefix = f"{model_prefix}.{child_name}"
         if child_prefix not in children_prefix:
             children_prefix.append(child_prefix)
@@ -216,9 +216,9 @@ def group_param_names(
 
 
 def reverse_layer_ids(
-        encoder_name_to_id: dict,
-        pre_enocder_name_to_id: dict,
-        post_enocder_name_to_id: dict,
+    encoder_name_to_id: dict,
+    pre_enocder_name_to_id: dict,
+    post_enocder_name_to_id: dict,
 ):
     """
     The layer ids need to increase when going from the output end to the input end.
@@ -250,10 +250,10 @@ def reverse_layer_ids(
 
 
 def assign_layer_ids(
-        names: List[str],
-        pre_encoder_patterns: Tuple[str, ...],
-        post_encoder_patterns: Tuple[str, ...],
-        model_pre: Optional[str] = None,
+    names: List[str],
+    pre_encoder_patterns: Tuple[str, ...],
+    post_encoder_patterns: Tuple[str, ...],
+    model_pre: Optional[str] = None,
 ):
     """
     Assign ids to all layers. It splits a model into three parts: pre-encoder, encoder, and post-encoder.
@@ -283,49 +283,39 @@ def assign_layer_ids(
     left_names
         The layer names not starting with the "model_pre".
     """
-    left_names, encoder_names, pre_encoder_names, post_encoder_names = \
-        group_param_names(
-            names=names,
-            pre_encoder_patterns=pre_encoder_patterns,
-            post_encoder_patterns=post_encoder_patterns,
-            model_prefix=model_pre,
-        )
+    left_names, encoder_names, pre_encoder_names, post_encoder_names = group_param_names(
+        names=names,
+        pre_encoder_patterns=pre_encoder_patterns,
+        post_encoder_patterns=post_encoder_patterns,
+        model_prefix=model_pre,
+    )
     # add a constraint
     if len(encoder_names) == 0 and len(pre_encoder_names) != 0:
-        raise ValueError(
-            f"encoder_names is empty, but pre_encoder_names has values: {pre_encoder_names}"
-        )
+        raise ValueError(f"encoder_names is empty, but pre_encoder_names has values: {pre_encoder_names}")
 
-    encoder_name_to_id, encoder_layer_num = \
-        assign_encoder_layer_ids(
-            encoder_names=encoder_names,
-        )
+    encoder_name_to_id, encoder_layer_num = assign_encoder_layer_ids(
+        encoder_names=encoder_names,
+    )
 
-    pre_encoder_name_to_id = \
-        assign_non_encoder_layer_ids(
-            non_encoder_names=pre_encoder_names,
-            layer_id=0
-        )
+    pre_encoder_name_to_id = assign_non_encoder_layer_ids(non_encoder_names=pre_encoder_names, layer_id=0)
 
-    post_encoder_name_to_id = \
-        assign_non_encoder_layer_ids(
-            non_encoder_names=post_encoder_names,
-            layer_id=encoder_layer_num + 1
-        )
+    post_encoder_name_to_id = assign_non_encoder_layer_ids(
+        non_encoder_names=post_encoder_names, layer_id=encoder_layer_num + 1
+    )
 
     name_to_id = reverse_layer_ids(
         encoder_name_to_id=encoder_name_to_id,
         pre_enocder_name_to_id=pre_encoder_name_to_id,
-        post_enocder_name_to_id=post_encoder_name_to_id
+        post_enocder_name_to_id=post_encoder_name_to_id,
     )
     return name_to_id, left_names
 
 
 def get_column_features(
-        batch: Dict[str, torch.Tensor],
-        column_name_prefix: str,
-        features: torch.Tensor,
-        valid_lengths: torch.Tensor,
+    batch: Dict[str, torch.Tensor],
+    column_name_prefix: str,
+    features: torch.Tensor,
+    valid_lengths: torch.Tensor,
 ):
     """
     Index the features of one column defined by `column_name_prefix`.

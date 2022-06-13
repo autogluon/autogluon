@@ -33,9 +33,7 @@ def _pad_arrs_to_max_length(arrs, pad_axis, pad_val, round_to=None, max_length=N
         if max_length < max_arr_len:
             raise ValueError(
                 "If max_length is specified, max_length={} must be larger "
-                "than the maximum length {} of the given arrays at axis={}.".format(
-                    max_length, max_arr_len, pad_axis
-                )
+                "than the maximum length {} of the given arrays at axis={}.".format(max_length, max_arr_len, pad_axis)
             )
         max_arr_len = max_length
 
@@ -116,18 +114,10 @@ class Pad:
     def __init__(self, axis=0, pad_val=0, round_to=None, max_length=None, ret_length=False):
         self._axis = axis
         if not isinstance(axis, int):
-            raise ValueError(
-                "axis must be an integer! Received axis={}, type={}.".format(
-                    str(axis), str(type(axis))
-                )
-            )
+            raise ValueError("axis must be an integer! Received axis={}, type={}.".format(str(axis), str(type(axis))))
 
         if round_to is not None and max_length is not None:
-            raise ValueError(
-                "Only either round_to={} or max_length={} can be specified.".format(
-                    round_to, max_length
-                )
-            )
+            raise ValueError("Only either round_to={} or max_length={} can be specified.".format(round_to, max_length))
 
         self._pad_val = 0 if pad_val is None else pad_val
         self._round_to = round_to
@@ -210,10 +200,7 @@ class Tuple:
             self._fn = (fn,) + args
         for i, ele_fn in enumerate(self._fn):
             if not hasattr(ele_fn, "__call__"):
-                raise ValueError(
-                    "Collate functions must be callable! "
-                    "type(fn[{}])={}".format(i, str(type(ele_fn)))
-                )
+                raise ValueError("Collate functions must be callable! " "type(fn[{}])={}".format(i, str(type(ele_fn))))
 
     def __call__(self, data):
         """
@@ -230,8 +217,7 @@ class Tuple:
         """
         if len(data[0]) != len(self._fn):
             raise ValueError(
-                "The number of attributes in each data sample "
-                "should contains {} elements".format(len(self._fn))
+                "The number of attributes in each data sample " "should contains {} elements".format(len(self._fn))
             )
         ret = []
         for i, ele_fn in enumerate(self._fn):
