@@ -8,7 +8,7 @@ setup_mxnet_gpu = """
     ls cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive/include/
     ls cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive/lib64/
 
-    echo $LD_LIBRARY_PATH
+    echo ${env.LD_LIBRARY_PATH}
 
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 
