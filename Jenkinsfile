@@ -1,19 +1,8 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    wget https://developer.nvidia.com/compute/cudnn/secure/8.4.0/local_installers/10.2/cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive.tar.xz
-
-    tar -xvf cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive.tar.xz
-
-    ls cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive/include/
-    ls cudnn-linux-x86_64-8.4.0.27_cuda10.2-archive/lib64/
-
-    echo ${env.LD_LIBRARY_PATH}
-
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-    python3 -m pip install mxnet-cu102==1.9.*
-
+    python3 -m pip install mxnet-cu101==1.9.*
     nvidia-smi
     ls -1a /usr/local | grep cuda
     pip freeze
@@ -75,8 +64,194 @@ install_autogluon = """
     python3 -m pip install --upgrade -e autogluon/
 """
 
+stage("Lint Check") {
+  parallel 'lint': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-lint-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-lint-py3-v3 -y
+          conda env update -n autogluon-lint-py3-v3 -f docs/build.yml
+          conda activate autogluon-lint-py3-v3
+          conda list
+          # Perform lint check
+          black --check --diff text/src/autogluon/text/automm
+          """
+        }
+      }
+    }
+  }
+}
+
 stage("Unit Test") {
-  parallel 'timeseries': {
+  parallel 'common': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-common-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-common-py3-v3 -y
+          conda env update -n autogluon-common-py3-v3 -f docs/build.yml
+          conda activate autogluon-common-py3-v3
+          conda list
+
+          ${install_common}
+          cd common/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'core': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-core-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-core-py3-v3 -y
+          conda env update -n autogluon-core-py3-v3 -f docs/build.yml
+          conda activate autogluon-core-py3-v3
+          conda list
+
+          ${install_core_all_tests}
+          cd core/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'features': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-features-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-features-py3-v3 -y
+          conda env update -n autogluon-features-py3-v3 -f docs/build.yml
+          conda activate autogluon-features-py3-v3
+          conda list
+
+          ${install_common}
+          ${install_features}
+          cd features/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'tabular': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tabular-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-tabular-py3-v3 -y
+          conda env update -n autogluon-tabular-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-tabular-py3-v3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+
+          ${install_core_all_tests}
+          ${install_features}
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+          ${install_tabular_all}
+          ${install_text}
+          ${install_vision}
+
+          cd tabular/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'text': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-text-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-text-py3-v3 -y
+          conda env update -n autogluon-text-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-text-py3-v3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+
+          ${install_core_all_tests}
+          ${install_features}
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+          ${install_text}
+          # launch different process for each test to make sure memory is released
+          python3 -m pip install --upgrade pytest-xdist
+
+          cd text/
+          python3 -m pytest --junitxml=results.xml --forked --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'vision': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-vision-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-vision-py3-v3 -y
+          conda env update -n autogluon-vision-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-vision-py3-v3
+          conda list
+          ${setup_torch_gpu}
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+
+          ${install_core_all_tests}
+          ${install_vision}
+
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+
+          cd vision/
+          python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'timeseries': {
     node('linux-gpu') {
       ws('workspace/autogluon-timeseries-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
@@ -90,7 +265,6 @@ stage("Unit Test") {
           conda env update -n autogluon-timeseries-py3-v3 -f docs/build_gpu.yml
           conda activate autogluon-timeseries-py3-v3
           conda list
-
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           ${install_core_all_tests}
