@@ -82,6 +82,9 @@ def main(args):
         'XGB': {},
         'NN': {},
         'AG_AUTOMM_NN': automm_hyperparameters,
+        'ag_args_ensemble': {
+            '_disable_parallel_fitting': True
+        }
     }
 
     if args.mode == 'single':
@@ -112,7 +115,12 @@ def main(args):
         print(scores)
     elif args.mode == 'weighted' or args.mode == 'single_bag5' or args.mode == 'stack5':
         if args.mode == 'single_bag5':
-            tabular_hyperparameters = {'AG_AUTOMM_NN': automm_hyperparameters}
+            tabular_hyperparameters = {
+                'AG_AUTOMM_NN': automm_hyperparameters,
+                'ag_args_ensemble': {
+                    '_disable_parallel_fitting': True
+                }
+            }
             num_bag_folds, num_stack_levels = 5, 0
         elif args.mode == 'weighted':
             num_bag_folds, num_stack_levels = None, None
