@@ -20,58 +20,58 @@ defaults:
     shell: bash
 
 jobs:
-  # test_common:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-  #         role-duration-seconds: 7200
-  #         aws-region: us-east-1
-  #     - name: Install dependencies
-  #       run: |
-  #         pip install boto3
-  #     - name: Test Common on AWS Batch(For push)
-  #       if: ${{ github.event_name == 'push' }}
-  #       run: |
-  #         echo "Start submitting job"
-  #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
-  #                                         --name AutoGluon-Common-${{ github.ref }} \
-  #                                         --source-ref ${{ github.ref }} \
-  #                                         --work-dir . \
-  #                                         --remote https://github.com/${{ github.repository }} \
-  #                                         --command "chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh" \
-  #                                         --wait
-  #     - name: Test Common on AWS Batch(For pull request)
-  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-  #       run: |
-  #         echo "Start submitting job"
-  #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
-  #                                         --name AutoGluon-Common-PR#${{ github.event.number }} \
-  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
-  #                                         --work-dir . \
-  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-  #                                         --command "chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh" \
-  #                                         --wait
-  #     - name: Cancel Batch Job if Action Cancelled(For push)
-  #       if: ${{ cancelled() && github.event_name == 'push' }}
-  #       run: |
-  #         echo "Cancelling job"
-  #         python ./CI/batch/cancel-job.py --region us-east-1 \
-  #                                          --job-type CI-CPU \
-  #                                          --name AutoGluon-Common-${{ github.ref }}
-  #     - name: Cancel Batch Job if Action Cancelled(For pull request)
-  #       if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-  #       run: |
-  #         echo "Cancelling job"
-  #         python ./CI/batch/cancel-job.py --region us-east-1 \
-  #                                          --job-type CI-CPU \
-  #                                          --name AutoGluon-Common-PR#${{ github.event.number }}
+  test_common:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+          role-duration-seconds: 7200
+          aws-region: us-east-1
+      - name: Install dependencies
+        run: |
+          pip install boto3
+      - name: Test Common on AWS Batch(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "Start submitting job"
+          python ./CI/batch/submit-job.py --region us-east-1 \
+                                          --job-type CI-CPU-PUSH \
+                                          --name AutoGluon-Common-${{ github.ref }} \
+                                          --source-ref ${{ github.ref }} \
+                                          --work-dir . \
+                                          --remote https://github.com/${{ github.repository }} \
+                                          --command "chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh" \
+                                          --wait
+      - name: Test Common on AWS Batch(For pull request)
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          echo "Start submitting job"
+          python ./CI/batch/submit-job.py --region us-east-1 \
+                                          --job-type CI-CPU \
+                                          --name AutoGluon-Common-PR#${{ github.event.number }} \
+                                          --source-ref ${{ github.event.pull_request.head.sha }} \
+                                          --work-dir . \
+                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+                                          --command "chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh" \
+                                          --wait
+      - name: Cancel Batch Job if Action Cancelled(For push)
+        if: ${{ cancelled() && github.event_name == 'push' }}
+        run: |
+          echo "Cancelling job"
+          python ./CI/batch/cancel-job.py --region us-east-1 \
+                                           --job-type CI-CPU \
+                                           --name AutoGluon-Common-${{ github.ref }}
+      - name: Cancel Batch Job if Action Cancelled(For pull request)
+        if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+        run: |
+          echo "Cancelling job"
+          python ./CI/batch/cancel-job.py --region us-east-1 \
+                                           --job-type CI-CPU \
+                                           --name AutoGluon-Common-PR#${{ github.event.number }}
   # test_core:
   #   runs-on: ubuntu-latest
   #   steps:
@@ -91,7 +91,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
+  #                                         --job-type CI-CPU-PUSH \
   #                                         --name AutoGluon-Core-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -143,7 +143,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
+  #                                         --job-type CI-CPU-PUSH \
   #                                         --name AutoGluon-Features-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -195,7 +195,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-Tabular-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -247,7 +247,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-Text-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -280,58 +280,58 @@ jobs:
   #         python ./CI/batch/cancel-job.py --region us-east-1 \
   #                                          --job-type CI-GPU \
   #                                          --name AutoGluon-Text-PR#${{ github.event.number }}
-  test_vision:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-          role-duration-seconds: 7200
-          aws-region: us-east-1
-      - name: Install dependencies
-        run: |
-          pip install boto3
-      - name: Test Vision on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-Vision-${{ github.ref }} \
-                                          --source-ref ${{ github.ref }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.repository }} \
-                                          --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
-                                          --wait
-      - name: Test Vision on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          echo "Start submitting job"
-          python ./CI/batch/submit-job.py --region us-east-1 \
-                                          --job-type CI-GPU \
-                                          --name AutoGluon-Vision-PR#${{ github.event.number }} \
-                                          --source-ref ${{ github.event.pull_request.head.sha }} \
-                                          --work-dir . \
-                                          --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-                                          --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
-                                          --wait
-      - name: Cancel Batch Job if Action Cancelled(For push)
-        if: ${{ cancelled() && github.event_name == 'push' }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-Vision-${{ github.ref }}
-      - name: Cancel Batch Job if Action Cancelled(For pull request)
-        if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-        run: |
-          echo "Cancelling job"
-          python ./CI/batch/cancel-job.py --region us-east-1 \
-                                           --job-type CI-GPU \
-                                           --name AutoGluon-Vision-PR#${{ github.event.number }}
+  # test_vision:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+  #         role-duration-seconds: 7200
+  #         aws-region: us-east-1
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install boto3
+  #     - name: Test Vision on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU-PUSH \
+  #                                         --name AutoGluon-Vision-${{ github.ref }} \
+  #                                         --source-ref ${{ github.ref }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.repository }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
+  #                                         --wait
+  #     - name: Test Vision on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  #       run: |
+  #         echo "Start submitting job"
+  #         python ./CI/batch/submit-job.py --region us-east-1 \
+  #                                         --job-type CI-GPU \
+  #                                         --name AutoGluon-Vision-PR#${{ github.event.number }} \
+  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
+  #                                         --work-dir . \
+  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
+  #                                         --command "chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh" \
+  #                                         --wait
+  #     - name: Cancel Batch Job if Action Cancelled(For push)
+  #       if: ${{ cancelled() && github.event_name == 'push' }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-Vision-${{ github.ref }}
+  #     - name: Cancel Batch Job if Action Cancelled(For pull request)
+  #       if: ${{ cancelled() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+  #       run: |
+  #         echo "Cancelling job"
+  #         python ./CI/batch/cancel-job.py --region us-east-1 \
+  #                                          --job-type CI-GPU \
+  #                                          --name AutoGluon-Vision-PR#${{ github.event.number }}
   # test_forecasting:
   #   runs-on: ubuntu-latest
   #   steps:
@@ -351,7 +351,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-Forecasting-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -403,7 +403,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
+  #                                         --job-type CI-CPU-PUSH \
   #                                         --name AutoGluon-Install-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -468,7 +468,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-BuildImagePrediction-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -533,7 +533,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-BuildObjectDetection-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -598,7 +598,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-BuildTabularPrediction-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -663,7 +663,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-BuildTextPrediction-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -729,7 +729,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
+  #                                         --job-type CI-CPU-PUSH \
   #                                         --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -795,7 +795,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-BuildForecasting-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
@@ -861,7 +861,7 @@ jobs:
   #       run: |
   #         echo "Start submitting job"
   #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-GPU \
+  #                                         --job-type CI-GPU-PUSH \
   #                                         --name AutoGluon-BuildAllDocs-${{ github.ref }} \
   #                                         --source-ref ${{ github.ref }} \
   #                                         --work-dir . \
