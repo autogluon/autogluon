@@ -168,6 +168,17 @@ class GenericGluonTSModel(AbstractGluonTSModel):
         params_dict["gluonts_estimator_class"] = self.gluonts_estimator_class
         return params_dict
 
+    def _get_estimator(self):
+        # TODO: temporarily disabling hybridization on GPU due to mxnet issue
+        # TODO: fixed in mxnet v2.0
+        if get_mxnet_context() != mx.context.cpu():
+            self.params["hybridize"] = False
+
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
+
 
 class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
     """Factory class for GenericGluonTSModel for convenience of use"""
