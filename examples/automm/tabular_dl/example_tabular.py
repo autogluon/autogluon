@@ -127,7 +127,8 @@ def main(args):
         predictor.fit(train_data.data,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
-                      num_stack_levels=num_stack_levels)
+                      num_stack_levels=num_stack_levels,
+                      _disable_parallel_fitting=True)
         leaderboard = predictor.leaderboard()
         leaderboard.to_csv(os.path.join(args.exp_dir, 'leaderboard.csv'))
     else:
