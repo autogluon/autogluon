@@ -242,7 +242,7 @@ class MergedLinear(nn.Linear, LoRALayer):
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
             # Compute the indices
-            self.lora_ind = self.weight.new_zeros((out_features, ), dtype=torch.bool).view(len(enable_lora), -1)
+            self.lora_ind = self.weight.new_zeros((out_features,), dtype=torch.bool).view(len(enable_lora), -1)
             self.lora_ind[enable_lora, :] = True
             self.lora_ind = self.lora_ind.view(-1)
         self.reset_parameters()
@@ -259,14 +259,13 @@ class MergedLinear(nn.Linear, LoRALayer):
     def zero_pad(self, x):
         result = x.new_zeros((*x.shape[:-1], self.out_features))
         result = result.view(-1, self.out_features)
-        result[:, self.lora_ind] = x.reshape(
-            -1, self.out_features // len(self.enable_lora) * sum(self.enable_lora)
-        )
+        result[:, self.lora_ind] = x.reshape(-1, self.out_features // len(self.enable_lora) * sum(self.enable_lora))
         return result.view((*x.shape[:-1], self.out_features))
 
     def train(self, mode: bool = True):
         def T(w):
             return w.T if self.fan_in_fan_out else w
+
         nn.Linear.train(self, mode)
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
@@ -286,9 +285,7 @@ class MergedLinear(nn.Linear, LoRALayer):
             # Merge the weights and mark it
             if self.r > 0 and any(self.enable_lora):
                 delta_w = F.conv1d(
-                    self.lora_A.data.unsqueeze(0),
-                    self.lora_B.data.unsqueeze(-1),
-                    groups=sum(self.enable_lora)
+                    self.lora_A.data.unsqueeze(0), self.lora_B.data.unsqueeze(-1), groups=sum(self.enable_lora)
                 ).squeeze(0)
                 self.weight.data += self.zero_pad(T(delta_w * self.scaling))
             self.merged = True
@@ -328,8 +325,8 @@ class Conv2d(nn.Conv2d, LoRALayer):
         assert type(kernel_size) is int
         # Actual trainable parameters
         if r > 0:
-            self.lora_A = nn.Parameter(self.weight.new_zeros((r*kernel_size, in_channels*kernel_size)))
-            self.lora_B = nn.Parameter(self.weight.new_zeros((out_channels*kernel_size, r*kernel_size)))
+            self.lora_A = nn.Parameter(self.weight.new_zeros((r * kernel_size, in_channels * kernel_size)))
+            self.lora_B = nn.Parameter(self.weight.new_zeros((out_channels * kernel_size, r * kernel_size)))
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
