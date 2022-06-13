@@ -24,11 +24,11 @@ class LoRALayer:
     Parameters
     ----------
     r
-        rank r of the low-rank decomposition
+        rank r of the low-rank decomposition.
     lora_alpha
         Scaling factor. Can be simply set to same value as r as initialization is scaled already.
     merge_weights
-        Merging weights during inference to reduce latency
+        Merging weights during inference to reduce latency.
 
     References
     ----------
@@ -64,17 +64,17 @@ class LoRALinear(nn.Linear, LoRALayer):
     Parameters
     ----------
     in_features
-        input dimension, set to the original linear layer input dimension LoRA is replacing
+        input dimension, set to the original linear layer input dimension LoRA is replacing.
     out_features
-        output dimension, set to the original linear layer output dimension LoRA is replacing
+        output dimension, set to the original linear layer output dimension LoRA is replacing.
     r
-        rank r of the low-rank decomposition
+        rank r of the low-rank decomposition.
     lora_alpha
         Scaling factor. Can be simply set to same value as r as initialization is scaled already.
     fan_in_fan_out
-        Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+        Set this to True if the layer to replace stores weight like (fan_in, fan_out).
     merge_weights
-        Merging weights during inference to reduce latency
+        Merging weights during inference to reduce latency.
 
     References
     ----------
@@ -149,8 +149,31 @@ class LoRALinear(nn.Linear, LoRALayer):
             return F.linear(x, self.T(self.weight), bias=self.bias)
 
 
-class Embedding(nn.Embedding, LoRALayer):
-    # LoRA implemented in a dense layer
+class LoRAEmbedding(nn.Embedding, LoRALayer):
+    """
+    LoRA incorporated in Embedding Layer. Weights of embedding layer are set to be frozen per default.
+
+    Parameters
+    ----------
+    num_embeddings
+        size of the dictionary of embeddings.
+    embedding_dim
+         the size of each embedding vector.
+    r
+        rank r of the low-rank decomposition.
+    lora_alpha
+        Scaling factor. Can be simply set to same value as r as initialization is scaled already.
+    merge_weights
+        Merging weights during inference to reduce latency.
+
+    References
+    ----------
+    1. Edward J. Hu*, Yelong Shen*, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen,
+    "LoRA: Low-Rank Adaptation of Large Language Models", 2021
+    https://arxiv.org/abs/2106.09685
+    2. Code: https://github.com/microsoft/LoRA
+    """
+
     def __init__(
         self,
         num_embeddings: int,
@@ -213,8 +236,35 @@ class Embedding(nn.Embedding, LoRALayer):
             return nn.Embedding.forward(self, x)
 
 
-class MergedLinear(nn.Linear, LoRALayer):
-    # LoRA implemented in a dense layer
+class LoRAMergedLinear(nn.Linear, LoRALayer):
+    """
+    LoRA where single nn.Linear represents more than one layer (used in some implementations of attention query/key/value projections). Weights of linear layer are set to be frozen per default.
+
+    Parameters
+    ----------
+    in_features
+        input dimension, set to the original linear layer input dimension LoRA is replacing
+    out_features
+        output dimension, set to the original linear layer output dimension LoRA is replacing
+    r
+        rank r of the low-rank decomposition
+    lora_alpha
+        Scaling factor. Can be simply set to same value as r as initialization is scaled already.
+    lora_dropout
+        Dropout rate for LoRA
+    fan_in_fan_out
+        Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+    merge_weights
+        Merging weights during inference to reduce latency
+
+    References
+    ----------
+    1. Edward J. Hu*, Yelong Shen*, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen,
+    "LoRA: Low-Rank Adaptation of Large Language Models", 2021
+    https://arxiv.org/abs/2106.09685
+    2. Code: https://github.com/microsoft/LoRA
+    """
+
     def __init__(
         self,
         in_features: int,
@@ -307,8 +357,35 @@ class MergedLinear(nn.Linear, LoRALayer):
             return result
 
 
-class Conv2d(nn.Conv2d, LoRALayer):
-    # LoRA implemented in a dense layer
+class LoRAConv2d(nn.Conv2d, LoRALayer):
+    """
+    LoRA incorporated in 2d-Convolutional Layer. Weights of convolutional layer are set to be frozen per default.
+
+    Parameters
+    ----------
+    in_channels
+         Number of channels in the input image.
+    out_channels
+        Number of channels produced by the convolution.
+    kernel_size
+        Size of the convolving kernel.
+    r
+        rank r of the low-rank decomposition.
+    lora_alpha
+        Scaling factor. Can be simply set to same value as r as initialization is scaled already.
+    lora_dropout
+        Adding dropout to LoRA.
+    merge_weights
+        Merging weights during inference to reduce latency.
+
+    References
+    ----------
+    1. Edward J. Hu*, Yelong Shen*, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen,
+    "LoRA: Low-Rank Adaptation of Large Language Models", 2021
+    https://arxiv.org/abs/2106.09685
+    2. Code: https://github.com/microsoft/LoRA
+    """
+
     def __init__(
         self,
         in_channels: int,

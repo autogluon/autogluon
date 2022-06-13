@@ -371,6 +371,7 @@ def inject_lora_to_linear_layer(
     Injects trainable Low-Rank decomposition matrices (LoRA) into linear
     layers of a PyTorch model. Used for efficient fine-tuning of large
     pre-trained models.
+
     Parameters
     ----------
     model

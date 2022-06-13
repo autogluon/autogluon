@@ -781,6 +781,7 @@ def create_model(
 def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     """
     Apply an adaptation to the model for efficient fine-tuning.
+
     Parameters
     ----------
     model
