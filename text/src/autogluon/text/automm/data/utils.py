@@ -91,7 +91,7 @@ class InsertPunctuation(Augmenter):
         """
         words = data.split(" ")
         cnt = random.randint(1, int(self.aug_p * len(words)))
-        loc = random.sample( range(0, len(words)), cnt)
+        loc = random.sample(range(0, len(words)), cnt)
         new = []
 
         for i, word in enumerate(words):

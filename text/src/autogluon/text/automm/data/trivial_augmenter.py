@@ -11,9 +11,10 @@ from PIL import ImageOps, ImageEnhance, ImageFilter, Image, ImageDraw
 import nlpaug.augmenter.word as naw
 from .utils import InsertPunctuation
 import nltk
-from ..constants import (IMAGE, TEXT, AUTOMM)
+from ..constants import IMAGE, TEXT, AUTOMM
 
 logger = logging.getLogger(AUTOMM)
+
 
 def scale_parameter(level, maxval, type):
     """
@@ -203,6 +204,7 @@ def set_image_augmentation_space():
     ]
     return image_all_transform
 
+
 def download_nltk():
     try:
         nltk.data.find("tagger/averaged_perceptron_tagger")
@@ -250,7 +252,7 @@ class TrivialAugment:
         max_strength
             Max strength for augmentation operation.
         space
-            Use to set augmentation space if specified in config. Text only for now. 
+            Use to set augmentation space if specified in config. Text only for now.
         """
         self.max_strength = max_strength
         self.data_type = datatype
@@ -275,7 +277,7 @@ class TrivialAugment:
 
     def augment_text(self, data):
         op = random.choice(self.all_transform)
-        
+
         # use specified operation magnitude if avalible
         if isinstance(op, tuple):
             op, scale = op
@@ -291,7 +293,7 @@ class TrivialAugment:
         elif op == "random_delete":
             op = naw.RandomWordAug(action="delete", aug_p=scale, aug_max=None)
         elif op == "insert_punc":
-            op = InsertPunctuation()   #scale will be randomized inside function
+            op = InsertPunctuation()  # scale will be randomized inside function
         else:
             raise NotImplementedError
         return op.augment(data)

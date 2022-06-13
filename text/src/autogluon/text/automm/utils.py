@@ -580,7 +580,7 @@ def init_data_processors(
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
                         text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
-                        text_trivial_aug_maxscale = OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
+                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )

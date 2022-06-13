@@ -13,14 +13,7 @@ from transformers import (
     AutoTokenizer,
     AutoConfig,
 )
-from ..constants import (
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    TEXT_SEGMENT_IDS,
-    AUTOMM,
-    COLUMN,
-    TEXT
-)
+from ..constants import TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, AUTOMM, COLUMN, TEXT
 from .collator import Stack, Pad
 from .utils import extract_value_from_config, InsertPunctuation
 import ast
@@ -66,7 +59,7 @@ def construct_text_augmenter(
         return None
 
     if augment_types is None or len(augment_types) == 0:
-        return TrivialAugment(TEXT, max_strength = augment_maxscale) 
+        return TrivialAugment(TEXT, max_strength=augment_maxscale)
     else:
         auglist = []
         for aug_type in augment_types:
@@ -77,9 +70,9 @@ def construct_text_augmenter(
             else:
                 trans_mode = aug_type
                 args = None
-            
+
             auglist.append((trans_mode, args))
-        
+
         return TrivialAugment(TEXT, augment_maxscale, auglist)
 
 
@@ -190,7 +183,6 @@ class TextProcessor:
         self.text_detection_length = text_detection_length
         self.text_trivial_aug_maxscale = text_trivial_aug_maxscale
         self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
-
 
     @property
     def text_token_ids_key(self):
@@ -486,4 +478,6 @@ class TextProcessor:
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self.train_augmenter = construct_text_augmenter(state["text_trivial_aug_maxscale"] ,state["train_augment_types"])
+        self.train_augmenter = construct_text_augmenter(
+            state["text_trivial_aug_maxscale"], state["train_augment_types"]
+        )
