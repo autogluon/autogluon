@@ -123,13 +123,13 @@ def main(args):
         from autogluon.tabular import TabularPredictor
         predictor = TabularPredictor(eval_metric=train_data.metric,
                                      label=train_data.label_column,
-                                     path=args.exp_path)
+                                     path=args.exp_dir)
         predictor.fit(train_data.data,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
                       num_stack_levels=num_stack_levels)
         leaderboard = predictor.leaderboard()
-        leaderboard.to_csv(os.path.join(args.exp_path, 'leaderboard.csv'))
+        leaderboard.to_csv(os.path.join(args.exp_dir, 'leaderboard.csv'))
     else:
         raise NotImplementedError
     scores = predictor.evaluate(
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_dir', default='./dataset', type=str)
     parser.add_argument('--exp_dir', default=None, type=str)
     parser.add_argument('--lr', default=1e-04, type=float)
-    parser.add_argument('--mode', choices=['single', 'weighted', 'single_bag5', 'stack5'])
+    parser.add_argument('--mode', choices=['single', 'weighted', 'single_bag5', 'stack5'], default='single')
     parser.add_argument('--seed', default=0, type=int)
     args = parser.parse_args()
 
