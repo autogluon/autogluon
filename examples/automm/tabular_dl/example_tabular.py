@@ -127,6 +127,7 @@ def main(args):
                                      label=train_data.label_column,
                                      path=args.exp_dir)
         predictor.fit(train_data.data,
+                      tuning_data=val_data.data,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
                       num_stack_levels=num_stack_levels,
