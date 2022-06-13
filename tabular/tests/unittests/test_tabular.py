@@ -102,8 +102,16 @@ def test_advanced_functionality():
     assert set(feature_importances.index) == original_features
     assert set(feature_importances.columns) == {'importance', 'stddev', 'p_value', 'n', 'p99_high', 'p99_low'}
     predictor.transform_features()
-    predictor.transform_features(data=test_data)
+    test_data_transformed = predictor.transform_features(data=test_data)
     predictor.info()
+
+    # Assert that transform_features=False works correctly
+    y_pred = predictor.predict(test_data)
+    y_pred_from_transform = predictor.predict(test_data_transformed, transform_features=False)
+    assert y_pred.equals(y_pred_from_transform)
+    y_pred_proba = predictor.predict_proba(test_data)
+    y_pred_proba_from_transform = predictor.predict_proba(test_data_transformed, transform_features=False)
+    assert y_pred_proba.equals(y_pred_proba_from_transform)
 
     assert predictor.get_model_names_persisted() == []  # Assert that no models were persisted during training
     assert predictor.unpersist_models() == []  # Assert that no models were unpersisted

@@ -65,7 +65,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_scaler = MinMaxScaler()
         elif numerical_label_preprocessing == "standardscaler":
             self._label_scaler = StandardScaler()
-        elif numerical_label_preprocessing is None:
+        elif numerical_label_preprocessing is None or numerical_label_preprocessing.lower() == "none":
             self._label_scaler = StandardScaler(with_mean=False, with_std=False)
         else:
             raise ValueError(

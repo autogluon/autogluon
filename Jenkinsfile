@@ -95,7 +95,7 @@ stage("Unit Test") {
         }
       }
     }
-  },
+  }
   'install': {
     node('linux-cpu') {
       ws('workspace/autogluon-install-py3-v3') {
