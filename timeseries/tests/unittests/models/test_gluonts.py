@@ -15,8 +15,10 @@ from autogluon.timeseries.models.gluonts import (
     # AutoTabularModel,
     GenericGluonTSModel,
     MQCNNModel,
+    MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
@@ -26,12 +28,13 @@ TESTABLE_MODELS = [
     # AutoTabularModel,  # TODO: enable tests when model is stabilized
     DeepARModel,
     MQCNNModel,
+    MQRNNModel,
     SimpleFeedForwardModel,
+    TransformerModel,
     partial(
         GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
     ),  # partial constructor for generic model
-    partial(GenericGluonTSModel, gluonts_estimator_class=TransformerEstimator),
-    GenericGluonTSModelFactory(MQRNNEstimator),
+    GenericGluonTSModelFactory(TransformerEstimator),
 ]
 
 if PROPHET_IS_INSTALLED:
