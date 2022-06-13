@@ -2,8 +2,10 @@
 
 set -ex
 
-PR_NUMBER=$(basename $1) # For push events, this will be master branch instead of PR number
-COMMIT_SHA=$2
+BRANCH=$(basename $1)
+GIT_REPO=$2
+COMMIT_SHA=$3
+PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 
 source $(dirname "$0")/env_setup.sh
 
@@ -20,10 +22,10 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
 fi
 
 cd ..
-# Verify we still own the bucket
-bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ ! -z bucket_query ]; then
-    aws s3 cp --recursive docs/_build/rst/tutorials/cloud_fit_deploy/ s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/cloud_fit_deploy/ --quiet
-else
-    echo Bucket does not belong to us anymore. Will not write to it
-fi;
+
+source $(dirname "$0")/write_to_s3.sh
+if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
+DOC_PATH=docs/_build/rst/tutorials/cloud_fit_deploy/
+S3_PATH=$BUCKET/cloud_fit_deploy/
+
+write_to_s3 $BUCKET $DOC_PATH $S3_PATH

@@ -12,8 +12,6 @@ set -ex
 
 source $(dirname "$0")/env_setup.sh
 
-if [[ -n $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; else build_docs_path=build_docs/$BRANCH/$COMMIT_SHA; fi
-
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-doc-staging'
@@ -43,8 +41,19 @@ then
     other_doc_version_branch='dev'
 fi
 
+if [[ -n $PR_NUMBER ]]; 
+then 
+    BUCKET=autogluon-ci
+    BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA
+    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all --quiet
+else
+    BUCKET=autogluon-ci=push
+    BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
+    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all --quiet
+fi
+
 mkdir -p docs/_build/rst/tutorials/
-aws s3 cp s3://autogluon-ci/$build_docs_path docs/_build/rst/tutorials/ --recursive
+aws s3 cp $BUILD_DOCS_PATH docs/_build/rst/tutorials/ --recursive
 
 setup_build_contrib_env
 install_all
@@ -64,22 +73,7 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-# Verify we still own the bucket
-bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ ! -z bucket_query ]; then
-    aws s3 cp --recursive _build/html/ s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all --quiet
-    echo "Uploaded doc to s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/all"
-else
-    echo Bucket does not belong to us anymore. Will not write to it
-fi;
-
-# Verify we still own the bucket
-bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ ! -z bucket_query ]; then
-    if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
-    then
-        aws s3 cp root_index.html s3://autogluon-ci/build_docs/${path}/$COMMIT_SHA/root_index.html
-    fi
-else
-    echo Bucket does not belong to us anymore. Will not write to it
-fi;
+# Write docs to s3
+write_to_s3 $BUCKET $DOC_PATH $S3_PATH
+# Write root_index to s3 if master
+write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/root_index.html
