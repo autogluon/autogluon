@@ -26,6 +26,9 @@ from autogluon.text.automm.constants import (
     BEST,
     NORM_FIT,
     BIT_FIT,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
 )
 from datasets import (
     PetFinderDataset,
