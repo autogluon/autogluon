@@ -1,9 +1,8 @@
 max_time = 180
 
 setup_mxnet_gpu = """
+    python3 -m pip install mxnet-cu102==1.8.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-
-    python3 -m pip install mxnet-cu102==1.9.*
     nvidia-smi
     ls -1a /usr/local | grep cuda
     pip freeze
@@ -266,7 +265,7 @@ stage("Unit Test") {
           conda env update -n autogluon-timeseries-py3-v3 -f docs/build_gpu_cu102.yml
           conda activate autogluon-timeseries-py3-v3
           conda list
-          ${setup_mxnet_gpu}
+          python3 -m pip install mxnet-cu102==1.9.*
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           ${install_core_all_tests}
           ${install_features}
@@ -325,7 +324,7 @@ stage("Build Tutorials") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon-tutorial-image-classification-v3 -y
-        conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_gpu_cu102.yml
+        conda env update -n autogluon-tutorial-image-classification-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-image-classification-v3
         conda list
         ${setup_mxnet_gpu}
@@ -358,7 +357,7 @@ stage("Build Tutorials") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon-tutorial-object-detection-v3 -y
-        conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_gpu_cu102.yml
+        conda env update -n autogluon-tutorial-object-detection-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-object-detection-v3
         conda list
         ${setup_mxnet_gpu}
@@ -419,7 +418,7 @@ stage("Build Tutorials") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon-tutorial-text-v3 -y
-        conda env update -n autogluon-tutorial-text-v3 -f docs/build_gpu_cu102.yml
+        conda env update -n autogluon-tutorial-text-v3 -f docs/build_contrib_gpu.yml
         conda activate autogluon-tutorial-text-v3
         conda list
         ${setup_mxnet_gpu}
@@ -477,10 +476,10 @@ stage("Build Tutorials") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon-tutorial-timeseries-v3 -y
-        conda env update -n autogluon-tutorial-timeseries-v3 -f docs/build_gpu_cu102.yml
+        conda env update -n autogluon-tutorial-timeseries-v3 -f docs/build_contrib_gpu_cu102.yml
         conda activate autogluon-tutorial-timeseries-v3
         conda list
-        ${setup_mxnet_gpu}
+        python3 -m pip install mxnet-cu102==1.9.*
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 
@@ -550,10 +549,10 @@ stage("Build Docs") {
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
         conda create -n autogluon_docs -y
-        conda env update -n autogluon_docs -f docs/build_gpu_cu102.yml
+        conda env update -n autogluon_docs -f docs/build_contrib_gpu_cu102.yml
         conda activate autogluon_docs
         conda list
-        ${setup_mxnet_gpu}
+        python3 -m pip install mxnet-cu102==1.9.*
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export AG_DOCS=1
 

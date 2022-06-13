@@ -1,0 +1,13 @@
+name: autogluon_py3
+channels:
+- conda-forge
+- defaults
+dependencies:
+- cudatoolkit=10.2
+- cudnn=8.2
+- nccl=2.12
+- python=3.9
+- pip
+- pip:
+  - -r requirements_doc.txt
+  - git+https://github.com/zhanghang1989/d2l-book
