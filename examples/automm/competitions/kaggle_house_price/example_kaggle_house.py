@@ -137,6 +137,6 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     if args.exp_path is None:
-        args.exp_path = f'automm_kaggle_house_{args.mode}_{args.automm_mode}_{args.text_backbone}'
+        args.exp_path = f'automm_kaggle_house_{args.mode}_{args.automm_mode}_cat_to_text{args.cat_to_text}_{args.text_backbone}'
     th.manual_seed(args.seed)
     train(args)
