@@ -708,10 +708,8 @@ def create_model(
     else:
         raise ValueError(f"No available models for {names}")
 
-def apply_model_adaptation(
-        model: nn.Module,
-        config: DictConfig
-) -> nn.Module:
+
+def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     """
     Apply an adaptation to the model for efficient fine-tuning.
 
@@ -722,17 +720,18 @@ def apply_model_adaptation(
     config:
         A DictConfig object. The optimization config should be accessible by "config.optimization".
     """
-    if 'lora' in config.optimization.efficient_finetune:
+    if "lora" in config.optimization.efficient_finetune:
         model = inject_lora_to_linear_layer(
-            model = model,
-            lora_r = config.optimization.lora.r,
-            lora_alpha = config.optimization.lora.alpha,
-            filter = config.optimization.lora.filter
+            model=model,
+            lora_r=config.optimization.lora.r,
+            lora_alpha=config.optimization.lora.alpha,
+            filter=config.optimization.lora.filter
         )
 
-    model.name_to_id = model.get_layer_ids() # Need to update name to id dictionary.
+    model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 
     return model
+
 
 def save_pretrained_models(
         model: nn.Module,

@@ -4,6 +4,7 @@ from torch import nn
 from ..constants import MASK
 from .lora_layers import LoRALinear
 
+
 def init_weights(module: nn.Module):
     """
     Initialize one module. It uses xavier_norm to initialize nn.Embedding
@@ -374,10 +375,7 @@ def get_column_features(
 
 
 def inject_lora_to_linear_layer(
-        model: nn.Module,
-        lora_r: int,
-        lora_alpha: int,
-        filter: Optional[List[str]] = None
+        model: nn.Module, lora_r: int, lora_alpha: int, filter: Optional[List[str]] = None
 ) -> nn.Module:
     """
     Injects trainable Low-Rank decomposition matrices (LoRA) into linear
@@ -403,12 +401,14 @@ def inject_lora_to_linear_layer(
     """
     for n, module in model.named_children():
         if len(list(module.children())) > 0:
-            inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter) # algorithm is in-place
+            inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
 
         if isinstance(module, nn.Linear) and (not filter or any(x in n for x in filter)):
-            lora_layer = LoRALinear(module.in_features, module.out_features, r= lora_r, lora_alpha=lora_alpha, merge_weights=False)
+            lora_layer = LoRALinear(
+                module.in_features, module.out_features, r= lora_r, lora_alpha=lora_alpha, merge_weights=False
+            )
             lora_layer.weight = module.weight
             lora_layer.bias = module.bias
             setattr(model, n, lora_layer)
 
-    return model # return model to enable method chaining
+    return model  # return model to enable method chaining

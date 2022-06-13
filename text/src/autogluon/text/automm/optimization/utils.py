@@ -399,6 +399,7 @@ def apply_two_stages_lr(
 
     return optimizer_grouped_parameters
 
+
 def apply_layerwise_lr_decay(
         model: nn.Module,
         lr: float,
@@ -439,7 +440,7 @@ def apply_layerwise_lr_decay(
     for name, param in model.named_parameters():
         if efficient_finetune == BIT_FIT:
             # For bit_fit, we disable tuning everything except the bias terms
-            if 'bias' not in name:
+            if "bias" not in name:
                 param.requires_grad = False
         elif efficient_finetune == NORM_FIT:
             # For norm-fit, we finetune all the normalization layers and bias layers
@@ -447,15 +448,15 @@ def apply_layerwise_lr_decay(
                 param.requires_grad = False
         elif efficient_finetune == LORA:
             # For LoRA adaptation we only fine-tune LoRA weights
-            if 'lora_' not in name:
+            if "lora_" not in name:
                 param.requires_grad = False
         elif efficient_finetune == LORA_BIAS:
             # For LoRA adapation we fine-tune LoRA and all bias weights
-            if 'lora_' not in name and "bias" not in name:
+            if "lora_" not in name and "bias" not in name:
                 param.requires_grad = False
         elif efficient_finetune == LORA_NORM:
             # For LoRA adapation we fine-tune LoRA and normalization and bias layers
-            if 'lora_' not in name and name not in norm_param_names and 'bias' not in name:
+            if "lora_" not in name and name not in norm_param_names and "bias" not in name:
                 param.requires_grad = False
 
         if not param.requires_grad:
