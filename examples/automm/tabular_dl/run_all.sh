@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DATASETS=$(
+DATASETS=[
 "ad"
 "al"
 "ca"
@@ -13,7 +13,7 @@ DATASETS=$(
 "mi"
 "ya"
 "ye"
-)
+]
 
 
 for dataset_name in ${DATASETS}
