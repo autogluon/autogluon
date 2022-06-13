@@ -119,7 +119,7 @@ class TextProcessor:
         stochastic_chunk: Optional[bool] = False,
         requires_column_info: bool = False,
         text_detection_length: Optional[int] = None,
-        train_augment_types: List[str] = [],
+        train_augment_types: Optional[List[str]] = None,
     ):
         """
         Parameters

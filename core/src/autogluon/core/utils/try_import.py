@@ -1,5 +1,9 @@
 import platform
 
+from types import ModuleType
+
+from ..version import __version__
+
 __all__ = [
     'try_import_mxboard',
     'try_import_mxnet',
@@ -8,10 +12,8 @@ __all__ = [
     'try_import_xgboost',
     'try_import_faiss',
     'try_import_fastai',
-    'try_import_cv2',
     'try_import_torch',
     'try_import_d8',
-    'try_import_skopt',
     'try_import_autogluon_text',
     'try_import_autogluon_vision',
     'try_import_rapids_cuml',
@@ -48,15 +50,15 @@ def try_import_mxnet():
             "or `pip install mxnet_cu101 --upgrade`")
 
 
-def try_import_ray():
+def try_import_ray() -> ModuleType:
     ray_max_version_os_map = dict(
-        Darwin='1.11.0',
-        Windows='1.11.0',
-        Linux='1.11.0',
+        Darwin='1.13.0',
+        Windows='1.13.0',
+        Linux='1.13.0',
     )
-    ray_min_version = '1.10.0'
+    ray_min_version = '1.12.0'
     current_os = platform.system()
-    ray_max_version = ray_max_version_os_map.get(current_os, '1.11.0')
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.13.0')
     try:
         import ray
         from distutils.version import LooseVersion
@@ -82,8 +84,8 @@ def try_import_catboost():
     try:
         import catboost
     except ImportError as e:
-        raise ImportError("`import catboost` failed."
-                          "A quick tip is to install via `pip install catboost`.")
+        raise ImportError("`import catboost` failed. "
+                          f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`.")
     except ValueError as e:
         raise ImportError("Import catboost failed. Numpy version may be outdated, "
                           "Please ensure numpy version >=1.17.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
@@ -95,7 +97,7 @@ def try_import_lightgbm():
         import lightgbm
     except ImportError as e:
         raise ImportError("`import lightgbm` failed. "
-                          "A quick tip is to install via `pip install lightgbm`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[lightgbm]=={__version__}`.")
     except OSError as e:
         raise ImportError("`import lightgbm` failed. If you are using Mac OSX, "
                           "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
@@ -106,7 +108,7 @@ def try_import_xgboost():
         import xgboost
     except ImportError:
         raise ImportError("`import xgboost` failed. "
-                          "A quick tip is to install via `pip install xgboost`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={__version__}`.")
 
 
 def try_import_faiss():
@@ -130,17 +132,7 @@ def try_import_fastai():
         import autogluon.tabular.models.fastainn.imports_helper
 
     except ModuleNotFoundError as e:
-        raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==2.*`. "
-                          "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")
-
-
-def try_import_cv2():
-    try:
-        import cv2
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency cv2. "
-            "A quick tip is to install via `pip install opencv-python`. ")
+        raise ImportError(f"Import fastai failed. A quick tip is to install via `pip install autogluon.tabular[fastai]=={__version__}`. ")
 
 
 def try_import_torch():
@@ -160,21 +152,12 @@ def try_import_d8():
                           "A quick tip is to install via `pip install d8`.\n")
 
 
-def try_import_skopt():
-    try:
-        import skopt
-    except ImportError:
-        raise ImportError("`import skopt` failed. skopt is an optional dependency and may not be installed.\n"
-                          "A quick tip is to install via `pip install scikit-optimize`.")
-
-
 def try_import_autogluon_text():
     try:
         import autogluon.text
     except ImportError:
         raise ImportError("`import autogluon.text` failed.\n"
-                          "A quick tip is to install via `pip install autogluon.text`.\n"
-                          "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
+                          f"A quick tip is to install via `pip install autogluon.text=={__version__}`.\n")
 
 
 def try_import_autogluon_vision():
@@ -182,8 +165,7 @@ def try_import_autogluon_vision():
         import autogluon.vision
     except ImportError:
         raise ImportError("`import autogluon.vision` failed.\n"
-                          "A quick tip is to install via `pip install autogluon.vision`.\n"
-                          "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
+                          f"A quick tip is to install via `pip install autogluon.vision=={__version__}`.\n")
 
 
 def try_import_rapids_cuml():
