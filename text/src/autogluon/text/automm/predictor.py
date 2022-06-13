@@ -437,7 +437,7 @@ class AutoMMPredictor:
         self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
-        
+
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
