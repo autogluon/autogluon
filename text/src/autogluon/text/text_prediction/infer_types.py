@@ -5,15 +5,17 @@ from typing import Union, Optional, List, Dict, Tuple
 from autogluon.core.constants import MULTICLASS, BINARY, REGRESSION
 from .constants import NULL, CATEGORICAL, NUMERICAL, TEXT
 
-#TODO, This file may later be merged with the infer type logic in tabular.
+# TODO, This file may later be merged with the infer type logic in tabular.
 
 
-def is_categorical_column(data: pd.Series,
-                          valid_data: pd.Series,
-                          threshold: int = None,
-                          ratio: Optional[float] = None,
-                          oov_ratio_threshold: Optional[float] = None,
-                          is_label: bool = False) -> bool:
+def is_categorical_column(
+    data: pd.Series,
+    valid_data: pd.Series,
+    threshold: int = None,
+    ratio: Optional[float] = None,
+    oov_ratio_threshold: Optional[float] = None,
+    is_label: bool = False,
+) -> bool:
     """Check whether the column is a categorical column.
 
     If the number of unique elements in the column is smaller than
@@ -44,7 +46,7 @@ def is_categorical_column(data: pd.Series,
     is_categorical
         Whether the column is a categorical column
     """
-    if data.dtype.name == 'category':
+    if data.dtype.name == "category":
         return True
     else:
         if threshold is None:
@@ -74,8 +76,7 @@ def is_categorical_column(data: pd.Series,
         return False
 
 
-def is_numerical_column(data: pd.Series,
-                        valid_data: Optional[pd.Series] = None):
+def is_numerical_column(data: pd.Series, valid_data: Optional[pd.Series] = None):
     """Try to identify if a column is a numerical column.
 
     We adopted a very simple rule to verify if the column is a numerical column.
@@ -102,11 +103,12 @@ def is_numerical_column(data: pd.Series,
 
 
 def infer_column_problem_types(
-        train_df: pd.DataFrame,
-        valid_df: pd.DataFrame,
-        label_columns: Union[str, List[str]],
-        problem_type: Optional[str] = None,
-        provided_column_types: Optional[Dict] = None) -> Tuple[collections.OrderedDict, str]:
+    train_df: pd.DataFrame,
+    valid_df: pd.DataFrame,
+    label_columns: Union[str, List[str]],
+    problem_type: Optional[str] = None,
+    provided_column_types: Optional[Dict] = None,
+) -> Tuple[collections.OrderedDict, str]:
     """Infer the column types of the data frame + the problem type
 
     Parameters
@@ -137,9 +139,9 @@ def infer_column_problem_types(
     elif isinstance(label_columns, (list, tuple)):
         pass
     else:
-        raise NotImplementedError(f'label_columns is not supported. label_columns={label_columns}.')
+        raise NotImplementedError(f"label_columns is not supported. label_columns={label_columns}.")
     label_set = set(label_columns)
-    assert len(label_set) == 1, 'Currently, only a single label column is supported.'
+    assert len(label_set) == 1, "Currently, only a single label column is supported."
     column_types = collections.OrderedDict()
     # Process all feature columns
 
@@ -152,13 +154,17 @@ def infer_column_problem_types(
             num_train_missing = train_df[col_name].isnull().sum()
             num_valid_missing = valid_df[col_name].isnull().sum()
             if num_train_missing > 0:
-                raise ValueError(f'Label column "{col_name}" contains missing values in the '
-                                 f'training data frame. You may want to filter your data because '
-                                 f'missing label is currently not supported.')
+                raise ValueError(
+                    f'Label column "{col_name}" contains missing values in the '
+                    f"training data frame. You may want to filter your data because "
+                    f"missing label is currently not supported."
+                )
             if num_valid_missing > 0:
-                raise ValueError(f'Label column "{col_name}" contains missing values in the '
-                                 f'validation data frame. You may want to filter your data because '
-                                 f'missing label is currently not supported.')
+                raise ValueError(
+                    f'Label column "{col_name}" contains missing values in the '
+                    f"validation data frame. You may want to filter your data because "
+                    f"missing label is currently not supported."
+                )
             if problem_type == MULTICLASS or problem_type == BINARY:
                 column_types[col_name] = CATEGORICAL
                 continue
@@ -172,14 +178,14 @@ def infer_column_problem_types(
             if not is_label:
                 column_types[col_name] = NULL
             else:
-                warnings.warn(f'Label column "{col_name}" contains only one label. You may want'
-                              f' to check your dataset again.')
+                warnings.warn(
+                    f'Label column "{col_name}" contains only one label. You may want' f" to check your dataset again."
+                )
         # Use the following way for type inference
         # 1) Inference categorical column
         # 2) Inference numerical column
         # 3) All the other columns are treated as text column
-        if is_categorical_column(train_df[col_name], valid_df[col_name],
-                                 is_label=is_label):
+        if is_categorical_column(train_df[col_name], valid_df[col_name], is_label=is_label):
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(train_df[col_name], valid_df[col_name]):
             column_types[col_name] = NUMERICAL
@@ -190,14 +196,13 @@ def infer_column_problem_types(
 
 
 def printable_column_type_string(column_types):
-    ret = 'Column Types:\n'
+    ret = "Column Types:\n"
     for col_name, col_type in column_types.items():
         ret += f'   - "{col_name}": {col_type}\n'
     return ret
 
 
-def infer_problem_type(column_types, label_column, data_df,
-                       provided_problem_type=None):
+def infer_problem_type(column_types, label_column, data_df, provided_problem_type=None):
     """Inference the type of the problem based on type of the column and
     the training data.
 
@@ -221,8 +226,10 @@ def infer_problem_type(column_types, label_column, data_df,
     """
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
-            err_msg = f'Provided problem type is "{provided_problem_type}" while the number of ' \
-                      f'unique value in the label column is {len(data_df[label_column].unique())}'
+            err_msg = (
+                f'Provided problem type is "{provided_problem_type}" while the number of '
+                f"unique value in the label column is {len(data_df[label_column].unique())}"
+            )
             if provided_problem_type == BINARY and len(data_df[label_column].unique()) != 2:
                 raise AssertionError(err_msg)
             elif provided_problem_type == MULTICLASS and len(data_df[label_column].unique()) <= 2:
@@ -237,5 +244,6 @@ def infer_problem_type(column_types, label_column, data_df,
         elif column_types[label_column] == NUMERICAL:
             return REGRESSION
         else:
-            raise ValueError(f'The label column "{label_column}" has type'
-                             f' "{column_types[label_column]}" and is supported yet.')
+            raise ValueError(
+                f'The label column "{label_column}" has type' f' "{column_types[label_column]}" and is supported yet.'
+            )
