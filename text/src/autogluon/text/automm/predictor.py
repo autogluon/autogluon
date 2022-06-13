@@ -22,6 +22,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities.types import _METRIC
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
+from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -478,7 +479,9 @@ class AutoMMPredictor:
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
         )
-
+        ray_tune_adapter = AutommRayTuneAdapter()
+        if try_import_ray_lightning():
+            ray_tune_adapter = AutommRayTuneLightningAdapter()
         search_space = _fit_args.get("hyperparameters", dict())
         metric = "val_" + _fit_args.get("validation_metric_name")
         mode = _fit_args.get("minmax_mode")
@@ -496,7 +499,7 @@ class AutoMMPredictor:
                 metric=metric,
                 mode=mode,
                 save_dir=save_path,
-                ray_tune_adapter=AutommRayTuneAdapter(),
+                ray_tune_adapter=ray_tune_adapter,
                 total_resources=resources,
                 time_budget_s=time_budget_s,
                 keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
@@ -899,7 +902,7 @@ class AutoMMPredictor:
             if use_ray_lightning:
                 from ray_lightning.tune import TuneReportCheckpointCallback
             else:
-                from ray.tune import TuneReportCheckpointCallback
+                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,

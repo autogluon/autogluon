@@ -1,7 +1,6 @@
 import psutil
 
 from abc import ABC, abstractmethod
-from ray_lightning.tune import get_tune_resources
 
 
 class ResourceCalculator(ABC):
@@ -126,6 +125,7 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
         model_estimate_memory_usage=None,
         **kwargs,
     ):
+        from ray_lightning.tune import get_tune_resources
         # TODO: for cpu case, is it better to have more workers or more cpus per worker?
         cpu_per_job = max(minimum_cpu_per_trial, total_num_cpus // num_samples)
         max_jobs_in_parallel_memory = num_samples
@@ -165,6 +165,7 @@ class RayLightningGpuResourceCalculator(ResourceCalculator):
         minimum_gpu_per_trial,
         **kwargs,
     ):
+        from ray_lightning.tune import get_tune_resources
         # Ray Tune requires 1 additional CPU per trial to use for the Trainable driver. 
         # So the actual number of cpu resources each trial requires is num_workers * num_cpus_per_worker + 1
         # Each ray worker will reserve 1 gpu

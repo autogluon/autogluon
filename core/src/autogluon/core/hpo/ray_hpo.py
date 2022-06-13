@@ -23,7 +23,6 @@ from .space_converter import RaySpaceConverterFactory
 from .. import Space
 
 from ray import tune
-from ray_lightning import RayPlugin
 from ray.tune import PlacementGroupFactory
 from ray.tune.sample import Domain
 from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler, PopulationBasedTraining
@@ -31,7 +30,6 @@ from ray.tune.schedulers.pb2 import PB2
 from ray.tune.suggest import SearchAlgorithm, Searcher
 from ray.tune.suggest.basic_variant import BasicVariantGenerator
 from ray.tune.suggest.hyperopt import HyperOptSearch
-from ray_lightning.tune import get_tune_resources
 
 
 logger = logging.getLogger(__name__)
@@ -457,6 +455,7 @@ class AutommRayTuneLightningAdapter(RayTuneAdapter):
         self.resources_per_trial = resources_info.get('resources_per_trial', None)
         
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
+        from ray_lightning import RayPlugin
         trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job
         trainable_args['hyperparameters']['env.num_workers'] = self.cpu_per_job
         trainable_args['hyperparameters']['env.num_nodes'] = 1  # num_nodes is not needed by ray lightning. Setting it to default, which is 1
