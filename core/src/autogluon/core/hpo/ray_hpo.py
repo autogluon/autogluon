@@ -16,7 +16,7 @@ from .constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
-from .resources_calculator import ResourceCalculator, ResourceCalculatorFactory
+from ..ray.resources_calculator import ResourceCalculatorFactory
 from .scheduler_factory import SchedulerFactory
 from .searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
@@ -111,10 +111,10 @@ class RayTuneAdapter(ABC):
         num_gpus = total_resources.get('num_gpus', 0)
         
         resources_calculator = self.get_resource_calculator(num_gpus=num_gpus)
-        resources_info = resources_calculator.get_resources_per_trial(
+        resources_info = resources_calculator.get_resources_per_job(
             total_num_cpus=num_cpus,
             total_num_gpus=num_gpus,
-            num_samples=num_samples,
+            num_jobs=num_samples,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
             model_estimate_memory_usage=model_estimate_memory_usage,
@@ -452,7 +452,7 @@ class AutommRayTuneLightningAdapter(RayTuneAdapter):
         self.gpu_per_job = resources_info.get('gpu_per_job', None)
         self.num_workers = resources_info.get('num_workers', None)
         self.cpu_per_worker = resources_info.get('cpu_per_worker', None)
-        self.resources_per_trial = resources_info.get('resources_per_trial', None)
+        self.resources_per_trial = resources_info.get('resources_per_job', None)
         
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         from ray_lightning import RayPlugin

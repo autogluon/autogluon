@@ -411,19 +411,47 @@ excluded_model_types = ['KNN', 'NN_TORCH', 'custom']
 predictor_light = TabularPredictor(label=label, eval_metric=metric).fit(train_data, excluded_model_types=excluded_model_types, time_limit=30)
 ```
 
+### (Advanced) Cache preprocessed data
+
+If you are repeatedly predicting on the same data you can cache the preprocessed version of the data and
+directly send the preprocessed data to `predictor.predict` for faster inference:
+
+```
+test_data_preprocessed = predictor.transform_features(test_data)
+
+# The following call will be faster than a normal predict call because we are skipping the preprocessing stage.
+predictions = predictor.predict(test_data_preprocessed, transform_features=False)
+```
+
+Note that this is only useful in situations where you are repeatedly predicting on the same data.
+If this significantly speeds up your use-case, consider whether your current approach makes sense
+or if a cache on the predictions is a better solution. 
+
+### (Advanced) Disable preprocessing
+
+If you would rather do data preprocessing outside of TabularPredictor,
+you can disable TabularPredictor's preprocessing entirely via:
+
+```
+predictor.fit(..., feature_generator=None, feature_metadata=YOUR_CUSTOM_FEATURE_METADATA)
+```
+
+Be warned that this removes ALL guardrails on data sanitization.
+It is very likely that you will run into errors doing this unless you are very familiar with AutoGluon.
+
+One instance where this can be helpful is if you have many problems
+that re-use the exact same data with the exact same features. If you had 30 tasks that re-use the same features,
+you could fit a `autogluon.features` feature generator once on the data, and then when you need to
+predict on the 30 tasks, preprocess the data only once and then send the preprocessed data to all 30 predictors.
+
 
 ## If you encounter memory issues
 
 To reduce memory usage during training, you may try each of the following strategies individually or combinations of them (these may harm accuracy):
 
-- In `fit()`, set `num_bag_sets = 1` (can also try values greater than 1 to harm accuracy less).
-
 - In `fit()`, set `excluded_model_types = ['KNN', 'XT' ,'RF']` (or some subset of these models).
-
 - Try different `presets` in `fit()`.
-
 - In `fit()`, set `hyperparameters = 'light'` or `hyperparameters = 'very_light'`.
-
 - Text fields in your table require substantial memory for N-gram featurization. To mitigate this in `fit()`, you can either: (1) add `'ignore_text'` to your `presets` list (to ignore text features), or (2) specify the argument:
 
 ```

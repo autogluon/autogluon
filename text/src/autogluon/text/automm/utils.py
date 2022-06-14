@@ -16,7 +16,7 @@ from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from sklearn.preprocessing import LabelEncoder
 from autogluon.core.metrics import get_metric
-
+from .models.utils import inject_lora_to_linear_layer
 from .models import (
     HFAutoModelForTextPrediction,
     TimmAutoModelForImagePrediction,
@@ -579,7 +579,8 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_detection_length"),
+                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
@@ -764,6 +765,9 @@ def create_model(
         else:
             raise ValueError(f"unknown model name: {model_name}")
 
+        if OmegaConf.select(config, "optimization.efficient_finetune"):
+            model = apply_model_adaptation(model, config)
+
         all_models.append(model)
 
     if len(all_models) > 1:
@@ -773,6 +777,30 @@ def create_model(
         return all_models[0]
     else:
         raise ValueError(f"No available models for {names}")
+
+
+def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
+    """
+    Apply an adaptation to the model for efficient fine-tuning.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    config:
+        A DictConfig object. The optimization config should be accessible by "config.optimization".
+    """
+    if "lora" in OmegaConf.select(config, "optimization.efficient_finetune"):
+        model = inject_lora_to_linear_layer(
+            model=model,
+            lora_r=config.optimization.lora.r,
+            lora_alpha=config.optimization.lora.alpha,
+            filter=config.optimization.lora.filter,
+        )
+
+    model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
+
+    return model
 
 
 def save_pretrained_models(

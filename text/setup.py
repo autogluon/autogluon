@@ -38,6 +38,7 @@ install_requires = [
     'omegaconf>=2.1.1,<2.2.0',
     'sentencepiece>=0.1.95,<0.2.0',
     f'autogluon.core[ray_tune]=={version}',
+    'protobuf<=3.18.1',  # https://github.com/awslabs/autogluon/issues/1762
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',

@@ -3,8 +3,10 @@ from .models import (
     DeepARModel,
     GenericGluonTSModel,
     MQCNNModel,
+    MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TransformerModel,
 )
 
 __all__ = [
@@ -12,6 +14,8 @@ __all__ = [
     "DeepARModel",
     "GenericGluonTSModel",
     "MQCNNModel",
+    "MQRNNModel",
     "ProphetModel",
     "SimpleFeedForwardModel",
+    "TransformerModel",
 ]

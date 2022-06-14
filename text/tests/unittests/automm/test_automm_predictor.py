@@ -4,6 +4,7 @@ import pytest
 import numpy.testing as npt
 import tempfile
 import copy
+import pickle
 
 from omegaconf import OmegaConf
 from ray import tune
@@ -25,6 +26,9 @@ from autogluon.text.automm.constants import (
     BEST,
     NORM_FIT,
     BIT_FIT,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
 )
 from datasets import (
     PetFinderDataset,
@@ -71,7 +75,7 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
-            NORM_FIT
+            LORA
         ),
 
         (
@@ -80,7 +84,7 @@ def verify_predictor_save_load(predictor, df,
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
             UNIFORM_SOUP,
-            BIT_FIT
+            LORA_NORM
         ),
 
         (
@@ -125,7 +129,7 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             None,
             BEST,
-            NORM_FIT
+            LORA_BIAS
         ),
 
         (
@@ -444,8 +448,9 @@ def test_model_configs():
                     'insert_sep': True, 
                     'text_segment_num': 2, 
                     'stochastic_chunk': False,
-                    'text_detection_length': 10,
-                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
+                    'text_aug_detect_length': 10,
+                    'text_trivial_aug_maxscale': 0.05,
+                    'test_train_augment_types' : ["synonym_replacement(0.1)"],
                 }, 
                 'timm_image': {
                     'checkpoint_name': 'swin_base_patch4_window7_224', 
@@ -470,8 +475,9 @@ def test_model_configs():
                     'insert_sep': False, 
                     'text_segment_num': 1, 
                     'stochastic_chunk': False,
-                    'text_detection_length': 10,
-                    'train_augment_types' : ["synonym_replacement({'aug_p': 0.1})"],
+                    'text_aug_detect_length': 10,
+                    'text_trivial_aug_maxscale': 0.05,
+                    'test_train_augment_types' : ["synonym_replacement(0.1)"],
                 }, 
                 'fusion_transformer': {
                     'hidden_size': 192, 
@@ -630,7 +636,10 @@ def test_textagumentor_deepcopy():
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
-        "model.hf_text.text_train_augment_types": ["synonym_replacement({'aug_p': 0.05})", "random_swap({'aug_p': 0.05})"]
+        "model.hf_text.text_trivial_aug_maxscale": 0.05,
+        "model.hf_text.text_train_augment_types": ["synonym_replacement(0.05)",
+                                                   "random_swap(0.05)"],
+        "optimization.top_k_average_method": "uniform_soup",
     }
 
     with tempfile.TemporaryDirectory() as save_path:
@@ -647,6 +656,18 @@ def test_textagumentor_deepcopy():
     predictor._df_preprocessor = df_preprocessor_copy
 
     # Test for copied preprocessor 
+    predictor.fit(
+        train_data=dataset.train_df,
+        config=config,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+
+    # Copy data preprocessor via pickle + load
+    df_preprocessor_copy_via_pickle = pickle.loads(pickle.dumps(predictor._df_preprocessor))
+    predictor._df_preprocessor = df_preprocessor_copy_via_pickle
+
+    # Test for copied preprocessor
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
@@ -783,3 +804,43 @@ def test_hpo_distillation(searcher, scheduler):
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         save_path=student_save_path,
     )
+
+def test_trivialaugment():
+    dataset = ALL_DATASETS["petfinder"]()
+    metric_name = dataset.metric
+
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    config = {
+        MODEL: f"fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "optimization.top_k_average_method": BEST,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
+        "data.mixup.turn_on": True,
+        "model.hf_text.text_trivial_aug_maxscale":0.1,
+        "model.hf_text.text_aug_detect_length":10,
+        "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
+    }
+
+    with tempfile.TemporaryDirectory() as save_path:
+        predictor.fit(
+            train_data=dataset.train_df,
+            config=config,
+            time_limit=30,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+        )
+
+        score = predictor.evaluate(dataset.test_df)
+        verify_predictor_save_load(predictor, dataset.test_df)
