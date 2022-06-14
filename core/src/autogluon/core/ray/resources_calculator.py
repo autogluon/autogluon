@@ -41,7 +41,11 @@ class CpuResourceCalculator(ResourceCalculator):
             # calculate how many jobs can run in parallel given memory available
             max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
         num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
-        cpu_per_job = max(minimum_cpu_per_trial, int(total_num_cpus // num_parallel_jobs))  # update cpu_per_job in case memory is not enough and can use more cores for each job
+        if num_parallel_jobs == 0:
+            raise AssertionError('Cannot train model with provided resources! '
+                                 f'num_cpus=={total_num_cpus} | '
+                                 f'min_cpus==({cpu_per_job}')
+        cpu_per_job = int(total_num_cpus // num_parallel_jobs)  # update cpu_per_job in case memory is not enough and can use more cores for each job
 
         resources_per_job = dict(cpu=cpu_per_job)
         batches = math.ceil(num_jobs / num_parallel_jobs)

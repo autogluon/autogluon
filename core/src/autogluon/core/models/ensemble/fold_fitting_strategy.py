@@ -347,7 +347,6 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     def __init__(self, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
-        self.num_parallel_jobs = num_folds_parallel
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
         self.time_start_fit = None
         self.time_end_fit = None
@@ -516,7 +515,6 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
     def _get_fold_time_limit(self, num_jobs):
         _, batches, _ = self._get_resource_suggestions(num_jobs)
-        print(self._get_resource_suggestions(num_jobs))
         time_elapsed = time.time() - self.time_start
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
