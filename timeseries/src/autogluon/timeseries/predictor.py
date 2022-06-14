@@ -21,14 +21,18 @@ logger = logging.getLogger(__name__)
 
 
 class TimeSeriesPredictor:
-    """autogluon.timeseries's TimeSeriesPredictor predicts future values of multiple related time-series by fitting
-    global timeseries models.
+    """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time-series by fitting
+    global time series models.
 
-    autogluon.timeseries provides probabilistic (distributional) forecasts for univariate time series, where the
-    timeseries model is essentially a mapping from the past of the time series to its future of length (i.e., forecast
-    horizon) defined by the user. The model learned "globally" from a collection of time series i.e., it is a
+    TimeSeriesPredictor provides probabilistic (distributional) forecasts for univariate time series, where the
+    time series model is essentially a mapping from the past of the time series to its future of length (i.e., forecast
+    horizon) defined by the user. The model is learned "globally" from a collection of time series; i.e., it is a
     set of time series model parameters that are shared across all time series to be predicted, in contrast to
     classical "local" approaches such as ARIMA.
+
+    TimeSeriesPredictor fits a variety of neural network-based forecasting models as well as Bayesian models such
+    as Prophet. It expects input data sets and outputs predictions in the
+    :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
     Parameters
     ----------
