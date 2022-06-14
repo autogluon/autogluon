@@ -11,6 +11,7 @@ PR_NUMBER=$4
 set -ex
 
 source $(dirname "$0")/env_setup.sh
+source $(dirname "$0")/write_to_s3.sh
 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then

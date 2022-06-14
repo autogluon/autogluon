@@ -9,7 +9,7 @@ set -ex
 
 source $(dirname "$0")/env_setup.sh
 
-if [[ -n $PR_NUMBER ]]; then build_docs_path=build_docs/$PR_NUMBER/$COMMIT_SHA; else build_docs_path=build_docs/$BRANCH/$COMMIT_SHA; fi
+if [[ -n $PR_NUMBER ]]; then BUILD_DOCS_PATH=s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUILD_DOCS_PATH=s3://autogluon-ci-push/build_docs/$BRANCH/$COMMIT_SHA; fi
 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
@@ -41,11 +41,11 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-aws s3 sync ${flags} s3://autogluon-ci/${build_docs_path}/all s3://${bucket}/${path} --acl public-read ${cacheControl}
+aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
 if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
 then
-    aws s3 cp s3://autogluon-ci/${build_docs_path}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
+    aws s3 cp ${BUILD_DOCS_PATH}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
     echo "Uploaded root_index.html s3://${bucket}/index.html"
 fi

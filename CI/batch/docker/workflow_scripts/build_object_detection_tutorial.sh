@@ -22,10 +22,9 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
 fi
 
 cd ..
-# Verify we still own the bucket
-bucket_query=$(aws s3 ls | grep -E "(^| )autogluon-ci( |$)")
-if [ ! -z bucket_query ]; then
-    aws s3 cp --recursive docs/_build/rst/tutorials/object_detection/ s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA/object_detection/ --quiet
-else
-    echo Bucket does not belong to us anymore. Will not write to it
-fi;
+
+if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
+DOC_PATH=docs/_build/rst/tutorials/object_detection/
+S3_PATH=$BUCKET/object_detection/
+
+write_to_s3 $BUCKET $DOC_PATH $S3_PATH
