@@ -346,8 +346,6 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
     def __init__(self, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
-        self.num_cpus = get_cpu_count()
-        self.num_gpus = None
         self.num_parallel_jobs = num_folds_parallel
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
         self.time_start_fit = None
@@ -360,6 +358,8 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         # initialize the model base to get necessary info for estimating memory usage
         self._initialized_model_base = copy.deepcopy(self.model_base)
         self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
+        self.num_cpus = self._get_cpu_count()
+        self.num_gpus = self._get_gpu_count()
 
     def is_mem_sufficient(self, num_jobs):
         '''Check if the memory is sufficient to do parallel training'''
@@ -376,20 +376,33 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         y_mem = get_approximate_df_mem_usage(self.y.to_frame()).sum()
         return X_mem + y_mem
 
+    # TODO: Move to generic location, re-use in parallel HPO
     def _get_gpu_count(self):
-        if not self.num_gpus:
-            _user_gpu_count = self.model_base.get_params().get('hyperparameters', {}). \
-                get('ag_args_fit', {}).get('num_gpus', 0)
-            model_base_class_name = self.model_base.__class__.__name__
-            # If user didn't specify num gpus and we are training text or image models,
-            # use all gpus.
-            if model_base_class_name in [TEXT_MODEL, IMAGE_MODEL] and _user_gpu_count == 0:
-                self.num_gpus = get_gpu_count_all()
-            else:
-                self.num_gpus = min(_user_gpu_count, get_gpu_count_all())
+        _user_gpu_count = self._initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
+        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
+
+        if _user_gpu_count is not None:
+            num_gpus = min(_user_gpu_count, get_gpu_count_all())
+        elif resource_kwargs['num_gpus'] > 0:
+            num_gpus = get_gpu_count_all()
+        else:
+            num_gpus = 0
+        return num_gpus
+
+    # TODO: Move to generic location, re-use in parallel HPO
+    def _get_cpu_count(self):
+        _user_cpu_count = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
+        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
+
+        if _user_cpu_count is not None:
+            num_cpus = min(_user_cpu_count, get_cpu_count())
+        elif resource_kwargs['num_cpus'] > 0:
+            num_cpus = get_cpu_count()
+        else:
+            num_cpus = 0
+        return num_cpus
 
     def schedule_fold_model_fit(self, fold_ctx):
-        self._get_gpu_count()
         if not self.ray.is_initialized():
             if self.num_gpus > 0:
                 self.ray.init(log_to_driver=False, num_gpus=self.num_gpus)
@@ -514,21 +527,27 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         return time_limit_fold
 
     def _get_resource_suggestions(self, num_jobs):
-        # TODO: We need to handle user provide custom num_cpus
-        cpu_per_job = max(1, int(self.num_cpus // self.num_parallel_jobs))
-        gpu_per_job = 0
-        resources = dict(num_cpus=cpu_per_job)
-        num_parallel_jobs = min(self.num_parallel_jobs, self.num_cpus // cpu_per_job)
+        model_min_resources = self._initialized_model_base.get_minimum_resources()
+
+        cpu_per_job = max(model_min_resources.get('num_cpus', 1), int(self.num_cpus // self.num_parallel_jobs))
+        gpu_per_job = max(model_min_resources.get('num_gpus', 0), int(self.num_gpus // self.num_parallel_jobs))
+        num_parallel_jobs = self.num_parallel_jobs
+        if cpu_per_job:
+            num_parallel_jobs = min(num_parallel_jobs, self.num_cpus // cpu_per_job)
+        if gpu_per_job:
+            num_parallel_jobs = min(num_parallel_jobs, self.num_gpus // gpu_per_job)
+        if num_parallel_jobs == 0:
+            raise AssertionError('Cannot train model with provided resources! '
+                                 f'(num_cpus, num_gpus)==({self.num_cpus}, {self.num_gpus}) | '
+                                 f'(min_cpus, min_gpus)==({cpu_per_job}, {gpu_per_job})')
+        cpu_per_job = int(self.num_cpus // num_parallel_jobs)
+        gpu_per_job = int(self.num_gpus // num_parallel_jobs)
         self.num_parallel_jobs = num_parallel_jobs
         batches = math.ceil(num_jobs / num_parallel_jobs)
-        if self.num_gpus and self.num_gpus > 0:
-            gpu_per_job = self.num_gpus / self.num_parallel_jobs
-            # For Image and Text model,
-            # we always guarantee a task has at least one full gpu to use
-            # FIXME: Avoid hardcoding model names.
-            if self.model_base.__class__.__name__ in [TEXT_MODEL, IMAGE_MODEL]:
-                gpu_per_job = max(1, math.ceil(gpu_per_job))
-            resources = dict(num_cpus=cpu_per_job, num_gpus=gpu_per_job)
+
+        resources = dict(num_cpus=cpu_per_job)
+        if gpu_per_job:
+            resources['num_gpus'] = gpu_per_job
         return resources, batches, num_parallel_jobs
 
     def _prepare_data(self, in_mem=True):
