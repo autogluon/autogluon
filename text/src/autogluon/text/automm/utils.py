@@ -584,7 +584,8 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_detection_length"),
+                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
@@ -1229,7 +1230,7 @@ def modify_duplicate_model_names(
 
     Returns
     -------
-    The predictor guaranteed has no duplicate model names with the backlist names.
+    The predictor guaranteed has no duplicate model names with the blacklist names.
     """
     model_names = []
     for n in predictor._config.model.names:
@@ -1365,6 +1366,7 @@ def try_to_infer_pos_label(
     else:
         pos_label = 1
 
+    logger.debug(f"pos_label: {pos_label}")
     return pos_label
 
 

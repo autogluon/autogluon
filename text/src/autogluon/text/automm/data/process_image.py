@@ -25,6 +25,7 @@ from ..constants import (
 )
 from .collator import Stack, Pad
 from .utils import extract_value_from_config
+from .trivial_augmenter import TrivialAugment
 
 logger = logging.getLogger(AUTOMM)
 
@@ -83,6 +84,10 @@ class ImageProcessor:
                 Use an image with zero pixels.
         requires_column_info
             Whether to require feature column information in dataloader.
+        trivial_augment_maxscale
+            Used in trival augment as the maximum scale that can be random generated
+            A value of 0 means turn off trivial augment
+            https://arxiv.org/pdf/2103.10158.pdf
         """
         self.checkpoint_name = checkpoint_name
         self.prefix = prefix
@@ -297,6 +302,8 @@ class ImageProcessor:
                     processor.append(RandAugment(*args))
                 else:
                     processor.append(RandAugment(2, 9))
+            elif trans_mode == "trivial_augment":
+                processor.append(TrivialAugment(IMAGE, 30))
             else:
                 raise ValueError(f"unknown transform type: {trans_mode}")
 
@@ -400,3 +407,13 @@ class ImageProcessor:
             per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
         }
         return self.process_one_sample(per_sample_paths, is_training)
+
+    def __getstate__(self):
+        odict = self.__dict__.copy()  # get attribute dictionary
+        del odict["train_processor"]  # remove augmenter to support pickle
+        return odict
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        if len(state["train_transform_types"]) > 0:
+            self.train_processor = self.construct_processor(self.train_transform_types)
