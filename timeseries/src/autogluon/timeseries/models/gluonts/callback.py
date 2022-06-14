@@ -2,9 +2,13 @@ import logging
 import time
 
 from gluonts.mx.trainer.callback import Callback
+from autogluon.core.utils.early_stopping import AdaptiveES
 
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_PATIENCE = 20
 
 
 class EpochCounter(Callback):
@@ -45,7 +49,7 @@ class GluonTSEarlyStoppingCallback(Callback):
     the loss is always minimized.
     """
 
-    def __init__(self, patience=10):
+    def __init__(self, patience=DEFAULT_PATIENCE):
         self.patience = patience
         self.best_round = 0
         self.best_loss = float("inf")
@@ -91,27 +95,19 @@ class GluonTSAdaptiveEarlyStoppingCallback(Callback):
     """
 
     def __init__(self, adaptive_rate=0.3, adaptive_offset=10, min_patience=10, max_patience=10000):
-        self.adaptive_rate = adaptive_rate
-        self.adaptive_offset = adaptive_offset
-        self.min_patience = min_patience
-        self.max_patience = max_patience
+        self.es = AdaptiveES(adaptive_rate, adaptive_offset, min_patience, max_patience)
         self.best_round = 0
         self.best_loss = float("inf")
-        self.patience = self._update_patience(self.best_round)
+        self.patience = self.es._update_patience(self.best_round)
 
     def on_validation_epoch_end(self, epoch_no, epoch_loss, **kwargs):
         if epoch_loss < self.best_loss:
             self.best_loss = epoch_loss
             self.best_round = epoch_no
-            self.patience = self._update_patience(self.best_round)
+            self.patience = self.es._update_patience(self.best_round)
             return True
         else:
             to_continue = (epoch_no - self.best_round) < self.patience
             if not to_continue:
                 logger.warning(f"Early stopping triggered, stop training. Best epoch {self.best_round}")
             return to_continue
-
-    def _update_patience(self, best_round):
-        return min(
-            self.max_patience, max(self.min_patience, round(best_round * self.adaptive_rate + self.adaptive_offset))
-        )

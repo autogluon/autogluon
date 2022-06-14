@@ -44,7 +44,7 @@ def test_adaptive_early_stopping(best_round, best_loss, epoch_no, epoch_loss, to
     es = GluonTSAdaptiveEarlyStoppingCallback()
     es.best_round = best_round
     es.best_loss = best_loss
-    es.patience = es._update_patience(best_round)
+    es.patience = es.es._update_patience(best_round)
     assert es.on_validation_epoch_end(epoch_no, epoch_loss) is to_continue
 
 
@@ -53,4 +53,4 @@ def test_adaptive_early_stopping(best_round, best_loss, epoch_no, epoch_loss, to
 )
 def test_adaptive_early_stopping_update_patience(best_round, patience):
     es = GluonTSAdaptiveEarlyStoppingCallback()
-    assert es._update_patience(best_round) == patience
+    assert es.es._update_patience(best_round) == patience
