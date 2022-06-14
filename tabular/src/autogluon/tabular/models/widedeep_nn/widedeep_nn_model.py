@@ -182,6 +182,8 @@ class WideDeepNNModel(AbstractModel):
 
         # prepare wide, crossed, embedding and continuous columns
         cont_cols = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
+        if not cont_cols:
+            cont_cols = None
 
         cat_cols = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
         cat_cols = CategoricalFeaturesFilter.filter(X, cat_cols, self.params.get('max_unique_categorical_values', 10000))
