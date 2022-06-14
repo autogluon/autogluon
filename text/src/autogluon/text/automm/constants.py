@@ -104,6 +104,9 @@ BEST = "best"
 # efficient finetuning strategies
 NORM_FIT = "norm_fit"
 BIT_FIT = "bit_fit"
+LORA = "lora"
+LORA_BIAS = "lora_bias"
+LORA_NORM = "lora_norm"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
