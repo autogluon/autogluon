@@ -424,13 +424,13 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         loss_func: Optional[_Loss] = None,
     ) -> NDArray[(Any,), Any]:
         """
-        Transform model's output logits into class labels for classification
+        Transform model's output logits/probability into class labels for classification
         or raw numerical values for regression.
 
         Parameters
         ----------
         y_pred
-            The model's output logits.
+            The model's output logits/probability.
         inverse_categorical
             Whether to transform categorical value back to the original space, e.g., string values.
         loss_func

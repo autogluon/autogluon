@@ -51,6 +51,8 @@ from .constants import (
     MODEL_CHECKPOINT,
     MODEL,
     DATA,
+    PROBABILITY,
+    MATCHER,
 )
 
 from .data.datamodule import BaseDataModule
@@ -88,6 +90,7 @@ from .optimization.utils import (
 )
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
+from .optimization.lit_matcher import MatcherLitModule
 
 from .. import version as ag_version
 
@@ -777,6 +780,16 @@ class AutoMMPredictor:
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path)
 
+        if hasattr(config, MATCHER):
+            warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
+            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
+            data_processors = turn_on_off_feature_column_info(
+                data_processors=data_processors,
+                flag=True,
+            )
+        else:
+            match_label = None
+
         if max_time == timedelta(seconds=0):
             self._top_k_average(
                 model=model,
@@ -842,6 +855,8 @@ class AutoMMPredictor:
             custom_metric_func=custom_metric_func,
         )
         is_distill = teacher_model is not None
+        is_match = hasattr(config, MATCHER)
+        assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
             task = DistillerLitModule(
                 student_model=model,
@@ -854,6 +869,14 @@ class AutoMMPredictor:
                 temperature=config.distiller.temperature,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
+        elif is_match:
+            task = MatcherLitModule(
+                model=model,
+                matches=config.matcher.matches,
+                match_label=match_label,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1182,6 +1205,11 @@ class AutoMMPredictor:
         else:
             strategy = None
 
+        if hasattr(self._config, MATCHER):
+            data_processors = turn_on_off_feature_column_info(
+                data_processors=data_processors,
+                flag=True,
+            )
         predict_dm = BaseDataModule(
             df_preprocessor=self._df_preprocessor,
             data_processors=data_processors,
@@ -1189,9 +1217,17 @@ class AutoMMPredictor:
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-        task = LitModule(
-            model=self._model,
-        )
+        if hasattr(self._config, MATCHER):
+            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
+            task = MatcherLitModule(
+                model=self._model,
+                matches=self._config.matcher.matches,
+                match_label=match_label,
+            )
+        else:
+            task = LitModule(
+                model=self._model,
+            )
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
@@ -1228,6 +1264,9 @@ class AutoMMPredictor:
         if ret_type == LOGITS:
             logits = [ele[LOGITS] for ele in outputs]
             ret = torch.cat(logits)
+        elif ret_type == PROBABILITY:
+            probability = [ele[PROBABILITY] for ele in outputs]
+            ret = torch.cat(probability)
         elif ret_type == FEATURES:
             features = [ele[FEATURES] for ele in outputs]
             ret = torch.cat(features)
@@ -1267,23 +1306,31 @@ class AutoMMPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        logits = self._predict(
+        if hasattr(self._config, MATCHER):
+            ret_type = PROBABILITY
+        else:
+            ret_type = LOGITS
+
+        logits_or_prob = self._predict(
             data=data,
-            ret_type=LOGITS,
+            ret_type=ret_type,
             requires_label=True,
         )
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
-            y_pred_prob = self._logits_to_prob(logits)
+            if ret_type == LOGITS:
+                y_pred_prob = self._logits_to_prob(logits_or_prob)
+            else:
+                y_pred_prob = logits_or_prob.detach().cpu().float().numpy()
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(
-            y_pred=logits,
+            y_pred=logits_or_prob,
             inverse_categorical=False,
             loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
-        y_pred_transformed = self._df_preprocessor.transform_prediction(
-            y_pred=logits,
+        y_pred_inv = self._df_preprocessor.transform_prediction(
+            y_pred=logits_or_prob,
             inverse_categorical=True,
             loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
@@ -1319,7 +1366,7 @@ class AutoMMPredictor:
             results[per_metric] = score
 
         if return_pred:
-            return results, self.as_pandas(data=data, to_be_converted=y_pred_transformed)
+            return results, self.as_pandas(data=data, to_be_converted=y_pred_inv)
         else:
             return results
 
@@ -1343,14 +1390,18 @@ class AutoMMPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+        if hasattr(self._config, MATCHER):
+            ret_type = PROBABILITY
+        else:
+            ret_type = LOGITS
 
-        logits = self._predict(
+        logits_or_prob = self._predict(
             data=data,
-            ret_type=LOGITS,
+            ret_type=ret_type,
             requires_label=False,
         )
         pred = self._df_preprocessor.transform_prediction(
-            y_pred=logits,
+            y_pred=logits_or_prob,
             loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
         if as_pandas:
@@ -1389,16 +1440,30 @@ class AutoMMPredictor:
             MULTICLASS,
         ], f"Problem {self._problem_type} has no probability output."
 
-        logits = self._predict(
+        if hasattr(self._config, MATCHER):
+            ret_type = PROBABILITY
+        else:
+            ret_type = LOGITS
+
+        logits_or_prob = self._predict(
             data=data,
-            ret_type=LOGITS,
+            ret_type=ret_type,
             requires_label=False,
         )
-        prob = self._logits_to_prob(logits)
+
+        if ret_type == LOGITS:
+            prob = self._logits_to_prob(logits_or_prob)
+        else:
+            prob = logits_or_prob.detach().cpu().float().numpy()
 
         if not as_multiclass:
             if self._problem_type == BINARY:
-                prob = prob[:, 1]
+                pos_label = try_to_infer_pos_label(
+                    data_config=self._config.data,
+                    label_encoder=self._df_preprocessor.label_generator,
+                    problem_type=self._problem_type,
+                )
+                prob = prob[:, pos_label]
         if as_pandas:
             prob = self.as_pandas(data=data, to_be_converted=prob)
         return prob
