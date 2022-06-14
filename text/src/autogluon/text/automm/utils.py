@@ -780,6 +780,7 @@ def create_model(
         return fusion_model(models=all_models)
     elif len(all_models) == 1:
         if isinstance(all_models[0], NumericalTransformer) or isinstance(all_models[0], CategoricalTransformer):
+            # retain fusion model for uni-modal tabular data
             return fusion_model(models=all_models)
         else:
             return all_models[0]
