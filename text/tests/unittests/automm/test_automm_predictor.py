@@ -26,6 +26,9 @@ from autogluon.text.automm.constants import (
     BEST,
     NORM_FIT,
     BIT_FIT,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
 )
 from datasets import (
     PetFinderDataset,
@@ -72,7 +75,7 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
-            NORM_FIT
+            LORA
         ),
 
         (
@@ -81,7 +84,7 @@ def verify_predictor_save_load(predictor, df,
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
             UNIFORM_SOUP,
-            BIT_FIT
+            LORA_NORM
         ),
 
         (
@@ -126,7 +129,7 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             None,
             BEST,
-            NORM_FIT
+            LORA_BIAS
         ),
 
         (
