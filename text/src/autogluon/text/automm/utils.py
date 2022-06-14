@@ -778,7 +778,7 @@ def create_model(
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=all_models)
     elif len(all_models) == 1:
-        if isinstance(all_models[0],NumericalTransformer) or isinstance(all_models[0],CategoricalTransformer):
+        if isinstance(all_models[0], NumericalTransformer) or isinstance(all_models[0], CategoricalTransformer):
             return fusion_model(models=all_models)
         else:
             return all_models[0]
