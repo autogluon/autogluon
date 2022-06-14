@@ -259,6 +259,7 @@ class TrivialAugment:
         if datatype == IMAGE:
             self.all_transform = set_image_augmentation_space()
         elif datatype == TEXT:
+            download_nltk()
             self.all_transform = set_text_augmentation_space(space)
         else:
             raise NotImplementedError
