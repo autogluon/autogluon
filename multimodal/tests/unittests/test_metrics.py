@@ -3,8 +3,8 @@ import random
 import torch
 from torchmetrics import MeanMetric
 from sklearn.metrics import log_loss
-from autogluon.text.automm.optimization.utils import get_metric, get_loss_func
-from autogluon.text.automm.constants import MULTICLASS
+from autogluon.multimodal.optimization.utils import get_metric, get_loss_func
+from autogluon.multimodal.constants import MULTICLASS
 
 
 @pytest.mark.parametrize(
@@ -13,7 +13,7 @@ from autogluon.text.automm.constants import MULTICLASS
         ("log_loss", 5),
         ("log_loss", 10),
         ("cross_entropy", 100),
-    ]
+    ],
 )
 def test_cross_entropy(metric_name, class_num):
     preds = []
@@ -46,7 +46,7 @@ def test_cross_entropy(metric_name, class_num):
     "problem_type,loss_func_name",
     [
         ("regression", "bcewithlogitsloss"),
-    ]
+    ],
 )
 def test_bce_with_logits_loss(problem_type, loss_func_name):
     preds = []

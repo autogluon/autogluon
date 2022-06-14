@@ -1631,6 +1631,7 @@ class AutoMMPredictor:
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
             df_preprocessor = pickle.load(fp)
+            df_preprocessor.__class__ = MultiModalFeaturePreprocessor  # backward compatibility.
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:

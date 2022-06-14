@@ -1,4 +1,4 @@
-from ..automm.presets import get_preset
+from autogluon.multimodal.presets import get_preset
 
 
 def list_text_presets(verbose=False):
@@ -32,7 +32,7 @@ def list_text_presets(verbose=False):
             "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
             "optimization.top_k": 1,
             "optimization.lr_decay": 0.9,
-            "env.precision": 'bf16',
+            "env.precision": "bf16",
             "env.per_gpu_batch_size": 4,
         },
     }
@@ -68,8 +68,7 @@ def get_text_preset(preset: str):
         overrides.update(available_presets[preset])
     else:
         raise ValueError(
-            f"Provided preset '{preset}' is not supported. "
-            f"Consider one of these: {list_text_presets()}"
+            f"Provided preset '{preset}' is not supported. " f"Consider one of these: {list_text_presets()}"
         )
 
     return automm_preset, overrides

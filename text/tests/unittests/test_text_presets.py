@@ -1,15 +1,16 @@
 import pytest
 import functools
-from autogluon.text.text_prediction.presets import (
+from autogluon.multimodal.utils import get_config
+from autogluon.text.presets import (
     get_text_preset,
     list_text_presets,
 )
-from autogluon.text.automm.utils import get_config
 
 
 def rgetattr(obj, attr, *args):
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
+
     return functools.reduce(_getattr, [obj] + attr.split("."))
 
 

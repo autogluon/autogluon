@@ -33,11 +33,11 @@ all the unit tests:
 ```
 pytest unittests/
 ```
-You can also run unit tests in one file, e.g., `unittests/automm/test_utils.py`:
+You can also run unit tests in one file, e.g., `unittests/test_utils.py`:
 ```
-pytest unittests/automm/test_utils.py
+pytest unittests/test_utils.py
 ```
 Furthermore, testing one function is also easy:
 ```
-pytest unittests/automm/test_utils.py -k test_inferring_pos_label
+pytest unittests/test_utils.py -k test_inferring_pos_label
 ```

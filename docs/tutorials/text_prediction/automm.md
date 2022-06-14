@@ -101,7 +101,7 @@ test_data = test_data.sample(100, random_state=0)
 
 
 ```{.python .input}
-from autogluon.text.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
@@ -128,7 +128,7 @@ Let's use `AutoMMPredictor` to train a late fusion model including [CLIP](https:
 
 
 ```{.python .input}
-from autogluon.text.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
@@ -154,7 +154,7 @@ If you want to use only image data or your tasks only have image data, `AutoMMPr
 
 
 ```{.python .input}
-from autogluon.text.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
@@ -180,7 +180,7 @@ Similarly, you may be interested in only finetuning the text backbones from [hug
 
 
 ```{.python .input}
-from autogluon.text.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 predictor = AutoMMPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
@@ -208,7 +208,7 @@ First, let's see the available model presets.
 
 
 ```{.python .input}
-from autogluon.text.automm.presets import list_model_presets, get_preset
+from autogluon.multimodal.presets import list_model_presets, get_preset
 model_presets = list_model_presets()
 model_presets
 ```
@@ -226,7 +226,7 @@ preset
 
 ```{.python .input}
 from omegaconf import OmegaConf
-from autogluon.text.automm.utils import get_config
+from autogluon.multimodal.utils import get_config
 config = get_config(preset)
 print(OmegaConf.to_yaml(config))
 ```
