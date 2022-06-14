@@ -5,7 +5,6 @@ from ..constants import MASKS, COLUMN_FEATURES, FEATURES
 from .lora_layers import LoRALinear
 
 
-
 def init_weights(module: nn.Module):
     """
     Initialize one module. It uses xavier_norm to initialize nn.Embedding
