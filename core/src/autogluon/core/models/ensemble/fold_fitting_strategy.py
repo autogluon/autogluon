@@ -13,6 +13,7 @@ from pandas import DataFrame, Series
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
+from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 from ...utils import get_cpu_count, get_gpu_count_all
 from ...utils.try_import import try_import_ray
@@ -515,6 +516,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
     def _get_fold_time_limit(self, num_jobs):
         _, batches, _ = self._get_resource_suggestions(num_jobs)
+        print(self._get_resource_suggestions(num_jobs))
         time_elapsed = time.time() - self.time_start
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
@@ -528,26 +530,24 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
     def _get_resource_suggestions(self, num_jobs):
         model_min_resources = self._initialized_model_base.get_minimum_resources()
+        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if self.num_gpus == 0 else 'gpu')
+        resources_info = resources_calculator.get_resources_per_job(
+            total_num_cpus=self.num_cpus,
+            total_num_gpus=self.num_gpus,
+            num_jobs=num_jobs,
+            minimum_cpu_per_trial=model_min_resources.get('num_cpus', 1),
+            minimum_gpu_per_trial=model_min_resources.get('num_gpus', 0),
+        )
+        resources = resources_info.get('resources_per_job')
+        num_parallel_jobs = resources_info.get('num_parallel_jobs')
+        batches = resources_info.get('batches')
 
-        cpu_per_job = max(model_min_resources.get('num_cpus', 1), int(self.num_cpus // self.num_parallel_jobs))
-        gpu_per_job = max(model_min_resources.get('num_gpus', 0), int(self.num_gpus // self.num_parallel_jobs))
-        num_parallel_jobs = self.num_parallel_jobs
-        if cpu_per_job:
-            num_parallel_jobs = min(num_parallel_jobs, self.num_cpus // cpu_per_job)
-        if gpu_per_job:
-            num_parallel_jobs = min(num_parallel_jobs, self.num_gpus // gpu_per_job)
-        if num_parallel_jobs == 0:
-            raise AssertionError('Cannot train model with provided resources! '
-                                 f'(num_cpus, num_gpus)==({self.num_cpus}, {self.num_gpus}) | '
-                                 f'(min_cpus, min_gpus)==({cpu_per_job}, {gpu_per_job})')
-        cpu_per_job = int(self.num_cpus // num_parallel_jobs)
-        gpu_per_job = int(self.num_gpus // num_parallel_jobs)
-        self.num_parallel_jobs = num_parallel_jobs
-        batches = math.ceil(num_jobs / num_parallel_jobs)
+        # renname key to match ray job requirement
+        resources['num_cpus'] = resources.pop('cpu')
+        num_gpus = resources.pop('gpu', None)
+        if num_gpus is not None and num_gpus > 0:
+            resources['num_gpus'] = num_gpus
 
-        resources = dict(num_cpus=cpu_per_job)
-        if gpu_per_job:
-            resources['num_gpus'] = gpu_per_job
         return resources, batches, num_parallel_jobs
 
     def _prepare_data(self, in_mem=True):
