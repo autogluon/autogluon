@@ -1,7 +1,7 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    python3 -m pip install mxnet-cu102==1.8.*
+    python3 -m pip install mxnet-cu102==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
     ls -1a /usr/local | grep cuda
@@ -293,7 +293,7 @@ stage("Unit Test") {
           conda activate autogluon-install-py3-v3
           conda list
 
-          python3 -m pip install 'mxnet==1.7.0.*'
+          python3 -m pip install 'mxnet==1.9.*'
 
           ${install_core_all_tests}
           ${install_features}
