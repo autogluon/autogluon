@@ -16,7 +16,7 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
-from .. import TimeSeriesDataFrame, TimeSeriesEvaluator
+from .. import TimeSeriesEvaluator, TimeSeriesDataFrame
 from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.warning_filters import disable_tqdm
@@ -552,7 +552,76 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         except ValueError as e:
             logger.error(str(e))
 
+        # TRAIN ENSEMBLE HERE
+        self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
+
         return model_names_trained
+
+    def _weight_preds(
+        self,
+        model_preds: Dict[str, TimeSeriesDataFrame],
+        model_names: List[str],
+        weights: List[float]
+    ) -> TimeSeriesDataFrame:
+        # TODO: this is a hack. indices may not match, which should be checked or better,
+        # TODO: weighted accordingly
+        assert len(set(v.shape for v in model_preds.values())) == 1
+
+        # TODO: handle NaNs
+        return sum(
+            model_preds[m] * w for m, w in zip(model_names, weights)
+        )
+
+    def fit_ensemble(self, val_data, model_names):
+        print('fitting ensemble')
+
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=self.eval_metric, prediction_length=self.prediction_length
+        )
+
+        model_preds = {}
+        for model_name in model_names:
+            model: AbstractGluonTSModel = self.load_model(model_name=model_name)
+            # predict on val_data
+            # TODO: make generic, this is gluonts specific
+            forecasts, tss = model._predict_for_scoring(val_data)
+            model_preds[model_name] = model._gluonts_forecasts_to_data_frame(
+                forecasts=forecasts, quantile_levels=self.quantile_levels
+            )
+
+        for model_name in model_preds:
+            model_score = evaluator(
+                val_data, model_preds[model_name]
+            ) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
+            print(f"{model_name}: {model_score}")
+
+        weights_list = [[n/100, (100-n)/100] for n in range(101)]
+
+        score_outs = []
+        score_out_best = None
+
+        for weights in weights_list:
+            forecasts_ensemble = self._weight_preds(
+                model_preds=model_preds, model_names=model_names, weights=weights
+            )
+            model_score = evaluator(val_data, forecasts_ensemble) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
+            print(f'ENSEMBLE SCORE: {model_score}\tWeights: {weights}')
+
+            if score_out_best is None or score_out_best[0] < model_score:
+                score_out_best = [model_score, weights]
+
+            score_outs.append([model_score, weights])
+        print()
+        for model_score, weights in score_outs:
+            print(f'ENSEMBLE SCORE: {model_score}\tWeights: {weights}')
+        print('-----')
+        print(f'BEST ENSEMBLE SCORE: {score_out_best[0]}\tWeights: {score_out_best[1]}')
+
+        # get optimal weights
+        # score
+        # TODO: Save ensemble
+        # TODO: Make ensemble available in leaderboard
+        # TODO: Make ensemble available in predict
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
