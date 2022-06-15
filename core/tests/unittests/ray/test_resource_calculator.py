@@ -1,4 +1,5 @@
 import psutil
+import pytest
 
 from autogluon.core.ray.resources_calculator import (
     ResourceCalculatorFactory,
@@ -114,6 +115,23 @@ def test_gpu_calculator_cpu_bottleneck():
     assert expected_resources_per_trial == resources_info['resources_per_job']
     assert expected_num_parallel_jobs ==  resources_info['num_parallel_jobs']
     assert expected_batches == resources_info['batches']
+
+
+@pytest.mark.parametrize('calculator_type', ['cpu', 'gpu', 'ray_lightning_cpu', 'ray_lightning_gpu'])
+def test_resource_not_enough(calculator_type):
+    num_cpus = 0
+    num_gpus = 0
+    num_jobs = 20
+
+    calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type=calculator_type)
+    with pytest.raises(Exception) as e_info:
+        resources_info = calculator.get_resources_per_job(
+            total_num_cpus=num_cpus,
+            total_num_gpus=num_gpus,
+            num_jobs=num_jobs,
+            minimum_cpu_per_trial=1,
+            minimum_gpu_per_trial=1,
+        )
 
 
 def test_ray_lightning_gpu_calculator():
