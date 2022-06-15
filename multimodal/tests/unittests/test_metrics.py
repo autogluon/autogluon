@@ -13,7 +13,7 @@ from autogluon.multimodal.constants import MULTICLASS
         ("log_loss", 5),
         ("log_loss", 10),
         ("cross_entropy", 100),
-    ],
+    ]
 )
 def test_cross_entropy(metric_name, class_num):
     preds = []
@@ -46,7 +46,7 @@ def test_cross_entropy(metric_name, class_num):
     "problem_type,loss_func_name",
     [
         ("regression", "bcewithlogitsloss"),
-    ],
+    ]
 )
 def test_bce_with_logits_loss(problem_type, loss_func_name):
     preds = []

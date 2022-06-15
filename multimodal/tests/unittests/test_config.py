@@ -87,7 +87,7 @@ def test_config():
         ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
         ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
         ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-    ],
+    ]
 )
 def test_model_selection(model_names):
     config = {
@@ -114,7 +114,7 @@ def test_model_selection(model_names):
         ["text"],
         ["numerical"],
         ["categorical"],
-    ],
+    ]
 )
 def test_invalid_model_selection(model_names):
     config = {
