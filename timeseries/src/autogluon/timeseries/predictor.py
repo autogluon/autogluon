@@ -436,6 +436,7 @@ class TimeSeriesPredictor:
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
 
+        * ``score_test``: The test score of the model on ``data``, if provided.
         * ``fit_time_marginal``: The fit time required to train the model (ignoring base models for ensembles).
         * ``fit_order``: The order in which models were fit. The first model fit has ``fit_order=1``, and the Nth
           model fit has ``fit_order=N``.
