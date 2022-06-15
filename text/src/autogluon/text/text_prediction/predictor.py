@@ -17,14 +17,14 @@ class TextPredictor:
     """
 
     def __init__(
-        self,
-        label,
-        problem_type=None,
-        eval_metric=None,
-        path=None,
-        backend=PYTORCH,
-        verbosity=3,
-        warn_if_exist=True,
+            self,
+            label,
+            problem_type=None,
+            eval_metric=None,
+            path=None,
+            backend=PYTORCH,
+            verbosity=3,
+            warn_if_exist=True,
     ):
         """
         Parameters
@@ -70,7 +70,6 @@ class TextPredictor:
             predictor_cls = AutoMMPredictor
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
-
             predictor_cls = MXTextPredictor
         else:
             raise ValueError(f"Unknown backend: {backend}")
@@ -151,22 +150,20 @@ class TextPredictor:
             return None
         return {k: v for k, v in zip(self.class_labels, self.class_labels_internal)}
 
-    def fit(
-        self,
-        train_data,
-        tuning_data=None,
-        time_limit=None,
-        presets=None,
-        hyperparameters=None,
-        column_types=None,
-        num_cpus=None,
-        num_gpus=None,
-        num_trials=None,
-        plot_results=None,
-        holdout_frac=None,
-        save_path=None,
-        seed=123,
-    ):
+    def fit(self,
+            train_data,
+            tuning_data=None,
+            time_limit=None,
+            presets=None,
+            hyperparameters=None,
+            column_types=None,
+            num_cpus=None,
+            num_gpus=None,
+            num_trials=None,
+            plot_results=None,
+            holdout_frac=None,
+            save_path=None,
+            seed=123):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
 
@@ -250,12 +247,8 @@ class TextPredictor:
                 seed=seed,
             )
         else:
-            warnings.warn(
-                f"MXNet backend will be deprecated in AutoGluon 0.5. "
-                f'You may try to switch to use backend="{PYTORCH}".',
-                DeprecationWarning,
-                stacklevel=1,
-            )
+            warnings.warn(f'MXNet backend will be deprecated in AutoGluon 0.5. '
+                          f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
             self._predictor.fit(
                 train_data=train_data,
                 tuning_data=tuning_data,
@@ -274,7 +267,7 @@ class TextPredictor:
         return self
 
     def evaluate(self, data, metrics=None):
-        """Report the predictive performance evaluated over a given dataset.
+        """ Report the predictive performance evaluated over a given dataset.
 
         Parameters
         ----------
@@ -382,20 +375,20 @@ class TextPredictor:
         path: str
             The path to directory in which to save this Predictor.
         standalone: bool, default = False
-            Whether to save the downloaded model for offline deployment.
+            Whether to save the downloaded model for offline deployment. 
             If `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
-            Also, see `AutoMMPredictor.save()` for more detials.
+            Also, see `AutoMMPredictor.save()` for more detials. 
             Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
-        self._predictor.save(path=path, standalone=standalone)
+        self._predictor.save(path=path,standalone=standalone)
 
     @staticmethod
     def load(
-        path: str,
-        verbosity: int = None,
-        backend: str = PYTORCH,
-        resume: bool = False,
+            path: str,
+            verbosity: int = None,
+            backend: str = PYTORCH,
+            resume: bool = False,
     ):
         """
         Load a TextPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
@@ -421,7 +414,6 @@ class TextPredictor:
             )
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
-
             _predictor = MXTextPredictor.load(
                 path=path,
                 verbosity=verbosity,

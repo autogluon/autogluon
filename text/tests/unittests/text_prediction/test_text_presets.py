@@ -1,7 +1,7 @@
 import pytest
 import functools
 from autogluon.multimodal.utils import get_config
-from autogluon.text.presets import (
+from autogluon.text.text_prediction.presets import (
     get_text_preset,
     list_text_presets,
 )
@@ -10,7 +10,6 @@ from autogluon.text.presets import (
 def rgetattr(obj, attr, *args):
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
-
     return functools.reduce(_getattr, [obj] + attr.split("."))
 
 
