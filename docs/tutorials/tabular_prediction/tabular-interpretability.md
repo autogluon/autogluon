@@ -36,7 +36,7 @@ Specifically, the interpretable preset fits different hyperparameter configurati
 2. Hierarchical Shrinkage tree - returns regularized version of CART decision tree ([Description](https://csinva.io/imodels/shrinkage.html), [Paper](https://arxiv.org/abs/2202.00858))
 3. Fast interpretable greedy-tree sum - returns a *sum* of trees, which are greedily grown simultaneously ([Description](https://csinva.io/imodels/figs.html), [Paper](https://arxiv.org/abs/2202.00858))
 4. RuleFit - returns a set of weighted rules, which are learned by a sparse linear model on rules extracted from decision trees ([Description](https://christophm.github.io/interpretable-ml-book/rulefit.html), [Paper](https://arxiv.org/abs/0811.1679))
-5. Boosted rule set - returns a set of rules, which are learned sequentially via AdaBoost ([Description](https://scikit-learn.org/stable/modules/ensemble.html#adaboost), [Paper](https://www.sciencedirect.com/science/article/pii/S002200009791504X))
+5. Boosted rule set - returns a set of rules, which are learned sequentially via AdaBoost ([Description](https://scikit-learn.org/stable/modules/ensemble.html#adaboost), [Paper](https://www.sciencedirect.com/science/article/pii/S002200009791504X)) 
 
 
 In addition to the usual functions in `TabularPredictor`, this predictor fitted with interpretable models has some additional functionality. For example, we can now inspect the complexity of the fitted models (i.e. how many rules they contain).
