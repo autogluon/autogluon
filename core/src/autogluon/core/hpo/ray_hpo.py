@@ -210,7 +210,7 @@ def run(
         raise EmptySearchSpace
     searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=ray_tune_adapter.get_supported_searchers())
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
-    search_space = _convert_search_space(search_space, searcher)
+    search_space = _convert_search_space(search_space)
 
     if ray.is_initialized():
         # shutdown to reinitialize resources because different model might require different total resources
@@ -315,22 +315,12 @@ def _validate_resources_per_trial(resources_per_trial):
     return resources_per_trial
 
 
-def _convert_search_space(search_space: dict, searcher: Union[SearchAlgorithm, Searcher]):
+def _convert_search_space(search_space: dict):
     """Convert the search space to Ray Tune search space if it's AG search space"""
-    from ray.tune.sample import Categorical
     tune_search_space = search_space.copy()
     for hyperparmaeter, space in search_space.items():
         if isinstance(space, Space):
             tune_search_space[hyperparmaeter] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
-        # This is a hack
-        # nested list are not correctly converted to hyperopt space by ray https://github.com/ray-project/ray/issues/24050
-        # convert list to tuple instead. models need to check for tuple and convert it back to list
-        # TODO: remove the hack once ray releases new version containing the fix
-        # TODO: remove searcher parameter passed to this function once the fix is out
-        if isinstance(tune_search_space[hyperparmaeter], Categorical) and isinstance(searcher, HyperOptSearch):
-            cat_list_tuple = [tuple(cat) if isinstance(cat, list) else cat
-                              for cat in tune_search_space[hyperparmaeter].categories]
-            tune_search_space[hyperparmaeter] = tune.choice(cat_list_tuple)
     return tune_search_space
 
 
