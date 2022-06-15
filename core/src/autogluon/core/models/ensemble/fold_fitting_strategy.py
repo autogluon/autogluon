@@ -416,7 +416,6 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.jobs.append(fold_ctx)
 
     def after_all_folds_scheduled(self):
-        print(self.resources, self.num_parallel_jobs, self.batches)
         num_jobs = len(self.jobs)
         job_refs = []
         job_fold_map = {}
