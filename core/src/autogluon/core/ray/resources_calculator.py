@@ -46,11 +46,15 @@ class CpuResourceCalculator(ResourceCalculator):
             max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
         num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
         if num_parallel_jobs == 0:
-            raise AssertionError('Cannot train model with provided resources! '
-                                 f'num_cpus=={total_num_cpus} | '
-                                 f'min_cpus=={minimum_cpu_per_job} | '
-                                 f'mem_available=={mem_available} | '
-                                 f'model_estimate_memory_usage=={model_estimate_memory_usage}')
+            error_msg = ('Cannot train model with provided resources! '
+                         f'num_cpus=={total_num_cpus} | '
+                         f'min_cpus=={minimum_cpu_per_job}')
+            if model_estimate_memory_usage is not None:
+                error_msg += (
+                    f' | mem_available=={mem_available} | '
+                    f'model_estimate_memory_usage=={model_estimate_memory_usage}'
+                )
+            raise AssertionError(error_msg)
         cpu_per_job = int(total_num_cpus // num_parallel_jobs)  # update cpu_per_job in case memory is not enough and can use more cores for each job
 
         resources_per_job = dict(cpu=cpu_per_job)
@@ -134,11 +138,15 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
             max_jobs_in_parallel_memory = max(1, int(mem_available // model_estimate_memory_usage))
         num_parallel_jobs = min(num_jobs, total_num_cpus // cpu_per_job, max_jobs_in_parallel_memory)
         if num_parallel_jobs == 0:
-            raise AssertionError('Cannot train model with provided resources! '
-                                 f'num_cpus=={total_num_cpus} | '
-                                 f'min_cpus=={minimum_cpu_per_job} | '
-                                 f'mem_available=={mem_available} | '
-                                 f'model_estimate_memory_usage=={model_estimate_memory_usage}')
+            error_msg = ('Cannot train model with provided resources! '
+                         f'num_cpus=={total_num_cpus} | '
+                         f'min_cpus=={minimum_cpu_per_job}')
+            if model_estimate_memory_usage is not None:
+                error_msg += (
+                    f' | mem_available=={mem_available} | '
+                    f'model_estimate_memory_usage=={model_estimate_memory_usage}'
+                )
+            raise AssertionError(error_msg)
         num_workers = max(minimum_cpu_per_job, cpu_per_job - 1)  # 1 cpu for master process
         cpu_per_worker = 1
         resources_per_job = get_tune_resources(

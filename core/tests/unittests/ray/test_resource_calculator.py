@@ -124,7 +124,7 @@ def test_resource_not_enough(calculator_type):
     num_jobs = 20
 
     calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type=calculator_type)
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception, match=r'Cannot train model with provided resources! .*') as e_info:
         resources_info = calculator.get_resources_per_job(
             total_num_cpus=num_cpus,
             total_num_gpus=num_gpus,
