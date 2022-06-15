@@ -92,7 +92,7 @@ from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 
-from .. import version as ag_version
+from . import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
 

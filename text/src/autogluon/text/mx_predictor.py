@@ -18,7 +18,7 @@ from . import constants as _C
 from .legacy_presets import ag_text_presets, merge_params
 from .infer_types import infer_column_problem_types, printable_column_type_string
 from .metrics import infer_eval_log_metrics
-from .. import version
+from . import version
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
