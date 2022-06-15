@@ -16,7 +16,7 @@ from .constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
-from ..ray.resources_calculator import ResourceCalculatorFactory
+from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 from .scheduler_factory import SchedulerFactory
 from .searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
@@ -89,7 +89,7 @@ class RayTuneAdapter(ABC):
         self.num_parallel_jobs = resources_info.get('num_parallel_jobs', None)
         self.cpu_per_job = resources_info.get('cpu_per_job', None)
         self.gpu_per_job = resources_info.get('gpu_per_job', None)
-        self.resources_per_trial = resources_info.get('resources_per_trial', None)
+        self.resources_per_trial = resources_info.get('resources_per_job', None)
     
     def get_resources_per_trial(
         self,
@@ -418,7 +418,7 @@ class AutommRayTuneAdapter(RayTuneAdapter):
             return resources_per_trial
         
     def get_resource_calculator(self, num_gpus: float):
-        return ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu_no_parallel')
+        return ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'non_parallel_gpu')
         
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
         trainable_args['hyperparameters']['env.num_gpus'] = self.gpu_per_job

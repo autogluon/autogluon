@@ -55,13 +55,13 @@ def try_import_mxnet():
 
 def try_import_ray() -> ModuleType:
     ray_max_version_os_map = dict(
-        Darwin='1.13.0',
-        Windows='1.13.0',
-        Linux='1.13.0',
+        Darwin='1.14.0',
+        Windows='1.14.0',
+        Linux='1.14.0',
     )
-    ray_min_version = '1.12.0'
+    ray_min_version = '1.13.0'
     current_os = platform.system()
-    ray_max_version = ray_max_version_os_map.get(current_os, '1.13.0')
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.14.0')
     try:
         import ray
         from distutils.version import LooseVersion
@@ -85,14 +85,12 @@ def try_import_ray() -> ModuleType:
         
 def try_import_ray_lightning():
     """This function tries to import ray lightning and check if the compatible pytorch lightning version is installed"""
-    supported_ray_lightning_min_version = '0.1.0'
+    supported_ray_lightning_min_version = '0.2.0'
     supported_ray_lightning_max_version = '0.3.0'
     ray_lightning_torch_lightning_compatibility_map = {
-        '0.1.x': '1.4.x',
         '0.2.x': '1.5.x',
     }
     ray_lightining_torch_lightning_compatibility_range_map = {
-        ('0.1.0', '0.2.0'): ('1.4.0', '1.5.0'),
         ('0.2.0', '0.3.0'): ('1.5.0', '1.6.0'),
     }
     try:

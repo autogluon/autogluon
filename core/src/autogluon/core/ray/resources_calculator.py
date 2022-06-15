@@ -100,31 +100,44 @@ class GpuResourceCalculator(ResourceCalculator):
         
 class NonParallelGpuResourceCalculator(ResourceCalculator):
     """
-    This calculator will only assign < 1 gpu to each trial because some job cannot be parallelized
+    This calculator will only assign < 1 gpu to each job because some job cannot be parallelized
     """
     
     @property
     def calc_type(self):
-        return 'gpu_no_parallel'
+        return 'non_parallel_gpu'
     
-    def get_resources_per_trial(
+    def get_resources_per_job(
         self,
         total_num_cpus,
         total_num_gpus,
-        num_samples,
+        num_jobs,
         minimum_cpu_per_trial,
+        minimum_gpu_per_trial,
         **kwargs,
     ):
-        gpu_per_job = 1
-        num_parallel_jobs = total_num_gpus // gpu_per_job  # num_parallel_jobs purely based on gpu
-        cpu_per_job = max(minimum_cpu_per_trial, total_num_cpus // num_parallel_jobs)
-        num_parallel_jobs = min(num_parallel_jobs, total_num_cpus // cpu_per_job)  # update num_parallel_jobs in case cpu is not enough
-        gpu_per_job = max(1, total_num_gpus // num_parallel_jobs)  # update gpu_per_job in case cpu was the bottleneck
-        resources_per_trial = dict(cpu=cpu_per_job, gpu=gpu_per_job)
-        
+        assert 0 < minimum_gpu_per_trial <= 1, f'{self.__class__.__name__} only supports assigning < 1 gpu to each job' 
+        cpu_per_job = max(minimum_cpu_per_trial, int(total_num_cpus // num_jobs))
+        gpu_per_job = min(minimum_gpu_per_trial, 1)
+        num_parallel_jobs = num_jobs
+        if cpu_per_job:
+            num_parallel_jobs = min(num_parallel_jobs, total_num_cpus // cpu_per_job)
+        if gpu_per_job:
+            num_parallel_jobs = min(num_parallel_jobs, total_num_gpus // gpu_per_job)
+        if num_parallel_jobs == 0:
+            raise AssertionError('Cannot train model with provided resources! '
+                                 f'(num_cpus, num_gpus)==({total_num_cpus}, {total_num_gpus}) | '
+                                 f'(min_cpus, min_gpus)==({cpu_per_job}, {gpu_per_job})')
+        cpu_per_job = int(total_num_cpus // num_parallel_jobs)
+        gpu_per_job = min(1, total_num_gpus / num_parallel_jobs)
+
+        resources_per_job = dict(cpu=cpu_per_job, gpu=gpu_per_job)
+        batches = math.ceil(num_jobs / num_parallel_jobs)
+
         return dict(
-                    resources_per_trial=resources_per_trial,
+                    resources_per_job=resources_per_job,
                     num_parallel_jobs=num_parallel_jobs,
+                    batches=batches,
                     cpu_per_job=cpu_per_job,
                     gpu_per_job=gpu_per_job,
                 )
