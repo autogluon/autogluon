@@ -344,7 +344,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         predict_time: float
             The amount of time used to do out of folds predictions for all folds.
     """
-    def __init__(self, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
+    def __init__(self, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
@@ -360,16 +360,12 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
         self.num_cpus = self._get_cpu_count()
         self.num_gpus = self._get_gpu_count()
-        self._user_specified_num_folds_parallel = num_folds_parallel
-        self.resources = None
-        self.num_parallel_jobs = None
-        self.batches = None
+        self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs, num_folds_parallel)
 
 
-    def is_mem_sufficient(self, num_jobs):
+    def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
-        self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs)
         total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()
         total_data_mem_est = self.num_parallel_jobs * data_mem_est
@@ -528,13 +524,13 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _get_resource_suggestions(self, num_jobs):
-        assert self._user_specified_num_folds_parallel <= num_jobs, f'num_folds_parallel: {self._user_specified_num_folds_parallel} needs to be less than num_jobs: {num_jobs}'
+    def _get_resource_suggestions(self, num_jobs, user_specified_num_folds_parallel):
+        user_specified_num_folds_parallel = min(num_jobs, user_specified_num_folds_parallel)
         model_min_resources = self._initialized_model_base.get_minimum_resources()
         resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if self.num_gpus == 0 else 'gpu')
         # use minimum resource to control number of jobs running in parallel
-        min_cpu_per_job_based_on_num_folds_parallel = self.num_cpus // self._user_specified_num_folds_parallel
-        min_gpu_per_job_based_on_num_folds_parallel = self.num_gpus / self._user_specified_num_folds_parallel
+        min_cpu_per_job_based_on_num_folds_parallel = self.num_cpus // user_specified_num_folds_parallel
+        min_gpu_per_job_based_on_num_folds_parallel = self.num_gpus / user_specified_num_folds_parallel
         min_cpu_based_on_model = model_min_resources.get('num_cpus', 1)
         min_gpu_based_on_model = model_min_resources.get('num_gpus', 0)
 

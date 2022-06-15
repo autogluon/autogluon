@@ -20,7 +20,7 @@ def test_cpu_calculator_no_bottleneck():
     resources_info = calculator.get_resources_per_job(
         total_num_cpus=num_cpus,
         num_jobs=num_jobs,
-        minimum_cpu_per_trial=4,  # allows 8 jobs to run in parallel
+        minimum_cpu_per_job=4,  # allows 8 jobs to run in parallel
     )
 
     expected_resources_per_trial = dict(
@@ -38,7 +38,7 @@ def test_cpu_calculator_mem_bottleneck():
     num_cpus = 32
     num_jobs = 20
     mem_available = psutil.virtual_memory().available
-    model_estimate_memory_usage = mem_available // 2.5  # allows 2 trials to run in parallel
+    model_estimate_memory_usage = mem_available // 2.5  # allows 2 jobs to run in parallel
     
     calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu')
     assert type(calculator) == CpuResourceCalculator
@@ -47,7 +47,7 @@ def test_cpu_calculator_mem_bottleneck():
         total_num_cpus=num_cpus,
         num_jobs=num_jobs,
         model_estimate_memory_usage=model_estimate_memory_usage,
-        minimum_cpu_per_trial=4,  # allows 8 jobs to run in parallel
+        minimum_cpu_per_job=4,  # allows 8 jobs to run in parallel
     )
 
     expected_num_parallel_jobs = 2  # even user wants to run 20 jobs in prallel, cpu can run 8 jobs in parallel, memory only allows for 2 jobs
@@ -73,8 +73,8 @@ def test_gpu_calculator_no_bottleneck():
         total_num_cpus=num_cpus,
         total_num_gpus=num_gpus,
         num_jobs=num_jobs,
-        minimum_cpu_per_trial=1, # allows 32 trials to run in parallel
-        minimum_gpu_per_trial=0.5,  # allows 8 trials to run in parallel
+        minimum_cpu_per_job=1, # allows 32 jobs to run in parallel
+        minimum_gpu_per_job=0.5,  # allows 8 jobs to run in parallel
     )
 
     expected_num_parallel_jobs = 8
@@ -101,8 +101,8 @@ def test_gpu_calculator_cpu_bottleneck():
         total_num_cpus=num_cpus,
         total_num_gpus=num_gpus,
         num_jobs=num_jobs,
-        minimum_cpu_per_trial=1, # allows 4 trials to run in parallel
-        minimum_gpu_per_trial=0.5,  # allows 8 trials to run in parallel
+        minimum_cpu_per_job=1, # allows 4 jobs to run in parallel
+        minimum_gpu_per_job=0.5,  # allows 8 jobs to run in parallel
     )
 
     expected_num_parallel_jobs = 4
@@ -129,8 +129,8 @@ def test_resource_not_enough(calculator_type):
             total_num_cpus=num_cpus,
             total_num_gpus=num_gpus,
             num_jobs=num_jobs,
-            minimum_cpu_per_trial=1,
-            minimum_gpu_per_trial=1,
+            minimum_cpu_per_job=1,
+            minimum_gpu_per_job=1,
         )
 
 
@@ -146,8 +146,8 @@ def test_ray_lightning_gpu_calculator():
         total_num_cpus=num_cpus,
         total_num_gpus=num_gpus,
         num_jobs=num_jobs,
-        minimum_cpu_per_trial=1, 
-        minimum_gpu_per_trial=1,  # allows 4 trials to run in parallel
+        minimum_cpu_per_job=1, 
+        minimum_gpu_per_job=1,  # allows 4 jobs to run in parallel
     )
     
     expected_num_parallel_jobs = 4

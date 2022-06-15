@@ -483,10 +483,11 @@ class BaggedEnsembleModel(AbstractModel):
         )
         # noinspection PyCallingNonCallable
         if fold_fitting_strategy == ParallelLocalFoldFittingStrategy:
+            fold_fitting_strategy_args['num_jobs'] = num_folds
             fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
         fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
 
-        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient(num_folds):
+        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():
             # If memory is not sufficient, fall back to sequential fold strategy
             fold_fitting_strategy_args.pop('num_folds_parallel', None)
             fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
