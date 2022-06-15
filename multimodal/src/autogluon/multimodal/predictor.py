@@ -82,6 +82,7 @@ from .utils import (
     turn_on_off_feature_column_info,
     try_to_infer_pos_label,
     get_mixup,
+    CustomUnpickler,
 )
 from .optimization.utils import (
     get_metric,
@@ -1630,8 +1631,7 @@ class AutoMMPredictor:
             assets = json.load(fp)
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)
-            df_preprocessor.__class__ = MultiModalFeaturePreprocessor  # backward compatibility.
+            df_preprocessor = CustomUnpickler(fp).load()
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
