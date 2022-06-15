@@ -272,15 +272,18 @@ def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_infer
     assert ts_df.freq == expected_freq
 
 
-@pytest.mark.parametrize(
-    "start_time, freq",
-    [
-        ("2020-01-01 00:00:00", "D"),
-        ("2020-01-01 00:00:00", "2D"),
-        ("2020-01-01 00:00:00", "T"),
-        ("2020-01-01 00:00:00", "H"),
-    ],
-)
+FREQ_TEST_CASES = [
+    ("2020-01-01 00:00:00", "D"),
+    ("2020-01-01", "D"),
+    ("2020-01-01 00:00:00", "2D"),
+    ("2020-01-01 00:00:00", "T"),
+    ("2020-01-01 00:00:00", "H"),
+    ("2020-01-31 00:00:00", "M"),
+    ("2020-01-31", "M"),
+]
+
+
+@pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
 def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
     start_time, freq
 ):
@@ -294,6 +297,21 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
     assert ts_df.freq == freq
 
 
+@pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
+def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(
+    start_time, freq
+):
+    item_list = ListDataset(
+        [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        freq=freq
+    )
+
+    ts_df = TimeSeriesDataFrame(item_list)
+
+    assert ts_df.freq == freq
+
+
+@pytest.mark.skip("Skipped until re-enabling regularity check.")
 @pytest.mark.parametrize("list_of_timestamps", [
     [
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],

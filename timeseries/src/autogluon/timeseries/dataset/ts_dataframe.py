@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import Any, Tuple, Type
+from typing import Any, Tuple, Type, Optional
 from collections.abc import Iterable
 
 import pandas as pd
@@ -83,7 +83,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         elif isinstance(data, Iterable):
             data = self.from_iterable_dataset(data)
         else:
-            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
+            raise ValueError(
+                "Data input type not recognized, must be DataFrame or iterable."
+            )
         super().__init__(data=data, *args, **kwargs)
 
     @property
@@ -93,7 +95,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def freq(self):
         ts_index = self.index.levels[1]  # noqa
-        freq = ts_index.freq or ts_index.inferred_freq
+        freq = (
+            ts_index.freq or ts_index.inferred_freq or self.loc[0].index.inferred_freq
+        )
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
         return freq
@@ -140,17 +144,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
             )
 
-        # check if timeseries are irregularly sampled
-        timedeltas = set()
-        for item_id in df[ITEMID].unique():
-            timedeltas = timedeltas.union(
-                df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:]
-            )
-            if len(timedeltas) > 1:
-                raise ValueError(
-                    f"Only a single uniformly sampled period is allowed for time series"
-                    f" data sets. Found {len(timedeltas)}"
-                )
+        # TODO: check if time series are irregularly sampled. this check was removed as
+        # TODO: pandas is inconsistent in identifying freq when period-end timestamps
+        # TODO: are provided.
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
