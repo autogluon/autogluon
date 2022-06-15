@@ -2,7 +2,7 @@
 
 ## 1. AutoMMPredictor for Training
 
-AutoMMPredictor is a tool that can handle diverse data including image, text, numerical data and categorical data. It can automatically identify data types and perform the fusion. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
+AutoMMPredictor is a tool that can handle diverse data including images, text, numerical data and categorical data. It can automatically identify data types and fuse the pretrained DL backbones. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
 
 ### 1.1 Build the AutoMMPredictor
 
@@ -16,11 +16,11 @@ You can build the predictor as follow.
 	    verbosity=4, 
 	)
 
- - `label`indicates the target value in training data.
- - `problem_type`indicates the type of the problem. That can be "Multiclass", "Binary" or "Regression".
- - `eval_metric`indicates the evaluation index of the model which is always the evaluation of the competition.
- - `path`indicates the path to save AutoMMPredictor models.
- - `verbosity`controls how much information is printed.
+ - `label` indicates the target value in training data.
+ - `problem_type` indicates the type of the problem. That can be "Multiclass", "Binary" or "Regression".
+ - `eval_metric` indicates the evaluation index of the model which is always the evaluation of the competition.
+ - `path` indicates the path to save AutoMMPredictor models.
+ - `verbosity` controls how much information is printed.
 
 ### 1.2 Train the AutoMMPredictor
 
@@ -48,20 +48,20 @@ Then, you can train the AutoMMPredictor with `.fit()`.
 		seed=1,
 	)
 
- - `train_data`is the data used for training.
- - `tuning_data`is the data for validation. If it is empty, the tuning data will be split from training data automatically.
- - `save_path`indicates the specific path for model saving in a fit process.
- - `hyperparameters`is a Dict which will override the default configs in the training. The configs contain five different types.  
- -- `model`contains the parameters which control the models used in the predictor. You can select the model you need and adjust the details. Default is selecting the models determined by the dataset automatically.
- --`data`contains the configs of transforms for different types of data. 
- --`env`contains the configs of the training environment.
- --`optimization`contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
- - `seed`determines the random seed.
+ - `train_data` is the data used for training.
+ - `tuning_data` is the data for validation. If it is empty, the tuning data will be split from training data automatically.
+ - `save_path` indicates the specific path for model saving in a fit process.
+ - `hyperparameters` is a Dict which will override the default configs in the training. The configs contain five different types.  
+ -- `model` contains the parameters which control the models used in the predictor. You can select the model you need and adjust the details. Default is selecting the models determined by the dataset automatically.
+ --`data` contains the configs of transforms for different types of data. 
+ --`env` contains the configs of the training environment.
+ --`optimization` contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
+ - `seed` determines the random seed.
 
 ### 1.3 Save Standalone Model
-In AutoMMPredictor, some pre-trained models will be downloaded during training. These models also need to be saved for use in predicting after submission. You can open standalone in model saving to save the downloaded models.
+In AutoMMPredictor, some pre-trained models will be downloaded during training. These models also need to be saved for use in predicting after submission. You can specify the predictor to save a “standalone” model that can be loaded without internet access.
 
-    predictor.save(path=save_standalone_path,standalone=True)
+    predictor.save(path=save_standalone_path, standalone=True)
 
 ## 2. Kaggle Kernel-only Competition with AutoGluon
 
