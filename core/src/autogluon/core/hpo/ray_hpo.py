@@ -375,8 +375,8 @@ class TabularRayTuneAdapter(RayTuneAdapter):
             total_num_cpus=num_cpus,
             total_num_gpus=num_gpus,
             num_jobs=num_samples,
-            minimum_cpu_per_trial=minimum_cpu_per_trial,
-            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            minimum_cpu_per_job=minimum_cpu_per_trial,
+            minimum_gpu_per_job=minimum_gpu_per_trial,
             model_estimate_memory_usage=model_estimate_memory_usage,
             **kwargs,
         )
@@ -428,8 +428,8 @@ class AutommRayTuneAdapter(RayTuneAdapter):
             total_num_cpus=num_cpus,
             total_num_gpus=num_gpus,
             num_jobs=num_samples,
-            minimum_cpu_per_trial=minimum_cpu_per_trial,
-            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            minimum_cpu_per_job=minimum_cpu_per_trial,
+            minimum_gpu_per_job=minimum_gpu_per_trial,
             model_estimate_memory_usage=model_estimate_memory_usage,
             **kwargs,
         )
