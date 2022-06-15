@@ -70,75 +70,75 @@ def verify_predictor_save_load(predictor, df,
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune",
     [
         (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-            "prajjwal1/bert-tiny",
-            "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP,
-            LORA
+                "petfinder",
+                ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+                "prajjwal1/bert-tiny",
+                "swin_tiny_patch4_window7_224",
+                GREEDY_SOUP,
+                LORA
         ),
 
         (
-            "hateful_memes",
-            ["timm_image", "hf_text", "clip", "fusion_mlp"],
-            "monsoon-nlp/hindi-bert",
-            "swin_tiny_patch4_window7_224",
-            UNIFORM_SOUP,
-            LORA_NORM
+                "hateful_memes",
+                ["timm_image", "hf_text", "clip", "fusion_mlp"],
+                "monsoon-nlp/hindi-bert",
+                "swin_tiny_patch4_window7_224",
+                UNIFORM_SOUP,
+                LORA_NORM
         ),
 
         (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
-            None,
-            "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP,
-            None
+                "petfinder",
+                ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
+                None,
+                "swin_tiny_patch4_window7_224",
+                GREEDY_SOUP,
+                None
         ),
 
         (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
-            "prajjwal1/bert-tiny",
-            None,
-            UNIFORM_SOUP,
-            None
+                "petfinder",
+                ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
+                "prajjwal1/bert-tiny",
+                None,
+                UNIFORM_SOUP,
+                None
         ),
 
         (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
-            None,
-            None,
-            BEST,
-            BIT_FIT
+                "petfinder",
+                ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+                None,
+                None,
+                BEST,
+                BIT_FIT
         ),
 
         (
-            "hateful_memes",
-            ["timm_image"],
-            None,
-            "swin_tiny_patch4_window7_224",
-            UNIFORM_SOUP,
-            NORM_FIT
+                "hateful_memes",
+                ["timm_image"],
+                None,
+                "swin_tiny_patch4_window7_224",
+                UNIFORM_SOUP,
+                NORM_FIT
         ),
 
         (
-            "ae",
-            ["hf_text"],
-            "prajjwal1/bert-tiny",
-            None,
-            BEST,
-            LORA_BIAS
+                "ae",
+                ["hf_text"],
+                "prajjwal1/bert-tiny",
+                None,
+                BEST,
+                LORA_BIAS
         ),
 
         (
-            "hateful_memes",
-            ["clip"],
-            None,
-            None,
-            BEST,
-            NORM_FIT
+                "hateful_memes",
+                ["clip"],
+                None,
+                None,
+                BEST,
+                NORM_FIT
         ),
 
     ]
@@ -221,7 +221,7 @@ def test_predictor(
         )
 
 
-def test_standalone(): # test standalong feature in AutoMMPredictor.save()
+def test_standalone():  # test standalong feature in AutoMMPredictor.save()
     from unittest import mock
     import torch
 
@@ -286,15 +286,14 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     with requests_gag:
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
         with tempfile.TemporaryDirectory() as tmpdirname:
-            torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
+            torch.hub.set_dir(tmpdirname)  # block reading files in `.cache`
             loaded_offline_predictor = AutoMMPredictor.load(path=save_path_standalone)
-
 
     offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
     del loaded_offline_predictor
 
     # check if save with standalone=True coincide with standalone=False
-    npt.assert_equal(online_predictions,offline_predictions)
+    npt.assert_equal(online_predictions, offline_predictions)
 
 
 @pytest.mark.parametrize(
@@ -320,7 +319,8 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         },
 
         {
-            "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "categorical_mlp_abc", "fusion_mlp"],
+            "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "categorical_mlp_abc",
+                            "fusion_mlp"],
             "model.timm_image_haha.checkpoint_name": "swin_tiny_patch4_window7_224",
             "model.hf_text_hello.checkpoint_name": "prajjwal1/bert-tiny",
             "data.categorical.convert_to_text": False,
@@ -411,90 +411,91 @@ def test_model_configs():
 
     model_config = {
         'model': {
-                'names': ['hf_text', 'timm_image', 'clip', 'categorical_transformer', 'numerical_transformer', 'fusion_transformer'],
-                'categorical_transformer': {
-                    'out_features': 192,
-                    'd_token': 192,
-                    'num_trans_blocks': 0,
-                    'num_attn_heads': 4,
-                    'residual_dropout': 0.0,
-                    'attention_dropout': 0.2,
-                    'ffn_dropout': 0.1,
-                    'normalization': 'layer_norm',
-                    'ffn_activation': 'reglu',
-                    'head_activation': 'relu',
-                    'data_types': ['categorical']
-                },
-                'numerical_transformer': {
-                    'out_features': 192,
-                    'd_token': 192,
-                    'num_trans_blocks': 0,
-                    'num_attn_heads': 4,
-                    'residual_dropout': 0.0,
-                    'attention_dropout': 0.2,
-                    'ffn_dropout': 0.1,
-                    'normalization': 'layer_norm',
-                    'ffn_activation': 'reglu',
-                    'head_activation': 'relu',
-                    'data_types': ['numerical'],
-                    'embedding_arch': ['linear','relu'],
-                    'merge': 'concat'
-                },
-                'hf_text': {
-                    'checkpoint_name': 'google/electra-base-discriminator',
-                    'data_types': ['text'],
-                    'tokenizer_name': 'hf_auto',
-                    'max_text_len': 512,
-                    'insert_sep': True,
-                    'text_segment_num': 2,
-                    'stochastic_chunk': False,
-                    'text_aug_detect_length': 10,
-                    'text_trivial_aug_maxscale': 0.05,
-                    'test_train_augment_types' : ["synonym_replacement(0.1)"],
-                },
-                'timm_image': {
-                    'checkpoint_name': 'swin_base_patch4_window7_224',
-                    'mix_choice': 'all_logits',
-                    'data_types': ['image'],
-                    'train_transform_types': ['resize_shorter_side', 'center_crop'],
-                    'val_transform_types': ['resize_shorter_side', 'center_crop'],
-                    'image_norm': 'imagenet',
-                    'image_size': 224,
-                    'max_img_num_per_col': 2,
-                },
-                'clip': {
-                    'checkpoint_name': 'openai/clip-vit-base-patch32',
-                    'data_types': ['image', 'text'],
-                    'train_transform_types': ['resize_shorter_side', 'center_crop'],
-                    'val_transform_types': ['resize_shorter_side', 'center_crop'],
-                    'image_norm': 'clip',
-                    'image_size': 224,
-                    'max_img_num_per_col': 2,
-                    'tokenizer_name': 'clip',
-                    'max_text_len': 77,
-                    'insert_sep': False,
-                    'text_segment_num': 1,
-                    'stochastic_chunk': False,
-                    'text_aug_detect_length': 10,
-                    'text_trivial_aug_maxscale': 0.05,
-                    'test_train_augment_types' : ["synonym_replacement(0.1)"],
-                },
-                'fusion_transformer': {
-                    'hidden_size': 192,
-                    'n_blocks': 2,
-                    'attention_n_heads': 4,
-                    'adapt_in_features': 'max',
-                    'attention_dropout': 0.2,
-                    'residual_dropout': 0.0,
-                    'ffn_dropout': 0.1,
-                    'ffn_d_hidden': 192,
-                    'normalization': 'layer_norm',
-                    'ffn_activation': 'geglu',
-                    'head_activation': 'relu',
-                    'data_types': None
-                },
-            }
+            'names': ['hf_text', 'timm_image', 'clip', 'categorical_transformer', 'numerical_transformer',
+                      'fusion_transformer'],
+            'categorical_transformer': {
+                'out_features': 192,
+                'd_token': 192,
+                'num_trans_blocks': 0,
+                'num_attn_heads': 4,
+                'residual_dropout': 0.0,
+                'attention_dropout': 0.2,
+                'ffn_dropout': 0.1,
+                'normalization': 'layer_norm',
+                'ffn_activation': 'reglu',
+                'head_activation': 'relu',
+                'data_types': ['categorical']
+            },
+            'numerical_transformer': {
+                'out_features': 192,
+                'd_token': 192,
+                'num_trans_blocks': 0,
+                'num_attn_heads': 4,
+                'residual_dropout': 0.0,
+                'attention_dropout': 0.2,
+                'ffn_dropout': 0.1,
+                'normalization': 'layer_norm',
+                'ffn_activation': 'reglu',
+                'head_activation': 'relu',
+                'data_types': ['numerical'],
+                'embedding_arch': ['linear', 'relu'],
+                'merge': 'concat'
+            },
+            'hf_text': {
+                'checkpoint_name': 'google/electra-base-discriminator',
+                'data_types': ['text'],
+                'tokenizer_name': 'hf_auto',
+                'max_text_len': 512,
+                'insert_sep': True,
+                'text_segment_num': 2,
+                'stochastic_chunk': False,
+                'text_aug_detect_length': 10,
+                'text_trivial_aug_maxscale': 0.05,
+                'test_train_augment_types': ["synonym_replacement(0.1)"],
+            },
+            'timm_image': {
+                'checkpoint_name': 'swin_base_patch4_window7_224',
+                'mix_choice': 'all_logits',
+                'data_types': ['image'],
+                'train_transform_types': ['resize_shorter_side', 'center_crop'],
+                'val_transform_types': ['resize_shorter_side', 'center_crop'],
+                'image_norm': 'imagenet',
+                'image_size': 224,
+                'max_img_num_per_col': 2,
+            },
+            'clip': {
+                'checkpoint_name': 'openai/clip-vit-base-patch32',
+                'data_types': ['image', 'text'],
+                'train_transform_types': ['resize_shorter_side', 'center_crop'],
+                'val_transform_types': ['resize_shorter_side', 'center_crop'],
+                'image_norm': 'clip',
+                'image_size': 224,
+                'max_img_num_per_col': 2,
+                'tokenizer_name': 'clip',
+                'max_text_len': 77,
+                'insert_sep': False,
+                'text_segment_num': 1,
+                'stochastic_chunk': False,
+                'text_aug_detect_length': 10,
+                'text_trivial_aug_maxscale': 0.05,
+                'test_train_augment_types': ["synonym_replacement(0.1)"],
+            },
+            'fusion_transformer': {
+                'hidden_size': 192,
+                'n_blocks': 2,
+                'attention_n_heads': 4,
+                'adapt_in_features': 'max',
+                'attention_dropout': 0.2,
+                'residual_dropout': 0.0,
+                'ffn_dropout': 0.1,
+                'ffn_d_hidden': 192,
+                'normalization': 'layer_norm',
+                'ffn_activation': 'geglu',
+                'head_activation': 'relu',
+                'data_types': None
+            },
         }
+    }
 
     hyperparameters = {
         "optimization.max_epochs": 1,
@@ -578,6 +579,7 @@ def test_modifying_duplicate_model_names():
         for per_processor in per_modality_processors:
             assert per_processor.prefix in teacher_predictor._config.model.names
 
+
 def test_mixup():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
@@ -614,6 +616,7 @@ def test_mixup():
 
         score = predictor.evaluate(dataset.test_df)
         verify_predictor_save_load(predictor, dataset.test_df)
+
 
 def test_textagumentor_deepcopy():
     dataset = ALL_DATASETS["ae"]()
@@ -674,6 +677,7 @@ def test_textagumentor_deepcopy():
         hyperparameters=hyperparameters,
         time_limit=10,
     )
+
 
 @pytest.mark.parametrize('searcher', list(SEARCHER_PRESETS.keys()))
 @pytest.mark.parametrize('scheduler', list(SCHEDULER_PRESETS.keys()))
@@ -805,6 +809,7 @@ def test_hpo_distillation(searcher, scheduler):
         save_path=student_save_path,
     )
 
+
 def test_trivialaugment():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
@@ -828,8 +833,8 @@ def test_trivialaugment():
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
         "data.mixup.turn_on": True,
-        "model.hf_text.text_trivial_aug_maxscale":0.1,
-        "model.hf_text.text_aug_detect_length":10,
+        "model.hf_text.text_trivial_aug_maxscale": 0.1,
+        "model.hf_text.text_aug_detect_length": 10,
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
     }
 

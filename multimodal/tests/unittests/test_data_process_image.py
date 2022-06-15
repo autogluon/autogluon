@@ -21,34 +21,42 @@ ALL_DATASETS = {
             "model.timm_image.train_transform_types": ["resize_to_square","center_crop"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","horizontal_flip","vertical_flip"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","affine","color_jitter","randaug"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","affine(15, (0.1, 0.1), (0.9, 1.1))"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","affine({'degrees': 15,'translate': (0.1, 0.1), 'scale': (0.9, 1.1)})"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","color_jitter(0.2, 0.1, 0.1)"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","color_jitter({'brightness': 0.2, 'contrast': 0.1, 'saturation': 0.1})"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
         },
+
         {
             "model.timm_image.train_transform_types": ["resize_shorter_side","center_crop","randaug(2, 7)"],
             "model.timm_image.val_transform_types": ["resize_shorter_side","center_crop"]
