@@ -41,6 +41,7 @@ install_requires = [
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
+    'autogluon-contrib-nlp==0.0.1b20220208',
     'pytorch-metric-learning>=1.3.0,<1.4.0',
     'nlpaug>=1.1.10,<2.0.0',
     'nltk>=3.4.5,<4.0.0',
