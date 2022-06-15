@@ -96,7 +96,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def freq(self):
         ts_index = self.index.levels[1]  # noqa
         freq = (
-            ts_index.freq or ts_index.inferred_freq or self.loc[0].index.inferred_freq
+            ts_index.freq
+            or ts_index.inferred_freq
+            or self.loc[0].index.freq  # fall back to freq of first item
+            or self.loc[0].index.inferred_freq
         )
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
