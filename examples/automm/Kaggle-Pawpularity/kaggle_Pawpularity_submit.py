@@ -29,81 +29,31 @@ if __name__ == "__main__":
     train_df, test_df = load_data(data_path)
 
     submission = pd.read_csv("../input/petfinder-pawpularity-score/sample_submission.csv")
-    N_fold = 5
+    save_paths = ["../input/pawpularity-automm-result/result1/result",
+                  "../input/pawpularity-automm-result/result2/result",
+                  "../input/pawpularity-automm-result/result3/result", ] #Model lists.
 
-    save_path = "../input/pawpularity-result/result1/result"
-    save_standalone_path = save_path + "_standalone"
-    all_preds_1 = []
-    for fold in range(N_fold):
-        predictor = AutoMMPredictor(
-            label="Pawpularity",
-            problem_type="regression",
-            eval_metric="rmse",
-            path=save_path,
-            verbosity=4,
-        )
-        pretrained_model = predictor.load(path=save_standalone_path + f"_fold{fold}/")  # Load the predictor.
-        test_pred = pretrained_model.predict(test_df)  # Predict the test dataset.
-        all_preds_1.append(test_pred)
-        del predictor
-        torch.cuda.empty_cache()
-    preds_1 = np.mean(np.stack(all_preds_1), axis=0)  # Fold ensemble.
+    model_preds = np.array([])
+    for perpath in save_paths:
+        N_fold = 5
+        save_standalone_path = perpath + '_standalone'
+        all_preds = []
+        for fold in range(N_fold):
+            predictor = AutoMMPredictor(
+                label='Pawpularity',
+                problem_type='regression',
+                eval_metric='rmse',
+                path=perpath,
+                verbosity=4,
+            )
+            pretrained_model = predictor.load(path=save_standalone_path + f'_fold{fold}/')
+            df_test = pretrained_model.predict(test_df)
+            all_preds.append(df_test)
+            del predictor
+            torch.cuda.empty_cache()
+        model_preds = np.append(model_preds, np.mean(np.stack(all_preds), axis=0))
 
-    save_path = "../input/pawpularity-result/result2/result"
-    save_standalone_path = save_path + "_standalone"
-    all_preds_2 = []
-    for fold in range(N_fold):
-        predictor = AutoMMPredictor(
-            label="Pawpularity",
-            problem_type="regression",
-            eval_metric="rmse",
-            path=save_path,
-            verbosity=4,
-        )
-        pretrained_model = predictor.load(path=save_standalone_path + f"_fold{fold}/")
-        test_pred = pretrained_model.predict(test_df)
-        all_preds_2.append(test_pred)
-        del predictor
-        torch.cuda.empty_cache()
-    preds_2 = np.mean(np.stack(all_preds_2), axis=0)
-
-    save_path = "../input/pawpularity-result/result3/result"
-    save_standalone_path = save_path + "_standalone"
-    all_preds_3 = []
-    for fold in range(N_fold):
-        predictor = AutoMMPredictor(
-            label="Pawpularity",
-            problem_type="regression",
-            eval_metric="rmse",
-            path=save_path,
-            verbosity=4,
-        )
-        pretrained_model = predictor.load(path=save_standalone_path + f'_fold{fold}/')
-        test_pred = pretrained_model.predict(test_df)
-        all_preds_3.append(test_pred)
-        del predictor
-        torch.cuda.empty_cache()
-    preds_3 = np.mean(np.stack(all_preds_3), axis=0)
-
-    save_path = "../input/pawpularity-result/result4/result"
-    save_standalone_path = save_path + "_standalone"
-    all_preds_4 = []
-    for fold in range(N_fold):
-        predictor = AutoMMPredictor(
-            label="Pawpularity",
-            problem_type="regression",
-            eval_metric="rmse",
-            path=save_path,
-            verbosity=4,
-        )
-        pretrained_model = predictor.load(path=save_standalone_path + f"_fold{fold}/")
-        test_pred = pretrained_model.predict(test_df)
-        all_preds_4.append(test_pred)
-        del predictor
-        torch.cuda.empty_cache()
-    preds_4 = np.mean(np.stack(all_preds_4), axis=0)
-
-    submission["Pawpularity"] = (preds_1 + preds_2 + preds_3 + preds_4) / 4  # Model ensemble.
+    submission["Pawpularity"] = np.mean(np.stack(model_preds), axis=0) # Model ensemble.
     submission.to_csv("submission.csv", index=False)
 
     print(submission)

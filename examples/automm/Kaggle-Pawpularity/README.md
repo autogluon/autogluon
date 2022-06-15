@@ -2,7 +2,7 @@
 
 ## 1. AutoMMPredictor for Training
 
-AutoMMPredictor is a tool that can handle diverse data including image, text, numerical data and categorical data. It can automatically identify data types and perform fusion. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
+AutoMMPredictor is a tool that can handle diverse data including image, text, numerical data and categorical data. It can automatically identify data types and perform the fusion. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
 
 ### 1.1 Build the AutoMMPredictor
 
@@ -52,34 +52,34 @@ Then, you can train the AutoMMPredictor with `.fit()`.
  - `tuning_data`is the data for validation. If it is empty, the tuning data will be split from training data automatically.
  - `save_path`indicates the specific path for model saving in a fit process.
  - `hyperparameters`is a Dict which will override the default configs in the training. The configs contain five different types.  
- -- `model`contains the parameters which control the models used in the predictor. You can select the model you need and adjust the details. Default is selecting the models determined by dataset automatically.
+ -- `model`contains the parameters which control the models used in the predictor. You can select the model you need and adjust the details. Default is selecting the models determined by the dataset automatically.
  --`data`contains the configs of transforms for different types of data. 
  --`env`contains the configs of the training environment.
- --`optimization`contains the configs in the optimization process, including but not limit to max training epochs, learning rate and warm up.
+ --`optimization`contains the configs in the optimization process, including but not limited to max training epochs, learning rate and warm-up.
  - `seed`determines the random seed.
 
 ### 1.3 Save Standalone Model
-In AutoMMPredictor, some pretrained models will be downloaded during training. These models also need to be saved for use in predicting after submission. You can open standalone in model saving to save the downloaded models.
+In AutoMMPredictor, some pre-trained models will be downloaded during training. These models also need to be saved for use in predicting after submission. You can open standalone in model saving to save the downloaded models.
 
     predictor.save(path=save_standalone_path,standalone=True)
 
 ## 2. Kaggle Kernel-only Competition with AutoGluon
 
-In a kaggle competition, especially a code competition, users cannot obtain AutoGluon resources through the network. 
+In a Kaggle competition, especially a code competition, users cannot obtain AutoGluon resources through the network. 
 To solve the problem, there are two key points:
 
- - Get AutoGluon and its dependent libraries.
- - Save the downloaded resources when saving your model.
+ - Loading AutoGluon and its related libraries through datasets.
+ - Using standalone models to avoid model downloading.
 
-You can download [AutoGluon](https://github.com/awslabs/autogluon) and use the tools to train your own model locally.
-For using AutoGluon in kaggle submission, it should be uploaded to kaggle as a dataset. You can create a new dataset called "auotgluon" in kaggle. After that, finding AutoGluon at the installation path and upload it into the dataset. 
+You can download [AutoGluon](https://github.com/awslabs/autogluon) and use the tools to train your model locally.
+For using AutoGluon in Kaggle submission, it should be uploaded to Kaggle as a dataset. You can create a new dataset called "auotgluon" in Kaggle. After that, find AutoGluon at the installation path and upload it into the dataset. 
 In this way, AutoGluon is introduced without network support in submission. 
-Through the code follow, you can import AutoGluon in your work.
+Through the code following, you can import AutoGluon into your work.
 
     import sys
     sys.path.append("../input/autogluon/")
   
-It should be noted that AutoGluon itself needs some dependencies which are not supported in the kaggle environment. They should be introduced the same way as Auotgluon. 
+It should be noted that AutoGluon itself needs some dependencies which are not supported in the Kaggle environment. They should be introduced the same way as Auotgluon. 
 Currently, these libraries need to be imported manually:
 
  - nptyping
@@ -87,13 +87,14 @@ Currently, these libraries need to be imported manually:
  - timm
  - omegaconf
  - antlr4
+ - nlpaug
 
 Using the saved standalone model can avoid downloading models in submission. You can refer to *1.3* to save the standalone model.
 
 ## 3. Prediction in Kaggle Competitions
 
-Next, let's upload the predictor to Kaggle and use it to generate predictions on the test set. You should upload the AutoMMPredictor standalone save files as a dataset to kaggle and put it in the input data sources of your prediction code. 
-You can load the AutoMMPredictor using the code follow.
+Next, let's upload the predictor to Kaggle and use it to generate predictions on the test set. You should upload the AutoMMPredictor standalone save files as a dataset to Kaggle and put it in the input data sources of your prediction code. 
+You can load the AutoMMPredictor using the code following.
 
     pretrained_model = predictor.load(path=save_standalone_path)
 
@@ -101,4 +102,4 @@ With the `.predict()`, you can get the prediction of test datasets.
 
     test_pred = pretrained_model.predict(test_df)
  
- For detail codes, please refer to [`kaggle_Pawpularity_submit.py`](./kaggle_Pawpularity_submit.py).
+For detailed codes, please refer to [`Kaggle_Pawpularity_submit.py`](./kaggle_Pawpularity_submit.py).
