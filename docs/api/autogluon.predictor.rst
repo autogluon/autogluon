@@ -52,6 +52,12 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 
    TextPredictor
 
+.. automodule:: autogluon.timeseries
+.. autosummary::
+   :nosignatures:
+
+   TimeSeriesPredictor
+
 
 :hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -112,6 +118,20 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
         :methods:
 
 
+:hidden:`TimeSeriesPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.timeseries
+
+.. autoclass:: TimeSeriesPredictor
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TimeSeriesPredictor
+        :methods:
+
+
 Additional Tabular APIs
 -----------------------
 
@@ -132,3 +152,15 @@ Additional Tabular APIs
    :members:
    :inherited-members:
 
+
+Additional Time Series APIs
+---------------------------
+
+.. automodule:: autogluon.timeseries
+
+:hidden:`TimeSeriesDataFrame`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TimeSeriesDataFrame
+    :members: freq, from_iterable_dataset, from_data_frame, from_pickle,
+              split_by_time, split_by_item, slice_by_timestep, subsequence

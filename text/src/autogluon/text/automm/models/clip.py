@@ -17,6 +17,8 @@ from ..constants import (
     FEATURES,
     AUTOMM,
     COLUMN,
+    COLUMN_FEATURES,
+    MASKS,
 )
 from typing import Optional
 
@@ -135,16 +137,17 @@ class CLIPForImageText(nn.Module):
         image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(image_features)  # (b, n)
         image_features = image_features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
 
-        ret = {}
+        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         # collect image features by image column names
-        ret.update(
-            get_column_features(
-                batch=batch,
-                column_name_prefix=self.image_column_prefix,
-                features=image_features,
-                valid_lengths=image_valid_num,
-            )
+        image_column_features, image_column_feature_masks = get_column_features(
+            batch=batch,
+            column_name_prefix=self.image_column_prefix,
+            features=image_features,
+            valid_lengths=image_valid_num,
+            has_cls_feature=False,
         )
+        ret[COLUMN_FEATURES][FEATURES].update(image_column_features)
+        ret[COLUMN_FEATURES][MASKS].update(image_column_feature_masks)
 
         image_features = image_features.sum(dim=1)  # (b, num_features)
 
@@ -161,14 +164,15 @@ class CLIPForImageText(nn.Module):
         logits = self.head(features)
 
         # collect text features by text column names
-        ret.update(
-            get_column_features(
-                batch=batch,
-                column_name_prefix=self.text_column_prefix,
-                features=text_outputs.last_hidden_state,
-                valid_lengths=text_valid_length,
-            )
+        text_column_features, text_column_feature_masks = get_column_features(
+            batch=batch,
+            column_name_prefix=self.text_column_prefix,
+            features=self.model.text_projection(text_outputs.last_hidden_state),
+            valid_lengths=text_valid_length,
+            has_cls_feature=True,
         )
+        ret[COLUMN_FEATURES][FEATURES].update(text_column_features)
+        ret[COLUMN_FEATURES][MASKS].update(text_column_feature_masks)
 
         ret.update(
             {

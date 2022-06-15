@@ -13,6 +13,8 @@ from ..constants import (
     FEATURES,
     AUTOMM,
     COLUMN,
+    COLUMN_FEATURES,
+    MASKS,
 )
 from typing import Optional, List, Tuple
 from .utils import (
@@ -139,12 +141,16 @@ class HFAutoModelForTextPrediction(nn.Module):
 
         logits = self.head(cls_features)
 
-        ret = get_column_features(
+        ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
+        column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
             features=outputs.last_hidden_state,
             valid_lengths=text_valid_length,
+            has_cls_feature=True,
         )
+        ret[COLUMN_FEATURES][FEATURES].update(column_features)
+        ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
         ret.update(
             {
