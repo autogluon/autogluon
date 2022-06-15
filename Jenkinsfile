@@ -244,6 +244,7 @@ stage("Unit Test") {
 
           ${install_core_all_tests}
           ${install_features}
+          ${install_multimodal}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_text}
