@@ -10,8 +10,9 @@ with warning_filter():
     from gluonts.model.deepar import DeepAREstimator
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
     from gluonts.model.prophet import ProphetPredictor
-    from gluonts.model.seq2seq import MQCNNEstimator
+    from gluonts.model.seq2seq import MQCNNEstimator, MQRNNEstimator
     from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
+    from gluonts.model.transformer import TransformerEstimator
     from gluonts.mx.context import get_mxnet_context
     from gluonts.nursery.autogluon_tabular import TabularEstimator
 
@@ -54,7 +55,23 @@ class DeepARModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
 
 
-class MQCNNModel(AbstractGluonTSModel):
+class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
+    """Abstract class for MQCNN and MQRNN which require hybridization to be turned off
+    when fitting on the GPU.
+    """
+    gluonts_estimator_class: Type[GluonTSEstimator] = None
+
+    def _get_estimator(self):
+        if get_mxnet_context() != mx.context.cpu():
+            self.params["hybridize"] = False
+
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
+
+
+class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     """MQCNN model from Gluon-TS. MQCNN is an encoder-decoder model where the encoder is a
     1D convolutional neural network and the decoder is a multilayer perceptron.
 
@@ -102,17 +119,19 @@ class MQCNNModel(AbstractGluonTSModel):
     scaling: bool
         Whether to automatically scale the target values. (default: False if quantile_output is used, True otherwise)
     """
-
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
-    def _get_estimator(self):
-        if get_mxnet_context() != mx.context.cpu():
-            self.params["hybridize"] = False
 
-        with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(
-                **self._get_estimator_init_args()
-            )
+class MQRNNModel(AbstractGluonTSSeq2SeqModel):
+    """MQRNN model from Gluon-TS. MQRNN is an encoder-decoder model where the encoder is a
+    recurrent neural network and the decoder is a multilayer perceptron.
+
+    See `AbstractGluonTSModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    """
+    gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
 class SimpleFeedForwardModel(AbstractGluonTSModel):
@@ -138,6 +157,47 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
+
+
+class TransformerModel(AbstractGluonTSModel):
+    """GluonTS Transformer model for forecasting, close to the one described in
+    [Vaswani2017]_.
+
+    .. [Vaswani2017] Vaswani, Ashish, et al. "Attention is all you need."
+        Advances in neural information processing systems. 2017.
+
+    See `AbstractGluonTSModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    context_length
+        Number of steps to unroll the RNN for before computing predictions
+        (default: None, in which case context_length = prediction_length)
+    trainer
+        Trainer object to be used (default: Trainer())
+    dropout_rate
+        Dropout regularization parameter (default: 0.1)
+    distr_output
+        Distribution to use to evaluate observations and sample predictions
+        (default: StudentTOutput())
+    model_dim
+        Dimension of the transformer network, i.e., embedding dimension of the
+        input (default: 32)
+    inner_ff_dim_scale
+        Dimension scale of the inner hidden layer of the transformer's
+        feedforward network (default: 4)
+    pre_seq
+        Sequence that defined operations of the processing block before the
+        main transformer network. Available operations: 'd' for dropout, 'r'
+        for residual connections and 'n' for normalization (default: 'dn')
+    post_seq
+        Sequence that defined operations of the processing block in and after
+        the main transformer network. Available operations: 'd' for
+        dropout, 'r' for residual connections and 'n' for normalization
+        (default: 'drn').
+    """
+
+    gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
 
 
 class GenericGluonTSModel(AbstractGluonTSModel):
@@ -167,6 +227,17 @@ class GenericGluonTSModel(AbstractGluonTSModel):
         params_dict = super().get_params()
         params_dict["gluonts_estimator_class"] = self.gluonts_estimator_class
         return params_dict
+
+    def _get_estimator(self):
+        # TODO: temporarily disabling hybridization on GPU due to mxnet issue
+        # TODO: fixed in mxnet v2.0
+        if get_mxnet_context() != mx.context.cpu():
+            self.params["hybridize"] = False
+
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(
+                **self._get_estimator_init_args()
+            )
 
 
 class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):

@@ -37,12 +37,14 @@ install_requires = [
     'nptyping>=1.4.4,<1.5.0',
     'omegaconf>=2.1.1,<2.2.0',
     'sentencepiece>=0.1.95,<0.2.0',
+    'protobuf<=3.18.1',  # https://github.com/awslabs/autogluon/issues/1762
     f'autogluon.core=={version}',
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
     'autogluon-contrib-nlp==0.0.1b20220208',
+    'pytorch-metric-learning>=1.3.0,<1.4.0',
     'nlpaug>=1.1.10,<2.0.0',
-    'nltk>=3.4.5,<4.0.0'
+    'nltk>=3.4.5,<4.0.0',
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -62,6 +64,8 @@ if __name__ == '__main__':
         'configs/model/*.yaml',
         'configs/optimization/*.yaml',
         'configs/environment/*.yaml',
+        'configs/distiller/*.yaml',
+        'configs/matcher/*.yaml',
     ]
     setup(
         install_requires=install_requires,

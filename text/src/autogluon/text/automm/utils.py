@@ -16,7 +16,7 @@ from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from sklearn.preprocessing import LabelEncoder
 from autogluon.core.metrics import get_metric
-
+from .models.utils import inject_lora_to_linear_layer
 from .models import (
     HFAutoModelForTextPrediction,
     TimmAutoModelForImagePrediction,
@@ -40,9 +40,6 @@ from .data import (
 from .constants import (
     ACCURACY,
     RMSE,
-    R2,
-    PEARSONR,
-    SPEARMANR,
     ALL_MODALITIES,
     IMAGE,
     TEXT,
@@ -67,7 +64,9 @@ from .constants import (
     FUSION_TRANSFORMER,
     ROC_AUC,
     AVERAGE_PRECISION,
-    LOG_LOSS,
+    METRIC_MODE_MAP,
+    VALID_METRICS,
+    VALID_CONFIG_KEYS,
 )
 from .presets import (
     list_model_presets,
@@ -86,15 +85,6 @@ def infer_metrics(
     Validation metric is for early-stopping and selecting the best model checkpoints.
     Evaluation metric is to report performance to users.
 
-    If the evaluation metric is provided, then we use it as the validation metric.
-    But there are some exceptions that validation metric is different from evaluation metric.
-    For example, if the provided evaluation metric is `r2`, we set the validation metric as `rmse`
-    since `torchmetrics.R2Score` may encounter errors for per gpu batch size 1. Another example is
-    that `torchmetrics.AUROC` requires that both positive and negative examples are available in a mini-batch.
-    When training a large model, the per gpu batch size is probably small, leading to an incorrect
-    roc_auc score.
-
-
     Parameters
     ----------
     problem_type
@@ -110,11 +100,20 @@ def infer_metrics(
         Name of evaluation metric.
     """
     if eval_metric_name is not None:
-        validation_metric_name = eval_metric_name
-        return validation_metric_name, eval_metric_name
+        if eval_metric_name in VALID_METRICS:
+            validation_metric_name = eval_metric_name
+            return validation_metric_name, eval_metric_name
+        warnings.warn(
+            f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
+            f"Thus, we will fall-back to use accuracy for multi-class classification problems "
+            f", ROC-AUC for binary classification problem, and RMSE for regression problems.",
+            UserWarning,
+        )
 
-    if problem_type in [MULTICLASS, BINARY]:
+    if problem_type == MULTICLASS:
         eval_metric_name = ACCURACY
+    elif problem_type == BINARY:
+        eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
         eval_metric_name = RMSE
     else:
@@ -123,6 +122,62 @@ def infer_metrics(
     validation_metric_name = eval_metric_name
 
     return validation_metric_name, eval_metric_name
+
+
+def get_minmax_mode(metric_name: str):
+    """
+    Get minmax mode based on metric name
+
+    Parameters
+    ----------
+    metric_name
+        A string representing metric
+
+    Returns
+    -------
+    mode
+        The min/max mode used in selecting model checkpoints.
+        - min
+             Its means that smaller metric is better.
+        - max
+            It means that larger metric is better.
+    """
+    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
+    return METRIC_MODE_MAP.get(metric_name)
+
+
+def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[str]]):
+    """
+    Filter search space within hyperparameters without the given keys as prefixes.
+    Hyperparameters that are not search space will not be filtered.
+
+    Parameters
+    ----------
+    hyperparameters
+        A dictionary containing search space and overrides to config.
+    keys_to_filter
+        Keys that needs to be filtered out
+
+    Returns
+    -------
+        hyperparameters being filtered
+    """
+    assert any(
+        key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
+    ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
+    from autogluon.core.space import Space
+    from ray.tune.sample import Domain
+
+    hyperparameters = copy.deepcopy(hyperparameters)
+    if isinstance(keys_to_filter, str):
+        keys_to_filter = [keys_to_filter]
+    for hyperparameter, value in hyperparameters.copy().items():
+        if not isinstance(value, (Space, Domain)):
+            continue
+        for key in keys_to_filter:
+            if hyperparameter.startswith(key):
+                del hyperparameters[hyperparameter]
+    return hyperparameters
 
 
 def get_config(
@@ -524,7 +579,8 @@ def init_data_processors(
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
                         stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_detection_length"),
+                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
                     )
                 )
@@ -709,6 +765,9 @@ def create_model(
         else:
             raise ValueError(f"unknown model name: {model_name}")
 
+        if OmegaConf.select(config, "optimization.efficient_finetune"):
+            model = apply_model_adaptation(model, config)
+
         all_models.append(model)
 
     if len(all_models) > 1:
@@ -718,6 +777,30 @@ def create_model(
         return all_models[0]
     else:
         raise ValueError(f"No available models for {names}")
+
+
+def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
+    """
+    Apply an adaptation to the model for efficient fine-tuning.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    config:
+        A DictConfig object. The optimization config should be accessible by "config.optimization".
+    """
+    if "lora" in OmegaConf.select(config, "optimization.efficient_finetune"):
+        model = inject_lora_to_linear_layer(
+            model=model,
+            lora_r=config.optimization.lora.r,
+            lora_alpha=config.optimization.lora.alpha,
+            filter=config.optimization.lora.filter,
+        )
+
+    model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
+
+    return model
 
 
 def save_pretrained_models(
@@ -1139,7 +1222,7 @@ def modify_duplicate_model_names(
 
     Returns
     -------
-    The predictor guaranteed has no duplicate model names with the backlist names.
+    The predictor guaranteed has no duplicate model names with the blacklist names.
     """
     model_names = []
     for n in predictor._config.model.names:
@@ -1275,6 +1358,7 @@ def try_to_infer_pos_label(
     else:
         pos_label = 1
 
+    logger.debug(f"pos_label: {pos_label}")
     return pos_label
 
 

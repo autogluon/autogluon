@@ -1,7 +1,7 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    python3 -m pip install mxnet-cu102==1.8.*
+    python3 -m pip install mxnet-cu102==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
     ls -1a /usr/local | grep cuda
@@ -63,6 +63,30 @@ install_timeseries = """
 install_autogluon = """
     python3 -m pip install --upgrade -e autogluon/
 """
+
+stage("Lint Check") {
+  parallel 'lint': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-lint-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-lint-py3-v3 -y
+          conda env update -n autogluon-lint-py3-v3 -f docs/build.yml
+          conda activate autogluon-lint-py3-v3
+          conda list
+          # Perform lint check
+          black --check --diff text/src/autogluon/text/automm
+          """
+        }
+      }
+    }
+  }
+}
 
 stage("Unit Test") {
   parallel 'common': {
@@ -190,7 +214,6 @@ stage("Unit Test") {
           # launch different process for each test to make sure memory is released
           python3 -m pip install --upgrade pytest-xdist
 
-          black --check --diff text/src/autogluon/text/automm
           cd text/
           python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
@@ -270,7 +293,7 @@ stage("Unit Test") {
           conda activate autogluon-install-py3-v3
           conda list
 
-          python3 -m pip install 'mxnet==1.7.0.*'
+          python3 -m pip install 'mxnet==1.9.*'
 
           ${install_core_all_tests}
           ${install_features}

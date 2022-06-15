@@ -1,7 +1,8 @@
 from typing import Optional, Union, Tuple, List, Dict
 import torch
 from torch import nn
-from ..constants import MASK
+from ..constants import MASKS, COLUMN_FEATURES, FEATURES
+from .lora_layers import LoRALinear
 
 
 def init_weights(module: nn.Module):
@@ -315,32 +316,42 @@ def get_column_features(
     column_name_prefix: str,
     features: torch.Tensor,
     valid_lengths: torch.Tensor,
+    has_cls_feature: bool,
 ):
     """
     Index the features of one column defined by `column_name_prefix`.
     This function can be used to index both image and text features.
     The features have shape (b, n, d), where n can be the image number or
     text token number. One column corresponds to a subset of
-    the n images or text tokens.
+    the n images or text tokens. One column name can only appear once in the return.
 
     Parameters
     ----------
     batch
         The batch input containing the feature column information, i.e., indexes.
     column_name_prefix
-        The column name prefix in `batch` keys.
+        The column name prefix of one modality (image or text).
     features
-        A model's features containing the column features of interest.
+        The features of columns whose names starts with column_name_prefix.
     valid_lengths
         The valid image number or text token number of each sample in a batch.
+    has_cls_feature
+        Whether the features include the cls feature. If True, then the joined names of all
+        columns share the cls feature.
 
     Returns
     -------
     The column features with masks. If the column has no valid features, its
     mask is 0.
     """
-    ret = {}
+    column_features = {}
+    feature_masks = {}
+
     cut_idx = len(column_name_prefix) + 1
+    if has_cls_feature:
+        all_column_names = []
+        # creat a zero mask to do logical_or with each column's mask
+        joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
     for key in batch:
         if key.startswith(column_name_prefix):
             per_col_features = []
@@ -356,8 +367,62 @@ def get_column_features(
                 else:  # the column has no valid image/text.
                     per_col_features.append(torch.zeros_like(features[0, 0]))
                     per_col_masks[i] = 0
+            column_name = key[cut_idx:]
+            column_features[column_name] = torch.stack(per_col_features, dim=0)  # (b, num_features)
+            feature_masks[column_name] = per_col_masks  # (b,)
+            if has_cls_feature:
+                all_column_names.append(column_name)
+                joint_mask = torch.logical_or(joint_mask, per_col_masks)
 
-            ret[key[cut_idx:]] = torch.stack(per_col_features, dim=0)  # (b, d)
-            ret[f"{key[cut_idx:]}_{MASK}"] = per_col_masks  # (b,)
+    # all the columns of one model's input share the model's cls feature
+    if (
+        has_cls_feature and len(all_column_names) > 0
+    ):  # some models', e.g, timm_image, output doesn't have the cls feature.
+        joint_column_name = "_".join(all_column_names)
+        column_features[joint_column_name] = features[:, 0, :]
+        feature_masks[joint_column_name] = joint_mask.to(features)
+        # remove the individual column features since these column features not independent
+        for column_name in all_column_names:
+            column_features.pop(column_name)
+            feature_masks.pop(column_name)
 
-    return ret
+    return column_features, feature_masks
+
+
+def inject_lora_to_linear_layer(
+    model: nn.Module, lora_r: int, lora_alpha: int, filter: Optional[List[str]] = None
+) -> nn.Module:
+    """
+    Injects trainable Low-Rank decomposition matrices (LoRA) into linear
+    layers of a PyTorch model. Used for efficient fine-tuning of large
+    pre-trained models.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    lora_r
+        The rank r of the low-rank decomposition.
+    lora_alpha
+        The scaling factor. Can be set to same value as r in
+        most cases, as initialization is scaled already.
+    filter
+        Apply LoRa only to linear layers filtered by name.
+        If None, LoRA is applied to all linear Layers in Model.
+    Returns
+    -------
+    Model with injected LoRA modules.
+    """
+    for n, module in model.named_children():
+        if len(list(module.children())) > 0:
+            inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
+
+        if isinstance(module, nn.Linear) and (not filter or any(x in n for x in filter)):
+            lora_layer = LoRALinear(
+                module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
+            )
+            lora_layer.weight = module.weight
+            lora_layer.bias = module.bias
+            setattr(model, n, lora_layer)
+
+    return model  # return model to enable method chaining

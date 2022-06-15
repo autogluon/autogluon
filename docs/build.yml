@@ -4,3 +4,4 @@ dependencies:
 - pip
 - pip:
   - flake8
+  - black>=22.3

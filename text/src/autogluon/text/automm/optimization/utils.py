@@ -1,11 +1,14 @@
+import logging
 from typing import Optional, Union, Tuple, List, Dict
 import functools
+import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
 from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
 from omegaconf import OmegaConf, DictConfig
+from pytorch_metric_learning import losses, miners, distances
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
@@ -31,9 +34,22 @@ from ..constants import (
     CROSS_ENTROPY,
     PEARSONR,
     SPEARMANR,
+    CONTRASTIVE_LOSS,
+    COSINE_SIMILARITY,
+    PAIR_MARGIN_MINER,
+    COLUMN_FEATURES,
+    FEATURES,
+    MASKS,
+    AUTOMM,
+    COSINE_EMBEDDING_LOSS,
+    LORA,
+    LORA_BIAS,
+    LORA_NORM,
 )
 import warnings
 from .soft_target_crossentropy import SoftTargetCrossEntropy
+
+logger = logging.getLogger(AUTOMM)
 
 
 def get_loss_func(
@@ -101,49 +117,35 @@ def get_metric(
     -------
     torchmetrics.Metric
         A torchmetrics.Metric object.
-    mode
-        The min/max mode used in selecting model checkpoints.
-        - min
-             Its means that smaller metric is better.
-        - max
-            It means that larger metric is better.
     custom_metric_func
         A customized metric function.
     """
     metric_name = metric_name.lower()
     if metric_name in [ACC, ACCURACY]:
-        return torchmetrics.Accuracy(), MAX, None
+        return torchmetrics.Accuracy(), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
-        return torchmetrics.MeanSquaredError(squared=False), MIN, None
+        return torchmetrics.MeanSquaredError(squared=False), None
     elif metric_name == R2:
-        return torchmetrics.R2Score(), MAX, None
+        return torchmetrics.R2Score(), None
     elif metric_name == QUADRATIC_KAPPA:
-        return torchmetrics.CohenKappa(num_classes=num_classes, weights="quadratic"), MAX, None
-    elif metric_name == ROC_AUC:
-        return torchmetrics.AUROC(pos_label=pos_label), MAX, None
-    elif metric_name == AVERAGE_PRECISION:
-        return torchmetrics.AveragePrecision(pos_label=pos_label), MAX, None
-    elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
-        return torchmetrics.MeanMetric(), MIN, functools.partial(F.cross_entropy, reduction="none")
-    elif metric_name == PEARSONR:
-        return torchmetrics.PearsonCorrCoef(), MAX, None
-    elif metric_name == SPEARMANR:
-        return torchmetrics.SpearmanCorrCoef(), MAX, None
-    else:
-        warnings.warn(
-            f"Currently, we cannot convert the metric: {metric_name} to a metric supported in torchmetrics. "
-            "Thus, we will fall-back to use accuracy for multi-class classification problems "
-            ", ROC-AUC for binary classification problem, and MSE for regression problems.",
-            UserWarning,
+        return (
+            torchmetrics.CohenKappa(num_classes=num_classes, weights="quadratic"),
+            None,
         )
-        if problem_type == REGRESSION:
-            return torchmetrics.MeanSquaredError(squared=False), MIN, None
-        elif problem_type == MULTICLASS:
-            return torchmetrics.Accuracy(), MAX, None
-        elif problem_type == BINARY:
-            return torchmetrics.AUROC(pos_label=pos_label), MAX, None
-        else:
-            raise ValueError(f"The problem_type={problem_type} is currently not supported")
+    elif metric_name == ROC_AUC:
+        return torchmetrics.AUROC(pos_label=pos_label), None
+    elif metric_name == AVERAGE_PRECISION:
+        return torchmetrics.AveragePrecision(pos_label=pos_label), None
+    elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
+        return torchmetrics.MeanMetric(), functools.partial(F.cross_entropy, reduction="none")
+    elif metric_name == COSINE_EMBEDDING_LOSS:
+        return torchmetrics.MeanMetric(), functools.partial(F.cosine_embedding_loss, reduction="none")
+    elif metric_name == PEARSONR:
+        return torchmetrics.PearsonCorrCoef(), None
+    elif metric_name == SPEARMANR:
+        return torchmetrics.SpearmanCorrCoef(), None
+    else:
+        raise ValueError(f"Unknown metric {metric_name}")
 
 
 def get_optimizer(
@@ -251,7 +253,9 @@ def get_lr_scheduler(
         )
     elif lr_schedule == "linear_decay":
         scheduler = get_linear_schedule_with_warmup(
-            optimizer=optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_max_steps
+            optimizer=optimizer,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_max_steps,
         )
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
@@ -274,7 +278,8 @@ def get_weight_decay_param_names(model: nn.Module):
     """
     # By default, we should not apply weight decay for all the norm layers
     decay_param_names = get_parameter_names(
-        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm]
+        model,
+        [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm],
     )
     decay_param_names = [name for name in decay_param_names if "bias" not in name]
     return decay_param_names
@@ -296,7 +301,8 @@ def get_norm_layer_param_names(model: nn.Module):
     """
     all_param_names = [name for name, _ in model.named_parameters()]
     all_param_names_except_norm_names = get_parameter_names(
-        model, [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm]
+        model,
+        [nn.LayerNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm],
     )
     norm_param_names = [name for name in all_param_names if name not in all_param_names_except_norm_names]
     return norm_param_names
@@ -468,6 +474,18 @@ def apply_layerwise_lr_decay(
             # For norm-fit, we finetune all the normalization layers and bias layers
             if name not in norm_param_names and "bias" not in name:
                 param.requires_grad = False
+        elif efficient_finetune == LORA:
+            # For LoRA adaptation we only fine-tune LoRA weights
+            if "lora_" not in name:
+                param.requires_grad = False
+        elif efficient_finetune == LORA_BIAS:
+            # For LoRA adapation we fine-tune LoRA and all bias weights
+            if "lora_" not in name and "bias" not in name:
+                param.requires_grad = False
+        elif efficient_finetune == LORA_NORM:
+            # For LoRA adapation we fine-tune LoRA and normalization and bias layers
+            if "lora_" not in name and name not in norm_param_names and "bias" not in name:
+                param.requires_grad = False
 
         if not param.requires_grad:
             continue  # frozen weights
@@ -484,9 +502,16 @@ def apply_layerwise_lr_decay(
 
         if group_name not in parameter_group_names:
             scale = lr_decay**layer_id
-
-            parameter_group_names[group_name] = {"weight_decay": this_weight_decay, "params": [], "lr": scale * lr}
-            parameter_group_vars[group_name] = {"weight_decay": this_weight_decay, "params": [], "lr": scale * lr}
+            parameter_group_names[group_name] = {
+                "weight_decay": this_weight_decay,
+                "params": [],
+                "lr": scale * lr,
+            }
+            parameter_group_vars[group_name] = {
+                "weight_decay": this_weight_decay,
+                "params": [],
+                "lr": scale * lr,
+            }
 
         parameter_group_vars[group_name]["params"].append(param)
         parameter_group_names[group_name]["params"].append(name)
@@ -526,3 +551,226 @@ def update_config_by_rules(
                 UserWarning,
             )
     return config
+
+
+def gather_column_features(
+    output: Dict[str, Dict],
+    column_names: Union[str, List[str]],
+):
+    """
+    Gather column features from models' outputs.
+    For each feature name in one model's output, we enumerate the provided column names to see
+    whether (partial) the provided columns share one cls feature or they have independent features.
+
+    TODO: return features' masks and use them to filter the losses.
+
+    Parameters
+    ----------
+    output
+        The models' outputs.
+    column_names
+        The columns whose features we want to get.
+
+    Returns
+    -------
+    The gathered feature vectors. Each sample should only have one feature vector.
+    """
+    if isinstance(column_names, str):
+        column_names = [column_names]
+
+    gathered_features = []
+    # logger.debug(f"gather features for columns: {column_names}")
+    for per_model_name, per_model_output in output.items():
+        # logger.debug(f"gather column features from model: {per_model_name}")
+        for feature_name in per_model_output[COLUMN_FEATURES][FEATURES]:
+            # logger.debug(f"processing feature: {feature_name}")
+            columns_share_one_feature = []
+            for col_name in column_names:
+                if col_name in feature_name:
+                    # this column feature is part of the cls feature
+                    if not (feature_name.startswith(col_name) and feature_name.endswith(col_name)):
+                        columns_share_one_feature.append(col_name)
+                        # logger.debug(f"column {col_name} is included in feature {feature_name}")
+                    else:  # this column's feature is independent of other columns'
+                        gathered_features.append(per_model_output[COLUMN_FEATURES][FEATURES][col_name])
+                        # logger.debug(f"col_name {col_name} has an independent feature in model: {per_model_name}")
+
+            # two or more columns share one cls feature, and no other columns share it.
+            if len(columns_share_one_feature) > 0:
+                assert len("_".join(columns_share_one_feature)) == len(
+                    feature_name
+                ), f"model `{per_model_name}`'s cls feature name `{feature_name}` doesn't match `{columns_share_one_feature}`"
+                gathered_features.append(per_model_output[COLUMN_FEATURES][FEATURES][feature_name])
+
+    if len(gathered_features) > 1:
+        # currently only support features of the same shape
+        assert all(
+            per_features.shape == gathered_features[0].shape for per_features in gathered_features
+        ), "Currently we only support gathering features of the same dimension."
+
+    if len(gathered_features) == 0:
+        raise ValueError(f"No features are found for columns names {column_names}.")
+
+    gathered_features = torch.stack(gathered_features, dim=0).mean(dim=0)  # (b, d)
+
+    return gathered_features
+
+
+def get_metric_learning_distance_func(
+    name: str,
+):
+    """
+    Return one pytorch metric learning's distance function based on its name.
+
+    Parameters
+    ----------
+    name
+        distance function name
+
+    Returns
+    -------
+    A distance function from the pytorch metric learning package.
+    """
+    if name.lower() == COSINE_SIMILARITY:
+        return distances.CosineSimilarity()
+    else:
+        raise ValueError(f"Unknown distance measure: {name}")
+
+
+def get_metric_learning_loss_funcs(
+    matches: List[DictConfig],
+):
+    """
+    Return a list of pytorch metric learning's loss functions based on their names.
+
+    Parameters
+    ----------
+    matches
+        A list of matches from the matcher config.
+
+    Returns
+    -------
+    A list of loss functions from the pytorch metric learning package.
+    """
+    metric_learning_loss_funcs = []
+    for per_match in matches:
+        if per_match.loss.type.lower() == CONTRASTIVE_LOSS:
+            metric_learning_loss_funcs.append(
+                losses.ContrastiveLoss(
+                    pos_margin=per_match.loss.pos_margin,
+                    neg_margin=per_match.loss.neg_margin,
+                    distance=get_metric_learning_distance_func(per_match.distance.type),
+                )
+            )
+        else:
+            raise ValueError(f"Unknown metric learning loss: {per_match.loss.type}")
+
+    return metric_learning_loss_funcs
+
+
+def get_metric_learning_miner_funcs(
+    matches: List[DictConfig],
+):
+    """
+    Return a list of pytorch metric learning's miner functions based on their names.
+    The miners are used to mine the positive and negative examples.
+
+    Parameters
+    ----------
+    matches
+        A list of matches from the matcher config.
+
+    Returns
+    -------
+    A list of miner functions from the pytorch metric learning package.
+    """
+    metric_learning_miner_funcs = []
+    for per_match in matches:
+        if per_match.miner.type.lower() == PAIR_MARGIN_MINER:
+            metric_learning_miner_funcs.append(
+                miners.PairMarginMiner(
+                    pos_margin=per_match.miner.pos_margin,
+                    neg_margin=per_match.miner.neg_margin,
+                    distance=get_metric_learning_distance_func(per_match.distance.type),
+                )
+            )
+        else:
+            raise ValueError(f"Unknown metric learning miner: {per_match.miner.type}")
+
+    return metric_learning_miner_funcs
+
+
+def generate_metric_learning_labels(
+    num_samples: int,
+    match_label: int,
+    labels: torch.Tensor,
+):
+    """
+    Generate labels to compute the metric learning loss of one mini-batch.
+    For n samples, it generates 2*n labels since each match has two sides, each of which
+    has one label. If we know the matching label, then it determines the two sides' labels
+    according to whether their label is the matching label. If the matching label is None,
+    it assigns a unique label for each side.
+
+    Parameters
+    ----------
+    num_samples
+        number of samples.
+    match_label
+        The matching label, which can be None.
+    labels
+        The sample labels used in the supervised setting. It's required only when match_label is not None.
+
+    Returns
+    -------
+    The labels used in computing the metric learning loss.
+    """
+    labels_1 = torch.arange(num_samples)
+
+    if match_label is not None:
+        labels_2 = torch.arange(num_samples, num_samples * 2)
+        # users need to specify the match_label based on the raw label's semantic meaning.
+        mask = labels == match_label
+        labels_2[mask] = labels_1[mask]
+    else:
+        labels_2 = torch.arange(num_samples)
+
+    metric_learning_labels = torch.cat([labels_1, labels_2], dim=0)
+
+    return metric_learning_labels
+
+
+def compute_probability(
+    logits: Optional[torch.Tensor] = None,
+    embeddings1: Optional[torch.Tensor] = None,
+    embeddings2: Optional[torch.Tensor] = None,
+    reverse_prob: Optional[bool] = False,
+):
+    """
+    Compute probabilities from logits or embedding pairs.
+
+    Parameters
+    ----------
+    logits
+        The output of a model's head layer.
+    embeddings1
+        Feature embeddings of one side in matching.
+    embeddings2
+        Feature embeddings 2 of the other side in matching.
+    reverse_prob
+        Whether to reverse the probability.
+
+    Returns
+    -------
+    Probabilities.
+    """
+    if logits is not None:
+        prob = F.softmax(logits.float(), dim=1)[:, 1]
+    else:
+        cosine_similarity = F.cosine_similarity(embeddings1, embeddings2)
+        prob = 0.5 * (cosine_similarity + 1)
+
+    if reverse_prob:
+        prob = 1 - prob
+
+    return prob

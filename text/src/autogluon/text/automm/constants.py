@@ -25,7 +25,10 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
-MASK = "mask"
+MASKS = "masks"
+PROBABILITY = "probability"
+COLUMN_FEATURES = "column_features"
+
 
 # Metric
 MAX = "max"
@@ -42,6 +45,21 @@ ROC_AUC = "roc_auc"
 AVERAGE_PRECISION = "average_precision"
 LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
+COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
+METRIC_MODE_MAP = {
+    ACC: MAX,
+    ACCURACY: MAX,
+    RMSE: MIN,
+    ROOT_MEAN_SQUARED_ERROR: MIN,
+    R2: MAX,
+    QUADRATIC_KAPPA: MAX,
+    ROC_AUC: MAX,
+    LOG_LOSS: MIN,
+    CROSS_ENTROPY: MIN,
+    PEARSONR: MAX,
+    SPEARMANR: MAX,
+}
+VALID_METRICS = METRIC_MODE_MAP.keys()
 
 # Training status
 TRAIN = "train"
@@ -67,6 +85,8 @@ DATA = "data"
 OPTIMIZATION = "optimization"
 ENVIRONMENT = "environment"
 DISTILLER = "distiller"
+MATCHER = "matcher"
+VALID_CONFIG_KEYS = [MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER, MATCHER]
 
 # Image normalization mean and std. This is only to normalize images for the CLIP model.
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
@@ -89,6 +109,9 @@ BEST = "best"
 # efficient finetuning strategies
 NORM_FIT = "norm_fit"
 BIT_FIT = "bit_fit"
+LORA = "lora"
+LORA_BIAS = "lora_bias"
+LORA_NORM = "lora_norm"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
@@ -100,3 +123,18 @@ NUMERICAL_TRANSFORMER = "numerical_transformer"
 CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
+
+# metric learning loss type
+CONTRASTIVE_LOSS = "contrastive_loss"
+
+# metric learning distance type
+COSINE_SIMILARITY = "cosine_similarity"
+
+# metric learning miner type
+PAIR_MARGIN_MINER = "pair_margin_miner"
+
+# checkpoints
+RAY_TUNE_CHECKPOINT = "ray_tune_checkpoint.ckpt"
+BEST_K_MODELS_FILE = "best_k_models.yaml"
+LAST_CHECKPOINT = "last.ckpt"
+MODEL_CHECKPOINT = "model.ckpt"
