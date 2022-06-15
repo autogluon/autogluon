@@ -145,7 +145,7 @@ def test_non_parallel_gpu_calculator():
     assert expected_num_parallel_jobs ==  resources_info['num_parallel_jobs']
     assert expected_batches == resources_info['batches']
 
-@pytest.mark.parametrize('calculator_type', ['cpu', 'gpu', 'ray_lightning_cpu', 'ray_lightning_gpu'])
+@pytest.mark.parametrize('calculator_type', ['cpu', 'gpu', 'non_parallel_gpu','ray_lightning_cpu', 'ray_lightning_gpu'])
 def test_resource_not_enough(calculator_type):
     num_cpus = 0
     num_gpus = 0
