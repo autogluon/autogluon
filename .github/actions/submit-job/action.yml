@@ -20,25 +20,29 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-        role-duration-seconds: 7200
-        aws-region: us-east-1
-    - name: Install dependencies
+    - name:
       shell: bash
       run: |
-        pip install boto3
-    - name: Submit Unit Test Job
-      shell: bash
-      run: |
-        echo "Start submitting job"
-        python ./CI/batch/submit-job.py --region ${{ inputs.region }} \
-                                        --job-type ${{ inputs.job-type }} \
-                                        --name ${{ inputs.job-name }} \
-                                        --source-ref ${{ inputs.source-ref }} \
-                                        --work-dir ${{ inputs.work-dir }} \
-                                        --remote ${{ inputs.remote }} \
-                                        --command "${{ inputs.command }}" \
-                                        --wait
+        echo ${{ github.event_name }} ${{ github.ref }}
+    # - name: Configure AWS Credentials
+    #   uses: aws-actions/configure-aws-credentials@v1
+    #   with:
+    #     role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+    #     role-duration-seconds: 7200
+    #     aws-region: us-east-1
+    # - name: Install dependencies
+    #   shell: bash
+    #   run: |
+    #     pip install boto3
+    # - name: Submit Unit Test Job
+    #   shell: bash
+    #   run: |
+    #     echo "Start submitting job"
+    #     python ./CI/batch/submit-job.py --region ${{ inputs.region }} \
+    #                                     --job-type ${{ inputs.job-type }} \
+    #                                     --name ${{ inputs.job-name }} \
+    #                                     --source-ref ${{ inputs.source-ref }} \
+    #                                     --work-dir ${{ inputs.work-dir }} \
+    #                                     --remote ${{ inputs.remote }} \
+    #                                     --command "${{ inputs.command }}" \
+    #                                     --wait

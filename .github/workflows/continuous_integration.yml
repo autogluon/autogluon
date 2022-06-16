@@ -43,167 +43,167 @@ jobs:
           source-ref: ${{ github.event.pull_request.head.sha }}
           remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
           command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
-  test_core:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Core on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU-PUSH
-          job-name: AutoGluon-Core-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
-      - name: Test Core on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Core-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
-  test_features:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Features on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU-PUSH
-          job-name: AutoGluon-Features-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
-      - name: Test Features on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Features-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
-  test_tabular:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Tabular on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU-PUSH
-          job-name: AutoGluon-Tabular-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
-      - name: Test Tabular on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Tabular-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
-  test_text:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Text on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU-PUSH
-          job-name: AutoGluon-Text-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
-      - name: Test Text on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Text-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
-  test_vision:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Vision on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU-PUSH
-          job-name: AutoGluon-Vision-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
-      - name: Test Vision on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Vision-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
-  test_forecasting:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Forecasting on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU-PUSH
-          job-name: AutoGluon-Forecasting-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_forecasting.sh && ./.github/workflow_scripts/test_forecasting.sh
-      - name: Test Forecasting on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Forecasting-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_forecasting.sh && ./.github/workflow_scripts/test_forecasting.sh
-  test_install:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Install on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU-PUSH
-          job-name: AutoGluon-Install-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
-          command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
-      - name: Test Install on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Install-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
+  # test_core:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Core on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU-PUSH
+  #         job-name: AutoGluon-Core-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
+  #     - name: Test Core on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-Core-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
+  # test_features:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Features on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU-PUSH
+  #         job-name: AutoGluon-Features-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
+  #     - name: Test Features on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-Features-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
+  # test_tabular:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Tabular on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU-PUSH
+  #         job-name: AutoGluon-Tabular-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
+  #     - name: Test Tabular on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Tabular-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
+  # test_text:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Text on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU-PUSH
+  #         job-name: AutoGluon-Text-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
+  #     - name: Test Text on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Text-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
+  # test_vision:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Vision on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU-PUSH
+  #         job-name: AutoGluon-Vision-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
+  #     - name: Test Vision on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Vision-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
+  # test_forecasting:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Forecasting on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU-PUSH
+  #         job-name: AutoGluon-Forecasting-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_forecasting.sh && ./.github/workflow_scripts/test_forecasting.sh
+  #     - name: Test Forecasting on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Forecasting-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_forecasting.sh && ./.github/workflow_scripts/test_forecasting.sh
+  # test_install:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Install on AWS Batch(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU-PUSH
+  #         job-name: AutoGluon-Install-${{ github.ref }}
+  #         source-ref: ${{ github.ref }}
+  #         remote: https://github.com/${{ github.repository }}
+  #         command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
+  #     - name: Test Install on AWS Batch(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-Install-PR#${{ github.event.number }}
+  #         source-ref: ${{ github.event.pull_request.head.sha }}
+  #         remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+  #         command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   # build_image_prediction_tutorial:
   #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
   #   runs-on: ubuntu-latest
@@ -466,7 +466,7 @@ jobs:
   #                                          --name AutoGluon-BuildTextPrediction-PR#${{ github.event.number }}
   # build_cloud_fit_deploy_tutorial:
   #   # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   needs: [test_common, test_vision]
+  #   needs: [test_common]
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Checkout repository
