@@ -2,8 +2,10 @@
 
 set -ex
 
-PR_NUMBER=$(basename $1) # For push events, this will be master branch instead of PR number
-COMMIT_SHA=$2
+BRANCH=$(basename $1)
+GIT_REPO=$2
+COMMIT_SHA=$3
+PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 
 source $(dirname "$0")/env_setup.sh
 

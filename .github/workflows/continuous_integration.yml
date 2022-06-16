@@ -20,21 +20,17 @@ defaults:
     shell: bash
 
 jobs:
-  test_common:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test
-        uses: ./.github/actions/get-commit-sha
-      - name: Test sha
-        run: echo ${{ env.SHORT_SHA }}
-      # - name: Test Common on AWS Batch
-      #   uses: ./.github/actions/submit-job
-      #   with:
-      #     job-type: CI-CPU
-      #     job-name: AutoGluon-Common
-      #     command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
+  # test_common:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Common on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-Common
+  #         command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
   # test_core:
   #   runs-on: ubuntu-latest
   #   steps:
@@ -372,55 +368,21 @@ jobs:
   #         python ./CI/batch/cancel-job.py --region us-east-1 \
   #                                          --job-type CI-GPU \
   #                                          --name AutoGluon-BuildTextPrediction-PR#${{ github.event.number }}
-  # build_cloud_fit_deploy_tutorial:
-  #   # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   needs: [test_common]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Test Common on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-CPU
-  #         job-name: AutoGluon-Common
-  #         command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
-  #     - name: Get Commit SHA(For push)
-  #       if: ${{ github.event_name == 'push' }}
-  #       run: |
-  #         SHA=${{ github.sha }}
-  #         short_sha=$(git rev-parse --short "$SHA")
-  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
-  #     - name: Get Commit SHA(For pull request)
-  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-  #       run: |
-  #         SHA=${{ github.event.pull_request.head.sha }}
-  #         short_sha=$(git rev-parse --short "$SHA")
-  #         echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV 
-  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For push)
-  #       if: ${{ github.event_name == 'push' }}
-  #       run: |
-  #         echo "Start submitting job"
-  #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU-PUSH \
-  #                                         --name AutoGluon-BuildCloudFitDeploy-${{ github.ref }} \
-  #                                         --source-ref ${{ github.ref }} \
-  #                                         --work-dir . \
-  #                                         --remote https://github.com/${{ github.repository }} \
-  #                                         --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ github.ref }} ${{ env.SHORT_SHA }}" \
-  #                                         --wait
-  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch(For pull request)
-  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-  #       run: |
-  #         echo "Start submitting job"
-  #         python ./CI/batch/submit-job.py --region us-east-1 \
-  #                                         --job-type CI-CPU \
-  #                                         --name AutoGluon-BuildCloudFitDeploy-PR#${{ github.event.number }} \
-  #                                         --source-ref ${{ github.event.pull_request.head.sha }} \
-  #                                         --work-dir . \
-  #                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
-  #                                         --command "chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh PR-${{ github.event.number }} ${{ env.SHORT_SHA }}" \
-  #                                         --wait
+  build_cloud_fit_deploy_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    # needs: [test_common]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Cloud Fit Deploy Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-CPU
+          job-name: AutoGluon-BuildCloudFitDeploy
+          command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
   # build_forecasting_tutorial:
   #   # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
   #   needs: [test_common, test_vision]
