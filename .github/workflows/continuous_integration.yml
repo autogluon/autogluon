@@ -33,7 +33,7 @@ jobs:
           job-name: AutoGluon-Common-${{ github.ref }}
           source-ref: ${{ github.ref }}
           remote: https://github.com/${{ github.repository }}
-          script-to-execute: ./.github/workflow_scripts/test_common.sh
+          command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
       - name: Test Common on AWS Batch(For pull request)
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: ./.github/actions/submit-unit-tests
@@ -42,7 +42,7 @@ jobs:
           job-name: AutoGluon-Common-PR#${{ github.event.number }}
           source-ref: ${{ github.event.pull_request.head.sha }}
           remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          script-to-execute: ./.github/workflow_scripts/test_common.sh
+          command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
   # test_core:
   #   runs-on: ubuntu-latest
   #   steps:

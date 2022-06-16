@@ -14,7 +14,7 @@ inputs:
     default: .
   remote:
     required: true
-  script-to-execute:
+  command:
     required: true
 
 runs:
@@ -40,5 +40,5 @@ runs:
                                         --source-ref ${{ inputs.source-ref }} \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote ${{ inputs.remote }} \
-                                        --command "chmod +x ${{ inputs.script-to-execute }} && ${{ inputs.script-to-execute }}" \
+                                        --command "${{ inputs.command }}" \
                                         --wait
