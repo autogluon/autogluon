@@ -148,7 +148,7 @@ class LitModule(pl.LightningModule):
         label: torch.Tensor,
     ):
         if isinstance(self.loss_func, nn.BCEWithLogitsLoss):
-            logits = torch.sigmoid(logits)
+            logits = torch.sigmoid(logits.float())
         if isinstance(metric, (torchmetrics.AUROC, torchmetrics.AveragePrecision)):
             prob = F.softmax(logits.float(), dim=1)
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
