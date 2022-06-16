@@ -482,6 +482,7 @@ class AutoMMPredictor:
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
         )
+
         ray_tune_adapter = AutommRayTuneAdapter()
         if try_import_ray_lightning():
             ray_tune_adapter = AutommRayTuneLightningAdapter()
