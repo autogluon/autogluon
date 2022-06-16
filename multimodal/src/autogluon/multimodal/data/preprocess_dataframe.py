@@ -440,9 +440,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Predicted labels ready to compute metric scores.
         """
-        if loss_func is not None and isinstance(loss_func, torch.nn.BCEWithLogitsLoss):
-            y_pred = torch.sigmoid(y_pred.float())
-
         y_pred = y_pred.detach().cpu().float().numpy()
 
         if self.label_type == CATEGORICAL:
