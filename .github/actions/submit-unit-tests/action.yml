@@ -1,0 +1,44 @@
+name: "Submit Unit Tests to AWS Batch"
+inputs:
+  region:
+    required: false
+    default: us-east-1
+  job-type:
+    required: true
+  job-name:
+    required: true
+  source-ref:
+    required: true
+  work-dir:
+    required: false
+    default: .
+  remote:
+    required: true
+  script-to-execute:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
+        role-duration-seconds: 7200
+        aws-region: us-east-1
+    - name: Install dependencies
+      run: |
+        pip install boto3
+    - name: Submit Unit Test Job
+      run: |
+        echo "Start submitting job"
+        python ./CI/batch/submit-job.py --region ${{ inputs.region }} \
+                                        --job-type ${{ inputs.job-type }} \
+                                        --name ${{ inputs.job-name }} \
+                                        --source-ref ${{ inputs.source-ref }} \
+                                        --work-dir ${{ inputs.work-dir }} \
+                                        --remote ${{ inputs.remote }} \
+                                        --command "chmod +x ${{ inputs.script-to-execute }} && ${{ inputs.script-to-execute }}" \
+                                        --wait
