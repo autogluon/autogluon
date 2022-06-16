@@ -12,15 +12,20 @@ TIMESTAMP = "timestamp"
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
-    """TimeSeriesDataFrame to represent time-series dataset.
+    """``TimeSeriesDataFrame`` s represent a collection of time series, where each row
+    identifies the values of an (``item_id``, ``timestamp``) pair.
+
+    For example, a time series data frame could represent the daily sales of a collection
+    of products, where each ``item_id`` identifies a product and ``timestamp`` s correspond to
+    the days.
 
     Parameters
     ----------
-    data : Any
-        Time-series data to construct a TimeSeriesDataFrame.
-        It currently supports three input formats:
+    data: Any
+        Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports three
+        input formats.
 
-            1. Time-series data in Iterable format. For example:
+        1. Time-series data in Iterable format. For example::
 
                 iterable_dataset = [
                     {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
@@ -28,7 +33,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
                 ]
 
-            2. Time-series data in pd.DataFrame format without multi-index. For example:
+        2. Time-series data in a pandas DataFrame format without multi-index. For example::
 
                    item_id  timestamp  target
                 0        0 2019-01-01       0
@@ -41,7 +46,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-            3. Time-series data in pd.DataFrame format with multi-index on item_id and timestamp. For example:
+        3. Time-series data in pandas DataFrame format with multi-index on item_id and timestamp. For example::
 
                                         target
                 item_id timestamp
@@ -54,7 +59,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2       2019-01-01       6
                         2019-01-02       7
                         2019-01-03       8
-                This example can be found using example() function.
+
+    Attributes
+    ----------
+    freq: str
+        A pandas and gluon-ts compatible string describing the frequency of the time series. For example
+        "D" is daily data, etc. Also see,
+        https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
     """
 
     index: pd.MultiIndex
@@ -68,11 +79,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
                 self._validate_multi_index_data_frame(data)
             else:
-                data = self.from_data_frame(data)
+                data = self._construct_pandas_frame_from_data_frame(data)
         elif isinstance(data, Iterable):
-            data = self.from_iterable_dataset(data)
+            data = self._construct_pandas_frame_from_iterable_dataset(data)
         else:
-            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
+            raise ValueError(
+                "Data input type not recognized, must be DataFrame or iterable."
+            )
         super().__init__(data=data, *args, **kwargs)
 
     @property
@@ -82,7 +95,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def freq(self):
         ts_index = self.index.levels[1]  # noqa
-        freq = ts_index.freq or ts_index.inferred_freq
+        freq = (
+            ts_index.freq
+            or ts_index.inferred_freq
+            or self.loc[0].index.freq  # fall back to freq of first item
+            or self.loc[0].index.inferred_freq
+        )
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
         return freq
@@ -129,25 +147,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
             )
 
-        # check if timeseries are irregularly sampled
-        timedeltas = set()
-        for item_id in df[ITEMID].unique():
-            timedeltas = timedeltas.union(
-                df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:]
-            )
-            if len(timedeltas) > 1:
-                raise ValueError(
-                    f"Only a single uniformly sampled period is allowed for time series"
-                    f" data sets. Found {len(timedeltas)}"
-                )
+        # TODO: check if time series are irregularly sampled. this check was removed as
+        # TODO: pandas is inconsistent in identifying freq when period-end timestamps
+        # TODO: are provided.
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
         """Validate a multi-index pd.DataFrame can be converted to TimeSeriesDataFrame
 
-        Parameters:
-        -----------
-        data : pd.DataFrame
+        Parameters
+        ----------
+        data: pd.DataFrame
             a data frame in pd.DataFrame format.
         """
 
@@ -167,26 +177,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
 
     @classmethod
-    def from_iterable_dataset(cls, iterable_dataset: Iterable) -> TimeSeriesDataFrame:
-        """Convenient function to Iterable dataset to TimeSeriesDataFrame.
-
-        Parameters:
-        -----------
-        iterable_dataset : Iterable
-            The iterable_dataset must have the following format:
-
-            iterable_dataset = [
-                {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
-            ]
-
-        Returns:
-        --------
-        ts_df : TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
-        """
-
+    def _construct_pandas_frame_from_iterable_dataset(
+        cls, iterable_dataset: Iterable
+    ) -> pd.DataFrame:
         cls._validate_iterable(iterable_dataset)
 
         all_ts = []
@@ -203,52 +196,87 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
             ts_df = pd.Series(target, name="target", index=idx).to_frame()
             all_ts.append(ts_df)
-        return TimeSeriesDataFrame(pd.concat(all_ts))
+        return pd.concat(all_ts)
+
+    @classmethod
+    def from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
+        """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
+        represent a single time series.
+
+        This function also offers compatibility with GluonTS data sets, see
+        https://ts.gluon.ai/_modules/gluonts/dataset/common.html#ListDataset.
+
+        Parameters
+        ----------
+        iterable_dataset: Iterable
+            An iterator over dictionaries, each with a ``target`` field specifying the value of the
+            (univariate) time series, and a ``start`` field that features a pandas Timestamp with features.
+            Example::
+
+                iterable_dataset = [
+                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                ]
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset))
+
+    @classmethod
+    def _construct_pandas_frame_from_data_frame(cls, df: pd.DataFrame) -> pd.DataFrame:
+        cls._validate_data_frame(df)
+        return df.set_index([ITEMID, TIMESTAMP])
 
     @classmethod
     def from_data_frame(cls, df: pd.DataFrame) -> TimeSeriesDataFrame:
-        """Convert a normal pd.DataFrame to a TimeSeriesDataFrame
+        """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         df: pd.DataFrame
             A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example:
 
-               item_id  timestamp  target
-            0        0 2019-01-01       0
-            1        0 2019-01-02       1
-            2        0 2019-01-03       2
-            3        1 2019-01-01       3
-            4        1 2019-01-02       4
-            5        1 2019-01-03       5
-            6        2 2019-01-01       6
-            7        2 2019-01-02       7
-            8        2 2019-01-03       8
+            .. code-block::
 
-        Returns:
-        --------
-        ts_df : TimeSeriesDataFrame
+                   item_id  timestamp  target
+                0        0 2019-01-01       0
+                1        0 2019-01-02       1
+                2        0 2019-01-03       2
+                3        1 2019-01-01       3
+                4        1 2019-01-02       4
+                5        1 2019-01-03       5
+                6        2 2019-01-01       6
+                7        2 2019-01-02       7
+                8        2 2019-01-03       8
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
-        cls._validate_data_frame(df)
-        return TimeSeriesDataFrame(df.set_index([ITEMID, TIMESTAMP]))
+        return cls(cls._construct_pandas_frame_from_data_frame(df))
 
     def split_by_time(
         self, cutoff_time: pd.Timestamp
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        """Split dataframe by a cutoff_time.
+        """Split dataframe to two different ``TimeSeriesDataFrame`` s before and after a certain
+        ``cutoff_time``.
 
         Parameters
         ----------
-        cutoff_time : pd.Timestamp
-            The time to Split the current data frame into two data frames, all in TimeSeriesDataFrame format.
+        cutoff_time: pd.Timestamp
+            The time to split the current data frame into two data frames.
 
         Returns
         -------
-        data_before : TimeSeriesDataFrame
-            The first one after split contains time-series before the cutoff_time (exclude cutoff_time).
-        data_after : TimeSeriesDataFrame
-            The second one after split contains time-series after the cutoff_time (include cutoff_time).
+        data_before: TimeSeriesDataFrame
+            Data frame containing time series before the ``cutoff_time`` (exclude ``cutoff_time``).
+        data_after: TimeSeriesDataFrame
+            Data frame containing time series after the ``cutoff_time`` (include ``cutoff_time``).
         """
 
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
@@ -259,26 +287,26 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def split_by_item(
         self, cutoff_item: int
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        """Split dataframe by an item_id cutoff_item.
+        """Split dataframe to two data frames containing items before and after a ``cutoff_item``.
 
         Parameters
         ----------
-        cutoff_item : int
-            The item_id to Split the current data frame into two data frames, all in TimeSeriesDataFrame format.
+        cutoff_item: int
+            The item_id to split the current data frame into two data frames.
 
         Returns
         -------
-        data_before : TimeSeriesDataFrame
-            The first one after split contains time-series before the cutoff_item (exclude cutoff_item).
-        data_after : TimeSeriesDataFrame
-            The second one after split contains time-series after the cutoff_item (include cutoff_item).
+        data_before: TimeSeriesDataFrame
+            Data frame containing time-series before the ``cutoff_item`` (exclude ``cutoff_item``).
+        data_after: TimeSeriesDataFrame
+            Data frame containing time-series after the ``cutoff_item`` (include ``cutoff_item``).
         """
 
         data_before = self.loc[(slice(None, cutoff_item - 1), slice(None)), :]
         data_after = self.loc[(slice(cutoff_item, None), slice(None)), :]
         return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
 
-    def slice_by_timestep(self, time_step_slice: slice):
+    def slice_by_timestep(self, time_step_slice: slice) -> TimeSeriesDataFrame:
         """Return a slice of time steps (with no regards to the actual timestamp) from within
         each item in a time series data frame. For example, if a data frame is constructed as::
 
@@ -293,7 +321,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                   2 2019-01-04       7
                   2 2019-01-05       8
 
-        then `df.slice_by_timestep(time_step_slice=slice(-2, None))` would return the last two
+        then :code:`df.slice_by_timestep(time_step_slice=slice(-2, None))` would return the last two
         time steps from each item::
 
             item_id  timestamp  target
@@ -311,6 +339,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ----------
         time_step_slice: slice
             A python slice object representing the slices to return from each item
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            Data frame containing only the time steps of each ``item_id`` sliced according to the
+            input ``time_step_slice``.
         """
         slice_gen = (
             (i, self.loc[i].iloc[time_step_slice]) for i in self.index.levels[0]
@@ -331,15 +365,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         Parameters
         ----------
-        start : pd.Timestamp
+        start: pd.Timestamp
             The start time (inclusive) of a time range that will be used for subsequence.
-        end : pd.Timestamp
+        end: pd.Timestamp
             The end time (exclusive) of a time range that will be used for subsequence.
 
         Returns
         -------
-        ts_df : TimeSeriesDataFrame
-            A new data frame in TimeSeriesDataFrame format contains time-series in a time range
+        ts_df: TimeSeriesDataFrame
+            A new data frame in ``TimeSeriesDataFrame`` format contains time-series in a time range
             defined between start and end time.
         """
 
@@ -355,6 +389,16 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def from_pickle(cls, filepath_or_buffer: Any) -> "TimeSeriesDataFrame":
         """Convenience method to read pickled time series data frames. If the read pickle
         file refers to a plain pandas DataFrame, it will be cast to a TimeSeriesDataFrame.
+
+        Parameters
+        ----------
+        filepath_or_buffer: Any
+            Filename provided as a string or an ``IOBuffer`` containing the pickled object.
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            The pickled time series data frame.
         """
         try:
             data = pd.read_pickle(filepath_or_buffer)

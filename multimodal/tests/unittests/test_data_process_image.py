@@ -1,6 +1,6 @@
 import pytest
 import PIL
-from autogluon.text.automm.data.process_image import ImageProcessor
+from autogluon.multimodal.data.process_image import ImageProcessor
 
 from datasets import (
     PetFinderDataset,

@@ -1,9 +1,9 @@
 import os
 import warnings
 
-from ..automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal.utils import parse_dotlist_conf
 from .presets import get_text_preset
-from ..automm.utils import parse_dotlist_conf
 from .constants import PYTORCH, MXNET
 
 

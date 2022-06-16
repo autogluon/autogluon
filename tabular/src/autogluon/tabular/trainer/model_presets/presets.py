@@ -11,7 +11,7 @@ from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
     ImagePredictorModel, VowpalWabbitModel, \
-    RuleFitModel, GreedyTreeModel, OptimalRuleListModel, OptimalTreeModel, BoostedRulesModel
+    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     # interpretable models
     IM_RULEFIT=0,
     IM_GREEDYTREE=0,
-    IM_RULELIST=0,
-    IM_OPTIMALTREE=0,
+    IM_FIGS=0,
+    IM_HSTREE=0,
     IM_BOOSTEDRULES=0,
 )
 
@@ -83,8 +83,8 @@ MODEL_TYPES = dict(
     # interpretable models
     IM_RULEFIT=RuleFitModel,
     IM_GREEDYTREE=GreedyTreeModel,
-    IM_RULELIST=OptimalRuleListModel,
-    IM_OPTIMALTREE=OptimalTreeModel,
+    IM_FIGS=FigsModel,
+    IM_HSTREE=HSTreeModel,
     IM_BOOSTEDRULES=BoostedRulesModel,
     VW=VowpalWabbitModel
 )
@@ -112,8 +112,8 @@ DEFAULT_MODEL_NAMES = {
     # Interpretable models
     RuleFitModel: 'RuleFit',
     GreedyTreeModel: 'GreedyTree',
-    OptimalRuleListModel: 'OptimalRuleList',
-    OptimalTreeModel: 'OptimalTree',
+    FigsModel: 'Figs',
+    HSTreeModel: 'HierarchicalShrinkageTree',
     BoostedRulesModel: 'BoostedRules',
 }
 

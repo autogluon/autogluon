@@ -1,7 +1,7 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    python3 -m pip install mxnet-cu102==1.8.*
+    python3 -m pip install mxnet-cu102==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
     ls -1a /usr/local | grep cuda
@@ -48,6 +48,10 @@ install_tabular_all = """
     python3 -m pip install --upgrade -e tabular/[all,tests]
 """
 
+install_multimodal = """
+    python3 -m pip install --upgrade -e multimodal/[tests]
+"""
+
 install_text = """
     python3 -m pip install --upgrade -e text/[tests]
 """
@@ -80,7 +84,7 @@ stage("Lint Check") {
           conda activate autogluon-lint-py3-v3
           conda list
           # Perform lint check
-          black --check --diff text/src/autogluon/text/automm
+          black --check --diff multimodal/src/autogluon/multimodal
           """
         }
       }
@@ -180,11 +184,43 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
+          ${install_multimodal}
           ${install_text}
           ${install_vision}
 
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'multimodal': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-multimodal-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-multimodal-py3-v3 -y
+          conda env update -n autogluon-multimodal-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-multimodal-py3-v3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+
+          ${install_core_all_tests}
+          ${install_features}
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+          ${install_multimodal}
+          # launch different process for each test to make sure memory is released
+          python3 -m pip install --upgrade pytest-xdist
+
+          cd multimodal/
+          python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
         }
       }
@@ -208,6 +244,7 @@ stage("Unit Test") {
 
           ${install_core_all_tests}
           ${install_features}
+          ${install_multimodal}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_text}
@@ -293,7 +330,7 @@ stage("Unit Test") {
           conda activate autogluon-install-py3-v3
           conda list
 
-          python3 -m pip install 'mxnet==1.7.0.*'
+          python3 -m pip install 'mxnet==1.9.*'
 
           ${install_core_all_tests}
           ${install_features}
@@ -302,6 +339,7 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
 
+          ${install_multimodal}
           ${install_text}
           ${install_vision}
           ${install_timeseries}
@@ -561,6 +599,7 @@ stage("Build Docs") {
         ${install_core_all_tests}
         ${install_features}
         ${install_tabular_all}
+        ${install_multimodal}
         ${install_text}
         ${install_vision}
         ${install_timeseries}

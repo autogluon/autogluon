@@ -1,5 +1,5 @@
 import pytest
-from autogluon.text.automm.presets import (
+from autogluon.multimodal.presets import (
     get_preset,
     list_model_presets,
 )

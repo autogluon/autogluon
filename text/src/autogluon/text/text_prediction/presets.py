@@ -1,4 +1,4 @@
-from ..automm.presets import get_preset
+from autogluon.multimodal.presets import get_preset
 
 
 def list_text_presets(verbose=False):

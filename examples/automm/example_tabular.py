@@ -1,4 +1,4 @@
-from autogluon.text.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 import argparse
 from dataset import (
     AdultTabularDataset,
