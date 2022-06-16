@@ -123,7 +123,7 @@ class DatasetLoaderHelper:
 
 class FitHelper:
     @staticmethod
-    def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, delete_directory=True):
+    def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, delete_directory=True, extra_metrics=None):
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
@@ -151,7 +151,8 @@ class FitHelper:
             predictor.predict(test_data, model=refit_model_name)
             predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
-        predictor.leaderboard(test_data, extra_info=True)
+        predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
+
         assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
