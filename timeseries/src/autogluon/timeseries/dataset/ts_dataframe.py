@@ -79,11 +79,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
                 self._validate_multi_index_data_frame(data)
             else:
-                data = self.from_data_frame(data)
+                data = self._construct_pandas_frame_from_data_frame(data)
         elif isinstance(data, Iterable):
-            data = self.from_iterable_dataset(data)
+            data = self._construct_pandas_frame_from_iterable_dataset(data)
         else:
-            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
+            raise ValueError(
+                "Data input type not recognized, must be DataFrame or iterable."
+            )
         super().__init__(data=data, *args, **kwargs)
 
     @property
@@ -93,7 +95,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def freq(self):
         ts_index = self.index.levels[1]  # noqa
-        freq = ts_index.freq or ts_index.inferred_freq
+        freq = (
+            ts_index.freq
+            or ts_index.inferred_freq
+            or self.loc[0].index.freq  # fall back to freq of first item
+            or self.loc[0].index.inferred_freq
+        )
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
         return freq
@@ -140,17 +147,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
             )
 
-        # check if timeseries are irregularly sampled
-        timedeltas = set()
-        for item_id in df[ITEMID].unique():
-            timedeltas = timedeltas.union(
-                df[df[ITEMID] == item_id][TIMESTAMP].diff()[1:]
-            )
-            if len(timedeltas) > 1:
-                raise ValueError(
-                    f"Only a single uniformly sampled period is allowed for time series"
-                    f" data sets. Found {len(timedeltas)}"
-                )
+        # TODO: check if time series are irregularly sampled. this check was removed as
+        # TODO: pandas is inconsistent in identifying freq when period-end timestamps
+        # TODO: are provided.
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
@@ -178,7 +177,29 @@ class TimeSeriesDataFrame(pd.DataFrame):
             )
 
     @classmethod
-    def from_iterable_dataset(cls, iterable_dataset: Iterable) -> TimeSeriesDataFrame:
+    def _construct_pandas_frame_from_iterable_dataset(
+        cls, iterable_dataset: Iterable
+    ) -> pd.DataFrame:
+        cls._validate_iterable(iterable_dataset)
+
+        all_ts = []
+        for i, ts in enumerate(iterable_dataset):
+            start_timestamp = ts["start"]
+            target = ts["target"]
+            datetime_index = tuple(
+                pd.date_range(
+                    start_timestamp, periods=len(target), freq=start_timestamp.freq
+                )
+            )
+            idx = pd.MultiIndex.from_product(
+                [(i,), datetime_index], names=[ITEMID, TIMESTAMP]
+            )
+            ts_df = pd.Series(target, name="target", index=idx).to_frame()
+            all_ts.append(ts_df)
+        return pd.concat(all_ts)
+
+    @classmethod
+    def from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
         """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
         represent a single time series.
 
@@ -203,24 +224,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
+        return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset))
 
-        cls._validate_iterable(iterable_dataset)
-
-        all_ts = []
-        for i, ts in enumerate(iterable_dataset):
-            start_timestamp = ts["start"]
-            target = ts["target"]
-            datetime_index = tuple(
-                pd.date_range(
-                    start_timestamp, periods=len(target), freq=start_timestamp.freq
-                )
-            )
-            idx = pd.MultiIndex.from_product(
-                [(i,), datetime_index], names=[ITEMID, TIMESTAMP]
-            )
-            ts_df = pd.Series(target, name="target", index=idx).to_frame()
-            all_ts.append(ts_df)
-        return TimeSeriesDataFrame(pd.concat(all_ts))
+    @classmethod
+    def _construct_pandas_frame_from_data_frame(cls, df: pd.DataFrame) -> pd.DataFrame:
+        cls._validate_data_frame(df)
+        return df.set_index([ITEMID, TIMESTAMP])
 
     @classmethod
     def from_data_frame(cls, df: pd.DataFrame) -> TimeSeriesDataFrame:
@@ -249,8 +258,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
-        cls._validate_data_frame(df)
-        return TimeSeriesDataFrame(df.set_index([ITEMID, TIMESTAMP]))
+        return cls(cls._construct_pandas_frame_from_data_frame(df))
 
     def split_by_time(
         self, cutoff_time: pd.Timestamp

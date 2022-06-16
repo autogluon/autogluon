@@ -1,10 +1,10 @@
 import pytest
 import functools
+from autogluon.multimodal.utils import get_config
 from autogluon.text.text_prediction.presets import (
     get_text_preset,
     list_text_presets,
 )
-from autogluon.text.automm.utils import get_config
 
 
 def rgetattr(obj, attr, *args):

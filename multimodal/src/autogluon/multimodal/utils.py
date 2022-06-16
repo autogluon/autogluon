@@ -1415,3 +1415,20 @@ def get_mixup(
         )
         mixup_fn = MixupModule(**mixup_args)
     return mixup_state, mixup_fn
+
+
+class CustomUnpickler(pickle.Unpickler):
+    """
+    This is to make pickle loading df_preprocessor backward compatible.
+    A df_preprocessor object saved with old name space `autogluon.text.automm` has errors
+    when being loaded under the context of new name `autogluon.multimodal`.
+    """
+
+    def find_class(self, module, name):
+        renamed_module = module
+        if module == "autogluon.text.automm.data.preprocess_dataframe":
+            renamed_module = "autogluon.multimodal.data.preprocess_dataframe"
+        elif module == "autogluon.text.automm.data":
+            renamed_module = "autogluon.multimodal.data"
+
+        return super(CustomUnpickler, self).find_class(renamed_module, name)

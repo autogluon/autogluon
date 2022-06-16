@@ -83,6 +83,7 @@ from .utils import (
     turn_on_off_feature_column_info,
     try_to_infer_pos_label,
     get_mixup,
+    CustomUnpickler,
 )
 from .optimization.utils import (
     get_metric,
@@ -93,7 +94,7 @@ from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 
-from .. import version as ag_version
+from . import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
 
@@ -1643,7 +1644,7 @@ class AutoMMPredictor:
             assets = json.load(fp)
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)
+            df_preprocessor = CustomUnpickler(fp).load()
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
@@ -1770,6 +1771,18 @@ class AutoMMPredictor:
         predictor._model = model
         if not resume:
             predictor._continuous_training = True
+
+        mixup_active, _ = get_mixup(
+            model_config=OmegaConf.select(predictor._config, "model"),
+            mixup_config=OmegaConf.select(predictor._config, "data.mixup"),
+            num_classes=predictor._output_shape,
+        )
+        loss_func = get_loss_func(
+            problem_type=predictor._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
+        )
+        predictor._loss_func = loss_func
 
         return predictor
 
