@@ -49,7 +49,7 @@ extras_require = {
 
 tests_require = [
     'pytest',
-    'ray_lightning',  # test ray lightning resource calculation
+    'ray_lightning>=0.2.0,<0.3.0',  # test ray lightning resource calculation
 ]
 
 all_requires = []
