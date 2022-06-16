@@ -1,26 +1,33 @@
+import contextlib
 import logging
+import os
 import warnings
 
-__all__ = ["evaluator_warning_filter", "serialize_warning_filter"]
+__all__ = ["evaluator_warning_filter", "disable_root_logger"]
 
 
-class evaluator_warning_filter(object):
-    def __enter__(self):
-        warnings.filterwarnings("ignore", category=RuntimeWarning)
-        warnings.filterwarnings("ignore", category=UserWarning)
-        warnings.filterwarnings("ignore", category=FutureWarning)
-        return self
+@contextlib.contextmanager
+def evaluator_warning_filter():
+    env_py_warnings = os.environ.get("PYTHONWARNINGS", "")
+    warning_categories = [RuntimeWarning, UserWarning, FutureWarning]  # ignore these
+    try:
+        for warning_category in warning_categories:
+            warnings.filterwarnings("ignore", category=warning_category)
 
-    def __exit__(self, *args):
-        warnings.filterwarnings("default", category=RuntimeWarning)
-        warnings.filterwarnings("default", category=UserWarning)
-        warnings.filterwarnings("default", category=FutureWarning)
+        # required to suppress gluonts evaluation warnings as the module uses multiprocessing
+        os.environ["PYTHONWARNINGS"] = ",".join([f"ignore::{c.__name__}" for c in warning_categories])
+
+        yield
+    finally:
+        for warning_category in warning_categories:
+            warnings.filterwarnings("default", category=warning_category)
+        os.environ["PYTHONWARNINGS"] = env_py_warnings
 
 
-class serialize_warning_filter(object):
-    def __enter__(self):
+@contextlib.contextmanager
+def disable_root_logger():
+    try:
         logging.getLogger().setLevel(logging.ERROR)
-        return self
-
-    def __exit__(self, *arg):
+        yield
+    finally:
         logging.getLogger().setLevel(logging.INFO)

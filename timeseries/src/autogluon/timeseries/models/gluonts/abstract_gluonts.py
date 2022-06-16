@@ -1,11 +1,14 @@
 import copy
 import logging
 import re
+import warnings
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Type, Iterator
 
+import gluonts
 import numpy as np
 import pandas as pd
+from gluonts.env import env as gluonts_env
 from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.evaluation import Evaluator
 from gluonts.evaluation.backtest import make_evaluation_predictions
@@ -14,23 +17,27 @@ from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 import autogluon.core as ag
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
 
 from ...dataset import TimeSeriesDataFrame
 from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
 from ...utils.metric_utils import METRIC_COEFFICIENTS
-from ...utils.warning_filters import evaluator_warning_filter, serialize_warning_filter
+from ...utils.warning_filters import evaluator_warning_filter, disable_root_logger
 from ..abstract import AbstractTimeSeriesModel
 from .callback import TimeLimitCallback
 
 logger = logging.getLogger(__name__)
+gts_logger = logging.getLogger(gluonts.__name__)
+gluonts_env.use_tqdm = False
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
     """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
     GluonTS Dataset protocol via lazy iterations.
     """
+
     def __init__(
         self,
         time_series_df: TimeSeriesDataFrame,
@@ -118,7 +125,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         predictor = self.gts_predictor
         self.gts_predictor = None
 
-        with serialize_warning_filter():
+        with disable_root_logger():
             if predictor:
                 Path.mkdir(path / self.gluonts_model_path, exist_ok=True)
                 predictor.serialize(path / self.gluonts_model_path)
@@ -181,12 +188,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             )
 
     def _to_gluonts_dataset(
-        self,
-        time_series_df: Optional[TimeSeriesDataFrame]
+        self, time_series_df: Optional[TimeSeriesDataFrame]
     ) -> Optional[GluonTSDataset]:
-        return SimpleGluonTSDataset(
-            time_series_df, target_field_name=self.target
-        ) if time_series_df is not None else None
+        return (
+            SimpleGluonTSDataset(time_series_df, target_field_name=self.target)
+            if time_series_df is not None
+            else None
+        )
 
     def _fit(
         self,
@@ -195,7 +203,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         time_limit: int = None,
         **kwargs,
     ) -> None:
-        logger.log(30, f"Training timeseries model {self.name}...")
+        verbosity = kwargs.get("verbosity", 2)
+        set_logger_verbosity(verbosity, logger=logger)
+        gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+
+        if verbosity > 3:
+            logger.warning(
+                "GluonTS logging is turned on during training. Note that losses reported by GluonTS "
+                "may not correspond to those specified via `eval_metric`."
+            )
 
         # gracefully handle hyperparameter specifications if they are provided to fit instead
         if any(isinstance(v, ag.Space) for v in self.params.values()):
@@ -210,7 +226,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
 
         estimator = self._get_estimator()
-        with warning_filter():
+        with warning_filter(), disable_root_logger():
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
@@ -222,7 +238,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     ) -> TimeSeriesDataFrame:
         gts_data = self._to_gluonts_dataset(data)
 
-        logger.log(30, f"Predicting with timeseries model {self.name}")
+        logger.debug(f"Predicting with time series model {self.name}")
+        logger.debug(
+            f"Provided data for prediction with {len(data)} rows, {data.num_items} items. "
+            f"Average time series length is {len(data) / data.num_items}."
+        )
+
         with warning_filter():
             quantiles = [str(q) for q in (quantile_levels or self.quantile_levels)]
             predicted_targets = list(self.gts_predictor.predict(gts_data))
@@ -311,7 +332,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             return list(forecast_it), list(ts_it)
 
     def score(
-        self, data: TimeSeriesDataFrame, metric: Optional[str] = None, num_samples: int = 100
+        self,
+        data: TimeSeriesDataFrame,
+        metric: Optional[str] = None,
+        num_samples: int = 100,
     ):
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
@@ -335,17 +359,18 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
-        evaluator = (
-            Evaluator(quantiles=self.quantile_levels)
-            if self.quantile_levels is not None
-            else Evaluator()
-        )
-        forecasts, tss = self._predict_for_scoring(data, num_samples=num_samples)
-        num_series = len(tss)
-
-        eval_metric = self.eval_metric if metric is None else metric
-
         with evaluator_warning_filter():
+            # TODO: due to the use of multiprocessing, evaluation still logs warnings
+            evaluator = (
+                Evaluator(quantiles=self.quantile_levels)
+                if self.quantile_levels is not None
+                else Evaluator()
+            )
+            forecasts, tss = self._predict_for_scoring(data, num_samples=num_samples)
+            num_series = len(tss)
+
+            eval_metric = self.eval_metric if metric is None else metric
+
             agg_metrics, item_metrics = evaluator(
                 iter(tss), iter(forecasts), num_series=num_series
             )

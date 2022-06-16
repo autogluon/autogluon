@@ -92,6 +92,7 @@ class TimeSeriesLearner(AbstractLearner):
                 scheduler_options=scheduler_options,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
+                verbosity=kwargs.get("verbosity", 2)
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -109,7 +110,7 @@ class TimeSeriesLearner(AbstractLearner):
 
         self._time_fit_training = time.time() - time_start
         logger.info(
-            f"AutoGluon TimeSeriesLearner complete, total runtime = {round(self._time_fit_training, 2)}s",
+            f"Training complete, total runtime = {round(self._time_fit_training, 2)}s",
         )
 
     def predict(
