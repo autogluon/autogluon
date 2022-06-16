@@ -27,6 +27,6 @@ cd ..
 
 if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
 DOC_PATH=docs/_build/rst/tutorials/text_prediction/
-S3_PATH=$BUCKET/text_prediction/
+S3_PATH=$S3_PATH/text_prediction/
 
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH
