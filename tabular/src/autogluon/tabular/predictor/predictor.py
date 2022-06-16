@@ -2309,6 +2309,7 @@ class TabularPredictor:
         train_data : pd.DataFrame, default = None
             Specify the original `train_data` to ensure that any training rows that were originally dropped internally are properly handled.
             If None, then output will not contain all rows if training rows were dropped internally during fit.
+            If `train_data` is specified and `model` is unable to predict and rows were dropped internally, an exception will be raised.
         internal_oof : bool, default = False
             [Advanced Option] Return the internal OOF preds rather than the externally facing OOF preds.
             Internal OOF preds may have more/fewer rows than was provided in train_data, and are incompatible with external data.
