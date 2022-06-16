@@ -1,0 +1,19 @@
+name: "Get Commit SHA"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get Commit SHA(For push)
+      if: ${{ github.event_name == 'push' }}
+      shell: bash
+      run: |
+        SHA=${{ github.sha }}
+        short_sha=$(git rev-parse --short "$SHA")
+        echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
+    - name: Get Commit SHA(For pull request)
+      if: ${{ github.event_name == 'pull_request_target' }}
+      shell: bash
+      run: |
+        SHA=${{ github.event.pull_request.head.sha }}
+        short_sha=$(git rev-parse --short "$SHA")
+        echo "SHORT_SHA=$short_sha" >> $GITHUB_ENV
