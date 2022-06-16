@@ -28,7 +28,7 @@ jobs:
       - name: Test Common on AWS Batch
         uses: ./.github/actions/submit-job
         with:
-          job-type: CI-CPU-PUSH
+          job-type: CI-CPU
           job-name: AutoGluon-Common
           command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
       # - name: Test Common on AWS Batch(For push)
