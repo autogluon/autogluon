@@ -1,7 +1,6 @@
 import copy
 import logging
 import re
-import warnings
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Type, Iterator
 
@@ -37,7 +36,6 @@ class SimpleGluonTSDataset(GluonTSDataset):
     """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
     GluonTS Dataset protocol via lazy iterations.
     """
-
     def __init__(
         self,
         time_series_df: TimeSeriesDataFrame,

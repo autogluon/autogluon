@@ -286,7 +286,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             )
             return skip_hpo(self, train_data, val_data, time_limit=time_limit)
         else:
-            logger.debug("Hyperparameter search space for {self.name}: ")
+            logger.debug(f"Hyperparameter search space for {self.name}: ")
             for hyperparameter in search_space:
                 if isinstance(search_space[hyperparameter], ag.Space):
                     logger.debug(f"{hyperparameter}: {search_space[hyperparameter]}")
