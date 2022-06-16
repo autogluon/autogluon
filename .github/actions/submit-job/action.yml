@@ -1,4 +1,4 @@
-name: "Submit Unit Tests to AWS Batch"
+name: "Submit Job to AWS Batch"
 inputs:
   region:
     required: false
