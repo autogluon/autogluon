@@ -473,6 +473,7 @@ class AbstractTrainer:
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
+        compute_score = not refit_full
         if refit_full and X_val is not None:
             X_init = pd.concat([X_init, X_val])
             y = pd.concat([y, y_val])
@@ -485,7 +486,7 @@ class AbstractTrainer:
 
         # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
         return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
-                                 models=models, level=level, stack_name=stack_name, fit_kwargs=fit_kwargs, **kwargs)
+                                 models=models, level=level, stack_name=stack_name, compute_score=compute_score, fit_kwargs=fit_kwargs, **kwargs)
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
@@ -738,8 +739,9 @@ class AbstractTrainer:
                 model_name = model.name
                 reuse_first_fold = False
                 if isinstance(model, BaggedEnsembleModel):
-                    # Re-use if model is already _FULL
-                    reuse_first_fold = not model._bagged_mode
+                    # Re-use if model is already _FULL and no X_val
+                    if X_val is None:
+                        reuse_first_fold = not model._bagged_mode
                 if not reuse_first_fold:
                     if isinstance(model, BaggedEnsembleModel):
                         can_refit_full = model._get_tags_child().get('can_refit_full', False)
@@ -1032,7 +1034,7 @@ class AbstractTrainer:
         model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, compute_score=True, **model_fit_kwargs) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -1080,7 +1082,10 @@ class AbstractTrainer:
             else:
                 w = None
                 w_val = None
-            if isinstance(model, BaggedEnsembleModel):
+            if not compute_score:
+                score = None
+                model.predict_time = None
+            elif isinstance(model, BaggedEnsembleModel):
                 if X_val is not None and y_val is not None:
                     score = model.score(X=X_val, y=y_val, sample_weight=w_val)
                 elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
@@ -1234,9 +1239,28 @@ class AbstractTrainer:
             logger.log(20, f'\t{round(predict_1_time_full, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, X_pseudo=None, y_pseudo=None,
-                           feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
+    def _train_single_full(self,
+                           X,
+                           y,
+                           model: AbstractModel,
+                           X_unlabeled=None,
+                           X_val=None,
+                           y_val=None,
+                           X_pseudo=None,
+                           y_pseudo=None,
+                           feature_prune=False,
+                           hyperparameter_tune_kwargs=None,
+                           stack_name='core',
+                           k_fold=None,
+                           k_fold_start=0,
+                           k_fold_end=None,
+                           n_repeats=None,
+                           n_repeat_start=0,
+                           level=1,
+                           time_limit=None,
+                           fit_kwargs=None,
+                           compute_score=True,
+                           **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1293,7 +1317,18 @@ class AbstractTrainer:
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
-            model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
+            model_names_trained = self._train_and_save(
+                X=X,
+                y=y,
+                model=model,
+                X_val=X_val,
+                y_val=y_val,
+                X_unlabeled=X_unlabeled,
+                stack_name=stack_name,
+                level=level,
+                compute_score=compute_score,
+                **model_fit_kwargs
+            )
         self.save()
         return model_names_trained
 
