@@ -23,6 +23,8 @@ jobs:
   test_common:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
       - name: Test Common on AWS Batch(For push)
         if: ${{ github.event_name == 'push' }}
         uses: ./.github/actions/submit-unit-tests
