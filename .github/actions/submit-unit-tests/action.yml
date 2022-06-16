@@ -27,9 +27,11 @@ runs:
         role-duration-seconds: 7200
         aws-region: us-east-1
     - name: Install dependencies
+      shell: bash
       run: |
         pip install boto3
     - name: Submit Unit Test Job
+      shell: bash
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --region ${{ inputs.region }} \
