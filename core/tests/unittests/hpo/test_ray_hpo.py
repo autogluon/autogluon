@@ -19,6 +19,9 @@ class DummyAdapter(RayTuneAdapter):
     supported_searchers = list(SEARCHER_PRESETS.keys())
     supported_schedulers = list(SCHEDULER_PRESETS.keys())
     
+    def get_resource_calculator(self, **kwargs):
+        pass
+    
     def get_resources_per_trial(self, total_resources, num_samples, **kwargs):
         return {'cpu':1}
     

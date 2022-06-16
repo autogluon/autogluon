@@ -130,8 +130,8 @@ def test_non_parallel_gpu_calculator():
         total_num_cpus=num_cpus,
         total_num_gpus=num_gpus,
         num_jobs=num_jobs,
-        minimum_cpu_per_trial=1,
-        minimum_gpu_per_trial=1,
+        minimum_cpu_per_job=1,
+        minimum_gpu_per_job=1,
     )
 
     expected_num_parallel_jobs = 2
