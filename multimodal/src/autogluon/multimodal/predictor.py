@@ -1759,6 +1759,18 @@ class AutoMMPredictor:
         if not resume:
             predictor._continuous_training = True
 
+        mixup_active, _ = get_mixup(
+            model_config=OmegaConf.select(predictor._config, "model"),
+            mixup_config=OmegaConf.select(predictor._config, "data.mixup"),
+            num_classes=predictor._output_shape,
+        )
+        loss_func = get_loss_func(
+            problem_type=predictor._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
+        )
+        predictor._loss_func = loss_func
+
         return predictor
 
     @property

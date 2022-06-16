@@ -67,7 +67,7 @@ def verify_predictor_save_load(predictor, df,
 
 
 @pytest.mark.parametrize(
-    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune",
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
         (
             "petfinder",
@@ -75,7 +75,8 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
-            LORA
+            LORA,
+            "auto",
         ),
 
         (
@@ -84,7 +85,8 @@ def verify_predictor_save_load(predictor, df,
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
             UNIFORM_SOUP,
-            LORA_NORM
+            LORA_NORM,
+            "auto",
         ),
 
         (
@@ -93,7 +95,8 @@ def verify_predictor_save_load(predictor, df,
             None,
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
-            None
+            None,
+            "auto",
         ),
 
         (
@@ -102,7 +105,8 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             None,
             UNIFORM_SOUP,
-            None
+            None,
+            "auto",
         ),
 
         (
@@ -111,7 +115,8 @@ def verify_predictor_save_load(predictor, df,
             None,
             None,
             BEST,
-            BIT_FIT
+            BIT_FIT,
+            "auto",
         ),
 
         (
@@ -120,7 +125,8 @@ def verify_predictor_save_load(predictor, df,
             None,
             "swin_tiny_patch4_window7_224",
             UNIFORM_SOUP,
-            NORM_FIT
+            NORM_FIT,
+            "auto",
         ),
 
         (
@@ -129,7 +135,8 @@ def verify_predictor_save_load(predictor, df,
             "prajjwal1/bert-tiny",
             None,
             BEST,
-            LORA_BIAS
+            LORA_BIAS,
+            "bcewithlogitsloss",
         ),
 
         (
@@ -138,7 +145,8 @@ def verify_predictor_save_load(predictor, df,
             None,
             None,
             BEST,
-            NORM_FIT
+            NORM_FIT,
+            "auto",
         ),
 
     ]
@@ -149,7 +157,8 @@ def test_predictor(
         text_backbone,
         image_backbone,
         top_k_average_method,
-        efficient_finetune
+        efficient_finetune,
+        loss_function,
 ):
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
@@ -172,6 +181,7 @@ def test_predictor(
         "env.num_workers_evaluation": 0,
         "optimization.top_k_average_method": top_k_average_method,
         "optimization.efficient_finetune": efficient_finetune,
+        "optimization.loss_function": loss_function,
     }
     if text_backbone is not None:
         hyperparameters.update({

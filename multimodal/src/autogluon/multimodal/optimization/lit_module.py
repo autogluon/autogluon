@@ -147,8 +147,6 @@ class LitModule(pl.LightningModule):
         logits: torch.Tensor,
         label: torch.Tensor,
     ):
-        if isinstance(self.loss_func, nn.BCEWithLogitsLoss):
-            logits = torch.sigmoid(logits)
         if isinstance(metric, (torchmetrics.AUROC, torchmetrics.AveragePrecision)):
             prob = F.softmax(logits.float(), dim=1)
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
@@ -209,6 +207,8 @@ class LitModule(pl.LightningModule):
             Index of mini-batch.
         """
         output, loss = self._shared_step(batch)
+        if isinstance(self.loss_func, nn.BCEWithLogitsLoss):
+            output[self.model.prefix][LOGITS] = torch.sigmoid(output[self.model.prefix][LOGITS].float())
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
         self._compute_metric_score(
@@ -245,6 +245,8 @@ class LitModule(pl.LightningModule):
         A dictionary with the mini-batch's logits and features.
         """
         output = self.model(batch)
+        if isinstance(self.loss_func, nn.BCEWithLogitsLoss):
+            output[self.model.prefix][LOGITS] = torch.sigmoid(output[self.model.prefix][LOGITS].float())
         return output[self.model.prefix]
 
     def configure_optimizers(self):
