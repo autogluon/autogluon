@@ -25,24 +25,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Test Common on AWS Batch(For push)
-        if: ${{ github.event_name == 'push' }}
+      - name: Test Common on AWS Batch
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU-PUSH
-          job-name: AutoGluon-Common-${{ github.ref }}
-          source-ref: ${{ github.ref }}
-          remote: https://github.com/${{ github.repository }}
+          job-name: AutoGluon-Common
           command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
-      - name: Test Common on AWS Batch(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Common-PR#${{ github.event.number }}
-          source-ref: ${{ github.event.pull_request.head.sha }}
-          remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
-          command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
+      # - name: Test Common on AWS Batch(For push)
+      #   if: ${{ github.event_name == 'push' }}
+      #   uses: ./.github/actions/submit-job
+      #   with:
+      #     job-type: CI-CPU-PUSH
+      #     job-name: AutoGluon-Common-${{ github.ref }}
+      #     source-ref: ${{ github.ref }}
+      #     remote: https://github.com/${{ github.repository }}
+      #     command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
+      # - name: Test Common on AWS Batch(For pull request)
+      #   if: ${{ github.event_name == 'pull_request_target' }}
+      #   uses: ./.github/actions/submit-job
+      #   with:
+      #     job-type: CI-CPU
+      #     job-name: AutoGluon-Common-PR#${{ github.event.number }}
+      #     source-ref: ${{ github.event.pull_request.head.sha }}
+      #     remote: https://github.com/${{ github.event.pull_request.head.repo.full_name }}
+      #     command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
   # test_core:
   #   runs-on: ubuntu-latest
   #   steps:
