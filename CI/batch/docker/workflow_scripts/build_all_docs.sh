@@ -46,11 +46,11 @@ if [[ -n $PR_NUMBER ]];
 then 
     BUCKET=autogluon-ci
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA
-    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all --quiet
+    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all
 else
     BUCKET=autogluon-ci=push
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
-    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all --quiet
+    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all
 fi
 
 mkdir -p docs/_build/rst/tutorials/

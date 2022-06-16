@@ -382,7 +382,7 @@ jobs:
         with:
           job-type: CI-CPU
           job-name: AutoGluon-BuildCloudFitDeploy
-          command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
   # build_forecasting_tutorial:
   #   # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
   #   needs: [test_common, test_vision]
