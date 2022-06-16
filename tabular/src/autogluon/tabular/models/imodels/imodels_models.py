@@ -97,30 +97,6 @@ class GreedyTreeModel(_IModelsModel):
             return GreedyTreeClassifier
 
 
-class OptimalTreeModel(_IModelsModel):
-
-    def get_model(self):
-        try_import_imodels()
-        from imodels import OptimalTreeClassifier
-
-        if self.problem_type in ['binary']:
-            return OptimalTreeClassifier
-        else:
-            raise Exception('OptimalTreeClassifier only supports binary classification!')
-
-
-class BayesianRuleSetModel(_IModelsModel):
-
-    def get_model(self):
-        try_import_imodels()
-        from imodels import BayesianRuleSetClassifier
-
-        if self.problem_type in ['binary']:
-            return BayesianRuleSetClassifier
-        else:
-            raise Exception('Bayesian Rule Set only supports binary classification!')
-
-
 class BoostedRulesModel(_IModelsModel):
 
     def get_model(self):
@@ -133,13 +109,25 @@ class BoostedRulesModel(_IModelsModel):
             raise Exception('Boosted Rule Set only supports binary classification!')
 
 
-class OptimalRuleListModel(_IModelsModel):
+class HSTreeModel(_IModelsModel):
 
     def get_model(self):
         try_import_imodels()
-        from imodels import OptimalRuleListClassifier
+        from imodels import HSTreeRegressorCV, HSTreeClassifierCV
 
-        if self.problem_type in ['binary']:
-            return OptimalRuleListClassifier
+        if self.problem_type in ['regression', 'softclass']:
+            return HSTreeRegressorCV
         else:
-            raise Exception('OptimalRuleList only supports binary classification!')
+            return HSTreeClassifierCV
+
+
+class FigsModel(_IModelsModel):
+
+    def get_model(self):
+        try_import_imodels()
+        from imodels import FIGSClassifier, 	FIGSRegressor
+
+        if self.problem_type in ['regression', 'softclass']:
+            return FIGSRegressor
+        else:
+            return FIGSClassifier

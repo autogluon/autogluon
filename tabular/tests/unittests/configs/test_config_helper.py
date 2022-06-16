@@ -59,7 +59,7 @@ def test_excluded_model_types_invalid_option():
 
 def test_included_model_types():
     expected_config = dict(excluded_model_types=['XT', 'KNN', 'GBM', 'CAT', 'XGB', 'NN_MXNET', 'NN_TORCH', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT',
-                                                 'IM_RULEFIT', 'IM_GREEDYTREE', 'IM_RULELIST', 'IM_OPTIMALTREE', 'IM_BOOSTEDRULES', 'VW'])
+                                                 'IM_RULEFIT', 'IM_GREEDYTREE', 'IM_FIGS', 'IM_HSTREE', 'IM_BOOSTEDRULES', 'VW'])
     actual_config = ConfigBuilder().included_model_types('RF').build()
     assert actual_config == expected_config
 
@@ -70,7 +70,7 @@ def test_included_model_types():
     assert actual_config == expected_config
 
     expected_config = dict(excluded_model_types=['XT', 'KNN', 'GBM', 'CAT', 'XGB', 'NN_MXNET', 'NN_TORCH', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT',
-                                                 'IM_RULEFIT', 'IM_GREEDYTREE', 'IM_RULELIST', 'IM_OPTIMALTREE', 'IM_BOOSTEDRULES', 'VW'])
+                                                 'IM_RULEFIT', 'IM_GREEDYTREE', 'IM_FIGS', 'IM_HSTREE', 'IM_BOOSTEDRULES', 'VW'])
     actual_config = ConfigBuilder().included_model_types(['RF', 'LR']).build()
     assert actual_config == expected_config
 
@@ -78,7 +78,7 @@ def test_included_model_types():
         pass
 
     expected_config = dict(excluded_model_types=['XT', 'KNN', 'GBM', 'CAT', 'XGB', 'NN_MXNET', 'NN_TORCH', 'LR', 'FASTAI', 'TRANSF', 'AG_TEXT_NN', 'AG_IMAGE_NN', 'FASTTEXT',
-                                                 'IM_RULEFIT', 'IM_GREEDYTREE', 'IM_RULELIST', 'IM_OPTIMALTREE', 'IM_BOOSTEDRULES', 'VW'])
+                                                 'IM_RULEFIT', 'IM_GREEDYTREE', 'IM_FIGS', 'IM_HSTREE', 'IM_BOOSTEDRULES', 'VW'])
     actual_config = ConfigBuilder().included_model_types([CustomKNN, 'RF']).build()
     assert actual_config == expected_config
 
