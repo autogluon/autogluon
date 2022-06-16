@@ -2233,7 +2233,7 @@ class TabularPredictor:
 
         return models
 
-    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False) -> pd.Series:
+    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, can_infer=None) -> pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -2251,6 +2251,8 @@ class TabularPredictor:
             Refer to `get_oof_pred_proba()` documentation.
         internal_oof : bool, default = False
             Refer to `get_oof_pred_proba()` documentation.
+        can_infer : bool, default = None
+            Refer to `get_oof_pred_proba()` documentation.
 
         Returns
         -------
@@ -2261,7 +2263,8 @@ class TabularPredictor:
                                                    transformed=transformed,
                                                    as_multiclass=True,
                                                    train_data=train_data,
-                                                   internal_oof=internal_oof)
+                                                   internal_oof=internal_oof,
+                                                   can_infer=can_infer)
         y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
         if transformed:
             return self._learner.label_cleaner.to_transformed_dtype(y_pred_oof)
@@ -2271,7 +2274,7 @@ class TabularPredictor:
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
     def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=True, train_data=None,
-                           internal_oof=False) -> Union[pd.DataFrame, pd.Series]:
+                           internal_oof=False, can_infer=None) -> Union[pd.DataFrame, pd.Series]:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -2310,6 +2313,10 @@ class TabularPredictor:
             [Advanced Option] Return the internal OOF preds rather than the externally facing OOF preds.
             Internal OOF preds may have more/fewer rows than was provided in train_data, and are incompatible with external data.
             If you don't know what this does, keep it as False.
+        can_infer : bool, default = None
+            Only used if `model` is not specified.
+            This is used to determine if the best model must be one that is able to predict on new data (True).
+            If None, the best model does not need to be able to infer on new data.
 
         Returns
         -------
@@ -2317,7 +2324,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('get_oof_pred_proba')
         if model is None:
-            model = self.get_model_best()
+            model = self._get_model_best(can_infer=can_infer)
         if not self._trainer.bagged_mode:
             raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
         if model in self._trainer._model_full_dict_val_score:
