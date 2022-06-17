@@ -22,6 +22,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities.types import _METRIC
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
+from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -480,8 +481,12 @@ class AutoMMPredictor:
             cleanup_checkpoints,
             EmptySearchSpace,
             AutommRayTuneAdapter,
+            AutommRayTuneLightningAdapter,
         )
 
+        ray_tune_adapter = AutommRayTuneAdapter()
+        if try_import_ray_lightning():
+            ray_tune_adapter = AutommRayTuneLightningAdapter()
         search_space = _fit_args.get("hyperparameters", dict())
         metric = "val_" + _fit_args.get("validation_metric_name")
         mode = _fit_args.get("minmax_mode")
@@ -499,7 +504,7 @@ class AutoMMPredictor:
                 metric=metric,
                 mode=mode,
                 save_dir=save_path,
-                ray_tune_adapter=AutommRayTuneAdapter(),
+                ray_tune_adapter=ray_tune_adapter,
                 total_resources=resources,
                 time_budget_s=time_budget_s,
                 keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
@@ -917,9 +922,12 @@ class AutoMMPredictor:
             model_summary,
         ]
 
+        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
         if hpo_mode:
-            from ray_lightning.tune import TuneReportCheckpointCallback
-
+            if use_ray_lightning:
+                from ray_lightning.tune import TuneReportCheckpointCallback
+            else:
+                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
@@ -978,13 +986,18 @@ class AutoMMPredictor:
             else:
                 strategy = config.env.strategy
         else:
-            strategy = hpo_kwargs.get("_ray_lightning_plugin")
+            # we don't support running each trial in parallel without ray lightning
+            if use_ray_lightning:
+                strategy = hpo_kwargs.get("_ray_lightning_plugin")
+            else:
+                strategy = None
+                num_gpus = min(num_gpus, 1)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                gpus=num_gpus if not hpo_mode else None,  # ray lightning requires not specifying gpus
+                gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
                 num_nodes=config.env.num_nodes,
                 precision=precision,

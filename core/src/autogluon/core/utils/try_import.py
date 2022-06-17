@@ -1,3 +1,4 @@
+import logging
 import platform
 
 from types import ModuleType
@@ -19,6 +20,8 @@ __all__ = [
     'try_import_rapids_cuml',
     'try_import_imodels',
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def try_import_mxboard():
@@ -52,13 +55,13 @@ def try_import_mxnet():
 
 def try_import_ray() -> ModuleType:
     ray_max_version_os_map = dict(
-        Darwin='1.13.0',
-        Windows='1.13.0',
-        Linux='1.13.0',
+        Darwin='1.14.0',
+        Windows='1.14.0',
+        Linux='1.14.0',
     )
-    ray_min_version = '1.12.0'
+    ray_min_version = '1.13.0'
     current_os = platform.system()
-    ray_max_version = ray_max_version_os_map.get(current_os, '1.13.0')
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.14.0')
     try:
         import ray
         from distutils.version import LooseVersion
@@ -78,6 +81,62 @@ def try_import_ray() -> ModuleType:
             "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
             "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
         )
+        
+        
+def try_import_ray_lightning():
+    """This function tries to import ray lightning and check if the compatible pytorch lightning version is installed"""
+    supported_ray_lightning_min_version = '0.2.0'
+    supported_ray_lightning_max_version = '0.3.0'
+    ray_lightning_torch_lightning_compatibility_map = {
+        '0.2.x': '1.5.x',
+    }
+    ray_lightining_torch_lightning_compatibility_range_map = {
+        ('0.2.0', '0.3.0'): ('1.5.0', '1.6.0'),
+    }
+    try:
+        import pkg_resources
+        import pytorch_lightning
+        import ray_lightning
+        from distutils.version import LooseVersion
+        
+        ray_lightning_version = pkg_resources.get_distribution('ray_lightning').version # ray_lightning doesn't have __version__...
+        
+        if not (LooseVersion(supported_ray_lightning_min_version)
+                <= LooseVersion(ray_lightning_version)
+                < LooseVersion(supported_ray_lightning_max_version)):
+            logger.log(
+                f"ray_lightning=={ray_lightning_version} detected. "
+                f"{supported_ray_lightning_min_version} <= ray_lighting < {supported_ray_lightning_max_version} is required."
+                "You can use pip to install certain version of ray_lightning."
+                f"Supported ray_lightning versions and the compatible torch lightning versions are {ray_lightning_torch_lightning_compatibility_map}."
+            )
+            return False
+        
+        for ray_lightning_versions, torch_lightning_versions in ray_lightining_torch_lightning_compatibility_range_map.items():
+            ray_lightning_min_version, ray_lightning_max_version = ray_lightning_versions
+            torch_lightning_min_version, torch_lightning_max_version = torch_lightning_versions
+            if (
+                LooseVersion(ray_lightning_min_version)
+                <= LooseVersion(ray_lightning_version)
+                < LooseVersion(ray_lightning_max_version)
+            ):
+                if not (LooseVersion(torch_lightning_min_version)
+                        <= LooseVersion(pytorch_lightning.__version__)
+                        < LooseVersion(torch_lightning_max_version)):
+                    logger.log(
+                        f"Found ray_lightning {ray_lightning_version} that's not compatible with pytorch_lightning."
+                        f"The compatible version of pytorch_lightning is >= {torch_lightning_min_version} and < {torch_lightning_max_version}."
+                    )
+                    return False
+        return True
+            
+
+    except ImportError:
+        logger.info(
+            "You can enable each individual trial using multiple gpus by installing ray_lightning."
+            f"Supported ray_lightning versions and the compatible torch lightning versions are {ray_lightning_torch_lightning_compatibility_map}."
+        )
+        return False
 
 
 def try_import_catboost():
