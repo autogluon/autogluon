@@ -196,6 +196,8 @@ jobs:
     needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
       - name: Build All Docs on AWS Batch
