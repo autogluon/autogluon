@@ -109,9 +109,6 @@ class TimeSeriesLearner(AbstractLearner):
         self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
-        logger.info(
-            f"Training complete, total runtime = {round(self._time_fit_training, 2)}s",
-        )
 
     def predict(
         self,

@@ -8,6 +8,7 @@ from warnings import warn
 
 import networkx as nx
 import pandas as pd
+from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
@@ -19,8 +20,9 @@ from ..dataset import TimeSeriesDataFrame
 from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.metric_utils import check_get_evaluation_metric
+from ..utils.warning_filters import disable_tqdm
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
 # TODO: This class is meant to be moved to `core`, where it will likely
@@ -354,20 +356,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if all(scheduler_options.get(s) is None for s in ["num_trials", "time_out"]):
             scheduler_options["num_trials"] = 10
 
-        logger.info(
-            f"Tuning hyperparameters of {model.name}. "
-            f"scheduler options: {scheduler_cls.__name__}, {pprint.pformat(scheduler_options)}. "
-        )
-        logger.info(
-            f"Time allocated to {model.name} for hyperparameter tuning: {time_limit}."
+        logger.debug(
+            f"\tTuning hyperparameters of {model.name}. scheduler "
+            f"options: {scheduler_cls.__name__}, {pprint.pformat(scheduler_options, indent=10)}. "
         )
 
-        hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
-            train_data=train_data,
-            val_data=val_data,
-            scheduler_options=(scheduler_cls, scheduler_options),
-            time_limit=time_limit,
-        )
+        with disable_tqdm():
+            hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+                train_data=train_data,
+                val_data=val_data,
+                scheduler_options=(scheduler_cls, scheduler_options),
+                time_limit=time_limit,
+            )
         hpo_results.pop("search_strategy", None)
         self.hpo_results[model.name] = hpo_results
         model_names_trained = []
@@ -380,8 +380,21 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model_names_trained.append(model_hpo.name)
 
         logger.info(
-            f"Hyperparameter tuning complete. Trained {len(model_names_trained)} models. "
+            f"\tTrained {len(model_names_trained)} models while tuning {model.name}."
         )
+
+        if hpo_results:
+            logger.info(
+                f"\t{hpo_results.get('best_reward'):<7.4f}".ljust(15)
+                + f"= Validation score ({self.eval_metric})"
+            )
+            logger.info(
+                f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15) + f"= Total tuning time"
+            )
+            logger.debug(
+                f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}"
+            )
+
         return model_names_trained
 
     def _train_and_save(
@@ -403,10 +416,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         try:
             if time_limit is not None:
                 if time_limit <= 0:
-                    logger.info(f"Skipping {model.name} due to lack of time remaining.")
+                    logger.info(
+                        f"\tSkipping {model.name} due to lack of time remaining."
+                    )
                     return model_names_trained
-
-            logger.info(f"\n Training timeseries model {model.name}")
 
             model = self._train_single(
                 train_data, model, val_data=val_data, time_limit=time_limit
@@ -424,22 +437,21 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     None if val_score is None else (pred_end_time - fit_end_time)
                 )
 
-            logger.info(f"Model training complete for {model.name}")
-            logger.info(f"Time spent training: {model.fit_time:.2f} sec")
-            if model.predict_time is not None:
-                logger.info(f"Time spent in prediction: {model.predict_time:.2f} sec")
             if val_score is not None:
                 logger.info(
-                    f"Final validation score ({self.eval_metric}): {val_score:.5f}"
+                    f"\t{val_score:<7.4f}".ljust(15)
+                    + f"= Validation score ({self.eval_metric})"
                 )
+            logger.info(f"\t{model.fit_time:<7.2f} s".ljust(15) + "= Training runtime")
+            if model.predict_time is not None:
+                logger.info(f"\t{model.predict_time:<7.2f} s".ljust(15) + "= Validation (prediction) runtime")
 
             self.save_model(model=model)
         except Exception as err:
             logger.error(
                 f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
             )
-            logger.error(f"\t\t{err}")
-            logger.exception("Detailed Traceback:")
+            logger.error(f"\t{err}")
         else:
             self._add_model(model=model)  # noqa: F821
             model_names_trained.append(model.name)  # noqa: F821
@@ -492,36 +504,51 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         for i, model in enumerate(models):
             if hyperparameter_tune:
                 time_left = time_limit_model_split
-                model_names_trained += self.tune_model_hyperparameters(
-                    model,
-                    time_limit=time_left,
-                    train_data=train_data,
-                    val_data=val_data,
-                )
+
+                fit_log_message = f"Hyperparameter tuning model: {model.name}. "
+                if time_limit is not None and time_limit_model_split is not None:
+                    fit_log_message += (
+                        f"Tuning model for up to {time_limit_model_split:.2f}s "
+                        f"of the {time_limit:.2f}s remaining."
+                    )
+                logger.info(fit_log_message)
+
+                with tqdm.external_write_mode():
+                    model_names_trained += self.tune_model_hyperparameters(
+                        model,
+                        time_limit=time_left,
+                        train_data=train_data,
+                        val_data=val_data,
+                    )
             else:
                 time_left = None
+                fit_log_message = f"Training timeseries model {model.name}. "
                 if time_limit is not None:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
-                    logger.info(f"Training time left: {time_left:.2f} seconds")
                     if time_left <= 0:
                         logger.info(
                             f"Stopping training due to lack of time remaining. Time left: {time_left:.2f} seconds"
                         )
                         break
 
+                    fit_log_message += (
+                        f"Training for up to {time_left:.2f}s of "
+                        f"the {time_left:.2f}s of remaining time."
+                    )
+
+                logger.info(fit_log_message)
                 model_names_trained += self._train_and_save(
                     train_data, model=model, val_data=val_data, time_limit=time_left
                 )
 
-        logger.info("\nTraining complete")
-        logger.info(f"Models trained: {model_names_trained}")
-
+        logger.info(f"Training complete. Models trained: {model_names_trained}")
+        logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         try:
             best_model = self.get_model_best()
             logger.info(f"Best model: {best_model}")
             logger.info(
-                f"Best model score: {self.get_model_attribute(best_model, 'val_score')}"
+                f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}"
             )
         except ValueError as e:
             logger.error(str(e))

@@ -261,7 +261,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.debug(
-            f"Starting generic AbstractTimeSeriesModel hyperparameter tuning for {self.name}"
+            f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}"
         )
         search_space = self._get_search_space()
 

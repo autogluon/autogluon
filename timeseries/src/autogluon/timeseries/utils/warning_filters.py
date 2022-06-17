@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import logging
 import os
 import warnings
@@ -31,3 +32,17 @@ def disable_root_logger():
         yield
     finally:
         logging.getLogger().setLevel(logging.INFO)
+
+
+@contextlib.contextmanager
+def disable_tqdm():
+    """monkey-patch tqdm to disable it within context"""
+    try:
+        from tqdm import tqdm
+        _init = tqdm.__init__
+        tqdm.__init__ = functools.partialmethod(tqdm.__init__, disable=True)
+        yield
+    except ImportError:
+        yield
+    else:
+        tqdm.__init__ = _init
