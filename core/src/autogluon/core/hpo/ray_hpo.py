@@ -5,7 +5,6 @@ import shutil
 
 from ..utils.try_import import try_import_ray
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
-import ray
 
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Union, List
@@ -16,6 +15,7 @@ from .constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
+from ..ray.manager import RayManager
 from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 from .scheduler_factory import SchedulerFactory
 from .searcher_factory import SearcherFactory
@@ -212,10 +212,8 @@ def run(
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
     search_space = _convert_search_space(search_space)
 
-    if ray.is_initialized():
-        # shutdown to reinitialize resources because different model might require different total resources
-        ray.shutdown()
-    ray.init(log_to_driver=False, **total_resources)
+    
+    RayManager.init_ray(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(

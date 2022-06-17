@@ -13,6 +13,7 @@ from pandas import DataFrame, Series
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
+from ...ray.manager import RayManager
 from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 from ...utils import get_cpu_count, get_gpu_count_all
@@ -404,11 +405,10 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         return num_cpus
 
     def schedule_fold_model_fit(self, fold_ctx):
-        if not self.ray.is_initialized():
-            if self.num_gpus > 0:
-                self.ray.init(log_to_driver=False, num_gpus=self.num_gpus)
-            else:
-                self.ray.init(log_to_driver=False)
+        ray_init_args = dict(log_to_driver=False, num_cpus=self.num_cpus)
+        if self.num_gpus > 0:
+            ray_init_args['num_gpus'] = self.num_gpus
+        RayManager.init_ray(**ray_init_args)
         self.jobs.append(fold_ctx)
 
     def after_all_folds_scheduled(self):
