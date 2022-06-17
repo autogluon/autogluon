@@ -858,10 +858,14 @@ class TabularPredictor:
             trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
             self.refit_full(model=refit_full, set_best_to_refit_full=False)
             if set_best_to_refit_full:
-                if trainer_model_best in self._trainer.model_full_dict.keys():
-                    self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
+                model_full_dict = self._trainer.get_model_full_dict()
+                if trainer_model_best in model_full_dict:
+                    self._trainer.model_best = model_full_dict[trainer_model_best]
                     # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                    self._trainer.save()
+                elif trainer_model_best in model_full_dict.values():
+                    self._trainer.model_best = trainer_model_best
                     self._trainer.save()
                 else:
                     logger.warning(
@@ -921,7 +925,7 @@ class TabularPredictor:
         if model_name is None:
             model_name = self.get_model_best()
 
-        model_full_dict = self._trainer.model_full_dict
+        model_full_dict = self._trainer.get_model_full_dict()
         model_name_og = model_name
         for m, m_full in model_full_dict.items():
             if m_full == model_name:
@@ -2073,13 +2077,21 @@ class TabularPredictor:
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
 
         if set_best_to_refit_full:
-            if model_best in self._trainer.model_full_dict.keys():
-                self._trainer.model_best = self._trainer.model_full_dict[model_best]
+            model_full_dict = self._trainer.get_model_full_dict()
+            if model_best in model_full_dict:
+                self._trainer.model_best = model_full_dict[model_best]
                 # Note: model_best will be overwritten if additional training is done with new models,
                 # since model_best will have validation score of None and any new model will have a better validation score.
                 # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                 self._trainer.save()
                 logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
+                               f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
+            elif model_best in model_full_dict.values():
+                # Model best is already a refit full model
+                prev_best = self._trainer.model_best
+                self._trainer.model_best = model_best
+                self._trainer.save()
+                logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{prev_best}"). '
                                f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
             else:
                 logger.warning(
@@ -2127,18 +2139,23 @@ class TabularPredictor:
         else:
             raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
 
-    def get_model_full_dict(self):
+    def get_model_full_dict(self, inverse=False):
         """
         Returns a dictionary of original model name -> refit full model name.
         Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
         This can be useful when determining the best model based off of `predictor.leaderboard()`, then getting the _FULL version of the model by passing its name as the key to this dictionary.
+
+        Parameters
+        ----------
+        inverse : bool, default = False
+            If True, instead returns a dictionary of refit full model name -> original model name (Swap keys with values)
 
         Returns
         -------
         Dictionary of original model name -> refit full model name.
         """
         self._assert_is_fit('get_model_full_dict')
-        return copy.deepcopy(self._trainer.model_full_dict)
+        return self._trainer.get_model_full_dict(inverse=inverse)
 
     def info(self):
         """
@@ -2328,14 +2345,17 @@ class TabularPredictor:
             model = self._get_model_best(can_infer=can_infer)
         if not self._trainer.bagged_mode:
             raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
-        if model in self._trainer._model_full_dict_val_score:
-            # FIXME: This is a hack, add refit tag in a nicer way than via the _model_full_dict_val_score
+        if self._trainer.get_model_attribute(model=model, attribute='refit_full', default=False):
+            model_to_get_oof = self._trainer.get_model_attribute(model=model, attribute='refit_full_parent')
             # TODO: bagged-with-holdout refit to bagged-no-holdout should still be able to return out-of-fold predictions
-            raise AssertionError('_FULL models do not have out-of-fold predictions.')
-        if self._trainer.get_model_attribute_full(model=model, attribute='val_in_fit', func=max):
+        else:
+            model_to_get_oof = model
+        if model != model_to_get_oof:
+            logger.log(20, f'Using OOF from "{model_to_get_oof}" as a proxy for "{model}".')
+        if self._trainer.get_model_attribute_full(model=model_to_get_oof, attribute='val_in_fit', func=max):
             raise AssertionError(
-                f'Model {model} does not have out-of-fold predictions because it used a validation set during training.')
-        y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
+                f'Model {model_to_get_oof} does not have out-of-fold predictions because it used a validation set during training.')
+        y_pred_proba_oof_transformed = self.transform_features(base_models=[model_to_get_oof], return_original_features=False)
         if not internal_oof:
             is_duplicate_index = y_pred_proba_oof_transformed.index.duplicated(keep='first')
             if is_duplicate_index.any():
