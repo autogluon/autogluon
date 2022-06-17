@@ -13,6 +13,7 @@ from pandas import DataFrame, Series
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
+from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 from ...utils import get_cpu_count, get_gpu_count_all
 from ...utils.try_import import try_import_ray
@@ -256,8 +257,8 @@ class SequentialLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
 def _ray_fit(model_base, bagged_ensemble_model_path,
              X, y, X_pseudo, y_pseudo,
-             fold_ctx, time_limit_fold, num_cpus,
-             save_bag_folds, kwargs_fold):
+             fold_ctx, time_limit_fold, save_bag_folds, 
+             resources, kwargs_fold):
     logger.log(10, 'ray worker training')
     time_start_fold = time.time()
     fold, folds_finished, folds_left, \
@@ -286,11 +287,11 @@ def _ray_fit(model_base, bagged_ensemble_model_path,
             X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
     fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold,
-                   time_limit=time_limit_fold, num_cpus=num_cpus, **kwargs_fold)
+                   time_limit=time_limit_fold, **resources, **kwargs_fold)
     time_train_end_fold = time.time()
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(fold_model, X_val_fold, y_val_fold,
-                                              time_train_end_fold, num_cpus, save_bag_folds)
+                                              time_train_end_fold, resources['num_cpus'], save_bag_folds)
     fold_model.save()
     return fold_model.name, pred_proba, time_start_fold, \
         time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time
@@ -343,12 +344,9 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         predict_time: float
             The amount of time used to do out of folds predictions for all folds.
     """
-    def __init__(self, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
+    def __init__(self, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
-        self.num_cpus = get_cpu_count()
-        self.num_gpus = None
-        self.num_parallel_jobs = num_folds_parallel
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
         self.time_start_fit = None
         self.time_end_fit = None
@@ -360,14 +358,17 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         # initialize the model base to get necessary info for estimating memory usage
         self._initialized_model_base = copy.deepcopy(self.model_base)
         self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
+        self.num_cpus = self._get_cpu_count()
+        self.num_gpus = self._get_gpu_count()
+        self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs, num_folds_parallel)
 
-    def is_mem_sufficient(self, num_jobs):
+
+    def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
-        _, _, num_parallel_jobs = self._get_resource_suggestions(num_jobs)
-        total_model_mem_est = num_parallel_jobs * model_mem_est
+        total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()
-        total_data_mem_est = num_parallel_jobs * data_mem_est
+        total_data_mem_est = self.num_parallel_jobs * data_mem_est
         mem_available = psutil.virtual_memory().available
         return (mem_available * self.max_memory_usage_ratio) > (total_model_mem_est + total_data_mem_est)
 
@@ -376,20 +377,33 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         y_mem = get_approximate_df_mem_usage(self.y.to_frame()).sum()
         return X_mem + y_mem
 
+    # TODO: Move to generic location, re-use in parallel HPO
     def _get_gpu_count(self):
-        if not self.num_gpus:
-            _user_gpu_count = self.model_base.get_params().get('hyperparameters', {}). \
-                get('ag_args_fit', {}).get('num_gpus', 0)
-            model_base_class_name = self.model_base.__class__.__name__
-            # If user didn't specify num gpus and we are training text or image models,
-            # use all gpus.
-            if model_base_class_name in [TEXT_MODEL, IMAGE_MODEL] and _user_gpu_count == 0:
-                self.num_gpus = get_gpu_count_all()
-            else:
-                self.num_gpus = min(_user_gpu_count, get_gpu_count_all())
+        _user_gpu_count = self._initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
+        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
+
+        if _user_gpu_count is not None:
+            num_gpus = min(_user_gpu_count, get_gpu_count_all())
+        elif resource_kwargs['num_gpus'] > 0:
+            num_gpus = get_gpu_count_all()
+        else:
+            num_gpus = 0
+        return num_gpus
+
+    # TODO: Move to generic location, re-use in parallel HPO
+    def _get_cpu_count(self):
+        _user_cpu_count = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
+        resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
+
+        if _user_cpu_count is not None:
+            num_cpus = min(_user_cpu_count, get_cpu_count())
+        elif resource_kwargs['num_cpus'] > 0:
+            num_cpus = get_cpu_count()
+        else:
+            num_cpus = 0
+        return num_cpus
 
     def schedule_fold_model_fit(self, fold_ctx):
-        self._get_gpu_count()
         if not self.ray.is_initialized():
             if self.num_gpus > 0:
                 self.ray.init(log_to_driver=False, num_gpus=self.num_gpus)
@@ -399,17 +413,16 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
 
     def after_all_folds_scheduled(self):
         num_jobs = len(self.jobs)
-        resources, _, _ = self._get_resource_suggestions(num_jobs)
         job_refs = []
         job_fold_map = {}
         # prepare shared data
         X, y, X_pseudo, y_pseudo = self._prepare_data()
         model_base_ref = self.ray.put(self.model_base)
-        time_limit_fold = self._get_fold_time_limit(num_jobs)
+        time_limit_fold = self._get_fold_time_limit()
         # spread the task
         for job in self.jobs:
             fold_ctx = job
-            ref = self._fit(model_base_ref, X, y, X_pseudo, y_pseudo, time_limit_fold, fold_ctx, resources, self.model_base_kwargs)
+            ref = self._fit(model_base_ref, X, y, X_pseudo, y_pseudo, time_limit_fold, fold_ctx, self.resources, self.model_base_kwargs)
             job_fold_map[ref] = fold_ctx
             job_refs.append(ref)
 
@@ -474,11 +487,10 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             else:
                 kwargs_fold['sample_weight'] = self.sample_weight[train_index]
                 kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
-        num_cpus = resources.get('num_cpus', 0)
         return self._ray_fit.options(**resources) \
             .remote(model_base_ref, self.bagged_ensemble_model.path,
-                    X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, fold_ctx_ref, time_limit_fold, num_cpus,
-                    save_bag_folds, kwargs_fold)
+                    X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, fold_ctx_ref, time_limit_fold,
+                    save_bag_folds, resources, kwargs_fold)
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit,
                                 time_end_fit, predict_time, predict_1_time, fold_ctx):
@@ -500,12 +512,11 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
                 self.predict_1_time = 0
             self.predict_1_time += predict_1_time
 
-    def _get_fold_time_limit(self, num_jobs):
-        _, batches, _ = self._get_resource_suggestions(num_jobs)
+    def _get_fold_time_limit(self):
         time_elapsed = time.time() - self.time_start
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
-            required_time_per_fold = time_left / batches
+            required_time_per_fold = time_left / self.batches
             time_limit_fold = required_time_per_fold * self.time_limit_fold_ratio
             if time_left <= 0:
                 raise TimeLimitExceeded
@@ -513,22 +524,33 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _get_resource_suggestions(self, num_jobs):
-        # TODO: We need to handle user provide custom num_cpus
-        cpu_per_job = max(1, int(self.num_cpus // self.num_parallel_jobs))
-        gpu_per_job = 0
-        resources = dict(num_cpus=cpu_per_job)
-        num_parallel_jobs = min(self.num_parallel_jobs, self.num_cpus // cpu_per_job)
-        self.num_parallel_jobs = num_parallel_jobs
-        batches = math.ceil(num_jobs / num_parallel_jobs)
-        if self.num_gpus and self.num_gpus > 0:
-            gpu_per_job = self.num_gpus / self.num_parallel_jobs
-            # For Image and Text model,
-            # we always guarantee a task has at least one full gpu to use
-            # FIXME: Avoid hardcoding model names.
-            if self.model_base.__class__.__name__ in [TEXT_MODEL, IMAGE_MODEL]:
-                gpu_per_job = max(1, math.ceil(gpu_per_job))
-            resources = dict(num_cpus=cpu_per_job, num_gpus=gpu_per_job)
+    def _get_resource_suggestions(self, num_jobs, user_specified_num_folds_parallel):
+        user_specified_num_folds_parallel = min(num_jobs, user_specified_num_folds_parallel)
+        model_min_resources = self._initialized_model_base.get_minimum_resources()
+        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if self.num_gpus == 0 else 'gpu')
+        # use minimum resource to control number of jobs running in parallel
+        min_cpu_per_job_based_on_num_folds_parallel = self.num_cpus // user_specified_num_folds_parallel
+        min_gpu_per_job_based_on_num_folds_parallel = self.num_gpus / user_specified_num_folds_parallel
+        min_cpu_based_on_model = model_min_resources.get('num_cpus', 1)
+        min_gpu_based_on_model = model_min_resources.get('num_gpus', 0)
+
+        resources_info = resources_calculator.get_resources_per_job(
+            total_num_cpus=self.num_cpus,
+            total_num_gpus=self.num_gpus,
+            num_jobs=num_jobs,
+            minimum_cpu_per_job=max(min_cpu_per_job_based_on_num_folds_parallel, min_cpu_based_on_model),
+            minimum_gpu_per_job=max(min_gpu_per_job_based_on_num_folds_parallel, min_gpu_based_on_model),
+        )
+        resources = resources_info.get('resources_per_job')
+        num_parallel_jobs = resources_info.get('num_parallel_jobs')
+        batches = resources_info.get('batches')
+
+        # renname key to match ray job requirement
+        resources['num_cpus'] = resources.pop('cpu')
+        num_gpus = resources.pop('gpu', None)
+        if num_gpus is not None and num_gpus > 0:
+            resources['num_gpus'] = num_gpus
+
         return resources, batches, num_parallel_jobs
 
     def _prepare_data(self, in_mem=True):

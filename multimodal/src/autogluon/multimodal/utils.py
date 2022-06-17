@@ -15,6 +15,7 @@ from typing import Optional, List, Any, Dict, Tuple, Union
 from nptyping import NDArray
 from omegaconf import OmegaConf, DictConfig
 from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import f1_score
 from autogluon.core.metrics import get_metric
 from .models.utils import inject_lora_to_linear_layer
 from .models import (
@@ -64,6 +65,7 @@ from .constants import (
     FUSION_TRANSFORMER,
     ROC_AUC,
     AVERAGE_PRECISION,
+    F1,
     METRIC_MODE_MAP,
     VALID_METRICS,
     VALID_CONFIG_KEYS,
@@ -1021,6 +1023,8 @@ def compute_score(
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
+    elif metric.name in [F1]:  # only for binary classification
+        return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
     else:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
@@ -1415,3 +1419,20 @@ def get_mixup(
         )
         mixup_fn = MixupModule(**mixup_args)
     return mixup_state, mixup_fn
+
+
+class CustomUnpickler(pickle.Unpickler):
+    """
+    This is to make pickle loading df_preprocessor backward compatible.
+    A df_preprocessor object saved with old name space `autogluon.text.automm` has errors
+    when being loaded under the context of new name `autogluon.multimodal`.
+    """
+
+    def find_class(self, module, name):
+        renamed_module = module
+        if module == "autogluon.text.automm.data.preprocess_dataframe":
+            renamed_module = "autogluon.multimodal.data.preprocess_dataframe"
+        elif module == "autogluon.text.automm.data":
+            renamed_module = "autogluon.multimodal.data"
+
+        return super(CustomUnpickler, self).find_class(renamed_module, name)

@@ -2,9 +2,10 @@ import pytest
 import random
 import torch
 from torchmetrics import MeanMetric
-from sklearn.metrics import log_loss
-from autogluon.text.automm.optimization.utils import get_metric, get_loss_func
-from autogluon.text.automm.constants import MULTICLASS
+from sklearn.metrics import log_loss, f1_score
+from autogluon.multimodal.optimization.utils import get_metric, get_loss_func
+from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
+from autogluon.multimodal.utils import compute_score
 
 
 @pytest.mark.parametrize(
@@ -72,3 +73,27 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
     bceloss = torch.nn.BCELoss()
     score2 = bceloss(input=preds, target=targets)
     assert pytest.approx(score1, 1e-6) == score2
+
+
+@pytest.mark.parametrize(
+    "pos_label",
+    [
+        0,
+        1,
+    ]
+)
+def test_f1(pos_label):
+    y_true = [0, 0, 1, 0, 1, 0]
+    y_pred = [1, 0, 0, 0, 1, 0]
+    score1 = f1_score(y_true, y_pred, pos_label=pos_label)
+    metric_data = {
+        Y_PRED: y_pred,
+        Y_TRUE: y_true,
+    }
+    score2 = compute_score(
+        metric_data=metric_data,
+        metric_name="f1",
+        pos_label=pos_label,
+    )
+    assert pytest.approx(score1, 1e-6) == score2
+

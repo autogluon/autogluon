@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from autogluon.text.automm.constants import (
+from autogluon.multimodal.constants import (
     MULTICLASS,
     BINARY,
     REGRESSION,

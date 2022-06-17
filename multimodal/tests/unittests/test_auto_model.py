@@ -1,5 +1,7 @@
 import pytest
-from autogluon.text.automm.models import (
+import torch
+from autogluon.multimodal.constants import LOGITS, FEATURES
+from autogluon.multimodal.models import (
     HFAutoModelForTextPrediction,
     TimmAutoModelForImagePrediction,
     NumericalTransformer,
@@ -62,9 +64,7 @@ def test_timm_automodel_init(checkpoint_name):
     ]
 )
 def test_numerical_transformer_init(embedding_arch):
-    import torch
-    from autogluon.text.automm.constants import LOGITS, FEATURES
-    
+
     in_features = 10
     d_token = 192
     num_classes = 5

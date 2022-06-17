@@ -1,7 +1,11 @@
 import torch
 
-from autogluon.text.automm.data.collator import (
-    Stack, Pad, Tuple, List, Dict,
+from autogluon.multimodal.data.collator import (
+    Stack,
+    Pad,
+    Tuple,
+    List,
+    Dict,
 )
 
 

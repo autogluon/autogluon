@@ -1,7 +1,7 @@
 import abc
 import os 
 import pandas as pd
-from autogluon.text.automm.constants import (
+from autogluon.multimodal.constants import (
     BINARY,
     MULTICLASS,
     REGRESSION,
