@@ -8,6 +8,7 @@ COMMIT_SHA=$3
 PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 
 source $(dirname "$0")/env_setup.sh
+source $(dirname "$0")/write_to_s3.sh
 
 setup_build_contrib_env
 setup_mxnet_gpu

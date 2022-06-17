@@ -8,6 +8,7 @@ PR_NUMBER=$4
 set -ex
 
 source $(dirname "$0")/env_setup.sh
+source $(dirname "$0")/write_to_s3.sh
 
 if [[ -n $PR_NUMBER ]]; then BUILD_DOCS_PATH=s3://autogluon-ci/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUILD_DOCS_PATH=s3://autogluon-ci-push/build_docs/$BRANCH/$COMMIT_SHA; fi
 
