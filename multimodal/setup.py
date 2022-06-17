@@ -27,7 +27,7 @@ install_requires = [
     'boto3',
     'setuptools<=59.5.0',
     'timm<0.6.0',
-    'torch>=1.0,<1.11',
+    'torch>=1.0,<1.12',
     'fairscale>=0.4.5,<0.5.0',
     'scikit-image>=0.19.1,<0.20.0',
     'smart_open>=5.2.1,<5.3.0',
