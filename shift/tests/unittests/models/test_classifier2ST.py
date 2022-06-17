@@ -18,6 +18,13 @@ def fit_tst():
     tst.fit(data, sample_label='label')
     return tst
 
+def test_make_source_target_label():
+    split = 0.5
+    data = get_dogs_data()
+    source, target = data.query('label == 0'), data.query('label == 1')
+    data2 = Classifier2ST._make_source_target_label((source, target))
+    assert True
+
 def test_classifier2ST_fit():
     tst = fit_tst()
     val = 0.82
