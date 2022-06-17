@@ -539,7 +539,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "fit_order": ix + 1,
                 "score_val": self.get_model_attribute(model_name, "val_score"),
                 "fit_time_marginal": self.get_model_attribute(model_name, "fit_time"),
-                "predict_time": self.get_model_attribute(model_name, "predict_time"),
+                "pred_time_val": self.get_model_attribute(model_name, "predict_time"),
             }
 
         if data is not None:
@@ -566,10 +566,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         explicit_column_order = [
             "model",
-            "score_val",
             "score_test",
+            "score_val",
+            "pred_time_val",
             "fit_time_marginal",
-            "predict_time",
             "fit_order",
         ]
         explicit_column_order = [

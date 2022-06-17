@@ -286,7 +286,7 @@ class TimeSeriesPredictor:
             hyperparameters=hyperparameters,
             hyperparameter_tune=all(scheduler_options),
             time_limit=time_left,
-            verbosity=self.verbosity,
+            verbosity=verbosity,
         )
 
         self.save()
