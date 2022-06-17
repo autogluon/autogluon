@@ -4,7 +4,7 @@ import pytest
 from gluonts.evaluation import Evaluator as GluonTSEvaluator
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.evaluator import Evaluator
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 
 from .common import DUMMY_TS_DATAFRAME
 
@@ -26,7 +26,7 @@ def test_when_given_forecasts_then_equal_to_gluonts(metric_name):
         forecast_iter, quantile_levels=model.quantile_levels
     )
 
-    ag_evaluator = Evaluator(eval_metric=metric_name, prediction_length=2)
+    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
     gts_evaluator = GluonTSEvaluator()

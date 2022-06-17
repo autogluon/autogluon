@@ -58,7 +58,7 @@ def in_sample_naive_1_error(*, target_history: np.ndarray, **kwargs):
     return np.mean(np.abs(np.diff(target_history)))
 
 
-class Evaluator:
+class TimeSeriesEvaluator:
     """Does not ensure consistency with GluonTS, for example in definition of MASE."""
 
     AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE"]

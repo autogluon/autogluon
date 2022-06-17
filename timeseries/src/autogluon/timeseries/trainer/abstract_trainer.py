@@ -16,7 +16,7 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
-from ..dataset import TimeSeriesDataFrame
+from .. import TimeSeriesDataFrame
 from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.metric_utils import check_get_evaluation_metric
