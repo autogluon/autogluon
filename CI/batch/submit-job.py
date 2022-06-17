@@ -22,7 +22,7 @@ job_type_info = {
         'job_queue': 'CI-CPU'
     },
     'CI-GPU-PUSH': {
-        'job_definition': 'autogluon-ci-gpu-push:2',
+        'job_definition': 'autogluon-ci-gpu-push:3',
         'job_queue': 'CI-GPU'
     },
 }
