@@ -21,8 +21,8 @@ class Classifier2ST:
     def _make_source_target_label(data, sample_label='label'):
         """turn a source, target pain into a single dataframe with label column"""
         source, target = data
-        source[sample_label] = 1
-        target[sample_label] = 0
+        source.loc[:,sample_label] = 0
+        target.loc[:,sample_label] = 1
         data = pd.concat((source, target))
         return data
 

@@ -23,7 +23,8 @@ def test_make_source_target_label():
     data = get_dogs_data()
     source, target = data.query('label == 0'), data.query('label == 1')
     data2 = Classifier2ST._make_source_target_label((source, target))
-    assert True
+    assert data2.shape == data.shape
+    assert data2['label'].sum() == data['label'].sum()
 
 def test_classifier2ST_fit():
     tst = fit_tst()
