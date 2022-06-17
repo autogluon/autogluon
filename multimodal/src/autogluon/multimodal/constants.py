@@ -46,6 +46,7 @@ AVERAGE_PRECISION = "average_precision"
 LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
+F1 = "f1"
 METRIC_MODE_MAP = {
     ACC: MAX,
     ACCURACY: MAX,
@@ -58,6 +59,7 @@ METRIC_MODE_MAP = {
     CROSS_ENTROPY: MIN,
     PEARSONR: MAX,
     SPEARMANR: MAX,
+    F1: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
