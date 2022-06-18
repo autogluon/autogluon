@@ -238,7 +238,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     requests_gag = mock.patch(
         'requests.Session.request',
         mock.Mock(side_effect=RuntimeError(
-            'Please use the `responses` library to unittests HTTP in your tests.'
+            'Please use the `responses` library to mock HTTP in your tests.'
         ))
     )
 
