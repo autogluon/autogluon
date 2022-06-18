@@ -4,7 +4,7 @@ import logging
 import os
 import warnings
 
-__all__ = ["evaluator_warning_filter", "disable_root_logger"]
+__all__ = ["evaluator_warning_filter", "disable_root_logger", "disable_tqdm"]
 
 
 @contextlib.contextmanager
