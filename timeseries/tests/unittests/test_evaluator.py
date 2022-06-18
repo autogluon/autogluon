@@ -9,7 +9,7 @@ from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 from .common import DUMMY_TS_DATAFRAME
 
 
-@pytest.mark.parametrize("metric_name", ["MAPE", "sMAPE"])
+@pytest.mark.parametrize("metric_name", ["mean_wQuantileLoss", "MAPE", "sMAPE"])
 def test_when_given_forecasts_then_equal_to_gluonts(metric_name):
     pred = TimeSeriesPredictor(prediction_length=2, verbosity=4)
 
