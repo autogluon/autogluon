@@ -65,7 +65,7 @@ def abs_target_mean(*, target: np.ndarray, **kwargs):  # noqa: F841
 
 
 def in_sample_naive_1_error(*, target_history: np.ndarray, **kwargs):  # noqa: F841
-    return np.mean(np.abs(np.diff(target_history)))
+    return np.nanmean(np.abs(np.diff(target_history)))
 
 
 class TimeSeriesEvaluator:
@@ -99,7 +99,7 @@ class TimeSeriesEvaluator:
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
     ) -> float:
         df = self.get_metrics_per_ts(data, predictions, metric_callables=[mape])
-        return float(np.mean(df["mape"]))
+        return float(np.nan_to_num(df["mape"].mean(), posinf=np.nan, nan=np.nan))
 
     def _smape(
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
