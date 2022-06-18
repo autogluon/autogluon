@@ -843,7 +843,7 @@ def test_trivialaugment():
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
     }
 
-    with tempfile.TemporaryDirectory() as save_path:
+    with get_home_dir() as save_path:
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
