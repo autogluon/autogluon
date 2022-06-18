@@ -69,8 +69,54 @@ def in_sample_naive_1_error(*, target_history: np.ndarray, **kwargs):  # noqa: F
 
 
 class TimeSeriesEvaluator:
-    """Does not ensure consistency with GluonTS, for example in definition of MASE."""
+    """Contains functions for computing forecast accuracy metrics.
 
+    Forecast accuracy metrics measure discrepancy between forecasts and ground-truth time
+    series. After being initialized, AutoGluon ``TimeSeriesEvaluator`` expects two time
+    series data sets (``TimeSeriesDataFrame``) as input: the first of which contains the
+    ground truth time series including both the "history" and the forecast horizon. The
+    second input is the data frame of predictions corresponding only to the forecast
+    horizon.
+
+    .. warning::
+        ``TimeSeriesEvaluator`` always computes metrics by their original definition, while
+        AutoGluon-TimeSeries predictor and model objects always report their scores in
+        higher-is-better fashion. The coefficients used to "flip" the signs of metrics to
+        obey this convention are given in ``TimeSeriesEvaluator.METRIC_COEFFICIENTS``.
+
+    .. warning::
+        Definitions of forecast accuracy metrics may differ from package to package.
+        For example, the definition of MASE is different between GluonTS and autogluon.
+
+    Parameters
+    ----------
+    eval_metric: str
+        Name of the metric to be computed. Available metrics are
+
+        * ``MASE``: mean absolute scaled error. See also, https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
+        * ``MAPE``: mean absolute percentage error
+        * ``sMAPE``: "symmetric" mean absolute percentage error
+        * ``mean_wQuantileLoss``: mean weighted quantile loss, i.e., average quantile loss scaled
+         by the total absolute values of the time series.
+        * ``MSE``: mean squared error
+        * ``RMSE``: root mean squared error
+
+    prediction_length: int
+        Length of the forecast horizon
+    target_column: str
+        Name of the target column to be forecasting.
+
+    Class Attributes
+    ----------------
+    AVAILABLE_METRICS
+        list of names of available metrics
+    METRIC_COEFFICIENTS
+        coefficients by which each metric should be multiplied with to obey the higher-is-better
+        convention
+    DEFAULT_METRIC
+        name of default metric returned by
+        :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
+    """
     AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
     METRIC_COEFFICIENTS = {
         "MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1

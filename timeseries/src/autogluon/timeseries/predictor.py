@@ -51,7 +51,7 @@ class TimeSeriesPredictor:
         metric. Available options include: "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss".
 
         If ``eval_metric is None``, it is set by default to "mean_wQuantileLoss".
-        For more information about these options, see ``autogluon.timeseries.utils.metric_utils`` and GluonTS
+        For more information about these options, see ``autogluon.timeseries.TimeSeriesEvaluator`` and GluonTS
         docs at https://ts.gluon.ai/api/gluonts/gluonts.evaluation.metrics.html
     path: str, default = None
         Path to directory where models and intermediate outputs should be saved. If unspecified, a timestamped folder
