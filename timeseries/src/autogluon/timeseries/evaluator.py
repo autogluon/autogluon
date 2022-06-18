@@ -72,6 +72,10 @@ class TimeSeriesEvaluator:
     """Does not ensure consistency with GluonTS, for example in definition of MASE."""
 
     AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
+    METRIC_COEFFICIENTS = {
+        "MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1
+    }
+    DEFAULT_METRIC = "mean_wQuantileLoss"
 
     def __init__(
         self, eval_metric: str, prediction_length: int, target_column: str = "target"
@@ -199,6 +203,37 @@ class TimeSeriesEvaluator:
             metrics.append(item_metrics)
 
         return pd.DataFrame(metrics)
+
+    @staticmethod
+    def check_get_evaluation_metric(
+        metric_name: Optional[str] = None,
+        raise_if_not_available: bool = True,
+    ):
+        """A utility function that checks if a given evaluation metric
+        name is available in autogluon.timeseries, and optionally raises
+        a ValueError otherwise.
+
+        Parameters
+        ----------
+        metric_name: str
+            The requested metric name, currently one of the evaluation metrics available
+            in GluonTS.
+        raise_if_not_available: bool
+            if True, a ValueError will be raised if the requested metric is not yet
+            available in autogluon.timeseries. Otherwise, the default metric name will be
+            returned instead of the requested metric.
+
+        Returns
+        -------
+        checked_metric_name: str
+            The requested metric name if it is available in autogluon.timeseries.
+        """
+        metric = metric_name or TimeSeriesEvaluator.DEFAULT_METRIC
+        if metric not in TimeSeriesEvaluator.AVAILABLE_METRICS:
+            if raise_if_not_available:
+                raise ValueError(f"metric {metric} is not available yet.")
+            return TimeSeriesEvaluator.DEFAULT_METRIC
+        return metric
 
     def __call__(
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame

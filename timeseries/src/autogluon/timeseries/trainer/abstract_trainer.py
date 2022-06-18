@@ -16,10 +16,9 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
-from .. import TimeSeriesDataFrame
+from .. import TimeSeriesDataFrame, TimeSeriesEvaluator
 from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from ..utils.metric_utils import check_get_evaluation_metric
 from ..utils.warning_filters import disable_tqdm
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
@@ -280,7 +279,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self._model_full_dict_val_score = {}
-        self.eval_metric = check_get_evaluation_metric(eval_metric)
+        self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
