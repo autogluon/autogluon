@@ -71,7 +71,7 @@ def in_sample_naive_1_error(*, target_history: np.ndarray, **kwargs):  # noqa: F
 class TimeSeriesEvaluator:
     """Does not ensure consistency with GluonTS, for example in definition of MASE."""
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
 
     def __init__(
         self, eval_metric: str, prediction_length: int, target_column: str = "target"
@@ -109,6 +109,15 @@ class TimeSeriesEvaluator:
         )
         return float(np.mean(df["symmetric_mape"]))
 
+    def _mse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
+        df = self.get_metrics_per_ts(
+            data, predictions, metric_callables=[mean_square_error]
+        )
+        return float(np.mean(df["mean_square_error"]))
+
+    def _rmse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
+        return np.sqrt(self._mse(data, predictions))
+
     def _mean_wquantileloss(
         self,
         data: TimeSeriesDataFrame,
@@ -136,16 +145,18 @@ class TimeSeriesEvaluator:
         return float(np.mean(w_quantile_losses))
 
     def _get_minimizing_forecast(
-        self, predictions: TimeSeriesDataFrame, metric: str
+        self, predictions: TimeSeriesDataFrame, metric_callable: Callable
     ) -> np.ndarray:
         """get field from among predictions that minimizes the given metric"""
-        if "0.5" in predictions.columns and metric != "MSE":
+        if "0.5" in predictions.columns and metric_callable is not mean_square_error:
             return np.array(predictions["0.5"])
-        elif metric != "MSE":
+        elif metric_callable is not mean_square_error:
             logger.warning("Median forecast not found. Defaulting to mean forecasts.")
 
         if "mean" not in predictions.columns:
-            ValueError(f"Mean forecast not found. Cannot evaluate metric {metric}")
+            ValueError(
+                f"Mean forecast not found. Cannot evaluate metric {metric_callable.__name__}"
+            )
         return np.array(predictions["mean"])
 
     def get_metrics_per_ts(
@@ -177,7 +188,7 @@ class TimeSeriesEvaluator:
                         )
                 else:
                     forecast = self._get_minimizing_forecast(
-                        predictions.loc[item_id], metric=self.eval_metric
+                        predictions.loc[item_id], metric_callable=metric_callable
                     )
                     item_metrics[metric_callable.__name__] = metric_callable(
                         target=target,

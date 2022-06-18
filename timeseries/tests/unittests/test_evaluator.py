@@ -11,29 +11,48 @@ from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 from .common import DUMMY_TS_DATAFRAME
 
 
-GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE"]
+GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE"]
 
 
-@pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
-def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_gluonts(
-    metric_name,
-):
+@pytest.fixture(scope="module")
+def deepar_trained():
     pred = TimeSeriesPredictor(prediction_length=2, verbosity=4)
-
     pred.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
             "DeepAR": dict(epochs=2),
         },
     )
+    return pred._trainer.load_model("DeepAR")
 
-    model = pred._trainer.load_model("DeepAR")
-    forecast_iter, timeseries_iter = model._predict_for_scoring(DUMMY_TS_DATAFRAME)
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        forecast_iter, quantile_levels=model.quantile_levels
+
+@pytest.fixture(scope="module")
+def deepar_trained_zero_data():
+    pred = TimeSeriesPredictor(prediction_length=2, verbosity=4)
+
+    data = DUMMY_TS_DATAFRAME.copy() * 0
+
+    pred.fit(
+        data,
+        hyperparameters={
+            "DeepAR": dict(epochs=2),
+        },
     )
+    return pred._trainer.load_model("DeepAR")
 
+
+@pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
+def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_gluonts(
+    metric_name, deepar_trained
+):
     with evaluator_warning_filter():
+        forecast_iter, timeseries_iter = deepar_trained._predict_for_scoring(
+            DUMMY_TS_DATAFRAME
+        )
+        forecast_df = deepar_trained._gluonts_forecasts_to_data_frame(
+            forecast_iter, quantile_levels=deepar_trained.quantile_levels
+        )
+
         ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
         ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
@@ -47,26 +66,17 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
 
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
 def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_gluonts(
-    metric_name,
+    metric_name, deepar_trained_zero_data
 ):
-    pred = TimeSeriesPredictor(prediction_length=2, verbosity=4)
-
+    model = deepar_trained_zero_data
     data = DUMMY_TS_DATAFRAME.copy() * 0
 
-    pred.fit(
-        data,
-        hyperparameters={
-            "DeepAR": dict(epochs=2),
-        },
-    )
-
-    model = pred._trainer.load_model("DeepAR")
-    forecast_iter, timeseries_iter = model._predict_for_scoring(data)
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        forecast_iter, quantile_levels=model.quantile_levels
-    )
-
     with evaluator_warning_filter():
+        forecast_iter, timeseries_iter = model._predict_for_scoring(data)
+        forecast_df = model._gluonts_forecasts_to_data_frame(
+            forecast_iter, quantile_levels=model.quantile_levels
+        )
+
         ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
         ag_value = ag_evaluator(data, forecast_df)
 
@@ -80,31 +90,28 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
 
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
 def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gluonts(
-    metric_name,
+    metric_name, deepar_trained
 ):
-    pred = TimeSeriesPredictor(prediction_length=2, verbosity=4)
-
-    pred.fit(
-        DUMMY_TS_DATAFRAME,
-        hyperparameters={
-            "DeepAR": dict(epochs=2),
-        },
-    )
-
-    model = pred._trainer.load_model("DeepAR")
-    forecast_iter, timeseries_iter = model._predict_for_scoring(DUMMY_TS_DATAFRAME)
-
-    zero_forecast_list = []
-    for s in forecast_iter:
-        zero_forecast_list.append(
-            SampleForecast(samples=np.zeros_like(s.samples), start_date=s.start_date, freq=s.freq, item_id=s.item_id)
+    with evaluator_warning_filter():
+        forecast_iter, timeseries_iter = deepar_trained._predict_for_scoring(
+            DUMMY_TS_DATAFRAME
         )
 
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        zero_forecast_list, quantile_levels=model.quantile_levels
-    )
+        zero_forecast_list = []
+        for s in forecast_iter:
+            zero_forecast_list.append(
+                SampleForecast(
+                    samples=np.zeros_like(s.samples),
+                    start_date=s.start_date,
+                    freq=s.freq,
+                    item_id=s.item_id,
+                )
+            )
 
-    with evaluator_warning_filter():
+        forecast_df = deepar_trained._gluonts_forecasts_to_data_frame(
+            zero_forecast_list, quantile_levels=deepar_trained.quantile_levels
+        )
+
         ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
         ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
