@@ -3,7 +3,7 @@ import random
 import torch
 from torchmetrics import MeanMetric
 from sklearn.metrics import log_loss, f1_score
-from autogluon.multimodal.optimization.utils import get_metric, get_loss_func
+from autogluon.multimodal.optimization.utils import get_metric, get_loss_func, CustomF1Score
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
 from autogluon.multimodal.utils import compute_score
 
@@ -83,8 +83,18 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
     ]
 )
 def test_f1(pos_label):
-    y_true = [0, 0, 1, 0, 1, 0]
-    y_pred = [1, 0, 0, 0, 1, 0]
+    y_true = torch.tensor([0, 1, 0, 0, 1, 1])
+    logits = torch.tensor(
+        [
+            [1.6605, -1.4413],
+            [-0.8016, 0.5224],
+            [-0.4859, -0.9226],
+            [-3.1272, -0.0620],
+            [-0.3837, 0.5376],
+            [-0.6448, 1.4258],
+        ]
+    )
+    y_pred = logits.argmax(dim=1)
     score1 = f1_score(y_true, y_pred, pos_label=pos_label)
     metric_data = {
         Y_PRED: y_pred,
@@ -97,3 +107,6 @@ def test_f1(pos_label):
     )
     assert pytest.approx(score1, 1e-6) == score2
 
+    custom_f1 = CustomF1Score(num_classes=2, pos_label=pos_label)
+    custom_f1.update(logits, y_true)
+    assert pytest.approx(score1, 1e-6) == custom_f1.compute().item()

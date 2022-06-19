@@ -101,6 +101,13 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
+    if problem_type != BINARY and eval_metric_name.lower() in [
+        ROC_AUC,
+        AVERAGE_PRECISION,
+        F1,
+    ]:
+        raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
+
     if eval_metric_name is not None:
         if eval_metric_name in VALID_METRICS:
             validation_metric_name = eval_metric_name
@@ -1357,7 +1364,7 @@ def try_to_infer_pos_label(
 
     pos_label = OmegaConf.select(data_config, "pos_label", default=None)
     if pos_label is not None:
-        print(f"pos_label: {pos_label}\n")
+        logger.debug(f"pos_label: {pos_label}\n")
         pos_label = label_encoder.transform([pos_label]).item()
     else:
         pos_label = 1

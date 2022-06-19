@@ -1362,12 +1362,6 @@ class AutoMMPredictor:
 
         results = {}
         for per_metric in metrics:
-            if self._problem_type != BINARY and per_metric.lower() in [
-                "roc_auc",
-                "average_precision",
-                "f1",
-            ]:
-                raise ValueError(f"Metric {per_metric} is only supported for binary classification.")
             pos_label = try_to_infer_pos_label(
                 data_config=self._config.data,
                 label_encoder=self._df_preprocessor.label_generator,

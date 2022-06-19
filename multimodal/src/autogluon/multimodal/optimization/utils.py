@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Union, Tuple, List, Dict
+from typing import Optional, Union, Tuple, List, Dict, Any
 import functools
 import torch
 from torch import nn
@@ -34,6 +34,7 @@ from ..constants import (
     CROSS_ENTROPY,
     PEARSONR,
     SPEARMANR,
+    F1,
     CONTRASTIVE_LOSS,
     COSINE_SIMILARITY,
     PAIR_MARGIN_MINER,
@@ -92,9 +93,50 @@ def get_loss_func(
     return loss_func
 
 
+class CustomF1Score(torchmetrics.F1Score):
+    """
+    Support computing the f1 score of one class, specified by `pos_label`,
+    which means the positive label users are interested in.
+
+    """
+
+    def __init__(
+            self,
+            num_classes: Optional[int] = None,
+            threshold: float = 0.5,
+            average: str = "micro",
+            mdmc_average: Optional[str] = None,
+            ignore_index: Optional[int] = None,
+            top_k: Optional[int] = None,
+            multiclass: Optional[bool] = None,
+            pos_label: Optional[int] = None,
+            **kwargs: Any,
+    ) -> None:
+        self.pos_label = pos_label
+        if pos_label is not None:
+            assert isinstance(pos_label, int)
+            average = None
+
+        super().__init__(
+            num_classes=num_classes,
+            threshold=threshold,
+            average=average,
+            mdmc_average=mdmc_average,
+            ignore_index=ignore_index,
+            top_k=top_k,
+            multiclass=multiclass,
+            **kwargs,
+        )
+
+    def compute(self) -> torch.Tensor:
+        f1_score = super().compute()
+        if self.pos_label is not None:
+            f1_score = f1_score[self.pos_label]
+        return f1_score
+
+
 def get_metric(
     metric_name: str,
-    problem_type: str,
     num_classes: Optional[int] = None,
     pos_label: Optional[int] = None,
 ):
@@ -105,9 +147,7 @@ def get_metric(
     Parameters
     ----------
     metric_name
-        Name of metric
-    problem_type
-        The type of the problem.
+        Name of metric.
     num_classes
         Number of classes, used in the quadratic_kappa metric for binary classification.
     pos_label
@@ -144,6 +184,8 @@ def get_metric(
         return torchmetrics.PearsonCorrCoef(), None
     elif metric_name == SPEARMANR:
         return torchmetrics.SpearmanCorrCoef(), None
+    elif metric_name == F1:
+        return CustomF1Score(pos_label=pos_label), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
