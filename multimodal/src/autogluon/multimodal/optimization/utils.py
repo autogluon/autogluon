@@ -101,16 +101,16 @@ class CustomF1Score(torchmetrics.F1Score):
     """
 
     def __init__(
-            self,
-            num_classes: Optional[int] = None,
-            threshold: float = 0.5,
-            average: str = "micro",
-            mdmc_average: Optional[str] = None,
-            ignore_index: Optional[int] = None,
-            top_k: Optional[int] = None,
-            multiclass: Optional[bool] = None,
-            pos_label: Optional[int] = None,
-            **kwargs: Any,
+        self,
+        num_classes: Optional[int] = None,
+        threshold: float = 0.5,
+        average: str = "micro",
+        mdmc_average: Optional[str] = None,
+        ignore_index: Optional[int] = None,
+        top_k: Optional[int] = None,
+        multiclass: Optional[bool] = None,
+        pos_label: Optional[int] = None,
+        **kwargs: Any,
     ) -> None:
         self.pos_label = pos_label
         if pos_label is not None:

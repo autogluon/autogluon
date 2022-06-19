@@ -14,7 +14,7 @@ from autogluon.multimodal.utils import compute_score
         ("log_loss", 5),
         ("log_loss", 10),
         ("cross_entropy", 100),
-    ]
+    ],
 )
 def test_cross_entropy(metric_name, class_num):
     preds = []
@@ -47,7 +47,7 @@ def test_cross_entropy(metric_name, class_num):
     "problem_type,loss_func_name",
     [
         ("regression", "bcewithlogitsloss"),
-    ]
+    ],
 )
 def test_bce_with_logits_loss(problem_type, loss_func_name):
     preds = []
@@ -80,7 +80,7 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
     [
         0,
         1,
-    ]
+    ],
 )
 def test_f1(pos_label):
     y_true = torch.tensor([0, 1, 0, 0, 1, 1])
