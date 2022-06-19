@@ -7,17 +7,30 @@ from autogluon.timeseries import TimeSeriesDataFrame
 
 try:
     from sktime.forecasting.ets import AutoETS
-    from sktime.forecasting.arima import AutoARIMA
+    from sktime.forecasting.arima import AutoARIMA, ARIMA
+    from sktime.forecasting.tbats import TBATS
     from sktime.forecasting.theta import ThetaForecaster
 except ImportError:
     pytest.skip("sktime not available", allow_module_level=True)
 
-from autogluon.timeseries.models.sktime import ThetaModel, AutoARIMAModel, AutoETSModel
+from autogluon.timeseries.models.sktime import (
+    ARIMAModel,
+    AutoARIMAModel,
+    AutoETSModel,
+    TBATSModel,
+    ThetaModel,
+)
 
 from ..common import DUMMY_TS_DATAFRAME
 
 
-TESTABLE_MODELS = [ThetaModel, AutoARIMAModel, AutoETSModel]
+TESTABLE_MODELS = [
+    ARIMAModel,
+    AutoARIMAModel,
+    AutoETSModel,
+    TBATSModel,
+    ThetaModel,
+]
 
 
 @pytest.mark.parametrize(
@@ -33,6 +46,18 @@ TESTABLE_MODELS = [ThetaModel, AutoARIMAModel, AutoETSModel]
             AutoARIMAModel,
             AutoARIMA,
             dict(sp=2, max_q=4),
+            dict(some_bad_param="A", some_other_bad_param=10),
+        ),
+        (
+            ARIMAModel,
+            ARIMA,
+            dict(order=(1, 1, 1)),
+            dict(some_bad_param="A", some_other_bad_param=10),
+        ),
+        (
+            TBATSModel,
+            TBATS,
+            dict(use_box_cox=False),
             dict(some_bad_param="A", some_other_bad_param=10),
         ),
         (

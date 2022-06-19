@@ -1,14 +1,30 @@
-from sktime.forecasting.arima import AutoARIMA
+from sktime.forecasting.arima import AutoARIMA, ARIMA
 from sktime.forecasting.ets import AutoETS
 from sktime.forecasting.tbats import TBATS
 from sktime.forecasting.theta import ThetaForecaster
 
-from .abstract_sktime import AbstractSktimeModel
+from . import AbstractSktimeModel
 
 
 class ThetaModel(AbstractSktimeModel):
     sktime_forecaster_class = ThetaForecaster
     sktime_allowed_init_args = ["initial_level", "deseasonalize", "sp"]
+
+
+class TBATSModel(AbstractSktimeModel):
+    sktime_forecaster_class = TBATS
+    sktime_allowed_init_args = [
+        "use_box_cox",
+        "box_cox_bounds",
+        "use_trend",
+        "use_damped_trend",
+        "sp",
+        "use_arma_errors",
+        "show_warnings",
+        "n_jobs",
+        "multiprocessing_start_method",
+        "context",
+    ]
 
 
 class AutoETSModel(AbstractSktimeModel):
@@ -41,6 +57,31 @@ class AutoETSModel(AbstractSktimeModel):
         "ignore_inf_ic",
         "n_jobs",
         "random_state",
+    ]
+
+
+class ARIMAModel(AbstractSktimeModel):
+    sktime_forecaster_class = ARIMA
+    sktime_allowed_init_args = [
+        "order",
+        "seasonal_order",
+        "start_params",
+        "method",
+        "maxiter",
+        "suppress_warnings",
+        "out_of_sample_size",
+        "scoring",
+        "scoring_args",
+        "trend",
+        "with_intercept",
+        "time_varying_regression",
+        "enforce_stationarity",
+        "enforce_invertibility",
+        "simple_differencing",
+        "measurement_error",
+        "mle_regression",
+        "hamilton_representation",
+        "concentrate_scale",
     ]
 
 

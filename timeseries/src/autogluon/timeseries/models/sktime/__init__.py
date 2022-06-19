@@ -1,5 +1,17 @@
 from .abstract_sktime import AbstractSktimeModel
 
-from .models import ThetaModel, AutoETSModel, AutoARIMAModel
+from .models import (
+    ARIMAModel,
+    AutoARIMAModel,
+    AutoETSModel,
+    TBATSModel,
+    ThetaModel,
+)
 
-__all__ = ["AutoARIMAModel", "AutoETSModel", "ThetaModel"]
+__all__ = [
+    "ARIMAModel",
+    "AutoARIMAModel",
+    "AutoETSModel",
+    "TBATSModel",
+    "ThetaModel",
+]

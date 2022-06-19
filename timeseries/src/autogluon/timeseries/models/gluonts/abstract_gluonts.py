@@ -13,7 +13,6 @@ from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
-import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
