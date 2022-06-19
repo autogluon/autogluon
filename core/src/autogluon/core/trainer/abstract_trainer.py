@@ -767,11 +767,11 @@ class AbstractTrainer:
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 for model_trained in models_trained:
-                    self._add_model_attr(model_trained,
-                                         refit_full=True,
-                                         refit_full_parent=model_name,
-                                         refit_full_parent_val_score=self.get_model_attribute(model_name, 'val_score'),
-                                         )
+                    self._update_model_attr(model_trained,
+                                            refit_full=True,
+                                            refit_full_parent=model_name,
+                                            refit_full_parent_val_score=self.get_model_attribute(model_name, 'val_score'),
+                                            )
                 models_trained_full += models_trained
 
         keys_to_del = []
@@ -1217,7 +1217,10 @@ class AbstractTrainer:
             del model
         return True
 
-    def _add_model_attr(self, model: str, **attributes):
+    # TODO: Once Python min-version is 3.8, can refactor to use positional-only argument for model
+    #  https://peps.python.org/pep-0570/#empowering-library-authors
+    #  Currently this method cannot accept the attribute key 'model' without making usage ugly.
+    def _update_model_attr(self, model: str, **attributes):
         """Updates model node in graph with the input attributes dictionary"""
         if model not in self.model_graph:
             raise AssertionError(f'"{model}" is not a key in self.model_graph, cannot add attributes: {attributes}')
