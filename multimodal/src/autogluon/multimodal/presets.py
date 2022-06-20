@@ -94,29 +94,29 @@ def get_basic_automm_config():
     }
 
 
-def get_automm_preset(name: str):
+def automm_preset_to_config(preset: str):
     """
-    Get the preset of one predictor in AutoMM.
-    Currently, we only use model presets to differentiate different predictors.
-    In future, we can simultaneously consider model, data, optimization,
-    and environment to construct more diverse presets.
+    Map a AutoMM preset string to its config including a basic config and an overriding dict.
 
     Parameters
     ----------
-    name
+    preset
         Name of a preset.
 
     Returns
     -------
-    AutoMM predictor's presets of MODEL, DATA, OPTIMIZATION, and ENVIRONMENT.
+    basic_config
+        The basic config of AutoMM.
+    overrides
+        The hyperparameter overrides of this preset.
     """
     basic_config = get_basic_automm_config()
-    name = name.lower()
-    if name in automm_presets.list_keys():
-        overrides = automm_presets.create(name)
+    preset = preset.lower()
+    if preset in automm_presets.list_keys():
+        overrides = automm_presets.create(preset)
     else:
         raise ValueError(
-            f"Provided preset '{name}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
+            f"Provided preset '{preset}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
         )
 
     return basic_config, overrides

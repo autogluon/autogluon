@@ -70,7 +70,7 @@ from .constants import (
     VALID_METRICS,
     VALID_CONFIG_KEYS,
 )
-from .presets import get_basic_automm_config
+from .presets import automm_preset_to_config, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -180,7 +180,8 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
-    config: Union[dict, DictConfig],
+    preset: Optional[str] = None,
+    config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
     """
@@ -189,6 +190,8 @@ def get_config(
 
     Parameters
     ----------
+    preset
+        Name of a preset.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
         If any key is not not given, we will fill in with the default value.
@@ -237,17 +240,20 @@ def get_config(
     Configurations as a DictConfig object
     """
     if config is None:
-        config = get_basic_automm_config()
+        config = {}
+
     if not isinstance(config, DictConfig):
-        all_configs = []
-        for k, default_value in [
-            ("model", "fusion_mlp_image_text_tabular"),
-            ("data", "default"),
-            ("optimization", "adamw"),
-            ("environment", "default"),
-        ]:
+        if preset is None:
+            basic_config = get_basic_automm_config()
+            preset_overrides = None
+        else:
+            basic_config, preset_overrides = automm_preset_to_config(preset=preset)
+
+        for k, default_value in basic_config.items():
             if k not in config:
                 config[k] = default_value
+
+        all_configs = []
         for k, v in config.items():
             if isinstance(v, dict):
                 per_config = OmegaConf.create(v)
@@ -266,10 +272,14 @@ def get_config(
             all_configs.append(per_config)
 
         config = OmegaConf.merge(*all_configs)
+        # apply the preset's overrides
+        if preset_overrides:
+            config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
+
     verify_model_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
-        # avoid manipulating user-provided overrides
+        # avoid manipulating the user-provided overrides
         overrides = copy.deepcopy(overrides)
         # apply customized model names
         overrides = parse_dotlist_conf(overrides)  # convert to a dict
@@ -279,7 +289,7 @@ def get_config(
         )
         # remove `model.names` from overrides since it's already applied.
         overrides.pop("model.names", None)
-        # apply all the overrides
+        # apply the user-provided overrides
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
     verify_model_names(config.model)
     return config
@@ -1027,7 +1037,8 @@ def compute_score(
 
 
 def parse_dotlist_conf(conf):
-    """Parse the config files that is potentially in the dotlist format to a dictionary
+    """
+    Parse the config files that is potentially in the dotlist format to a dictionary.
 
     Parameters
     ----------
