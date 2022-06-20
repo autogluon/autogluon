@@ -308,7 +308,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))
 
             df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = int(item_id)
+            df[ITEMID] = item_id
             df[TIMESTAMP] = pd.date_range(
                 start=forecasts[i].start_date,
                 periods=self.prediction_length,

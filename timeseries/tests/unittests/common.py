@@ -5,9 +5,11 @@ import pandas as pd
 from gluonts.dataset.common import ListDataset
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 
 
 # TODO: add larger unit test data sets to S3
+
 DUMMY_DATASET = ListDataset(
     [
         {
@@ -24,7 +26,20 @@ DUMMY_DATASET = ListDataset(
     freq="H",
 )
 
-DUMMY_TS_DATAFRAME = TimeSeriesDataFrame.from_iterable_dataset(DUMMY_DATASET)
+
+DUMMY_TS_DATAFRAME = TimeSeriesDataFrame(
+    pd.DataFrame(
+        index=pd.MultiIndex.from_product(
+            [
+                ["A", "B", "C", "D"],
+                pd.date_range(pd.Timestamp("2022-01-01"), freq="D", periods=20),  # noqa
+            ],
+            names=(ITEMID, TIMESTAMP),
+        ),
+        data=[random.random() for _ in range(4 * 20)],
+        columns=["target"],
+    )
+)
 
 
 def dict_equal_primitive(this, that):
