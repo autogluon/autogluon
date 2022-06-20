@@ -106,14 +106,14 @@ For detailed codes, please refer to [`Kaggle_Pawpularity_submit.py`](./kaggle_Pa
 
 ## 4. Result in Kaggle Competitions
 
-| ID | Backbone | Fusion | Augment | learning_rate | lr_decay | weight_decay | Max_epochs | Warmup_step | Per_gpu_batch_size | Per_gpu_batch_size_evaluation | Precision | CV | Public_Leaderboard | Private_Leaderboard |
-|----|----------|--------|---------|---------------|----------|--------------|------------|-------------|--------------------|-------------------------------|-----------|----|--------------------|---------------------|
-| 1 | vit_large_patch16_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.3740541397068 | 17.97642 | 17.10867
-| 2 | swin_large_patch4_window12_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 32 | 32 | 17.4974990118305 | 18.09335 | 17.18875
-| 3 | convnext_large_384_in22ft2k | False | randaug | 5e-5 | 1 | 0 | 10 | 0 | 8 | 4 | 32 | 17.4523797944187 | 18.25999 | 17.20016
-| 4 | swin_large_patch4_window7_224 | False | randaug | 5e-5 | 1 | 0 | 5 | 0 | 16 | 32 | 32 | 17.5192244849318 | 18.03887 | 17.27713
-| 5 | swin_large_patch4_window7_224 | True | randaug | 5e-5 | 1 | 0 | 10 | 0.1 | 16 | 32 | 32 | 17.4848481619876 | 18.15082 | 17.29325
-| 6 | vit_large_patch16_384 | False | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.5162709909151 | 18.15326 | 17.37978
+| ID | Backbone | Fusion | Augment | learning_rate | lr_decay | weight_decay | Max_epochs | Warmup_step | Per_gpu_batch_size | Per_gpu_batch_size_evaluation | Precision | CV | Public_Leaderboard | Private_Leaderboard | Download |
+|----|----------|--------|---------|---------------|----------|--------------|------------|-------------|--------------------|-------------------------------|-----------|----|--------------------|---------------------|----------|
+| 1 | vit_large_patch16_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.3740541397068 | 17.97642 | 17.10867| [result7](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result7_standalone.zip)
+| 2 | swin_large_patch4_window12_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 32 | 32 | 17.4974990118305 | 18.09335 | 17.18875 | [result6](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result6_standalone.zip)
+| 3 | convnext_large_384_in22ft2k | False | randaug | 5e-5 | 1 | 0 | 10 | 0 | 8 | 4 | 32 | 17.4523797944187 | 18.25999 | 17.20016 | [result26](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result26_standalone.zip)
+| 4 | swin_large_patch4_window7_224 | False | randaug | 5e-5 | 1 | 0 | 5 | 0 | 16 | 32 | 32 | 17.5192244849318 | 18.03887 | 17.27713 | [result13](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result13_standalone.zip)
+| 5 | swin_large_patch4_window7_224 | True | randaug | 5e-5 | 1 | 0 | 10 | 0.1 | 16 | 32 | 32 | 17.4848481619876 | 18.15082 | 17.29325 | [result30](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result30_standalone.zip)
+| 6 | vit_large_patch16_384 | False | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.5162709909151 | 18.15326 | 17.37978 | [result23](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result23_standalone.zip)
 
 The results of the model are shown in the table above.
 
@@ -123,7 +123,7 @@ It is obvious that the model using fusion usually has better results.
 |----------|-----------|---------------|
 | swin_large_patch4_window7_224 | 17.4848481619876 | 17.5192244849318 |
 | swin_large_patch4_window12_384 | 17.4974990118305 | 17.5871592343891 |
-| convnext_large_384_in22ft1k | 17.4523797944187 | 17.8359277673301 |
+| convnext_large_384_in22ft1k | 17.6218877694844 | 17.4523797944187 |
 | vit_large_patch16_384 | 17.3740541397068 | 17.5162709909151 | 
 | beit_large_patch16_384 | 17.530005178868 | 17.6423355406175 |
 
