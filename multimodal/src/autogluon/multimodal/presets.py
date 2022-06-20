@@ -5,25 +5,96 @@ from .constants import (
     OPTIMIZATION,
     ENVIRONMENT,
 )
+from .registry import Registry
+
+automm_presets = Registry("automm_presets")
 
 
-def list_model_presets():
+@automm_presets.register()
+def default():
+    return {
+        "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "optimization.lr_decay": 0.9,
+    }
+
+
+@automm_presets.register()
+def medium_quality_faster_train():
+    return {
+        "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+        "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+        "optimization.learning_rate": 4e-4,
+        "optimization.lr_decay": 0.9,
+    }
+
+
+@automm_presets.register()
+def high_quality():
+    return {
+        "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
+        "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+        "optimization.lr_decay": 0.9,
+    }
+
+
+@automm_presets.register()
+def best_quality():
+    return {
+        "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
+        "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
+        "optimization.lr_decay": 0.9,
+        "env.per_gpu_batch_size": 1,
+    }
+
+
+@automm_presets.register()
+def multilingual():
+    return {
+        "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
+        "optimization.top_k": 1,
+        "optimization.lr_decay": 0.9,
+        "env.precision": 'bf16',
+        "env.per_gpu_batch_size": 4,
+    }
+
+
+def list_automm_presets(verbose: bool = False):
     """
-    List all available model types.
-    Image/text backbones can be customized for one model type.
+    List all available presets.
 
     Returns
     -------
-    A list of model types.
+    A list of presets.
     """
-    cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_config_dir = os.path.join(cur_path, "configs", "model")
-    model_config_files = [f for f in os.listdir(model_config_dir) if f.endswith((".yaml", ".yml"))]
-    model_presets = [f.split(".")[0] for f in model_config_files]
-    return model_presets
+    preset_keys = automm_presets.list_keys()
+    if not verbose:
+        return preset_keys
+
+    preset_details = {}
+    for k in preset_keys:
+        preset_details[k] = automm_presets.create(k)
+
+    return preset_details
 
 
-def get_preset(model_preset: str):
+def get_basic_config():
+    """
+    Get the basic config of AutoMM.
+
+    Returns
+    -------
+    A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
+    """
+    return {
+        MODEL: "fusion_mlp_image_text_tabular",
+        DATA: "default",
+        OPTIMIZATION: "adamw",
+        ENVIRONMENT: "default",
+    }
+
+
+def get_automm_preset(name: str):
     """
     Get the preset of one predictor in AutoMM.
     Currently, we only use model presets to differentiate different predictors.
@@ -32,27 +103,21 @@ def get_preset(model_preset: str):
 
     Parameters
     ----------
-    model_preset
-        A model preset supported by AutoMM.
+    name
+        Name of a preset.
 
     Returns
     -------
     AutoMM predictor's presets of MODEL, DATA, OPTIMIZATION, and ENVIRONMENT.
     """
-    model_preset = model_preset.lower()
-    preset = {
-        MODEL: model_preset,
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
-
-    cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_config_dir = os.path.join(cur_path, "configs", "model")
-    model_config_path = os.path.join(model_config_dir, f"{model_preset}.yaml")
-    if not os.path.isfile(model_config_path):
+    basic_config = get_basic_config()
+    name = name.lower()
+    if name in automm_presets.list_keys():
+        overrides = automm_presets.create(name)
+    else:
         raise ValueError(
-            f"Model preset '{model_preset}' is not supported yet. Consider one of these: {list_model_presets()}"
+            f"Provided preset '{name}' is not supported. "
+            f"Consider one of these: {automm_presets.list_keys()}"
         )
 
-    return preset
+    return basic_config, overrides

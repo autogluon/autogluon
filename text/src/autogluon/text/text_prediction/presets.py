@@ -1,4 +1,4 @@
-from autogluon.multimodal.presets import get_preset
+from autogluon.multimodal.presets import get_basic_config
 
 
 def list_text_presets(verbose=False):
@@ -59,7 +59,7 @@ def get_text_preset(preset: str):
     overrides
         A dictionary of overriding configs.
     """
-    automm_preset = get_preset("fusion_mlp_image_text_tabular")
+    basic_config = get_basic_config()
     overrides = {"model.names": ["hf_text", "numerical_mlp", "categorical_mlp", "fusion_mlp"]}
     preset = preset.lower()
     available_presets = list_text_presets(verbose=True)
@@ -72,4 +72,4 @@ def get_text_preset(preset: str):
             f"Consider one of these: {list_text_presets()}"
         )
 
-    return automm_preset, overrides
+    return basic_config, overrides
