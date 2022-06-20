@@ -6,5 +6,6 @@ from .ray_hpo import (
     RayTuneAdapter,
     TabularRayTuneAdapter,
     ForecastingRayTuneAdapter,
-    AutommRayTuneAdapter
+    AutommRayTuneAdapter,
+    AutommRayTuneLightningAdapter,
 )

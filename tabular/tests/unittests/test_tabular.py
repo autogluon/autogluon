@@ -163,6 +163,51 @@ def test_advanced_functionality():
     print('Tabular Advanced Functionality Test Succeeded.')
 
 
+def test_advanced_functionality_bagging():
+    fast_benchmark = True
+    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
+               'name': 'AdultIncomeBinaryClassification',
+               'problem_type': BINARY}
+    label = 'class'
+    directory_prefix = './datasets/'
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset['name'], url=dataset['url'])
+    if fast_benchmark:  # subsample for fast_benchmark
+        subsample_size = 500
+        train_data = train_data.head(subsample_size)
+        test_data = test_data.head(subsample_size)
+    print(f"Evaluating Advanced Functionality (Bagging) on Benchmark Dataset {dataset['name']}")
+    directory = directory_prefix + 'advanced/' + dataset['name'] + "/"
+    savedir = directory + 'AutogluonOutput/'
+    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    predictor = TabularPredictor(label=label, path=savedir).fit(
+        train_data,
+        num_bag_folds=2,
+        hyperparameters={'GBM': {}},
+    )
+
+    expected_num_models = 2
+    assert(len(predictor.get_model_names()) == expected_num_models)
+
+    oof_pred_proba = predictor.get_oof_pred_proba()
+    assert(len(oof_pred_proba) == len(train_data))
+
+    score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
+    model_best = predictor.get_model_best()
+
+    predictor.refit_full()
+    assert(len(predictor.get_model_full_dict()) == expected_num_models)
+    assert(len(predictor.get_model_names()) == expected_num_models * 2)
+
+    model_best_refit = predictor.get_model_best()
+    assert(model_best != model_best_refit)
+
+    # assert that refit model uses original model's OOF predictions
+    oof_pred_proba_refit = predictor.get_oof_pred_proba()
+    assert oof_pred_proba.equals(oof_pred_proba_refit)
+
+
 def load_data(directory_prefix, train_file, test_file, name, url=None):
     if not os.path.exists(directory_prefix):
         os.mkdir(directory_prefix)
