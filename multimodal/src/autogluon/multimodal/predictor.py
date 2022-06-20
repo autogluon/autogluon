@@ -754,7 +754,6 @@ class AutoMMPredictor:
         )
         validation_metric, custom_metric_func = get_metric(
             metric_name=validation_metric_name,
-            problem_type=self._problem_type,
             num_classes=self._output_shape,
             pos_label=pos_label,
         )
