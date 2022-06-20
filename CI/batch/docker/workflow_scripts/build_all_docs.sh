@@ -48,7 +48,7 @@ then
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA
     S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all
 else
-    BUCKET=autogluon-ci=push
+    BUCKET=autogluon-ci-push
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
     S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all
 fi
@@ -74,7 +74,11 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
+DOC_PATH=_build/html/
 # Write docs to s3
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 # Write root_index to s3 if master
-write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/root_index.html
+if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
+then
+    write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/root_index.html
+fi
