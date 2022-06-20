@@ -8,6 +8,7 @@ except ImportError:
 
 from .predictor import TimeSeriesPredictor
 from .dataset import TimeSeriesDataFrame
+
 try:
     from mxnet import __version__ as mxnet_version
 
