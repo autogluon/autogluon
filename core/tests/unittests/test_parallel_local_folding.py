@@ -21,7 +21,7 @@ def _prepare_data():
     return X, y
 
 
-def _construct_dummy_fold_strategy(time_limit=None, num_folds_parallel=8):
+def _construct_dummy_fold_strategy(num_jobs, time_limit=None, num_folds_parallel=8):
     dummy_model_base = AbstractModel()
     dummy_bagged_ensemble_model = BaggedEnsembleModel(dummy_model_base)
     train_data, test_data = _prepare_data()
@@ -40,6 +40,7 @@ def _construct_dummy_fold_strategy(time_limit=None, num_folds_parallel=8):
         oof_pred_proba=np.array([]),
         oof_pred_model_repeats=np.array([]),
         save_folds=True,
+        num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
     )
@@ -50,13 +51,13 @@ def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_
     num_cpus = get_cpu_count()
     num_gpus = get_gpu_count_all()
     time_start = time.time()
-    fold_fitting_strategy = _construct_dummy_fold_strategy(time_limit=time_limit, num_folds_parallel=num_folds_parallel)
+    fold_fitting_strategy = _construct_dummy_fold_strategy(num_jobs=num_jobs, time_limit=time_limit, num_folds_parallel=num_folds_parallel)
     for i in range(num_jobs):
         fold_fitting_strategy.schedule_fold_model_fit(dict())
-    resources, batches, num_parallel_jobs = fold_fitting_strategy._get_resource_suggestions(len(fold_fitting_strategy.jobs))
+    resources, batches, num_parallel_jobs = fold_fitting_strategy.resources, fold_fitting_strategy.batches, fold_fitting_strategy.num_parallel_jobs
     time_elapsed = time.time() - time_start
     time_remaining = time_limit - time_elapsed
-    time_limit_fold = fold_fitting_strategy._get_fold_time_limit(len(fold_fitting_strategy.jobs))
+    time_limit_fold = fold_fitting_strategy._get_fold_time_limit()
     num_cpus_per_job = resources.get('num_cpus', 0)
     num_gpus_per_job = resources.get('num_gpus', 0)
     assert batches >= 1

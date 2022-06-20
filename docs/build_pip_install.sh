@@ -2,6 +2,7 @@
 python3 -m pip uninstall -y autogluon
 python3 -m pip uninstall -y autogluon.vision
 python3 -m pip uninstall -y autogluon.text
+python3 -m pip uninstall -y autogluon.multimodal
 python3 -m pip uninstall -y autogluon.tabular
 python3 -m pip uninstall -y autogluon.timeseries
 python3 -m pip uninstall -y autogluon.features
@@ -25,6 +26,10 @@ cd tabular/
 # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
 python3 -m pip uninstall -y typing
 python3 -m pip install -e .[all,tests]
+cd ..
+
+cd multimodal/
+python3 -m pip install -e .
 cd ..
 
 cd text/

@@ -20,6 +20,7 @@ install_requires = [
     f'autogluon.core[all]=={version}',
     f'autogluon.features=={version}',
     f'autogluon.tabular[all]=={version}',
+    f'autogluon.multimodal=={version}',
     f'autogluon.text=={version}',
     f'autogluon.vision=={version}',
 ]

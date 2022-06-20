@@ -46,7 +46,7 @@ extras_require = {
         'scikit-learn-intelex>=2021.5,<2021.6',
     ],
     'imodels': [
-        'imodels>=1.2.0',
+        'imodels>=1.3.0',
     ],
     'vowpalwabbit': [
         'vowpalwabbit>=8.10,<8.11'

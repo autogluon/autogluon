@@ -503,7 +503,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             }
         )
         if test_score:
-            df["test_score"] = test_score
+            df["score_test"] = test_score
 
         df_sorted = df.sort_values(
             by=["score_val", "model"], ascending=[False, False]

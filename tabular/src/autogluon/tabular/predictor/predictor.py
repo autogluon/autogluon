@@ -76,8 +76,9 @@ class TabularPredictor:
             'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
             'precision_weighted', 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
         Options for regression:
-            ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2']
+            ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'mean_absolute_percentage_error', 'r2']
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
+        For metric source code, see `autogluon.core.metrics`.
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
         For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
@@ -857,10 +858,14 @@ class TabularPredictor:
             trainer_model_best = self._trainer.get_model_best(infer_limit=infer_limit)
             self.refit_full(model=refit_full, set_best_to_refit_full=False)
             if set_best_to_refit_full:
-                if trainer_model_best in self._trainer.model_full_dict.keys():
-                    self._trainer.model_best = self._trainer.model_full_dict[trainer_model_best]
+                model_full_dict = self._trainer.get_model_full_dict()
+                if trainer_model_best in model_full_dict:
+                    self._trainer.model_best = model_full_dict[trainer_model_best]
                     # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                    self._trainer.save()
+                elif trainer_model_best in model_full_dict.values():
+                    self._trainer.model_best = trainer_model_best
                     self._trainer.save()
                 else:
                     logger.warning(
@@ -920,7 +925,7 @@ class TabularPredictor:
         if model_name is None:
             model_name = self.get_model_best()
 
-        model_full_dict = self._trainer.model_full_dict
+        model_full_dict = self._trainer.get_model_full_dict()
         model_name_og = model_name
         for m, m_full in model_full_dict.items():
             if m_full == model_name:
@@ -2072,13 +2077,21 @@ class TabularPredictor:
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
 
         if set_best_to_refit_full:
-            if model_best in self._trainer.model_full_dict.keys():
-                self._trainer.model_best = self._trainer.model_full_dict[model_best]
+            model_full_dict = self._trainer.get_model_full_dict()
+            if model_best in model_full_dict:
+                self._trainer.model_best = model_full_dict[model_best]
                 # Note: model_best will be overwritten if additional training is done with new models,
                 # since model_best will have validation score of None and any new model will have a better validation score.
                 # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                 self._trainer.save()
                 logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
+                               f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
+            elif model_best in model_full_dict.values():
+                # Model best is already a refit full model
+                prev_best = self._trainer.model_best
+                self._trainer.model_best = model_best
+                self._trainer.save()
+                logger.log(20, f'Updated best model to "{self._trainer.model_best}" (Previously "{prev_best}"). '
                                f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().')
             else:
                 logger.warning(
@@ -2126,18 +2139,23 @@ class TabularPredictor:
         else:
             raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
 
-    def get_model_full_dict(self):
+    def get_model_full_dict(self, inverse=False):
         """
         Returns a dictionary of original model name -> refit full model name.
         Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
         This can be useful when determining the best model based off of `predictor.leaderboard()`, then getting the _FULL version of the model by passing its name as the key to this dictionary.
+
+        Parameters
+        ----------
+        inverse : bool, default = False
+            If True, instead returns a dictionary of refit full model name -> original model name (Swap keys with values)
 
         Returns
         -------
         Dictionary of original model name -> refit full model name.
         """
         self._assert_is_fit('get_model_full_dict')
-        return copy.deepcopy(self._trainer.model_full_dict)
+        return self._trainer.get_model_full_dict(inverse=inverse)
 
     def info(self):
         """
@@ -2232,7 +2250,7 @@ class TabularPredictor:
 
         return models
 
-    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False) -> pd.Series:
+    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, can_infer=None) -> pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -2250,6 +2268,8 @@ class TabularPredictor:
             Refer to `get_oof_pred_proba()` documentation.
         internal_oof : bool, default = False
             Refer to `get_oof_pred_proba()` documentation.
+        can_infer : bool, default = None
+            Refer to `get_oof_pred_proba()` documentation.
 
         Returns
         -------
@@ -2260,7 +2280,8 @@ class TabularPredictor:
                                                    transformed=transformed,
                                                    as_multiclass=True,
                                                    train_data=train_data,
-                                                   internal_oof=internal_oof)
+                                                   internal_oof=internal_oof,
+                                                   can_infer=can_infer)
         y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
         if transformed:
             return self._learner.label_cleaner.to_transformed_dtype(y_pred_oof)
@@ -2270,7 +2291,7 @@ class TabularPredictor:
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
     def get_oof_pred_proba(self, model: str = None, transformed=False, as_multiclass=True, train_data=None,
-                           internal_oof=False) -> Union[pd.DataFrame, pd.Series]:
+                           internal_oof=False, can_infer=None) -> Union[pd.DataFrame, pd.Series]:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -2305,10 +2326,15 @@ class TabularPredictor:
         train_data : pd.DataFrame, default = None
             Specify the original `train_data` to ensure that any training rows that were originally dropped internally are properly handled.
             If None, then output will not contain all rows if training rows were dropped internally during fit.
+            If `train_data` is specified and `model` is unable to predict and rows were dropped internally, an exception will be raised.
         internal_oof : bool, default = False
             [Advanced Option] Return the internal OOF preds rather than the externally facing OOF preds.
             Internal OOF preds may have more/fewer rows than was provided in train_data, and are incompatible with external data.
             If you don't know what this does, keep it as False.
+        can_infer : bool, default = None
+            Only used if `model` is not specified.
+            This is used to determine if the best model must be one that is able to predict on new data (True).
+            If None, the best model does not need to be able to infer on new data.
 
         Returns
         -------
@@ -2316,17 +2342,20 @@ class TabularPredictor:
         """
         self._assert_is_fit('get_oof_pred_proba')
         if model is None:
-            model = self.get_model_best()
+            model = self._get_model_best(can_infer=can_infer)
         if not self._trainer.bagged_mode:
             raise AssertionError('Predictor must be in bagged mode to get out-of-fold predictions.')
-        if model in self._trainer._model_full_dict_val_score:
-            # FIXME: This is a hack, add refit tag in a nicer way than via the _model_full_dict_val_score
+        if self._trainer.get_model_attribute(model=model, attribute='refit_full', default=False):
+            model_to_get_oof = self._trainer.get_model_attribute(model=model, attribute='refit_full_parent')
             # TODO: bagged-with-holdout refit to bagged-no-holdout should still be able to return out-of-fold predictions
-            raise AssertionError('_FULL models do not have out-of-fold predictions.')
-        if self._trainer.get_model_attribute_full(model=model, attribute='val_in_fit', func=max):
+        else:
+            model_to_get_oof = model
+        if model != model_to_get_oof:
+            logger.log(20, f'Using OOF from "{model_to_get_oof}" as a proxy for "{model}".')
+        if self._trainer.get_model_attribute_full(model=model_to_get_oof, attribute='val_in_fit', func=max):
             raise AssertionError(
-                f'Model {model} does not have out-of-fold predictions because it used a validation set during training.')
-        y_pred_proba_oof_transformed = self.transform_features(base_models=[model], return_original_features=False)
+                f'Model {model_to_get_oof} does not have out-of-fold predictions because it used a validation set during training.')
+        y_pred_proba_oof_transformed = self.transform_features(base_models=[model_to_get_oof], return_original_features=False)
         if not internal_oof:
             is_duplicate_index = y_pred_proba_oof_transformed.index.duplicated(keep='first')
             if is_duplicate_index.any():
