@@ -149,7 +149,7 @@ def get_metric(
     metric_name
         Name of metric.
     num_classes
-        Number of classes, used in the quadratic_kappa metric for binary classification.
+        Number of classes.
     pos_label
         The label (0 or 1) of binary classification's positive class, which is used in some metrics, e.g., AUROC.
 
@@ -185,7 +185,7 @@ def get_metric(
     elif metric_name == SPEARMANR:
         return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
-        return CustomF1Score(pos_label=pos_label), None
+        return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
