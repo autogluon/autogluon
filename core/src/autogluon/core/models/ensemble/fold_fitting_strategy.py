@@ -117,7 +117,7 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
                  X: DataFrame, y: Series, X_pseudo: DataFrame, y_pseudo: Series,
                  sample_weight, time_limit: float, time_start: float,
                  models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray,
-                 save_folds: bool, time_limit_fold_ratio=0.8):
+                 save_folds: bool, time_limit_fold_ratio=0.8, **kwargs):
         self.model_base = model_base
         self.model_base_kwargs = model_base_kwargs
         self.X = X
