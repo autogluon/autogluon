@@ -70,10 +70,7 @@ from .constants import (
     VALID_METRICS,
     VALID_CONFIG_KEYS,
 )
-from .presets import (
-    list_model_presets,
-    get_preset,
-)
+from .presets import get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -240,7 +237,7 @@ def get_config(
     Configurations as a DictConfig object
     """
     if config is None:
-        config = get_preset(list_model_presets()[0])
+        config = get_basic_automm_config()
     if not isinstance(config, DictConfig):
         all_configs = []
         for k, default_value in [

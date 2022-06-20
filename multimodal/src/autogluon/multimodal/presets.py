@@ -78,7 +78,7 @@ def list_automm_presets(verbose: bool = False):
     return preset_details
 
 
-def get_basic_config():
+def get_basic_automm_config():
     """
     Get the basic config of AutoMM.
 
@@ -110,7 +110,7 @@ def get_automm_preset(name: str):
     -------
     AutoMM predictor's presets of MODEL, DATA, OPTIMIZATION, and ENVIRONMENT.
     """
-    basic_config = get_basic_config()
+    basic_config = get_basic_automm_config()
     name = name.lower()
     if name in automm_presets.list_keys():
         overrides = automm_presets.create(name)
