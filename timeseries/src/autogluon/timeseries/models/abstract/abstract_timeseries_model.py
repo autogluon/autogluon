@@ -260,10 +260,8 @@ class AbstractTimeSeriesModel(AbstractModel):
     ):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
-        logger.log(
-            15,
-            "Starting generic AbstractTimeSeriesModel hyperparameter tuning for %s model..."
-            % self.name,
+        logger.debug(
+            f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}"
         )
         search_space = self._get_search_space()
 
@@ -288,12 +286,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             )
             return skip_hpo(self, train_data, val_data, time_limit=time_limit)
         else:
-            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
+            logger.debug(f"Hyperparameter search space for {self.name}: ")
             for hyperparameter in search_space:
                 if isinstance(search_space[hyperparameter], ag.Space):
-                    logger.log(
-                        15, f"{hyperparameter}:   {search_space[hyperparameter]}"
-                    )
+                    logger.debug(f"{hyperparameter}: {search_space[hyperparameter]}")
 
         dataset_train_filename = "dataset_train.pkl"
         train_path = self.path + dataset_train_filename
