@@ -10,7 +10,7 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.timeseries import TimeSeriesEvaluator, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
-from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
+from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 
@@ -180,23 +180,69 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [5, 10])
+@pytest.mark.parametrize("train_data", [
+    DUMMY_TS_DATAFRAME,
+    get_data_frame_with_item_index([0, 1, 2, 3]),
+])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_correct(
-    model_class, prediction_length, temp_model_path
+    model_class, prediction_length, temp_model_path, train_data
 ):
     model = model_class(
         path=temp_model_path,
         freq="H",
         prediction_length=prediction_length,
-        hyperparameters={"epochs": 2},
+        hyperparameters={"epochs": 1},
     )
 
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model.fit(train_data=train_data)
 
-    predictions = model.predict(DUMMY_TS_DATAFRAME)
+    predictions = model.predict(train_data)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
     predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    assert all(predicted_item_index == train_data.index.levels[0])  # noqa
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
-    assert all(predictions.loc[i].index[0].hour for i in predicted_item_index)
+    assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [5, 10])
+@pytest.mark.parametrize("train_data, test_data", [
+    (
+        get_data_frame_with_item_index([0, 1, 2, 3]),
+        get_data_frame_with_item_index([0, 1, 2, 3])
+    ),
+    (
+        get_data_frame_with_item_index([0, 1, 2, 3]),
+        get_data_frame_with_item_index([2, 3, 4, 5])
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B", "C"]),
+        get_data_frame_with_item_index(["A", "B", "C"]),
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B", "C", "D"]),
+        get_data_frame_with_item_index(["A", "E", "F"]),
+    ),
+])
+def test_when_predict_called_with_test_data_then_predictor_inference_correct(
+    model_class, prediction_length, temp_model_path, train_data, test_data
+):
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=prediction_length,
+        hyperparameters={"epochs": 1},
+    )
+
+    model.fit(train_data=train_data)
+
+    predictions = model.predict(test_data)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions.index.levels[0]
+    assert all(predicted_item_index == test_data.index.levels[0])  # noqa
+    assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
+    assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
