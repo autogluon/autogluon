@@ -7,6 +7,7 @@ dependencies:
 - nccl=2.12
 - python=3.9
 - pip
+- sphinx==3.2.0
 - pip:
   - -r requirements_doc.txt
   - git+https://github.com/zhanghang1989/d2l-book
