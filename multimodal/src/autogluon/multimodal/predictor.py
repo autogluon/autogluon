@@ -84,7 +84,6 @@ from .utils import (
     try_to_infer_pos_label,
     get_mixup,
     CustomUnpickler,
-    parse_dotlist_conf,
 )
 from .optimization.utils import (
     get_metric,
