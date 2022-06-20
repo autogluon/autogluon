@@ -1,4 +1,4 @@
-Examples showing how to use AutoMMPredictor distillation.
+Examples showing how to use `AutoMMPredictor` for model distillation.
 
 ## 1. Distillation on GLUE tasks
 
@@ -11,7 +11,7 @@ To run the example:
 ```python automm_distillation.py --glue_task stsb --<other_flag> <value>```
    - `glue_task` determines to run the experiments on which GLUE task, refers to [Dataset Section](###1.2-Datasets).
    - `teacher_model` is the name of teacher model
-   - `student_model` is the name of the student model. It is recommended to have the same backbone as teacher model (e.g. both Electra or both BERT).
+   - `student_model` is the name of the student model. It is recommended to have the same backbone as teacher model (e.g. both ELECTRA or both BERT).
    - `seed` determines the random seed. Default is 123.
    - `max_epochs` determines the max epoch for training student model.
    - `time_limit` determines the max time to train each model. The unit is second.
@@ -55,7 +55,7 @@ The student model's loss is defined by
 ```
 glue_task = qnli
 Teacher Model = google/bert_uncased_L-12_H-768_A-12
-Pretrained Model = google/bert_uncased_L-6_H-768_A-12
+Student Model = google/bert_uncased_L-6_H-768_A-12
 seed = 123
 max_epoch = 8
 time_limit = 3600

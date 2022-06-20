@@ -4,11 +4,6 @@ from datasets import load_dataset
 
 from time import time
 
-import os
-
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"]="4,5,6,7"
-
 GLUE_METRICS = {
     "mnli": {"val": "accuracy", "eval": ["accuracy"]},
     "qqp": {"val": "accuracy", "eval": ["accuracy", "f1"]},
@@ -135,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument("--student_model", default="google/bert_uncased_L-4_H-768_A-12", type=str)
     parser.add_argument("--seed", default=123, type=int)
     parser.add_argument("--max_epochs", default=1000, type=int)
-    parser.add_argument("--time_limit", default=7200, type=int)
+    parser.add_argument("--time_limit", default=None, type=int)
     parser.add_argument("--num_gpu", default=-1, type=int)
     parser.add_argument("--temperature", default=5.0, type=float)
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
