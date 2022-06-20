@@ -37,7 +37,7 @@ def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TabularPredictor.load(model_dir)
     globals()["column_names"] = model.feature_metadata_in.get_features()
-    predictor.persist_models()
+    model.persist_models()
     return model
 
 
