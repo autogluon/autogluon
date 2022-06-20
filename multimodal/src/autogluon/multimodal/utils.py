@@ -458,6 +458,7 @@ def select_model(
         raise ValueError("No model is available for this dataset.")
     # only allow no more than 1 fusion model
     assert len(fusion_model_name) <= 1
+
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
