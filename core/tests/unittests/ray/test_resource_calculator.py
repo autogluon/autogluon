@@ -5,6 +5,7 @@ from autogluon.core.ray.resources_calculator import (
     ResourceCalculatorFactory,
     CpuResourceCalculator,
     GpuResourceCalculator,
+    NonParallelGpuResourceCalculator,
     RayLightningCpuResourceCalculator,
     RayLightningGpuResourceCalculator
 )
@@ -115,9 +116,36 @@ def test_gpu_calculator_cpu_bottleneck():
     assert expected_resources_per_trial == resources_info['resources_per_job']
     assert expected_num_parallel_jobs ==  resources_info['num_parallel_jobs']
     assert expected_batches == resources_info['batches']
+    
+    
+def test_non_parallel_gpu_calculator():
+    num_cpus = 32
+    num_gpus = 4
+    num_jobs = 2
+    
+    calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type='non_parallel_gpu')
+    assert type(calculator) == NonParallelGpuResourceCalculator
 
+    resources_info = calculator.get_resources_per_job(
+        total_num_cpus=num_cpus,
+        total_num_gpus=num_gpus,
+        num_jobs=num_jobs,
+        minimum_cpu_per_job=1,
+        minimum_gpu_per_job=1,
+    )
 
-@pytest.mark.parametrize('calculator_type', ['cpu', 'gpu', 'ray_lightning_cpu', 'ray_lightning_gpu'])
+    expected_num_parallel_jobs = 2
+    expected_resources_per_trial = dict(
+        cpu = 16,
+        gpu = 1,
+    )
+    expected_batches = 1
+
+    assert expected_resources_per_trial == resources_info['resources_per_job']
+    assert expected_num_parallel_jobs ==  resources_info['num_parallel_jobs']
+    assert expected_batches == resources_info['batches']
+
+@pytest.mark.parametrize('calculator_type', ['cpu', 'gpu', 'non_parallel_gpu','ray_lightning_cpu', 'ray_lightning_gpu'])
 def test_resource_not_enough(calculator_type):
     num_cpus = 0
     num_gpus = 0
