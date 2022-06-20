@@ -62,6 +62,8 @@ time_limit = 3600
 metric = "accuracy"
 ```
 
+`python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 --student_model google/bert_uncased_L-6_H-768_A-12 --seed 123 --max_epoch 8 --hard_label_weight 0.5 --soft_label_weight 5`
+
 temperature | hard_label_weight | soft_label_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio | Speed Up 
 ------------|-------------------|-------------------|-------------------|----------------------|-------------------|--------------------|----
 5           | 0.2               | 50                | 0.91067           | 0.89420              | 0.90244           | 0.50               | 1.08x
