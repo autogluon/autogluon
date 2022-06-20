@@ -115,6 +115,7 @@ For detailed codes, please refer to [`Kaggle_Pawpularity_submit.py`](./kaggle_Pa
 | 5 | swin_large_patch4_window7_224 | True | randaug | 5e-5 | 1 | 0 | 10 | 0.1 | 16 | 32 | 32 | 17.4848481619876 | 18.15082 | 17.29325 | [result30](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result30_standalone.zip)
 | 6 | vit_large_patch16_384 | False | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.5162709909151 | 18.15326 | 17.37978 | [result23](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result23_standalone.zip)
 
+
 The results of the model are shown in the table above.
 
 It is obvious that the model using fusion usually has better results.

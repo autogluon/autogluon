@@ -1,10 +1,9 @@
 name: autogluon_py3
 channels:
 - conda-forge
-- defaults
 dependencies:
-- cudatoolkit=10.2
-- cudnn=8.2
+- cudatoolkit=11.3
+- cudnn=8.4
 - nccl=2.12
 - python=3.9
 - pip
