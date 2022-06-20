@@ -54,7 +54,7 @@ def multilingual():
         "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
         "optimization.top_k": 1,
         "optimization.lr_decay": 0.9,
-        "env.precision": 'bf16',
+        "env.precision": "bf16",
         "env.per_gpu_batch_size": 4,
     }
 
@@ -116,8 +116,7 @@ def get_automm_preset(name: str):
         overrides = automm_presets.create(name)
     else:
         raise ValueError(
-            f"Provided preset '{name}' is not supported. "
-            f"Consider one of these: {automm_presets.list_keys()}"
+            f"Provided preset '{name}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
         )
 
     return basic_config, overrides
