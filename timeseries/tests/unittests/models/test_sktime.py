@@ -83,10 +83,7 @@ def test_when_sktime_models_fitted_then_allowed_hyperparameters_are_passed_to_sk
         except TypeError:
             pass
         finally:
-            call_kwargs = const_mock.call_args.kwargs
-            assert all(
-                k in call_kwargs and call_kwargs[k] == v for k, v in good_params.items()
-            )
+            const_mock.assert_called_with(**good_params)
 
 
 def test_when_sktime_converts_dataframe_then_data_not_duplicated_and_index_correct():
