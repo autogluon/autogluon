@@ -101,17 +101,19 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
-    if problem_type != BINARY and eval_metric_name.lower() in [
-        ROC_AUC,
-        AVERAGE_PRECISION,
-        F1,
-    ]:
-        raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
 
     if eval_metric_name is not None:
+        if problem_type != BINARY and eval_metric_name.lower() in [
+            ROC_AUC,
+            AVERAGE_PRECISION,
+            F1,
+        ]:
+            raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
+
         if eval_metric_name in VALID_METRICS:
             validation_metric_name = eval_metric_name
             return validation_metric_name, eval_metric_name
+
         warnings.warn(
             f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
             f"Thus, we will fall-back to use accuracy for multi-class classification problems "
