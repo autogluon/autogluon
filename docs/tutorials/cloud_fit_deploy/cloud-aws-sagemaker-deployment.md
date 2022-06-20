@@ -37,6 +37,7 @@ def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TabularPredictor.load(model_dir)
     globals()["column_names"] = model.feature_metadata_in.get_features()
+    model.persist_models()
     return model
 
 
@@ -51,10 +52,8 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             raise Exception(
                 f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}"
             )
-
         else:
             data.columns = column_names
-
     else:
         raise Exception(f"{input_content_type} content type not supported")
 
@@ -108,7 +107,8 @@ model = AutoGluonInferenceModel(
     model_data=model_data,
     role=role,
     region=region,
-    framework_version="0.3.1",
+    framework_version="0.4",
+    py_version="py38",
     instance_type=instance_type,
     source_dir="scripts",
     entry_point="tabular_serve.py",
@@ -154,7 +154,8 @@ model = AutoGluonInferenceModel(
     model_data=model_data,
     role=role,
     region=region,
-    framework_version="0.3.1",
+    framework_version="0.4",
+    py_version="py38",
     instance_type=instance_type,
     entry_point="tabular_serve-batch.py",
     source_dir="scripts",
@@ -200,7 +201,6 @@ def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TabularPredictor.load(model_dir)
     globals()["column_names"] = model.feature_metadata_in.get_features()
-
     return model
 
 
@@ -213,10 +213,8 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             raise Exception(
                 f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}"
             )
-
         else:
             data.columns = column_names
-
     else:
         raise Exception(f"{input_content_type} content type not supported")
 
