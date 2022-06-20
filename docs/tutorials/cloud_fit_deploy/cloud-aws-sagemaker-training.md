@@ -174,7 +174,8 @@ ag = AutoGluonTraining(
     region=region,
     instance_count=1,
     instance_type="ml.m5.2xlarge",
-    framework_version="0.3.1",
+    framework_version="0.4",
+    py_version="py38",
     base_job_name="autogluon-tabular-train",
 )
 ```
