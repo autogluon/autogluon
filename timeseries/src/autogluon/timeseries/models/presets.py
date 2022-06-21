@@ -34,15 +34,15 @@ MODEL_TYPES = dict(
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=50,
-    MQRNN=50,
-    SimpleFeedForward=30,
-    Transformer=50,
+    MQCNN=40,
+    MQRNN=40,
+    SimpleFeedForward=50,
+    Transformer=40,
     DeepAR=50,
-    Prophet=50,
+    Prophet=10,
     AutoTabular=10,
-    AutoARIMA=50,
-    AutoETS=50
+    AutoARIMA=60,
+    AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
