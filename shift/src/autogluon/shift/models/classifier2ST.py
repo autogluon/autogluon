@@ -11,7 +11,12 @@ class Classifier2ST:
     Parameters
     ----------
     classifier : an autogluon predictor, i.e. ...
-        description
+        the predictor (classifier) to classify the source from target dataset
+
+    Attributes
+    ----------
+    test_stat: float
+        the test statistic, which is the error metric on the test dataset
     """
     def __init__(self,
                  classifier):
@@ -20,7 +25,7 @@ class Classifier2ST:
     @staticmethod
     def _make_source_target_label(data, sample_label='label'):
         """turn a source, target pain into a single dataframe with label column"""
-        source, target = data
+        source, target = data[0].copy(), data[1].copy()
         source.loc[:,sample_label] = 0
         target.loc[:,sample_label] = 1
         data = pd.concat((source, target))
@@ -31,7 +36,7 @@ class Classifier2ST:
             sample_label = None,
             accuracy_metric = accuracy_score,
             split=0.5):
-        """Fit the classifier for predicting if source or target and compute the test statistic.
+        """Fit the classifier for predicting if source or target and compute the 2-sample test statistic.
 
         Parameters
         ----------
@@ -79,6 +84,11 @@ class Classifier2ST:
         ----------
         method : str
             one of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+
+        Returns
+        -------
+        pval: float
+            The p-value for the 2-sample test
         """
         valid_methods = [
             'half permutation'
@@ -88,3 +98,37 @@ class Classifier2ST:
             pval = self._pvalue_half_permutation(
                 num_permutations=num_permutations)
         return pval
+
+    def sample_anomaly_scores(self,
+                              sample_size = 100,
+                              how = 'rand'):
+        """Return anomaly ranks for a subset of test datapoint from target set.  Rank of 1 means most like the target
+        set and unlike source set, rank of 0 means opposite.
+
+        Parameters
+        ----------
+        sample_size: int
+            size of the subsample to compute anomaly scores
+        how: str
+            'rand' = random selection of rows in test set
+            'top' = most anomalous values in test set
+
+        Returns
+        -------
+        phat: pd.DataFrame
+            prediction probability for subset with labels as columns and "rank" as column for the rank
+        """
+        how_valid = ['top', 'rand']
+        assert how in how_valid, 'how is not in valid set: ' + ' '.join(how_valid)
+        test = self._test.loc[self._test['label']==1]
+        if how == 'rand':
+            test = test.sample(sample_size)
+            phat = self._classifier.predict_proba(test)
+            phat = phat.sort_values(1, ascending=False)
+            phat['rank'] = np.linspace(1, 0, sample_size)
+        if how == 'top':
+            phat = self._classifier.predict_proba(test)
+            phat = phat.sort_values(1, ascending=False)
+            phat = phat.iloc[-sample_size:]
+            phat['rank'] = np.linspace(1, 0, sample_size)
+        return phat

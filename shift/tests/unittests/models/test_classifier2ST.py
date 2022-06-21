@@ -32,6 +32,22 @@ def test_classifier2ST_fit():
     assert math.isclose(tst.test_stat, val, abs_tol = 1e-1), \
         f'test stat ({tst.test_stat}) is too far from similar ({val})'
 
+def test_sample_anomaly_score():
+    tst = fit_tst()
+    as_rand = tst.sample_anomaly_scores()
+    assert as_rand.shape[0] == 100
+    idx = as_rand.index[[0, -1]]
+    test_s = tst._test.loc[idx]
+    prob_s = tst._classifier.predict_proba(test_s)
+    assert prob_s.iloc[0,1] > prob_s.iloc[1,1]
+    as_top = tst.sample_anomaly_scores(how='top')
+    assert as_top.shape[0] == 100
+    idx = as_top.index[[0, -1]]
+    test_s = tst._test.loc[idx]
+    prob_s = tst._classifier.predict_proba(test_s)
+    assert prob_s.iloc[0, 1] > prob_s.iloc[1, 1]
+
+
 def test_null_test():
     data = get_dogs_data()
     data['label'] = np.random.permutation(data['label'])
