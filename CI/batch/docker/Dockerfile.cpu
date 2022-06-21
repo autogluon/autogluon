@@ -8,19 +8,20 @@ RUN apt-get update \
  && apt-get autoremove -y \
  && apt-get clean
 
-RUN pip install --no-cache-dir -U \
-    awscli==${AWSCLI_VER}
-# remove installed autogluon from container
-RUN pip3 freeze | grep autogluon | xargs pip3 uninstall -y
+RUN adduser --disabled-password --disabled-login ci
+WORKDIR /home/ci
 
 #  add autogluon_job script
 ADD autogluon_job.sh .
-RUN chmod +x autogluon_job.sh
+RUN chmod +x autogluon_job.sh; chown ci autogluon_job.sh
 
-# add workflow scripts
-ADD workflow_scripts/ ./workflow_scripts
+USER ci
 
-# setup git repo
-RUN git clone https://github.com/awslabs/autogluon.git
+ENV VIRTUAL_ENV=/home/ci/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+RUN pip install --upgrade pip
+RUN pip3 install --no-cache-dir awscli -U awscli==${AWSCLI_VER}
 
 CMD ["/bin/bash"]

@@ -12,7 +12,8 @@ function write_to_s3 {
             aws s3 cp $DOC_PATH $S3_PATH --quiet
         else
             echo Neither file nor directory being passed
+        fi
     else
         echo Bucket does not belong to us anymore. Will not write to it
-    fi;
+    fi
 }

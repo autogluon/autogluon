@@ -10,19 +10,19 @@ from botocore.compat import total_seconds
 
 job_type_info = {
     'CI-CPU': {
-        'job_definition': 'autogluon-ci-cpu:2',
+        'job_definition': 'autogluon-ci-cpu:3',
         'job_queue': 'CI-CPU'
     },
     'CI-GPU': {
-        'job_definition': 'autogluon-ci-gpu:2',
+        'job_definition': 'autogluon-ci-gpu:3',
         'job_queue': 'CI-GPU'
     },
     'CI-CPU-PUSH': {
-        'job_definition': 'autogluon-ci-cpu-push:2',
+        'job_definition': 'autogluon-ci-cpu-push:4',
         'job_queue': 'CI-CPU'
     },
     'CI-GPU-PUSH': {
-        'job_definition': 'autogluon-ci-gpu-push:3',
+        'job_definition': 'autogluon-ci-gpu-push:4',
         'job_queue': 'CI-GPU'
     },
 }
@@ -54,6 +54,9 @@ parser.add_argument('--command', help='command to run', type=str,
 parser.add_argument('--remote',
                     help='git repo address. https://github.com/awslabs/autogluon',
                     type=str, default="https://github.com/awslabs/autogluon")
+parser.add_argument('--safe-to-use-script',
+                    help='whether the script changes from the actor is safe. We assume it is safe if the actor has write permission to our repo',
+                    action='store_true')
 parser.add_argument('--wait', help='block wait until the job completes. '
                     'Non-zero exit code if job fails.', action='store_true')
 parser.add_argument('--timeout', help='job timeout in seconds', default=None, type=int)
@@ -103,13 +106,18 @@ def main():
     jobDefinition = job_type_info[jobType]['job_definition']
     wait = args.wait
 
+    safe_to_use_script = 'False'
+    if args.safe_to_use_script:
+        safe_to_use_script = 'True'
+
     parameters = {
         'SOURCE_REF': args.source_ref,
         'WORK_DIR': args.work_dir,
         'SAVED_OUTPUT': args.saved_output,
         'SAVE_PATH': args.save_path,
         'COMMAND': args.command,
-        'REMOTE': args.remote
+        'REMOTE': args.remote,
+        'SAFE_TO_USE_SCRIPT': safe_to_use_script,
     }
     kwargs = dict(
         jobName=jobName,

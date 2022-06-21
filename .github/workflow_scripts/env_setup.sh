@@ -13,9 +13,9 @@ function setup_mxnet_gpu {
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 }
 
-# function setup_torch {
-#     python3 -m pip install torch==1.9.1 torchvision==0.10.1
-# }
+function setup_torch_gpu {
+    python3 -m pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+}
 
 function install_common {
     python3 -m pip install --upgrade -e common/[tests]

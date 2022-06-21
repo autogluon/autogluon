@@ -12,12 +12,12 @@ source $(dirname "$0")/write_to_s3.sh
 
 setup_build_contrib_env
 setup_mxnet_gpu
-# setup_torch
+setup_torch_gpu
 export CUDA_VISIBLE_DEVICES=0
 bash docs/build_pip_install.sh
-# only build for docs/image_prediction
+# only build for docs/tabular
 shopt -s extglob
-rm -rf ./docs/tutorials/!(image_prediction)
+rm -rf ./docs/tutorials/!(tabular_prediction)
 cd docs && rm -rf _build && d2lbook build rst
 
 COMMAND_EXIT_CODE=$?
@@ -28,7 +28,7 @@ fi
 cd ..
 
 if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
-DOC_PATH=docs/_build/rst/tutorials/image_prediction/
-S3_PATH=$S3_PATH/image_prediction/
+DOC_PATH=docs/_build/rst/tutorials/tabular_prediction/
+S3_PATH=$S3_PATH/tabular_prediction/
 
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH
