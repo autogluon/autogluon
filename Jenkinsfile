@@ -61,7 +61,7 @@ install_vision = """
 """
 
 install_timeseries = """
-    python3 -m pip install --upgrade -e timeseries/[tests]
+    python3 -m pip install --upgrade -e timeseries/[all,tests]
 """
 
 install_autogluon = """

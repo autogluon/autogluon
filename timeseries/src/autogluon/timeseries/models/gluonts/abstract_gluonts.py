@@ -13,7 +13,6 @@ from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
-import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
@@ -209,12 +208,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 "may not correspond to those specified via `eval_metric`."
             )
 
-        # gracefully handle hyperparameter specifications if they are provided to fit instead
-        if any(isinstance(v, ag.Space) for v in self.params.values()):
-            raise ValueError(
-                "Hyperparameter spaces provided to `fit`. Please provide concrete values "
-                "as hyperparameters when initializing or use `hyperparameter_tune` instead."
-            )
+        self._check_fit_params()
 
         # update auxiliary parameters
         self._deferred_init_params_aux(
@@ -323,6 +317,3 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             result_dfs.append(df)
 
         return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
-
-    def __repr__(self) -> str:
-        return self.name
