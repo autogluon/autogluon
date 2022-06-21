@@ -1,10 +1,11 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.4.0-cpu-py38-ubuntu20.04
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.4.2-cpu-py38-ubuntu20.04
 ARG AWSCLI_VER=1.22.45
 
 RUN apt-get update \
  && apt-get -y upgrade \
  && apt-get install -y --no-install-recommends \
     pandoc \
+    python3.8-venv \
  && apt-get autoremove -y \
  && apt-get clean
 

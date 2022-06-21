@@ -33,7 +33,7 @@ git checkout working
 
 # If not safe to use script, we overwrite with the script from master branch
 TRUE=true
-if [[ "${SAFE_TO_USE_SCRIPT,,}"!="${TRUE,,}" ]]; then
+if [[ ${SAFE_TO_USE_SCRIPT,,} != ${TRUE,,} ]]; then
     if [ -d ../workflow_scripts ]; then
         rm -rf .github/workflow_scripts
         mv ../workflow_scripts .github/

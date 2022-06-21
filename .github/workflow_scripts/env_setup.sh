@@ -1,5 +1,6 @@
 function setup_build_env {
     python3 -m pip install flake8
+    python3 -m pip instsall black>=22.3
 }
 
 function setup_build_contrib_env {
@@ -10,6 +11,7 @@ function setup_build_contrib_env {
 }
 
 function setup_mxnet_gpu {
+    python3 -m pip install mxnet-cu112==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 }
 
@@ -48,8 +50,13 @@ function install_tabular_all {
     python3 -m pip install --upgrade -e tabular/[all,tests]
 }
 
+function install_multimodal {
+    # launch different process for each test to make sure memory is released
+    python3 -m pip install --upgrade pytest-xdist
+    python3 -m pip install --upgrade -e multimodal/[tests]
+}
+
 function install_text {
-    # python3 -m pip install --upgrade pytest-xdist  # launch different process for each test to avoid resource not being released by either mxnet or torch
     python3 -m pip install --upgrade -e text/
 }
 
@@ -58,8 +65,8 @@ function install_vision {
     python3 -m pip install --upgrade -e vision/
 }
 
-function install_forecasting {
-    python3 -m pip install --upgrade -e forecasting/
+function install_timeseries {
+    python3 -m pip install --upgrade -e timeseries/
 }
 
 function install_autogluon {
@@ -72,7 +79,8 @@ function install_all {
     install_features
     install_tabular_all
     install_text
+    install_multimodal
     install_vision
-    install_forecasting
+    install_timeseries
     install_autogluon
 }

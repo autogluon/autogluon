@@ -9,7 +9,6 @@ export CUDA_VISIBLE_DEVICES=0
 install_core_all_tests
 install_features
 install_multimodal
-install_text
 
-cd text/
-python3 -m pytest --junitxml=results.xml --runslow tests
+cd multimodal/
+python3 -m pytest --junitxml=results.xml --forked --runslow tests

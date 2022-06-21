@@ -18,7 +18,19 @@ defaults:
     shell: bash
 
 jobs:
+  # lint_check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Lint Check on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-LintCheck
+  #         command: chmod +x ./.github/workflow_scripts/lint_check.sh && ./.github/workflow_scripts/lint_check.sh
   test_common:
+    # needs: lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -73,6 +85,17 @@ jobs:
   #         job-type: CI-GPU
   #         job-name: AutoGluon-Text
   #         command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
+  test_multimodal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Test Multimodal on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-Multimodal
+          command: chmod +x ./.github/workflow_scripts/test_multimodal.sh && ./.github/workflow_scripts/test_multimodal.sh
   test_vision:
     runs-on: ubuntu-latest
     steps:
