@@ -14,9 +14,9 @@ setup_build_contrib_env
 setup_mxnet_gpu
 export CUDA_VISIBLE_DEVICES=0
 bash docs/build_pip_install.sh
-# only build for docs/forecasting
+# only build for docs/timeseries
 shopt -s extglob
-rm -rf ./docs/tutorials/!(forecasting)
+rm -rf ./docs/tutorials/!(timeseries)
 cd docs && rm -rf _build && d2lbook build rst
 
 COMMAND_EXIT_CODE=$?
@@ -27,7 +27,7 @@ fi
 cd ..
 
 if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
-DOC_PATH=docs/_build/rst/tutorials/forecasting/
-S3_PATH=$S3_PATH/forecasting/
+DOC_PATH=docs/_build/rst/tutorials/timeseries/
+S3_PATH=$S3_PATH/timeseries/
 
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH

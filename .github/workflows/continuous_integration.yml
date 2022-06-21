@@ -85,17 +85,17 @@ jobs:
   #         job-type: CI-GPU
   #         job-name: AutoGluon-Text
   #         command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
-  test_multimodal:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Multimodal on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Multimodal
-          command: chmod +x ./.github/workflow_scripts/test_multimodal.sh && ./.github/workflow_scripts/test_multimodal.sh
+  # test_multimodal:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Multimodal on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Multimodal
+  #         command: chmod +x ./.github/workflow_scripts/test_multimodal.sh && ./.github/workflow_scripts/test_multimodal.sh
   test_vision:
     runs-on: ubuntu-latest
     steps:
@@ -107,17 +107,17 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-Vision
           command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
-  # test_forecasting:
+  # test_timeseries:
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Checkout repository
   #       uses: actions/checkout@v2
-  #     - name: Test Forecasting on AWS Batch
+  #     - name: Test Timeseries on AWS Batch
   #       uses: ./.github/actions/submit-job
   #       with:
   #         job-type: CI-GPU
   #         job-name: AutoGluon-Forecasting
-  #         command: chmod +x ./.github/workflow_scripts/test_forecasting.sh && ./.github/workflow_scripts/test_forecasting.sh
+  #         command: chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh
   # test_install:
   #   runs-on: ubuntu-latest
   #   steps:
@@ -199,7 +199,7 @@ jobs:
   #         job-type: CI-CPU
   #         job-name: AutoGluon-BuildCloudFitDeploy
   #         command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # build_forecasting_tutorial:
+  # build_timeseries_tutorial:
   #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
   #   runs-on: ubuntu-latest
   #   steps:
@@ -207,12 +207,12 @@ jobs:
   #       uses: actions/checkout@v2
   #     - name: Setup Env Vars
   #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Forecasting Tutorial on AWS Batch
+  #     - name: Build Timeseries Tutorial on AWS Batch
   #       uses: ./.github/actions/submit-job
   #       with:
   #         job-type: CI-GPU
-  #         job-name: AutoGluon-BuildForecasting
-  #         command: chmod +x ./.github/workflow_scripts/build_forecasting_tutorial.sh && ./.github/workflow_scripts/build_forecasting_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  #         job-name: AutoGluon-BuildTimeseries
+  #         command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
   # build_all_docs:
   #   needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
   #   runs-on: ubuntu-latest
