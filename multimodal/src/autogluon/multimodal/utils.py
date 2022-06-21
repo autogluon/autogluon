@@ -70,7 +70,7 @@ from .constants import (
     VALID_METRICS,
     VALID_CONFIG_KEYS,
 )
-from .presets import automm_preset_to_config, get_basic_automm_config
+from .presets import get_automm_preset, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -247,7 +247,7 @@ def get_config(
             basic_config = get_basic_automm_config()
             preset_overrides = None
         else:
-            basic_config, preset_overrides = automm_preset_to_config(preset=preset)
+            basic_config, preset_overrides = get_automm_preset(preset=preset)
 
         for k, default_value in basic_config.items():
             if k not in config:

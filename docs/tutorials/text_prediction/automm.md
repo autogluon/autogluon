@@ -208,7 +208,7 @@ First, let's see the available presets.
 
 
 ```{.python .input}
-from autogluon.multimodal.presets import list_automm_presets, automm_preset_to_config
+from autogluon.multimodal.presets import list_automm_presets, get_automm_preset
 presets = list_automm_presets()
 presets
 ```
@@ -217,9 +217,9 @@ Each preset consists of one basic configuration dictionary and some preset-relat
 
 
 ```{.python .input}
-basic_config, overrides = automm_preset_to_config("default")
+basic_config, preset_overrides = get_automm_preset("default")
 print(basic_config)
-print(overrides)
+print(preset_overrides)
 ```
 
 `AutoMMPredictor` configurations consist of four parts: `model`, `data`, `optimization`, and `environment`. You can convert the preset to full configurations.

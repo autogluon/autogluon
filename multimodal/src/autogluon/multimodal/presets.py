@@ -89,7 +89,7 @@ def get_basic_automm_config():
     }
 
 
-def automm_preset_to_config(preset: str):
+def get_automm_preset(preset: str):
     """
     Map a AutoMM preset string to its config including a basic config and an overriding dict.
 
