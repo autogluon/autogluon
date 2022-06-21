@@ -966,8 +966,8 @@ class AutoMMPredictor:
             warnings.warn(
                 "Interactive environment is detected. Currently, AutoMMPredictor does not support multi-gpu "
                 "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-                "in PT Lightning. Thus, we switch to single gpu training. You can consider to execute "
-                "autogluon in a script",
+                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
+                "AutoMMPredictor in a script.",
                 UserWarning,
             )
             num_gpus = 1

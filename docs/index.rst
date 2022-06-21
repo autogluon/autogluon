@@ -40,9 +40,9 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
    AutoGluon can be applied just as easily for prediction tasks with image or text data. For adopting state-of-the-art deep learning models for multimodal prediction problems, you may try `AutoMMPredictor`:
 
    >>> from autogluon.multimodal import AutoMMPredictor
-   >>> import datasets
-   >>> train_data = load_dataset("glue", 'sst2')['train'].to_pandas().drop('idx', axis=1)
-   >>> test_data = load_dataset("glue", 'sst2')['validation'].to_pandas().drop('idx', axis=1)
+   >>> from datasets import load_dataset
+   >>> train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1)
+   >>> test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
    >>> predictor = AutoMMPredictor(label='class').fit(train_data)
    >>> predictions = predictor.predict(test_data)
 
