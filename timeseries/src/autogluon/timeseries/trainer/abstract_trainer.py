@@ -20,7 +20,10 @@ from .. import TimeSeriesEvaluator, TimeSeriesDataFrame
 from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.warning_filters import disable_tqdm
-from ..models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
+from ..models.ensemble.greedy_ensemble import (
+    TimeSeriesEnsembleSelection,
+    TimeSeriesEnsembleWrapper,
+)
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -172,17 +175,15 @@ class SimpleAbstractTrainer:
             return model_name
         if model_name in self.models.keys():
             return self.models[model_name]
-        elif self.get_model_attribute(model=model_name, attribute="type") == TimeSeriesEnsembleWrapper:
+
+        if path is None:
+            path = self.get_model_attribute(model=model_name, attribute="path")
+        if model_type is None:
+            model_type = self.get_model_attribute(model=model_name, attribute="type")
+        if model_type == TimeSeriesEnsembleWrapper:
             # FIXME: Hack to avoid having to save/load
-            return self.get_model_attribute(model=model_name, attribute='model')
-        else:
-            if path is None:
-                path = self.get_model_attribute(model=model_name, attribute="path")
-            if model_type is None:
-                model_type = self.get_model_attribute(
-                    model=model_name, attribute="type"
-                )
-            return model_type.load(path=path, reset_paths=self.reset_paths)
+            return self.get_model_attribute(model=model_name, attribute="model")
+        return model_type.load(path=path, reset_paths=self.reset_paths)
 
     def construct_model_templates(
         self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
@@ -278,6 +279,9 @@ class SimpleAbstractTrainer:
 
         return info
 
+    def predict(self, *args, **kwargs):
+        raise NotImplementedError
+
 
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def __init__(
@@ -286,6 +290,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
         save_data: bool = True,
+        enable_ensemble: bool = True,
         verbosity: int = 2,
         **kwargs,
     ):
@@ -298,6 +303,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         )
         self.target = kwargs.get("target", "target")
         self.is_data_saved = False
+        self.enable_ensemble = enable_ensemble
 
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
@@ -342,21 +348,24 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
-    def _add_model(self, model: AbstractTimeSeriesModel, base_models=None):
+    def _add_model(
+        self,
+        model: Union[AbstractTimeSeriesModel, TimeSeriesEnsembleWrapper],
+        base_models=None,
+    ):
+        node_attrs = dict(
+            path=model.path,
+            type=type(model),
+            fit_time=model.fit_time,
+            predict_time=model.predict_time,
+            val_score=model.val_score,
+        )
         if isinstance(model, TimeSeriesEnsembleWrapper):
-            node_attrs = dict(
-                model=model,
-                type=type(model),
-                fit_time=model.fit_time,
-                val_score=model.val_score,
-            )
-        else:
-            # TODO: also register predict time
-            node_attrs = dict(
-                path=model.path,
-                type=type(model),
-                fit_time=model.fit_time,
-                val_score=model.val_score,
+            node_attrs.update(
+                dict(
+                    model=model,
+                    predict_time=None,
+                )
             )
         self.model_graph.add_node(model.name, **node_attrs)
 
@@ -428,7 +437,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 + f"= Validation score ({self.eval_metric})"
             )
             logger.info(
-                f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15) + f"= Total tuning time"
+                f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15)
+                + f"= Total tuning time"
             )
             logger.debug(
                 f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}"
@@ -476,14 +486,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     None if val_score is None else (pred_end_time - fit_end_time)
                 )
 
-            if val_score is not None:
-                logger.info(
-                    f"\t{val_score:<7.4f}".ljust(15)
-                    + f"= Validation score ({self.eval_metric})"
-                )
-            logger.info(f"\t{model.fit_time:<7.2f} s".ljust(15) + "= Training runtime")
-            if model.predict_time is not None:
-                logger.info(f"\t{model.predict_time:<7.2f} s".ljust(15) + "= Validation (prediction) runtime")
+            self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
         except Exception as err:
@@ -498,6 +501,25 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             del model
 
         return model_names_trained
+
+    def _log_scores_and_times(
+        self,
+        val_score: Optional[float] = None,
+        fit_time: Optional[float] = None,
+        predict_time: Optional[float] = None,
+    ):
+        if val_score is not None:
+            logger.info(
+                f"\t{val_score:<7.4f}".ljust(15)
+                + f"= Validation score ({self.eval_metric})"
+            )
+        if fit_time is not None:
+            logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
+        if predict_time is not None:
+            logger.info(
+                f"\t{predict_time:<7.2f} s".ljust(15)
+                + "= Validation (prediction) runtime"
+            )
 
     def _train_multi(
         self,
@@ -592,47 +614,41 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         except ValueError as e:
             logger.error(str(e))
 
-        # TRAIN ENSEMBLE HERE
-        self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
+        if self.enable_ensemble:
+            self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
 
         return model_names_trained
 
-    def _weight_preds(
-        self,
-        model_preds: Dict[str, TimeSeriesDataFrame],
-        model_names: List[str],
-        weights: List[float]
-    ) -> TimeSeriesDataFrame:
-        # TODO: this is a hack. indices may not match, which should be checked or better,
-        # TODO: weighted accordingly
-        assert len(set(v.shape for v in model_preds.values())) == 1
-
-        # TODO: handle NaNs
-        return sum(
-            model_preds[m] * w for m, w in zip(model_names, weights)
-        )
-
     def fit_ensemble(self, val_data, model_names):
         evaluator = TimeSeriesEvaluator(
-            eval_metric=self.eval_metric, prediction_length=self.prediction_length
+            eval_metric=self.eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
         )
+
+        logging.info("Fitting simple weighted ensemble")
 
         model_preds = {}
         for model_name in model_names:
             model: AbstractGluonTSModel = self.load_model(model_name=model_name)
-            # predict on val_data
-            # TODO: make generic, this is gluonts specific
+
             # FIXME: This differs from predictions made to calc val_score for the models. Try to align.
             #  Can either seed for deterministic results or cache the pred during val_score calc and reuse.
-            forecasts, tss = model._predict_for_scoring(val_data)
-            model_preds[model_name] = model._gluonts_forecasts_to_data_frame(
-                forecasts=forecasts, quantile_levels=self.quantile_levels
+            model_preds[model_name] = model.predict_for_scoring(
+                data=val_data, quantile_levels=self.quantile_levels
             )
 
         time_start = time.time()
 
-        higher_is_better = TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == 1
-        ensemble = TimeSeriesEnsembleSelection(ensemble_size=100, problem_type='regression', metric=evaluator, higher_is_better=higher_is_better)
+        higher_is_better = (
+            TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == 1
+        )
+        ensemble = TimeSeriesEnsembleSelection(
+            ensemble_size=100,
+            problem_type="regression",
+            metric=evaluator,
+            higher_is_better=higher_is_better,
+        )
         predictions = [model_preds[p] for p in model_names]
         ensemble.fit(predictions=predictions, labels=val_data)
         ensemble_weights = ensemble.weights_
@@ -642,20 +658,36 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if w != 0:
                 final_models_ensemble.append(model_names[i])
                 final_weights_ensemble.append(w)
-        print(final_models_ensemble)
-        print(final_weights_ensemble)
+
         # FIXME: Ensure we don't have name collisions
-        # FIXME: This is currently **extremely** hacky to simply get it working. Align on design / API of ensembles after v0.5.
-        simple_ensemble = TimeSeriesEnsembleWrapper(weights=final_weights_ensemble, name='WeightedEnsemble')
+        # FIXME: This is currently **extremely** hacky to simply get it working.
+        #  Align on design / API of ensembles after v0.5.
+        simple_ensemble = TimeSeriesEnsembleWrapper(
+            weights=final_weights_ensemble,
+            name="WeightedEnsemble",
+            freq=val_data.freq,
+            prediction_length=self.prediction_length,
+            eval_metric=self.eval_metric,
+            path=self.path,
+            invalid_model_names=self._get_banned_model_names(),
+            target=self.target,
+            quantiles=self.quantile_levels,
+        )
         time_end = time.time()
         simple_ensemble.fit_time = time_end - time_start
-        predictions = [model_preds[p] for p in final_models_ensemble]
 
+        predictions: List[TimeSeriesDataFrame] = [
+            model_preds[p] for p in final_models_ensemble
+        ]
         forecasts = simple_ensemble.predict(predictions)
-        model_score = evaluator(
-            val_data, forecasts
-        ) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
-        print(f"{simple_ensemble.name}: {model_score}")
+        model_score = (
+            evaluator(val_data, forecasts)
+            * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
+        )
+        logging.info(f"\t Finished fitting {simple_ensemble.name}.")
+        self._log_scores_and_times(
+            val_score=model_score, fit_time=simple_ensemble.fit_time
+        )
 
         simple_ensemble.val_score = model_score
 
@@ -743,36 +775,36 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, AbstractModel]] = None,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Optional[str] = None,
     ) -> float:
         model = self._get_model_for_prediction(model)
         eval_metric = self.eval_metric if metric is None else metric
-        # FIXME: this method should be able to score on all data sets regardless of
-        # FIXME: whether the implementation is in GluonTS
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric, prediction_length=self.prediction_length
+        )
+
         if isinstance(model, TimeSeriesEnsembleWrapper):
             # FIXME: This section is hacky
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=eval_metric, prediction_length=self.prediction_length
-            )
             model_preds = {}
             base_models = self.get_minimum_model_set(model, include_self=False)
             for base_model in base_models:
                 base_model_loaded = self._get_model_for_prediction(base_model)
-                forecasts, tss = base_model_loaded._predict_for_scoring(data)
-                model_preds[base_model] = base_model_loaded._gluonts_forecasts_to_data_frame(
-                    forecasts=forecasts, quantile_levels=self.quantile_levels
+                model_preds[base_model] = base_model_loaded.predict_for_scoring(
+                    data, quantile_levels=self.quantile_levels
                 )
+            # FIXME: dict doesn't guarantee order!
             forecasts = model.predict(model_preds)
-            model_score = evaluator(
-                data, forecasts
-            ) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[eval_metric]
+
+            model_score = (
+                evaluator(data, forecasts)
+                * TimeSeriesEvaluator.METRIC_COEFFICIENTS[eval_metric]
+            )
             return model_score
+
         elif not isinstance(model, AbstractGluonTSModel):
             raise ValueError("Model must be a GluonTS model to score")
 
-        # FIXME: when ensembling is implemented, score logic will have to be revised
-        # FIXME: in order to enable prior model predictions in the ensemble
         return model.score(data, metric=eval_metric)
 
     def _predict_model(

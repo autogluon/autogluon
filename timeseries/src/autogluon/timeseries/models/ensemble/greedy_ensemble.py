@@ -1,30 +1,35 @@
 import copy
 import logging
 import time
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 
-from autogluon.core.models.greedy_ensemble.ensemble_selection import AbstractWeightedEnsemble, EnsembleSelection
+from autogluon.core.models.greedy_ensemble.ensemble_selection import (
+    AbstractWeightedEnsemble,
+    EnsembleSelection,
+)
 
 from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
 
 
 class TimeSeriesEnsembleSelection(EnsembleSelection):
     def __init__(
-            self,
-            ensemble_size: int,
-            problem_type: str,
-            metric,
-            higher_is_better=False,
-            sorted_initialization: bool = False,
-            bagging: bool = False,
-            tie_breaker: str = 'random',
-            random_state: np.random.RandomState = None,
-            **kwargs,
+        self,
+        ensemble_size: int,
+        problem_type: str,
+        metric,
+        higher_is_better=False,
+        sorted_initialization: bool = False,
+        bagging: bool = False,
+        tie_breaker: str = "random",
+        random_state: np.random.RandomState = None,
+        **kwargs,
     ):
+        # TODO: call super init?
         self.ensemble_size = ensemble_size
         self.problem_type = problem_type
         self.metric = metric
@@ -32,26 +37,36 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.sorted_initialization = sorted_initialization
         self.bagging = bagging
         self.use_best = True
-        if tie_breaker not in ['random', 'second_metric']:
-            raise ValueError(f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']")
+        if tie_breaker not in ["random", "second_metric"]:
+            raise ValueError(
+                f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']"
+            )
         self.tie_breaker = tie_breaker
         if random_state is not None:
             self.random_state = random_state
         else:
             self.random_state = np.random.RandomState(seed=0)
-        self.quantile_levels = kwargs.get('quantile_levels', None)
+        self.quantile_levels = kwargs.get("quantile_levels", None)
 
-    def fit(self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None):
+    def fit(
+        self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None
+    ):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
-            raise ValueError('Ensemble size cannot be less than one!')
-        self._fit(predictions=predictions, labels=labels, time_limit=time_limit, sample_weight=sample_weight)
+            raise ValueError("Ensemble size cannot be less than one!")
+        self._fit(
+            predictions=predictions,
+            labels=labels,
+            time_limit=time_limit,
+            sample_weight=sample_weight,
+        )
         self._calculate_weights()
-        logger.log(30, 'Ensemble weights: ')
+        logger.log(30, "Ensemble weights: ")
         logger.log(30, self.weights_)
         return self
 
-    # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
+    # TODO: Consider having a removal stage, remove each model and see if
+    #  score is affected, if improves or not effected, remove it.
     def _fit(self, predictions, labels, time_limit=None, sample_weight=None):
         ensemble_size = self.ensemble_size
         self.num_input_models_ = len(predictions)
@@ -80,8 +95,16 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
                 weighted_ensemble_prediction = (s / float(s + 1)) * ensemble_prediction
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
-                fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1. / float(s + 1)) * pred.values
-                scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight, dummy_pred=dummy_pred)
+                fant_ensemble_prediction[:] = (
+                    weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred.values
+                )
+                scores[j] = self._calculate_regret(
+                    y_true=labels,
+                    y_pred_proba=fant_ensemble_prediction,
+                    metric=self.metric,
+                    sample_weight=sample_weight,
+                    dummy_pred=dummy_pred,
+                )
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
 
@@ -101,8 +124,9 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
             # If first iteration
             if i == 0:
-                # If abs value of min score is large enough, round to 6 decimal places to avoid floating point error deciding the best index.
-                # This avoids 2 models with the same pred proba both being used in the ensemble due to floating point error
+                # If abs value of min score is large enough, round to 6 decimal places to avoid
+                # floating point error deciding the best index.  This avoids 2 models with the same pred
+                # proba both being used in the ensemble due to floating point error
                 if np.abs(best_score) > epsilon:
                     round_scores = True
                     best_score = best_score.round(round_decimals)
@@ -120,26 +144,31 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
                 time_elapsed = time.time() - time_start
                 time_left = time_limit - time_elapsed
                 if time_left <= 0:
-                    logger.warning('Warning: Ensemble Selection ran out of time, early stopping at iteration %s. This may mean that the time_limit specified is very small for this problem.' % (i+1))
+                    logger.warning(
+                        f"Warning: Ensemble Selection ran out of time, early stopping at iteration {i+1}. This "
+                        f"may mean that the time_limit specified is very small for this problem."
+                    )
                     break
 
         min_score = np.min(trajectory)
         first_index_of_best = trajectory.index(min_score)
 
         if self.use_best:
-            self.indices_ = order[:first_index_of_best+1]
-            self.trajectory_ = trajectory[:first_index_of_best+1]
+            self.indices_ = order[: first_index_of_best + 1]
+            self.trajectory_ = trajectory[: first_index_of_best + 1]
             self.train_score_ = trajectory[first_index_of_best]
             self.ensemble_size = first_index_of_best + 1
-            logger.log(15, 'Ensemble size: %s' % self.ensemble_size)
+            logger.log(15, "Ensemble size: %s" % self.ensemble_size)
         else:
             self.indices_ = order
             self.trajectory_ = trajectory
             self.train_score_ = trajectory[-1]
 
-        logger.debug("Ensemble indices: "+str(self.indices_))
+        logger.debug("Ensemble indices: " + str(self.indices_))
 
-    def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred, sample_weight=None):
+    def _calculate_regret(  # noqa
+        self, y_true, y_pred_proba, metric, dummy_pred, sample_weight=None
+    ):
         dummy_pred = copy.deepcopy(dummy_pred)
         dummy_pred[list(dummy_pred.columns)] = y_pred_proba
         score = metric(y_true, dummy_pred)
@@ -150,6 +179,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
 class SimpleTimeSeriesWeightedEnsemble(AbstractWeightedEnsemble):
     """Predefined user-weights ensemble"""
+
     def __init__(self, weights, **kwargs):
         self.weights_ = weights
 
@@ -173,24 +203,38 @@ class SimpleTimeSeriesWeightedEnsemble(AbstractWeightedEnsemble):
         assert len(set(v.shape for v in preds)) == 1
 
         # TODO: handle NaNs
-        return sum(
-            p * w for p, w in zip(preds, weights)
-        )
+        return sum(p * w for p, w in zip(preds, weights))
 
 
-class TimeSeriesEnsembleWrapper:
+class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):
     """Predefined user-weights ensemble"""
+
     def __init__(self, weights, name, **kwargs):
+        super().__init__(name=name, **kwargs)
         self.model = SimpleTimeSeriesWeightedEnsemble(weights=weights)
         self.name = name
         self.fit_time = None
         self.val_score = None
 
+    def _fit(
+        self,
+        train_data,
+        val_data=None,
+        time_limit=None,
+        num_cpus=None,
+        num_gpus=None,
+        verbosity=2,
+        **kwargs,
+    ) -> None:
+        raise NotImplementedError
+
     @property
     def weights(self):
         return self.model.weights_
 
-    def predict(self, X):
-        if isinstance(X, dict):  # FIXME: HACK, unclear what the input to predict should be for weighted ensemble
-            X = [X[m] for m in X.keys()]
-        return self.model.predict(X)
+    def predict(self, data: List[TimeSeriesDataFrame], **kwargs):
+        if isinstance(
+            data, dict
+        ):  # FIXME: HACK, unclear what the input to predict should be for weighted ensemble
+            data = [data[m] for m in data.keys()]
+        return self.model.predict(data)
