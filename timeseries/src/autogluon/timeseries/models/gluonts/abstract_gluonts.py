@@ -231,6 +231,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
             f"Average time series length is {len(data) / data.num_items}."
         )
+        input_index_type = type(data.index.levels[0][0])
 
         with warning_filter():
             quantiles = quantile_levels or self.quantile_levels
@@ -247,6 +248,17 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
             )
+
+            # if index type is different than the input data, cast it back
+            if len(df.index.levels[0]) > 0:
+                prediction_index_type = type(df.index.levels[0][0])
+                if prediction_index_type is not input_index_type:
+                    df.set_index(
+                        df.index.set_levels(
+                            [input_index_type(i) for i in df.index.levels[0]], level=0
+                        ),
+                        inplace=True,
+                    )
 
         return df
 
@@ -308,7 +320,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))
 
             df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = int(item_id)
+            df[ITEMID] = item_id
             df[TIMESTAMP] = pd.date_range(
                 start=forecasts[i].start_date,
                 periods=self.prediction_length,

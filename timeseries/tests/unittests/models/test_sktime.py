@@ -18,11 +18,10 @@ from autogluon.timeseries.models.sktime import (
     AutoARIMAModel,
     AutoETSModel,
     TBATSModel,
-    ThetaModel,
+    ThetaModel, AbstractSktimeModel,
 )
 
-from ..common import DUMMY_TS_DATAFRAME
-
+from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 TESTABLE_MODELS = [
     ARIMAModel,
@@ -141,3 +140,30 @@ def test_when_skt_models_saved_then_forecasters_can_be_loaded(
 
     assert isinstance(model.skt_forecaster, loaded_model.skt_forecaster.__class__)
     assert repr(loaded_model.skt_forecaster) == repr(model.skt_forecaster)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("train_data, test_data", [
+    (
+        get_data_frame_with_item_index([0, 1, 2, 3]),
+        get_data_frame_with_item_index([2, 3, 4, 5])
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B", "C", "D"]),
+        get_data_frame_with_item_index(["A", "E", "F"]),
+    ),
+])
+def test_when_predict_called_with_test_data_then_predictor_inference_correct(
+    model_class, temp_model_path, train_data, test_data
+):
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=3,
+    )
+
+    model.fit(train_data=train_data)
+    with mock.patch.object(AbstractSktimeModel, "_fit") as mock_fit:
+
+        _ = model.predict(test_data)
+        mock_fit.assert_called_with(test_data)

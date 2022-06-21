@@ -105,6 +105,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
         )
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
+        if isinstance(freq, str):
+            return freq
+        elif isinstance(freq, pd._libs.tslibs.BaseOffset):
+            return freq.freqstr
         return freq
 
     def iter_items(self) -> Iterable[Any]:
@@ -149,8 +153,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"`{ITEMID}` column can not have nan")
         if df[TIMESTAMP].isnull().any():
             raise ValueError(f"`{TIMESTAMP}` column can not have nan")
-        if not df[ITEMID].dtype == "int64":
-            raise ValueError(f"for {ITEMID}, the only pandas dtype allowed is ‘int64’.")
         if not df[TIMESTAMP].dtype == "datetime64[ns]":
             raise ValueError(
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
@@ -174,8 +176,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
         if not isinstance(data.index, pd.MultiIndex):
             raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
-        if not data.index.dtypes.array[0] == "int64":
-            raise ValueError(f"for {ITEMID}, the only pandas dtype allowed is ‘int64’.")
         if not data.index.dtypes.array[1] == "datetime64[ns]":
             raise ValueError(
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
