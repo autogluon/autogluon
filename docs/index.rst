@@ -45,6 +45,7 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
    >>> test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
    >>> predictor = AutoMMPredictor(label='class').fit(train_data)
    >>> predictions = predictor.predict(test_data)
+   >>> score = predictor.evaluate(test_data)
 
 
 Installation
