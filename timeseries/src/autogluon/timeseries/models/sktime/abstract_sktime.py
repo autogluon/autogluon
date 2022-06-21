@@ -85,10 +85,12 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         """
         return pd.DataFrame(
             data=data.values,
-            index=pd.MultiIndex.from_arrays([
-                data.index.get_level_values(0),
-                data.index.get_level_values(1).to_period(freq=data.freq),  # noqa
-            ]),
+            index=pd.MultiIndex.from_arrays(
+                [
+                    data.index.get_level_values(0),
+                    data.index.get_level_values(1).to_period(freq=data.freq),  # noqa
+                ]
+            ),
         )
 
     def _to_time_series_data_frame(self, data: pd.DataFrame) -> TimeSeriesDataFrame:
@@ -137,7 +139,12 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             raise ValueError("No sktime forecaster found. Please fit the model first.")
 
         new_index = list(data.iter_items())
-        if not all(x == y for x, y in zip(self._fit_index, new_index)):
+
+        # TODO: reconsider when to refit the model. currently we refit whenever train and
+        #  test indices are not identical
+        if len(self._fit_index) != len(new_index) or not all(
+            x == y for x, y in zip(self._fit_index, new_index)
+        ):
             logger.warning(
                 f"\tDifferent set of items than those provided during training were provided for "
                 f"prediction. The model {self.name} will be re-trained on newly provided data"
