@@ -1240,7 +1240,7 @@ class AutoMMPredictor:
         else:
             task = LitModule(
                 model=self._model,
-                loss_func=self._loss_func,
+                loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
             )
 
         blacklist_msgs = []
