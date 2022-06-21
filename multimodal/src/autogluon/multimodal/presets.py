@@ -15,7 +15,6 @@ def default():
     return {
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "optimization.lr_decay": 0.9,
     }
 
 
@@ -25,7 +24,6 @@ def medium_quality_faster_train():
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
-        "optimization.lr_decay": 0.9,
     }
 
 
@@ -34,7 +32,6 @@ def high_quality():
     return {
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
-        "optimization.lr_decay": 0.9,
     }
 
 
@@ -43,7 +40,6 @@ def best_quality():
     return {
         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
-        "optimization.lr_decay": 0.9,
         "env.per_gpu_batch_size": 1,
     }
 
@@ -53,7 +49,6 @@ def multilingual():
     return {
         "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
         "optimization.top_k": 1,
-        "optimization.lr_decay": 0.9,
         "env.precision": "bf16",
         "env.per_gpu_batch_size": 4,
     }
