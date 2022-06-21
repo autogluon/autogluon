@@ -4,12 +4,17 @@ from datasets import load_dataset
 
 from time import time
 
+import os
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"]="0,1"
+
 GLUE_METRICS = {
     "mnli": {"val": "accuracy", "eval": ["accuracy"]},
     "qqp": {"val": "accuracy", "eval": ["accuracy", "f1"]},
     "qnli": {"val": "accuracy", "eval": ["accuracy"]},
     "sst2": {"val": "accuracy", "eval": ["accuracy"]},
-    #"stsb": {"val": "pearsonr", "eval": ["pearsonr", "spearmanr"]},  # Current default soft label loss func is for classification, should automatically select loss_func
+    "stsb": {"val": "pearsonr", "eval": ["pearsonr", "spearmanr"]},  # Current default soft label loss func is for classification, should automatically select loss_func
     "mrpc": {"val": "accuracy", "eval": ["accuracy"]},
     "rte": {"val": "accuracy", "eval": ["accuracy"]},
     # "cola": "", #phi coeffiecient is not implemented
@@ -93,6 +98,7 @@ def main(args):
             "distiller.temperature": args.temperature,
             "distiller.hard_label_weight": args.hard_label_weight,
             "distiller.soft_label_weight": args.soft_label_weight,
+            'model.hf_text.text_trivial_aug_maxscale': 0.0
         },
         teacher_predictor=teacher_predictor,
         time_limit=args.time_limit,

@@ -639,7 +639,14 @@ class AutoMMPredictor:
         )
 
         critics, baseline_funcs = None, None
-        if self._config.distiller.soft_label_loss_type == "mean_square_error":
+        if not self._config.distiller.soft_label_loss_type:
+            # automatically infer loss func based on problem type if not specified
+            if self._problem_type == "regression":
+                soft_label_loss_func = nn.MSELoss()
+            else:
+                print(type(self._problem_type))
+                soft_label_loss_func = nn.CrossEntropyLoss()
+        elif self._config.distiller.soft_label_loss_type == "mean_square_error":
             soft_label_loss_func = nn.MSELoss()
         elif self._config.distiller.soft_label_loss_type == "cross_entropy":
             soft_label_loss_func = nn.CrossEntropyLoss()
