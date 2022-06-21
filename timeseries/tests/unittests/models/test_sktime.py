@@ -149,8 +149,16 @@ def test_when_skt_models_saved_then_forecasters_can_be_loaded(
         get_data_frame_with_item_index([2, 3, 4, 5])
     ),
     (
-        get_data_frame_with_item_index(["A", "B", "C", "D"]),
-        get_data_frame_with_item_index(["A", "E", "F"]),
+        get_data_frame_with_item_index(["A", "B", "C"]),
+        get_data_frame_with_item_index(["A", "B", "D"]),
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B"]),
+        get_data_frame_with_item_index(["A", "B", "C"]),
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B", "C"]),
+        get_data_frame_with_item_index(["A", "B"]),
     ),
 ])
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(

@@ -222,8 +222,16 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
         get_data_frame_with_item_index(["A", "B", "C"]),
     ),
     (
-        get_data_frame_with_item_index(["A", "B", "C", "D"]),
-        get_data_frame_with_item_index(["A", "E", "F"]),
+        get_data_frame_with_item_index(["A", "B", "C"]),
+        get_data_frame_with_item_index(["A", "B", "D"]),
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B", "C"]),
+        get_data_frame_with_item_index(["A", "B"]),
+    ),
+    (
+        get_data_frame_with_item_index(["A", "B"]),
+        get_data_frame_with_item_index(["A", "B", "C"]),
     ),
 ])
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(
@@ -241,6 +249,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     predictions = model.predict(test_data)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == test_data.num_items * prediction_length
 
     predicted_item_index = predictions.index.levels[0]
     assert all(predicted_item_index == test_data.index.levels[0])  # noqa
