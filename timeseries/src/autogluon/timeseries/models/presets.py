@@ -70,24 +70,17 @@ def get_default_hps(key, prediction_length):
             },
         },
         "default": {
+            "AutoETS": {},
+            "AutoARIMA": {}
             "SimpleFeedForward": {},
             "MQCNN": {},
             "MQRNN": {},
             "DeepAR": {},
             "Transformer": {},
-            "AutoETS": {},
-            "AutoARIMA": {}
             # "AutoTabular": {} # AutoTabular model is experimental.
         },
         "default_hpo": {
             "MQCNN": {
-                "context_length": ag.Int(
-                    min(prediction_length, max(10, 2 * prediction_length), 250),
-                    max(min(500, 12 * prediction_length), 4 * prediction_length),
-                    default=prediction_length * 4,
-                ),
-            },
-            "MQRNN": {
                 "context_length": ag.Int(
                     min(prediction_length, max(10, 2 * prediction_length), 250),
                     max(min(500, 12 * prediction_length), 4 * prediction_length),
@@ -107,13 +100,6 @@ def get_default_hps(key, prediction_length):
                     max(min(500, 12 * prediction_length), prediction_length),
                     default=prediction_length,
                 ),
-            },
-            "Transformer": {
-                "context_length": ag.Int(
-                    min(prediction_length, max(10, 2 * prediction_length), 250),
-                    max(min(500, 12 * prediction_length), prediction_length),
-                    default=prediction_length,
-                )
             },
             "AutoETS": {},
             "AutoARIMA": {}
