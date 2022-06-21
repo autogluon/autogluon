@@ -108,12 +108,12 @@ For detailed codes, please refer to [`Kaggle_Pawpularity_submit.py`](./kaggle_Pa
 
 | ID | Backbone | Fusion | Augment | learning_rate | lr_decay | weight_decay | Max_epochs | Warmup_step | Per_gpu_batch_size | Per_gpu_batch_size_evaluation | Precision | CV | Public_Leaderboard | Private_Leaderboard | Download |
 |----|----------|--------|---------|---------------|----------|--------------|------------|-------------|--------------------|-------------------------------|-----------|----|--------------------|---------------------|----------|
-| 1 | vit_large_patch16_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.3740541397068 | 17.97642 | 17.10867| [result7](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result7_standalone.zip)
-| 2 | swin_large_patch4_window12_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 32 | 32 | 17.4974990118305 | 18.09335 | 17.18875 | [result6](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result6_standalone.zip)
-| 3 | convnext_large_384_in22ft2k | False | randaug | 5e-5 | 1 | 0 | 10 | 0 | 8 | 4 | 32 | 17.4523797944187 | 18.25999 | 17.20016 | [result26](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result26_standalone.zip)
-| 4 | swin_large_patch4_window7_224 | False | randaug | 5e-5 | 1 | 0 | 5 | 0 | 16 | 32 | 32 | 17.5192244849318 | 18.03887 | 17.27713 | [result13](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result13_standalone.zip)
-| 5 | swin_large_patch4_window7_224 | True | randaug | 5e-5 | 1 | 0 | 10 | 0.1 | 16 | 32 | 32 | 17.4848481619876 | 18.15082 | 17.29325 | [result30](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result30_standalone.zip)
-| 6 | vit_large_patch16_384 | False | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.5162709909151 | 18.15326 | 17.37978 | [result23](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result23_standalone.zip)
+| 1 | vit_large_patch16_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.3740541397068 | 17.97642 | 17.10867| [result7](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result7_standalone.zip) |
+| 2 | swin_large_patch4_window12_384 | True | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 32 | 32 | 17.4974990118305 | 18.09335 | 17.18875 | [result6](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result6_standalone.zip) |
+| 3 | convnext_large_384_in22ft2k | False | randaug | 5e-5 | 1 | 0 | 10 | 0 | 8 | 4 | 32 | 17.4523797944187 | 18.25999 | 17.20016 | [result26](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result26_standalone.zip) |
+| 4 | swin_large_patch4_window7_224 | False | randaug | 5e-5 | 1 | 0 | 5 | 0 | 16 | 32 | 32 | 17.5192244849318 | 18.03887 | 17.27713 | [result13](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result13_standalone.zip) |
+| 5 | swin_large_patch4_window7_224 | True | randaug | 5e-5 | 1 | 0 | 10 | 0.1 | 16 | 32 | 32 | 17.4848481619876 | 18.15082 | 17.29325 | [result30](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result30_standalone.zip) |
+| 6 | vit_large_patch16_384 | False | randaug | 2e-5 | 1 | 0 | 5 | 0 | 8 | 3 | 32 | 17.5162709909151 | 18.15326 | 17.37978 | [result23](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/result23_standalone.zip) |
 
 The results of the model are shown in the table above.
 
@@ -131,9 +131,9 @@ With AutoMMPredictor, You can easily use fusion through modifying hyper paramete
 
 The results of model ensemble are as follows.
 
-| Ensemble IDs | Weights | Public_Leaderboard | Private_Leaderboard |
-|--------------|---------|--------------------|---------------------|
-| [1, 2, 3] | [0.5, 0.25, 0.25] | 17.91944 | 16.97737 |
-| [1, 2, 3, 4] | [0.25, 0.25, 0.25, 0.25] | 17.90128 | 16.97970 |
-| [1, 2, 4] | [0.4, 0.4, 0.2] | 17.88050 | 16.99416 |
-| [1, 2] | [0.5, 0.5] | 17.91753 | 17.01075 |
+| Ensemble IDs | Weights | Public_Leaderboard | Private_Leaderboard | Kaggle screenshot |
+|--------------|---------|--------------------|---------------------|-------------------|
+| [1, 2, 3] | [0.5, 0.25, 0.25] | 17.91944 | 16.97737 | [Kaggle result](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/kaggle-shot/shot_1.png) |
+| [1, 2, 3, 4] | [0.25, 0.25, 0.25, 0.25] | 17.90128 | 16.97970 | [Kaggle result](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/kaggle-shot/shot_2.png) |
+| [1, 2, 4] | [0.4, 0.4, 0.2] | 17.88050 | 16.99416 | [Kaggle result](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/kaggle-shot/shot_3.png) |
+| [1, 2] | [0.5, 0.5] | 17.91753 | 17.01075 | [Kaggle result](http://automl-mm-bench.s3.amazonaws.com/0.5release/petfinder_pawpularity/kaggle-shot/shot_4.png) |

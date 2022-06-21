@@ -1240,6 +1240,7 @@ class AutoMMPredictor:
         else:
             task = LitModule(
                 model=self._model,
+                loss_func=self._loss_func,
             )
 
         blacklist_msgs = []
@@ -1340,12 +1341,10 @@ class AutoMMPredictor:
         y_pred = self._df_preprocessor.transform_prediction(
             y_pred=logits_or_prob,
             inverse_categorical=False,
-            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
         y_pred_inv = self._df_preprocessor.transform_prediction(
             y_pred=logits_or_prob,
             inverse_categorical=True,
-            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
@@ -1410,7 +1409,6 @@ class AutoMMPredictor:
         )
         pred = self._df_preprocessor.transform_prediction(
             y_pred=logits_or_prob,
-            loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
         )
         if as_pandas:
             pred = self.as_pandas(data=data, to_be_converted=pred)
