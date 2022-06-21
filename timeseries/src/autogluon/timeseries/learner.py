@@ -5,6 +5,7 @@ from typing import Type, Optional, Any, Dict, Tuple, Union
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
+from . import TimeSeriesEvaluator
 
 from .dataset import TimeSeriesDataFrame
 from .models.abstract import AbstractTimeSeriesModel
@@ -12,7 +13,6 @@ from .trainer import (
     AutoTimeSeriesTrainer,
     AbstractTimeSeriesTrainer,
 )
-from .utils.metric_utils import check_get_evaluation_metric
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class TimeSeriesLearner(AbstractLearner):
         **kwargs,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
-        self.eval_metric: str = check_get_evaluation_metric(eval_metric)
+        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.trainer_type = trainer_type
         self.target = target
         self.prediction_length = prediction_length
@@ -92,6 +92,7 @@ class TimeSeriesLearner(AbstractLearner):
                 scheduler_options=scheduler_options,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
+                verbosity=kwargs.get("verbosity", 2)
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -108,9 +109,6 @@ class TimeSeriesLearner(AbstractLearner):
         self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
-        logger.info(
-            f"AutoGluon TimeSeriesLearner complete, total runtime = {round(self._time_fit_training, 2)}s",
-        )
 
     def predict(
         self,

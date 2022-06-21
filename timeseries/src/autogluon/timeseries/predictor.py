@@ -1,6 +1,7 @@
 import logging
 import pprint
 import time
+from pathlib import Path
 from typing import Optional, Type, Any, Union, Dict, Tuple, List
 
 import pandas as pd
@@ -50,7 +51,7 @@ class TimeSeriesPredictor:
         metric. Available options include: "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss".
 
         If ``eval_metric is None``, it is set by default to "mean_wQuantileLoss".
-        For more information about these options, see ``autogluon.timeseries.utils.metric_utils`` and GluonTS
+        For more information about these options, see ``autogluon.timeseries.TimeSeriesEvaluator`` and GluonTS
         docs at https://ts.gluon.ai/api/gluonts/gluonts.evaluation.metrics.html
     path: str, default = None
         Path to directory where models and intermediate outputs should be saved. If unspecified, a timestamped folder
@@ -230,19 +231,32 @@ class TimeSeriesPredictor:
         if presets is not None:
             logger.info(f"presets is set to {presets}")
 
-        if verbosity >= 3:
-            fit_args = dict(
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                presets=presets,
-                time_limit=time_limit,
-                **kwargs,
+        fit_args = dict(
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+            time_limit=time_limit,
+            evaluation_metric=self.eval_metric,
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            **kwargs,
+        )
+        logger.info("================ TimeSeriesPredictor ================")
+        logger.info("TimeSeriesPredictor.fit() called")
+        if presets is not None:
+            logger.info(f"Setting presets to: {presets}")
+        logger.info("Fitting with arguments:")
+        logger.info(f"{pprint.pformat(fit_args)}")
+        logger.info(
+            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items. "
+            f"Average time series length is {len(train_data) / train_data.num_items}."
+        )
+        if tuning_data is not None:
+            logger.info(
+                f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
+                f"Average time series length is {len(tuning_data) / tuning_data.num_items}."
             )
-            logger.info("============ fit arguments ============")
-            logger.info("fit() called with arguments:")
-            logger.info(f"{pprint.pformat(fit_args)}")
-            logger.info("=======================================")
+        logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
+        logger.info("=====================================================")
 
         # Inform the user extra columns in dataset will not be used.
         extra_columns = [c for c in train_data.columns.copy() if c != self.target]
@@ -272,6 +286,7 @@ class TimeSeriesPredictor:
             hyperparameters=hyperparameters,
             hyperparameter_tune=all(scheduler_options),
             time_limit=time_left,
+            verbosity=verbosity,
         )
 
         self.save()
@@ -429,6 +444,7 @@ class TimeSeriesPredictor:
         pandas data frame containing the columns,
 
         * ``model``: The name of the model.
+        * ``score_test``: The test score of the model on ``data``, if provided.
         * ``score_val``: The validation score of the model on the 'eval_metric'.
 
             **NOTE:** Metrics scores are always shown in higher is better form.
@@ -436,7 +452,7 @@ class TimeSeriesPredictor:
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
 
-        * ``score_test``: The test score of the model on ``data``, if provided.
+        * ``pred_time_val``: Time taken by the model to predict on the validation data set
         * ``fit_time_marginal``: The fit time required to train the model (ignoring base models for ensembles).
         * ``fit_order``: The order in which models were fit. The first model fit has ``fit_order=1``, and the Nth
           model fit has ``fit_order=N``.

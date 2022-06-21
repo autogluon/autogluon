@@ -6,11 +6,12 @@ from typing import Any, Dict, Union, Tuple, Optional
 import autogluon.core as ag
 from autogluon.core.models import AbstractModel
 from autogluon.common.savers import save_pkl
+from ... import TimeSeriesEvaluator
 
 from ...dataset import TimeSeriesDataFrame
 from ...utils.metadata import get_prototype_metadata_dict
-from ...utils.metric_utils import check_get_evaluation_metric
 from .model_trial import skip_hpo, model_trial
+from ...utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.eval_metric: str = check_get_evaluation_metric(eval_metric)
+        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
@@ -223,6 +224,34 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         raise NotImplementedError
 
+    def predict_for_scoring(self, data: TimeSeriesDataFrame, **kwargs):
+        """Given a dataset, truncate the last `self.prediction_length` time steps and forecast these
+        steps with previous history. This method produces predictions for the *last* `self.prediction_length`
+        steps of the *given* time series, in order to be used for validation or scoring.
+
+        Parameters
+        ----------
+        data: TimeSeriesDataFrame
+            The dataset where each time series is the "context" for predictions.
+
+        Other Parameters
+        ----------------
+        quantile_levels
+            Quantiles of probabilistic forecasts, if probabilistic forecasts are implemented by the
+            corresponding subclass. If None, `self.quantile_levels` will be used instead,
+            if provided during initialization.
+
+        Returns
+        -------
+        predictions: TimeSeriesDataFrame
+            pandas data frames with a timestamp index, where each input item from the input
+            data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
+            of input items.
+        """
+        return self.predict(
+            data.slice_by_timestep(slice(None, -self.prediction_length)), **kwargs
+        )
+
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
         `self.prediction_length` time steps of each time series in the input data set
@@ -249,7 +278,17 @@ class AbstractTimeSeriesModel(AbstractModel):
             The computed forecast evaluation score on the last `self.prediction_length`
             time steps of each time series.
         """
-        raise NotImplementedError
+        metric = self.eval_metric if metric is None else metric
+        with evaluator_warning_filter():
+            evaluator = TimeSeriesEvaluator(
+                eval_metric=metric,
+                prediction_length=self.prediction_length,
+                target_column=self.target,
+            )
+            predictions = self.predict_for_scoring(data)
+            metric_value = evaluator(data, predictions)
+
+        return metric_value * TimeSeriesEvaluator.METRIC_COEFFICIENTS[metric]
 
     def _hyperparameter_tune(
         self,
@@ -260,10 +299,8 @@ class AbstractTimeSeriesModel(AbstractModel):
     ):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
-        logger.log(
-            15,
-            "Starting generic AbstractTimeSeriesModel hyperparameter tuning for %s model..."
-            % self.name,
+        logger.debug(
+            f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}"
         )
         search_space = self._get_search_space()
 
@@ -288,12 +325,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             )
             return skip_hpo(self, train_data, val_data, time_limit=time_limit)
         else:
-            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
+            logger.debug(f"Hyperparameter search space for {self.name}: ")
             for hyperparameter in search_space:
                 if isinstance(search_space[hyperparameter], ag.Space):
-                    logger.log(
-                        15, f"{hyperparameter}:   {search_space[hyperparameter]}"
-                    )
+                    logger.debug(f"{hyperparameter}: {search_space[hyperparameter]}")
 
         dataset_train_filename = "dataset_train.pkl"
         train_path = self.path + dataset_train_filename

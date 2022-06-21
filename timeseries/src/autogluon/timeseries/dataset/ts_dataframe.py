@@ -66,6 +66,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         A pandas and gluon-ts compatible string describing the frequency of the time series. For example
         "D" is daily data, etc. Also see,
         https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+    num_items: int
+        Number of items (time series) in the data set.
     """
 
     index: pd.MultiIndex
@@ -104,6 +106,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
         return freq
+
+    def iter_items(self) -> Iterable[Any]:
+        return iter(self.index.levels[0])
+
+    @property
+    def num_items(self):
+        return len(self.index.levels[0])
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):

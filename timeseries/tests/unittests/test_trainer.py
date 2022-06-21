@@ -35,7 +35,9 @@ def test_trainer_can_be_initialized(temp_model_path):
 def test_when_trainer_called_then_training_is_performed(temp_model_path):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS
+        train_data=DUMMY_TS_DATAFRAME,
+        val_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS,
     )
 
     assert "SimpleFeedForward" in trainer.get_model_names()
