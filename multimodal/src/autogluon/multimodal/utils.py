@@ -7,6 +7,7 @@ import pandas as pd
 import pickle
 import collections
 import copy
+import sys
 import torch
 from torch import nn
 import warnings
@@ -73,6 +74,14 @@ from .constants import (
 from .presets import get_automm_preset, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
+
+
+def is_interactive():
+    """
+    Return whether the current process is running under the interactive mode.
+    Check also https://stackoverflow.com/a/64523765
+    """
+    return hasattr(sys, "ps1")
 
 
 def infer_metrics(

@@ -84,6 +84,7 @@ from .utils import (
     try_to_infer_pos_label,
     get_mixup,
     CustomUnpickler,
+    is_interactive,
 )
 from .optimization.utils import (
     get_metric,
@@ -960,6 +961,16 @@ class AutoMMPredictor:
         num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
+
+        if is_interactive() and num_gpus > 1:
+            warnings.warn(
+                "Interactive environment is detected. Currently, AutoMMPredictor does not support multi-gpu "
+                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
+                "in PT Lightning. Thus, we switch to single gpu training. You can consider to execute "
+                "autogluon in a script",
+                UserWarning,
+            )
+            num_gpus = 1
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(

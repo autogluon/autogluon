@@ -39,6 +39,12 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 
    TabularPredictor
 
+.. automodule:: autogluon.multimodal
+.. autosummary::
+   :nosignatures:
+
+   AutoMMPredictor
+
 .. automodule:: autogluon.vision
 .. autosummary::
    :nosignatures:
@@ -71,6 +77,20 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
     .. rubric:: Methods
 
     .. autoautosummary:: TabularPredictor
+        :methods:
+
+
+:hidden:`AutoMMPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.multimodal
+
+.. autoclass:: AutoMMPredictor
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: AutoMMPredictor
         :methods:
 
 
