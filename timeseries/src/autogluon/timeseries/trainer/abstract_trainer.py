@@ -641,11 +641,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> float:
         model = self._get_model_for_prediction(model)
 
-        # FIXME: this method should be able to score on all data sets regardless of
-        # FIXME: whether the implementation is in GluonTS
-        if not isinstance(model, AbstractGluonTSModel):
-            raise ValueError("Model must be a GluonTS model to score")
-
         # FIXME: when ensembling is implemented, score logic will have to be revised
         # FIXME: in order to enable prior model predictions in the ensemble
         eval_metric = self.eval_metric if metric is None else metric
