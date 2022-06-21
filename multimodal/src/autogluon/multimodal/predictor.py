@@ -228,6 +228,7 @@ class AutoMMPredictor:
     def fit(
         self,
         train_data: pd.DataFrame,
+        preset: str = None,
         config: Optional[dict] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -247,6 +248,8 @@ class AutoMMPredictor:
         ----------
         train_data
             A dataframe containing training data.
+        preset
+            Name of a preset. See the available presets in `presets.py`.
         config
             A dictionary with four keys "model", "data", "optimization", and "environment".
             Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
@@ -453,6 +456,7 @@ class AutoMMPredictor:
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            preset=preset,
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
@@ -701,6 +705,7 @@ class AutoMMPredictor:
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
+        preset: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, AutoMMPredictor] = None,
@@ -711,6 +716,7 @@ class AutoMMPredictor:
             config = self._config
 
         config = get_config(
+            preset=preset,
             config=config,
             overrides=hyperparameters,
         )

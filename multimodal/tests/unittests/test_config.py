@@ -31,7 +31,7 @@ def test_config():
         OPTIMIZATION: optimization_config_path,
         ENVIRONMENT: environemnt_config_path,
     }
-    config = get_config(config)
+    config = get_config(config=config)
     assert config == config_gt
 
     # test DictConfg
@@ -41,7 +41,7 @@ def test_config():
         OPTIMIZATION: optimization_config,
         ENVIRONMENT: environemnt_config,
     }
-    config = get_config(config)
+    config = get_config(config=config)
     assert config == config_gt
 
     # test dict
@@ -63,7 +63,7 @@ def test_config():
         OPTIMIZATION: optimization_config,
         ENVIRONMENT: environemnt_config,
     }
-    config = get_config(config)
+    config = get_config(config=config)
     assert config == config_gt
 
     # test default string
@@ -73,7 +73,7 @@ def test_config():
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
-    config = get_config(config)
+    config = get_config(config=config)
     assert config == config_gt
 
 
