@@ -612,12 +612,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         the validation score."""
 
         if model is None:
-            logger.info(
-                "Model not specified in predict, will default to the model with the best validation score",
-            )
             if self.model_best is None:
                 best_model_name: str = self.get_model_best()
                 self.model_best = best_model_name
+            logger.info(
+                f"Model not specified in predict, will default to the model with the "
+                f"best validation score: {self.model_best}",
+            )
             return self.load_model(self.model_best)
         else:
             if isinstance(model, str):
