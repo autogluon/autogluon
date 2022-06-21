@@ -644,7 +644,7 @@ class AutoMMPredictor:
             if self._problem_type == "regression":
                 soft_label_loss_func = nn.MSELoss()
             else:
-                print(type(self._problem_type))
+                assert self._output_shape > 1
                 soft_label_loss_func = nn.CrossEntropyLoss()
         elif self._config.distiller.soft_label_loss_type == "mean_square_error":
             soft_label_loss_func = nn.MSELoss()
