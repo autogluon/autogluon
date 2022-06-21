@@ -6,8 +6,9 @@ try:
 except ImportError:
     pass
 
-from .predictor import TimeSeriesPredictor
 from .dataset import TimeSeriesDataFrame
+from .evaluator import TimeSeriesEvaluator
+from .predictor import TimeSeriesPredictor
 
 try:
     from mxnet import __version__ as mxnet_version

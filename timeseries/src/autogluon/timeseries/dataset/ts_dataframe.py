@@ -107,6 +107,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError("Frequency not provided and cannot be inferred")
         return freq
 
+    def iter_items(self) -> Iterable[Any]:
+        return iter(self.index.levels[0])
+
     @property
     def num_items(self):
         return len(self.index.levels[0])

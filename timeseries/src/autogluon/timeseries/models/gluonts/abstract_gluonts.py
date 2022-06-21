@@ -2,15 +2,13 @@ import copy
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple, Type, Iterator
+from typing import Optional, List, Dict, Any, Type, Iterator
 
 import gluonts
 import numpy as np
 import pandas as pd
 from gluonts.env import env as gluonts_env
 from gluonts.dataset.common import Dataset as GluonTSDataset
-from gluonts.evaluation import Evaluator
-from gluonts.evaluation.backtest import make_evaluation_predictions
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
@@ -22,8 +20,7 @@ from autogluon.core.utils import warning_filter
 
 from ...dataset import TimeSeriesDataFrame
 from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
-from ...utils.metric_utils import METRIC_COEFFICIENTS
-from ...utils.warning_filters import evaluator_warning_filter, disable_root_logger
+from ...utils.warning_filters import disable_root_logger
 from ..abstract import AbstractTimeSeriesModel
 from .callback import TimeLimitCallback
 
@@ -36,6 +33,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
     GluonTS Dataset protocol via lazy iterations.
     """
+
     def __init__(
         self,
         time_series_df: TimeSeriesDataFrame,
@@ -230,149 +228,101 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 validation_data=self._to_gluonts_dataset(val_data),
             )
 
-    # TODO: predict should also accept number of samples
     def predict(
         self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs
     ) -> TimeSeriesDataFrame:
-        gts_data = self._to_gluonts_dataset(data)
 
         logger.debug(f"Predicting with time series model {self.name}")
         logger.debug(
-            f"Provided data for prediction with {len(data)} rows, {data.num_items} items. "
+            f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
             f"Average time series length is {len(data) / data.num_items}."
         )
 
         with warning_filter():
-            quantiles = [str(q) for q in (quantile_levels or self.quantile_levels)]
-            predicted_targets = list(self.gts_predictor.predict(gts_data))
-
-            if not all(0 < float(q) < 1 for q in quantiles):
+            quantiles = quantile_levels or self.quantile_levels
+            if not all(0 < q < 1 for q in quantiles):
                 raise ValueError(
                     "Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive)."
                 )
 
+            predicted_targets = self._predict_gluonts_forecasts(data, **kwargs)
             if not isinstance(predicted_targets[0], (QuantileForecast, SampleForecast)):
-                raise TypeError("DistributionForecast is not yet supported.")
+                raise TypeError("DistributionForecast is not supported.")
 
-            # if predictions are gluonts SampleForecasts, convert them to quantile forecasts
-            # but save the means
-            forecast_means = []
-
-            if isinstance(predicted_targets[0], SampleForecast):
-                transformed_targets = []
-                for forecast in predicted_targets:
-                    tmp = []
-                    for quantile in quantiles:
-                        tmp.append(forecast.quantile(quantile))
-                    transformed_targets.append(
-                        QuantileForecast(
-                            forecast_arrays=np.array(tmp),
-                            start_date=forecast.start_date,
-                            freq=forecast.freq,
-                            forecast_keys=quantiles,
-                            item_id=forecast.item_id,
-                        )
-                    )
-
-                    forecast_means.append(forecast.mean)
-
-                predicted_targets = copy.deepcopy(transformed_targets)
-
-            # sanity check to ensure all quantiles are accounted for
-            assert all(q in predicted_targets[0].forecast_keys for q in quantiles), (
-                "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
-                " the model trained to forecast all quantiles?"
+            df = self._gluonts_forecasts_to_data_frame(
+                predicted_targets,
+                quantile_levels=quantile_levels or self.quantile_levels,
             )
 
-            result_dfs = []
-            for i, item_id in enumerate(data.index.levels[0]):
-                item_forecast_dict = dict(
-                    mean=forecast_means[i]
-                    if forecast_means
-                    else (
-                        predicted_targets[i].quantile(
-                            0.5
-                        )  # assign P50 to mean if mean is missing
-                    )
-                )
-                for quantile in quantiles:
-                    item_forecast_dict[quantile] = predicted_targets[i].quantile(
-                        str(quantile)
-                    )
+        return df
 
-                df = pd.DataFrame(item_forecast_dict)
-                df[ITEMID] = item_id
-                df[TIMESTAMP] = pd.date_range(
-                    start=predicted_targets[i].start_date,
-                    periods=self.prediction_length,
-                    freq=self.freq,
+    def _predict_gluonts_forecasts(
+        self, data: TimeSeriesDataFrame, **kwargs
+    ) -> List[Forecast]:
+        gts_data = self._to_gluonts_dataset(data)
+
+        predictor_kwargs = dict(dataset=gts_data)
+        if "num_samples" in kwargs:
+            predictor_kwargs["num_samples"] = kwargs["num_samples"]
+
+        return list(self.gts_predictor.predict(**predictor_kwargs))
+
+    def _gluonts_forecasts_to_data_frame(
+        self, forecasts: List[Forecast], quantile_levels: List[float]
+    ) -> TimeSeriesDataFrame:
+        # if predictions are gluonts SampleForecasts, convert them to quantile forecasts
+        # but save the means
+        forecast_means = []
+        quantiles = [str(q) for q in quantile_levels]
+
+        if isinstance(forecasts[0], SampleForecast):
+            transformed_targets = []
+            for forecast in forecasts:
+                tmp = []
+                for quantile in quantiles:
+                    tmp.append(forecast.quantile(quantile))
+                transformed_targets.append(
+                    QuantileForecast(
+                        forecast_arrays=np.array(tmp),
+                        start_date=forecast.start_date,
+                        freq=forecast.freq,
+                        forecast_keys=quantiles,
+                        item_id=forecast.item_id,
+                    )
                 )
-                result_dfs.append(df)
+                forecast_means.append(forecast.mean)
+
+            forecasts = copy.deepcopy(transformed_targets)
+
+        # sanity check to ensure all quantiles are accounted for
+        assert all(q in forecasts[0].forecast_keys for q in quantiles), (
+            "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
+            " the model trained to forecast all quantiles?"
+        )
+        result_dfs = []
+        item_ids = (d.item_id for d in forecasts)
+
+        for i, item_id in enumerate(item_ids):
+            item_forecast_dict = dict(
+                mean=forecast_means[i]
+                if forecast_means
+                else (
+                    forecasts[i].quantile(0.5)  # assign P50 to mean if mean is missing
+                )
+            )
+            for quantile in quantiles:
+                item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))
+
+            df = pd.DataFrame(item_forecast_dict)
+            df[ITEMID] = int(item_id)
+            df[TIMESTAMP] = pd.date_range(
+                start=forecasts[i].start_date,
+                periods=self.prediction_length,
+                freq=self.freq,
+            )
+            result_dfs.append(df)
 
         return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
-
-    def _predict_for_scoring(
-        self, data: TimeSeriesDataFrame, num_samples: int = 100
-    ) -> Tuple[List[Forecast], List[Any]]:
-        """Generate forecasts for the trailing `prediction_length` time steps of the
-        data set, and return two iterators, one for the predictions and one for the
-        ground truth time series.
-
-        Differently from the `predict` function, this function returns predictions in
-        GluonTS format for easier evaluation, and does not necessarily compute quantiles.
-        """
-        with warning_filter():
-            forecast_it, ts_it = make_evaluation_predictions(
-                dataset=self._to_gluonts_dataset(data),
-                predictor=self.gts_predictor,
-                num_samples=num_samples,
-            )
-            return list(forecast_it), list(ts_it)
-
-    def score(
-        self,
-        data: TimeSeriesDataFrame,
-        metric: Optional[str] = None,
-        num_samples: int = 100,
-    ):
-        """Return the evaluation scores for given metric and dataset. The last
-        `self.prediction_length` time steps of each time series in the input data set
-        will be held out and used for computing the evaluation score.
-
-        Parameters
-        ----------
-        data: gluonts.dataset.common.Dataset
-            Dataset used for scoring.
-        metric: str
-            String identifier of evaluation metric to use, from one of
-            `autogluon.timeseries.utils.metric_utils.AVAILABLE_METRICS`.
-        num_samples: int
-            Number of samples to use for making evaluation predictions if the probabilistic
-            forecasts are generated by forward sampling from the fitted model. Otherwise, this
-            parameter will be ignored.
-
-        Returns
-        -------
-        score: float
-            The computed forecast evaluation score on the last `self.prediction_length`
-            time steps of each time series.
-        """
-        with evaluator_warning_filter():
-            # TODO: due to the use of multiprocessing, evaluation still logs warnings
-            evaluator = (
-                Evaluator(quantiles=self.quantile_levels)
-                if self.quantile_levels is not None
-                else Evaluator()
-            )
-            forecasts, tss = self._predict_for_scoring(data, num_samples=num_samples)
-            num_series = len(tss)
-
-            eval_metric = self.eval_metric if metric is None else metric
-
-            agg_metrics, item_metrics = evaluator(
-                iter(tss), iter(forecasts), num_series=num_series
-            )
-        return agg_metrics[eval_metric] * METRIC_COEFFICIENTS[eval_metric]
 
     def __repr__(self) -> str:
         return self.name

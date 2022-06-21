@@ -4,7 +4,6 @@ Examples showing how to use `AutoMMPredictor` for model distillation.
 
 ### 1.1 Example
 [`automm_distillation.py`](./automm_distillation.py) : This example provides a use case 
-for using distillation in AutoMMPredictor, as well as the evaluation of the distillation result.
 
 To run the example:
 
@@ -24,7 +23,7 @@ To run the example:
 We borrow 7 NLP tasks in GLUE [1], and use identically the same abbreviation as in [1] to name each tasks,
 i.e. "mnli(m/mm)", "qqp", "qnli", "sst2", "stsb", "mrpc", and "rte".
 The dataset are loaded using huggingface's API: https://huggingface.co/datasets/glue.
-All Data will be automatically downloaded from HuggingFace (thus online connection is necessary) if it does not exist with the given dataset path. 
+All Data will be automatically downloaded from HuggingFace (thus online connection is necessary) if it does not exist with the given dataset path.
 
 In GLUE, labels in test sets are private and thus we use training set for training/validation and use validation set for testing.
 
