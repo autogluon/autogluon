@@ -15,6 +15,8 @@ from .gluonts import (
     SimpleFeedForwardModel,
     TransformerModel,
 )
+from .sktime import AutoARIMAModel, AutoETSModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,8 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    AutoARIMA=AutoARIMAModel,
+    AutoETS=AutoETSModel
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -37,6 +41,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     DeepAR=50,
     Prophet=50,
     AutoTabular=10,
+    AutoARIMA=50,
+    AutoETS=50
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
