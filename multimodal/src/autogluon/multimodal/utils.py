@@ -467,11 +467,17 @@ def select_model(
         raise ValueError("No model is available for this dataset.")
     # only allow no more than 1 fusion model
     assert len(fusion_model_name) <= 1
+
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
-    else:  # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
-        if len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+    elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+        if data_status[CATEGORICAL] or data_status[NUMERICAL]:
+            # retain the fusion model for uni-modal tabular data.
+            assert len(fusion_model_name) == 1
+            selected_model_names.extend(fusion_model_name)
+        else:
+            # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
             delattr(config.model, fusion_model_name[0])
 
     config.model.names = selected_model_names
@@ -785,7 +791,11 @@ def create_model(
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=all_models)
     elif len(all_models) == 1:
-        return all_models[0]
+        if isinstance(all_models[0], NumericalTransformer) or isinstance(all_models[0], CategoricalTransformer):
+            # retain fusion model for uni-modal tabular data
+            return fusion_model(models=all_models)
+        else:
+            return all_models[0]
     else:
         raise ValueError(f"No available models for {names}")
 
