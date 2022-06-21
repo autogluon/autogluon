@@ -70,6 +70,8 @@ def get_default_hps(key, prediction_length):
             },
         },
         "default": {
+            "AutoETS": {},
+            "AutoARIMA": {},
             "SimpleFeedForward": {},
             "MQCNN": {},
             "MQRNN": {},
@@ -99,6 +101,8 @@ def get_default_hps(key, prediction_length):
                     default=prediction_length,
                 ),
             },
+            "AutoETS": {},
+            "AutoARIMA": {}
         },
     }
     return default_model_hps[key]
