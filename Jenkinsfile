@@ -467,7 +467,7 @@ stage("Build Tutorials") {
         git clean -fx
         bash docs/build_pip_install.sh
 
-        # only build for docs/text
+        # only build for docs/multimodal
         shopt -s extglob
         rm -rf ./docs/tutorials/!(multimodal)
         cd docs && rm -rf _build && d2lbook build rst && cd ..

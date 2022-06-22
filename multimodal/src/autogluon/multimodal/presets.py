@@ -89,13 +89,13 @@ def get_basic_automm_config():
     }
 
 
-def get_automm_preset(preset: str):
+def get_automm_presets(presets: str):
     """
     Map a AutoMM preset string to its config including a basic config and an overriding dict.
 
     Parameters
     ----------
-    preset
+    presets
         Name of a preset.
 
     Returns
@@ -106,12 +106,12 @@ def get_automm_preset(preset: str):
         The hyperparameter overrides of this preset.
     """
     basic_config = get_basic_automm_config()
-    preset = preset.lower()
-    if preset in automm_presets.list_keys():
-        overrides = automm_presets.create(preset)
+    presets = presets.lower()
+    if presets in automm_presets.list_keys():
+        overrides = automm_presets.create(presets)
     else:
         raise ValueError(
-            f"Provided preset '{preset}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
+            f"Provided preset '{presets}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
         )
 
     return basic_config, overrides
