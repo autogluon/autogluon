@@ -421,7 +421,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self,
         y_pred: torch.Tensor,
         inverse_categorical: bool = True,
-        loss_func: Optional[_Loss] = None,
     ) -> NDArray[(Any,), Any]:
         """
         Transform model's output logits/probability into class labels for classification

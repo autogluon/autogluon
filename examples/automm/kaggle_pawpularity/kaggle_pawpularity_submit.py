@@ -7,7 +7,7 @@ sys.path.append("../input/omegaconf/")
 sys.path.append("../input/antlr4/")
 sys.path.append("../input/nlpaug/")
 
-from autogluon.multimodal.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 import pandas as pd
 import numpy as np
 import torch

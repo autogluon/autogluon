@@ -204,30 +204,31 @@ scores
 ## Configuration Customization
 The above examples have shown the flexibility of `AutoMMPredictor`. You may want to know how to customize configurations for your tasks. Fortunately, `AutoMMPredictor` has a user-friendly configuration design.
 
-First, let's see the available model presets.
+First, let's see the available presets.
 
 
 ```{.python .input}
-from autogluon.multimodal.presets import list_model_presets, get_preset
-model_presets = list_model_presets()
-model_presets
+from autogluon.multimodal.presets import list_automm_presets, get_automm_presets
+presets = list_automm_presets()
+presets
 ```
 
-Currently, `AutoMMPredictor` has only one model preset, from which we can construct the predictor's preset.
+Each preset consists of one basic configuration dictionary and some preset-related hyperparameters. For example, let's take a look at preset `default`.
 
 
 ```{.python .input}
-preset = get_preset(model_presets[0])
-preset
+basic_config, preset_overrides = get_automm_presets("default")
+print(basic_config)
+print(preset_overrides)
 ```
 
-`AutoMMPredictor` configurations consist of four parts: `model`, `data`, `optimization`, and `environment`. You can convert the preset to configurations to see the details.
+`AutoMMPredictor` configurations consist of four parts: `model`, `data`, `optimization`, and `environment`. You can convert the preset to full configurations.
 
 
 ```{.python .input}
 from omegaconf import OmegaConf
 from autogluon.multimodal.utils import get_config
-config = get_config(preset)
+config = get_config(presets="default")
 print(OmegaConf.to_yaml(config))
 ```
 

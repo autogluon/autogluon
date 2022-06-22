@@ -7,6 +7,7 @@ import pandas as pd
 import pickle
 import collections
 import copy
+import sys
 import torch
 from torch import nn
 import warnings
@@ -70,12 +71,17 @@ from .constants import (
     VALID_METRICS,
     VALID_CONFIG_KEYS,
 )
-from .presets import (
-    list_model_presets,
-    get_preset,
-)
+from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
+
+
+def is_interactive():
+    """
+    Return whether the current process is running under the interactive mode.
+    Check also https://stackoverflow.com/a/64523765
+    """
+    return hasattr(sys, "ps1")
 
 
 def infer_metrics(
@@ -192,7 +198,8 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
-    config: Union[dict, DictConfig],
+    presets: Optional[str] = None,
+    config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
     """
@@ -201,6 +208,8 @@ def get_config(
 
     Parameters
     ----------
+    presets
+        Name of the presets.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
         If any key is not not given, we will fill in with the default value.
@@ -249,17 +258,20 @@ def get_config(
     Configurations as a DictConfig object
     """
     if config is None:
-        config = get_preset(list_model_presets()[0])
+        config = {}
+
     if not isinstance(config, DictConfig):
-        all_configs = []
-        for k, default_value in [
-            ("model", "fusion_mlp_image_text_tabular"),
-            ("data", "default"),
-            ("optimization", "adamw"),
-            ("environment", "default"),
-        ]:
+        if presets is None:
+            basic_config = get_basic_automm_config()
+            preset_overrides = None
+        else:
+            basic_config, preset_overrides = get_automm_presets(presets=presets)
+
+        for k, default_value in basic_config.items():
             if k not in config:
                 config[k] = default_value
+
+        all_configs = []
         for k, v in config.items():
             if isinstance(v, dict):
                 per_config = OmegaConf.create(v)
@@ -278,10 +290,14 @@ def get_config(
             all_configs.append(per_config)
 
         config = OmegaConf.merge(*all_configs)
+        # apply the preset's overrides
+        if preset_overrides:
+            config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
+
     verify_model_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
-        # avoid manipulating user-provided overrides
+        # avoid manipulating the user-provided overrides
         overrides = copy.deepcopy(overrides)
         # apply customized model names
         overrides = parse_dotlist_conf(overrides)  # convert to a dict
@@ -291,7 +307,7 @@ def get_config(
         )
         # remove `model.names` from overrides since it's already applied.
         overrides.pop("model.names", None)
-        # apply all the overrides
+        # apply the user-provided overrides
         config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
     verify_model_names(config.model)
     return config
@@ -467,11 +483,17 @@ def select_model(
         raise ValueError("No model is available for this dataset.")
     # only allow no more than 1 fusion model
     assert len(fusion_model_name) <= 1
+
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
-    else:  # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
-        if len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+    elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+        if data_status[CATEGORICAL] or data_status[NUMERICAL]:
+            # retain the fusion model for uni-modal tabular data.
+            assert len(fusion_model_name) == 1
+            selected_model_names.extend(fusion_model_name)
+        else:
+            # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
             delattr(config.model, fusion_model_name[0])
 
     config.model.names = selected_model_names
@@ -785,7 +807,11 @@ def create_model(
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=all_models)
     elif len(all_models) == 1:
-        return all_models[0]
+        if isinstance(all_models[0], NumericalTransformer) or isinstance(all_models[0], CategoricalTransformer):
+            # retain fusion model for uni-modal tabular data
+            return fusion_model(models=all_models)
+        else:
+            return all_models[0]
     else:
         raise ValueError(f"No available models for {names}")
 
@@ -1039,7 +1065,8 @@ def compute_score(
 
 
 def parse_dotlist_conf(conf):
-    """Parse the config files that is potentially in the dotlist format to a dictionary
+    """
+    Parse the config files that is potentially in the dotlist format to a dictionary.
 
     Parameters
     ----------
@@ -1439,9 +1466,7 @@ class CustomUnpickler(pickle.Unpickler):
 
     def find_class(self, module, name):
         renamed_module = module
-        if module == "autogluon.text.automm.data.preprocess_dataframe":
-            renamed_module = "autogluon.multimodal.data.preprocess_dataframe"
-        elif module == "autogluon.text.automm.data":
-            renamed_module = "autogluon.multimodal.data"
+        if module.startswith("autogluon.text.automm"):
+            renamed_module = module.replace("autogluon.text.automm", "autogluon.multimodal")
 
         return super(CustomUnpickler, self).find_class(renamed_module, name)

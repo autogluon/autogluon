@@ -1,4 +1,4 @@
-from autogluon.multimodal.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import mean_squared_error
 import argparse

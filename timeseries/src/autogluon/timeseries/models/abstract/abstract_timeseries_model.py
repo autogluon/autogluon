@@ -1,7 +1,7 @@
 import copy
 import logging
 import time
-from typing import Any, Dict, Union, Tuple, Optional
+from typing import Any, Dict, Union, Tuple, Optional, List
 
 import autogluon.core as ag
 from autogluon.core.models import AbstractModel
@@ -85,7 +85,9 @@ class AbstractTimeSeriesModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(
+            eval_metric
+        )
         self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
@@ -99,6 +101,9 @@ class AbstractTimeSeriesModel(AbstractModel):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
+
+    def __repr__(self) -> str:
+        return self.name
 
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
@@ -194,6 +199,32 @@ class AbstractTimeSeriesModel(AbstractModel):
         track of the time limit, etc.
         """
         raise NotImplementedError
+
+    def _check_fit_params(self):
+        # gracefully handle hyperparameter specifications if they are provided to fit instead
+        if any(isinstance(v, ag.Space) for v in self.params.values()):
+            raise ValueError(
+                "Hyperparameter spaces provided to `fit`. Please provide concrete values "
+                "as hyperparameters when initializing or use `hyperparameter_tune` instead."
+            )
+
+    def _check_predict_inputs(
+        self,
+        data: TimeSeriesDataFrame,
+        quantile_levels: Optional[List[float]] = None,
+        **kwargs,  # noqa: F841
+    ):
+        logger.debug(f"Predicting with time series model {self.name}")
+        logger.debug(
+            f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
+            f"Average time series length is {len(data) / data.num_items}."
+        )
+
+        quantiles = quantile_levels or self.quantile_levels
+        if not all(0 < q < 1 for q in quantiles):
+            raise ValueError(
+                "Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive)."
+            )
 
     def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
