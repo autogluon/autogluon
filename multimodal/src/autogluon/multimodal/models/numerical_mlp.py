@@ -24,7 +24,7 @@ class NumericalMLP(nn.Module):
         dropout_prob: Optional[float] = 0.5,
         normalization: Optional[str] = "layer_norm",
         num_classes: Optional[int] = 0,
-        d_token: Optional[int] = 3,
+        d_token: Optional[int] = 8,
         embedding_arch: Optional[List[str]] = None,
     ):
         """
