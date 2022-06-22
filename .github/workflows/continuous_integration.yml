@@ -92,6 +92,7 @@ jobs:
   #         command: chmod +x ./.github/workflow_scripts/test_multimodal.sh && ./.github/workflow_scripts/test_multimodal.sh
   test_vision:
     runs-on: ubuntu-latest
+    needs: lint_check
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
