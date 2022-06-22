@@ -41,7 +41,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     DeepAR=50,
     Prophet=10,
     AutoTabular=10,
-    AutoARIMA=60,
+    AutoARIMA=20,
     AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
@@ -155,7 +155,14 @@ def get_preset_models(
     invalid_model_names = set(invalid_model_names)
     all_assigned_names = set(invalid_model_names)
 
-    for model, model_hps in hyperparameters.items():
+    model_priority_list = sorted(
+        hyperparameters.keys(),
+        key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0),
+        reverse=True
+    )
+
+    for model in model_priority_list:
+        model_hps = hyperparameters[model]
         if isinstance(model, str):
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")
