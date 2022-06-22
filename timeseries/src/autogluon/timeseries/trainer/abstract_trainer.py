@@ -624,9 +624,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         except ValueError as e:
             logger.error(str(e))
 
-        if self.enable_ensemble:
-            self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
-
         return model_names_trained
 
     def fit_ensemble(self, val_data, model_names):
@@ -694,6 +691,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             evaluator(val_data, forecasts)
             * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
         )
+
         simple_ensemble.val_score = model_score
 
         predict_time = 0

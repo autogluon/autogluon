@@ -284,17 +284,10 @@ class TimeSeriesEvaluator:
     def __call__(
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
     ) -> float:
-        try:
-            assert all(
-                len(predictions.loc[i]) == self.prediction_length
-                for i in predictions.iter_items()
-            )
-        except AssertionError:
-            logger.error("Eval errored!!")
-            logger.error(predictions)
-            for i in predictions.iter_items():
-                logger.error(predictions.loc[i])
-
+        assert all(
+            len(predictions.loc[i]) == self.prediction_length
+            for i in predictions.iter_items()
+        )
         assert set(predictions.iter_items()) == set(
             data.iter_items()
         ), "Prediction and data indices do not match."
