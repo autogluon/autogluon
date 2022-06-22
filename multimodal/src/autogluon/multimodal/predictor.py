@@ -59,7 +59,6 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.mixup import MixupModule
 
 from .utils import (
     create_model,
@@ -798,9 +797,9 @@ class AutoMMPredictor:
             )
 
         loss_func = get_loss_func(
-            self._problem_type,
-            mixup_active,
-            OmegaConf.select(config, "optimization.loss_function"),
+            problem_type=self._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
         self._config = config
@@ -918,7 +917,7 @@ class AutoMMPredictor:
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.mixup_off_epoch"),
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1801,14 +1800,9 @@ class AutoMMPredictor:
         if not resume:
             predictor._continuous_training = True
 
-        mixup_active, _ = get_mixup(
-            model_config=OmegaConf.select(predictor._config, "model"),
-            mixup_config=OmegaConf.select(predictor._config, "data.mixup"),
-            num_classes=predictor._output_shape,
-        )
         loss_func = get_loss_func(
             problem_type=predictor._problem_type,
-            mixup_active=mixup_active,
+            mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
         )
         predictor._loss_func = loss_func

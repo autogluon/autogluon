@@ -2,7 +2,8 @@
 :label:`sec_automm_customization`
 
 AutoMM has a powerful yet easy-to-use configuration design.
-This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of four parts: 
+This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of four parts:
+
 - optimization
 - environment
 - model
@@ -22,6 +23,7 @@ predictor.fit(hyperparameters={"optimization.learning_rate": 5.0e-4})
 
 ### optimization.optim_type
 Optimizer type.
+
 - `"sgd"`: stochastic gradient descent with momentum.
 - `"adam"`: a stochastic gradient descent method that is based on adaptive estimation of first-order and second-order moments. See [this paper](https://arxiv.org/abs/1412.6980) for details.
 - `"adamw"`: improves adam by decoupling the weight decay from the optimization step. See [this paper](https://arxiv.org/abs/1711.05101) for details.
@@ -55,6 +57,7 @@ predictor.fit(hyperparameters={"optimization.lr_decay": 1})
 
 ### optimization.lr_schedule
 Learning rate schedule.
+
 - `"cosine_decay"`: the decay of learning rate follows the cosine curve.
 - `"polynomial_decay"`: the learning rate is decayed based on polynomial functions. 
 - `"linear_decay"`: linearly decay the learing rate.
@@ -106,6 +109,7 @@ predictor.fit(hyperparameters={"optimization.patience": 5})
 
 ### optimization.val_check_interval
 How often within one training epoch to check the validation set. Can specify as float or int.
+
 - pass a float in the range [0.0, 1.0] to check after a fraction of the training epoch.
 - pass an int to check after a fixed number of training batches.
 ```
@@ -126,6 +130,7 @@ predictor.fit(hyperparameters={"optimization.top_k": 5})
 
 ### optimization.top_k_average_method
 Use what strategy to average the top k model checkpoints.
+
 - `"greedy_soup"`: try to add the checkpoints from best to worst into the averaging pool and stop if the averaged checkpoint performance decreases. See [the paper](https://arxiv.org/pdf/2203.05482.pdf) for details.
 - `"uniform_soup"`: average all the top k checkpoints as the final checkpoint.
 - `"best"`: pick the checkpoint with the best validation performance.
@@ -138,6 +143,7 @@ predictor.fit(hyperparameters={"optimization.top_k_average_method": "uniform_sou
 
 ### optimization.efficient_finetune
 Finetune only a small portion of parameters instead of one whole pretrained backbone.
+
 - `"bit_fit"`: bias parameters only.
 - `"norm_fit"`: normalization parameters + bias parameters.
 - `"lora"`: LoRA Adaptors. See [this paper](https://arxiv.org/abs/2106.09685) for details.
@@ -221,6 +227,7 @@ predictor.fit(hyperparameters={"env.num_workers_evaluation": 4})
 
 ### env.strategy
 Distributed training mode.
+
 - `"dp"`: data parallel.
 - `"ddp"`: distributed data parallel (python script based).
 - `"ddp_spawn"`: distributed data parallel (spawn based).
@@ -237,6 +244,7 @@ predictor.fit(hyperparameters={"env.strategy": "ddp"})
 
 ### model.names
 Choose what types of models to use.
+
 - `"hf_text"`: the pretrained text models from [Huggingface](https://huggingface.co/).
 - `"timm_image"`: the pretrained image models from [TIMM](https://github.com/rwightman/pytorch-image-models/tree/master/timm/models).
 - `"clip"`: the pretrained CLIP models.
@@ -281,6 +289,7 @@ predictor.fit(hyperparameters={"model.timm_image.checkpoint_name": "vit_base_pat
 
 ### data.image.missing_value_strategy
 How to deal with missing images, opening which fails.
+
 - `"skip"`: skip a sample with missing images.
 - `"zero"`: use zero image to replace a missing image.
 
@@ -333,6 +342,7 @@ predictor.fit(hyperparameters={"data.numerical.scaler_with_std": False})
 
 ### data.label.numerical_label_preprocessing
 How to process the numerical labels in regression tasks.
+
 - `"standardscaler"`: standardize numerical labels by removing the mean and scaling to unit variance.
 - `"minmaxscaler"`: transform numerical labels by scaling each feature to range (0, 1).
 

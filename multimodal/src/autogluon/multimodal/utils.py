@@ -1447,9 +1447,9 @@ def get_mixup(
             mixup_alpha=mixup_config.mixup_alpha,
             cutmix_alpha=mixup_config.cutmix_alpha,
             cutmix_minmax=mixup_config.cutmix_minmax,
-            prob=mixup_config.mixup_prob,
-            switch_prob=mixup_config.mixup_switch_prob,
-            mode=mixup_config.mixup_mode,
+            prob=mixup_config.prob,
+            switch_prob=mixup_config.switch_prob,
+            mode=mixup_config.mode,
             label_smoothing=mixup_config.label_smoothing,
             num_classes=num_classes,
         )
