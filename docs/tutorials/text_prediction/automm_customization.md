@@ -1,7 +1,8 @@
 # AutoMMPredictor for Image, Text, and Tabular
 :label:`sec_automm_customization`
 
-This tutorial walks you through customizing various AutoMM configurations to give you advanced control of the fitting process. Specifically, AutoMM configurations consist of four parts: 
+AutoMM has a powerful yet easy-to-use configuration design.
+This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of four parts: 
 - optimization
 - environment
 - model
@@ -233,4 +234,191 @@ predictor.fit(hyperparameters={"env.strategy": "ddp"})
 ```
 
 ## Model
+
+### model.names
+Choose what types of models to use.
+- `"hf_text"`: the pretrained text models from [Huggingface](https://huggingface.co/).
+- `"timm_image"`: the pretrained image models from [TIMM](https://github.com/rwightman/pytorch-image-models/tree/master/timm/models).
+- `"clip"`: the pretrained CLIP models.
+- `"categorical_mlp"`: MLP for categorical data.
+- `"numerical_mlp"`: MLP for numerical data.
+- `"categorical_transformer"`: [FT-Transformer](https://arxiv.org/pdf/2106.11959.pdf) for categorical data.
+- `"numerical_transformer"`: [FT-Transformer](https://arxiv.org/pdf/2106.11959.pdf) for numerical data.
+- `"fusion_mlp"`: MLP-based fusion for features from multiple backbones.
+- `"fusion_transformer"`: transformer-based fusion for features from multiple backbones.
+
+If no data of one modality is detected, the related model types will be automatically removed in training.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.names": ["hf_text", "timm_image", "clip", "categorical_mlp", "numerical_mlp", "fusion_mlp"]})
+# use only text models
+predictor.fit(hyperparameters={"model.names": ["hf_text"]})
+# use only image models
+predictor.fit(hyperparameters={"model.names": ["timm_image"]})
+# use only clip models
+predictor.fit(hyperparameters={"model.names": ["clip"]})
+```
+
+### model.hf_text.checkpoint_name
+Specify a text backbone supported by the Hugginface [AutoModel](https://huggingface.co/transformers/v3.0.2/model_doc/auto.html#automodel).
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.checkpoint_name": "google/electra-base-discriminator"})
+# choose roberta base
+predictor.fit(hyperparameters={"model.hf_text.checkpoint_name": "roberta-base"})
+```
+
+### model.timm_image.checkpoint_name
+Select an image backbone from [TIMM](https://github.com/rwightman/pytorch-image-models/tree/master/timm/models).
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.timm_image.checkpoint_name": "swin_base_patch4_window7_224"})
+# choose a vit base
+predictor.fit(hyperparameters={"model.timm_image.checkpoint_name": "vit_base_patch32_224"})
+```
+
 ## Data
+
+### data.image.missing_value_strategy
+How to deal with missing images, opening which fails.
+- `"skip"`: skip a sample with missing images.
+- `"zero"`: use zero image to replace a missing image.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.image.missing_value_strategy": "skip"})
+# use zero image
+predictor.fit(hyperparameters={"data.image.missing_value_strategy": "zero"})
+```
+
+### data.categorical.convert_to_text
+Whether to treat categorical data as text. If true, no categorical models would be used.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.categorical.convert_to_text": True})
+# turn off the conversion
+predictor.fit(hyperparameters={"data.categorical.convert_to_text": False})
+```
+
+### data.numerical.convert_to_text
+Whether to convert numerical data to text. If true, no numerical models would be used.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.numerical.convert_to_text": False})
+# turn on the conversion
+predictor.fit(hyperparameters={"data.numerical.convert_to_text": True})
+```
+
+### data.numerical.scaler_with_mean
+If True, center the numerical data before scaling.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.numerical.scaler_with_mean": True})
+# turn off centering
+predictor.fit(hyperparameters={"data.numerical.scaler_with_mean": False})
+```
+
+### data.numerical.scaler_with_std
+If True, scale the numerical data to unit variance.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.numerical.scaler_with_std": True})
+# turn off scaling
+predictor.fit(hyperparameters={"data.numerical.scaler_with_std": False})
+```
+
+### data.label.numerical_label_preprocessing
+How to process the numerical labels in regression tasks.
+- `"standardscaler"`: standardize numerical labels by removing the mean and scaling to unit variance.
+- `"minmaxscaler"`: transform numerical labels by scaling each feature to range (0, 1).
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.label.numerical_label_preprocessing": "standardscaler"})
+# scale numerical labels to (0, 1)
+predictor.fit(hyperparameters={"data.label.numerical_label_preprocessing": "minmaxscaler"})
+```
+
+### data.pos_label
+The positive label in a binary classification task. Users need to specify this label to properly use some metrics, e.g., roc_auc, average_precision, and f1.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.pos_label": None})
+# assume the labels are ["changed", "not changed"] and "changed" is the positive label
+predictor.fit(hyperparameters={"data.pos_label": "changed"})
+```
+
+### data.mixup.turn_on
+If true, use Mixup in training.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.turn_on": False})
+# turn on Mixup
+predictor.fit(hyperparameters={"data.mixup.turn_on": True})
+```
+
+### data.mixup.mixup_alpha
+Mixup alpha value. Mixup is active if `data.mixup.mixup_alpha` > 0.  
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.mixup_alpha": 0.8})
+# set it to 1.0 to turn off Mixup
+predictor.fit(hyperparameters={"data.mixup.mixup_alpha": 1.0})
+```
+
+### data.mixup.cutmix_alpha
+Cutomix alpha value. Cutomix is active if `data.mixup.cutmix_alpha` > 0. 
+
+```
+# by default, Cutmix is turned off by using alpha 1.0
+predictor.fit(hyperparameters={"data.mixup.cutmix_alpha": 1.0})
+# turn it on by choosing a number in range (0, 1)
+predictor.fit(hyperparameters={"data.mixup.cutmix_alpha": 0.8})
+```
+
+### data.mixup.mixup_prob
+The probability of conducting Mixup or Cutmix if enabled.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.mixup_prob": 1.0})
+# set probability to 0.5
+predictor.fit(hyperparameters={"data.mixup.mixup_prob": 0.5})
+```
+
+### data.mixup.mixup_switch_prob
+The probability of switching to cutmix instead of mixup when both are active.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.mixup_switch_prob": 0.5})
+# set probability to 0.7
+predictor.fit(hyperparameters={"data.mixup.mixup_switch_prob": 0.7})
+```
+
+### data.mixup.mixup_mode
+How to apply Mixup or Cutmix params (per `"batch"`, `"pair"` (pair of elements), `"elem"` (element).
+See [here](https://github.com/rwightman/pytorch-image-models/blob/d30685c283137b4b91ea43c4e595c964cd2cb6f0/timm/data/mixup.py#L211-L216) for more details.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.mixup_mode": "batch"})
+# use "pair"
+predictor.fit(hyperparameters={"data.mixup.mixup_mode": "pair"})
+```
+
+### data.mixup.label_smoothing
+Apply label smoothing to the mixed label tensors.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.label_smoothing": 0.1})
+# set it to 0.2
+predictor.fit(hyperparameters={"data.mixup.label_smoothing": 0.2})
+```
