@@ -393,34 +393,34 @@ predictor.fit(hyperparameters={"data.mixup.cutmix_alpha": 1.0})
 predictor.fit(hyperparameters={"data.mixup.cutmix_alpha": 0.8})
 ```
 
-### data.mixup.mixup_prob
+### data.mixup.prob
 The probability of conducting Mixup or Cutmix if enabled.
 
 ```
 # default used by AutoMM
-predictor.fit(hyperparameters={"data.mixup.mixup_prob": 1.0})
+predictor.fit(hyperparameters={"data.mixup.prob": 1.0})
 # set probability to 0.5
-predictor.fit(hyperparameters={"data.mixup.mixup_prob": 0.5})
+predictor.fit(hyperparameters={"data.mixup.prob": 0.5})
 ```
 
-### data.mixup.mixup_switch_prob
+### data.mixup.switch_prob
 The probability of switching to cutmix instead of mixup when both are active.
 ```
 # default used by AutoMM
-predictor.fit(hyperparameters={"data.mixup.mixup_switch_prob": 0.5})
+predictor.fit(hyperparameters={"data.mixup.switch_prob": 0.5})
 # set probability to 0.7
-predictor.fit(hyperparameters={"data.mixup.mixup_switch_prob": 0.7})
+predictor.fit(hyperparameters={"data.mixup.switch_prob": 0.7})
 ```
 
-### data.mixup.mixup_mode
+### data.mixup.mode
 How to apply Mixup or Cutmix params (per `"batch"`, `"pair"` (pair of elements), `"elem"` (element).
 See [here](https://github.com/rwightman/pytorch-image-models/blob/d30685c283137b4b91ea43c4e595c964cd2cb6f0/timm/data/mixup.py#L211-L216) for more details.
 
 ```
 # default used by AutoMM
-predictor.fit(hyperparameters={"data.mixup.mixup_mode": "batch"})
+predictor.fit(hyperparameters={"data.mixup.mode": "batch"})
 # use "pair"
-predictor.fit(hyperparameters={"data.mixup.mixup_mode": "pair"})
+predictor.fit(hyperparameters={"data.mixup.mode": "pair"})
 ```
 
 ### data.mixup.label_smoothing
@@ -432,3 +432,14 @@ predictor.fit(hyperparameters={"data.mixup.label_smoothing": 0.1})
 # set it to 0.2
 predictor.fit(hyperparameters={"data.mixup.label_smoothing": 0.2})
 ```
+
+### data.mixup.turn_off_epoch
+Stop Mixup or Cutmix after reaching this number of epochs.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.mixup.turn_off_epoch": 5})
+# turn off mixup after 7 epochs
+predictor.fit(hyperparameters={"data.mixup.turn_off_epoch": 7})
+```
+
