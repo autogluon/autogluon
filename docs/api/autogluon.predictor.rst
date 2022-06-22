@@ -26,6 +26,28 @@ AutoGluon Predictors
 
    >>> leaderboard = predictor.leaderboard(test_data)
 
+.. admonition:: Example (Deep learning predictor for image, text and multimodal data):
+
+   Import AutoMMPredictor:
+
+   >>> from autogluon.multimodal import AutoMMPredictor
+   >>> from datasets import load_dataset
+
+   Load a multimodal data table:
+
+   >>> train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1)
+
+   Fit classification models predicting the "class" column:
+
+   >>> predictor = AutoMMPredictor(label="label").fit(train_data)
+
+   Load test data:
+
+   >>> test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
+
+   Evaluate predictions on test data:
+
+   >>> score = predictor.evaluate(test_data)
 
 
 Predictors
