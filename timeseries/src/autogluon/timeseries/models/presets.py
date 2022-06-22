@@ -78,7 +78,7 @@ def get_default_hps(key, prediction_length):
         },
         "default": {
             "AutoETS": {},
-            "AutoARIMA": {},
+            # "AutoARIMA": {},
             "SimpleFeedForward": {},
             "MQCNN": {},
             "MQRNN": {},
@@ -109,7 +109,7 @@ def get_default_hps(key, prediction_length):
                 ),
             },
             "AutoETS": {"error": ag.Categorical("add", "mul")},
-            "AutoARIMA": {"max_p": ag.Int(2, 4)}
+            # "AutoARIMA": {"max_p": ag.Int(2, 4)}
         },
     }
     return default_model_hps[key]
