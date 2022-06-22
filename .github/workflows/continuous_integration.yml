@@ -7,30 +7,24 @@ on:
 permissions:
   id-token: write
 
-# Ensures that only one CI task per PR will run at a time.
-# This won't affect any push event
-concurrency:
-  group: CI-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
-
 defaults:
   run:
     shell: bash
 
 jobs:
-  # lint_check:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Lint Check on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-CPU
-  #         job-name: AutoGluon-LintCheck
-  #         command: chmod +x ./.github/workflow_scripts/lint_check.sh && ./.github/workflow_scripts/lint_check.sh
+  lint_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Lint Check on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-CPU
+          job-name: AutoGluon-LintCheck
+          command: chmod +x ./.github/workflow_scripts/lint_check.sh && ./.github/workflow_scripts/lint_check.sh
   test_common:
-    # needs: lint_check
+    needs: lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
