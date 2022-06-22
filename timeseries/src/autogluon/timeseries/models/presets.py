@@ -107,8 +107,8 @@ def get_default_hps(key, prediction_length):
                     default=prediction_length,
                 ),
             },
-            "AutoETS": {},
-            "AutoARIMA": {}
+            "AutoETS": {"error": ag.Categorical("add", "mul")},
+            "AutoARIMA": {"max_p": ag.Int(2, 4)}
         },
     }
     return default_model_hps[key]
