@@ -3,6 +3,7 @@ from unittest import mock
 
 import numpy as np
 import pytest
+from flaky import flaky
 
 import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -89,6 +90,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
     assert dict_equal_primitive(model.metadata, loaded_model.metadata)
 
 
+@flaky
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
     model_class, temp_model_path
@@ -106,7 +108,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 
     _, _, results = model.hyperparameter_tune(
         scheduler_options=scheduler_options,
-        time_limit=100,
+        time_limit=300,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
