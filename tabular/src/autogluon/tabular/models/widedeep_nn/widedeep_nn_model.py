@@ -77,6 +77,9 @@ class WideDeepNNModel(AbstractModel):
         best_epoch_stop = params.get("best_epoch", None)  # Use best epoch for refit_full.
         batch_size = self.__get_batch_size(params)
 
+        if batch_size > len(X_train):
+            batch_size = len(X_train)
+
         tab_opt = torch.optim.Adam(model.deeptabular.parameters(), lr=params['lr'])
         tab_sch = torch.optim.lr_scheduler.OneCycleLR(  # superconvergence schedule
             tab_opt,
