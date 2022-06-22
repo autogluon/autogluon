@@ -123,6 +123,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
+            warnings.simplefilter("ignore", category=RuntimeWarning)
 
             self.skt_forecaster.fit(
                 self._to_skt_data_frame(train_data[[self.target]]), fh=self._fh()
@@ -142,7 +143,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         #  test indices are not identical
         if not self._fit_index.equals(data.index):
             logger.warning(
-                f"\tDifferent set of items than those provided during training were provided for "
+                f"Different set of items than those provided during training were provided for "
                 f"prediction. The model {self.name} will be re-trained on newly provided data"
             )
             self._fit(data)

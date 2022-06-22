@@ -803,7 +803,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model = self._get_model_for_prediction(model)
         eval_metric = self.eval_metric if metric is None else metric
         evaluator = TimeSeriesEvaluator(
-            eval_metric=eval_metric, prediction_length=self.prediction_length
+            eval_metric=eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
         )
 
         if isinstance(model, TimeSeriesEnsembleWrapper):
