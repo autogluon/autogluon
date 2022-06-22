@@ -1,4 +1,4 @@
-# AutoMMPredictor for Text Prediction - Quick Start
+# AutoMM for Text - Quick Start
 :label:`sec_automm_textprediction_beginner`
 
 `AutoMMPredictor` can solve problems where the data are either image, text, numerical values, or categorical features. 
