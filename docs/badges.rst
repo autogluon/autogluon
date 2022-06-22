@@ -1,4 +1,4 @@
-.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.4.0-blue
+.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.4.2-blue
 .. _ReleaseVersion: https://auto.gluon.ai/dev/versions.html
 .. |StableVersion| image:: https://img.shields.io/github/v/release/awslabs/autogluon?color=blue&label=stable%20release&sort=semver
 .. _StableVersion: https://auto.gluon.ai/stable/index.html

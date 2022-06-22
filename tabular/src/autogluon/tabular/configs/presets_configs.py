@@ -33,6 +33,9 @@ tabular_presets_dict = dict(
     # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
     ignore_text={'_feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False, 'enable_raw_text_features': False}},
 
+    # Fit only interpretable models.
+    interpretable={'auto_stack': False, 'hyperparameters': 'interpretable'},
+
     # TODO: Consider HPO-enabled configs if training time doesn't matter but inference latency does.
 )
 

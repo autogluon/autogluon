@@ -39,11 +39,14 @@ extras_require = {
         'xgboost>=1.4,<1.5',
     ],
     'fastai': [
-        'torch>=1.0,<1.11',
+        'torch>=1.0,<1.12',
         'fastai>=2.3.1,<2.6',
     ],
     'skex': [
         'scikit-learn-intelex>=2021.5,<2021.6',
+    ],
+    'imodels': [
+        'imodels>=1.3.0',
     ],
     'vowpalwabbit': [
         'vowpalwabbit>=8.10,<8.11'
@@ -57,11 +60,11 @@ for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai']:
 all_requires = list(set(all_requires))
 extras_require['all'] = all_requires
 
-tests_requires = []
-for extra_package in ['vowpalwabbit']:
-    tests_requires += extras_require[extra_package]
-extras_require['tests'] = tests_requires
 
+test_requires = []
+for test_package in ['imodels', 'vowpalwabbit']:
+    test_requires += extras_require[test_package]
+extras_require['tests'] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == '__main__':

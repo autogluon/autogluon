@@ -1,7 +1,7 @@
 max_time = 180
 
 setup_mxnet_gpu = """
-    python3 -m pip install mxnet-cu101==1.7.0
+    python3 -m pip install mxnet-cu112==1.9.*
     export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
     nvidia-smi
     ls -1a /usr/local | grep cuda
@@ -48,21 +48,49 @@ install_tabular_all = """
     python3 -m pip install --upgrade -e tabular/[all,tests]
 """
 
+install_multimodal = """
+    python3 -m pip install --upgrade -e multimodal/[tests]
+"""
+
 install_text = """
-    python3 -m pip install --upgrade -e text/
+    python3 -m pip install --upgrade -e text/[tests]
 """
 
 install_vision = """
     python3 -m pip install --upgrade -e vision/
 """
 
-install_forecasting = """
-    python3 -m pip install --upgrade -e forecasting/
+install_timeseries = """
+    python3 -m pip install --upgrade -e timeseries/[all,tests]
 """
 
 install_autogluon = """
     python3 -m pip install --upgrade -e autogluon/
 """
+
+stage("Lint Check") {
+  parallel 'lint': {
+    node('linux-cpu') {
+      ws('workspace/autogluon-lint-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-lint-py3-v3 -y
+          conda env update -n autogluon-lint-py3-v3 -f docs/build.yml
+          conda activate autogluon-lint-py3-v3
+          conda list
+          # Perform lint check
+          black --check --diff multimodal/src/autogluon/multimodal
+          """
+        }
+      }
+    }
+  }
+}
 
 stage("Unit Test") {
   parallel 'common': {
@@ -156,11 +184,43 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_tabular_all}
+          ${install_multimodal}
           ${install_text}
           ${install_vision}
 
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow tests
+          """
+        }
+      }
+    }
+  },
+  'multimodal': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-multimodal-py3-v3') {
+        timeout(time: max_time, unit: 'MINUTES') {
+          checkout scm
+          VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+          sh """#!/bin/bash
+          set -ex
+          # conda create allows overwrite the existing env with -y flag, but does not take file as input
+          # hence create the new env and update it with file
+          conda create -n autogluon-multimodal-py3-v3 -y
+          conda env update -n autogluon-multimodal-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-multimodal-py3-v3
+          conda list
+          export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+
+          ${install_core_all_tests}
+          ${install_features}
+          # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
+          python3 -m pip uninstall -y typing
+          ${install_multimodal}
+          # launch different process for each test to make sure memory is released
+          python3 -m pip install --upgrade pytest-xdist
+
+          cd multimodal/
+          python3 -m pytest --junitxml=results.xml --forked --runslow tests
           """
         }
       }
@@ -184,6 +244,7 @@ stage("Unit Test") {
 
           ${install_core_all_tests}
           ${install_features}
+          ${install_multimodal}
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
           ${install_text}
@@ -227,9 +288,9 @@ stage("Unit Test") {
       }
     }
   },
-  'forecasting': {
+  'timeseries': {
     node('linux-gpu') {
-      ws('workspace/autogluon-forecasting-py3-v3') {
+      ws('workspace/autogluon-timeseries-py3-v3') {
         timeout(time: max_time, unit: 'MINUTES') {
           checkout scm
           VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
@@ -237,17 +298,17 @@ stage("Unit Test") {
           set -ex
           # conda create allows overwrite the existing env with -y flag, but does not take file as input
           # hence create the new env and update it with file
-          conda create -n autogluon-forecasting-py3-v3 -y
-          conda env update -n autogluon-forecasting-py3-v3 -f docs/build_gpu.yml
-          conda activate autogluon-forecasting-py3-v3
+          conda create -n autogluon-timeseries-py3-v3 -y
+          conda env update -n autogluon-timeseries-py3-v3 -f docs/build_gpu.yml
+          conda activate autogluon-timeseries-py3-v3
           conda list
           ${setup_mxnet_gpu}
           export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
           ${install_core_all_tests}
           ${install_features}
           ${install_tabular_all}
-          ${install_forecasting}
-          cd forecasting/
+          ${install_timeseries}
+          cd timeseries/
           python3 -m pytest --junitxml=results.xml --runslow tests
           """
         }
@@ -269,7 +330,7 @@ stage("Unit Test") {
           conda activate autogluon-install-py3-v3
           conda list
 
-          python3 -m pip install 'mxnet==1.7.0.*'
+          python3 -m pip install 'mxnet==1.9.*'
 
           ${install_core_all_tests}
           ${install_features}
@@ -278,9 +339,10 @@ stage("Unit Test") {
           # Python 3.7 bug workaround: https://github.com/python/typing/issues/573
           python3 -m pip uninstall -y typing
 
+          ${install_multimodal}
           ${install_text}
           ${install_vision}
-          ${install_forecasting}
+          ${install_timeseries}
           ${install_autogluon}
           """
         }
@@ -384,6 +446,36 @@ stage("Build Tutorials") {
       }
     }
   },
+  'multimodal': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-multimodal-v3') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-multimodal-v3 -y
+        conda env update -n autogluon-tutorial-multimodal-v3 -f docs/build_contrib_gpu.yml
+        conda activate autogluon-tutorial-multimodal-v3
+        conda list
+
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        export AG_DOCS=1
+        export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
+
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/multimodal
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(multimodal)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/rst/tutorials/multimodal/*', name: 'multimodal'
+      }
+    }
+  },
   'text_prediction': {
     node('linux-gpu') {
       ws('workspace/autogluon-tutorial-text-v3') {
@@ -442,18 +534,18 @@ stage("Build Tutorials") {
       }
     }
   },
-  'forecasting': {
+  'timeseries': {
     node('linux-gpu') {
-      ws('workspace/autogluon-forecasting-py3-v3') {
+      ws('workspace/autogluon-timeseries-py3-v3') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
         # conda create allows overwrite the existing env with -y flag, but does not take file as input
         # hence create the new env and update it with file
-        conda create -n autogluon-tutorial-forecasting-v3 -y
-        conda env update -n autogluon-tutorial-forecasting-v3 -f docs/build_contrib_gpu.yml
-        conda activate autogluon-tutorial-forecasting-v3
+        conda create -n autogluon-tutorial-timeseries-v3 -y
+        conda env update -n autogluon-tutorial-timeseries-v3 -f docs/build_contrib_gpu.yml
+        conda activate autogluon-tutorial-timeseries-v3
         conda list
         ${setup_mxnet_gpu}
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
@@ -463,12 +555,12 @@ stage("Build Tutorials") {
         git clean -fx
         bash docs/build_pip_install.sh
 
-        # only build for docs/forecasting
+        # only build for docs/timeseries
         shopt -s extglob
-        rm -rf ./docs/tutorials/!(forecasting)
+        rm -rf ./docs/tutorials/!(timeseries)
         cd docs && rm -rf _build && d2lbook build rst && cd ..
         """
-        stash includes: 'docs/_build/rst/tutorials/forecasting/*', name: 'forecasting'
+        stash includes: 'docs/_build/rst/tutorials/timeseries/*', name: 'timeseries'
       }
     }
   }
@@ -516,9 +608,10 @@ stage("Build Docs") {
         unstash 'image_prediction'
         unstash 'object_detection'
         unstash 'tabular'
+        unstash 'multimodal'
         unstash 'text'
         unstash 'cloud_fit_deploy'
-        unstash 'forecasting'
+        unstash 'timeseries'
 
         sh """#!/bin/bash
         set -ex
@@ -537,9 +630,10 @@ stage("Build Docs") {
         ${install_core_all_tests}
         ${install_features}
         ${install_tabular_all}
+        ${install_multimodal}
         ${install_text}
         ${install_vision}
-        ${install_forecasting}
+        ${install_timeseries}
         ${install_autogluon}
 
         sed -i -e 's/###_PLACEHOLDER_WEB_CONTENT_ROOT_###/http:\\/\\/${escaped_context_root}/g' docs/config.ini

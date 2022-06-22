@@ -1,7 +1,7 @@
 AutoGluon: AutoML for Text, Image, and Tabular Data
 ====================================================
 
-.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.4.0-blue
+.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.4.2-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
 .. |StableVersion| image:: https://img.shields.io/github/v/release/awslabs/autogluon?color=blue&label=stable%20release&sort=semver
@@ -37,7 +37,15 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
    >>> predictor = TabularPredictor(label='class').fit(train_data=train_data)
    >>> predictions = predictor.predict(test_data)
 
-   AutoGluon can be applied just as easily for prediction tasks with image or text data.
+   AutoGluon can be applied for prediction tasks that involve image or text data. For adopting state-of-the-art deep learning models for multimodal prediction problems, you may try `autogluon.multimodal`:
+
+   >>> from autogluon.multimodal import AutoMMPredictor
+   >>> from datasets import load_dataset
+   >>> train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1)
+   >>> test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
+   >>> predictor = AutoMMPredictor(label='label').fit(train_data)
+   >>> predictions = predictor.predict(test_data)
+   >>> score = predictor.evaluate(test_data)
 
 
 Installation
@@ -51,6 +59,7 @@ Quick Start
 
 .. raw:: html
    :file: static/application.html
+
 
 Tutorials
 ---------
@@ -83,7 +92,7 @@ Tutorials
 
    .. card::
       :title: Multimodal Prediction
-      :link: tutorials/tabular_prediction/tabular-multimodal.html
+      :link: tutorials/multimodal/index.html
 
       How to solve problems that contain Image, Text, and Tabular features at the same time.
 
@@ -93,10 +102,10 @@ Tutorials
    :hidden:
 
    tutorials/tabular_prediction/index
+   tutorials/multimodal/index
    tutorials/image_prediction/index
    tutorials/object_detection/index
    tutorials/text_prediction/index
-   tutorials/tabular_prediction/tabular-multimodal
    tutorials/cloud_fit_deploy/index
    cheatsheet.rst
    api/autogluon.predictor

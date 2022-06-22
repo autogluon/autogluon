@@ -1,4 +1,9 @@
+import logging
 import platform
+
+from types import ModuleType
+
+from ..version import __version__
 
 __all__ = [
     'try_import_mxboard',
@@ -8,13 +13,15 @@ __all__ = [
     'try_import_xgboost',
     'try_import_faiss',
     'try_import_fastai',
-    'try_import_cv2',
     'try_import_torch',
     'try_import_d8',
-    'try_import_skopt',
     'try_import_autogluon_text',
     'try_import_autogluon_vision',
-    'try_import_rapids_cuml']
+    'try_import_rapids_cuml',
+    'try_import_imodels',
+]
+
+logger = logging.getLogger(__name__)
 
 
 def try_import_mxboard():
@@ -46,15 +53,15 @@ def try_import_mxnet():
             "or `pip install mxnet_cu101 --upgrade`")
 
 
-def try_import_ray():
+def try_import_ray() -> ModuleType:
     ray_max_version_os_map = dict(
-        Darwin='1.11.0',
-        Windows='1.11.0',
-        Linux='1.11.0',
+        Darwin='1.14.0',
+        Windows='1.14.0',
+        Linux='1.14.0',
     )
-    ray_min_version = '1.10.0'
+    ray_min_version = '1.13.0'
     current_os = platform.system()
-    ray_max_version = ray_max_version_os_map.get(current_os, '1.11.0')
+    ray_max_version = ray_max_version_os_map.get(current_os, '1.14.0')
     try:
         import ray
         from distutils.version import LooseVersion
@@ -74,14 +81,70 @@ def try_import_ray():
             "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
             "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
         )
+        
+        
+def try_import_ray_lightning():
+    """This function tries to import ray lightning and check if the compatible pytorch lightning version is installed"""
+    supported_ray_lightning_min_version = '0.2.0'
+    supported_ray_lightning_max_version = '0.3.0'
+    ray_lightning_torch_lightning_compatibility_map = {
+        '0.2.x': '1.5.x',
+    }
+    ray_lightining_torch_lightning_compatibility_range_map = {
+        ('0.2.0', '0.3.0'): ('1.5.0', '1.6.0'),
+    }
+    try:
+        import pkg_resources
+        import pytorch_lightning
+        import ray_lightning
+        from distutils.version import LooseVersion
+        
+        ray_lightning_version = pkg_resources.get_distribution('ray_lightning').version # ray_lightning doesn't have __version__...
+        
+        if not (LooseVersion(supported_ray_lightning_min_version)
+                <= LooseVersion(ray_lightning_version)
+                < LooseVersion(supported_ray_lightning_max_version)):
+            logger.log(
+                f"ray_lightning=={ray_lightning_version} detected. "
+                f"{supported_ray_lightning_min_version} <= ray_lighting < {supported_ray_lightning_max_version} is required."
+                "You can use pip to install certain version of ray_lightning."
+                f"Supported ray_lightning versions and the compatible torch lightning versions are {ray_lightning_torch_lightning_compatibility_map}."
+            )
+            return False
+        
+        for ray_lightning_versions, torch_lightning_versions in ray_lightining_torch_lightning_compatibility_range_map.items():
+            ray_lightning_min_version, ray_lightning_max_version = ray_lightning_versions
+            torch_lightning_min_version, torch_lightning_max_version = torch_lightning_versions
+            if (
+                LooseVersion(ray_lightning_min_version)
+                <= LooseVersion(ray_lightning_version)
+                < LooseVersion(ray_lightning_max_version)
+            ):
+                if not (LooseVersion(torch_lightning_min_version)
+                        <= LooseVersion(pytorch_lightning.__version__)
+                        < LooseVersion(torch_lightning_max_version)):
+                    logger.log(
+                        f"Found ray_lightning {ray_lightning_version} that's not compatible with pytorch_lightning."
+                        f"The compatible version of pytorch_lightning is >= {torch_lightning_min_version} and < {torch_lightning_max_version}."
+                    )
+                    return False
+        return True
+            
+
+    except ImportError:
+        logger.info(
+            "You can enable each individual trial using multiple gpus by installing ray_lightning."
+            f"Supported ray_lightning versions and the compatible torch lightning versions are {ray_lightning_torch_lightning_compatibility_map}."
+        )
+        return False
 
 
 def try_import_catboost():
     try:
         import catboost
     except ImportError as e:
-        raise ImportError("`import catboost` failed."
-                          "A quick tip is to install via `pip install catboost`.")
+        raise ImportError("`import catboost` failed. "
+                          f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`.")
     except ValueError as e:
         raise ImportError("Import catboost failed. Numpy version may be outdated, "
                           "Please ensure numpy version >=1.17.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
@@ -93,7 +156,7 @@ def try_import_lightgbm():
         import lightgbm
     except ImportError as e:
         raise ImportError("`import lightgbm` failed. "
-                          "A quick tip is to install via `pip install lightgbm`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[lightgbm]=={__version__}`.")
     except OSError as e:
         raise ImportError("`import lightgbm` failed. If you are using Mac OSX, "
                           "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
@@ -104,7 +167,7 @@ def try_import_xgboost():
         import xgboost
     except ImportError:
         raise ImportError("`import xgboost` failed. "
-                          "A quick tip is to install via `pip install xgboost`.")
+                          f"A quick tip is to install via `pip install autogluon.tabular[xgboost]=={__version__}`.")
 
 
 def try_import_faiss():
@@ -128,17 +191,7 @@ def try_import_fastai():
         import autogluon.tabular.models.fastainn.imports_helper
 
     except ModuleNotFoundError as e:
-        raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==2.*`. "
-                          "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")
-
-
-def try_import_cv2():
-    try:
-        import cv2
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency cv2. "
-            "A quick tip is to install via `pip install opencv-python`. ")
+        raise ImportError(f"Import fastai failed. A quick tip is to install via `pip install autogluon.tabular[fastai]=={__version__}`. ")
 
 
 def try_import_torch():
@@ -158,21 +211,12 @@ def try_import_d8():
                           "A quick tip is to install via `pip install d8`.\n")
 
 
-def try_import_skopt():
-    try:
-        import skopt
-    except ImportError:
-        raise ImportError("`import skopt` failed. skopt is an optional dependency and may not be installed.\n"
-                          "A quick tip is to install via `pip install scikit-optimize`.")
-
-
 def try_import_autogluon_text():
     try:
         import autogluon.text
     except ImportError:
         raise ImportError("`import autogluon.text` failed.\n"
-                          "A quick tip is to install via `pip install autogluon.text`.\n"
-                          "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
+                          f"A quick tip is to install via `pip install autogluon.text=={__version__}`.\n")
 
 
 def try_import_autogluon_vision():
@@ -180,8 +224,7 @@ def try_import_autogluon_vision():
         import autogluon.vision
     except ImportError:
         raise ImportError("`import autogluon.vision` failed.\n"
-                          "A quick tip is to install via `pip install autogluon.vision`.\n"
-                          "Ensure that the version installed is the same as the version of the other autogluon modules seen in `pip freeze`.")
+                          f"A quick tip is to install via `pip install autogluon.vision=={__version__}`.\n")
 
 
 def try_import_rapids_cuml():
@@ -193,6 +236,15 @@ def try_import_rapids_cuml():
                           "You will likely need to create a fresh conda environment based off of a RAPIDS install, and then install AutoGluon on it.\n"
                           "RAPIDS is highly experimental within AutoGluon, and we recommend to only use RAPIDS if you are an advanced user / developer.\n"
                           "Please refer to RAPIDS install instructions for more information: https://rapids.ai/start.html#get-rapids")
+
+
+def try_import_imodels():
+    try:
+        import imodels
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency imodels. "
+            "A quick tip is to install via `pip install imodels`. ")
 
 
 def try_import_vowpalwabbit():

@@ -2,45 +2,6 @@ Tutorials
 =========
 
 
-Image Prediction
-----------------
-.. container:: cards
-
-   .. card::
-      :title: Dataset Preparation for Image Predictor
-      :link: image_prediction/dataset.html
-
-      Quick dataset preparation guide for image prediction.
-
-   .. card::
-      :title: Quick Start Using FIT
-      :link: image_prediction/beginner.html
-
-      5 min tutorial on classifying images.
-
-   .. card::
-      :title: Customized Search and HPO
-      :link: image_prediction/hpo.html
-
-      Hyperparameter tuning to improve image classification accuracy.
-
-
-Object Detection
-----------------
-.. container:: cards
-
-   .. card::
-      :title: Dataset Preparation for Object Detector
-      :link: object_detection/dataset.html
-
-      Quick dataset preparation guide for object detection.
-
-   .. card::
-      :title: Quick Start Using FIT
-      :link: object_detection/beginner.html
-
-      5 min tutorial on detecting objects in images.
-
 
 Tabular Prediction
 ------------------
@@ -100,6 +61,69 @@ Tabular Prediction
 
       Frequently asked questions about AutoGluon-Tabular.
 
+
+Multimodal Prediction
+---------------------
+.. container:: cards
+
+   .. card::
+      :title: Use AutoGluon Multimodal for Text Prediction: Quick Start
+      :link: multimodal/beginner_text.html
+
+      How to train high-quality text prediction models with AutoMMPredictor in under 5 minutes.
+
+   .. card::
+      :title: Solving Multilingual Problems
+      :link: multimodal/multilingual_text.html
+
+      How to use AutoMMPredictor to build models on datasets with languages other than English.
+
+   .. card::
+      :title: Multimodal Data Tables with Text
+      :link: multimodal/multimodal_text_tabular.html
+
+      How AutoMMPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
+
+
+Image Prediction
+----------------
+.. container:: cards
+
+   .. card::
+      :title: Dataset Preparation for Image Predictor
+      :link: image_prediction/dataset.html
+
+      Quick dataset preparation guide for image prediction.
+
+   .. card::
+      :title: Quick Start Using FIT
+      :link: image_prediction/beginner.html
+
+      5 min tutorial on classifying images.
+
+   .. card::
+      :title: Customized Search and HPO
+      :link: image_prediction/hpo.html
+
+      Hyperparameter tuning to improve image classification accuracy.
+
+
+Object Detection
+----------------
+.. container:: cards
+
+   .. card::
+      :title: Dataset Preparation for Object Detector
+      :link: object_detection/dataset.html
+
+      Quick dataset preparation guide for object detection.
+
+   .. card::
+      :title: Quick Start Using FIT
+      :link: object_detection/beginner.html
+
+      5 min tutorial on detecting objects in images.
+
 Text Prediction
 ---------------
 .. container:: cards
@@ -157,4 +181,5 @@ Cloud Training and Deployment
    object_detection/index
    text_prediction/index
    tabular_prediction/index
-   customize/index
+   multimodal/index
+   cloud_fit_deploy/index

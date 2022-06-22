@@ -3,7 +3,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from typing import List, Union, Tuple
+from typing import Dict, List, Union, Tuple
 
 import networkx as nx
 import numpy as np
@@ -57,6 +57,8 @@ class AbstractTrainer:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
         logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
+        if not self.eval_metric.greater_is_better:
+            logger.log(25, "\tThis metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value.")
         if not (self.eval_metric.needs_pred or self.eval_metric.needs_quantile):
             logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
@@ -77,8 +79,6 @@ class AbstractTrainer:
 
         self.models = {}  # Dict of model name -> model object. A key, value pair only exists if a model is persisted in memory.  # TODO: v0.1 Rename and consider making private
         self.model_graph = nx.DiGraph()  # Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain other models. Contains numerous metadata regarding each model.
-        self.model_full_dict = {}  # Dict of normal model -> FULL model. FULL models are produced by self.refit_single_full() and self.refit_ensemble_full().
-        self._model_full_dict_val_score = {}  # Dict of FULL model -> normal model validation score in case the normal model had been deleted.
         self.reset_paths = False
 
         self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
@@ -473,6 +473,7 @@ class AbstractTrainer:
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
+        compute_score = not refit_full
         if refit_full and X_val is not None:
             X_init = pd.concat([X_init, X_val])
             y = pd.concat([y, y_val])
@@ -485,7 +486,7 @@ class AbstractTrainer:
 
         # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
         return self._train_multi(X=X_init, y=y, X_val=X_val, y_val=y_val, X_unlabeled=X_unlabeled,
-                                 models=models, level=level, stack_name=stack_name, fit_kwargs=fit_kwargs, **kwargs)
+                                 models=models, level=level, stack_name=stack_name, compute_score=compute_score, fit_kwargs=fit_kwargs, **kwargs)
 
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
@@ -738,8 +739,9 @@ class AbstractTrainer:
                 model_name = model.name
                 reuse_first_fold = False
                 if isinstance(model, BaggedEnsembleModel):
-                    # Re-use if model is already _FULL
-                    reuse_first_fold = not model._bagged_mode
+                    # Re-use if model is already _FULL and no X_val
+                    if X_val is None:
+                        reuse_first_fold = not model._bagged_mode
                 if not reuse_first_fold:
                     if isinstance(model, BaggedEnsembleModel):
                         can_refit_full = model._get_tags_child().get('can_refit_full', False)
@@ -767,7 +769,11 @@ class AbstractTrainer:
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 for model_trained in models_trained:
-                    self._model_full_dict_val_score[model_trained] = self.get_model_attribute(model_name, 'val_score')
+                    self._update_model_attr(model_trained,
+                                            refit_full=True,
+                                            refit_full_parent=model_name,
+                                            refit_full_parent_val_score=self.get_model_attribute(model_name, 'val_score'),
+                                            )
                 models_trained_full += models_trained
 
         keys_to_del = []
@@ -776,7 +782,6 @@ class AbstractTrainer:
                 keys_to_del.append(model)
         for key in keys_to_del:
             del model_full_dict[key]
-        self.model_full_dict.update(model_full_dict)
         self.save()  # TODO: This could be more efficient by passing in arg to not save if called by refit_ensemble_full since it saves anyways later.
         return models_trained_full
 
@@ -792,9 +797,10 @@ class AbstractTrainer:
             ensemble_set = self.get_minimum_model_set(model)
         existing_models = self.get_model_names()
         ensemble_set_valid = []
+        model_full_dict = self.get_model_full_dict()
         for model in ensemble_set:
-            if model in self.model_full_dict and self.model_full_dict[model] in existing_models:
-                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{self.model_full_dict[model]}', skipping refit...")
+            if model in model_full_dict and model_full_dict[model] in existing_models:
+                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_full_dict[model]}', skipping refit...")
             else:
                 ensemble_set_valid.append(model)
         if ensemble_set_valid:
@@ -802,6 +808,7 @@ class AbstractTrainer:
         else:
             models_trained_full = []
 
+        model_full_dict = self.get_model_full_dict()
         for model_full in models_trained_full:
             # TODO: Consider moving base model info to a separate pkl file so that it can be edited without having to load/save the model again
             #  Downside: Slower inference speed when models are not persisted in memory prior.
@@ -809,7 +816,7 @@ class AbstractTrainer:
             if isinstance(model_loaded, StackerEnsembleModel):
                 for stack_column_prefix in model_loaded.stack_column_prefix_lst:
                     base_model = model_loaded.stack_column_prefix_to_model_map[stack_column_prefix]
-                    new_base_model = self.model_full_dict[base_model]
+                    new_base_model = model_full_dict[base_model]
                     new_base_model_type = self.get_model_attribute(model=new_base_model, attribute='type')
                     new_base_model_path = self.get_model_attribute(model=new_base_model, attribute='path')
 
@@ -829,32 +836,37 @@ class AbstractTrainer:
                     self.model_graph.add_edge(base_model_name, model_loaded.name)
 
         self.save()
-        return copy.deepcopy(self.model_full_dict)
+        return self.get_model_full_dict()
 
     # TODO: Take best performance model with lowest inference
     def get_model_best(self, can_infer=None, allow_full=True, infer_limit=None):
         models = self.get_model_names(can_infer=can_infer)
         if not models:
             raise AssertionError('Trainer has no fit models that can infer.')
-        model_performances = self.get_models_attribute_dict(attribute='val_score')
+        models_full = self.get_models_attribute_dict(models=models, attribute='refit_full_parent')
+        if not allow_full:
+            models = [model for model in models if model not in models_full]
+
         if infer_limit is not None:
-            model_inferences = self.get_models_attribute_full(models=models, attribute='predict_1_time')
-            for model_key in model_inferences:
-                if model_inferences[model_key] > infer_limit:
+            models_predict_1_time = self.get_models_attribute_full(models=models, attribute='predict_1_time')
+            for model_key in models_predict_1_time:
+                if models_predict_1_time[model_key] > infer_limit:
                     models.remove(model_key)
                     logger.log(20, f'Removing {model_key}')
         if not models:
-            raise AssertionError(f'Trainer has no fit models that can infer while satisfying the constraints: (infer_limit={infer_limit}).')
-        perfs = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
+            raise AssertionError(f'Trainer has no fit models that can infer while satisfying the constraints: (infer_limit={infer_limit}, allow_full={allow_full}).')
+        model_performances = self.get_models_attribute_dict(models=models, attribute='val_score')
+        models_predict_time = self.get_models_attribute_full(models=models, attribute='predict_time')  # FIXME: Refit_full???
+
+        perfs = [(m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None]
         if not perfs:
-            model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
-            models = [m for m in models if m in model_full_dict_inverse]
-            perfs = [(m, self._get_full_model_val_score(m)) for m in models]
+            models = [m for m in models if m in models_full]
+            perfs = [(m, self.get_model_attribute(model=m, attribute='refit_full_parent_val_score'), models_predict_time[m]) for m in models]
             if not perfs:
                 raise AssertionError('No fit models that can infer exist with a validation score to choose the best model.')
             elif not allow_full:
                 raise AssertionError('No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model.')
-        return max(perfs, key=lambda i: i[1])[0]
+        return max(perfs, key=lambda i: (i[1], -i[2]))[0]
 
     def save_model(self, model, reduce_memory=True):
         # TODO: In future perhaps give option for the reduce_memory_size arguments, perhaps trainer level variables specified by user?
@@ -1032,7 +1044,7 @@ class AbstractTrainer:
         model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **model_fit_kwargs)
         return model
 
-    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, **model_fit_kwargs) -> List[str]:
+    def _train_and_save(self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name='core', level=1, compute_score=True, **model_fit_kwargs) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -1080,7 +1092,10 @@ class AbstractTrainer:
             else:
                 w = None
                 w_val = None
-            if isinstance(model, BaggedEnsembleModel):
+            if not compute_score:
+                score = None
+                model.predict_time = None
+            elif isinstance(model, BaggedEnsembleModel):
                 if X_val is not None and y_val is not None:
                     score = model.score(X=X_val, y=y_val, sample_weight=w_val)
                 elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
@@ -1204,13 +1219,26 @@ class AbstractTrainer:
             del model
         return True
 
+    # TODO: Once Python min-version is 3.8, can refactor to use positional-only argument for model
+    #  https://peps.python.org/pep-0570/#empowering-library-authors
+    #  Currently this method cannot accept the attribute key 'model' without making usage ugly.
+    def _update_model_attr(self, model: str, **attributes):
+        """Updates model node in graph with the input attributes dictionary"""
+        if model not in self.model_graph:
+            raise AssertionError(f'"{model}" is not a key in self.model_graph, cannot add attributes: {attributes}')
+        self.model_graph.nodes[model].update(attributes)
+
     def _log_model_stats(self, model):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
                 logger.log(20, f'\tNote: model has different eval_metric than default.')
-            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation score   ({model.eval_metric.name})')
+            if not model.eval_metric.greater_is_better:
+                sign_str = '-'
+            else:
+                sign_str = ''
+            logger.log(20, f'\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})')
         if model.fit_time is not None:
             logger.log(20, f'\t{round(model.fit_time, 2)}s\t = Training   runtime')
         if model.predict_time is not None:
@@ -1234,9 +1262,28 @@ class AbstractTrainer:
             logger.log(20, f'\t{round(predict_1_time_full, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
-    def _train_single_full(self, X, y, model: AbstractModel, X_unlabeled=None, X_val=None, y_val=None, X_pseudo=None, y_pseudo=None,
-                           feature_prune=False, hyperparameter_tune_kwargs=None,
-                           stack_name='core', k_fold=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=1, time_limit=None, fit_kwargs=None, **kwargs) -> List[str]:
+    def _train_single_full(self,
+                           X,
+                           y,
+                           model: AbstractModel,
+                           X_unlabeled=None,
+                           X_val=None,
+                           y_val=None,
+                           X_pseudo=None,
+                           y_pseudo=None,
+                           feature_prune=False,
+                           hyperparameter_tune_kwargs=None,
+                           stack_name='core',
+                           k_fold=None,
+                           k_fold_start=0,
+                           k_fold_end=None,
+                           n_repeats=None,
+                           n_repeat_start=0,
+                           level=1,
+                           time_limit=None,
+                           fit_kwargs=None,
+                           compute_score=True,
+                           **kwargs) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -1293,7 +1340,18 @@ class AbstractTrainer:
             if isinstance(model, BaggedEnsembleModel):
                 bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
-            model_names_trained = self._train_and_save(X, y, model, X_val, y_val, X_unlabeled=X_unlabeled, stack_name=stack_name, level=level, **model_fit_kwargs)
+            model_names_trained = self._train_and_save(
+                X=X,
+                y=y,
+                model=model,
+                X_val=X_val,
+                y_val=y_val,
+                X_unlabeled=X_unlabeled,
+                stack_name=stack_name,
+                level=level,
+                compute_score=compute_score,
+                **model_fit_kwargs
+            )
         self.save()
         return model_names_trained
 
@@ -1816,11 +1874,21 @@ class AbstractTrainer:
             models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
-    # TODO: v0.1 Proper error catching
-    # Returns attribute value for the given model
-    def get_model_attribute(self, model, attribute: str):
+    def get_model_attribute(self, model, attribute: str, **kwargs):
+        """
+        Return model attribute value.
+        If `default` is specified, return default value if attribute does not exist.
+        If `default` is not specified, raise ValueError if attribute does not exist.
+        """
         if not isinstance(model, str):
             model = model.name
+        if model not in self.model_graph.nodes:
+            raise ValueError(f'Model does not exist: (model={model})')
+        if attribute not in self.model_graph.nodes[model]:
+            if 'default' in kwargs:
+                return kwargs['default']
+            else:
+                raise ValueError(f'Model does not contain attribute: (model={model}, attribute={attribute})')
         return self.model_graph.nodes[model][attribute]
 
     def set_model_attribute(self, model, attribute: str, val):
@@ -1853,6 +1921,17 @@ class AbstractTrainer:
             model = model.name
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
+
+    def get_model_full_dict(self, inverse=False) -> Dict[str, str]:
+        """
+        Returns dict of parent model -> refit model
+
+        If inverse=True, return dict of refit model -> parent model
+        """
+        model_full_dict = self.get_models_attribute_dict(attribute='refit_full_parent')
+        if not inverse:
+            model_full_dict = {parent: refit for refit, parent in model_full_dict.items()}
+        return model_full_dict
 
     def _get_banned_model_names(self) -> list:
         """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
@@ -2174,21 +2253,6 @@ class AbstractTrainer:
 
     def _process_hyperparameters(self, hyperparameters: dict) -> dict:
         return process_hyperparameters(hyperparameters=hyperparameters)
-
-    def _get_full_model_val_score(self, model: str) -> float:
-        model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
-        model_performances = self.get_models_attribute_dict(attribute='val_score')
-
-        normal_model = model_full_dict_inverse[model]
-        if normal_model not in model_performances:
-            # normal model is deleted
-            if model not in self._model_full_dict_val_score:
-                raise ValueError(f'_FULL model {model} had the model it was based on ({normal_model}) deleted, and the validation score was not stored.')
-            val_score = self._model_full_dict_val_score[model]
-        else:
-            # normal model exists
-            val_score = model_performances[normal_model]
-        return val_score
 
     def distill(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None,
                 time_limit=None, hyperparameters=None, holdout_frac=None, verbosity=None,

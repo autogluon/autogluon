@@ -10,7 +10,8 @@ from autogluon.core.trainer.utils import process_hyperparameters
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
-    ImagePredictorModel, VowpalWabbitModel
+    ImagePredictorModel, VowpalWabbitModel, \
+    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,13 @@ DEFAULT_MODEL_PRIORITY = dict(
     AG_IMAGE_NN=0,
     TRANSF=0,
     custom=0,
+
+    # interpretable models
+    IM_RULEFIT=0,
+    IM_GREEDYTREE=0,
+    IM_FIGS=0,
+    IM_HSTREE=0,
+    IM_BOOSTEDRULES=0,
 )
 
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
@@ -71,8 +79,16 @@ MODEL_TYPES = dict(
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+
+    # interpretable models
+    IM_RULEFIT=RuleFitModel,
+    IM_GREEDYTREE=GreedyTreeModel,
+    IM_FIGS=FigsModel,
+    IM_HSTREE=HSTreeModel,
+    IM_BOOSTEDRULES=BoostedRulesModel,
     VW=VowpalWabbitModel
 )
+
 
 DEFAULT_MODEL_NAMES = {
     RFModel: 'RandomForest',
@@ -92,6 +108,13 @@ DEFAULT_MODEL_NAMES = {
     VowpalWabbitModel: 'VowpalWabbit',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
     SimpleWeightedEnsembleModel: 'WeightedEnsemble',
+
+    # Interpretable models
+    RuleFitModel: 'RuleFit',
+    GreedyTreeModel: 'GreedyTree',
+    FigsModel: 'Figs',
+    HSTreeModel: 'HierarchicalShrinkageTree',
+    BoostedRulesModel: 'BoostedRules',
 }
 
 
