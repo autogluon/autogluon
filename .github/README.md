@@ -19,6 +19,6 @@ The CI is consisted with two parts:
 ### Maintainers
 For maintainers with write permission, the easiest way to update our workflow is push to a branch under `awslabs/autogluon`.
 The Push event will trigger the workflow to reflect your latest changes.
-Once you are satisfied with the changes and the CI passed, start a pull request. CI for both Push and Pull Request event will be triggered in the pull request, and **only the one with Push event reflects the latest changes**
+Once you are satisfied with the changes and the CI passed, start a pull request. CI for both Push and Pull Request event will be triggered in the pull request, and **only the one with Push event reflects your latest workflow changes**
 
 If you try to update the workflow from your fork, **only changes under `.github/workflow_scripts`** will be reflected.
