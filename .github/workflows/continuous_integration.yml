@@ -12,11 +12,11 @@ defaults:
     shell: bash
 
 jobs:
-  lint_check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+  # lint_check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+        # uses: actions/checkout@v2
       # - name: Lint Check on AWS Batch
       #   uses: ./.github/actions/submit-job
       #   with:
@@ -107,18 +107,18 @@ jobs:
   #         job-type: CI-GPU
   #         job-name: AutoGluon-Vision
   #         command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
-  test_timeseries:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Timeseries on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Forecasting
-          command: chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh
+  # test_timeseries:
+  #   needs: lint_check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Timeseries on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Forecasting
+  #         command: chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh
   # test_install:
   #   needs: lint_check
   #   runs-on: ubuntu-latest
@@ -131,90 +131,90 @@ jobs:
   #         job-type: CI-CPU
   #         job-name: AutoGluon-Install
   #         command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
-  # build_image_prediction_tutorial:
-  #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Setup Env Vars
-  #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Image Prediction Tutorial on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-GPU
-  #         job-name: AutoGluon-BuildImagePrediction
-  #         command: chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # build_object_detection_tutorial:
-  #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Setup Env Vars
-  #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Object Detection Tutorial on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-GPU
-  #         job-name: AutoGluon-BuildObjectDetection
-  #         command: chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # build_tabular_prediction_tutorial:
-  #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Setup Env Vars
-  #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Tabular Prediction Tutorial on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-GPU
-  #         job-name: AutoGluon-BuildTabularPrediction
-  #         command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # build_text_prediction_tutorial:
-  #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Setup Env Vars
-  #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Text Prediction Tutorial on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-GPU
-  #         job-name: AutoGluon-BuildTextPrediction
-  #         command: chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # build_cloud_fit_deploy_tutorial:
-  #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Setup Env Vars
-  #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-CPU
-  #         job-name: AutoGluon-BuildCloudFitDeploy
-  #         command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # build_timeseries_tutorial:
-  #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Setup Env Vars
-  #       uses: ./.github/actions/setup-env-vars
-  #     - name: Build Timeseries Tutorial on AWS Batch
-  #       uses: ./.github/actions/submit-job
-  #       with:
-  #         job-type: CI-GPU
-  #         job-name: AutoGluon-BuildTimeseries
-  #         command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  build_image_prediction_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Image Prediction Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-BuildImagePrediction
+          command: chmod +x ./.github/workflow_scripts/build_image_prediction_tutorial.sh && ./.github/workflow_scripts/build_image_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  build_object_detection_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Object Detection Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-BuildObjectDetection
+          command: chmod +x ./.github/workflow_scripts/build_object_detection_tutorial.sh && ./.github/workflow_scripts/build_object_detection_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  build_tabular_prediction_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Tabular Prediction Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-BuildTabularPrediction
+          command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  build_text_prediction_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Text Prediction Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-BuildTextPrediction
+          command: chmod +x ./.github/workflow_scripts/build_text_prediction_tutorial.sh && ./.github/workflow_scripts/build_text_prediction_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  build_cloud_fit_deploy_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Cloud Fit Deploy Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-CPU
+          job-name: AutoGluon-BuildCloudFitDeploy
+          command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+  build_timeseries_tutorial:
+    # needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Build Timeseries Tutorial on AWS Batch
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-BuildTimeseries
+          command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
   # build_all_docs:
   #   needs: [build_image_prediction_tutorial, build_object_detection_tutorial, build_tabular_prediction_tutorial, build_text_prediction_tutorial, build_cloud_fit_deploy_tutorial, build_forecasting_tutorial]
   #   runs-on: ubuntu-latest
