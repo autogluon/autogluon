@@ -1677,7 +1677,7 @@ class AutoMMPredictor:
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = pickle.load(fp)
+                data_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
             if TEXT in data_processors:
                 data_processors[TEXT] = load_text_tokenizers(

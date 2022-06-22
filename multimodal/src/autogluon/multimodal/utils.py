@@ -1466,9 +1466,7 @@ class CustomUnpickler(pickle.Unpickler):
 
     def find_class(self, module, name):
         renamed_module = module
-        if module == "autogluon.text.automm.data.preprocess_dataframe":
-            renamed_module = "autogluon.multimodal.data.preprocess_dataframe"
-        elif module == "autogluon.text.automm.data":
-            renamed_module = "autogluon.multimodal.data"
+        if module.startswith("autogluon.text.automm"):
+            renamed_module = module.replace("autogluon.text.automm", "autogluon.multimodal")
 
         return super(CustomUnpickler, self).find_class(renamed_module, name)
