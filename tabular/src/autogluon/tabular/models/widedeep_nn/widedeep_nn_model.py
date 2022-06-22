@@ -138,6 +138,12 @@ class WideDeepNNModel(AbstractModel):
                 **system_params
             )
 
+            # Torch expects longs for categoricals - converting if present (see dionis dataset)
+            for ds in [X_train, X_valid]:
+                for k, d in ds.items():
+                    if ds[k].dtype == np.uint16:
+                        ds[k] = ds[k].astype(np.int64)
+
             trainer.fit(
                 X_train=X_train,
                 X_val=X_valid,
