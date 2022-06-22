@@ -364,7 +364,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             node_attrs.update(
                 dict(
                     model=model,
-                    predict_time=None,
                 )
             )
         self.model_graph.add_node(model.name, **node_attrs)
@@ -432,9 +431,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         )
 
         if hpo_results:
+            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
+                sign_str = '-'
+            else:
+                sign_str = ''
             logger.info(
                 f"\t{hpo_results.get('best_reward'):<7.4f}".ljust(15)
-                + f"= Validation score ({self.eval_metric})"
+                + f"= Validation score ({sign_str}{self.eval_metric})"
             )
             logger.info(
                 f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15)
@@ -509,9 +512,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         predict_time: Optional[float] = None,
     ):
         if val_score is not None:
+            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
+                sign_str = '-'
+            else:
+                sign_str = ''
             logger.info(
                 f"\t{val_score:<7.4f}".ljust(15)
-                + f"= Validation score ({self.eval_metric})"
+                + f"= Validation score ({sign_str}{self.eval_metric})"
             )
         if fit_time is not None:
             logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
@@ -603,6 +610,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     train_data, model=model, val_data=val_data, time_limit=time_left
                 )
 
+        if self.enable_ensemble:
+            model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=model_names_trained))
+
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         try:
@@ -614,9 +624,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         except ValueError as e:
             logger.error(str(e))
 
-        if self.enable_ensemble:
-            self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
-
         return model_names_trained
 
     def fit_ensemble(self, val_data, model_names):
@@ -626,7 +633,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             target_column=self.target,
         )
 
-        logging.info("Fitting simple weighted ensemble")
+        logger.info("Fitting simple weighted ensemble.")
 
         model_preds = {}
         for model_name in model_names:
@@ -684,14 +691,23 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             evaluator(val_data, forecasts)
             * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
         )
-        logging.info(f"\t Finished fitting {simple_ensemble.name}.")
-        self._log_scores_and_times(
-            val_score=model_score, fit_time=simple_ensemble.fit_time
-        )
 
         simple_ensemble.val_score = model_score
 
+        predict_time = 0
+        # FIXME: This is a hack, should instead leverage `predict_time_marginal` as in Tabular.
+        for m in final_models_ensemble:
+            predict_time += self.get_model_attribute(model=m, attribute='predict_time')
+        simple_ensemble.predict_time = predict_time
+
+        self._log_scores_and_times(
+            val_score=model_score,
+            fit_time=simple_ensemble.fit_time,
+            predict_time=simple_ensemble.predict_time,
+        )
+
         self._add_model(model=simple_ensemble, base_models=final_models_ensemble)
+        return simple_ensemble.name
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")

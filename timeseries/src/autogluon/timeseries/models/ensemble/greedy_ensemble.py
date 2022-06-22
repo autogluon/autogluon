@@ -61,8 +61,8 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             sample_weight=sample_weight,
         )
         self._calculate_weights()
-        logger.log(30, "Ensemble weights: ")
-        logger.log(30, self.weights_)
+        logger.log(10, "Ensemble weights: ")
+        logger.log(10, self.weights_)
         return self
 
     # TODO: Consider having a removal stage, remove each model and see if
