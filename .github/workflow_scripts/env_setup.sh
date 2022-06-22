@@ -66,7 +66,7 @@ function install_vision {
 }
 
 function install_timeseries {
-    python3 -m pip install --upgrade -e timeseries/
+    python3 -m pip install --upgrade -e timeseries/[all,tests]
 }
 
 function install_autogluon {
