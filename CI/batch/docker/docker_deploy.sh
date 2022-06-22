@@ -2,6 +2,10 @@
 
 TYPE=$1
 
+# This executes a command that logs into ECR for both our CI repo and the AutoGluon DLC container repo.
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 369469875935.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
+
 if [ -z $TYPE ]; then
 	echo "No type detected. Choices: cpu, gpu"
 	exit 1

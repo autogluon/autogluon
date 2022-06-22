@@ -49,7 +49,7 @@ runs:
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }} \
-                                        --name {{ inputs.job-name }}-PR#${{ github.event.number }} \
+                                        --name ${{ inputs.job-name }}-PR#${{ github.event.number }} \
                                         --source-ref ${{ github.event.pull_request.head.sha }} \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \
@@ -62,7 +62,7 @@ runs:
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }} \
-                                        --name {{ inputs.job-name }}-PR#${{ github.event.number }} \
+                                        --name ${{ inputs.job-name }}-PR#${{ github.event.number }} \
                                         --source-ref ${{ github.event.pull_request.head.sha }} \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote https://github.com/${{ github.event.pull_request.head.repo.full_name }} \

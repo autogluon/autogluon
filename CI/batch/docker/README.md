@@ -1,18 +1,19 @@
 # Updating the Docker Image for AWS Batch
-This is for AutoGluon Devs to update the CI docker environment
+This is for AutoGluon Devs to update the CI docker environment.
+
+**IMPORTANT**:
+Please push the changes to our github repository even the docker changes will take effect if you don't. This helps to make sure everyone sees the changes you made and build on top.
 
 To update the docker:
 
 - Update the Dockerfile
+- Log into the AWS account that holds the ECR repo on your dev machine.
 - Export the AWS account credentials as environment variables
 - CD to the same folder as the Dockerfile and execute the following:
 
 ```shell
 # First export your ecr repo address as a environment variable
 export AWS_ECR_REPO=${your_repo}
-
-# This executes a command that logs into ECR.
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $AWS_ECR_REPO
 
 # Following script will build, tag, and push the image
 # For cpu
