@@ -26,7 +26,7 @@ smoothing or ARIMA, through the `sktime library <https://www.sktime.org/en/stabl
 
       Quick start tutorial on fitting models with time-series datasets.
 
-    .. card::
+   .. card::
       :title: FAQ
       :link: forecasting-faq.html
 
