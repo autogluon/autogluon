@@ -710,8 +710,8 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
-                d_token=OmegaConf.select(model_config, 'd_token'),
-                embedding_arch=OmegaConf.select(model_config, 'embedding_arch'),
+                d_token=OmegaConf.select(model_config, "d_token"),
+                embedding_arch=OmegaConf.select(model_config, "embedding_arch"),
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
