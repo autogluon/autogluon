@@ -112,7 +112,6 @@ Tutorials
    tutorials/image_prediction/index
    tutorials/object_detection/index
    tutorials/text_prediction/index
-   tutorials/tabular_prediction/tabular-multimodal
    tutorials/timeseries/index
    tutorials/cloud_fit_deploy/index
    cheatsheet.rst
