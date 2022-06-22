@@ -118,7 +118,6 @@ plt.fill_betweenx(
 plt.legend()
 ```
 
-    
 Below we instantiate a `TimeSeriesPredictor` object and instruct AutoGluon to fit models that can forecast up to 
 5 time-points into the future (`prediction_length`) and save them in the folder `./autogluon-covidforecast`.
 We also specify that AutoGluon should rank models according to mean absolute percentage error (MAPE) and that
