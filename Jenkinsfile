@@ -608,6 +608,7 @@ stage("Build Docs") {
         unstash 'image_prediction'
         unstash 'object_detection'
         unstash 'tabular'
+        unstash 'multimodal'
         unstash 'text'
         unstash 'cloud_fit_deploy'
         unstash 'timeseries'
