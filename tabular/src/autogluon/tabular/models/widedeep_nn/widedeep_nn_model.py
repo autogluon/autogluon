@@ -144,6 +144,7 @@ class WideDeepNNModel(AbstractModel):
                 n_epochs=params['epochs'],
                 batch_size=batch_size,
                 val_split=val_split,
+                drop_last=True
             )
             best_epoch = model_checkpoint.best_epoch
             trainer.model.load_state_dict(torch.load(model_checkpoint.old_files[-1]))
