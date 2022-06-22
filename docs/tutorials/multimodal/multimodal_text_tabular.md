@@ -1,4 +1,4 @@
-# AutoMMPredictor for Multimodal Table with Text
+# Multimodal Table with Text and Tabular Features
 :label:`sec_automm_textprediction_multimodal`
 
 In many applications, text data may be mixed with numeric/categorical data. 
