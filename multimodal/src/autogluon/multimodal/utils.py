@@ -7,6 +7,7 @@ import pandas as pd
 import pickle
 import collections
 import copy
+import sys
 import torch
 from torch import nn
 import warnings
@@ -70,9 +71,17 @@ from .constants import (
     VALID_METRICS,
     VALID_CONFIG_KEYS,
 )
-from .presets import get_automm_preset, get_basic_automm_config
+from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
+
+
+def is_interactive():
+    """
+    Return whether the current process is running under the interactive mode.
+    Check also https://stackoverflow.com/a/64523765
+    """
+    return hasattr(sys, "ps1")
 
 
 def infer_metrics(
@@ -189,7 +198,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
-    preset: Optional[str] = None,
+    presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
 ):
@@ -199,8 +208,8 @@ def get_config(
 
     Parameters
     ----------
-    preset
-        Name of a preset.
+    presets
+        Name of the presets.
     config
         A dictionary including four keys: "model", "data", "optimization", and "environment".
         If any key is not not given, we will fill in with the default value.
@@ -252,11 +261,11 @@ def get_config(
         config = {}
 
     if not isinstance(config, DictConfig):
-        if preset is None:
+        if presets is None:
             basic_config = get_basic_automm_config()
             preset_overrides = None
         else:
-            basic_config, preset_overrides = get_automm_preset(preset=preset)
+            basic_config, preset_overrides = get_automm_presets(presets=presets)
 
         for k, default_value in basic_config.items():
             if k not in config:

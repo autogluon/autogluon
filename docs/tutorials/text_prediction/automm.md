@@ -208,7 +208,7 @@ First, let's see the available presets.
 
 
 ```{.python .input}
-from autogluon.multimodal.presets import list_automm_presets, get_automm_preset
+from autogluon.multimodal.presets import list_automm_presets, get_automm_presets
 presets = list_automm_presets()
 presets
 ```
@@ -217,7 +217,7 @@ Each preset consists of one basic configuration dictionary and some preset-relat
 
 
 ```{.python .input}
-basic_config, preset_overrides = get_automm_preset("default")
+basic_config, preset_overrides = get_automm_presets("default")
 print(basic_config)
 print(preset_overrides)
 ```
@@ -228,7 +228,7 @@ print(preset_overrides)
 ```{.python .input}
 from omegaconf import OmegaConf
 from autogluon.multimodal.utils import get_config
-config = get_config(preset="default")
+config = get_config(presets="default")
 print(OmegaConf.to_yaml(config))
 ```
 
