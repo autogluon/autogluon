@@ -71,7 +71,7 @@ def main(args):
     )
 
     automm_hyperparameters['optimization.learning_rate'] = args.lr
-    automm_hyperparameters['optimization.end_lr'] = args.lr
+    automm_hyperparameters['optimization.end_lr'] = args.end_lr
 
     tabular_hyperparameters = {
         'GBM': [
@@ -155,6 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_dir', default='./dataset', type=str)
     parser.add_argument('--exp_dir', default=None, type=str)
     parser.add_argument('--lr', default=1e-04, type=float)
+    parser.add_argument('--end_lr', default=1e-04, type=float)
     parser.add_argument('--mode', choices=['single', 'weighted', 'single_bag5', 'stack5'], default='single')
     parser.add_argument('--seed', default=0, type=int)
     args = parser.parse_args()
