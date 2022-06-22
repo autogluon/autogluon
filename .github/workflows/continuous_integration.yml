@@ -23,90 +23,90 @@ jobs:
       #     job-type: CI-CPU
       #     job-name: AutoGluon-LintCheck
       #     command: chmod +x ./.github/workflow_scripts/lint_check.sh && ./.github/workflow_scripts/lint_check.sh
-  test_common:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Common on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Common
-          command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
-  test_core:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Core on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Core
-          command: chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
-  test_features:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Features on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Features
-          command: chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
-  test_tabular:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Tabular on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Tabular
-          command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
-  test_text:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Text on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Text
-          command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
-  test_multimodal:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Multimodal on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Multimodal
-          command: chmod +x ./.github/workflow_scripts/test_multimodal.sh && ./.github/workflow_scripts/test_multimodal.sh
-  test_vision:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Vision on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-Vision
-          command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
+  # # test_common:
+  # #   needs: lint_check
+  # #   runs-on: ubuntu-latest
+  # #   steps:
+  # #     - name: Checkout repository
+  # #       uses: actions/checkout@v2
+  # #     - name: Test Common on AWS Batch
+  # #       uses: ./.github/actions/submit-job
+  # #       with:
+  # #         job-type: CI-CPU
+  # #         job-name: AutoGluon-Common
+  # #         command: chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
+  # # test_core:
+  # #   needs: lint_check
+  # #   runs-on: ubuntu-latest
+  # #   steps:
+  # #     - name: Checkout repository
+  # #       uses: actions/checkout@v2
+  # #     - name: Test Core on AWS Batch
+  # #       uses: ./.github/actions/submit-job
+  # #       with:
+  # #         job-type: CI-CPU
+  # #         job-name: AutoGluon-Core
+  # #         command: chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
+  # # test_features:
+  # #   needs: lint_check
+  # #   runs-on: ubuntu-latest
+  # #   steps:
+  # #     - name: Checkout repository
+  # #       uses: actions/checkout@v2
+  # #     - name: Test Features on AWS Batch
+  # #       uses: ./.github/actions/submit-job
+  # #       with:
+  # #         job-type: CI-CPU
+  # #         job-name: AutoGluon-Features
+  # #         command: chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
+  # # test_tabular:
+  # #   needs: lint_check
+  # #   runs-on: ubuntu-latest
+  # #   steps:
+  # #     - name: Checkout repository
+  # #       uses: actions/checkout@v2
+  # #     - name: Test Tabular on AWS Batch
+  # #       uses: ./.github/actions/submit-job
+  # #       with:
+  # #         job-type: CI-GPU
+  # #         job-name: AutoGluon-Tabular
+  # #         command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
+  # # test_text:
+  # #   needs: lint_check
+  # #   runs-on: ubuntu-latest
+  # #   steps:
+  # #     - name: Checkout repository
+  # #       uses: actions/checkout@v2
+  # #     - name: Test Text on AWS Batch
+  # #       uses: ./.github/actions/submit-job
+  # #       with:
+  # #         job-type: CI-GPU
+  # #         job-name: AutoGluon-Text
+  # #         command: chmod +x ./.github/workflow_scripts/test_text.sh && ./.github/workflow_scripts/test_text.sh
+  # test_multimodal:
+  #   needs: lint_check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Multimodal on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Multimodal
+  #         command: chmod +x ./.github/workflow_scripts/test_multimodal.sh && ./.github/workflow_scripts/test_multimodal.sh
+  # test_vision:
+  #   needs: lint_check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Vision on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-Vision
+  #         command: chmod +x ./.github/workflow_scripts/test_vision.sh && ./.github/workflow_scripts/test_vision.sh
   test_timeseries:
     needs: lint_check
     runs-on: ubuntu-latest
@@ -119,18 +119,18 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-Forecasting
           command: chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh
-  test_install:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Test Install on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-Install
-          command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
+  # test_install:
+  #   needs: lint_check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Test Install on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-Install
+  #         command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   # build_image_prediction_tutorial:
   #   needs: [test_common, test_core, test_features, test_tabular, test_text, test_vision, test_forecasting, test_install]
   #   runs-on: ubuntu-latest

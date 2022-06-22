@@ -12,5 +12,5 @@ install_features
 install_tabular_all
 install_timeseries
 
-cd timeeries/
+cd timeseries/
 python3 -m pytest --junitxml=results.xml --runslow tests
