@@ -268,6 +268,7 @@ class NumEmbeddings(nn.Module):
             "autodis",
             "positional",
             "relu",
+            "leaky_relu",
             "layernorm",
         }
 
@@ -317,6 +318,8 @@ class NumEmbeddings(nn.Module):
             layers.append(
                 nn.ReLU()
                 if x == "relu"
+                else nn.LeakyReLU
+                if x == "leaky_relu"
                 else NLinear_(in_features, d_embedding, d_embedding)
                 if x == "linear"
                 else nn.Linear(d_embedding, d_embedding)
