@@ -123,3 +123,6 @@ Refer to the tutorial ":ref:`sec_tabularprediction_text_multimodal`"  for more d
 ## Other Examples
 
 You may go to https://github.com/awslabs/autogluon/tree/master/examples/automm to explore other AutoMMPredictor examples.
+
+## Customization
+To customize AutoMM, please refer to :ref:`sec_automm_customization`.
