@@ -46,8 +46,14 @@ except (ImportError, AssertionError):
     )
 
 extras_require = {
-    "tests": ["pytest", "flake8", "flaky", "pytest-timeout"]
+    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1"],
+    "sktime": ["sktime~=0.12", "pmdarima~=1.8", "tbats~=1.1"],
 }
+
+all_requires = []
+for extra_package in ["sktime"]:
+    all_requires += extras_require[extra_package]
+extras_require['all'] = list(set(all_requires))
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

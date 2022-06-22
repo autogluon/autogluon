@@ -612,12 +612,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         the validation score."""
 
         if model is None:
-            logger.info(
-                "Model not specified in predict, will default to the model with the best validation score",
-            )
             if self.model_best is None:
                 best_model_name: str = self.get_model_best()
                 self.model_best = best_model_name
+            logger.info(
+                f"Model not specified in predict, will default to the model with the "
+                f"best validation score: {self.model_best}",
+            )
             return self.load_model(self.model_best)
         else:
             if isinstance(model, str):
@@ -640,11 +641,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         metric: Optional[str] = None,
     ) -> float:
         model = self._get_model_for_prediction(model)
-
-        # FIXME: this method should be able to score on all data sets regardless of
-        # FIXME: whether the implementation is in GluonTS
-        if not isinstance(model, AbstractGluonTSModel):
-            raise ValueError("Model must be a GluonTS model to score")
 
         # FIXME: when ensembling is implemented, score logic will have to be revised
         # FIXME: in order to enable prior model predictions in the ensemble

@@ -16,13 +16,13 @@ from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactor
 from autogluon.timeseries.models.presets import get_default_hps
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
     "toy",
     DUMMY_TRAINER_HYPERPARAMETERS,
-    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}, "AutoETS": {}},
 ]
 
 
@@ -61,7 +61,7 @@ def test_given_validation_data_when_trainer_called_then_training_is_performed(
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
 )
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
@@ -78,9 +78,33 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
+@pytest.mark.parametrize("eval_metric", ["MAPE"])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
+)
+def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
+    temp_model_path, eval_metric, hyperparameters, expected_board_length
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+
+    test_data = get_data_frame_with_item_index(["A", "B", "C"])
+
+    leaderboard = trainer.leaderboard(test_data)
+
+    assert len(leaderboard) == expected_board_length
+    assert not np.any(np.isnan(leaderboard["score_test"]))
+    assert np.all(leaderboard["score_test"] < 0)  # all MAPEs should be negative
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, expected_board_length",
+    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
 )
 def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
     temp_model_path, hyperparameters, expected_board_length

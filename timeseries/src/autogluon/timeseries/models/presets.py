@@ -15,6 +15,8 @@ from .gluonts import (
     SimpleFeedForwardModel,
     TransformerModel,
 )
+from .sktime import AutoARIMAModel, AutoETSModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +29,20 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    AutoARIMA=AutoARIMAModel,
+    AutoETS=AutoETSModel
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=50,
-    MQRNN=50,
-    SimpleFeedForward=30,
-    Transformer=50,
+    MQCNN=40,
+    MQRNN=40,
+    SimpleFeedForward=50,
+    Transformer=40,
     DeepAR=50,
-    Prophet=50,
+    Prophet=10,
     AutoTabular=10,
+    AutoARIMA=60,
+    AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
@@ -70,6 +76,8 @@ def get_default_hps(key, prediction_length):
             },
         },
         "default": {
+            "AutoETS": {},
+            "AutoARIMA": {},
             "SimpleFeedForward": {},
             "MQCNN": {},
             "MQRNN": {},
@@ -99,6 +107,8 @@ def get_default_hps(key, prediction_length):
                     default=prediction_length,
                 ),
             },
+            "AutoETS": {},
+            "AutoARIMA": {}
         },
     }
     return default_model_hps[key]

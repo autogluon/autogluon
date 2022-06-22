@@ -13,7 +13,6 @@ from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
-import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
@@ -209,12 +208,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 "may not correspond to those specified via `eval_metric`."
             )
 
-        # gracefully handle hyperparameter specifications if they are provided to fit instead
-        if any(isinstance(v, ag.Space) for v in self.params.values()):
-            raise ValueError(
-                "Hyperparameter spaces provided to `fit`. Please provide concrete values "
-                "as hyperparameters when initializing or use `hyperparameter_tune` instead."
-            )
+        self._check_fit_params()
 
         # update auxiliary parameters
         self._deferred_init_params_aux(
@@ -237,6 +231,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
             f"Average time series length is {len(data) / data.num_items}."
         )
+        input_index_type = type(data.index.levels[0][0])
 
         with warning_filter():
             quantiles = quantile_levels or self.quantile_levels
@@ -253,6 +248,17 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
             )
+
+            # if index type is different than the input data, cast it back
+            if len(df.index.levels[0]) > 0:
+                prediction_index_type = type(df.index.levels[0][0])
+                if prediction_index_type is not input_index_type:
+                    df.set_index(
+                        df.index.set_levels(
+                            [input_index_type(i) for i in df.index.levels[0]], level=0
+                        ),
+                        inplace=True,
+                    )
 
         return df
 
@@ -314,7 +320,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))
 
             df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = int(item_id)
+            df[ITEMID] = item_id
             df[TIMESTAMP] = pd.date_range(
                 start=forecasts[i].start_date,
                 periods=self.prediction_length,
@@ -323,6 +329,3 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             result_dfs.append(df)
 
         return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
-
-    def __repr__(self) -> str:
-        return self.name
