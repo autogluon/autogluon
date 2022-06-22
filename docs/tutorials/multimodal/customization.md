@@ -60,7 +60,7 @@ Learning rate schedule.
 
 - `"cosine_decay"`: the decay of learning rate follows the cosine curve.
 - `"polynomial_decay"`: the learning rate is decayed based on polynomial functions. 
-- `"linear_decay"`: linearly decay the learing rate.
+- `"linear_decay"`: linearly decays the learing rate.
 
 ```
 # default used by AutoMM
@@ -81,7 +81,7 @@ predictor.fit(hyperparameters={"optimization.max_epochs": 20})
 
 ### optimization.max_steps
 Stop training after this number of steps. Training will stop if `optimization.max_steps` or `optimization.max_epochs` have reached (earliest).
-By default, we disable `optimization.max_steps` by setting it as -1.
+By default, we disable `optimization.max_steps` by setting it to -1.
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"optimization.max_steps": -1})
@@ -131,9 +131,9 @@ predictor.fit(hyperparameters={"optimization.top_k": 5})
 ### optimization.top_k_average_method
 Use what strategy to average the top k model checkpoints.
 
-- `"greedy_soup"`: try to add the checkpoints from best to worst into the averaging pool and stop if the averaged checkpoint performance decreases. See [the paper](https://arxiv.org/pdf/2203.05482.pdf) for details.
-- `"uniform_soup"`: average all the top k checkpoints as the final checkpoint.
-- `"best"`: pick the checkpoint with the best validation performance.
+- `"greedy_soup"`: tries to add the checkpoints from best to worst into the averaging pool and stop if the averaged checkpoint performance decreases. See [the paper](https://arxiv.org/pdf/2203.05482.pdf) for details.
+- `"uniform_soup"`: averages all the top k checkpoints as the final checkpoint.
+- `"best"`: picks the checkpoint with the best validation performance.
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"optimization.top_k_average_method": "greedy_soup"})
@@ -144,9 +144,9 @@ predictor.fit(hyperparameters={"optimization.top_k_average_method": "uniform_sou
 ### optimization.efficient_finetune
 Finetune only a small portion of parameters instead of one whole pretrained backbone.
 
-- `"bit_fit"`: bias parameters only.
-- `"norm_fit"`: normalization parameters + bias parameters.
-- `"lora"`: LoRA Adaptors. See [this paper](https://arxiv.org/abs/2106.09685) for details.
+- `"bit_fit"`: bias parameters only. See [this paper](https://arxiv.org/pdf/2106.10199.pdf) for details.
+- `"norm_fit"`: normalization parameters + bias parameters. See [this paper](https://arxiv.org/pdf/2003.00152.pdf) for details.
+- `"lora"`: LoRA Adaptors. See [this paper](https://arxiv.org/pdf/2106.09685.pdf) for details.
 - `"lora_bias"`: LoRA Adaptors + bias parameters.
 - `"lora_norm"`: LoRA Adaptors + normalization parameters + bias parameters.
 ```
@@ -197,7 +197,7 @@ predictor.fit(hyperparameters={"env.eval_batch_size_ratio": 2})
 ### env.precision
 Support either double (`64`), float (`32`), bfloat16 (`"bf16"`), or half (`16`) precision training.
 
-Half precision, or mixed precision, is the combined use of 32 and 16 bit floating points to reduce memory footprint during model training. This can result in improved performance, achieving +3X speedups on modern GPUs.
+Half precision, or mixed precision, is the combined use of 32 and 16 bit floating points to reduce memory footprint during model training. This can result in improved performance, achieving +3x speedups on modern GPUs.
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"env.precision": 16})
@@ -206,7 +206,7 @@ predictor.fit(hyperparameters={"env.precision": "bf16"})
 ```
 
 ### env.num_workers
-The number of worker processes used by Pytorch dataloader in training. Note that more workers don't always bring speedup especially when `env.strategy` is `"ddp_spawn"`. 
+The number of worker processes used by the Pytorch dataloader in training. Note that more workers don't always bring speedup especially when `env.strategy = "ddp_spawn"`. 
 For more details, see the guideline [here](https://pytorch-lightning.readthedocs.io/en/stable/accelerators/gpu.html#distributed-data-parallel).
 ```
 # default used by AutoMM
@@ -216,7 +216,7 @@ predictor.fit(hyperparameters={"env.num_workers": 4})
 ```
 
 ### env.num_workers_evaluation
-The number of worker processes used by Pytorch dataloader in prediction or evaluation.
+The number of worker processes used by the Pytorch dataloader in prediction or evaluation.
 
 ```
 # default used by AutoMM
@@ -301,7 +301,7 @@ predictor.fit(hyperparameters={"data.image.missing_value_strategy": "zero"})
 ```
 
 ### data.categorical.convert_to_text
-Whether to treat categorical data as text. If true, no categorical models would be used.
+Whether to treat categorical data as text. If True, no categorical models, e.g., `"categorical_mlp"` and `"categorical_transformer"`, would be used.
 
 ```
 # default used by AutoMM
@@ -311,7 +311,7 @@ predictor.fit(hyperparameters={"data.categorical.convert_to_text": False})
 ```
 
 ### data.numerical.convert_to_text
-Whether to convert numerical data to text. If true, no numerical models would be used.
+Whether to convert numerical data to text. If True, no numerical models e.g., `"numerical_mlp"` and `"numerical_transformer"`, would be used.
 
 ```
 # default used by AutoMM
@@ -321,7 +321,7 @@ predictor.fit(hyperparameters={"data.numerical.convert_to_text": True})
 ```
 
 ### data.numerical.scaler_with_mean
-If True, center the numerical data before scaling.
+If True, center the numerical data (not including the numerical labels) before scaling.
 
 ```
 # default used by AutoMM
@@ -331,7 +331,7 @@ predictor.fit(hyperparameters={"data.numerical.scaler_with_mean": False})
 ```
 
 ### data.numerical.scaler_with_std
-If True, scale the numerical data to unit variance.
+If True, scale the numerical data (not including the numerical labels) to unit variance.
 
 ```
 # default used by AutoMM
@@ -343,8 +343,8 @@ predictor.fit(hyperparameters={"data.numerical.scaler_with_std": False})
 ### data.label.numerical_label_preprocessing
 How to process the numerical labels in regression tasks.
 
-- `"standardscaler"`: standardize numerical labels by removing the mean and scaling to unit variance.
-- `"minmaxscaler"`: transform numerical labels by scaling each feature to range (0, 1).
+- `"standardscaler"`: standardizes numerical labels by removing the mean and scaling to unit variance.
+- `"minmaxscaler"`: transforms numerical labels by scaling each feature to range (0, 1).
 
 ```
 # default used by AutoMM
@@ -364,7 +364,7 @@ predictor.fit(hyperparameters={"data.pos_label": "changed"})
 ```
 
 ### data.mixup.turn_on
-If true, use Mixup in training.
+If True, use Mixup in training.
 
 ```
 # default used by AutoMM
@@ -404,7 +404,7 @@ predictor.fit(hyperparameters={"data.mixup.prob": 0.5})
 ```
 
 ### data.mixup.switch_prob
-The probability of switching to cutmix instead of mixup when both are active.
+The probability of switching to Cutmix instead of Mixup when both are active.
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"data.mixup.switch_prob": 0.5})
@@ -413,7 +413,7 @@ predictor.fit(hyperparameters={"data.mixup.switch_prob": 0.7})
 ```
 
 ### data.mixup.mode
-How to apply Mixup or Cutmix params (per `"batch"`, `"pair"` (pair of elements), `"elem"` (element).
+How to apply Mixup or Cutmix params (per `"batch"`, `"pair"` (pair of elements), `"elem"` (element)).
 See [here](https://github.com/rwightman/pytorch-image-models/blob/d30685c283137b4b91ea43c4e595c964cd2cb6f0/timm/data/mixup.py#L211-L216) for more details.
 
 ```
