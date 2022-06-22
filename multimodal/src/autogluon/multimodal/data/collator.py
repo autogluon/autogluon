@@ -84,7 +84,7 @@ class Stack:
         -------
             batch_data (torch.Tensor)
         """
-        return _stack_arrs(data, True)
+        return _stack_arrs(data, False)
 
 
 class Pad:
