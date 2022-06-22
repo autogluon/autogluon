@@ -1,7 +1,7 @@
 import os
 import argparse
 import json
-from autogluon.text.automm import AutoMMPredictor
+from autogluon.multimodal import AutoMMPredictor
 
 from dataset import (
     AdultTabularDataset,
