@@ -97,7 +97,7 @@ Tutorials
       How to solve problems that contain Image, Text, and Tabular features at the same time.
 
    .. card::
-      :title: Time Series
+      :title: Time Series Forecasting
       :link: tutorials/timeseries/index.html
 
       How to train time series models for forecasting.

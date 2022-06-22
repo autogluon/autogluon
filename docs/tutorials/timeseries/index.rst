@@ -1,4 +1,4 @@
-Time-Series Forecasting
+Time Series Forecasting
 ========================
 
 For time-series data containing multiple individual series, AutoGluon can produce

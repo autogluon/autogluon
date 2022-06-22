@@ -1,4 +1,4 @@
-# FAQ - Forecasting
+# FAQ - Time Series
 :label:`sec_forecastingfaq`
 
 
