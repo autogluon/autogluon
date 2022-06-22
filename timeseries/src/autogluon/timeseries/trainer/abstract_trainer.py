@@ -611,7 +611,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
 
         if self.enable_ensemble:
-            model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=model_names_trained))
+            try:
+                model_names_trained.append(
+                    self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
+                )
+            except Exception as e:
+                logger.error(f"\tEnsemble training failed with error {str(e)}.")
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")

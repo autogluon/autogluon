@@ -98,6 +98,7 @@ def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
     test_data = get_data_frame_with_item_index(["A", "B", "C"])
 
     leaderboard = trainer.leaderboard(test_data)
+    expected_board_length += int(trainer.enable_ensemble)
 
     assert len(leaderboard) == expected_board_length
     assert not np.any(np.isnan(leaderboard["score_test"]))

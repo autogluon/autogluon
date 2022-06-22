@@ -207,6 +207,31 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
+def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
+    model_class, test_data_index, temp_model_path
+):
+    prediction_length = 3
+    train_data = get_data_frame_with_item_index(["A", "B"], data_length=10)
+    test_data = get_data_frame_with_item_index(test_data_index, data_length=15)
+
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        prediction_length=prediction_length,
+        hyperparameters={"epochs": 1},
+    )
+
+    model.fit(train_data=train_data)
+
+    max_hour_in_test = test_data.index.levels[1].max().hour
+    predictions = model.predict(test_data)
+    min_hour_in_pred = predictions.index.levels[1].min().hour
+
+    assert min_hour_in_pred == max_hour_in_test + 1
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [5, 10])
 @pytest.mark.parametrize("train_data, test_data", [
     (
