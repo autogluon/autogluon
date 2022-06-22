@@ -1,4 +1,4 @@
-# AutoMMPredictor for Image, Text, and Tabular
+# Customize AutoMM
 :label:`sec_automm_customization`
 
 AutoMM has a powerful yet easy-to-use configuration design.
@@ -153,7 +153,7 @@ predictor.fit(hyperparameters={"optimization.efficient_finetune": "bit_fit"})
 ## Environment
 
 ### env.num_gpus
-The number of gpus to use.
+The number of gpus to use. If given -1, we count the GPUs by `env.num_gpus = torch.cuda.device_count()`.
 ```
 # by default, all available gpus are used by AutoMM
 predictor.fit(hyperparameters={"env.num_gpus": -1})
@@ -171,7 +171,7 @@ predictor.fit(hyperparameters={"env.per_gpu_batch_size": 16})
 ```
 
 ### env.batch_size
-The batch size to use in each step of training. If `env.batch_size` is larger than `env.per_gpu_batch_size * env.num_gpus`, we accumulate gradients to reach the effective `env.batch_size` before performing one optimization step.
+The batch size to use in each step of training. If `env.batch_size` is larger than `env.per_gpu_batch_size * env.num_gpus`, we accumulate gradients to reach the effective `env.batch_size` before performing one optimization step. The accumulation steps are calculated by `env.batch_size // (env.per_gpu_batch_size * env.num_gpus)`.
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"env.batch_size": 128})
@@ -200,8 +200,8 @@ predictor.fit(hyperparameters={"env.precision": "bf16"})
 ```
 
 ### env.num_workers
-The number of worker processes used by Pytorch dataloader in training.
-
+The number of worker processes used by Pytorch dataloader in training. Note that more workers don't always bring speedup especially when `env.strategy` is `"ddp_spawn"`. 
+For more details, see the guideline [here](https://pytorch-lightning.readthedocs.io/en/stable/accelerators/gpu.html#distributed-data-parallel).
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"env.num_workers": 2})

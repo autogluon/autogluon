@@ -30,6 +30,13 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
 
       How AutoMMPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
 
+   .. card::
+      :title: Customize AutoMM
+      :link: customization.html
+
+      How to customize AutoMM configurations.
+
+
 .. toctree::
    :maxdepth: 1
    :hidden:
@@ -37,3 +44,4 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
    beginner_text
    multilingual_text
    multimodal_text_tabular
+   customization
