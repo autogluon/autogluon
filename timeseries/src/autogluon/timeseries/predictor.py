@@ -439,7 +439,7 @@ class TimeSeriesPredictor:
         """Returns the name of the best model from trainer."""
         return self._trainer.get_model_best()
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, silent=False) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
         pandas data frame containing the columns,
 
@@ -462,6 +462,8 @@ class TimeSeriesPredictor:
         data: TimeSeriesDataFrame
             dataset used for additional evaluation. If None, the validation set used during training will
             be used.
+        silent : bool, default = False
+            Should leaderboard DataFrame be printed?
 
         Returns
         -------
@@ -469,7 +471,11 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             validation performance.
         """
-        return self._learner.leaderboard(data)
+        leaderboard = self._learner.leaderboard(data)
+        if not silent:
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+                print(leaderboard)
+        return leaderboard
 
     def fit_summary(self, verbosity: int = 1) -> Dict[str, Any]:
         """Output summary of information about models produced during
