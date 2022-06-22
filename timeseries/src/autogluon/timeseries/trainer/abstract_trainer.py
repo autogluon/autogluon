@@ -3,6 +3,7 @@ import logging
 import os
 import pprint
 import time
+import traceback
 from typing import Optional, Tuple, List, Any, Dict, Union, Type
 from warnings import warn
 
@@ -615,8 +616,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 model_names_trained.append(
                     self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
                 )
-            except Exception as e:
-                logger.error(f"\tEnsemble training failed with error {str(e)}.")
+            except Exception as e:  # noqa
+                logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")

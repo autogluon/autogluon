@@ -27,9 +27,9 @@ TESTABLE_MODELS = [
     # AutoTabularModel,  # TODO: enable tests when model is stabilized
     DeepARModel,
     MQCNNModel,
-    MQRNNModel,
+    # MQRNNModel,
     SimpleFeedForwardModel,
-    TransformerModel,
+    # TransformerModel,
     partial(
         GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
     ),  # partial constructor for generic model
