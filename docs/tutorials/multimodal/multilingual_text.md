@@ -1,4 +1,4 @@
-# AutoMMPredictor for Text Prediction - Solving Multilingual Problems
+# AutoMM for Text - Multilingual Problems
 :label:`sec_automm_textprediction_multilingual`
 
 People around the world speaks lots of languages. According to [SIL International](https://en.wikipedia.org/wiki/SIL_International)'s [Ethnologue: Languages of the World](https://en.wikipedia.org/wiki/Ethnologue), 

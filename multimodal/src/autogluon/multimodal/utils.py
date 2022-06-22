@@ -710,6 +710,8 @@ def create_model(
                 activation=model_config.activation,
                 dropout_prob=model_config.drop_rate,
                 normalization=model_config.normalization,
+                d_token=OmegaConf.select(model_config, "d_token"),
+                embedding_arch=OmegaConf.select(model_config, "embedding_arch"),
                 num_classes=num_classes,
             )
         elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
@@ -728,8 +730,9 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
-                num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
+                embedding_arch=model_config.embedding_arch,
+                num_classes=num_classes,
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
