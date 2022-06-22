@@ -3,8 +3,9 @@ import json
 from torch import nn
 from .mlp import MLP
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
-from typing import Optional
+from typing import Optional, List
 from .utils import init_weights
+from .numerical_transformer import NumEmbeddings
 
 
 class NumericalMLP(nn.Module):
@@ -23,6 +24,8 @@ class NumericalMLP(nn.Module):
         dropout_prob: Optional[float] = 0.5,
         normalization: Optional[str] = "layer_norm",
         num_classes: Optional[int] = 0,
+        d_token: Optional[int] = 3,
+        embedding_arch: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -45,9 +48,28 @@ class NumericalMLP(nn.Module):
             Name of normalization function.
         num_classes
             Number of classes. 1 for a regression task.
+        d_token
+            The size of one token for `NumericalEmbedding`.
+        embedding_arch
+            A list containing the names of embedding layers.
+            Currently support:
+            {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
         """
         super().__init__()
         self.out_features = out_features
+
+        self.numerical_feature_tokenizer = (
+            NumEmbeddings(
+                in_features=in_features,
+                d_embedding=d_token,
+                embedding_arch=embedding_arch,
+            )
+            if embedding_arch is not None
+            else nn.Identity()
+        )
+
+        in_features = in_features * d_token if embedding_arch is not None else in_features
+
         self.mlp = MLP(
             in_features=in_features,
             hidden_features=hidden_features,
@@ -90,7 +112,9 @@ class NumericalMLP(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        features = self.mlp(batch[self.numerical_key])
+        features = self.numerical_feature_tokenizer(batch[self.numerical_key])
+        features = features.flatten(1, 2) if features.ndim == 3 else features
+        features = self.mlp(features)
         logits = self.head(features)
 
         return {

@@ -244,6 +244,7 @@ class NumEmbeddings(nn.Module):
                 6. `PLR`: ['positional', 'linear', 'relu']
                 7. `PLRLR`: ['positional', 'linear', 'relu', 'linear', 'relu']
                 8. `AutoDis`: ['autodis']
+                9. `Leaky Gates` in [ref.3]: ['linear', 'leaky_relu']
             Notably, in `L` (i.e. embedding_arch=['linear']) for numerical transformer,
             it identical as the original feature_tokenzier in FT_Transformer (c.f. Figure 2.a in https://arxiv.org/pdf/2106.11959.pdf).
         d_embedding:
@@ -256,6 +257,7 @@ class NumEmbeddings(nn.Module):
         ----------
         1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
         2. Paper: On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+        3. Paper: Simple Modifications to Improve Tabular Neural Networks: https://arxiv.org/pdf/2108.03214
         """
 
         super().__init__()
@@ -359,7 +361,6 @@ class NumericalTransformer(nn.Module):
         cls_token: Optional[bool] = False,
         out_features: Optional[int] = None,
         num_classes: Optional[int] = 0,
-        token_bias: Optional[bool] = True,
         token_initialization: Optional[str] = "normal",
         n_blocks: Optional[int] = 0,
         attention_n_heads: Optional[int] = 8,
@@ -387,9 +388,9 @@ class NumericalTransformer(nn.Module):
         in_features
             Dimension of input features.
         d_token
-            The size of one token for `_CategoricalFeatureTokenizer`.
+            The size of one token for `NumericalEmbedding`.
         cls_token
-            If `True`, cls token will be added to the token embeddings.
+            If `True`, [cls] token will be added to the token embeddings.
         out_features
             Dimension of output features.
         num_classes
