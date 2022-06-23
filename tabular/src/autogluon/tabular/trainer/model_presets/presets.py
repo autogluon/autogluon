@@ -180,9 +180,9 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
-        # TODO: Remove in v0.5.0
+        # TODO: Remove in v0.6.0
         logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
-                       'Starting in v0.5.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
+                       'Starting in v0.6.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:
         if problem_type == QUANTILE:
             if model_type not in DEFAULT_QUANTILE_MODEL:
@@ -197,7 +197,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
         if model_type == 'NN':
-            # TODO: Remove in v0.5.0
+            # TODO: Remove in v0.6.0
             model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
             if model_type in invalid_type_set:

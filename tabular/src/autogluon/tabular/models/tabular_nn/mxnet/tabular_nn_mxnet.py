@@ -139,7 +139,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
         if not _has_warned_mxnet_deprecation:
             _has_warned_mxnet_deprecation = True
             logger.log(30, '\tWARNING: TabularNeuralNetMxnetModel (alias "NN" & "NN_MXNET") has been deprecated in v0.4.0.\n'
-                           '\t\tStarting in v0.5.0, calling TabularNeuralNetMxnetModel will raise an exception.\n'
+                           '\t\tStarting in v0.6.0, calling TabularNeuralNetMxnetModel will raise an exception.\n'
                            '\t\tConsider instead using TabularNeuralNetTorchModel via "NN_TORCH".')
 
         if sample_weight is not None:  # TODO: support
