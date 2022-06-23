@@ -80,8 +80,8 @@ function install_all {
     install_core_all
     install_features
     install_tabular_all
-    install_text
     install_multimodal
+    install_text
     install_vision
     install_timeseries
     install_autogluon
