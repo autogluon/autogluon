@@ -2,12 +2,13 @@
 See also, https://ts.gluon.ai/api/gluonts/gluonts.evaluation.html
 """
 import logging
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Any
 
 import numpy as np
 import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,12 @@ class TimeSeriesEvaluator:
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
 
+    def _safemean(self, data: Any):
+        data_filled = np.nan_to_num(
+            data, neginf=np.nan, posinf=np.nan, nan=np.nan
+        )
+        return np.nanmean(data_filled)
+
     def _mase(
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
     ) -> float:
@@ -143,13 +150,13 @@ class TimeSeriesEvaluator:
         df = self.get_metrics_per_ts(
             data, predictions, metric_callables=metric_callables
         )
-        return float(np.mean(df["mean_abs_error"] / df["in_sample_naive_1_error"]))
+        return float(self._safemean(df["mean_abs_error"] / df["in_sample_naive_1_error"]))
 
     def _mape(
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
     ) -> float:
         df = self.get_metrics_per_ts(data, predictions, metric_callables=[mape])
-        return float(np.nan_to_num(df["mape"].mean(), posinf=np.nan, nan=np.nan))
+        return float(self._safemean(df["mape"]))
 
     def _smape(
         self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
@@ -157,7 +164,7 @@ class TimeSeriesEvaluator:
         df = self.get_metrics_per_ts(
             data, predictions, metric_callables=[symmetric_mape]
         )
-        return float(np.mean(df["symmetric_mape"]))
+        return float(self._safemean(df["symmetric_mape"]))
 
     def _mse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
         df = self.get_metrics_per_ts(
@@ -292,4 +299,5 @@ class TimeSeriesEvaluator:
             data.iter_items()
         ), "Prediction and data indices do not match."
 
-        return self.metric_method(data, predictions)
+        with evaluator_warning_filter():
+            return self.metric_method(data, predictions)

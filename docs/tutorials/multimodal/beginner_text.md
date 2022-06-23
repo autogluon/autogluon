@@ -228,3 +228,5 @@ Unlike `TabularPredictor` which trains/ensembles different types of models,
 `AutoMMPredictor` focuses on selecting and finetuning deep learning based models. 
 Internally, it integrates with [timm](https://github.com/rwightman/pytorch-image-models) , [huggingface/transformers](https://github.com/huggingface/transformers), 
 [openai/clip](https://github.com/openai/CLIP) as the model zoo.
+
+To customize AutoMM, please refer to :ref:`sec_automm_customization`.

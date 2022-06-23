@@ -52,18 +52,11 @@ def _pad_arrs_to_max_length(arrs, pad_axis, pad_val, round_to=None, max_length=N
     return out_tensor, original_length
 
 
-def _stack_arrs(arrs, use_shared_mem):
+def _stack_arrs(arrs):
     if isinstance(arrs[0], torch.Tensor):
-        if use_shared_mem:
-            elem = arrs[0]
-            numel = sum([x.numel() for x in arrs])
-            storage = elem.storage()._new_shared(numel)
-            out = elem.new(storage)
-            return torch.stack(arrs, 0, out=out)
-        else:
-            return torch.stack(arrs, 0)
+        return torch.stack(arrs, 0)
     else:
-        return _stack_arrs([torch.as_tensor(x) for x in arrs], use_shared_mem)
+        return _stack_arrs([torch.as_tensor(x) for x in arrs])
 
 
 class Stack:
@@ -84,7 +77,7 @@ class Stack:
         -------
             batch_data (torch.Tensor)
         """
-        return _stack_arrs(data, False)
+        return _stack_arrs(data)
 
 
 class Pad:

@@ -155,3 +155,5 @@ print('Score in the Japanese Testset:')
 print(score_in_jp)
 ```
 Amazingly, the model also works for Japanese!
+
+To customize AutoMM, please refer to :ref:`sec_automm_customization`.
