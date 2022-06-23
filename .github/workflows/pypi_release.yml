@@ -6,7 +6,6 @@
 name: Pypi Release
 
 on:
-  workflow_dispatch:
   release:
     types: [created]
 
@@ -31,7 +30,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
         RELEASE: 1
       run: |
-        for v in timeseries autogluon
+        for v in common core features tabular multimodal text vision timeseries autogluon
         do
           cd "$v"/
           python setup.py sdist bdist_wheel
