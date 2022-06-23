@@ -373,8 +373,7 @@ class AutoMMPredictor:
                     "We will filter them out from the search space."
                 )
                 hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
-        if teacher_predictor is not None and "distiller" not in config:
-            config["distiller"] = "default"
+
         pl.seed_everything(seed, workers=True)
 
         if self._resume or save_path is None:
@@ -739,6 +738,9 @@ class AutoMMPredictor:
             problem_type=self._problem_type,
             config=config,
         )
+
+        if teacher_predictor is not None and "distiller" not in config:
+            config["distiller"] = "default"
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
