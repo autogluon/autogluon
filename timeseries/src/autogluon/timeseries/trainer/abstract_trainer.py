@@ -3,6 +3,7 @@ import logging
 import os
 import pprint
 import time
+import traceback
 from typing import Optional, Tuple, List, Any, Dict, Union, Type
 from warnings import warn
 
@@ -16,10 +17,14 @@ from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
 
-from .. import TimeSeriesDataFrame, TimeSeriesEvaluator
+from .. import TimeSeriesEvaluator, TimeSeriesDataFrame
 from ..models.abstract import AbstractTimeSeriesModel
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.warning_filters import disable_tqdm
+from ..models.ensemble.greedy_ensemble import (
+    TimeSeriesEnsembleSelection,
+    TimeSeriesEnsembleWrapper,
+)
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -171,19 +176,45 @@ class SimpleAbstractTrainer:
             return model_name
         if model_name in self.models.keys():
             return self.models[model_name]
-        else:
-            if path is None:
-                path = self.get_model_attribute(model=model_name, attribute="path")
-            if model_type is None:
-                model_type = self.get_model_attribute(
-                    model=model_name, attribute="type"
-                )
-            return model_type.load(path=path, reset_paths=self.reset_paths)
+
+        if path is None:
+            path = self.get_model_attribute(model=model_name, attribute="path")
+        if model_type is None:
+            model_type = self.get_model_attribute(model=model_name, attribute="type")
+        if model_type == TimeSeriesEnsembleWrapper:
+            # FIXME: Hack to avoid having to save/load
+            return self.get_model_attribute(model=model_name, attribute="model")
+        return model_type.load(path=path, reset_paths=self.reset_paths)
 
     def construct_model_templates(
         self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
     ):
         raise NotImplementedError
+
+    # TODO: This is horribly inefficient beyond simple weighted ensembling.
+    #  Refactor to Tabular's implementation if doing stacking / multiple ensembles
+    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None):
+        if model_pred_proba_dict is None:
+            model_pred_proba_dict = {}
+        model_set = self.get_minimum_model_set(model, include_self=False)
+        if model_set:
+            for m in model_set:
+                if m not in model_pred_proba_dict:
+                    model_pred_proba_dict[m] = self.predict(model=m, data=X)
+            return model_pred_proba_dict
+        else:
+            return X
+
+    # FIXME: Copy pasted from Tabular
+    # Gets the minimum set of models that the provided model depends on, including itself
+    # Returns a list of model names
+    def get_minimum_model_set(self, model, include_self=True) -> list:
+        if not isinstance(model, str):
+            model = model.name
+        minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
+        if not include_self:
+            minimum_model_set = [m for m in minimum_model_set if m != model]
+        return minimum_model_set
 
     def get_models_info(self, models: List[str] = None) -> Dict[str, Any]:
         if models is None:
@@ -249,6 +280,9 @@ class SimpleAbstractTrainer:
 
         return info
 
+    def predict(self, *args, **kwargs):
+        raise NotImplementedError
+
 
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def __init__(
@@ -257,6 +291,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         prediction_length: Optional[int] = 1,
         eval_metric: Optional[str] = None,
         save_data: bool = True,
+        enable_ensemble: bool = True,
         verbosity: int = 2,
         **kwargs,
     ):
@@ -269,6 +304,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         )
         self.target = kwargs.get("target", "target")
         self.is_data_saved = False
+        self.enable_ensemble = enable_ensemble
 
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
@@ -313,8 +349,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
-    def _add_model(self, model: AbstractTimeSeriesModel):
-        # TODO: also register predict time
+    def _add_model(
+        self,
+        model: Union[AbstractTimeSeriesModel, TimeSeriesEnsembleWrapper],
+        base_models=None,
+    ):
         node_attrs = dict(
             path=model.path,
             type=type(model),
@@ -322,7 +361,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             predict_time=model.predict_time,
             val_score=model.val_score,
         )
+        if isinstance(model, TimeSeriesEnsembleWrapper):
+            node_attrs.update(
+                dict(
+                    model=model,
+                )
+            )
         self.model_graph.add_node(model.name, **node_attrs)
+
+        if base_models:
+            for base_model in base_models:
+                self.model_graph.add_edge(base_model, model.name)
 
     def _train_single(
         self,
@@ -383,12 +432,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         )
 
         if hpo_results:
+            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
+                sign_str = '-'
+            else:
+                sign_str = ''
             logger.info(
                 f"\t{hpo_results.get('best_reward'):<7.4f}".ljust(15)
-                + f"= Validation score ({self.eval_metric})"
+                + f"= Validation score ({sign_str}{self.eval_metric})"
             )
             logger.info(
-                f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15) + f"= Total tuning time"
+                f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15)
+                + f"= Total tuning time"
             )
             logger.debug(
                 f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}"
@@ -436,14 +490,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     None if val_score is None else (pred_end_time - fit_end_time)
                 )
 
-            if val_score is not None:
-                logger.info(
-                    f"\t{val_score:<7.4f}".ljust(15)
-                    + f"= Validation score ({self.eval_metric})"
-                )
-            logger.info(f"\t{model.fit_time:<7.2f} s".ljust(15) + "= Training runtime")
-            if model.predict_time is not None:
-                logger.info(f"\t{model.predict_time:<7.2f} s".ljust(15) + "= Validation (prediction) runtime")
+            self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
         except Exception as err:
@@ -458,6 +505,29 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             del model
 
         return model_names_trained
+
+    def _log_scores_and_times(
+        self,
+        val_score: Optional[float] = None,
+        fit_time: Optional[float] = None,
+        predict_time: Optional[float] = None,
+    ):
+        if val_score is not None:
+            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
+                sign_str = '-'
+            else:
+                sign_str = ''
+            logger.info(
+                f"\t{val_score:<7.4f}".ljust(15)
+                + f"= Validation score ({sign_str}{self.eval_metric})"
+            )
+        if fit_time is not None:
+            logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
+        if predict_time is not None:
+            logger.info(
+                f"\t{predict_time:<7.2f} s".ljust(15)
+                + "= Validation (prediction) runtime"
+            )
 
     def _train_multi(
         self,
@@ -541,6 +611,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     train_data, model=model, val_data=val_data, time_limit=time_left
                 )
 
+        if self.enable_ensemble:
+            try:
+                model_names_trained.append(
+                    self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
+                )
+            except Exception as e:  # noqa
+                logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
+
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         try:
@@ -553,6 +631,89 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             logger.error(str(e))
 
         return model_names_trained
+
+    def fit_ensemble(self, val_data, model_names):
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=self.eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+
+        logger.info("Fitting simple weighted ensemble.")
+
+        model_preds = {}
+        for model_name in model_names:
+            model: AbstractGluonTSModel = self.load_model(model_name=model_name)
+
+            # FIXME: This differs from predictions made to calc val_score for the models. Try to align.
+            #  Can either seed for deterministic results or cache the pred during val_score calc and reuse.
+            model_preds[model_name] = model.predict_for_scoring(
+                data=val_data, quantile_levels=self.quantile_levels
+            )
+
+        time_start = time.time()
+
+        higher_is_better = (
+            TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == 1
+        )
+        ensemble = TimeSeriesEnsembleSelection(
+            ensemble_size=100,
+            problem_type="regression",
+            metric=evaluator,
+            higher_is_better=higher_is_better,
+        )
+        predictions = [model_preds[p] for p in model_names]
+        ensemble.fit(predictions=predictions, labels=val_data)
+        ensemble_weights = ensemble.weights_
+        final_models_ensemble = []
+        final_weights_ensemble = []
+        for i, w in enumerate(ensemble_weights):
+            if w != 0:
+                final_models_ensemble.append(model_names[i])
+                final_weights_ensemble.append(w)
+
+        # FIXME: Ensure we don't have name collisions
+        # FIXME: This is currently **extremely** hacky to simply get it working.
+        #  Align on design / API of ensembles after v0.5.
+        simple_ensemble = TimeSeriesEnsembleWrapper(
+            weights=final_weights_ensemble,
+            name="WeightedEnsemble",
+            freq=val_data.freq,
+            prediction_length=self.prediction_length,
+            eval_metric=self.eval_metric,
+            path=self.path,
+            invalid_model_names=self._get_banned_model_names(),
+            target=self.target,
+            quantiles=self.quantile_levels,
+        )
+        time_end = time.time()
+        simple_ensemble.fit_time = time_end - time_start
+
+        predictions: List[TimeSeriesDataFrame] = [
+            model_preds[p] for p in final_models_ensemble
+        ]
+        forecasts = simple_ensemble.predict(predictions)
+        model_score = (
+            evaluator(val_data, forecasts)
+            * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
+        )
+
+        simple_ensemble.val_score = model_score
+
+        predict_time = 0
+        # FIXME: This is a hack, should instead leverage `predict_time_marginal` as in Tabular.
+        for m in final_models_ensemble:
+            predict_time += self.get_model_attribute(model=m, attribute='predict_time')
+        simple_ensemble.predict_time = predict_time
+
+        self._log_scores_and_times(
+            val_score=model_score,
+            fit_time=simple_ensemble.fit_time,
+            predict_time=simple_ensemble.predict_time,
+        )
+
+        self._add_model(model=simple_ensemble, base_models=final_models_ensemble)
+        return simple_ensemble.name
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
@@ -637,14 +798,35 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[Union[str, AbstractModel]] = None,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Optional[str] = None,
     ) -> float:
         model = self._get_model_for_prediction(model)
-
-        # FIXME: when ensembling is implemented, score logic will have to be revised
-        # FIXME: in order to enable prior model predictions in the ensemble
         eval_metric = self.eval_metric if metric is None else metric
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=eval_metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+
+        if isinstance(model, TimeSeriesEnsembleWrapper):
+            # FIXME: This section is hacky
+            model_preds = {}
+            base_models = self.get_minimum_model_set(model, include_self=False)
+            for base_model in base_models:
+                base_model_loaded = self._get_model_for_prediction(base_model)
+                model_preds[base_model] = base_model_loaded.predict_for_scoring(
+                    data, quantile_levels=self.quantile_levels
+                )
+            # FIXME: dict doesn't guarantee order!
+            forecasts = model.predict(model_preds)
+
+            model_score = (
+                evaluator(data, forecasts)
+                * TimeSeriesEvaluator.METRIC_COEFFICIENTS[eval_metric]
+            )
+            return model_score
+
         return model.score(data, metric=eval_metric)
 
     def _predict_model(
@@ -655,6 +837,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> TimeSeriesDataFrame:
         if isinstance(model, str):
             model = self.load_model(model)
+        data = self.get_inputs_to_model(model=model, X=data)
         return model.predict(data, **kwargs)
 
     # TODO: experimental

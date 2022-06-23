@@ -1,11 +1,42 @@
 from torch import nn
 from typing import Optional
+import numpy as np
+import torch
 
 ALL_ACT_LAYERS = {
     "leaky_relu": nn.LeakyReLU,
     "gelu": nn.GELU,
     "relu": nn.ReLU,
 }
+
+
+class GhostBatchNorm(nn.Module):
+    """
+    Ghost Batch Normalization.
+    It allows the use of large batch sizes,
+    but with batch normalization parameters calculated on smaller sub-batches.
+
+    [1] Train longer, generalize better: closing the generalization gap in large batch training of neural networks : https://arxiv.org/abs/1705.08741
+    [2] Simple Modifications to Improve Tabular Neural Networks: https://arxiv.org/pdf/2108.03214
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        virtual_batch_size: Optional[int] = 64,
+        momentum: Optional[float] = 0.01,
+    ):
+        super(GhostBatchNorm, self).__init__()
+
+        self.input_dim = input_dim
+        self.virtual_batch_size = virtual_batch_size
+        self.bn = nn.BatchNorm1d(self.input_dim, momentum=momentum)
+
+    def forward(self, x):
+        chunks = x.chunk(int(np.ceil(x.shape[0] / self.virtual_batch_size)), 0)
+        res = [self.bn(x_) for x_ in chunks]
+
+        return torch.cat(res, dim=0)
 
 
 class Unit(nn.Module):
@@ -38,6 +69,10 @@ class Unit(nn.Module):
         super().__init__()
         if normalization == "layer_norm":
             self.norm = nn.LayerNorm(in_features)
+        elif normalization == "batch_norm":
+            self.norm = nn.BatchNorm1d(in_features)
+        elif normalization == "ghost_batch_norm":
+            self.norm = GhostBatchNorm(in_features)
         else:
             raise ValueError(f"unknown normalization: {normalization}")
         self.fc = nn.Linear(in_features, out_features)

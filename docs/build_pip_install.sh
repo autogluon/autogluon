@@ -41,7 +41,7 @@ python3 -m pip install -e .
 cd ..
 
 cd timeseries/
-python3 -m pip install -e .
+python3 -m pip install -e .[all,tests]
 cd ..
 
 cd autogluon/

@@ -151,6 +151,9 @@ def test_given_hyperparameters_and_custom_models_when_predictor_called_then_lead
     )
     leaderboard = predictor.leaderboard()
 
+    if predictor._trainer.enable_ensemble:
+        expected_board_length += 1
+
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 

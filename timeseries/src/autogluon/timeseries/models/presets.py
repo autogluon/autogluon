@@ -41,7 +41,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     DeepAR=50,
     Prophet=10,
     AutoTabular=10,
-    AutoARIMA=60,
+    AutoARIMA=20,
     AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
@@ -57,6 +57,7 @@ def get_default_hps(key, prediction_length):
             },
             "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+            "AutoETS": {},
         },
         "toy_hpo": {
             "SimpleFeedForward": {
@@ -77,7 +78,7 @@ def get_default_hps(key, prediction_length):
         },
         "default": {
             "AutoETS": {},
-            "AutoARIMA": {},
+            # "AutoARIMA": {},
             "SimpleFeedForward": {},
             "MQCNN": {},
             "MQRNN": {},
@@ -107,8 +108,8 @@ def get_default_hps(key, prediction_length):
                     default=prediction_length,
                 ),
             },
-            "AutoETS": {},
-            "AutoARIMA": {}
+            "AutoETS": {"error": ag.Categorical("add", "mul")},
+            # "AutoARIMA": {"max_p": ag.Int(2, 4)}
         },
     }
     return default_model_hps[key]
@@ -154,7 +155,14 @@ def get_preset_models(
     invalid_model_names = set(invalid_model_names)
     all_assigned_names = set(invalid_model_names)
 
-    for model, model_hps in hyperparameters.items():
+    model_priority_list = sorted(
+        hyperparameters.keys(),
+        key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0),
+        reverse=True
+    )
+
+    for model in model_priority_list:
+        model_hps = hyperparameters[model]
         if isinstance(model, str):
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")
