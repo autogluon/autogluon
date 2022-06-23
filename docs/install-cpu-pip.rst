@@ -7,4 +7,4 @@
     # pytorch documentation - https://pytorch.org/get-started/locally/
     pip3 install "torch>=1.0,<1.12+cpu" -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
-    pip3 install --pre autogluon
+    pip3 install autogluon
