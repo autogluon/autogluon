@@ -205,7 +205,7 @@ class AutoMMPredictorModel(AbstractModel):
 
     def _get_default_resources(self):
         num_cpus = get_cpu_count()
-        num_gpus = get_gpu_count_torch()
+        num_gpus = min(get_gpu_count_torch(), 1)  # Use single gpu training by default. Consider to revise it later.
         return num_cpus, num_gpus
 
     def get_minimum_resources(self) -> Dict[str, int]:
