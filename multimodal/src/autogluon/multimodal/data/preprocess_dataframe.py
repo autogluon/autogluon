@@ -450,6 +450,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             y_pred = self._label_scaler.inverse_transform(y_pred)
             y_pred = np.squeeze(y_pred)
+            # Convert nan to 0
+            y_pred = np.nan_to_num(y_pred)
         else:
             raise NotImplementedError
 
