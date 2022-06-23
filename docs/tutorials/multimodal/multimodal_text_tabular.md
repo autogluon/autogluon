@@ -1,4 +1,4 @@
-# Multimodal Table with Text and Tabular Features
+# AutoMM for Text + Tabular - Quick Start
 :label:`sec_automm_textprediction_multimodal`
 
 In many applications, text data may be mixed with numeric/categorical data. 

@@ -1285,6 +1285,8 @@ class AutoMMPredictor:
             blacklist_msgs.append("GPU available")
             blacklist_msgs.append("TPU available")
             blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("HPU available")
+            blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
