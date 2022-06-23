@@ -366,6 +366,8 @@ class AutoMMPredictor:
                 assert isinstance(
                     teacher_predictor, str
                 ), "HPO with distillation only supports passing a path to the predictor"
+                if "distiller" not in config:
+                    config["distiller"] = "default"
             if self._continuous_training:
                 warnings.warn(
                     "HPO while continuous training."
