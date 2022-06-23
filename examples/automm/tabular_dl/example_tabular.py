@@ -47,7 +47,7 @@ automm_hyperparameters = {
     'optimization.max_epochs': 2000,  # Specify a large value to train until convergence
     'optimization.weight_decay': 1.0e-5,
     'optimization.lr_choice': None,
-    'optimization.lr_schedule': "polynomial_decay",
+    'optimization.lr_schedule': "cosine_decay",
     'optimization.warmup_steps': 0.,
     'optimization.patience': 20,
     'optimization.top_k': 3,
@@ -113,7 +113,7 @@ def main(args):
     elif args.mode == 'weighted' or args.mode == 'single_bag5' or args.mode == 'stack5':
         if args.mode == 'single_bag5':
             tabular_hyperparameters = {
-                'AG_AUTOMM_NN': automm_hyperparameters,
+                'AG_AUTOMM': automm_hyperparameters,
             }
             num_bag_folds, num_stack_levels = 5, 0
         elif args.mode == 'weighted':
@@ -126,7 +126,7 @@ def main(args):
         predictor = TabularPredictor(eval_metric=train_data.metric,
                                      label=train_data.label_column,
                                      path=args.exp_dir)
-        predictor.fit(train_data.data,
+        predictor.fit(train_data=train_data.data,
                       tuning_data=val_data.data,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
