@@ -24,7 +24,4 @@ ENV VIRTUAL_ENV=/home/ci/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN pip install --upgrade pip
-RUN pip3 install --no-cache-dir awscli -U awscli==${AWSCLI_VER}
-
 CMD ["/bin/bash"]

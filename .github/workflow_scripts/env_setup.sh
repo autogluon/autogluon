@@ -1,9 +1,11 @@
 function setup_build_env {
+    python3 -m pip install --upgrade pip
     python3 -m pip install flake8
     python3 -m pip install black>=22.3
 }
 
 function setup_build_contrib_env {
+    python3 -m pip install --upgrade pip
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
     export AG_DOCS=1
