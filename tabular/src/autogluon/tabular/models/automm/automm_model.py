@@ -147,7 +147,7 @@ class AutoMMPredictorModel(AbstractModel):
             params['env.num_gpus'] = num_gpus
         presets = params.pop('presets', None)
         seed = params.pop('seed', 0)
-        print(params)
+
         self.model.fit(train_data=X_train,
                        tuning_data=X_val,
                        time_limit=time_limit,
