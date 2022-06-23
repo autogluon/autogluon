@@ -33,7 +33,7 @@ predictor = AutoMMPredictor(label="label", path="./automm_imgcls")
 predictor.fit(
     train_data=train_dataset,
     time_limit=30, # seconds
-) # you can trust the default config, e.g., we use a `swin_tiny_patch4_window7_224` model
+) # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
 ```
 
 **label** is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. **path** indicates the directory where models and intermediate outputs should be saved. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. To customize AutoMM, please refer to :ref:`sec_automm_customization`.
