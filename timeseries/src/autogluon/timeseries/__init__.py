@@ -6,10 +6,6 @@ try:
 except ImportError:
     pass
 
-from .dataset import TimeSeriesDataFrame
-from .evaluator import TimeSeriesEvaluator
-from .predictor import TimeSeriesPredictor
-
 try:
     from mxnet import __version__ as mxnet_version
 
@@ -20,5 +16,9 @@ except (ImportError, AssertionError):
         "Please install a suitable version of MxNet in order to use autogluon.forecasting using "
         "`pip install mxnet==1.9` or `pip install mxnet-cu112==1.9` for GPU support."
     )
+
+from .dataset import TimeSeriesDataFrame
+from .evaluator import TimeSeriesEvaluator
+from .predictor import TimeSeriesPredictor
 
 logging.basicConfig(format="%(message)s")  # just print message in logs
