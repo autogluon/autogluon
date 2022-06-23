@@ -31,7 +31,7 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
       How AutoMMPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
 
    .. card::
-      :title: AutoMM for Image Classification: Quick Start
+      :title: AutoMM for Image Classification - Quick Start
       :link: beginner_image_cls.html
 
       How to train image classfiers with AutoMMPredictor.

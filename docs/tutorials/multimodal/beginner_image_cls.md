@@ -1,7 +1,7 @@
-# AutoMM for Image Classification: Quick Start
+# AutoMM for Image Classification - Quick Start
 :label:`sec_automm_imageclassification_beginner`
 
-In this quick start, we'll use the task of image classification to illustrate how to use `AutoMMPredictor`. Once the data is prepared in [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) format, a single call to `AutoMMPredictor.fit()` will take care of the model training for you.
+In this quick start, we'll use the task of image classification to illustrate how to use **AutoMMPredictor**. Once the data is prepared in [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) format, a single call to `AutoMMPredictor.fit()` will take care of the model training for you.
 
 
 ## Create Image Dataset
@@ -13,12 +13,14 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We can load a dataset by downloading a url data automatically:
 
 ```{.python .input}
+import warnings
+warnings.filterwarnings('ignore')
 from autogluon.vision import ImageDataset
 train_dataset, _, test_dataset = ImageDataset.from_folders("https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip")
 print(train_dataset)
 ```
 
-We can see there are 800 rows and 2 columns in this training dataframe. The 2 columns are `image` and `label`, and each row represents a different training sample
+We can see there are 800 rows and 2 columns in this training dataframe. The 2 columns are **image** and **label**, and each row represents a different training sample.
 
 
 ## Use AutoMM to Fit Models
@@ -34,7 +36,7 @@ predictor.fit(
 ) # you can trust the default config, e.g., we use a `swin_tiny_patch4_window7_224` model
 ```
 
-`label` is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. `path` indicates the directory where models and intermediate outputs should be saved. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. 
+**label** is the name of the column that contains the target variable to predict, e.g., it is "label" in our example. **path** indicates the directory where models and intermediate outputs should be saved. We set the training time limit to 30 seconds for demonstration purpose, but you can control the training time by setting configurations. To customize AutoMM, please refer to :ref:`sec_automm_customization`.
 
 
 ## Evaluate on Test Dataset
@@ -49,10 +51,18 @@ print('Top-1 test acc: %.3f' % scores["accuracy"])
 
 ## Predict on a New Image
 
-Given an example image, we can easily use the final model to `predict` the label,
+Given an example image, let's visualize it first,
 
 ```{.python .input}
 image_path = test_dataset.iloc[0]['image']
+from IPython.display import Image, display
+pil_img = Image(filename=image_path)
+display(pil_img)
+```
+
+We can easily use the final model to `predict` the label,
+
+```{.python .input}
 predictions = predictor.predict({'image': [image_path]})
 print(predictions)
 ```
@@ -79,10 +89,10 @@ print(feature[0].shape)
 
 The trained predictor is automatically saved at the end of `fit()`, and you can easily reload it.
 
-
 ```{.python .input}
 loaded_predictor = AutoMMPredictor.load('automm_imgcls')
 load_proba = loaded_predictor.predict_proba({'image': [image_path]})
 print(load_proba)
-
 ```
+
+We can see the predicted class probabilities are still the same as above, which means same model!
