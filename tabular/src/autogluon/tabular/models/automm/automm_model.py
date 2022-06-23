@@ -20,7 +20,7 @@ class AutoMMPredictorModel(AbstractModel):
     _NN_MODEL_NAME = 'automm_model'
 
     def __init__(self, **kwargs):
-        """Wrapper of autogluon.text.automm.AutoMMPredictor. #TODO Change it to autogluon.multimodal.AutoMMPredictor later.
+        """Wrapper of autogluon.multimodal.AutoMMPredictor.
 
         The features can be a mix of
         - image column
