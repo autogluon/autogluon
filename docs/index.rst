@@ -96,6 +96,12 @@ Tutorials
 
       How to solve problems that contain Image, Text, and Tabular features at the same time.
 
+   .. card::
+      :title: Time Series Forecasting
+      :link: tutorials/timeseries/index.html
+
+      How to train time series models for forecasting.
+
 
 .. toctree::
    :maxdepth: 2
@@ -106,6 +112,7 @@ Tutorials
    tutorials/image_prediction/index
    tutorials/object_detection/index
    tutorials/text_prediction/index
+   tutorials/timeseries/index
    tutorials/cloud_fit_deploy/index
    cheatsheet.rst
    api/autogluon.predictor
