@@ -1,6 +1,7 @@
 import os
 import argparse
 import json
+import pandas as pd
 from autogluon.multimodal import AutoMMPredictor
 
 from dataset import (
@@ -127,7 +128,7 @@ def main(args):
                                      label=train_data.label_column,
                                      path=args.exp_dir)
         predictor.fit(train_data=train_data.data,
-                      tuning_data=val_data.data,
+                      tuning_data=val_data.data if num_bag_folds is None else None,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
                       num_stack_levels=num_stack_levels,

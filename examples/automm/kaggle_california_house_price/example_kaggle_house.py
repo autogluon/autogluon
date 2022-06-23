@@ -101,7 +101,7 @@ def train(args):
             {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
         ],
         'CAT': {},
-        'AG_AUTOMM_NN': automm_hyperparameters,
+        'AG_AUTOMM': automm_hyperparameters,
     }
     if args.mode == 'single':
         predictor = AutoMMPredictor(eval_metric=eval_metric, label=label_column, path=args.exp_path)
