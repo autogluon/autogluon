@@ -93,12 +93,12 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             ),
         )
 
-    def _to_time_series_data_frame(self, data: pd.DataFrame) -> TimeSeriesDataFrame:
+    def _to_time_series_data_frame(self, data: pd.DataFrame, freq: Optional[str] = None) -> TimeSeriesDataFrame:
         df = data.copy(deep=False)
         df.set_index(
             [
                 df.index.get_level_values(0),
-                df.index.get_level_values(1).to_timestamp(),  # noqa
+                df.index.get_level_values(1).to_timestamp(freq=freq),  # noqa
             ],
             inplace=True,
         )
@@ -158,4 +158,4 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         ]
 
         predictions = pd.concat([mean_predictions, quantile_predictions], axis=1)
-        return self._to_time_series_data_frame(predictions)
+        return self._to_time_series_data_frame(predictions, freq=data.freq)
