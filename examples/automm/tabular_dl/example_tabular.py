@@ -130,8 +130,7 @@ def main(args):
                       tuning_data=val_data.data if num_bag_folds is None else None,
                       hyperparameters=tabular_hyperparameters,
                       num_bag_folds=num_bag_folds,
-                      num_stack_levels=num_stack_levels,
-                      ag_args_ensemble=ag_args_ensemble)
+                      num_stack_levels=num_stack_levels)
         leaderboard = predictor.leaderboard()
         leaderboard.to_csv(os.path.join(args.exp_dir, 'leaderboard.csv'))
     else:
