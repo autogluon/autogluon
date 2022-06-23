@@ -81,9 +81,8 @@ def main(args):
         ],
         'CAT': {},
         'XGB': {},
-        'AG_AUTOMM_NN': automm_hyperparameters,
+        'AG_AUTOMM': automm_hyperparameters,
     }
-    ag_args_ensemble = {'_disable_parallel_fitting': True}
 
     if args.mode == 'single':
         ### model initalization

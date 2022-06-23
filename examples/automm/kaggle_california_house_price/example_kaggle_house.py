@@ -93,7 +93,6 @@ def train(args):
     eval_metric = 'r2'
 
     automm_hyperparameters = get_automm_hyperparameters(args.automm_mode, args.text_backbone, args.cat_as_text)
-    ag_args_ensemble = {'_disable_parallel_fitting': True}
 
     tabular_hyperparameters = {
         'GBM': [
@@ -111,7 +110,7 @@ def train(args):
 
         if args.mode == 'single_bag5':
             tabular_hyperparameters = {
-                'AG_AUTOMM_NN': automm_hyperparameters,
+                'AG_AUTOMM': automm_hyperparameters,
             }
             num_bag_folds, num_stack_levels = 5, 0
         elif args.mode == 'weighted':

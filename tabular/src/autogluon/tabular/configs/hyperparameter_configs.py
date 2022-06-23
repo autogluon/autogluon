@@ -82,7 +82,8 @@ hyperparameter_config_dict = dict(
         'CAT': {},
         'XGB': {},
         # 'FASTAI': {},  # FastAI gets killed if the dataset is large (400K rows).
-        'AG_AUTOMM': {'presets': 'medium_quality_faster_train'},
+        'AG_TEXT_NN': {'presets': 'medium_quality_faster_train'},
+        'AG_IMAGE_NN': {},  # TODO, Support changing the config w.r.t the preset option.
         'VW': {},
     },
     # Hyperparameters intended to find an interpretable model which doesn't sacrifice predictive accuracy
