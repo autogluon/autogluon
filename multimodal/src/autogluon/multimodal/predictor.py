@@ -366,8 +366,6 @@ class AutoMMPredictor:
                 assert isinstance(
                     teacher_predictor, str
                 ), "HPO with distillation only supports passing a path to the predictor"
-                if "distiller" not in config:
-                    config["distiller"] = "default"
             if self._continuous_training:
                 warnings.warn(
                     "HPO while continuous training."
@@ -375,7 +373,8 @@ class AutoMMPredictor:
                     "We will filter them out from the search space."
                 )
                 hyperparameters = filter_search_space(hyperparameters, [MODEL, DATA])
-
+        if teacher_predictor is not None and "distiller" not in config:
+            config["distiller"] = "default"
         pl.seed_everything(seed, workers=True)
 
         if self._resume or save_path is None:
