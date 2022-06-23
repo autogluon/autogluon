@@ -53,6 +53,10 @@ automm_hyperparameters = {
 
 
 def main(args):
+
+    if args.gpu_id is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+
     assert args.dataset_name in TABULAR_DATASETS.keys(), "Unsupported dataset name."
 
     ### Dataset loading
@@ -132,11 +136,10 @@ def main(args):
     predictions = predictor.predict(data=test_data.data)
     predictions.to_csv(os.path.join(args.exp_dir, "predictions.csv"))
 
-    print(results)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--gpu_id", default=None, type=str)
     parser.add_argument("--dataset_name", default="ad", type=str)
     parser.add_argument("--dataset_dir", default="./dataset", type=str)
     parser.add_argument("--exp_dir", default=None, type=str)

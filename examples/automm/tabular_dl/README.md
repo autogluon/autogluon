@@ -4,7 +4,7 @@
 ## 1. Tabular Data
 
 ### 1.1 Example
-[`example_tabular.py`](./example_tabular.py) : This example provide a use case for the pure *tabular* data, including numerical and categorical, with FT_Transformer [1].
+[`example_tabular.py`](./example_tabular.py) : This example provides a use case for the pure *tabular* data, including pure numerical and numerical + categorical, with FT_Transformer [1].
 
 To run the example: 
 
@@ -16,10 +16,10 @@ To run the example:
 
 
 ### 1.2 Datasets
-We borrow 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in [1] to name each datasets. 
-The original datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
-Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to AutoMMPredictor. 
-All Data will be automatically downloaded from s3 (thus online connection is necessary) if it does not exisit with the given dataset path. 
+We borrowed 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in the original paper [1] to name each datasets. 
+The datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
+These Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `AutoMMPredictor`. 
+All Data can be automatically downloaded from s3 (online connection is necessary) if it does not exisit with the given dataset path `dataset_dir`. 
 
 
 ### 1.3 FT-Transformer
@@ -61,8 +61,30 @@ problem_type | regression | binary | multiclass | multiclass | binary | multicla
 #classes | - | 2 | 100 | 4 | 2 | 1000 | 2 | - | 7 | - | -
 Best in [1] | 0.459 | 0.859 | 0.396 | 0.732 | 0.729 | 0.963 | 0.8982 | 8.794 | 0.970 | 0.753 | 0.745
 FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 | 8.855 | 0.970 | 0.756 | 0.746
-AutoMM FT-Transformer + Const Lr=1e-4 | 0.404 | 0.863 | 0.388 | 0.727 | 0.729 | 0.954 | OverflowError | 0.781 | 0.964 | AttributeError | 0.904
-AutoMM FT-Transformer + Cosine Lr=1e-4| 0.401 | 0.864 | 0.388 | 0.728 | 0.729 | 0.952 | OverflowError | 0.780 | 0.964 | 0.765 | 0.924
+AutoMM FT-Transformer | 0.489 | 0.861 | 0.375 | 0.725 | 0.720 | 0.946 | OverflowError | 8.962 | 0.965 | - | 0.768
+
+
+For AutoMM, we use the following hyperparameter:
+```
+automm_hyperparameters = {
+    "data.categorical.convert_to_text": False,
+    "model.names": ["categorical_transformer", "numerical_transformer", "fusion_transformer"],
+    "model.numerical_transformer.embedding_arch": ["linear"],
+    "env.batch_size": 128,
+    "env.per_gpu_batch_size": 128,
+    "env.eval_batch_size_ratio": 1,
+    "env.num_workers": 12,
+    "env.num_workers_evaluation": 12,
+    "env.num_gpus": 1,
+    "optimization.max_epochs": 2000,
+    "optimization.weight_decay": 1.0e-5,
+    "optimization.lr_choice": None,
+    "optimization.lr_schedule": "polynomial_decay",
+    "optimization.warmup_steps": 0.0,
+    "optimization.patience": 20,
+    "optimization.top_k": 3,
+}
+```
 
 The trained weights and configs are accessible at https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/results.zip or s3://autogluon/results/tabular/results.zip. Use
 ```
