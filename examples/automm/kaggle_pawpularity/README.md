@@ -1,4 +1,6 @@
-﻿Take [Petfinder Pawpularity competition](https://www.kaggle.com/competitions/petfinder-pawpularity-score/overview) as an example showing how to use AutoMMPredictor to complete a competition.
+﻿# How to obtain top 1% in Petfinder Pawpularity with AutoMM
+
+Take [Petfinder Pawpularity competition](https://www.kaggle.com/competitions/petfinder-pawpularity-score/overview) as an example showing how to use AutoMMPredictor to complete a competition.
 
 ## 1. AutoMMPredictor for Training
 
