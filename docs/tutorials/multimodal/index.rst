@@ -13,19 +13,19 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
 .. container:: cards
 
    .. card::
-      :title: Use AutoGluon Multimodal for Text Prediction: Quick Start
+      :title: AutoMM for Text - Quick Start
       :link: beginner_text.html
 
       How to train high-quality text prediction models with AutoMMPredictor in under 5 minutes.
 
    .. card::
-      :title: Solving Multilingual Problems
+      :title: AutoMM for Text - Multilingual Problems
       :link: multilingual_text.html
 
       How to use AutoMMPredictor to build models on datasets with languages other than English.
 
    .. card::
-      :title: Multimodal Data Tables with Text
+      :title: AutoMM for Text + Tabular - Quick Start
       :link: multimodal_text_tabular.html
 
       How AutoMMPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
@@ -34,7 +34,7 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
       :title: AutoMM for Multimodal - Quick Start
       :link: beginner_multimodal.html
 
-      How to train high-quality multimodal models with AutoMMPredictor under 5 minutes.
+      How to train high-quality multimodal models with AutoMMPredictor.
 
    .. card::
       :title: Customize AutoMM
