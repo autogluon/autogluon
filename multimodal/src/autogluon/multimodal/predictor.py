@@ -728,6 +728,12 @@ class AutoMMPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
+        if config is None:
+            config = {}
+
+        if teacher_predictor is not None and "distiller" not in config:
+            config["distiller"] = "default"
+
         config = get_config(
             presets=presets,
             config=config,
@@ -738,9 +744,6 @@ class AutoMMPredictor:
             problem_type=self._problem_type,
             config=config,
         )
-
-        if teacher_predictor is not None and "distiller" not in config:
-            config["distiller"] = "default"
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
