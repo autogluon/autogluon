@@ -3,7 +3,7 @@
 ## 1. Tabular Data
 
 ### 1.1 Example
-[`example_tabular.py`](./example_tabular.py) : This example provides a use case for the pure *tabular* data, including pure numerical and numerical + categorical, with FT_Transformer [1].
+[`example_tabular.py`](./example_tabular.py) : This example provides a use case for the pure *tabular* data, including pure numerical features and numerical + categorical feartures, with FT_Transformer [1].
 
 To run the example: 
 
@@ -34,7 +34,7 @@ We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, na
    - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently we support the following embedding layers: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
   
 These features can be tuned using `hyperparameters` in `AutoMMPredictor. For example: 
-```
+```python
 hyperparameters = {
    'model.names': ["categorical_transformer","numerical_transformer","fusion_transformer"],
    'model.categorical_transformer.num_trans_blocks': 1,
@@ -56,14 +56,17 @@ problem_type | regression | binary | multiclass | multiclass | binary | multicla
 #classes | - | 2 | 100 | 4 | 2 | 1000 | 2 | - | 7 | - | -
 Best in [1] | 0.459 | 0.859 | 0.396 | 0.732 | 0.729 | 0.963 | 0.8982 | 8.794 | 0.970 | 0.753 | 0.745
 FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 | 8.855 | 0.970 | 0.756 | 0.746
-AutoMM FT-Transformer | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | OverflowError | 8.891 | 0.963 |  | 0.761
+AutoMM FT-Transformer | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 |  | 0.761
+
+`FT-Transformer in [1]` row leverages parameters searching, and `AutoMM FT-Transformer` row use a fixed training configurations.
+
 
 You can reproduce the `AutoMM FT-Transformer` row by running:
 ```bash
 bash run_all.sh
 ```
 with overrideng the following hyperparameters:
-```
+```python
 automm_hyperparameters = {
     "data.categorical.convert_to_text": False,
     "model.names": ["categorical_transformer", "numerical_transformer", "fusion_transformer"],
@@ -84,9 +87,10 @@ automm_hyperparameters = {
 }
 ```
 
-The trained weights, configs and loggings can be accessible at https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip.
+We run the experinments on one NVIDIA Tesla T4 GPU with 15360MiB memory.
+All trained models, exported results and loggings can be accessible from https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip.
 Use:
-```
+```bash
 wget https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip
 unzip tabular_example_result.zip
 ```
