@@ -51,7 +51,7 @@ hyperparameters = {
 bash run_all.sh
 ```
 
-Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | ml 
+Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi 
 ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
 metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
 problem_type | regression | binary | multiclass | multiclass | binary | multiclass | binary | regression | multiclass | regression | regression
@@ -61,10 +61,9 @@ problem_type | regression | binary | multiclass | multiclass | binary | multicla
 #classes | - | 2 | 100 | 4 | 2 | 1000 | 2 | - | 7 | - | -
 Best in [1] | 0.459 | 0.859 | 0.396 | 0.732 | 0.729 | 0.963 | 0.8982 | 8.794 | 0.970 | 0.753 | 0.745
 FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 | 8.855 | 0.970 | 0.756 | 0.746
-AutoMM FT-Transformer | 0.489 | 0.861 | 0.375 | 0.725 | 0.720 | 0.946 | OverflowError | 8.962 | 0.965 | 0.772 | 0.768
+AutoMM FT-Transformer | 0.482 | 0.859 |  |  |  | 0.949 | OverflowError |  | 0.963 |  | 0.761
 
-
-For AutoMM, we use the following hyperparameter:
+The `AutoMM FT-Transformer` column is runed by `run_all.sh`, where we use the following hyperparameter:
 ```
 automm_hyperparameters = {
     "data.categorical.convert_to_text": False,
@@ -86,7 +85,7 @@ automm_hyperparameters = {
 }
 ```
 
-The trained weights and configs are accessible at https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip.
+The trained weights, configs and loggings can be accessible at https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip.
 Use
 ```
 wget https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip
