@@ -1496,7 +1496,7 @@ def data_to_df(
     A dataframe with required columns.
     """
     if isinstance(data, pd.DataFrame):
-        pass
+        return data
     if isinstance(data, (list, dict)):
         data = pd.DataFrame(data)
     elif isinstance(data, str):

@@ -2,6 +2,7 @@ import pytest
 from omegaconf import OmegaConf
 from ray import tune
 from sklearn.preprocessing import LabelEncoder
+import pandas as pd
 
 from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from autogluon.multimodal.utils import (
@@ -132,6 +133,7 @@ def test_inferring_pos_label(labels, pos_label, problem_type, true_pos_label):
         ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "c"], True),
         ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "c", "d"], False),
         ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "d"], False),
+        (pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}), ["b", "a"], True),
     ],
 )
 def test_data_to_df(data, required_columns, is_valid_input):
