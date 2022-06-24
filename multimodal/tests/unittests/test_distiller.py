@@ -37,14 +37,6 @@ ALL_DATASETS = {
 def test_distillation():
     dataset = PetFinderDataset()
 
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-        DISTILLER: "default",
-    }
-
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": ["hf_text", "timm_image", "fusion_mlp"],
@@ -66,7 +58,6 @@ def test_distillation():
 
     teacher_predictor = teacher_predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=teacher_save_path,
@@ -86,7 +77,6 @@ def test_distillation():
     predictor = predictor.fit(
         train_data=dataset.train_df,
         teacher_predictor=teacher_predictor,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=student_save_path,

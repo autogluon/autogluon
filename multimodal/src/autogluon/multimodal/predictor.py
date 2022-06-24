@@ -728,16 +728,11 @@ class AutoMMPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
-        if config is None:
-            config = {}
-
-        if teacher_predictor is not None and "distiller" not in config:
-            config["distiller"] = "default"
-
         config = get_config(
             presets=presets,
             config=config,
             overrides=hyperparameters,
+            is_distill=teacher_predictor is not None,
         )
 
         config = update_config_by_rules(
