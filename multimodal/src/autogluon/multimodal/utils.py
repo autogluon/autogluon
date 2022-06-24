@@ -18,6 +18,8 @@ from omegaconf import OmegaConf, DictConfig
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import f1_score
 from autogluon.core.metrics import get_metric
+from autogluon.core.utils.loaders import load_pd
+
 from .models.utils import inject_lora_to_linear_layer
 from .models import (
     HFAutoModelForTextPrediction,
@@ -1473,3 +1475,62 @@ class CustomUnpickler(pickle.Unpickler):
             renamed_module = module.replace("autogluon.text.automm", "autogluon.multimodal")
 
         return super(CustomUnpickler, self).find_class(renamed_module, name)
+
+
+def data_to_df(
+    data: Union[pd.DataFrame, Dict, List],
+    required_columns: List,
+    all_columns: List,
+):
+    """
+    Convert the input data to a dataframe.
+
+    Parameters
+    ----------
+    data
+        Input data provided by users during prediction/evaluation.
+    required_columns
+        Required columns.
+    all_columns
+        All the possible columns got from training data. The column order is preserved.
+
+    Returns
+    -------
+    A dataframe with required columns.
+    """
+    if isinstance(data, pd.DataFrame):
+        pass
+    elif isinstance(data, (list, dict)):
+        data = pd.DataFrame(data)
+    elif isinstance(data, str):
+        data = load_pd.load(data)
+    else:
+        raise NotImplementedError(
+            f"The format of data is not understood. "
+            f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
+        )
+
+    detected_columns = data.columns.values.tolist()
+    missing_columns = []
+    for per_col in required_columns:
+        if per_col not in detected_columns:
+            missing_columns.append(per_col)
+
+    if len(missing_columns) > 0:
+        # assume no column names are provided and users organize data in the same column order of training data.
+        if len(detected_columns) == len(all_columns):
+            warnings.warn(
+                f"Replacing detected dataframe columns `{detected_columns}` with columns "
+                f"`{all_columns}` from training data."
+                "Double check the correspondences between them to avoid unexpected behaviors.",
+                UserWarning,
+            )
+            data.rename(dict(zip(detected_columns, required_columns)), axis=1, inplace=True)
+        else:
+            raise ValueError(
+                f"Dataframe columns `{detected_columns}` are detected, but columns `{missing_columns}` are missing. "
+                f"Please double check your input data to provide all the "
+                f"required columns `{required_columns}`."
+            )
+
+    return data
