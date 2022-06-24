@@ -61,9 +61,9 @@ problem_type | regression | binary | multiclass | multiclass | binary | multicla
 #classes | - | 2 | 100 | 4 | 2 | 1000 | 2 | - | 7 | - | -
 Best in [1] | 0.459 | 0.859 | 0.396 | 0.732 | 0.729 | 0.963 | 0.8982 | 8.794 | 0.970 | 0.753 | 0.745
 FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 | 8.855 | 0.970 | 0.756 | 0.746
-AutoMM FT-Transformer | 0.482 | 0.859 |  |  |  | 0.949 | OverflowError |  | 0.963 |  | 0.761
+AutoMM FT-Transformer | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | OverflowError |  | 0.963 |  | 0.761
 
-The `AutoMM FT-Transformer` column is runed by `run_all.sh`, where we use the following hyperparameter:
+You can reproduce the `AutoMM FT-Transformer` column by running `run_all.sh`, where we use the following hyperparameter:
 ```
 automm_hyperparameters = {
     "data.categorical.convert_to_text": False,
