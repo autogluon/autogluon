@@ -1480,6 +1480,7 @@ class CustomUnpickler(pickle.Unpickler):
 def data_to_df(
     data: Union[pd.DataFrame, Dict, List],
     required_columns: List,
+    all_columns: List,
 ):
     """
     Convert the input data to a dataframe.
@@ -1489,15 +1490,17 @@ def data_to_df(
     data
         Input data provided by users during prediction/evaluation.
     required_columns
-        The columns data must have.
+        Required columns.
+    all_columns
+        All the possible columns got from training data. The column order is preserved.
 
     Returns
     -------
     A dataframe with required columns.
     """
     if isinstance(data, pd.DataFrame):
-        return data
-    if isinstance(data, (list, dict)):
+        pass
+    elif isinstance(data, (list, dict)):
         data = pd.DataFrame(data)
     elif isinstance(data, str):
         data = load_pd.load(data)
@@ -1507,29 +1510,27 @@ def data_to_df(
             f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
         )
 
-    has_columns = []
-    missing_columns = []
     detected_columns = data.columns.values.tolist()
+    missing_columns = []
     for per_col in required_columns:
-        if per_col in detected_columns:
-            has_columns.append(per_col)
-        else:
+        if per_col not in detected_columns:
             missing_columns.append(per_col)
 
     if len(missing_columns) > 0:
-        if len(has_columns) > 0:  # only partial column names are correct.
-            raise ValueError(
-                f"Some data columns `{missing_columns}` are missing. "
-                f"Please double check your input data to provide all the required data columns `{required_columns}`."
+        # assume no column names are provided and users organize data in the same column order of training data.
+        if len(detected_columns) == len(all_columns):
+            warnings.warn(
+                f"Replacing detected dataframe columns `{detected_columns}` with columns "
+                f"`{all_columns}` from training data."
+                "Double check the correspondences between them to avoid unexpected behaviors.",
+                UserWarning,
             )
-        elif len(detected_columns) == len(required_columns):  # assume no column names are provided.
-            # assume users remember the column order in training data and the last column has labels.
             data.rename(dict(zip(detected_columns, required_columns)), axis=1, inplace=True)
-        else:  # detected column number doesn't match the required column number.
+        else:
             raise ValueError(
-                f"Detected {len(detected_columns)} columns, which doesn't match "
-                f"the training data's column number `{len(required_columns)}`. "
-                f"Please provide a dataframe with the columns `{required_columns}`."
+                f"Dataframe columns `{detected_columns}` are detected, but columns `{missing_columns}` are missing. "
+                f"Please double check your input data to provide all the "
+                f"required columns `{required_columns}`."
             )
 
     return data

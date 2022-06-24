@@ -120,25 +120,26 @@ def test_inferring_pos_label(labels, pos_label, problem_type, true_pos_label):
 
 
 @pytest.mark.parametrize(
-    "data,required_columns,is_valid_input",
+    "data,required_columns,all_columns,is_valid_input",
     [
-        ([1, 2, 3], ["a"], True),
-        ({"a": [1, 2, 3]}, ["a"], True),
-        ({"a": [1, 2, 3]}, ["b"], True),
-        ({"a": [1, 2, 3], "b": [4, 5, 6]}, ["b", "a"], True),
-        ([(1, 2), (3, 4)], ["a", "b"], True),
-        ([[1, 2], [3, 4]], ["a", "b"], True),
-        ([[1, 2], [3, 4]], ["a", "b", "c"], False),
-        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "c"], True),
-        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "c"], True),
-        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "c", "d"], False),
-        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "d"], False),
-        (pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}), ["b", "a"], True),
+        ([1, 2, 3], ["a"], ["a"], True),
+        ([1, 2, 3], ["a"], ["a", "b"], False),
+        ({"a": [1, 2, 3]}, ["a"], ["a", "b"], True),
+        ({"a": [1, 2, 3]}, ["b"], ["a", "b"], False),
+        ({"a": [1, 2, 3], "b": [4, 5, 6]}, ["b", "a"], ["a", "b"], True),
+        ([(1, 2), (3, 4)], ["a", "b"], ["a", "b"], True),
+        ([[1, 2], [3, 4]], ["a"], ["a", "b"], True),
+        ([[1, 2], [3, 4]], ["a", "b"], ["a", "b", "c"], False),
+        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "c"], ["a", "b", "c"], True),
+        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "c"], ["a", "b", "c"], True),
+        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "c", "d"], ["a", "b", "c", "d"], False),
+        ([{"a": 1, "b": 2, "c": 3}, {"a": 10, "b": 20, "c": 30}], ["a", "b", "d"], ["a", "b", "c", "d"], False),
+        (pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}), ["b", "a"], ["b", "c", "a"], True),
     ],
 )
-def test_data_to_df(data, required_columns, is_valid_input):
+def test_data_to_df(data, required_columns, all_columns, is_valid_input):
     if is_valid_input:
-        df = data_to_df(data=data, required_columns=required_columns)
+        df = data_to_df(data=data, required_columns=required_columns, all_columns=all_columns)
     else:
         with pytest.raises(ValueError):
-            df = data_to_df(data=data, required_columns=required_columns)
+            df = data_to_df(data=data, required_columns=required_columns, all_columns=all_columns)

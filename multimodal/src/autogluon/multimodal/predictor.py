@@ -1215,7 +1215,11 @@ class AutoMMPredictor:
         required_columns = self._df_preprocessor.required_feature_names
         if requires_label:
             required_columns.append(self._df_preprocessor.label_column)
-        data = data_to_df(data=data, required_columns=required_columns)
+        data = data_to_df(
+            data=data,
+            required_columns=required_columns,
+            all_columns=self._df_preprocessor.all_column_names,
+        )
 
         # For prediction data with no labels provided.
         if not requires_label:
