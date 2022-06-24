@@ -42,4 +42,3 @@ def test_basic_config():
 
     basic_config = get_basic_automm_config(is_distill=True)
     assert list(basic_config.keys()).sort() == [MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER].sort()
-
