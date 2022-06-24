@@ -131,6 +131,19 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._numerical_feature_names
 
     @property
+    def required_feature_names(self):
+        return (
+            self._image_path_names
+            + self._text_feature_names
+            + self._numerical_feature_names
+            + self._categorical_feature_names
+        )
+
+    @property
+    def all_column_names(self):
+        return self._column_types.keys()
+
+    @property
     def categorical_num_categories(self):
         """We will always include the unknown category"""
         return self._categorical_num_categories
