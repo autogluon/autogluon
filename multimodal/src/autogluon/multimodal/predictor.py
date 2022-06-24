@@ -59,7 +59,6 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.mixup import MixupModule
 
 from .utils import (
     create_model,
@@ -84,6 +83,7 @@ from .utils import (
     try_to_infer_pos_label,
     get_mixup,
     CustomUnpickler,
+    is_interactive,
 )
 from .optimization.utils import (
     get_metric,
@@ -125,9 +125,13 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
 
 class AutoMMPredictor:
     """
-    AutoMMPredictor can predict the values of one dataframe column conditioned on the rest columns.
-    The prediction can be either a classification or regression problem. The feature columns can contain
-    image paths, text, numerical, and categorical features.
+    AutoMMPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
+    are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
+    and the AutoMMPredictor can predict the values of one column conditioned on the features from the other columns.
+
+    The prediction can be either classification or regression. The feature columns can contain
+    image paths, text, numerical, and categorical values.
+
     """
 
     def __init__(
@@ -223,11 +227,21 @@ class AutoMMPredictor:
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
+        """Set the verbosity level of the log.
+
+        Parameters
+        ----------
+        verbosity
+            The verbosity level
+
+        """
+        self._verbosity = verbosity
         set_logger_verbosity(verbosity, logger=logger)
 
     def fit(
         self,
         train_data: pd.DataFrame,
+        presets: str = None,
         config: Optional[dict] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -247,6 +261,8 @@ class AutoMMPredictor:
         ----------
         train_data
             A dataframe containing training data.
+        presets
+            Name of the presets. See the available presets in `presets.py`.
         config
             A dictionary with four keys "model", "data", "optimization", and "environment".
             Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
@@ -453,6 +469,7 @@ class AutoMMPredictor:
             ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            presets=presets,
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
@@ -639,7 +656,14 @@ class AutoMMPredictor:
         )
 
         critics, baseline_funcs = None, None
-        if self._config.distiller.soft_label_loss_type == "mean_square_error":
+        if not self._config.distiller.soft_label_loss_type:
+            # automatically infer loss func based on problem type if not specified
+            if self._problem_type == "regression":
+                soft_label_loss_func = nn.MSELoss()
+            else:
+                assert self._output_shape > 1
+                soft_label_loss_func = nn.CrossEntropyLoss()
+        elif self._config.distiller.soft_label_loss_type == "mean_square_error":
             soft_label_loss_func = nn.MSELoss()
         elif self._config.distiller.soft_label_loss_type == "cross_entropy":
             soft_label_loss_func = nn.CrossEntropyLoss()
@@ -694,6 +718,7 @@ class AutoMMPredictor:
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
+        presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, AutoMMPredictor] = None,
@@ -703,7 +728,14 @@ class AutoMMPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
+        if config is None:
+            config = {}
+
+        if teacher_predictor is not None and "distiller" not in config:
+            config["distiller"] = "default"
+
         config = get_config(
+            presets=presets,
             config=config,
             overrides=hyperparameters,
         )
@@ -771,9 +803,9 @@ class AutoMMPredictor:
             )
 
         loss_func = get_loss_func(
-            self._problem_type,
-            mixup_active,
-            OmegaConf.select(config, "optimization.loss_function"),
+            problem_type=self._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
         self._config = config
@@ -891,7 +923,7 @@ class AutoMMPredictor:
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.mixup_off_epoch"),
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -947,6 +979,16 @@ class AutoMMPredictor:
         num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
+
+        if is_interactive() and num_gpus > 1:
+            warnings.warn(
+                "Interactive environment is detected. Currently, AutoMMPredictor does not support multi-gpu "
+                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
+                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
+                "AutoMMPredictor in a script.",
+                UserWarning,
+            )
+            num_gpus = 1
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(
@@ -1249,6 +1291,8 @@ class AutoMMPredictor:
             blacklist_msgs.append("GPU available")
             blacklist_msgs.append("TPU available")
             blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("HPU available")
+            blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1373,7 +1417,7 @@ class AutoMMPredictor:
             results[per_metric] = score
 
         if return_pred:
-            return results, self.as_pandas(data=data, to_be_converted=y_pred_inv)
+            return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
         else:
             return results
 
@@ -1411,7 +1455,7 @@ class AutoMMPredictor:
             y_pred=logits_or_prob,
         )
         if as_pandas:
-            pred = self.as_pandas(data=data, to_be_converted=pred)
+            pred = self._as_pandas(data=data, to_be_converted=pred)
         return pred
 
     def predict_proba(
@@ -1471,7 +1515,7 @@ class AutoMMPredictor:
                 )
                 prob = prob[:, pos_label]
         if as_pandas:
-            prob = self.as_pandas(data=data, to_be_converted=prob)
+            prob = self._as_pandas(data=data, to_be_converted=prob)
         return prob
 
     def extract_embedding(
@@ -1521,7 +1565,7 @@ class AutoMMPredictor:
             )
         return data
 
-    def as_pandas(
+    def _as_pandas(
         self,
         data: Union[pd.DataFrame, dict, list],
         to_be_converted: np.ndarray,
@@ -1572,7 +1616,7 @@ class AutoMMPredictor:
             Whether to save the downloaded model for offline deployment.
             When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
-            When standalone = False, does not save the model, and requires online environment to download in load().
+            When standalone = False, the saved artifact may require an online environment to process in load().
         """
 
         if standalone:
@@ -1640,7 +1684,7 @@ class AutoMMPredictor:
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = pickle.load(fp)
+                data_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
             if TEXT in data_processors:
                 data_processors[TEXT] = load_text_tokenizers(
@@ -1764,14 +1808,9 @@ class AutoMMPredictor:
         if not resume:
             predictor._continuous_training = True
 
-        mixup_active, _ = get_mixup(
-            model_config=OmegaConf.select(predictor._config, "model"),
-            mixup_config=OmegaConf.select(predictor._config, "data.mixup"),
-            num_classes=predictor._output_shape,
-        )
         loss_func = get_loss_func(
             problem_type=predictor._problem_type,
-            mixup_active=mixup_active,
+            mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
         )
         predictor._loss_func = loss_func

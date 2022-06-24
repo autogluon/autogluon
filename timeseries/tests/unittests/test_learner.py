@@ -46,7 +46,6 @@ def test_when_learner_called_then_training_is_performed(temp_model_path):
 def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    print(temp_model_path)
     learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
@@ -54,7 +53,9 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
         val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = learner.leaderboard()
-    print(temp_model_path)
+
+    expected_board_length += int(learner.load_trainer().enable_ensemble)
+
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -103,7 +104,7 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
 
         leaderboard = learner.leaderboard()
 
-    assert len(leaderboard) == 3
+    assert len(leaderboard) == 3 + 1  # include ensemble
 
     config_history = learner.load_trainer().hpo_results[model_name]["config_history"]
     assert len(config_history) == 3
@@ -134,6 +135,8 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
         val_data=DUMMY_TS_DATAFRAME,
     )
     leaderboard = learner.leaderboard()
+
+    expected_board_length += int(learner.load_trainer().enable_ensemble)
 
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative

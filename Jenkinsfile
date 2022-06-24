@@ -61,7 +61,7 @@ install_vision = """
 """
 
 install_timeseries = """
-    python3 -m pip install --upgrade -e timeseries/[tests]
+    python3 -m pip install --upgrade -e timeseries/[all,tests]
 """
 
 install_autogluon = """
@@ -446,6 +446,36 @@ stage("Build Tutorials") {
       }
     }
   },
+  'multimodal': {
+    node('linux-gpu') {
+      ws('workspace/autogluon-tutorial-multimodal-v3') {
+        checkout scm
+        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+        sh """#!/bin/bash
+        set -ex
+        # conda create allows overwrite the existing env with -y flag, but does not take file as input
+        # hence create the new env and update it with file
+        conda create -n autogluon-tutorial-multimodal-v3 -y
+        conda env update -n autogluon-tutorial-multimodal-v3 -f docs/build_contrib_gpu.yml
+        conda activate autogluon-tutorial-multimodal-v3
+        conda list
+
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        export AG_DOCS=1
+        export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
+
+        git clean -fx
+        bash docs/build_pip_install.sh
+
+        # only build for docs/multimodal
+        shopt -s extglob
+        rm -rf ./docs/tutorials/!(multimodal)
+        cd docs && rm -rf _build && d2lbook build rst && cd ..
+        """
+        stash includes: 'docs/_build/rst/tutorials/multimodal/*', name: 'multimodal'
+      }
+    }
+  },
   'text_prediction': {
     node('linux-gpu') {
       ws('workspace/autogluon-tutorial-text-v3') {
@@ -578,6 +608,7 @@ stage("Build Docs") {
         unstash 'image_prediction'
         unstash 'object_detection'
         unstash 'tabular'
+        unstash 'multimodal'
         unstash 'text'
         unstash 'cloud_fit_deploy'
         unstash 'timeseries'

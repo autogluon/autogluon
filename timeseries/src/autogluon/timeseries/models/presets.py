@@ -15,6 +15,8 @@ from .gluonts import (
     SimpleFeedForwardModel,
     TransformerModel,
 )
+from .sktime import AutoARIMAModel, AutoETSModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +29,20 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    AutoARIMA=AutoARIMAModel,
+    AutoETS=AutoETSModel
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
-    MQCNN=50,
-    MQRNN=50,
-    SimpleFeedForward=30,
-    Transformer=50,
+    MQCNN=40,
+    MQRNN=40,
+    SimpleFeedForward=50,
+    Transformer=40,
     DeepAR=50,
-    Prophet=50,
+    Prophet=10,
     AutoTabular=10,
+    AutoARIMA=20,
+    AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
@@ -51,6 +57,7 @@ def get_default_hps(key, prediction_length):
             },
             "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
+            "AutoETS": {},
         },
         "toy_hpo": {
             "SimpleFeedForward": {
@@ -70,6 +77,8 @@ def get_default_hps(key, prediction_length):
             },
         },
         "default": {
+            "AutoETS": {},
+            # "AutoARIMA": {},
             "SimpleFeedForward": {},
             "MQCNN": {},
             "MQRNN": {},
@@ -99,6 +108,8 @@ def get_default_hps(key, prediction_length):
                     default=prediction_length,
                 ),
             },
+            "AutoETS": {"error": ag.Categorical("add", "mul")},
+            # "AutoARIMA": {"max_p": ag.Int(2, 4)}
         },
     }
     return default_model_hps[key]
@@ -144,7 +155,14 @@ def get_preset_models(
     invalid_model_names = set(invalid_model_names)
     all_assigned_names = set(invalid_model_names)
 
-    for model, model_hps in hyperparameters.items():
+    model_priority_list = sorted(
+        hyperparameters.keys(),
+        key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0),
+        reverse=True
+    )
+
+    for model in model_priority_list:
+        model_hps = hyperparameters[model]
         if isinstance(model, str):
             if model not in MODEL_TYPES:
                 raise ValueError(f"Model {model} is not supported yet.")

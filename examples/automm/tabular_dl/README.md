@@ -1,4 +1,4 @@
-Examples showing how to use AutoMMPredictor.
+# Advanced Tabular DL models in AutoMMPredictor
 
 
 ## 1. Tabular Data
@@ -18,11 +18,11 @@ To run the example:
 ### 1.2 Datasets
 We borrow 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in [1] to name each datasets. 
 The original datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
-Data in `Numpy.darray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to AutoMMPredictor. 
+Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to AutoMMPredictor. 
 All Data will be automatically downloaded from s3 (thus online connection is necessary) if it does not exisit with the given dataset path. 
 
 
-### 1.3 FT_Transformer
+### 1.3 FT-Transformer
 We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
    - `out_features` is the output feature size.
    - `d_token` is the dimension of the embedding tokens.
@@ -44,7 +44,13 @@ hyperparameters = {
 ```
 
 
+
 ### 1.4 Results
+
+```bash
+bash run_all.sh
+```
+
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | ml 
 ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
 metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse

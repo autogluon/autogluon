@@ -215,4 +215,5 @@ jobs:
           python3 -m pip install --upgrade -e multimodal/
           python3 -m pip install --upgrade -e text/
           python3 -m pip install --upgrade -e vision/
+          python3 -m pip install --upgrade -e timeseries/
           python3 -m pip install --upgrade -e autogluon/

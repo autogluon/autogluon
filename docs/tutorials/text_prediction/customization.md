@@ -129,5 +129,3 @@ predictor.fit(
 ```{.python .input}
 predictor.evaluate(test_data, metrics=["f1", "acc"])
 ```
-
-`TextPredictor` builds on top of `AutoMMPredictor`, which has a flexible and easy-to-use configuration design. Please refer to :ref:`sec_automm_predictor` on how to customize more hyperparameters.

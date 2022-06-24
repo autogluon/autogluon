@@ -11,18 +11,19 @@ from gluonts.model.seq2seq import MQRNNEstimator
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models import DeepARModel
+from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 from autogluon.timeseries.models.presets import get_default_hps
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
-from .common import DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
     "toy",
     DUMMY_TRAINER_HYPERPARAMETERS,
-    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}, "AutoETS": {}},
 ]
 
 
@@ -61,7 +62,7 @@ def test_given_validation_data_when_trainer_called_then_training_is_performed(
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
 )
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
@@ -74,13 +75,39 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     )
     leaderboard = trainer.leaderboard()
 
+    expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
+@pytest.mark.parametrize("eval_metric", ["MAPE"])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
+)
+def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
+    temp_model_path, eval_metric, hyperparameters, expected_board_length
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
+    trainer.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        val_data=DUMMY_TS_DATAFRAME,
+    )
+
+    test_data = get_data_frame_with_item_index(["A", "B", "C"])
+
+    leaderboard = trainer.leaderboard(test_data)
+    expected_board_length += int(trainer.enable_ensemble)
+
+    assert len(leaderboard) == expected_board_length
+    assert not np.any(np.isnan(leaderboard["score_test"]))
+    assert np.all(leaderboard["score_test"] < 0)  # all MAPEs should be negative
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, expected_board_length",
+    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
 )
 def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
     temp_model_path, hyperparameters, expected_board_length
@@ -172,7 +199,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 4
+    assert len(leaderboard) == 4 + 1
 
     config_history = trainer.hpo_results[model_name]["config_history"]
     assert len(config_history) == 4
@@ -196,6 +223,7 @@ def test_given_hyperparameters_to_prophet_when_trainer_called_then_leaderboard_i
     )
     leaderboard = trainer.leaderboard()
 
+    expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -241,7 +269,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 4
+    assert len(leaderboard) == 4 + 1
 
     config_history = trainer.hpo_results["Prophet"]["config_history"]
     assert len(config_history) == 4
@@ -273,6 +301,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     )
     leaderboard = trainer.leaderboard()
 
+    expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -402,12 +431,15 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 
     model_names = trainer.get_model_names()
 
+    if trainer.enable_ensemble:
+        expected_number_of_unique_names += 1
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
         assert any(name.endswith(suffix) for name in model_names)
 
-    # there should be no edges in the model graph without ensembling
-    assert not trainer.model_graph.edges
+    if not trainer.enable_ensemble:
+        # there should be no edges in the model graph without ensembling
+        assert not trainer.model_graph.edges
 
 
 @pytest.mark.parametrize(
@@ -469,7 +501,7 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 4
+    assert len(leaderboard) == 4 + 1  # ensemble
 
     config_history = next(iter(trainer.hpo_results.values()))["config_history"]
     assert len(config_history) == 4
@@ -506,6 +538,9 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
     for m in model_names:
         loaded_model = loaded_trainer.load_model(m)
+        if isinstance(loaded_model, TimeSeriesEnsembleWrapper):
+            continue
+
         predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
 
         assert isinstance(predictions, TimeSeriesDataFrame)

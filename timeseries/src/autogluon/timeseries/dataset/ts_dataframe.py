@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import Any, Tuple, Type
+from typing import Any, Tuple, Type, Optional
 from collections.abc import Iterable
 
 import pandas as pd
@@ -105,6 +105,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
         )
         if freq is None:
             raise ValueError("Frequency not provided and cannot be inferred")
+        if isinstance(freq, str):
+            return freq
+        elif isinstance(freq, pd._libs.tslibs.BaseOffset):
+            return freq.freqstr
         return freq
 
     def iter_items(self) -> Iterable[Any]:
@@ -149,8 +153,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"`{ITEMID}` column can not have nan")
         if df[TIMESTAMP].isnull().any():
             raise ValueError(f"`{TIMESTAMP}` column can not have nan")
-        if not df[ITEMID].dtype == "int64":
-            raise ValueError(f"for {ITEMID}, the only pandas dtype allowed is ‘int64’.")
         if not df[TIMESTAMP].dtype == "datetime64[ns]":
             raise ValueError(
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
@@ -174,8 +176,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
         if not isinstance(data.index, pd.MultiIndex):
             raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
-        if not data.index.dtypes.array[0] == "int64":
-            raise ValueError(f"for {ITEMID}, the only pandas dtype allowed is ‘int64’.")
         if not data.index.dtypes.array[1] == "datetime64[ns]":
             raise ValueError(
                 f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
@@ -236,12 +236,34 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset))
 
     @classmethod
-    def _construct_pandas_frame_from_data_frame(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def _construct_pandas_frame_from_data_frame(
+        cls,
+        df: pd.DataFrame,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+    ) -> pd.DataFrame:
+
+        df = df.copy()
+        if id_column is not None:
+            assert id_column in df.columns, f"Column {id_column} not found!"
+            df.rename(columns={id_column: ITEMID}, inplace=True)
+
+        if timestamp_column is not None:
+            assert (
+                timestamp_column in df.columns
+            ), f"Column {timestamp_column} not found!"
+            df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
+
         cls._validate_data_frame(df)
         return df.set_index([ITEMID, TIMESTAMP])
 
     @classmethod
-    def from_data_frame(cls, df: pd.DataFrame) -> TimeSeriesDataFrame:
+    def from_data_frame(
+        cls,
+        df: pd.DataFrame,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+    ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
 
         Parameters
@@ -261,13 +283,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 6        2 2019-01-01       6
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
+        id_column: str
+            Name of the 'item_id' column if column name is different
+        timestamp_column: str
+            Name of the 'timestamp' column if column name is different
 
         Returns
         -------
         ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
-        return cls(cls._construct_pandas_frame_from_data_frame(df))
+        return cls(
+            cls._construct_pandas_frame_from_data_frame(
+                df, id_column=id_column, timestamp_column=timestamp_column
+            )
+        )
 
     def split_by_time(
         self, cutoff_time: pd.Timestamp
