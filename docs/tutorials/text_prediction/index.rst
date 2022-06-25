@@ -14,13 +14,6 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
       How to train high-quality text prediction models in under 5 minutes.
 
    .. card::
-      :title: Multimodal Data Tables with Text
-      :link: multimodal_text.html
-
-      How TextPredictor can be applied to multimodal data tables with
-      a mix of text, numeric, and categorical columns.
-
-   .. card::
       :title: Customize TextPredictor Configurations
       :link: customization.html
 
@@ -32,18 +25,10 @@ A single call to `predictor.fit()` will train highly accurate neural networks on
 
       Build models on datasets with languages other than English.
 
-   .. card::
-      :title: Getting Started with AutoMM
-      :link: automm.html
-
-      How to use AutoMM to train models on single modal and multimodal data.
-
 .. toctree::
    :maxdepth: 1
    :hidden:
 
    beginner
-   multimodal_text
    customization
    multilingual_text
-   automm

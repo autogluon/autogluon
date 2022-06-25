@@ -25,9 +25,9 @@ from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 TESTABLE_MODELS = [
     ARIMAModel,
-    AutoARIMAModel,
+    # AutoARIMAModel,
     AutoETSModel,
-    TBATSModel,
+    # TBATSModel,
     ThetaModel,
 ]
 

@@ -1,3 +1,5 @@
+# Model Distillation in AutoMM
+
 Examples showing how to use `AutoMMPredictor` for model distillation.
 
 ## 1. Distillation on GLUE tasks

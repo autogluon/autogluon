@@ -1,4 +1,4 @@
-# Multimodal Table with Text and Tabular Features
+# AutoMM for Text + Tabular - Quick Start
 :label:`sec_automm_textprediction_multimodal`
 
 In many applications, text data may be mixed with numeric/categorical data. 
@@ -123,3 +123,6 @@ Refer to the tutorial ":ref:`sec_tabularprediction_text_multimodal`"  for more d
 ## Other Examples
 
 You may go to https://github.com/awslabs/autogluon/tree/master/examples/automm to explore other AutoMMPredictor examples.
+
+## Customization
+To customize AutoMM, please refer to :ref:`sec_automm_customization`.

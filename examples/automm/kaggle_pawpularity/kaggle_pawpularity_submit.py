@@ -1,11 +1,8 @@
+import warnings
+warnings.filterwarnings('ignore')
 import sys
-sys.path.append("../input/autogluon/")
-sys.path.append("../input/nptyping/")
-sys.path.append("../input/typish/")
-sys.path.append("../input/timm-pytorch-image-models/pytorch-image-models-master/")
-sys.path.append("../input/omegaconf/")
-sys.path.append("../input/antlr4/")
-sys.path.append("../input/nlpaug/")
+sys.path.append('../input/autogluon-standalone-install/autogluon_standalone/antlr4-python3-runtime-4.8/antlr4-python3-runtime-4.8/src/')
+!pip install --no-deps --no-index --quiet ../input/autogluon-standalone-install/autogluon_standalone/*.whl --find-links autogluon_standalone
 
 from autogluon.multimodal import AutoMMPredictor
 import pandas as pd
@@ -13,26 +10,32 @@ import numpy as np
 import torch
 import os
 
+
 data_path = "../input/petfinder-pawpularity-score/"
 
 config_6 = {
     "save_path": "../input/pawpularity-automm-result/result6/result",
-    "per_batch_size_evaluation": 32,
+    "per_gpu_batch_size_evaluation": 32,
     "N_fold": 5,
 }
 config_7 = {
     "save_path": "../input/pawpularity-automm-result/result7/result",
-    "per_batch_size_evaluation": 3,
+    "per_gpu_batch_size_evaluation": 3,
+    "N_fold": 5,
+}
+config_13 = {
+    "save_path": "../input/pawpularity-automm-result/result13/result",
+    "per_gpu_batch_size_evaluation": 32,
     "N_fold": 5,
 }
 config_26 = {
     "save_path": "../input/pawpularity-automm-result26/result",
-    "per_batch_size_evaluation": 4,
+    "per_gpu_batch_size_evaluation": 3,
     "N_fold": 5,
 }
 config_30 = {
     "save_path": "../input/pawpularity-automm-result30/result",
-    "per_batch_size_evaluation": 32,
+    "per_gpu_batch_size_evaluation": 32,
     "N_fold": 5,
 }
 
@@ -52,9 +55,9 @@ train_df, test_df = load_data(data_path)
 
 if __name__ == "__main__":
     submission = pd.read_csv("../input/petfinder-pawpularity-score/sample_submission.csv")
-
+    
     configs = [config_6, config_7, config_26]
-    model_preds = np.empty(shape=[0, submission.shape[0]])
+    model_preds = np.empty(shape=[0,submission.shape[0]])
     for perconfig in configs:
         print(perconfig)
         save_standalone_path = perconfig["save_path"] + '_standalone'
@@ -68,14 +71,14 @@ if __name__ == "__main__":
                 verbosity=4,
             )
             pretrained_model = predictor.load(path=save_standalone_path + f'_fold{fold}/')
-            pretrained_model._config.per_batch_size_evaluation = perconfig["per_batch_size_evaluation"]
+            pretrained_model._config.env.per_gpu_batch_size_evaluation = perconfig["per_gpu_batch_size_evaluation"]
             df_test = pretrained_model.predict(test_df)
             all_preds.append(df_test)
             del predictor
             torch.cuda.empty_cache()
         model_preds = np.append(model_preds, [np.mean(np.stack(all_preds), axis=0)], axis=0)
-
-    submission["Pawpularity"] = model_preds[0] * 0.25 + model_preds[1] * 0.5 + model_preds[2] * 0.25  # Model ensemble.
+    
+    submission["Pawpularity"] = model_preds[0] * 0.25 + model_preds[1] * 0.5  + model_preds[2] * 0.25  #Model ensemble.
     submission.to_csv("submission.csv", index=False)
 
     print(submission)

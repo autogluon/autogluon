@@ -24,7 +24,6 @@ from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
-from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 
@@ -59,7 +58,6 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import infer_column_problem_types
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.mixup import MixupModule
 
 from .utils import (
     create_model,
@@ -85,6 +83,7 @@ from .utils import (
     get_mixup,
     CustomUnpickler,
     is_interactive,
+    data_to_df,
 )
 from .optimization.utils import (
     get_metric,
@@ -729,6 +728,12 @@ class AutoMMPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
+        if config is None:
+            config = {}
+
+        if teacher_predictor is not None and "distiller" not in config:
+            config["distiller"] = "default"
+
         config = get_config(
             presets=presets,
             config=config,
@@ -798,9 +803,9 @@ class AutoMMPredictor:
             )
 
         loss_func = get_loss_func(
-            self._problem_type,
-            mixup_active,
-            OmegaConf.select(config, "optimization.loss_function"),
+            problem_type=self._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
         self._config = config
@@ -918,7 +923,7 @@ class AutoMMPredictor:
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.mixup_off_epoch"),
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1207,7 +1212,14 @@ class AutoMMPredictor:
         requires_label: bool,
     ) -> torch.Tensor:
 
-        data = self._data_to_df(data)
+        required_columns = self._df_preprocessor.required_feature_names
+        if requires_label:
+            required_columns.append(self._df_preprocessor.label_column)
+        data = data_to_df(
+            data=data,
+            required_columns=required_columns,
+            all_columns=self._df_preprocessor.all_column_names,
+        )
 
         # For prediction data with no labels provided.
         if not requires_label:
@@ -1286,6 +1298,8 @@ class AutoMMPredictor:
             blacklist_msgs.append("GPU available")
             blacklist_msgs.append("TPU available")
             blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("HPU available")
+            blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1544,20 +1558,6 @@ class AutoMMPredictor:
 
         return features
 
-    def _data_to_df(self, data: Union[pd.DataFrame, dict, list]):
-        if isinstance(data, pd.DataFrame):
-            return data
-        if isinstance(data, (list, dict)):
-            data = pd.DataFrame(data)
-        elif isinstance(data, str):
-            data = load_pd.load(data)
-        else:
-            raise NotImplementedError(
-                f"The format of data is not understood. "
-                f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
-            )
-        return data
-
     def _as_pandas(
         self,
         data: Union[pd.DataFrame, dict, list],
@@ -1801,14 +1801,9 @@ class AutoMMPredictor:
         if not resume:
             predictor._continuous_training = True
 
-        mixup_active, _ = get_mixup(
-            model_config=OmegaConf.select(predictor._config, "model"),
-            mixup_config=OmegaConf.select(predictor._config, "data.mixup"),
-            num_classes=predictor._output_shape,
-        )
         loss_func = get_loss_func(
             problem_type=predictor._problem_type,
-            mixup_active=mixup_active,
+            mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
         )
         predictor._loss_func = loss_func
