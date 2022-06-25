@@ -536,16 +536,17 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
+
         try:
             y_pred_proba = self._classifier.predict(data, with_proba=True) 
         except AssertionError:
             y_pred_proba = self._classifier.predict(data)
         
-        class_ids = list(self._label_cleaner.cat_mappings_dependent_var.values())
         if isinstance(data, pd.DataFrame):
             y_pred_proba.index = data.index
         
         if self._problem_type in [MULTICLASS, BINARY]:
+            class_ids = list(self._label_cleaner.cat_mappings_dependent_var.values())
             if len(y_pred_proba['image_proba'][0]) > len(class_ids):
                 # inference on multiple images and input data type is torch.Tensor
                 flatten_list = y_pred_proba['image_proba'][0]
