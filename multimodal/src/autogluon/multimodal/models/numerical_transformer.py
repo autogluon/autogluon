@@ -318,7 +318,7 @@ class NumEmbeddings(nn.Module):
             layers.append(
                 nn.ReLU()
                 if x == "relu"
-                else nn.LeakyReLU
+                else nn.LeakyReLU()
                 if x == "leaky_relu"
                 else NLinear_(in_features, d_embedding, d_embedding)
                 if x == "linear"
