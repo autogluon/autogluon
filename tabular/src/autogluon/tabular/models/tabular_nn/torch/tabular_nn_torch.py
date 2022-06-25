@@ -44,7 +44,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.optimizer = None
         self.device = None
         self.max_batch_size = None
-        self._infer_cpus = None
+        self._num_cpus_infer = None
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -151,7 +151,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         seed_value = params.pop('seed_value', 0)
 
-        self._infer_cpus = params.pop('_cpu_infer', 1)
+        self._num_cpus_infer = params.pop('_num_cpus_infer', 1)
         if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
@@ -392,7 +392,18 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.params_trained['batch_size'] = batch_size
         self.params_trained['num_epochs'] = best_epoch
 
+    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
+    #  If this isn't here, inference speed is slowed down massively.
+    #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
+        import torch
+        num_threads = torch.get_num_threads()
+        torch.set_num_threads(self._num_cpus_infer)
+        pred_proba = self._predict_proba_internal(X=X, **kwargs)
+        torch.set_num_threads(num_threads)
+        return pred_proba
+
+    def _predict_proba_internal(self, X, **kwargs):
         """ To align predict with abstract_model API.
             Preprocess here only refers to feature processing steps done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
@@ -409,10 +420,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             raise ValueError("X must be of type pd.DataFrame or TabularTorchDataset, not type: %s" % type(X))
 
     def _predict_tabular_data(self, new_data, process=True):
-        import torch
-        num_threads = torch.get_num_threads()
-        torch.set_num_threads(self._infer_cpus)
-
         from .tabular_torch_dataset import TabularTorchDataset
         if process:
             new_data = self._process_test_data(new_data)
@@ -424,7 +431,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             preds_batch = self.model.predict(data_batch)
             preds_dataset.append(preds_batch)
         preds_dataset = np.concatenate(preds_dataset, 0)
-        torch.set_num_threads(num_threads)
         return preds_dataset
 
     def _generate_datasets(self, X, y, params, X_val=None, y_val=None):
