@@ -44,6 +44,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.optimizer = None
         self.device = None
         self.max_batch_size = None
+        self._infer_cpus = None
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -149,6 +150,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
         seed_value = params.pop('seed_value', 0)
+
+        self._infer_cpus = params.pop('_cpu_infer', 1)
         if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
@@ -406,6 +409,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             raise ValueError("X must be of type pd.DataFrame or TabularTorchDataset, not type: %s" % type(X))
 
     def _predict_tabular_data(self, new_data, process=True):
+        import torch
+        num_threads = torch.get_num_threads()
+        torch.set_num_threads(self._infer_cpus)
+
         from .tabular_torch_dataset import TabularTorchDataset
         if process:
             new_data = self._process_test_data(new_data)
@@ -417,6 +424,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             preds_batch = self.model.predict(data_batch)
             preds_dataset.append(preds_batch)
         preds_dataset = np.concatenate(preds_dataset, 0)
+        torch.set_num_threads(num_threads)
         return preds_dataset
 
     def _generate_datasets(self, X, y, params, X_val=None, y_val=None):
