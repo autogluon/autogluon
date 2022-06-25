@@ -9,6 +9,20 @@ Via a simple `fit()` call, AutoGluon can train
 
 to produce multi-step ahead _probabilistic_ forecasts for univariate time series data. 
 
+---
+**NOTE**
+
+`autogluon.timeseries` depends on Apache MXNet. Please install MXNet by
+
+```shell
+python -m pip install mxnet>=1.9
+```
+
+or, if you are using a GPU with a matching MXNet package for your CUDA driver. See the 
+MXNet [documentation](https://mxnet.apache.org/versions/1.9.1/get_started?) for more info.
+
+---
+
 This tutorial demonstrates how to quickly start using AutoGluon to produce forecasts of COVID-19 cases in a 
 country given [historical data from each country](https://www.kaggle.com/c/covid19-global-forecasting-week-4). 
 
