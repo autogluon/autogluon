@@ -327,10 +327,10 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         },
 
         {
-            "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "categorical_mlp_abc", "fusion_mlp"],
+            "model.names": ["timm_image_haha", "hf_text_hello", "numerical_mlp_456", "fusion_mlp"],
             "model.timm_image_haha.checkpoint_name": "swin_tiny_patch4_window7_224",
             "model.hf_text_hello.checkpoint_name": "prajjwal1/bert-tiny",
-            "data.categorical.convert_to_text": False,
+            "data.numerical.convert_to_text": False,
         },
     ]
 )
