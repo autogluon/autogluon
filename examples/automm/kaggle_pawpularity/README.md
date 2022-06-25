@@ -91,6 +91,13 @@ Currently, these libraries need to be imported manually:
  - antlr4
  - nlpaug
 
+You can also get [simplified standalone install tool](http://automl-mm-bench.s3.amazonaws.com/0.5release/autogluon_standalone/autogluon_standalone.tar.gz), unzip and upload it into a kaggle dataset. 
+Use the code following to install AutoGluon without network in the kaggle notebook. 
+
+    import sys
+    sys.path.append('../input/autogluon-standalone-install/autogluon_standalone/antlr4-python3-runtime-4.8/antlr4-python3-runtime-4.8/src/')
+    !pip install --no-deps --no-index --quiet ../input/autogluon-standalone-install/autogluon_standalone/*.whl --find-links autogluon_standalone
+
 Using the saved standalone model can avoid downloading models in submission. You can refer to *1.3* to save the standalone model.
 
 ## 3. Prediction in Kaggle Competitions
@@ -107,6 +114,8 @@ With the `.predict()`, you can get the prediction of test datasets.
 For detailed codes, please refer to [`Kaggle_Pawpularity_submit.py`](./kaggle_Pawpularity_submit.py).
 
 ## 4. Result in Kaggle Competitions
+
+You can refer to the [kaggle notebook](https://www.kaggle.com/code/linuxdex/use-autogluon-to-predict-pet-adoption) for submission and results.
 
 | ID | Backbone | Fusion | Augment | learning_rate | lr_decay | weight_decay | Max_epochs | Warmup_step | Per_gpu_batch_size | Per_gpu_batch_size_evaluation | Precision | CV | Public_Leaderboard | Private_Leaderboard | Download |
 |----|----------|--------|---------|---------------|----------|--------------|------------|-------------|--------------------|-------------------------------|-----------|----|--------------------|---------------------|----------|
