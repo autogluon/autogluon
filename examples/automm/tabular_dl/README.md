@@ -105,7 +105,7 @@ Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi
 metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
 ['linear'] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
 ['linear','relu'] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 |  | 0.757
-['linear','leaky_relu'] |  | 0.858 |  |  |  |  | RuntimeError |  |  |  | 
+['linear','leaky_relu'] | 0.473 | 0.858 |  |  |  | 0.947 | RuntimeError | 8.915 |  |  | 0.776
 
 
 ### Reference
