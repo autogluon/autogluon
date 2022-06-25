@@ -550,7 +550,7 @@ class ImagePredictor(object):
             if len(y_pred_proba['image_proba'].iloc[0]) > len(class_ids):
                 # inference on multiple images and input data type is torch.Tensor
                 # y_pred_proba['image_proba'] is a Pandas Series
-                flatten_list = y_pred_proba['image_proba'][0]
+                flatten_list = y_pred_proba['image_proba'].iloc[0]
                 nested_list = [flatten_list[i:i + len(class_ids)] for i in range(0, len(flatten_list), len(class_ids))]
                 ret = pd.DataFrame(nested_list)
             else:
