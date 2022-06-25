@@ -1,4 +1,4 @@
-# Advanced Tabular DL models in AutoMMPredictor
+# Advanced Tabular DL models in AutoMM
 
 ## 1. Tabular Data
 
@@ -32,14 +32,14 @@ We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, na
    - `ffn_activation` determines the activation fuction in feadforward layer. We support `relu`, `gelu`, `reglu` and `leaky_relu`.
    - `attention_dropout` is the dropout rate in attention layer.
 `numerical_transformer` supports an additional feature:
-   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently we support the following embedding layers: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
+   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently we support the following embedding layers: {"linear", "shared_linear", "autodis", "positional", "relu", "layernorm"}. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
   
 These features can be tuned using `hyperparameters` in `AutoMMPredictor. For example: 
 ```python
 hyperparameters = {
-   'model.names': ["categorical_transformer","numerical_transformer","fusion_transformer"],
-   'model.categorical_transformer.num_trans_blocks': 1,
-   'ffn_dropout': 0.0,
+   "model.names": ["categorical_transformer","numerical_transformer","fusion_transformer"],
+   "model.categorical_transformer.num_trans_blocks": 1,
+   "ffn_dropout": 0.0,
 }
 ```
 
@@ -103,12 +103,20 @@ We present ablations on `AutoMM FT-Transformer` with variours embedding architec
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi 
 ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
 metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
-['linear'] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
-['linear','relu'] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 |  | 0.757
-['linear','leaky_relu'] | 0.473 | 0.858 |  |  |  | 0.947 | RuntimeError | 8.915 |  |  | 0.776
+["linear"] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
+["linear","relu"] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 | 0.772 | 0.757
+["linear","leaky_relu"] | 0.473 | 0.858 | 0.370 | 0.722 | 0.725 | 0.947 | RuntimeError | 8.915 | 0.965 |  | 0.776
+["linear","relu","linear"] |  |  |  |  |  |  | RuntimeError |  |  |  \* | 
 
+\* denotes adjusting `env.per_gpu_batch_size` from 128 to 64 to support runing a larger model.
+
+Download our trained results:
+   - ["linear"]: https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip
+   - ["linear","relu"]: https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result2.zip
+   - ["linear","leaky_relu"]: 
+   - ["linear","relu","linear"]: 
 
 ### Reference
 [1] Revisiting Deep Learning Models for Tabular Data, 2021, https://arxiv.org/pdf/2106.11959.pdf
 
-[2] On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+[2] On Embeddings for Numerical Features in Tabular Deep Learning, 2022, https://arxiv.org/abs/2203.05556
