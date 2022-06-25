@@ -21,7 +21,7 @@ def test_hpo(searcher, scheduler):
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
         "data.categorical.convert_to_text": False,
-        "data.convert_to_text.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -71,7 +71,7 @@ def test_hpo_distillation(searcher, scheduler):
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
         "data.categorical.convert_to_text": False,
-        "data.convert_to_text.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -103,7 +103,7 @@ def test_hpo_distillation(searcher, scheduler):
         "optimization.learning_rate": tune.uniform(0.0001, 0.01),
         "optimization.max_epochs": 1,
         "model.names": ["numerical_mlp"],
-        "data.convert_to_text.convert_to_text": False,
+        "data.numerical.convert_to_text": False,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
