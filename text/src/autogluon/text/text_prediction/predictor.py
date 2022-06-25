@@ -1,8 +1,10 @@
 import os
 import warnings
+from typing import Union
 
 from autogluon.multimodal import AutoMMPredictor
 from autogluon.multimodal.utils import parse_dotlist_conf
+from autogluon.multimodal.presets import get_basic_automm_config
 from .presets import get_text_preset
 from .constants import PYTORCH, MXNET
 
@@ -163,6 +165,7 @@ class TextPredictor:
             plot_results=None,
             holdout_frac=None,
             save_path=None,
+            teacher_predictor: Union[str, AutoMMPredictor] = None,
             seed=123):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
@@ -215,6 +218,9 @@ class TextPredictor:
             Default value (if None) is selected based on the number of rows in the training data and whether hyperparameter-tuning is utilized.
         save_path : str, default = None
             The path for auto-saving the models' weights
+        teacher_predictor
+            The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
+            knowledge to a student predictor, i.e., the current predictor.
         seed : int, default = 0
             The random seed to use for this training run. If None, no seed will be specified and repeated runs will produce different results.
 
@@ -223,27 +229,35 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         if self._backend == PYTORCH:
-            if presets is None:
-                presets = "default"
+            basic_config = get_basic_automm_config(is_distill=teacher_predictor is not None)
             if self._predictor._config is None:
-                config, overrides = get_text_preset(presets)
+                if presets is None:
+                    presets = "default"
+                overrides = get_text_preset(preset=presets)
             else:
                 # Continue training setting
-                config, overrides = self._predictor._config, dict()
+                overrides = dict()
+
             if hyperparameters is not None:
                 hyperparameters = parse_dotlist_conf(hyperparameters)
                 overrides.update(hyperparameters)
+
             if num_gpus is not None:
                 overrides.update({"env.num_gpus": int(num_gpus)})
+
+            if teacher_predictor is not None:
+                teacher_predictor = teacher_predictor._predictor
+
             self._predictor.fit(
                 train_data=train_data,
-                config=config,
+                config=basic_config,
                 tuning_data=tuning_data,
                 time_limit=time_limit,
                 hyperparameters=overrides,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
+                teacher_predictor=teacher_predictor,
                 seed=seed,
             )
         else:
@@ -381,7 +395,7 @@ class TextPredictor:
             Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
-        self._predictor.save(path=path,standalone=standalone)
+        self._predictor.save(path=path, standalone=standalone)
 
     @staticmethod
     def load(
