@@ -82,3 +82,23 @@ def test_distillation():
         save_path=student_save_path,
     )
     verify_predictor_save_load(predictor, dataset.test_df)
+
+    # test for distillation with teacher predictor path
+    predictor = AutoMMPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=dataset.metric,
+    )
+
+    student_save_path = os.path.join(get_home_dir(), "petfinder", "student")
+    if os.path.exists(student_save_path):
+        shutil.rmtree(student_save_path)
+
+    predictor = predictor.fit(
+        train_data=dataset.train_df,
+        teacher_predictor=teacher_predictor.path,
+        hyperparameters=hyperparameters,
+        time_limit=30,
+        save_path=student_save_path,
+    )
+    verify_predictor_save_load(predictor, dataset.test_df)

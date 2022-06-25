@@ -229,7 +229,6 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         if self._backend == PYTORCH:
-            basic_config = get_basic_automm_config(is_distill=teacher_predictor is not None)
             if self._predictor._config is None:
                 if presets is None:
                     presets = "default"
@@ -245,12 +244,11 @@ class TextPredictor:
             if num_gpus is not None:
                 overrides.update({"env.num_gpus": int(num_gpus)})
 
-            if teacher_predictor is not None:
+            if isinstance(teacher_predictor, TextPredictor):
                 teacher_predictor = teacher_predictor._predictor
 
             self._predictor.fit(
                 train_data=train_data,
-                config=basic_config,
                 tuning_data=tuning_data,
                 time_limit=time_limit,
                 hyperparameters=overrides,
