@@ -700,7 +700,7 @@ def test_hpo(searcher, scheduler):
     hyperparameters = {
         "optimization.learning_rate": tune.uniform(0.0001, 0.01),
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+        "model.names": ["numerical_mlp"],
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -758,7 +758,7 @@ def test_hpo_distillation(searcher, scheduler):
 
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+        "model.names": ["numerical_mlp"],
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
