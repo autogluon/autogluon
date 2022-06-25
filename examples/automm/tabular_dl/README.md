@@ -2,6 +2,7 @@
 
 ## 1. Tabular Data
 
+
 ### 1.1 Example
 [`example_tabular.py`](./example_tabular.py) : This example provides a use case for the pure *tabular* data, including pure numerical features and numerical + categorical feartures, with FT_Transformer [1].
 
@@ -43,7 +44,6 @@ hyperparameters = {
 ```
 
 
-
 ### 1.4 Results
 
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi 
@@ -57,10 +57,8 @@ problem_type | regression | binary | multiclass | multiclass | binary | multicla
 Best in [1] | 0.459 | 0.859 | 0.396 | 0.732 | 0.729 | 0.963 | 0.8982 | 8.794 | 0.970 | 0.753 | 0.745
 FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 | 8.855 | 0.970 | 0.756 | 0.746
 AutoMM FT-Transformer | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
-AutoMM FT-Transformer + ['linear','relu'] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 |  | 0.757
 
 `FT-Transformer in [1]` row leverages parameters searching, and `AutoMM FT-Transformer` row use a fixed training configurations.
-
 
 You can reproduce the `AutoMM FT-Transformer` row by running:
 ```bash
@@ -96,6 +94,18 @@ wget https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_exampl
 unzip tabular_example_result.zip
 ```
 to download the our results.
+
+
+### 1.5 Ablations on Numerical Embedding Architecture
+
+We present ablations on `AutoMM FT-Transformer` with variours embedding architectures [2].
+
+Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi 
+----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
+metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
+['linear'] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
+['linear','relu'] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 |  | 0.757
+['linear','leaky_relu'] |  | 0.858 |  |  |  |  | RuntimeError |  |  |  | 
 
 
 ### Reference
