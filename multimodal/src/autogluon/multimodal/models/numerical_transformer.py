@@ -233,7 +233,7 @@ class NumEmbeddings(nn.Module):
         embedding_arch
             A list containing the names of embedding layers.
             Currently support:
-                {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
+                {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'leaky_relu', 'layernorm'}
             To use the embedding schemes summarized in Table 3 of 'On Embeddings for Numerical Features in Tabular Deep Learning' (https://arxiv.org/abs/2203.05556)
             By setting the embedding_arch as follows:
                 1. `L`: ['linear']

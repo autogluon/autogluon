@@ -32,7 +32,7 @@ We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, na
    - `ffn_activation` determines the activation fuction in feadforward layer. We support `relu`, `gelu`, `reglu` and `leaky_relu`.
    - `attention_dropout` is the dropout rate in attention layer.
 `numerical_transformer` supports an additional feature:
-   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently we support the following embedding layers: {"linear", "shared_linear", "autodis", "positional", "relu", "layernorm"}. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
+   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
   
 These features can be tuned using `hyperparameters` in `AutoMMPredictor. For example: 
 ```python
@@ -100,7 +100,7 @@ to download the our results.
 
 We present ablations on `AutoMM FT-Transformer` with variours embedding architectures [2].
 
-We support the composition of the following architectures: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}.
+We support the composition of the following architectures: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'leaky_relu', 'layernorm'}.
 
 We can reproduce the following results by tuning `--embedding_arch` in `example_tabular.py`.
 
