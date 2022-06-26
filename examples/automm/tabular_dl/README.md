@@ -107,11 +107,11 @@ We can reproduce the following results by tuning `--embedding_arch` in `example_
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi 
 ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
 metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
-["linear"] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
+["linear" ] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
 ["linear", "relu"] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 | 0.772 | 0.757
 ["linear", "leaky_relu"] | 0.473 | 0.858 | 0.370 | 0.722 | 0.725 | 0.947 | RuntimeError | 8.915 | 0.965 | 0.771 | 0.776
 ["linear", "relu", "linear"] | 0.468 | 0.858 | 0.374 | 0.721 | 0.723 | 0.951 | RuntimeError | 8.941 | 0.965 |  \* | 0.770
-["positional", "linear"] |  | 0.864 |  |  |  |  | RuntimeError |  |  | \* | 
+["positional", "linear"] | 0.467 | 0.864 | 0.347 | 0.694 | 0.709 | 0.951 | RuntimeError |  | 0.967 | \* | 
 
 \* denotes adjusting `env.per_gpu_batch_size` from 128 to 64 to support runing a larger model.
 
