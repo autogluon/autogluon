@@ -67,7 +67,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self.skt_forecaster: Optional[BaseForecaster] = None
-        self._fit_index: Optional[List[Any]] = None
+        self._fit_index: Optional[pd.Index] = None
 
     def _get_skt_forecaster(self) -> BaseForecaster:
         """Return the sktime forecaster object for the model"""
@@ -93,12 +93,12 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             ),
         )
 
-    def _to_time_series_data_frame(self, data: pd.DataFrame) -> TimeSeriesDataFrame:
+    def _to_time_series_data_frame(self, data: pd.DataFrame, freq: Optional[str] = None) -> TimeSeriesDataFrame:
         df = data.copy(deep=False)
         df.set_index(
             [
                 df.index.get_level_values(0),
-                df.index.get_level_values(1).to_timestamp(),  # noqa
+                df.index.get_level_values(1).to_timestamp(freq=freq),  # noqa
             ],
             inplace=True,
         )
@@ -123,12 +123,13 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
+            warnings.simplefilter("ignore", category=RuntimeWarning)
 
             self.skt_forecaster.fit(
                 self._to_skt_data_frame(train_data[[self.target]]), fh=self._fh()
             )
 
-        self._fit_index = list(train_data.iter_items())
+        self._fit_index = train_data.index.copy()
 
     def predict(
         self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs
@@ -138,15 +139,11 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         if not self.skt_forecaster:
             raise ValueError("No sktime forecaster found. Please fit the model first.")
 
-        new_index = list(data.iter_items())
-
         # TODO: reconsider when to refit the model. currently we refit whenever train and
         #  test indices are not identical
-        if len(self._fit_index) != len(new_index) or not all(
-            x == y for x, y in zip(self._fit_index, new_index)
-        ):
+        if not self._fit_index.equals(data.index):
             logger.warning(
-                f"\tDifferent set of items than those provided during training were provided for "
+                f"Different set of items than those provided during training were provided for "
                 f"prediction. The model {self.name} will be re-trained on newly provided data"
             )
             self._fit(data)
@@ -161,4 +158,4 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         ]
 
         predictions = pd.concat([mean_predictions, quantile_predictions], axis=1)
-        return self._to_time_series_data_frame(predictions)
+        return self._to_time_series_data_frame(predictions, freq=data.freq)

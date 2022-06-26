@@ -1570,6 +1570,8 @@ class AbstractTrainer:
 
     def _train_multi_and_ensemble(self, X, y, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, groups=None, **kwargs) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
+        if time_limit is not None and time_limit <= 0:
+            raise AssertionError(f'Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s')
         if self.save_data and not self.is_data_saved:
             self.save_X(X)
             self.save_y(y)

@@ -33,6 +33,8 @@ model:
     num_layers: 1
     drop_rate: 0.1
     normalization: "layer_norm"
+    d_token: 8
+    embedding_arch:
     data_types:
       - "numerical"
     merge: "concat"

@@ -536,15 +536,26 @@ class ImagePredictor(object):
         if self._classifier is None:
             raise RuntimeError('Classifier is not initialized, try `fit` first.')
         assert self._label_cleaner is not None
+
         try:
-            y_pred_proba = self._classifier.predict(data, with_proba=True)
+            y_pred_proba = self._classifier.predict(data, with_proba=True) 
         except AssertionError:
             y_pred_proba = self._classifier.predict(data)
+        
         if isinstance(data, pd.DataFrame):
             y_pred_proba.index = data.index
+        
         if self._problem_type in [MULTICLASS, BINARY]:
-            y_pred_proba[list(self._label_cleaner.cat_mappings_dependent_var.values())] = y_pred_proba['image_proba'].to_list()
-            ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
+            class_ids = list(self._label_cleaner.cat_mappings_dependent_var.values())
+            if len(y_pred_proba['image_proba'].iloc[0]) > len(class_ids):
+                # inference on multiple images and input data type is torch.Tensor
+                # y_pred_proba['image_proba'] is a Pandas Series
+                flatten_list = y_pred_proba['image_proba'].iloc[0]
+                nested_list = [flatten_list[i:i + len(class_ids)] for i in range(0, len(flatten_list), len(class_ids))]
+                ret = pd.DataFrame(nested_list)
+            else:
+                y_pred_proba[class_ids] = y_pred_proba['image_proba'].to_list()
+                ret = y_pred_proba.drop(['image', 'image_proba'], axis=1, errors='ignore')
         elif self._problem_type == REGRESSION:
             ret = y_pred_proba['prediction']
         if as_pandas:
