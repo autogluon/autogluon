@@ -12,7 +12,7 @@ from test_predictor import verify_predictor_save_load
 
 pytest.skip(
     "HPO testing fails due to RuntimeError: CUDA error: out of memory, "
-    "but the GPU memory usage is low. Seems something seems wrong with ray. "
+    "but the GPU memory usage is low. Something seems wrong with ray. "
     "Need to investigate the reasons. Skip the tests for now.",
     allow_module_level=True
 )
