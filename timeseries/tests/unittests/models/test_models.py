@@ -1,4 +1,8 @@
 """Unit tests and utils common to all models"""
+import itertools
+import os
+import shutil
+import tempfile
 from unittest import mock
 
 import numpy as np
@@ -15,8 +19,34 @@ from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_wi
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
+TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS
+TESTABLE_PREDICTION_LENGTHS = [1, 5]
+
+
+@pytest.fixture(scope="module")
+def trained_models():
+    models = {}
+    model_paths = []
+    for model_class, prediction_length in itertools.product(
+        TESTABLE_MODELS, TESTABLE_PREDICTION_LENGTHS
+    ):
+        temp_model_path = tempfile.mkdtemp()
+        model = model_class(
+            path=temp_model_path + os.path.sep,
+            freq="H",
+            prediction_length=prediction_length,
+            hyperparameters={"epochs": 1},
+        )
+
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
+        models[(prediction_length, repr(model_class))] = model
+        model_paths.append(temp_model_path)
+
+    yield models
+
+    for td in model_paths:
+        shutil.rmtree(td)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -29,16 +59,9 @@ def test_models_can_be_initialized(model_class, temp_model_path):
 @pytest.mark.parametrize("prediction_length", [1, 5])
 @pytest.mark.parametrize("metric", AVAILABLE_METRICS)
 def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
-    model_class, prediction_length, metric, temp_model_path
+    model_class, prediction_length, metric, trained_models
 ):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 2},
-    )
-
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model = trained_models[(prediction_length, repr(model_class))]
     score = model.score(DUMMY_TS_DATAFRAME, metric)
 
     assert isinstance(score, float)
@@ -47,15 +70,9 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 5])
 def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
-    model_class, prediction_length, temp_model_path
+    model_class, prediction_length, trained_models
 ):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 1},
-    )
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model = trained_models[(prediction_length, repr(model_class))]
 
     with mock.patch.object(model, "predict") as patch_method:
         _ = model.predict_for_scoring(DUMMY_TS_DATAFRAME)
@@ -69,18 +86,10 @@ def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        quantile_levels=[0.1, 0.9],
-        hyperparameters={
-            "epochs": 1,
-        },
-    )
-    model.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-    )
+@pytest.mark.parametrize("prediction_length", TESTABLE_PREDICTION_LENGTHS)
+def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, prediction_length):
+    model = trained_models[(prediction_length, repr(model_class))]
+
     model.save()
 
     loaded_model = model.__class__.load(path=model.path)
@@ -164,7 +173,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         prediction_length=3,
         quantile_levels=quantile_levels,
         hyperparameters={
-            "epochs": 2,
+            "epochs": 1,
         },
     )
 

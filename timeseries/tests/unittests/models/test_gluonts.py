@@ -36,8 +36,8 @@ TESTABLE_MODELS = [
     GenericGluonTSModelFactory(TransformerEstimator),
 ]
 
-if PROPHET_IS_INSTALLED:
-    TESTABLE_MODELS += [ProphetModel]
+# if PROPHET_IS_INSTALLED:
+#     TESTABLE_MODELS += [ProphetModel]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
