@@ -35,7 +35,7 @@ TABULAR_DATASETS = {
 automm_hyperparameters = {
     "data.categorical.convert_to_text": False,
     "model.names": ["categorical_transformer", "numerical_transformer", "fusion_transformer"],
-    "model.numerical_transformer.embedding_arch": ["linear","leaky_relu"],
+    "model.numerical_transformer.embedding_arch": ["linear"],
     "env.batch_size": 128,
     "env.per_gpu_batch_size": 128,
     "env.eval_batch_size_ratio": 1,
@@ -68,6 +68,9 @@ def main(args):
 
     automm_hyperparameters["optimization.learning_rate"] = args.lr
     automm_hyperparameters["optimization.end_lr"] = args.end_lr
+    
+    if args.embedding_arch is not None:
+        automm_hyperparameters["model.numerical_transformer.embedding_arch"] = args.embedding_arch
 
     tabular_hyperparameters = {
         "GBM": [
@@ -147,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--end_lr", default=1e-04, type=float)
     parser.add_argument("--mode", choices=["single", "weighted", "single_bag5", "stack5"], default="single")
     parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument('--embedding_arch', type=str, nargs='+', default=None)
     args = parser.parse_args()
 
     if args.exp_dir is None:
