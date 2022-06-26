@@ -1,9 +1,10 @@
-import os
+from typing import Optional
 from .constants import (
     MODEL,
     DATA,
     OPTIMIZATION,
     ENVIRONMENT,
+    DISTILLER,
 )
 from .registry import Registry
 
@@ -73,20 +74,29 @@ def list_automm_presets(verbose: bool = False):
     return preset_details
 
 
-def get_basic_automm_config():
+def get_basic_automm_config(is_distill: Optional[bool] = False):
     """
     Get the basic config of AutoMM.
+
+    Parameters
+    ----------
+    is_distill
+        Whether in the distillation mode.
 
     Returns
     -------
     A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
     """
-    return {
+    config = {
         MODEL: "fusion_mlp_image_text_tabular",
         DATA: "default",
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
+    if is_distill:
+        config[DISTILLER] = "default"
+
+    return config
 
 
 def get_automm_presets(presets: str):
@@ -105,7 +115,6 @@ def get_automm_presets(presets: str):
     overrides
         The hyperparameter overrides of this preset.
     """
-    basic_config = get_basic_automm_config()
     presets = presets.lower()
     if presets in automm_presets.list_keys():
         overrides = automm_presets.create(presets)
@@ -114,4 +123,4 @@ def get_automm_presets(presets: str):
             f"Provided preset '{presets}' is not supported. " f"Consider one of these: {automm_presets.list_keys()}"
         )
 
-    return basic_config, overrides
+    return overrides
