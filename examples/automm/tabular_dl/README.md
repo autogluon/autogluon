@@ -111,16 +111,18 @@ metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
 ["linear", "relu"] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 | 0.772 | 0.757
 ["linear", "leaky_relu"] | 0.473 | 0.858 | 0.370 | 0.722 | 0.725 | 0.947 | RuntimeError | 8.915 | 0.965 | 0.771 | 0.776
 ["linear", "relu", "linear"] | 0.468 | 0.858 | 0.374 | 0.721 | 0.723 | 0.951 | RuntimeError | 8.941 | 0.965 | 0.769\* | 0.770
-["positional", "linear"] | 0.467 | 0.864 | 0.347 | 0.694 | 0.709 | 0.951 | RuntimeError |  | 0.967 | \* | 
+["positional", "linear"] | 0.467 | 0.864 | 0.347 | 0.694 | 0.709 | 0.951 | RuntimeError | 9.120 | 0.967 | 0.773\* | 0.761
 
-\* denotes adjusting `env.per_gpu_batch_size` from 128 to 64 to support runing a larger model.
+\* denotes adjusting `env.per_gpu_batch_size` from `128` to `64` to support runing a larger model on our device.
 
 Download our results:
-   - "linear": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip
-   - "linear","relu": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result2.zip
-   - "linear","leaky_relu": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result3.zip
-   - "linear","relu","linear": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result4.zip
-   - "positional", "linear":
+   - "linear": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip or s3://autogluon/results/tabular/tabular_example_result.zip
+   - "linear","relu": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result2.zip or s3://autogluon/results/tabular/tabular_example_result2.zip
+   - "linear","leaky_relu": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result3.zip or s3://autogluon/results/tabular/tabular_example_result3.zip
+   - "linear","relu","linear": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result4.zip or s3://autogluon/results/tabular/tabular_example_result4.zip
+   - "positional", "linear": https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result5.zip or s3://autogluon/results/tabular/tabular_example_result5.zip
+
+---
 
 ### Reference
 [1] Revisiting Deep Learning Models for Tabular Data, 2021, https://arxiv.org/pdf/2106.11959.pdf
