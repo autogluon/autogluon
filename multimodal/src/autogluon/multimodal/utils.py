@@ -203,6 +203,7 @@ def get_config(
     presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
+    is_distill: Optional[bool] = False,
 ):
     """
     Construct configurations for model, data, optimization, and environment.
@@ -254,6 +255,8 @@ def get_config(
                             "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
                             "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
                         }
+    is_distill
+        Whether in the distillation mode.
 
     Returns
     -------
@@ -263,11 +266,11 @@ def get_config(
         config = {}
 
     if not isinstance(config, DictConfig):
+        basic_config = get_basic_automm_config(is_distill=is_distill)
         if presets is None:
-            basic_config = get_basic_automm_config()
             preset_overrides = None
         else:
-            basic_config, preset_overrides = get_automm_presets(presets=presets)
+            preset_overrides = get_automm_presets(presets=presets)
 
         for k, default_value in basic_config.items():
             if k not in config:
