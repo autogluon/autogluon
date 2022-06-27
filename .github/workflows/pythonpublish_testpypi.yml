@@ -20,7 +20,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine pypandoc
+        pip install setuptools wheel twine pypandoc packaging
     - name: Build and publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_TEST_USERNAME }}

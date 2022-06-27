@@ -60,8 +60,7 @@ def update_version(version, use_file_if_exists=True, create_file=False):
                     day = f.read().strip()
             else:
                 today = date.today()
-                # day = today.strftime("b%Y%m%d")
-                day = '-rc1'  # TODO: remove after release
+                day = today.strftime("b%Y%m%d")
             version += day
     except Exception:
         pass

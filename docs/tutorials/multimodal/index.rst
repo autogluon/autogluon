@@ -17,6 +17,12 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
       :link: beginner_text.html
 
       How to train high-quality text prediction models with AutoMMPredictor in under 5 minutes.
+    
+   .. card::
+      :title: AutoMM for Image Classification - Quick Start
+      :link: beginner_image_cls.html
+
+      How to train image classfiers with AutoMMPredictor.
 
    .. card::
       :title: AutoMM for Text - Multilingual Problems
@@ -48,6 +54,7 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
    :hidden:
 
    beginner_text
+   beginner_image_cls
    multilingual_text
    multimodal_text_tabular
    beginner_multimodal

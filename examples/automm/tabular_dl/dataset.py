@@ -1,5 +1,5 @@
 import abc
-import os 
+import os
 import pandas as pd
 from autogluon.multimodal.constants import (
     BINARY,
@@ -19,17 +19,17 @@ class BaseTabularDataset(abc.ABC):
     @abc.abstractmethod
     def data(self):
         pass
-    
+
     @property
     @abc.abstractmethod
     def label_column(self):
         pass
-    
+
     @property
     @abc.abstractmethod
     def label_type(self):
         pass
-    
+
     @property
     @abc.abstractmethod
     def metric(self):
@@ -40,47 +40,50 @@ class BaseTabularDataset(abc.ABC):
     def problem_type(self):
         pass
 
-  
+
 class AdultTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/adult/train.csv',
-            'sha1sum': '0a797588f36e05b740cd4fca518e12afa2aa7650'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/adult/train.csv",
+            "sha1sum": "7fca6a419cff0f8504f083f7534119956452a337",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/adult/val.csv',
-            'sha1sum': '26b01ed3806bebe2004a2564fd2081b6888ac56c'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/adult/val.csv",
+            "sha1sum": "80fd57b2848966c8e14f5a96a97f1bfcd41ab42c",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/adult/test.csv',
-            'sha1sum': 'c8842fc31699c582746926ab274d13451c4415fd'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/adult/test.csv",
+            "sha1sum": "2ca8470c2514ba147da593882c76f956681e304a",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'adult',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "adult", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return BINARY
@@ -88,44 +91,47 @@ class AdultTabularDataset(BaseTabularDataset):
 
 class AloiTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/aloi/train.csv',
-            'sha1sum': '48fec570223b865f7392aa5476040335e06e10d8'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/aloi/train.csv",
+            "sha1sum": "62f8457a455506d83db0c671fe9d271d376ecb22",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/aloi/val.csv',
-            'sha1sum': 'e2edeafd00c56591153b47ef0d1ef52d4adb63ad'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/aloi/val.csv",
+            "sha1sum": "2e0e70dd710a441ac130a7b29a420acac26fbef4",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/aloi/test.csv',
-            'sha1sum': 'a57a2dd03839949e10a12179862cdd99157a8beb'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/aloi/test.csv",
+            "sha1sum": "3f9311df8b1a8cb0c0d9b51ad32e274e7f5eb36b",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'aloi',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "aloi", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return MULTICLASS
@@ -133,44 +139,47 @@ class AloiTabularDataset(BaseTabularDataset):
 
 class CaliforniaHousingTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/california_housing/train.csv',
-            'sha1sum': '0044f5d10336b17376e95b7935cc6047e20105d1'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/california_housing/train.csv",
+            "sha1sum": "2f8bd84e8665859ea09ec7dfc75540357e0e8b30",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/california_housing/val.csv',
-            'sha1sum': 'c2d79c5f041418396b45dd54d79c997851e4e168'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/california_housing/val.csv",
+            "sha1sum": "09b165f96d1d53062dc4b8da1f6257b98a320acc",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/california_housing/test.csv',
-            'sha1sum': '10c9594779023486d8ad136f8bbffe8dd5016d2b'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/california_housing/test.csv",
+            "sha1sum": "434e092996e94f4067145db7716a7a95849759ec",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'california_housing',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "california_housing", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return NUMERICAL
-    
+
     @property
     def metric(self):
         return RMSE
-    
+
     @property
     def problem_type(self):
         return REGRESSION
@@ -178,44 +187,47 @@ class CaliforniaHousingTabularDataset(BaseTabularDataset):
 
 class CovtypeTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/covtype/train.csv',
-            'sha1sum': 'b73899f72eacb4e7895fd0232e503235ba7eb5b5'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/covtype/train.csv",
+            "sha1sum": "7cd56fed5f667dcebe6fb3eb096bc0166636bc5d",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/covtype/val.csv',
-            'sha1sum': '33ccd97b6aa741612ae11888adc1a6b2dc48e4e8'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/covtype/val.csv",
+            "sha1sum": "0e32c887a586963f4e7cb62d16964ec8dd57cf08",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/covtype/test.csv',
-            'sha1sum': 'e88918ff9878dff80a1b062874db320b259899f1'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/covtype/test.csv",
+            "sha1sum": "35883acd6db686e148338bb7c6f0c46df0039574",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'covtype',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "covtype", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return MULTICLASS
@@ -223,44 +235,47 @@ class CovtypeTabularDataset(BaseTabularDataset):
 
 class EpsilonTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/epsilon/train.csv',
-            'sha1sum': '8444901bdb20d42359b85ca076eff7f16a34b94c'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular/epsilon/train.csv",
+            "sha1sum": "8444901bdb20d42359b85ca076eff7f16a34b94c",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/epsilon/val.csv',
-            'sha1sum': '9d607e0db43979d3d9a6034dc7603ef09934b5c8'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular/epsilon/val.csv",
+            "sha1sum": "9d607e0db43979d3d9a6034dc7603ef09934b5c8",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/epsilon/test.csv',
-            'sha1sum': '0a33633875a87a8c9f316e78d225ddfb41c54718'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular/epsilon/test.csv",
+            "sha1sum": "0a33633875a87a8c9f316e78d225ddfb41c54718",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'epsilon',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "epsilon", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return BINARY
@@ -268,44 +283,47 @@ class EpsilonTabularDataset(BaseTabularDataset):
 
 class HelenaTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/helena/train.csv',
-            'sha1sum': '8af8b8fc01535446c189f60d13dcd026c0743bc4'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/helena/train.csv",
+            "sha1sum": "61f290ee851695715662177b5726055cc7f8bccb",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/helena/val.csv',
-            'sha1sum': '8146b59c01f78ad9831fde388b7235d42b9cf7fc'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/helena/val.csv",
+            "sha1sum": "67d01556af5f78015de1151e3a3c81f71de6bc11",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/helena/test.csv',
-            'sha1sum': 'd098ce6b36ed52cd5be6e3abb80695ae3a682acc'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/helena/test.csv",
+            "sha1sum": "c55709b71ce79051e5f580e9edb73be81d41bf92",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'helena',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "helena", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return MULTICLASS
@@ -313,44 +331,47 @@ class HelenaTabularDataset(BaseTabularDataset):
 
 class HiggsSmallTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/higgs_small/train.csv',
-            'sha1sum': '90fe90bb5313f0718e98c58b0f36a013a46680c5'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/higgs_small/train.csv",
+            "sha1sum": "65554dceee2c6647f348153412c099891c3b0516",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/higgs_small/val.csv',
-            'sha1sum': '83a5e93b2b64fc0fcef60ecc9089431e6b316cc7'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/higgs_small/val.csv",
+            "sha1sum": "63ab6b0ac6730ea63c18d106c6eb17f5874042f8",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/higgs_small/test.csv',
-            'sha1sum': '68fc67a3546be69553dff61ae07ed5d9e5c6c45a'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/higgs_small/test.csv",
+            "sha1sum": "dd372975aae92ffcc3a0335299382f7ff1d889bc",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'higgs_small',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "higgs_small", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return BINARY
@@ -358,44 +379,47 @@ class HiggsSmallTabularDataset(BaseTabularDataset):
 
 class JannisTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/jannis/train.csv',
-            'sha1sum': '1044879f8a16bd5c18e471bb587619758e52267b'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/jannis/train.csv",
+            "sha1sum": "6b2cb95c8858aac965908e6973d8728ce13152c5",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/jannis/val.csv',
-            'sha1sum': 'a4a69d823237a2a52f30caf3ffea35bb7423420f'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/jannis/val.csv",
+            "sha1sum": "17332c6155d60aeb30ddc201f9da8dc93fa05584",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/jannis/test.csv',
-            'sha1sum': '3bf2c2827b607ecab2ecd7a25083c81edecc9c52'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/jannis/test.csv",
+            "sha1sum": "c27654b99794de445bc4053ccb052800886d0d0a",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'jannis',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "jannis", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return CATEGORICAL
-    
+
     @property
     def metric(self):
         return ACC
-    
+
     @property
     def problem_type(self):
         return MULTICLASS
@@ -403,44 +427,47 @@ class JannisTabularDataset(BaseTabularDataset):
 
 class MicrosoftTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/microsoft/train.csv',
-            'sha1sum': '00c6ffd175e03859359ec41c7ff9e3742055954e'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/microsoft/train.csv",
+            "sha1sum": "40f773e920798759c59d0afc6b83112389953a0a",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/microsoft/val.csv',
-            'sha1sum': '0a29767b36d9ffe5b9c63dc9a64eaabc6028f557'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/microsoft/val.csv",
+            "sha1sum": "351b43ce2eddb9af3ce38c5404e6c2eb4907392f",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/microsoft/test.csv',
-            'sha1sum': '3fbfc60b4c17f1009df180dde6aac742ff6f5aca'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/microsoft/test.csv",
+            "sha1sum": "03a10cb4b34010a41c87e8268f63cfb08ec93711",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'microsoft',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "microsoft", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return NUMERICAL
-    
+
     @property
     def metric(self):
         return RMSE
-    
+
     @property
     def problem_type(self):
         return REGRESSION
@@ -448,44 +475,47 @@ class MicrosoftTabularDataset(BaseTabularDataset):
 
 class YahooTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/yahoo/train.csv',
-            'sha1sum': '4a6ca419807da6991f755d0a349bfbac71cb6289'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/yahoo/train.csv",
+            "sha1sum": "9444919528cd4f8429b049e98e67d95ca743b607",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/yahoo/val.csv',
-            'sha1sum': '50b5017d7aa01b0c07f0bc2e6b8c2ee298b2a1e2'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/yahoo/val.csv",
+            "sha1sum": "627ba212d51719449453e24aaa7a14435ca97d8b",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/yahoo/test.csv',
-            'sha1sum': '8b550c1dec3d1d6f980f7e51f3358336cd9d1973'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/yahoo/test.csv",
+            "sha1sum": "ad8acb167c1d125c47380e57ac50de120072af23",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'yahoo',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "yahoo", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return NUMERICAL
-    
+
     @property
     def metric(self):
         return RMSE
-    
+
     @property
     def problem_type(self):
         return REGRESSION
@@ -493,44 +523,47 @@ class YahooTabularDataset(BaseTabularDataset):
 
 class YearTabularDataset(BaseTabularDataset):
     _INFO = {
-        'train': {
-            'url': 's3://autogluon/datasets/tabular/year/train.csv',
-            'sha1sum': '1f609cc6fb7d3cb71098041a5082eda190538de8'
+        "train": {
+            "url": "s3://autogluon/datasets/tabular_example/year/train.csv",
+            "sha1sum": "52a5b79a14a0fd69c94105f3212d9728dfc658ed",
         },
-        'val': {
-            'url': 's3://autogluon/datasets/tabular/year/val.csv',
-            'sha1sum': '4afdc7452aa3ef643d1c24719c91970791c31ecd'
+        "val": {
+            "url": "s3://autogluon/datasets/tabular_example/year/val.csv",
+            "sha1sum": "f5469142509a75c8ba2915fda74efe1fea221058",
         },
-        'test': {
-            'url': 's3://autogluon/datasets/tabular/year/test.csv',
-            'sha1sum': 'b412b511519e04444337f82e54e292d6d4beeb5e'
+        "test": {
+            "url": "s3://autogluon/datasets/tabular_example/year/test.csv",
+            "sha1sum": "d5cf1b15c255a8a6ac0ab94f83373266944a7675",
         },
     }
-    def __init__(self, split='train', path='./dataset/'):
-        assert split in ['train', 'val', 'test'], f'Unsupported split {split}. Split must be one of train, val, or test.'
+
+    def __init__(self, split="train", path="./dataset/"):
+        assert split in [
+            "train",
+            "val",
+            "test",
+        ], f"Unsupported split {split}. Split must be one of train, val, or test."
         self._split = split
-        self._path = os.path.join(path,'year',f'{split}.csv')
-        download(self._INFO[split]['url'],
-                 path=self._path,
-                 sha1_hash=self._INFO[split]['sha1sum'])
+        self._path = os.path.join(path, "year", f"{split}.csv")
+        download(self._INFO[split]["url"], path=self._path, sha1_hash=self._INFO[split]["sha1sum"])
         self._data = pd.read_csv(self._path)
-    
-    @property  
+
+    @property
     def data(self):
         return self._data
-    
+
     @property
     def label_column(self):
-        return 'target'
-    
+        return "target"
+
     @property
     def label_type(self):
         return NUMERICAL
-    
+
     @property
     def metric(self):
         return RMSE
-    
+
     @property
     def problem_type(self):
         return REGRESSION

@@ -24,7 +24,6 @@ from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
-from autogluon.core.utils.loaders import load_pd
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
 
@@ -84,6 +83,7 @@ from .utils import (
     get_mixup,
     CustomUnpickler,
     is_interactive,
+    data_to_df,
 )
 from .optimization.utils import (
     get_metric,
@@ -728,16 +728,11 @@ class AutoMMPredictor:
         if self._config is not None:  # continuous training
             config = self._config
 
-        if config is None:
-            config = {}
-
-        if teacher_predictor is not None and "distiller" not in config:
-            config["distiller"] = "default"
-
         config = get_config(
             presets=presets,
             config=config,
             overrides=hyperparameters,
+            is_distill=teacher_predictor is not None,
         )
 
         config = update_config_by_rules(
@@ -1212,7 +1207,14 @@ class AutoMMPredictor:
         requires_label: bool,
     ) -> torch.Tensor:
 
-        data = self._data_to_df(data)
+        required_columns = self._df_preprocessor.required_feature_names
+        if requires_label:
+            required_columns.append(self._df_preprocessor.label_column)
+        data = data_to_df(
+            data=data,
+            required_columns=required_columns,
+            all_columns=self._df_preprocessor.all_column_names,
+        )
 
         # For prediction data with no labels provided.
         if not requires_label:
@@ -1343,7 +1345,7 @@ class AutoMMPredictor:
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list],
-        metrics: Optional[List[str]] = None,
+        metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
         """
@@ -1401,6 +1403,8 @@ class AutoMMPredictor:
 
         if metrics is None:
             metrics = [self._eval_metric_name]
+        if isinstance(metrics, str):
+            metrics = [metrics]
 
         results = {}
         for per_metric in metrics:
@@ -1550,20 +1554,6 @@ class AutoMMPredictor:
             features = pd.DataFrame(features, index=data.index)
 
         return features
-
-    def _data_to_df(self, data: Union[pd.DataFrame, dict, list]):
-        if isinstance(data, pd.DataFrame):
-            return data
-        if isinstance(data, (list, dict)):
-            data = pd.DataFrame(data)
-        elif isinstance(data, str):
-            data = load_pd.load(data)
-        else:
-            raise NotImplementedError(
-                f"The format of data is not understood. "
-                f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
-            )
-        return data
 
     def _as_pandas(
         self,
