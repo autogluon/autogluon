@@ -31,8 +31,9 @@ def trained_learners():
     for hp in TEST_HYPERPARAMETER_SETTINGS:
         temp_model_path = tempfile.mkdtemp()
         learner = TimeSeriesLearner(
-            path_context=temp_model_path,
+            path_context=temp_model_path + os.path.sep,
             eval_metric="MASE",
+            prediction_length=3,
         )
         learner.fit(
             train_data=DUMMY_TS_DATAFRAME,
@@ -57,7 +58,7 @@ def test_learner_can_be_initialized(temp_model_path):
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
 def test_when_learner_called_then_training_is_performed(hyperparameters, trained_learners):
     learner = trained_learners[repr(hyperparameters)]
-    assert "SimpleFeedForward" in learner.load_trainer().get_model_names()
+    assert learner.load_trainer().get_model_names()
 
 
 @pytest.mark.parametrize(
@@ -65,14 +66,9 @@ def test_when_learner_called_then_training_is_performed(hyperparameters, trained
     zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
-    temp_model_path, hyperparameters, expected_board_length
+    trained_learners, hyperparameters, expected_board_length
 ):
-    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
-    learner.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-    )
+    learner = trained_learners[repr(hyperparameters)]
     leaderboard = learner.leaderboard()
 
     expected_board_length += int(learner.load_trainer().enable_ensemble)
@@ -86,14 +82,9 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
     zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_learner_called_then_model_can_predict(
-    temp_model_path, hyperparameters, expected_board_length
+    trained_learners, hyperparameters, expected_board_length
 ):
-    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=3)
-    learner.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-    )
+    learner = trained_learners[repr(hyperparameters)]
     predictions = learner.predict(DUMMY_TS_DATAFRAME)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
@@ -104,7 +95,7 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
     assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward", "MQCNN"])
+@pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(
     temp_model_path, model_name
 ):
@@ -170,7 +161,11 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
 def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=2)
+    learner = TimeSeriesLearner(
+        path_context=temp_model_path,
+        eval_metric="MAPE",
+        prediction_length=2
+    )
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -205,6 +200,7 @@ def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters="toy",
         val_data=DUMMY_TS_DATAFRAME,
+        time_limit=2,
     )
     if random_seed is None:
         random_seed = learner.random_state
