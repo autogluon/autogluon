@@ -2,7 +2,7 @@
 :label:`sec_automm_multimodal_beginner`
 
 AutoMM is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that are suitable for multimodal datasets. You will only need to convert the data into the multimodal dataframe format
-and AutoMM can predict the values of one column conditioned on the features from the other columns.
+and AutoMM can predict the values of one column conditioned on the features from the other columns including images, text, and tabular data.
 
 
 ```{.python .input}
@@ -15,14 +15,14 @@ np.random.seed(123)
 
 ## Dataset
 
-For demonstration, we use the [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction). The PetFinder dataset provides information about shelter animals that appear on their adoption profile to predict the animals' adoption rates, grouped into five categories, hence a multi-class classification problem.
+For demonstration, we use a simplified and subsampled version of [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction), which provides information about shelter animals that appear on their adoption profile to predict the animals' adoption rates, grouped into two categories, hence a binary classification problem.
 
 To get started, let's download and prepare the dataset.
 
 
 ```{.python .input}
 download_dir = './ag_automm_tutorial'
-zip_file = 'https://automl-mm-bench.s3.amazonaws.com/petfinder_kaggle.zip'
+zip_file = 'https://automl-mm-bench.s3.amazonaws.com/petfinder_for_tutorial.zip'
 from autogluon.core.utils.loaders import load_zip
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 ```
@@ -32,17 +32,17 @@ Next, we will load the CSV files.
 
 ```{.python .input}
 import pandas as pd
-dataset_path = download_dir + '/petfinder_processed'
+dataset_path = download_dir + '/petfinder_for_tutorial'
 train_data = pd.read_csv(f'{dataset_path}/train.csv', index_col=0)
-test_data = pd.read_csv(f'{dataset_path}/dev.csv', index_col=0)
-label_col = 'AdoptionSpeed'
+test_data = pd.read_csv(f'{dataset_path}/test.csv', index_col=0)
+label_col = 'to_be_adopted'
 ```
 
 We need to expand the image paths to load them in training.
 
 
 ```{.python .input}
-image_col = 'Images'
+image_col = 'Image'
 train_data[image_col] = train_data[image_col].apply(lambda ele: ele.split(';')[0]) # Use the first image for a quick tutorial
 test_data[image_col] = test_data[image_col].apply(lambda ele: ele.split(';')[0])
 
@@ -61,7 +61,7 @@ Each animal's adoption profile includes pictures, a text description, and variou
 
 
 ```{.python .input}
-example_row = train_data.iloc[47]
+example_row = train_data.iloc[0]
 
 example_row
 ```
@@ -73,19 +73,11 @@ example_row['Description']
 
 
 ```{.python .input}
-example_image = example_row['Images']
+example_image = example_row[image_col]
 
 from IPython.display import Image, display
 pil_img = Image(filename=example_image)
 display(pil_img)
-```
-
-For the demo purpose, we will sample 500 and 100 rows for training and testing, respectively.
-
-
-```{.python .input}
-train_data = train_data.sample(500, random_state=0)
-test_data = test_data.sample(100, random_state=0)
 ```
 
 ## Training
