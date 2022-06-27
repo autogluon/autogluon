@@ -1,7 +1,6 @@
 from functools import partial
 
 import pytest
-from flaky import flaky
 from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.seq2seq import MQRNNEstimator
@@ -14,10 +13,10 @@ from autogluon.timeseries.models.gluonts import (
     # AutoTabularModel,
     GenericGluonTSModel,
     MQCNNModel,
-    MQRNNModel,
+    # MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
-    TransformerModel,
+    # TransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
@@ -119,7 +118,7 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
 
     assert model.gts_predictor.prophet_params.get("growth") == growth  # noqa
     assert (
-        model.gts_predictor.prophet_params.get("n_changepoints")
+        model.gts_predictor.prophet_params.get("n_changepoints")  # noqa
         == n_changepoints  # noqa
     )  # noqa
 

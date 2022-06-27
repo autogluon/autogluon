@@ -11,7 +11,6 @@ from ... import TimeSeriesEvaluator
 from ...dataset import TimeSeriesDataFrame
 from ...utils.metadata import get_prototype_metadata_dict
 from .model_trial import skip_hpo, model_trial
-from ...utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -311,14 +310,13 @@ class AbstractTimeSeriesModel(AbstractModel):
             time steps of each time series.
         """
         metric = self.eval_metric if metric is None else metric
-        with evaluator_warning_filter():
-            evaluator = TimeSeriesEvaluator(
-                eval_metric=metric,
-                prediction_length=self.prediction_length,
-                target_column=self.target,
-            )
-            predictions = self.predict_for_scoring(data)
-            metric_value = evaluator(data, predictions)
+        evaluator = TimeSeriesEvaluator(
+            eval_metric=metric,
+            prediction_length=self.prediction_length,
+            target_column=self.target,
+        )
+        predictions = self.predict_for_scoring(data)
+        metric_value = evaluator(data, predictions)
 
         return metric_value * TimeSeriesEvaluator.METRIC_COEFFICIENTS[metric]
 
