@@ -155,9 +155,7 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
         },
     ],
 )
-def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(
-    temp_model_path, hyperparameters
-):
+def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_model_path, hyperparameters):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE")
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
@@ -171,15 +169,11 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(
 
 
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
-def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(
-    temp_model_path, model_name
-):
+def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": ag.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
-    with mock.patch(
-        "autogluon.timeseries.models.presets.get_default_hps"
-    ) as default_hps_mock:
+    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
         trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
@@ -247,9 +241,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
     hyperparameters = {"Prophet": {"n_changepoints": ag.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
-    with mock.patch(
-        "autogluon.timeseries.models.presets.get_default_hps"
-    ) as default_hps_mock:
+    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
         trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
@@ -371,9 +363,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {
-                        "epochs": 1
-                    },
+                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
                 },
             ],
             3,
@@ -388,15 +378,11 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {
-                        "epochs": 1
-                    },
+                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
                 },
                 {
                     GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
-                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {
-                        "epochs": 1
-                    },
+                    GenericGluonTSModelFactory(MQRNNEstimator, name="MQRNN_2"): {"epochs": 1},
                 },
             ],
             7,
@@ -460,9 +446,7 @@ def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_ca
     for model in models:
         if isinstance(model, GenericGluonTSModel):
             model_hyperparam = next(
-                hyperparameters[m]
-                for m in hyperparameters
-                if isinstance(m, GenericGluonTSModelFactory)
+                hyperparameters[m] for m in hyperparameters if isinstance(m, GenericGluonTSModelFactory)
             )
         else:
             model_hyperparam = hyperparameters[model.name]
@@ -474,14 +458,10 @@ def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_ca
 def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_then_hpo_is_performed(
     temp_model_path,
 ):
-    hyperparameters = {
-        GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": ag.Int(1, 4)}
-    }
+    hyperparameters = {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": ag.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
-    with mock.patch(
-        "autogluon.timeseries.models.presets.get_default_hps"
-    ) as default_hps_mock:
+    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
         trainer = AutoTimeSeriesTrainer(path=temp_model_path)
         trainer.fit(
@@ -513,9 +493,7 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
 def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict(
     temp_model_path, hyperparameters, low_memory
 ):
-    trainer = AutoTimeSeriesTrainer(
-        path=temp_model_path, eval_metric="MAPE", prediction_length=2
-    )
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric="MAPE", prediction_length=2)
     trainer.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,

@@ -50,9 +50,7 @@ def deepar_trained_zero_data() -> AbstractGluonTSModel:
 
 
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
-def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_gluonts(
-    metric_name, deepar_trained
-):
+def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_gluonts(metric_name, deepar_trained):
     model = deepar_trained
 
     forecast_iter, ts_iter = make_evaluation_predictions(
@@ -61,9 +59,7 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
         num_samples=100,
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        fcast_list, quantile_levels=model.quantile_levels
-    )
+    forecast_df = model._gluonts_forecasts_to_data_frame(fcast_list, quantile_levels=model.quantile_levels)
 
     ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
@@ -90,9 +86,7 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
         num_samples=100,
     )
     fcast_list, ts_list = list(forecast_iter), list(ts_iter)
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        fcast_list, quantile_levels=model.quantile_levels
-    )
+    forecast_df = model._gluonts_forecasts_to_data_frame(fcast_list, quantile_levels=model.quantile_levels)
 
     ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
     ag_value = ag_evaluator(data, forecast_df)
@@ -104,9 +98,7 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
 
 
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
-def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gluonts(
-    metric_name, deepar_trained
-):
+def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gluonts(metric_name, deepar_trained):
     model = deepar_trained
     forecast_iter, ts_iter = make_evaluation_predictions(
         dataset=model._to_gluonts_dataset(DUMMY_TS_DATAFRAME),
@@ -125,17 +117,13 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
                 item_id=s.item_id,
             )
         )
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        zero_forecast_list, quantile_levels=model.quantile_levels
-    )
+    forecast_df = model._gluonts_forecasts_to_data_frame(zero_forecast_list, quantile_levels=model.quantile_levels)
 
     ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=2)
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
     gts_evaluator = GluonTSEvaluator()
-    gts_results, _ = gts_evaluator(
-        ts_iterator=ts_list, fcst_iterator=zero_forecast_list
-    )
+    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=zero_forecast_list)
 
     assert np.isclose(gts_results[metric_name], ag_value, atol=1e-5)
 
@@ -153,9 +141,7 @@ def test_available_metrics_have_coefficients():
     + [(k, k) for k in TimeSeriesEvaluator.AVAILABLE_METRICS],
 )
 @pytest.mark.parametrize("raise_errors", [True, False])
-def test_given_correct_input_check_get_eval_metric_output_correct(
-    check_input, expected_output, raise_errors
-):
+def test_given_correct_input_check_get_eval_metric_output_correct(check_input, expected_output, raise_errors):
     assert expected_output == TimeSeriesEvaluator.check_get_evaluation_metric(
         check_input, raise_if_not_available=raise_errors
     )
@@ -163,25 +149,17 @@ def test_given_correct_input_check_get_eval_metric_output_correct(
 
 @pytest.mark.parametrize("raise_errors", [True, False])
 def test_given_no_input_check_get_eval_metric_output_default(raise_errors):
-    assert (
-        TimeSeriesEvaluator.DEFAULT_METRIC
-        == TimeSeriesEvaluator.check_get_evaluation_metric(
-            raise_if_not_available=raise_errors
-        )
+    assert TimeSeriesEvaluator.DEFAULT_METRIC == TimeSeriesEvaluator.check_get_evaluation_metric(
+        raise_if_not_available=raise_errors
     )
 
 
 def test_given_unavailable_input_and_raise_check_get_eval_metric_raises():
     with pytest.raises(ValueError):
-        TimeSeriesEvaluator.check_get_evaluation_metric(
-            "some_nonsense_eval_metric", raise_if_not_available=True
-        )
+        TimeSeriesEvaluator.check_get_evaluation_metric("some_nonsense_eval_metric", raise_if_not_available=True)
 
 
 def test_given_unavailable_input_and_no_raise_check_get_eval_metric_output_default():
-    assert (
-        TimeSeriesEvaluator.DEFAULT_METRIC
-        == TimeSeriesEvaluator.check_get_evaluation_metric(
-            "some_nonsense_eval_metric", raise_if_not_available=False
-        )
+    assert TimeSeriesEvaluator.DEFAULT_METRIC == TimeSeriesEvaluator.check_get_evaluation_metric(
+        "some_nonsense_eval_metric", raise_if_not_available=False
     )

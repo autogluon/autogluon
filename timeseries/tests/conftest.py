@@ -6,26 +6,18 @@ import pytest
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--runslow", action="store_true", default=False, help="run slow tests"
-    )
+    parser.addoption("--runslow", action="store_true", default=False, help="run slow tests")
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
     # known mxnet warnings
-    config.addinivalue_line(
-        "filterwarnings", "ignore:In accordance with NEP 32:DeprecationWarning"
-    )
+    config.addinivalue_line("filterwarnings", "ignore:In accordance with NEP 32:DeprecationWarning")
     config.addinivalue_line("filterwarnings", "ignore:.np.bool:DeprecationWarning")
 
     # known gluonts warnings
-    config.addinivalue_line(
-        "filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.distribution.*"
-    )
-    config.addinivalue_line(
-        "filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.trainer.*"
-    )
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.distribution.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.trainer.*")
     config.addinivalue_line("filterwarnings", "ignore:Using `json`-module:UserWarning")
 
     # pandas future warnings on timestamp freq being deprecated

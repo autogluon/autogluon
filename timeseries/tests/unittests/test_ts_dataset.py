@@ -21,12 +21,8 @@ EMPTY_TARGETS = np.array([], dtype=np.int64)
 
 
 def _build_ts_dataframe(item_ids, datetime_index, target):
-    multi_inds = pd.MultiIndex.from_product(
-        [item_ids, datetime_index], names=["item_id", "timestamp"]
-    )
-    return TimeSeriesDataFrame(
-        pd.Series(target, name="target", index=multi_inds).to_frame()
-    )
+    multi_inds = pd.MultiIndex.from_product([item_ids, datetime_index], names=["item_id", "timestamp"])
+    return TimeSeriesDataFrame(pd.Series(target, name="target", index=multi_inds).to_frame())
 
 
 SAMPLE_TS_DATAFRAME = _build_ts_dataframe(ITEM_IDS, DATETIME_INDEX, TARGETS)
@@ -108,9 +104,7 @@ def test_from_gluonts_list_dataset():
 
 def test_from_data_frame():
     tsdf_from_data_frame = TimeSeriesDataFrame(SAMPLE_DATAFRAME)
-    pd.testing.assert_frame_equal(
-        tsdf_from_data_frame, SAMPLE_TS_DATAFRAME, check_dtype=True
-    )
+    pd.testing.assert_frame_equal(tsdf_from_data_frame, SAMPLE_TS_DATAFRAME, check_dtype=True)
 
 
 @pytest.mark.parametrize(
@@ -257,9 +251,7 @@ def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, target
         (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "H"),
     ],
 )
-def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(
-    timestamps, expected_freq
-):
+def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(timestamps, expected_freq):
     df = pd.DataFrame(
         {
             "item_id": [0, 0, 0],
@@ -284,9 +276,7 @@ FREQ_TEST_CASES = [
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
-    start_time, freq
-):
+def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(start_time, freq):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time)} for _ in range(3)],  # type: ignore
         freq=freq,
@@ -298,12 +288,10 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(
-    start_time, freq
-):
+def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
-        freq=freq
+        freq=freq,
     )
 
     ts_df = TimeSeriesDataFrame(item_list)
@@ -312,27 +300,28 @@ def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferre
 
 
 @pytest.mark.skip("Skipped until re-enabling regularity check.")
-@pytest.mark.parametrize("list_of_timestamps", [
+@pytest.mark.parametrize(
+    "list_of_timestamps",
     [
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ],
     ],
-    [
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
-    ],
-    [
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
-    ],
-    [
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-    ]
-])
-def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_raises(
-    list_of_timestamps
-):
+)
+def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_raises(list_of_timestamps):
     df_tuples = []
     for i, ts in enumerate(list_of_timestamps):
         for t in ts:
@@ -435,9 +424,7 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
     assert all(ixval[1] == pd.Timestamp(expected_times[i]) for i, ixval in enumerate(dfv.index.values))  # type: ignore
 
 
-@pytest.mark.parametrize("input_df", [
-    SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY
-])
+@pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 def test_when_dataframe_copy_called_on_instance_then_output_correct(input_df):
     copied_df = input_df.copy()
 
@@ -445,9 +432,7 @@ def test_when_dataframe_copy_called_on_instance_then_output_correct(input_df):
     assert copied_df._data is not input_df._data
 
 
-@pytest.mark.parametrize("input_df", [
-    SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY
-])
+@pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 def test_when_dataframe_stdlib_copy_called_then_output_correct(input_df):
     copied_df = copy.deepcopy(input_df)
 
@@ -455,9 +440,7 @@ def test_when_dataframe_stdlib_copy_called_then_output_correct(input_df):
     assert copied_df._data is not input_df._data
 
 
-@pytest.mark.parametrize("input_df", [
-    SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY
-])
+@pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 def test_when_dataframe_class_copy_called_then_output_correct(input_df):
     copied_df = TimeSeriesDataFrame.copy(input_df, deep=True)
 
@@ -465,9 +448,7 @@ def test_when_dataframe_class_copy_called_then_output_correct(input_df):
     assert copied_df._data is not input_df._data
 
 
-@pytest.mark.parametrize("input_df", [
-    SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY
-])
+@pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 @pytest.mark.parametrize("inplace", [True, False])
 def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplace):
     renamed_df = TimeSeriesDataFrame.rename(input_df, columns={"target": "mytarget"}, inplace=inplace)
@@ -481,9 +462,7 @@ def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplac
         assert renamed_df._data is input_df._data
 
 
-@pytest.mark.parametrize("input_df", [
-    SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY
-])
+@pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 @pytest.mark.parametrize("inplace", [True, False])
 def test_when_dataframe_instance_rename_called_then_output_correct(input_df, inplace):
     renamed_df = input_df.rename(columns={"target": "mytarget"}, inplace=inplace)
@@ -497,9 +476,7 @@ def test_when_dataframe_instance_rename_called_then_output_correct(input_df, inp
         assert renamed_df._data is input_df._data
 
 
-@pytest.mark.parametrize("input_df", [
-    SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY
-])
+@pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 @pytest.mark.parametrize("read_fn", [pd.read_pickle, TimeSeriesDataFrame.from_pickle])
 def test_when_dataframe_read_pickle_called_then_output_correct(input_df, read_fn):
 

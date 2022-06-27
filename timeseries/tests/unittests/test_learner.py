@@ -96,15 +96,11 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
 
 
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
-def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(
-    temp_model_path, model_name
-):
+def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": ag.Int(1, 3)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
-    with mock.patch(
-        "autogluon.timeseries.models.presets.get_default_hps"
-    ) as default_hps_mock:
+    with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
         default_hps_mock.return_value = defaultdict(dict)
         learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
         learner.fit(
@@ -161,11 +157,7 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
 def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters, expected_board_length
 ):
-    learner = TimeSeriesLearner(
-        path_context=temp_model_path,
-        eval_metric="MAPE",
-        prediction_length=2
-    )
+    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE", prediction_length=2)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -188,9 +180,7 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
 
 
 @pytest.mark.parametrize("random_seed", [None, 1616])
-def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
-    temp_model_path, random_seed
-):
+def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(temp_model_path, random_seed):
     init_kwargs = dict(path_context=temp_model_path, eval_metric="MAPE")
     if random_seed is not None:
         init_kwargs["random_state"] = random_seed

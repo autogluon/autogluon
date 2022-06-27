@@ -18,7 +18,8 @@ from autogluon.timeseries.models.sktime import (
     AutoARIMAModel,
     AutoETSModel,
     TBATSModel,
-    ThetaModel, AbstractSktimeModel,
+    ThetaModel,
+    AbstractSktimeModel,
 )
 
 from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
@@ -74,9 +75,7 @@ def test_when_sktime_models_fitted_then_allowed_hyperparameters_are_passed_to_sk
     hyperparameters.update(bad_params)
     model = model_class(hyperparameters=hyperparameters)
 
-    with mock.patch.object(
-        target=sktime_forecaster_class, attribute="__init__"
-    ) as const_mock:
+    with mock.patch.object(target=sktime_forecaster_class, attribute="__init__") as const_mock:
         try:
             model.fit(train_data=DUMMY_TS_DATAFRAME)
         except TypeError:
@@ -129,9 +128,7 @@ def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_skt_models_saved_then_forecasters_can_be_loaded(
-    model_class, temp_model_path
-):
+def test_when_skt_models_saved_then_forecasters_can_be_loaded(model_class, temp_model_path):
     model = model_class()
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
@@ -143,24 +140,24 @@ def test_when_skt_models_saved_then_forecasters_can_be_loaded(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("train_data, test_data", [
-    (
-        get_data_frame_with_item_index([0, 1, 2, 3]),
-        get_data_frame_with_item_index([2, 3, 4, 5])
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B", "C"]),
-        get_data_frame_with_item_index(["A", "B", "D"]),
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B"]),
-        get_data_frame_with_item_index(["A", "B", "C"]),
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B", "C"]),
-        get_data_frame_with_item_index(["A", "B"]),
-    ),
-])
+@pytest.mark.parametrize(
+    "train_data, test_data",
+    [
+        (get_data_frame_with_item_index([0, 1, 2, 3]), get_data_frame_with_item_index([2, 3, 4, 5])),
+        (
+            get_data_frame_with_item_index(["A", "B", "C"]),
+            get_data_frame_with_item_index(["A", "B", "D"]),
+        ),
+        (
+            get_data_frame_with_item_index(["A", "B"]),
+            get_data_frame_with_item_index(["A", "B", "C"]),
+        ),
+        (
+            get_data_frame_with_item_index(["A", "B", "C"]),
+            get_data_frame_with_item_index(["A", "B"]),
+        ),
+    ],
+)
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     model_class, temp_model_path, train_data, test_data
 ):

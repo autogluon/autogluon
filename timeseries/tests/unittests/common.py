@@ -59,8 +59,6 @@ def dict_equal_primitive(this, that):
         if isinstance(v, dict):
             equal_fields.append(dict_equal_primitive(v, that[k]))
         if isinstance(v, list):
-            equal_fields.append(
-                dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k])))
-            )
+            equal_fields.append(dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k]))))
 
     return all(equal_fields)
