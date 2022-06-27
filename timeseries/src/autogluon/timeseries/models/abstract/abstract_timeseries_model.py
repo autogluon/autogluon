@@ -127,6 +127,7 @@ class AbstractTimeSeriesModel(AbstractModel):
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 metadata=self.metadata,
+                target=self.target,
             )
         )
         return params
@@ -356,10 +357,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             )
             return skip_hpo(self, train_data, val_data, time_limit=time_limit)
         else:
-            logger.debug(f"Hyperparameter search space for {self.name}: ")
+            logger.debug(f"\tHyperparameter search space for {self.name}: ")
             for hyperparameter in search_space:
                 if isinstance(search_space[hyperparameter], ag.Space):
-                    logger.debug(f"{hyperparameter}: {search_space[hyperparameter]}")
+                    logger.debug(f"\t{hyperparameter}: {search_space[hyperparameter]}")
 
         dataset_train_filename = "dataset_train.pkl"
         train_path = self.path + dataset_train_filename
