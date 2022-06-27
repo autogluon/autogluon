@@ -3,17 +3,21 @@ import itertools
 import os
 import shutil
 import tempfile
+from functools import partial
 from unittest import mock
 
 import numpy as np
 import pytest
 from flaky import flaky
+from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 
 from autogluon.timeseries import TimeSeriesEvaluator, TimeSeriesDataFrame
+from autogluon.timeseries.models import DeepARModel, AutoETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
@@ -190,20 +194,12 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [5, 10])
-@pytest.mark.parametrize("train_data", [
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_item_index([0, 1, 2, 3]),
-])
+@pytest.mark.parametrize("prediction_length", [1, 5])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_correct(
-    model_class, prediction_length, temp_model_path, train_data
+    model_class, prediction_length, trained_models
 ):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 1},
-    )
+    train_data = DUMMY_TS_DATAFRAME
+    model = trained_models[(prediction_length, repr(model_class))]
 
     model.fit(train_data=train_data)
 
@@ -242,8 +238,11 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     assert min_hour_in_pred == max_hour_in_test + 1
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [5, 10])
+@pytest.mark.parametrize("model_class", [
+    DeepARModel, AutoETSModel, partial(
+        GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
+    )
+])
 @pytest.mark.parametrize("train_data, test_data", [
     (
         get_data_frame_with_item_index([0, 1, 2, 3]),
@@ -271,8 +270,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     ),
 ])
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(
-    model_class, prediction_length, temp_model_path, train_data, test_data
+    model_class, temp_model_path, train_data, test_data
 ):
+    prediction_length = 5
     model = model_class(
         path=temp_model_path,
         freq="H",

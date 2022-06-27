@@ -35,7 +35,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.get_model_names()
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["toy"])
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters
 ):
@@ -57,7 +57,7 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
     assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["toy"])
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters
 ):

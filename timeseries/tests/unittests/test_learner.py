@@ -11,15 +11,14 @@ from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
-from autogluon.timeseries.models.presets import get_default_hps
 
 from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
-    "toy",
     {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"DeepAR": {"epochs": 1}, "AutoETS": {}},
 ]
+TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
 
 def test_learner_can_be_initialized(temp_model_path):
@@ -38,13 +37,12 @@ def test_when_learner_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in learner.load_trainer().get_model_names()
 
 
-@pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
-    temp_model_path, eval_metric, hyperparameters, expected_board_length
+    temp_model_path, hyperparameters, expected_board_length
 ):
     learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
     learner.fit(
@@ -62,7 +60,7 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
 
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_learner_called_then_model_can_predict(
     temp_model_path, hyperparameters, expected_board_length
@@ -144,7 +142,7 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
 
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 2]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_models_can_predict(
     temp_model_path, hyperparameters, expected_board_length
@@ -171,7 +169,7 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
         assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("random_seed", [None, 12, 23, 34])
+@pytest.mark.parametrize("random_seed", [None, 1616])
 def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(
     temp_model_path, random_seed
 ):

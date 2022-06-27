@@ -1,5 +1,8 @@
 """Unit tests for trainers"""
 import copy
+import os
+import shutil
+import tempfile
 from collections import defaultdict
 from unittest import mock
 
@@ -14,17 +17,41 @@ from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleWrapper
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
-from autogluon.timeseries.models.presets import get_default_hps
 from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
-    "toy",
-    DUMMY_TRAINER_HYPERPARAMETERS,
-    {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}, "AutoETS": {}},
+    {"SimpleFeedForward": {"epochs": 1}},
+    {"DeepAR": {"epochs": 1}, "AutoETS": {}},
 ]
+TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
+
+
+@pytest.fixture(scope="module")
+def trained_trainers():
+    trainers = {}
+    model_paths = []
+    for hp in TEST_HYPERPARAMETER_SETTINGS:
+        temp_model_path = tempfile.mkdtemp()
+        trainer = AutoTimeSeriesTrainer(
+            path=temp_model_path + os.path.sep,
+            eval_metric="MAPE",
+            prediction_length=3,
+        )
+        trainer.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            val_data=DUMMY_TS_DATAFRAME,
+            hyperparameters=hp,
+        )
+        trainers[repr(hp)] = trainer
+        model_paths.append(temp_model_path)
+
+    yield trainers
+
+    for td in model_paths:
+        shutil.rmtree(td)
 
 
 def test_trainer_can_be_initialized(temp_model_path):
@@ -33,36 +60,15 @@ def test_trainer_can_be_initialized(temp_model_path):
 
 
 # smoke test for the short 'happy path'
-def test_when_trainer_called_then_training_is_performed(temp_model_path):
-    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        val_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS,
-    )
-
-    assert "SimpleFeedForward" in trainer.get_model_names()
-
-
-def test_given_validation_data_when_trainer_called_then_training_is_performed(
-    temp_model_path,
-):
-    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS,
-        val_data=DUMMY_TS_DATAFRAME,
-    )
-
-    assert "SimpleFeedForward" in trainer.get_model_names()
-    val_score = trainer.get_model_attribute("SimpleFeedForward", "val_score")
-    assert val_score is not None
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+def test_when_trainer_called_then_training_is_performed(trained_trainers, hyperparameters):
+    assert trained_trainers[repr(hyperparameters)].get_model_names()
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
@@ -80,21 +86,14 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
 
-@pytest.mark.parametrize("eval_metric", ["MAPE"])
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
-    temp_model_path, eval_metric, hyperparameters, expected_board_length
+    trained_trainers, hyperparameters, expected_board_length
 ):
-    trainer = AutoTimeSeriesTrainer(path=temp_model_path, eval_metric=eval_metric)
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-    )
-
+    trainer = trained_trainers[repr(hyperparameters)]
     test_data = get_data_frame_with_item_index(["A", "B", "C"])
 
     leaderboard = trainer.leaderboard(test_data)
@@ -107,20 +106,12 @@ def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
 
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
-    zip(TEST_HYPERPARAMETER_SETTINGS, [len(get_default_hps("toy", 1)), 1, 3]),
+    zip(TEST_HYPERPARAMETER_SETTINGS, TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS),
 )
 def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
-    temp_model_path, hyperparameters, expected_board_length
+    trained_trainers, hyperparameters, expected_board_length
 ):
-    trainer = AutoTimeSeriesTrainer(
-        path=temp_model_path,
-        prediction_length=3,
-    )
-    trainer.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters=hyperparameters,
-        val_data=DUMMY_TS_DATAFRAME,
-    )
+    trainer = trained_trainers[repr(hyperparameters)]
     predictions = trainer.predict(DUMMY_TS_DATAFRAME)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
@@ -179,7 +170,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(
         assert model.freq == DUMMY_TS_DATAFRAME.freq
 
 
-@pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward", "MQCNN"])
+@pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(
     temp_model_path, model_name
 ):
@@ -453,8 +444,8 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
             "SimpleFeedForward": {"epochs": 1},
         },
         {
-            GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 2},
-            "DeepAR": {"epochs": 2},
+            GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": 1},
+            "DeepAR": {"epochs": 1},
         },
     ],
 )
