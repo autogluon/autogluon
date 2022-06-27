@@ -213,7 +213,11 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", [
+    DeepARModel, AutoETSModel, partial(
+        GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
+    )
+])
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
     model_class, test_data_index, temp_model_path
@@ -247,10 +251,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     (
         get_data_frame_with_item_index([0, 1, 2, 3]),
         get_data_frame_with_item_index([0, 1, 2, 3])
-    ),
-    (
-        get_data_frame_with_item_index([0, 1, 2, 3]),
-        get_data_frame_with_item_index([2, 3, 4, 5])
     ),
     (
         get_data_frame_with_item_index(["A", "B", "C"]),

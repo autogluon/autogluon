@@ -1,4 +1,7 @@
 """Unit tests for learners"""
+import os
+import shutil
+import tempfile
 from collections import defaultdict
 from unittest import mock
 
@@ -21,19 +24,39 @@ TEST_HYPERPARAMETER_SETTINGS = [
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
 
+@pytest.fixture(scope="module")
+def trained_learners():
+    learners = {}
+    model_paths = []
+    for hp in TEST_HYPERPARAMETER_SETTINGS:
+        temp_model_path = tempfile.mkdtemp()
+        learner = TimeSeriesLearner(
+            path_context=temp_model_path,
+            eval_metric="MASE",
+        )
+        learner.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters=hp,
+            val_data=DUMMY_TS_DATAFRAME,
+        )
+        learners[repr(hp)] = learner
+        model_paths.append(temp_model_path)
+
+    yield learners
+
+    for td in model_paths:
+        shutil.rmtree(td)
+
+
 def test_learner_can_be_initialized(temp_model_path):
     learner = TimeSeriesLearner(path_context=temp_model_path)
     assert isinstance(learner, TimeSeriesLearner)
 
 
 # smoke test for the short 'happy path'
-def test_when_learner_called_then_training_is_performed(temp_model_path):
-    learner = TimeSeriesLearner(path_context=temp_model_path, eval_metric="MAPE")
-    learner.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-        val_data=DUMMY_TS_DATAFRAME,
-    )
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+def test_when_learner_called_then_training_is_performed(hyperparameters, trained_learners):
+    learner = trained_learners[repr(hyperparameters)]
     assert "SimpleFeedForward" in learner.load_trainer().get_model_names()
 
 
