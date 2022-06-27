@@ -6,8 +6,9 @@
 
 ## AutoML for Image, Text, and Tabular Data
 
-[![Continuous Integration](https://github.com/yinweisu/autogluon/actions/workflows/continuous_integration.yml/badge.svg?branch=master&event=push)](https://github.com/yinweisu/autogluon/actions/workflows/continuous_integration.yml)
-[![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
+[![Latest Release](https://img.shields.io/github/v/release/awslabs/autogluon)](https://github.com/awslabs/autogluon/releases)
+[![Build Status](https://ci.gluon.ai/view/all/job/autogluon/job/master/badge/icon)](https://ci.gluon.ai/view/all/job/autogluon/job/master/)
+[![Python Versions](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue)](https://pypi.org/project/autogluon/)
 [![GitHub license](docs/static/apache2.svg)](./LICENSE)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
 [![Twitter](https://img.shields.io/twitter/follow/autogluon?style=social)](https://twitter.com/autogluon)
