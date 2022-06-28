@@ -1,9 +1,11 @@
 ## This is the public API that should be exposed to the general user
 
+import shift as sft
+
 class XShiftDetector:
-    """Detect a change in covariate (X) distribution between training and test, which we call XShift.  This should be used after the
-    predictor is instantiated, but before the predictor is fit.  It can tell you if your training set is not
-    representative of your test set distribution.
+    """Detect a change in covariate (X) distribution between training and test, which we call XShift.  This should be
+    used after the predictor is instantiated, but before the predictor is fit.  It can tell you if your training set is
+    not representative of your test set distribution.
 
     Parameters
     ----------
@@ -48,10 +50,11 @@ class XShiftDetector:
             - a dataframe with a label column where 1 = target and 0 = source
             - a tuple of training dataframe and test dataframe
         """
+        self._is_fit = True
         pass
 
     def infer(self):
-        """Output the results of the XShift detection
+        """Return the results of the XShift detection
 
         Returns
         -------
@@ -59,4 +62,6 @@ class XShiftDetector:
             - .json(): output json object of the results
             - .print(): print the results in a nice format
         """
-        pass
+        assert self._is_fit, "Need to call .fit() before inference"
+        inferrer = sft.XShiftInferrer(self)
+        return inferrer
