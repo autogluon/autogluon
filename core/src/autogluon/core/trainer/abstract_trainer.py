@@ -1312,7 +1312,7 @@ class AbstractTrainer:
             logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+                    hpo_models, hpo_results = model.hyperparameter_tune(
                         X=X,
                         y=y,
                         k_fold=k_fold,
@@ -1320,7 +1320,7 @@ class AbstractTrainer:
                         **model_fit_kwargs
                     )
                 else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+                    hpo_models, hpo_results = model.hyperparameter_tune(
                         X=X,
                         y=y,
                         X_val=X_val,

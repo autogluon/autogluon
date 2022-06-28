@@ -19,6 +19,7 @@ def model_trial(args,
                 reporter=None,  # reporter only used by custom strategy, hence optional
                 time_limit=None,
                 fit_kwargs=None,
+                checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
                 ):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
     try:
@@ -114,5 +115,6 @@ def skip_hpo(model, X, y, X_val, y_val, time_limit=None, **kwargs):
     )
     hpo_results = {'total_time': model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
+    hpo_results['hpo_model_performances'] = hpo_model_performances
     hpo_models = {model.name: model.path}
-    return hpo_models, hpo_model_performances, hpo_results
+    return hpo_models, hpo_results

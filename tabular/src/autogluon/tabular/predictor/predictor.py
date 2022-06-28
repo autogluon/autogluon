@@ -2766,8 +2766,6 @@ class TabularPredictor:
                     'hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
             else:
                 ag_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
-        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
-            ag_args.pop('hyperparameter_tune_kwargs', None)
         if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
             logger.log(30,
                        'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')

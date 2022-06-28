@@ -53,6 +53,19 @@ class HpoExecutor(ABC):
 
 class RayHpoExecutor(HpoExecutor):
     
+    custom_to_ray_preset_map = {
+        'auto': {'scheduler': 'FIFO', 'searcher': 'bayes'},
+        'local_random': {'scheduler': 'FIFO', 'searcher': 'random'},
+        'random': {'scheduler': 'FIFO', 'searcher': 'random'},
+    }
+    custom_to_ray_scheduler_preset_map = {
+        'local': 'FIFO',
+    }
+    custom_to_ray_searcher_preset_map = {
+        'local_random': 'random',
+        'random': 'random', 
+    }
+    
     def __init__(self):
         self.resources = None
         self.hyperparameter_tune_kwargs = None
@@ -64,6 +77,17 @@ class RayHpoExecutor(HpoExecutor):
     
     def initialize(self, hyperparameter_tune_kwargs, time_limit=None):
         self.time_limit = time_limit
+        hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
+        if isinstance(hyperparameter_tune_kwargs, str):
+            hyperparameter_tune_kwargs = self.custom_to_ray_preset_map[hyperparameter_tune_kwargs]
+        hyperparameter_tune_kwargs['scheduler'] = self.custom_to_ray_scheduler_preset_map.get(
+            hyperparameter_tune_kwargs['scheduler'],
+            hyperparameter_tune_kwargs['scheduler']
+        )
+        hyperparameter_tune_kwargs['searcher'] = self.custom_to_ray_scheduler_preset_map.get(
+            hyperparameter_tune_kwargs['searcher'],
+            hyperparameter_tune_kwargs['searcher']
+        )
         self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
         return time_limit
     
@@ -85,7 +109,6 @@ class RayHpoExecutor(HpoExecutor):
     def execute(
             self,
             model_trial,
-            search_space,
             train_fn_kwargs,
             directory,
             minimum_cpu_per_trial,
@@ -145,6 +168,7 @@ class CustomHpoExecutor(HpoExecutor):
         return CUSTOM_BACKEND
     
     def initialize(self, hyperparameter_tune_kwargs, time_limit=None):
+        hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
         if not isinstance(hyperparameter_tune_kwargs, tuple):
             num_trials = 1 if time_limit is None else 1000
             hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
@@ -178,7 +202,6 @@ class CustomHpoExecutor(HpoExecutor):
         scheduler_cls, scheduler_params = self.scheduler_options  # Unpack tuple
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
-        train_fn_kwargs['fit_kwargs']['time_limit'] = scheduler_params['time_out']
         train_fn_kwargs['fit_kwargs'].update(scheduler_params['resource'].copy())
         scheduler = scheduler_cls(model_trial, search_space=self.search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
         self.scheduler = scheduler
@@ -188,7 +211,7 @@ class CustomHpoExecutor(HpoExecutor):
     
     def report(self, reporter, **kwargs):
         assert reporter is not None
-        reporter.report(**kwargs)    
+        reporter(**kwargs)    
         
     def get_hpo_results(self, model_name, model_path_root, time_start, **kwargs):
         assert self.scheduler is not None, 'Call `execute()` before `get_hpo_results()`'
@@ -218,8 +241,8 @@ class CustomHpoExecutor(HpoExecutor):
         
         hpo_results['hpo_model_performances'] = hpo_model_performances
 
-        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
-        logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
+        logger.log(15, "Time for %s model HPO: %s" % (model_name, str(hpo_results['total_time'])))
+        logger.log(15, "Best hyperparameter configuration for %s model: " % model_name)
         logger.log(15, str(best_hp))
 
         return hpo_models, hpo_results

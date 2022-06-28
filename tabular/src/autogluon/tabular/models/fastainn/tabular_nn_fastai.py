@@ -11,6 +11,7 @@ import sklearn
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import try_import_fastai
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
@@ -501,6 +502,10 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         return 10 * get_approximate_df_mem_usage(X).sum()
+    
+    def _get_hpo_backend(self):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        return RAY_BACKEND
 
     def _more_tags(self):
         return {'can_refit_full': True}

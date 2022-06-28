@@ -925,9 +925,8 @@ class AbstractModel:
         return template
 
     def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs):
-        # Determine backend
-        backend = self._get_hpo_backend(hyperparameter_tune_kwargs)
-        hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)
+        backend = self._get_hpo_backend()
+        hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
         time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, time_limit)
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
@@ -999,10 +998,8 @@ class AbstractModel:
             time_start=time_start,
         )
     
-    def _get_hpo_backend(hyperparameter_tune_kwargs):
+    def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
-        if isinstance(hyperparameter_tune_kwargs, str) and hyperparameter_tune_kwargs == 'bayesopt':
-            return RAY_BACKEND
         return CUSTOM_BACKEND
 
     # Resets metrics for the model
