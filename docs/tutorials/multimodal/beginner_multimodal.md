@@ -15,7 +15,7 @@ np.random.seed(123)
 
 ## Dataset
 
-For demonstration, we use a simplified and subsampled version of [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction), which provides information about shelter animals that appear on their adoption profile to predict the animals' adoption rates, grouped into two categories, hence a binary classification problem.
+For demonstration, we use a simplified and subsampled version of [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction). The task is to predict the animals' adoption rates based on their adoption profile information. In this simplified version, the adoption speed is grouped into two categories: 0 (slow) and 1 (fast).
 
 To get started, let's download and prepare the dataset.
 
@@ -35,14 +35,14 @@ import pandas as pd
 dataset_path = download_dir + '/petfinder_for_tutorial'
 train_data = pd.read_csv(f'{dataset_path}/train.csv', index_col=0)
 test_data = pd.read_csv(f'{dataset_path}/test.csv', index_col=0)
-label_col = 'to_be_adopted'
+label_col = 'AdoptionSpeed'
 ```
 
 We need to expand the image paths to load them in training.
 
 
 ```{.python .input}
-image_col = 'Image'
+image_col = 'Images'
 train_data[image_col] = train_data[image_col].apply(lambda ele: ele.split(';')[0]) # Use the first image for a quick tutorial
 test_data[image_col] = test_data[image_col].apply(lambda ele: ele.split(';')[0])
 
