@@ -1,3 +1,6 @@
+## This API should be assumed to be private and only exposed to developers
+## for the public API look at learners
+
 from sklearn.metrics import accuracy_score
 import numpy as np
 import pandas as pd
@@ -21,9 +24,10 @@ class Classifier2ST:
     def __init__(self,
                  classifier):
         self._classifier = classifier
+        self._is_fit = False
 
     @staticmethod
-    def _make_source_target_label(data, sample_label='label'):
+    def _make_source_target_label(data, sample_label):
         """turn a source, target pain into a single dataframe with label column"""
         source, target = data[0].copy(), data[1].copy()
         source.loc[:,sample_label] = 0
@@ -33,30 +37,37 @@ class Classifier2ST:
 
     def fit(self,
             data,
-            sample_label = None,
+            sample_label = 'label',
             accuracy_metric = accuracy_score,
             split=0.5):
         """Fit the classifier for predicting if source or target and compute the 2-sample test statistic.
 
         Parameters
         ----------
-        data : pd.DataFrame
-            description
+        data : pd.DataFrame, or tuple
+            either
+            - a dataframe with a label column where 1 = target and 0 = source
+            - a tuple of source dataframe and target dataframe
+        sample_label : str
+            the name of the label that indicates whether the sample is in source or target, None if data is tuple
         """
-        if sample_label:
+        if isinstance(data, pd.DataFrame):
             assert sample_label in data.columns, "sample_label needs to be a column of data"
             assert split, "sample_label requires the split parameter"
-            train, _, test = data.random_split(split)
+            train = data.sample(frac=split)
+            test = data.drop(train.index)
         else:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
-            data = _make_source_target_label(data)
-            train, _, test = data.random_split(split)
+            data = self._make_source_target_label(data, sample_label)
+            train = data.sample(frac=split)
+            test = data.drop(train.index)
         self._classifier.fit(train)
-        self._test = test
         yhat = self._classifier.predict(test)
         self._accuracy_metric = accuracy_metric
         self._sample_label = sample_label
         self.test_stat = accuracy_metric(test[sample_label], yhat)
+        self._test = test
+        self._is_fit = True
 
     def _pvalue_half_permutation(self,
                                  num_permutations=1000):
@@ -84,6 +95,8 @@ class Classifier2ST:
         ----------
         method : str
             one of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+        num_permutations: int
+            the number of permutations used for any permutation based method
 
         Returns
         -------
@@ -132,3 +145,12 @@ class Classifier2ST:
             phat = phat.iloc[-sample_size:]
             phat['rank'] = np.linspace(1, 0, sample_size)
         return phat
+
+    def feature_importance(self):
+        """Returns the feature importances for the trained classifier for source v. target
+        """
+        has_fi = getattr(self._classifier, "feature_importance", None)
+        assert has_fi, "Classifier class does not have feature_importance method"
+        assert self._is_fit, ".fit() not called yet"
+        fi_scores = self._classifier.feature_importance(self._test)
+        return fi_scores

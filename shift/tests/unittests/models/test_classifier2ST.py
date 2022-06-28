@@ -1,3 +1,4 @@
+import pandas as pd
 from autogluon.shift import Classifier2ST
 from autogluon.vision import ImageDataset, ImagePredictor
 import os
@@ -5,6 +6,15 @@ import numpy as np
 import math
 
 data_dir = os.path.join('..','..','data')
+
+def load_adult_data():
+    adult_data_dir = os.path.join(data_dir,'AdultIncomeBinaryClassification')
+    train_data = os.path.join(adult_data_dir, 'train_data.csv')
+    test_data = os.path.join(adult_data_dir, 'test_data.csv')
+    train = pd.read_csv(train_data)
+    test = pd.read_csv(test_data)
+    data = (train, test)
+    return data
 
 def get_dogs_data():
     twodogs_dir = os.path.join(data_dir, 'two_dogs')
@@ -29,8 +39,7 @@ def test_make_source_target_label():
 def test_classifier2ST_fit():
     tst = fit_tst()
     val = 0.82
-    assert math.isclose(tst.test_stat, val, abs_tol = 1e-1), \
-        f'test stat ({tst.test_stat}) is too far from similar ({val})'
+    assert math.isclose(tst.test_stat, val, abs_tol = 2e-1)
 
 def test_sample_anomaly_score():
     tst = fit_tst()
@@ -46,7 +55,6 @@ def test_sample_anomaly_score():
     test_s = tst._test.loc[idx]
     prob_s = tst._classifier.predict_proba(test_s)
     assert prob_s.iloc[0, 1] > prob_s.iloc[1, 1]
-
 
 def test_null_test():
     data = get_dogs_data()
@@ -64,4 +72,4 @@ def test_classifier2ST_pvalue():
     pval = tst.pvalue(num_permutations=100)
     assert pval < 0.05
 
-
+# def test_feature_importance():
