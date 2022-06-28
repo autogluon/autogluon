@@ -97,7 +97,7 @@ Under the hood, AutoMM automatically infers the problem type (classification or 
 ## Evaluation
 Then we can evaluate the predictor on the test data.
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy"])
+scores = predictor.evaluate(test_data, metrics=["roc_auc"])
 scores
 ```
 
@@ -139,7 +139,7 @@ It is also convenient to save a predictor and re-load it.
 ```{.python .input}
 predictor.save('my_saved_dir')
 loaded_predictor = AutoMMPredictor.load('my_saved_dir')
-scores2 = loaded_predictor.evaluate(test_data, metrics=["accuracy"])
+scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
 scores2
 ```
 
