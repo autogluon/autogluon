@@ -683,13 +683,16 @@ class AbstractTabularLearner(AbstractLearner):
 
     def infer_problem_type(self, y: Series, silent=False):
         problem_type = self._infer_problem_type(y, silent=silent)
-        if self.quantile_levels is not None:
+        if problem_type == QUANTILE:
+            if self.quantile_levels is None:
+                raise AssertionError(f'problem_type is inferred to be {QUANTILE}, yet quantile_levels is not specified.')
+        elif self.quantile_levels is not None:
             if problem_type == REGRESSION:
                 problem_type = QUANTILE
             else:
-                raise ValueError("autogluon infers this to be classification problem for which quantile_levels "
-                                 "cannot be specified. If it is truly a quantile regression problem, "
-                                 "please specify:problem_type='quantile'")
+                raise AssertionError(f"autogluon infers this to be classification problem ('{problem_type}'), yet quantile_levels is not None."
+                                     "If it is truly a quantile regression problem, "
+                                     f"please specify problem_type='{QUANTILE}'.")
         return problem_type
 
     @staticmethod
