@@ -927,7 +927,8 @@ class AbstractModel:
     def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs):
         backend = self._get_hpo_backend()
         hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
-        time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, time_limit)
+        default_num_trials = kwargs.pop('default_num_trials', None)
+        time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)

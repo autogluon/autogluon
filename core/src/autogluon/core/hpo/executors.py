@@ -27,7 +27,7 @@ class HpoExecutor(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def initialize(self, hyperparameter_tune_kwargs, time_limit=None):
+    def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
         raise NotImplementedError
     
     @abstractmethod
@@ -75,7 +75,7 @@ class RayHpoExecutor(HpoExecutor):
     def executor_type(self):
         return RAY_BACKEND
     
-    def initialize(self, hyperparameter_tune_kwargs, time_limit=None):
+    def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
         self.time_limit = time_limit
         hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
         if isinstance(hyperparameter_tune_kwargs, str):
@@ -88,6 +88,8 @@ class RayHpoExecutor(HpoExecutor):
             hyperparameter_tune_kwargs['searcher'],
             hyperparameter_tune_kwargs['searcher']
         )
+        if 'num_trials' not in hyperparameter_tune_kwargs and default_num_trials is not None:
+            hyperparameter_tune_kwargs['num_trials'] = default_num_trials
         self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
         return time_limit
     
@@ -167,10 +169,12 @@ class CustomHpoExecutor(HpoExecutor):
     def executor_type(self):
         return CUSTOM_BACKEND
     
-    def initialize(self, hyperparameter_tune_kwargs, time_limit=None):
+    def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
         hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
         if not isinstance(hyperparameter_tune_kwargs, tuple):
-            num_trials = 1 if time_limit is None else 1000
+            num_trials = default_num_trials  # This will be ignored if hyperparameter_tune_kwargs contains num_trials
+            if default_num_trials is None:
+                num_trials = 1 if time_limit is None else 1000
             hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             hyperparameter_tune_kwargs = copy.deepcopy(hyperparameter_tune_kwargs)
             if 'time_out' not in hyperparameter_tune_kwargs[1]:

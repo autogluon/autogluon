@@ -273,18 +273,14 @@ class TimeSeriesPredictor:
                 slice(None, -self.prediction_length)
             )
 
-        scheduler_options = self._get_scheduler_options(
-            hyperparameter_tune_kwargs, time_limit=time_limit
-        )
         time_left = (
             None if time_limit is None else time_limit - (time.time() - time_start)
         )
         self._learner.fit(
             train_data=train_data,
             val_data=tuning_data,
-            scheduler_options=scheduler_options,
             hyperparameters=hyperparameters,
-            hyperparameter_tune=all(scheduler_options),
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_left,
             verbosity=verbosity,
         )
