@@ -6,6 +6,6 @@ import numpy as np
 import math
 
 def test_xsd_init():
-    pred = ImagePredictor()
+    pred = ImagePredictor(label='class')
     xsd = XShiftDetector(pred)
     pass
