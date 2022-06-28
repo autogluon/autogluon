@@ -16,7 +16,6 @@ from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
 from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
-from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
@@ -213,7 +212,9 @@ class AbstractTrainer:
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
         for model, prev_path in model_paths.items():
-            model_local_path = prev_path.split(self.path, 1)[1]
+            prev_path = os.path.abspath(prev_path) + os.path.sep
+            abs_path = os.path.abspath(self.path) + os.path.sep
+            model_local_path = prev_path.split(abs_path, 1)[1]
             new_path = path + model_local_path
             model_paths[model] = new_path
 
@@ -1296,9 +1297,6 @@ class AbstractTrainer:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
             elif k_fold_start != 0:
                 raise ValueError(f'k_fold_start must be 0 to hyperparameter_tune, value = {k_fold_start}')
-            if not isinstance(hyperparameter_tune_kwargs, tuple):
-                num_trials = 1 if time_limit is None else 1000
-                hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             # hpo_models (dict): keys = model_names, values = model_paths
             fit_log_message = f'Hyperparameter tuning model: {model.name} ...'
             if time_limit is not None:
@@ -1314,9 +1312,22 @@ class AbstractTrainer:
             logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+                        X=X,
+                        y=y,
+                        k_fold=k_fold,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        **model_fit_kwargs
+                    )
                 else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, X_val=X_val, y_val=y_val, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+                        X=X,
+                        y=y,
+                        X_val=X_val,
+                        y_val=y_val,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        **model_fit_kwargs
+                    )
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)

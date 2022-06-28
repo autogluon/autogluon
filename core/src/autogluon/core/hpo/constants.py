@@ -7,3 +7,7 @@ MAX = 'max'
 
 SEARCHER_PRESETS = SearcherFactory.searcher_presets
 SCHEDULER_PRESETS = SchedulerFactory.scheduler_presets
+
+RAY_BACKEND = 'ray'
+CUSTOM_BACKEND = 'custom'
+VALID_BACKEND = [RAY_BACKEND, CUSTOM_BACKEND]

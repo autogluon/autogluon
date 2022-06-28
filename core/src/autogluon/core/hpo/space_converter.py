@@ -80,7 +80,5 @@ class RaySpaceConverterFactory:
     @staticmethod
     def get_space_converter(converter_type: str) -> RaySpaceConverter:
         """Return the resource calculator"""
-        for i, j in RaySpaceConverterFactory.__type_to_converter.items():
-            print(i,j)
         assert converter_type in RaySpaceConverterFactory.__type_to_converter, f'{converter_type} not supported'
         return RaySpaceConverterFactory.__type_to_converter[converter_type]

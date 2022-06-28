@@ -23,6 +23,9 @@ from ._tags import _DEFAULT_TAGS
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ...hpo.exceptions import EmptySearchSpace
+from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
+from ...hpo.executors import HpoExecutorFactory
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -921,25 +924,18 @@ class AbstractModel:
 
         return template
 
-    def hyperparameter_tune(self, scheduler_options, time_limit=None, **kwargs):
-        scheduler_options = copy.deepcopy(scheduler_options)
-        if 'time_out' not in scheduler_options[1]:
-            scheduler_options[1]['time_out'] = time_limit
-        kwargs = self.initialize(time_limit=scheduler_options[1]['time_out'], **kwargs)
+    def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs):
+        # Determine backend
+        backend = self._get_hpo_backend(hyperparameter_tune_kwargs)
+        hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)
+        time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, time_limit)
+        kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        resource = copy.deepcopy(scheduler_options[1]['resource'])
-        if 'num_cpus' in resource:
-            if resource['num_cpus'] == 'auto':
-                resource.pop('num_cpus')
-        if 'num_gpus' in resource:
-            if resource['num_gpus'] == 'auto':
-                resource.pop('num_gpus')
+        hpo_executor.register_resources(self._preprocess_fit_resources(silent=True))
+        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
-        scheduler_options[1]['resource'] = self._preprocess_fit_resources(silent=True, **resource)
-        return self._hyperparameter_tune(scheduler_options=scheduler_options, **kwargs)
-
-    def _hyperparameter_tune(self, X, y, X_val, y_val, scheduler_options, **kwargs):
+    def _hyperparameter_tune(self, X, y, X_val, y_val, hpo_executor, **kwargs):
         """
         Hyperparameter tune the model.
 
@@ -949,34 +945,28 @@ class AbstractModel:
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
-
-        if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
-            logger.warning(f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
-                           f"Will train one model based on the provided hyperparameters.")
+        
+        try:
+            hpo_executor.validate_search_space(search_space, self.name)
+        except EmptySearchSpace:
             return skip_hpo(self, X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
-        else:
-            logger.log(15, f"\tHyperparameter search space for {self.name}: ")
-            for hyperparam in search_space:
-                if isinstance(search_space[hyperparam], Space):
-                    logger.log(15, f"{hyperparam}:   {search_space[hyperparam]}")
 
+        # Use absolute path here because ray tune will change the working directory
+        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        scheduler_cls, scheduler_params = scheduler_options  # Unpack tuple
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         dataset_train_filename = 'dataset_train.pkl'
-        train_path = directory + dataset_train_filename
+        train_path = os.path.join(directory, dataset_train_filename)
         save_pkl.save(path=train_path, object=(X, y))
 
         dataset_val_filename = 'dataset_val.pkl'
-        val_path = directory + dataset_val_filename
+        val_path = os.path.join(directory, dataset_val_filename)
         save_pkl.save(path=val_path, object=(X_val, y_val))
 
         model_cls = self.__class__
         init_params = self.get_params()
 
-        fit_kwargs = scheduler_params['resource'].copy()
+        fit_kwargs = dict()
         fit_kwargs['feature_metadata'] = self.feature_metadata
         fit_kwargs['num_classes'] = self.num_classes
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
@@ -985,48 +975,35 @@ class AbstractModel:
             model_cls=model_cls,
             init_params=init_params,
             time_start=time_start,
-            time_limit=scheduler_params['time_out'],
+            time_limit=hpo_executor.time_limit,
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
+            hpo_executor=hpo_executor,
+        )
+        model_estimate_memory_usage = None
+        if self.estimate_memory_usage is not None:
+            model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
+        hpo_executor.execute(
+            model_trial=model_trial,
+            train_fn_kwargs=train_fn_kwargs,
+            directory=directory,
+            minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
+            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0.1),
+            model_estimate_memory_usage=model_estimate_memory_usage,
         )
 
-        scheduler: LocalSequentialScheduler = scheduler_cls(model_trial, search_space=search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
-
-        scheduler.run()
-        scheduler.join_jobs()
-
-        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
-
-    def _get_hpo_results(self, scheduler, scheduler_params: dict, time_start):
-        # Store results / models from this HPO run:
-        best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
-        hpo_results = {
-            'best_reward': scheduler.get_best_reward(),
-            'best_config': best_hp,
-            'total_time': time.time() - time_start,
-            'metadata': scheduler.metadata,
-            'training_history': scheduler.training_history,
-            'config_history': scheduler.config_history,
-            'reward_attr': scheduler._reward_attr,
-        }
-
-        hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
-        hpo_model_performances = {}
-        for trial in sorted(hpo_results['config_history'].keys()):
-            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = f"T{trial+1}"  # unique identifier to files from this trial
-            trial_model_name = self.name + os.path.sep + file_id
-            trial_model_path = self.path_root + trial_model_name + os.path.sep
-            trial_reward = scheduler.searcher.get_reward(hpo_results['config_history'][trial])
-
-            hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = trial_reward
-
-        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
-        logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
-        logger.log(15, str(best_hp))
-        return hpo_models, hpo_model_performances, hpo_results
+        return hpo_executor.get_hpo_results(
+            model_name=self.name,
+            model_path_root=self.path_root,
+            time_start=time_start,
+        )
+    
+    def _get_hpo_backend(hyperparameter_tune_kwargs):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        if isinstance(hyperparameter_tune_kwargs, str) and hyperparameter_tune_kwargs == 'bayesopt':
+            return RAY_BACKEND
+        return CUSTOM_BACKEND
 
     # Resets metrics for the model
     def reset_metrics(self):

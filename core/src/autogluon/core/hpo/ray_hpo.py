@@ -16,11 +16,12 @@ from .constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
-from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
+from .exceptions import EmptySearchSpace
 from .scheduler_factory import SchedulerFactory
 from .searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
 from .. import Space
+from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 
 from ray import tune
 from ray.tune import PlacementGroupFactory
@@ -33,10 +34,6 @@ from ray.tune.suggest.hyperopt import HyperOptSearch
 
 
 logger = logging.getLogger(__name__)
-
-
-class EmptySearchSpace(Exception):
-    pass
 
 
 class RayTuneAdapter(ABC):
