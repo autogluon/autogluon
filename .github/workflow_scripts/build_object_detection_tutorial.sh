@@ -8,26 +8,9 @@ COMMIT_SHA=$3
 PR_NUMBER=$4  # For push events, PR_NUMBER will be empty
 
 source $(dirname "$0")/env_setup.sh
-source $(dirname "$0")/write_to_s3.sh
+source $(dirname "$0")/build_doc.sh
 
-setup_build_contrib_env
 setup_mxnet_gpu
 export CUDA_VISIBLE_DEVICES=0
-bash docs/build_pip_install.sh
-# only build for docs/object_detection
-shopt -s extglob
-rm -rf ./docs/tutorials/!(object_detection)
-cd docs && rm -rf _build && d2lbook build rst
 
-COMMAND_EXIT_CODE=$?
-if [ $COMMAND_EXIT_CODE -ne 0 ]; then
-    exit COMMAND_EXIT_CODE
-fi
-
-cd ..
-
-if [[ -n $PR_NUMBER ]]; then BUCKET=autogluon-ci S3_PATH=s3://$BUCKET/build_docs/$PR_NUMBER/$COMMIT_SHA; else BUCKET=autogluon-ci-push S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA; fi
-DOC_PATH=docs/_build/rst/tutorials/object_detection/
-S3_PATH=$S3_PATH/object_detection/
-
-write_to_s3 $BUCKET $DOC_PATH $S3_PATH
+build_doc object_detection $BRANCH $GIT_REPO $COMMIT_SHA $PR_NUMBER
