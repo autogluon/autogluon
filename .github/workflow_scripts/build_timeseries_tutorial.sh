@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -ex
+shopt -s extglob
 
 BRANCH=$(basename $1)
 GIT_REPO=$2

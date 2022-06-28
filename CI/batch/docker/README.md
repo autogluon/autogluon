@@ -2,7 +2,9 @@
 This is for AutoGluon Devs to update the CI docker environment.
 
 **IMPORTANT**:
-Please push the changes to our github repository even the docker changes will take effect if you don't. This helps to make sure everyone sees the changes you made and build on top.
+Please push the changes to our github repository if you updated the docker file and pushed the new docker image to our ECR.
+The new docker image will take effect even you didn't push the changes to our github repository.
+This helps to make sure everyone sees the changes you made and build on top.
 
 To update the docker:
 
