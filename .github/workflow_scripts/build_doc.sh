@@ -10,8 +10,7 @@ function build_doc {
     setup_build_contrib_env
     bash docs/build_pip_install.sh
     # only build for docs/$DOC
-    shopt -s extglob
-    rm -rf ./docs/tutorials/!("$DOC")
+    rm -rf ./docs/tutorials/!($DOC)
     cd docs && rm -rf _build && d2lbook build rst
 
     COMMAND_EXIT_CODE=$?
