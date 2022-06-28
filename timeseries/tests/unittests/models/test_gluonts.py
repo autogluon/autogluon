@@ -1,7 +1,6 @@
 from functools import partial
 
 import pytest
-from flaky import flaky
 from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.seq2seq import MQRNNEstimator
@@ -14,10 +13,10 @@ from autogluon.timeseries.models.gluonts import (
     # AutoTabularModel,
     GenericGluonTSModel,
     MQCNNModel,
-    MQRNNModel,
+    # MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
-    TransformerModel,
+    # TransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
@@ -30,21 +29,17 @@ TESTABLE_MODELS = [
     # MQRNNModel,
     SimpleFeedForwardModel,
     # TransformerModel,
-    partial(
-        GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator
-    ),  # partial constructor for generic model
+    partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
 ]
 
-if PROPHET_IS_INSTALLED:
-    TESTABLE_MODELS += [ProphetModel]
+# if PROPHET_IS_INSTALLED:
+#     TESTABLE_MODELS += [ProphetModel]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("time_limit", [10, None])
-def test_given_time_limit_when_fit_called_then_models_train_correctly(
-    model_class, time_limit, temp_model_path
-):
+def test_given_time_limit_when_fit_called_then_models_train_correctly(model_class, time_limit, temp_model_path):
     model = model_class(
         path=temp_model_path,
         freq="H",
@@ -77,9 +72,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_models_saved_then_gluonts_predictors_can_be_loaded(
-    model_class, temp_model_path
-):
+def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,
         freq="H",
@@ -118,10 +111,7 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
     model.fit(train_data=DUMMY_TS_DATAFRAME)
 
     assert model.gts_predictor.prophet_params.get("growth") == growth  # noqa
-    assert (
-        model.gts_predictor.prophet_params.get("n_changepoints")
-        == n_changepoints  # noqa
-    )  # noqa
+    assert model.gts_predictor.prophet_params.get("n_changepoints") == n_changepoints  # noqa  # noqa  # noqa
 
 
 @pytest.mark.skipif(
@@ -130,9 +120,7 @@ def test_when_fit_called_on_prophet_then_hyperparameters_are_passed_to_underlyin
 )
 @pytest.mark.parametrize("growth", ["linear", "logistic"])
 @pytest.mark.parametrize("n_changepoints", [3, 5])
-def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
-    growth, n_changepoints, temp_model_path
-):
+def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(growth, n_changepoints, temp_model_path):
     model = ProphetModel(
         path=temp_model_path,
         freq="H",
@@ -147,10 +135,7 @@ def test_when_prophet_model_saved_then_prophet_parameters_are_loaded(
     loaded_model = model.__class__.load(path=model.path)
 
     assert loaded_model.gts_predictor.prophet_params.get("growth") == growth  # noqa
-    assert (
-        loaded_model.gts_predictor.prophet_params.get("n_changepoints")  # noqa
-        == n_changepoints
-    )  # noqa
+    assert loaded_model.gts_predictor.prophet_params.get("n_changepoints") == n_changepoints  # noqa  # noqa
 
 
 @pytest.mark.skipif(
