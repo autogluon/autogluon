@@ -1345,7 +1345,7 @@ class AutoMMPredictor:
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list],
-        metrics: Optional[List[str]] = None,
+        metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
         """
@@ -1403,6 +1403,8 @@ class AutoMMPredictor:
 
         if metrics is None:
             metrics = [self._eval_metric_name]
+        if isinstance(metrics, str):
+            metrics = [metrics]
 
         results = {}
         for per_metric in metrics:
