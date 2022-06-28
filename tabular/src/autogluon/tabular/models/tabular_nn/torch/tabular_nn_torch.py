@@ -396,11 +396,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     #  If this isn't here, inference speed is slowed down massively.
     #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
-        import torch
-        num_threads = torch.get_num_threads()
-        torch.set_num_threads(self._num_cpus_infer)
-        pred_proba = self._predict_proba_internal(X=X, **kwargs)
-        torch.set_num_threads(num_threads)
+        from ..._utils.torch_utils import TorchThreadManager
+        with TorchThreadManager(num_threads=self._num_cpus_infer):
+            pred_proba = self._predict_proba_internal(X=X, **kwargs)
         return pred_proba
 
     def _predict_proba_internal(self, X, **kwargs):
