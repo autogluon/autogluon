@@ -119,6 +119,33 @@ predictor.fit(hyperparameters={"optimization.val_check_interval": 0.5})
 predictor.fit(hyperparameters={"optimization.val_check_interval": 0.25})
 ```
 
+### optimization.gradient_clip_algorithm
+The gradient clipping algorithm to use. Support to clip gradients by value or norm.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.gradient_clip_algorithm": "norm"})
+# clip gradients by value
+predictor.fit(hyperparameters={"optimization.gradient_clip_algorithm": "value"})
+```
+
+### optimization.gradient_clip_val
+Gradient clipping value, which can be the absolute value or gradient norm depending on the choice of `optimization.gradient_clip_algorithm`.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.gradient_clip_val": 1})
+# cap the gradients to 5
+predictor.fit(hyperparameters={"optimization.gradient_clip_val": 5})
+```
+
+### optimization.log_every_n_steps
+How often to log within steps.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.log_every_n_steps": 10})
+# log once every 50 steps
+predictor.fit(hyperparameters={"optimization.log_every_n_steps": 50})
+```
+
 ### optimization.top_k
 Based on the validation score, choose top k model checkpoints to do model averaging.
 ```

@@ -1,7 +1,7 @@
 import copy
 import logging
 import time
-from typing import List, Dict
+from typing import List
 
 import numpy as np
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class TimeSeriesEnsembleSelection(EnsembleSelection):
-    def __init__(
+    def __init__(  # noqa
         self,
         ensemble_size: int,
         problem_type: str,

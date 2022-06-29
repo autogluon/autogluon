@@ -2,7 +2,7 @@
 :label:`sec_automm_multimodal_beginner`
 
 AutoMM is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that are suitable for multimodal datasets. You will only need to convert the data into the multimodal dataframe format
-and AutoMM can predict the values of one column conditioned on the features from the other columns.
+and AutoMM can predict the values of one column conditioned on the features from the other columns including images, text, and tabular data.
 
 
 ```{.python .input}
@@ -15,14 +15,14 @@ np.random.seed(123)
 
 ## Dataset
 
-For demonstration, we use the [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction). The PetFinder dataset provides information about shelter animals that appear on their adoption profile to predict the animals' adoption rates, grouped into five categories, hence a multi-class classification problem.
+For demonstration, we use a simplified and subsampled version of [PetFinder dataset](https://www.kaggle.com/c/petfinder-adoption-prediction). The task is to predict the animals' adoption rates based on their adoption profile information. In this simplified version, the adoption speed is grouped into two categories: 0 (slow) and 1 (fast).
 
 To get started, let's download and prepare the dataset.
 
 
 ```{.python .input}
 download_dir = './ag_automm_tutorial'
-zip_file = 'https://automl-mm-bench.s3.amazonaws.com/petfinder_kaggle.zip'
+zip_file = 'https://automl-mm-bench.s3.amazonaws.com/petfinder_for_tutorial.zip'
 from autogluon.core.utils.loaders import load_zip
 load_zip.unzip(zip_file, unzip_dir=download_dir)
 ```
@@ -32,9 +32,9 @@ Next, we will load the CSV files.
 
 ```{.python .input}
 import pandas as pd
-dataset_path = download_dir + '/petfinder_processed'
+dataset_path = download_dir + '/petfinder_for_tutorial'
 train_data = pd.read_csv(f'{dataset_path}/train.csv', index_col=0)
-test_data = pd.read_csv(f'{dataset_path}/dev.csv', index_col=0)
+test_data = pd.read_csv(f'{dataset_path}/test.csv', index_col=0)
 label_col = 'AdoptionSpeed'
 ```
 
@@ -61,7 +61,7 @@ Each animal's adoption profile includes pictures, a text description, and variou
 
 
 ```{.python .input}
-example_row = train_data.iloc[47]
+example_row = train_data.iloc[0]
 
 example_row
 ```
@@ -73,19 +73,11 @@ example_row['Description']
 
 
 ```{.python .input}
-example_image = example_row['Images']
+example_image = example_row[image_col]
 
 from IPython.display import Image, display
 pil_img = Image(filename=example_image)
 display(pil_img)
-```
-
-For the demo purpose, we will sample 500 and 100 rows for training and testing, respectively.
-
-
-```{.python .input}
-train_data = train_data.sample(500, random_state=0)
-test_data = test_data.sample(100, random_state=0)
 ```
 
 ## Training
@@ -105,7 +97,7 @@ Under the hood, AutoMM automatically infers the problem type (classification or 
 ## Evaluation
 Then we can evaluate the predictor on the test data.
 ```{.python .input}
-scores = predictor.evaluate(test_data, metrics=["accuracy"])
+scores = predictor.evaluate(test_data, metrics=["roc_auc"])
 scores
 ```
 
@@ -147,7 +139,7 @@ It is also convenient to save a predictor and re-load it.
 ```{.python .input}
 predictor.save('my_saved_dir')
 loaded_predictor = AutoMMPredictor.load('my_saved_dir')
-scores2 = loaded_predictor.evaluate(test_data, metrics=["accuracy"])
+scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
 scores2
 ```
 

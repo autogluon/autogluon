@@ -35,13 +35,9 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.get_model_names()
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
-def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
-    temp_model_path, hyperparameters
-):
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path, eval_metric="MAPE", prediction_length=3
-    )
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["toy"])  # noqa
+def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -57,10 +53,8 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(
     assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
-def test_given_different_target_name_when_predictor_called_then_model_can_predict(
-    temp_model_path, hyperparameters
-):
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["toy"])  # noqa
+def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
 
@@ -85,12 +79,8 @@ def test_given_different_target_name_when_predictor_called_then_model_can_predic
 
 
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
-def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(
-    temp_model_path, hyperparameters
-):
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path, eval_metric="MAPE", prediction_length=3
-    )
+def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -110,9 +100,7 @@ def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(
 def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_can_predict(
     temp_model_path, hyperparameters, quantile_kwarg_name
 ):
-    predictor_init_kwargs = dict(
-        path=temp_model_path, eval_metric="MAPE", prediction_length=3
-    )
+    predictor_init_kwargs = dict(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor_init_kwargs[quantile_kwarg_name] = [0.1, 0.4, 0.9]
     predictor = TimeSeriesPredictor(**predictor_init_kwargs)
 

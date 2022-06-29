@@ -45,6 +45,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.optimizer = None
         self.device = None
         self.max_batch_size = None
+        self._num_cpus_infer = None
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -150,6 +151,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
         seed_value = params.pop('seed_value', 0)
+
+        self._num_cpus_infer = params.pop('_num_cpus_infer', 1)
         if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
@@ -390,7 +393,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.params_trained['batch_size'] = batch_size
         self.params_trained['num_epochs'] = best_epoch
 
+    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
+    #  If this isn't here, inference speed is slowed down massively.
+    #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
+        from ..._utils.torch_utils import TorchThreadManager
+        with TorchThreadManager(num_threads=self._num_cpus_infer):
+            pred_proba = self._predict_proba_internal(X=X, **kwargs)
+        return pred_proba
+
+    def _predict_proba_internal(self, X, **kwargs):
         """ To align predict with abstract_model API.
             Preprocess here only refers to feature processing steps done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.

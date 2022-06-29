@@ -69,6 +69,9 @@ def main(args):
     automm_hyperparameters["optimization.learning_rate"] = args.lr
     automm_hyperparameters["optimization.end_lr"] = args.end_lr
 
+    if args.embedding_arch is not None:
+        automm_hyperparameters["model.numerical_transformer.embedding_arch"] = args.embedding_arch
+
     tabular_hyperparameters = {
         "GBM": [
             {},
@@ -139,14 +142,15 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gpu_id", default=None, type=str)
-    parser.add_argument("--dataset_name", default="ad", type=str)
-    parser.add_argument("--dataset_dir", default="./dataset", type=str)
-    parser.add_argument("--exp_dir", default=None, type=str)
-    parser.add_argument("--lr", default=1e-04, type=float)
-    parser.add_argument("--end_lr", default=1e-04, type=float)
-    parser.add_argument("--mode", choices=["single", "weighted", "single_bag5", "stack5"], default="single")
+    parser.add_argument("--gpu_id", default=None, type=str, help="Specify the GPU to use.")
+    parser.add_argument("--dataset_name", default="ad", type=str, help="Specify the dataset to run the experinments.")
+    parser.add_argument("--dataset_dir", default="./dataset", type=str, help="Path to the dataset.")
+    parser.add_argument("--exp_dir", default=None, type=str, help="Path to the outputs.")
+    parser.add_argument("--lr", default=1e-04, type=float, help="Initial learning rate.")
+    parser.add_argument("--end_lr", default=1e-04, type=float, help="End learning rate.")
+    parser.add_argument("--mode", choices=["single", "weighted", "single_bag5", "stack5"], default="single", help="Method to run with.")
     parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument("--embedding_arch", type=str, nargs="+", default=None, help="Embedding architecture for numerical features in FT_Transformer.")
     args = parser.parse_args()
 
     if args.exp_dir is None:

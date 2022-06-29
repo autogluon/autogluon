@@ -437,7 +437,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
             logger.info(
                 f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15)
-                + f"= Total tuning time"
+                + "= Total tuning time"
             )
             logger.debug(
                 f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}"

@@ -69,6 +69,8 @@ class DefaultLearner(AbstractTabularLearner):
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         self._pre_X_rows = len(X)
+        if self.problem_type is None:
+            self.problem_type = self.infer_problem_type(y=X[self.label])
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
@@ -145,25 +147,11 @@ class DefaultLearner(AbstractTabularLearner):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
 
-        # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
-        # if self.problem_type == MULTICLASS:
-        #     X[self.label] = X[self.label].fillna('')
-
         # Remove all examples with missing labels from this dataset:
         missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
         if len(missinglabel_inds) > 0:
             logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
             X = X.drop(missinglabel_inds, axis=0)
-
-        if self.problem_type is None:
-            self.problem_type = self.infer_problem_type(X[self.label])
-            if self.quantile_levels is not None:
-                if self.problem_type == REGRESSION:
-                    self.problem_type = QUANTILE
-                else:
-                    raise ValueError("autogluon infers this to be classification problem for which quantile_levels "
-                                     "cannot be specified. If it is truly a quantile regression problem, "
-                                     "please specify:problem_type='quantile'")
 
         if X_val is not None and self.label in X_val.columns:
             holdout_frac = 1
