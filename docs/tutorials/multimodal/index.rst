@@ -1,13 +1,13 @@
 Multimodal Prediction
 =====================
 
-For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `AutoMMPredictor` (or simply calling it AutoMM)
+For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `AutoMMPredictor` (abbreviated `AutoMM`)
 that automatically selects and fuses deep learning backbones from popular packages like `timm <https://github.com/rwightman/pytorch-image-models>`_,
 `huggingface/transformers <https://github.com/huggingface/transformers>`_,
-`CLIP <https://github.com/openai/CLIP>`_, etc. You can not only use `AutoMMPredictor` to solve classical text and image prediction
+`CLIP <https://github.com/openai/CLIP>`_, etc. You can not only use `AutoMM` to solve classical text and image prediction
 problems such as sentiment classification, intent detection, paraphrase detection, image classification,
 but also use it on multimodal problems that involve image, text, and tabular features, e.g., predicting the product price
-based on the items' description, photo, and other metadata, or matching images with text descriptions. Moreover, `AutoMMPredictor` can
+based on the items' description, photo, and other metadata, or matching images with text descriptions. Moreover, `AutoMM` can
 be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`.
 
 .. container:: cards
@@ -22,7 +22,7 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
       :title: AutoMM for Image Classification - Quick Start
       :link: beginner_image_cls.html
 
-      How to train image classfiers with AutoMMPredictor.
+      How to train image classification models with AutoMMPredictor.
 
    .. card::
       :title: AutoMM for Text - Multilingual Problems
@@ -40,7 +40,7 @@ be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`
       :title: AutoMM for Multimodal - Quick Start
       :link: beginner_multimodal.html
 
-      How to train high-quality multimodal models with AutoMMPredictor.
+      How to use AutoMMPredictor to train a model that predicts the adoption speed of pets.
 
    .. card::
       :title: Customize AutoMM
