@@ -86,7 +86,7 @@ class RayHpoExecutor(HpoExecutor):
             hyperparameter_tune_kwargs['scheduler'],
             hyperparameter_tune_kwargs['scheduler']
         )
-        hyperparameter_tune_kwargs['searcher'] = self.custom_to_ray_scheduler_preset_map.get(
+        hyperparameter_tune_kwargs['searcher'] = self.custom_to_ray_searcher_preset_map.get(
             hyperparameter_tune_kwargs['searcher'],
             hyperparameter_tune_kwargs['searcher']
         )
