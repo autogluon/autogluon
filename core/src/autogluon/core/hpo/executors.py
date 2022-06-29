@@ -63,7 +63,8 @@ class RayHpoExecutor(HpoExecutor):
     }
     custom_to_ray_searcher_preset_map = {
         'local_random': 'random',
-        'random': 'random', 
+        'random': 'random',
+        'auto': 'random',
     }
     
     def __init__(self):
