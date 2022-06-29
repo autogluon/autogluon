@@ -1,4 +1,4 @@
-class fairnessAssessor:
+class FairnessAssessor:
     """Assess the fairness of a predictor post-fit by computing protected group specific metrics.
 
     Parameters

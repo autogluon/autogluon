@@ -1,4 +1,4 @@
-class fairPareto:
+class FairPareto:
     """Calculate the Pareto frontier for aggregated group-wise metrics.  This is done by changing the thresholds for
     each label class to achieve improved metrics in a Pareto optimal sense.
 
