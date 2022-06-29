@@ -44,7 +44,7 @@ class fairPareto:
         """
         pass
 
-    def summarize(self, how='table'):
+    def summarize(self):
         """Summarize the Pareto frontier
 
         Returns
@@ -57,7 +57,7 @@ class fairPareto:
         """Plot the Pareto frontier for aggregation, metric pairs
         """
 
-    def select(self, model):
+    def select(self, model_id):
         """Select a model by model_id
 
         Returns

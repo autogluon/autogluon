@@ -1,5 +1,5 @@
 class fairnessAssessor:
-    """Assess the fairness of a predictor post-fit by computing group specific metrics.
+    """Assess the fairness of a predictor post-fit by computing protected group specific metrics.
 
     Parameters
     ----------
@@ -10,7 +10,14 @@ class fairnessAssessor:
     -------
     fit: compute group-specific metrics for a predictor and aggregate
 
-    summarize: output the results
+    eval: compute group-wise or aggregated metric
+
+    Usage
+    -----
+    >>> pred = TabularPredictor(label='class') #class is the Y variable
+    >>> fass = FairnessAssessor(pred)
+    >>> fass.fit(test, 'race')
+    >>> res = fass.eval('accuracy', agg='min_median_ratio')
     """
 
     def __init__(self, predictor):
@@ -18,10 +25,8 @@ class fairnessAssessor:
 
     def fit(self,
             test_data,
-            protected_attribute,
-            metrics='all',
-            aggregations='all'):
-        """Compute the group-specific metrics for the prediction based on the protected attribute.
+            protected_attribute):
+        """Make predictions and prepare to evaluate metrics.
 
         Parameters
         ----------
@@ -31,26 +36,24 @@ class fairnessAssessor:
         protected_attribute: str or pd.Series
             the protected attribute (categorical) either as
             - a column name in test_data (str)
-            - or the column variable with same index as test_data (pd.Series)
-
-        metrics: list or str
-            metrics to compute for each protected group
-            - if list then it should be a list of metrics (either by name or callable)
-            - 'all' will compute all available metrics for that prediction task
-
-        aggregations: list or str
-            aggregation methods for combining a metric for each protected group into a single metric
-            - if list then it should be a list of aggregation methods
-            - 'all' will compute all available aggregations for that prediction task
-            options: 'max_min_diff', 'max_min_ratio', 'max_abs_dev', 'max_abs_ratio'
+            - or a categorical variable with same index as test_data (pd.Series)
         """
         pass
 
-    def summarize(self, how='table'):
+    def eval(self,
+             metric,
+             agg=None):
         """Return the results of fairness assessor.
+
+        metric: str
+            the metric to be computed by protected group
+
+        agg: str
+            aggregation method for combining a metric for each protected group into a single metric,
+            if None then no aggregation is used and the results are by protected group
 
         Returns
         -------
-        how = "table": returns a table with the rows as aggregation methods and columns as metrics
+        pd.Series (indexed by protected group) if agg==None, float otherwise
         """
         pass
