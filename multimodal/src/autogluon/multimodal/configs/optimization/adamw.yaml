@@ -12,6 +12,9 @@ optimization:
   lr_mult: 1  # multiply lr for downstream heads
   patience: 10
   val_check_interval: 0.5
+  gradient_clip_val: 1
+  gradient_clip_algorithm: "norm"
+  log_every_n_steps: 10
   top_k: 3
   top_k_average_method: "greedy_soup"  # We support averaging method described in https://arxiv.org/pdf/2203.05482.pdf.
                                        # Currently support "uniform_soup", "greedy_soup", and "best".
