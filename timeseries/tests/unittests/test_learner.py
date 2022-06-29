@@ -99,15 +99,19 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
-            hyperparameter_tune=True,
+            hyperparameter_tune_kwargs={
+                "searcher": "random",
+                "scheduler": "local",
+                "num_trials": 2,
+            },
         )
 
         leaderboard = learner.leaderboard()
 
-    assert len(leaderboard) == 3 + 1  # include ensemble
+    assert len(leaderboard) == 2 + 1  # include ensemble
 
     config_history = learner.load_trainer().hpo_results[model_name]["config_history"]
-    assert len(config_history) == 3
+    assert len(config_history) == 2
     assert all(1 <= model["epochs"] <= 3 for model in config_history.values())
 
 

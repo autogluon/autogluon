@@ -425,7 +425,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             f"\tTrained {len(model_names_trained)} models while tuning {model.name}."
         )
 
-        if hpo_results:
+        # TODO: log result for ray backend
+        if hpo_results and isinstance(hpo_results, dict):
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
                 sign_str = '-'
             else:

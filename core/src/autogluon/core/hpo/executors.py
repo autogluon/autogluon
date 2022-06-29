@@ -77,7 +77,8 @@ class RayHpoExecutor(HpoExecutor):
     
     def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
         self.time_limit = time_limit
-        hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
+        if isinstance(hyperparameter_tune_kwargs, dict):
+            hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
         if isinstance(hyperparameter_tune_kwargs, str):
             hyperparameter_tune_kwargs = self.custom_to_ray_preset_map[hyperparameter_tune_kwargs]
         hyperparameter_tune_kwargs['scheduler'] = self.custom_to_ray_scheduler_preset_map.get(
@@ -170,8 +171,9 @@ class CustomHpoExecutor(HpoExecutor):
         return CUSTOM_BACKEND
     
     def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
-        hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
         if not isinstance(hyperparameter_tune_kwargs, tuple):
+            if isinstance(hyperparameter_tune_kwargs, dict):
+                hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
             num_trials = default_num_trials  # This will be ignored if hyperparameter_tune_kwargs contains num_trials
             if default_num_trials is None:
                 num_trials = 1 if time_limit is None else 1000
@@ -202,8 +204,8 @@ class CustomHpoExecutor(HpoExecutor):
                     
     def execute(self, model_trial, train_fn_kwargs, **kwargs):
         assert self.scheduler_options is not None, 'Call `initialize()` before execute'
-
         scheduler_cls, scheduler_params = self.scheduler_options  # Unpack tuple
+        print(scheduler_params)
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         train_fn_kwargs['fit_kwargs'].update(scheduler_params['resource'].copy())

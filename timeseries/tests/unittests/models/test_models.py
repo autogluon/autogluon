@@ -95,7 +95,6 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
     model_class, temp_model_path
 ):
-    scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
 
     model = model_class(
         path=temp_model_path,
@@ -106,9 +105,11 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         },
     )
 
-    _, _, results = model.hyperparameter_tune(
-        scheduler_options=scheduler_options,
-        time_limit=300,
+    hyperparameter_tune_kwargs = 'auto'
+
+    models, results = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        time_limit=100,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
