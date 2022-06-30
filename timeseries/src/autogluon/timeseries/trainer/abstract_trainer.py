@@ -732,12 +732,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
             for model_name in model_names:
                 try:
+                    time_start_test_score = time.time()
                     model_info[model_name]["score_test"] = self.score(data, model_name)
+                    model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
                 except Exception as e:  # noqa
                     logger.error(
                         f"Cannot score with model {model_name}. An error occurred: {str(e)}"
                     )
                     model_info[model_name]["score_test"] = float("nan")
+                    model_info[model_name]["pred_time_test"] = float("nan")
 
         df = pd.DataFrame(model_info.values())
 
@@ -751,6 +754,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "model",
             "score_test",
             "score_val",
+            "pred_time_test",
             "pred_time_val",
             "fit_time_marginal",
             "fit_order",
