@@ -36,7 +36,7 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       :title: AutoMM for Text + Tabular - Quick Start
       :link: multimodal_text_tabular.html
 
-      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
+      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns. Here, we train a model to predict the price of books.
 
    .. card::
       :title: AutoMM for Multimodal - Quick Start

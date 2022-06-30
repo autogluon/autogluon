@@ -23,7 +23,7 @@ np.random.seed(123)
 
 ## Book Price Prediction Data
 
-For demonstration, we use the book price prediction dataset from the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview). Our goal is to predict a book's price given various features like its author, the abstract, the book's rating, etc.
+For demonstration, we use the book price prediction dataset from the [MachineHack Book Price Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview). Our goal is to predict a book's price given various features like its author, the abstract, the book's rating, etc.
 
 ```{.python .input}
 !mkdir -p price_of_books
