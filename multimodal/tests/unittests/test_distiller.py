@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
     MODEL,
     DATA,
@@ -46,7 +46,7 @@ def test_distillation():
         "env.num_workers_evaluation": 0,
     }
 
-    teacher_predictor = AutoMMPredictor(
+    teacher_predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
@@ -64,7 +64,7 @@ def test_distillation():
     )
 
     # test for distillation
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
@@ -84,7 +84,7 @@ def test_distillation():
     verify_predictor_save_load(predictor, dataset.test_df)
 
     # test for distillation with teacher predictor path
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,

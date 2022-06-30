@@ -2,7 +2,7 @@ import os
 import argparse
 import json
 import pandas as pd
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 
 from dataset import (
     AdultTabularDataset,
@@ -84,7 +84,7 @@ def main(args):
 
     if args.mode == "single":
         ### model initalization
-        predictor = AutoMMPredictor(
+        predictor = MultiModalPredictor(
             label=train_data.label_column,
             problem_type=train_data.problem_type,
             eval_metric=train_data.metric,

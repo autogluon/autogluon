@@ -8,7 +8,7 @@ import pickle
 from omegaconf import OmegaConf
 from torch import nn
 
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import modify_duplicate_model_names
 from autogluon.multimodal.constants import (
     MODEL,
@@ -46,7 +46,7 @@ def verify_predictor_save_load(predictor, df,
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df, as_pandas=False)
-        loaded_predictor = AutoMMPredictor.load(root)
+        loaded_predictor = MultiModalPredictor.load(root)
         predictions2 = loaded_predictor.predict(df, as_pandas=False)
         predictions2_df = loaded_predictor.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
@@ -160,7 +160,7 @@ def test_predictor(
     dataset = ALL_DATASETS[dataset_name]()
     metric_name = dataset.metric
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -219,7 +219,7 @@ def test_predictor(
     # Saving to folder, loading the saved model and call fit again (continuous fit)
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
-        predictor = AutoMMPredictor.load(root)
+        predictor = MultiModalPredictor.load(root)
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
@@ -228,7 +228,7 @@ def test_predictor(
         )
 
 
-def test_standalone(): # test standalong feature in AutoMMPredictor.save()
+def test_standalone(): # test standalong feature in MultiModalPredictor.save()
     from unittest import mock
     import torch
 
@@ -257,7 +257,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         "env.num_workers_evaluation": 0,
     }
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
@@ -285,7 +285,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
     del predictor
     torch.cuda.empty_cache()
 
-    loaded_online_predictor = AutoMMPredictor.load(path=save_path)
+    loaded_online_predictor = MultiModalPredictor.load(path=save_path)
     online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
     del loaded_online_predictor
 
@@ -294,7 +294,7 @@ def test_standalone(): # test standalong feature in AutoMMPredictor.save()
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
         with tempfile.TemporaryDirectory() as tmpdirname:
             torch.hub.set_dir(tmpdirname) # block reading files in `.cache`
-            loaded_offline_predictor = AutoMMPredictor.load(path=save_path_standalone)
+            loaded_offline_predictor = MultiModalPredictor.load(path=save_path_standalone)
 
 
     offline_predictions = loaded_offline_predictor.predict(dataset.test_df, as_pandas=False)
@@ -340,7 +340,7 @@ def test_customizing_model_names(
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -394,7 +394,7 @@ def test_customizing_model_names(
     # Saving to folder, loading the saved model and call fit again (continuous fit)
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
-        predictor = AutoMMPredictor.load(root)
+        predictor = MultiModalPredictor.load(root)
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
@@ -410,7 +410,7 @@ def test_model_configs():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -536,7 +536,7 @@ def test_modifying_duplicate_model_names():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
 
-    teacher_predictor = AutoMMPredictor(
+    teacher_predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -552,7 +552,7 @@ def test_modifying_duplicate_model_names():
         config=config,
         time_limit=1,
     )
-    student_predictor = AutoMMPredictor(
+    student_predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -590,7 +590,7 @@ def test_mixup():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -628,7 +628,7 @@ def test_textagumentor_deepcopy():
     dataset = ALL_DATASETS["ae"]()
     metric_name = dataset.metric
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
@@ -689,7 +689,7 @@ def test_trivialaugment():
     dataset = ALL_DATASETS["petfinder"]()
     metric_name = dataset.metric
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=metric_name,

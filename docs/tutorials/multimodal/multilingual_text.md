@@ -5,7 +5,7 @@ People around the world speaks lots of languages. According to [SIL Internationa
 there are more than **7,100** spoken and signed languages. In fact, web data nowadays are highly multilingual and lots of 
 real-world problems involve text written in languages other than English.
 
-In this tutorial, we introduce how `AutoMMPredictor` can help you build multilingual models. For the purpose of demonstration, 
+In this tutorial, we introduce how `MultiModalPredictor` can help you build multilingual models. For the purpose of demonstration, 
 we use the [Cross-Lingual Amazon Product Review Sentiment](https://webis.de/data/webis-cls-10.html) dataset, which 
 comprises about 800,000 Amazon product reviews in four languages: English, German, French, and Japanese. 
 We will demonstrate how to use AutoGluon Text to build sentiment classification models on the German fold of this dataset in two ways:
@@ -63,15 +63,15 @@ print(train_en_df)
 ## Finetune the German BERT
 
 Our first approach is to finetune the [German BERT model](https://www.deepset.ai/german-bert) pretrained by deepset. 
-Since `AutoMMPredictor` integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), 
+Since `MultiModalPredictor` integrates with the [Huggingface/Transformers](https://huggingface.co/docs/transformers/index) (as explained in :ref:`sec_textprediction_customization`), 
 we directly load the German BERT model available in Huggingface/Transformers, with the key as [bert-base-german-cased](https://huggingface.co/bert-base-german-cased). 
 To simplify the experiment, we also just finetune for 4 epochs.
 
 
 ```{.python .input}
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 
-predictor = AutoMMPredictor(label='label')
+predictor = MultiModalPredictor(label='label')
 predictor.fit(train_de_df,
               hyperparameters={
                   'model.hf_text.checkpoint_name': 'bert-base-german-cased',
@@ -107,14 +107,14 @@ The author showed that via large-scale pretraining, the backbone (called XLM-R) 
 meaning that you can directly apply the model trained in the English dataset to datasets in other languages. 
 It also outperforms the baseline "TRANSLATE-TEST", meaning to translate the data from other languages to English and apply the English model. 
 
-In AutoGluon, you can just turn on `presets="multilingual"` in AutoMMPredictor to load a backbone that is suitable for zero-shot transfer. 
+In AutoGluon, you can just turn on `presets="multilingual"` in MultiModalPredictor to load a backbone that is suitable for zero-shot transfer. 
 Internally, we will automatically use state-of-the-art models like [DeBERTa-V3](https://arxiv.org/abs/2111.09543).
 
 
 ```{.python .input}
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 
-predictor = AutoMMPredictor(label='label')
+predictor = MultiModalPredictor(label='label')
 predictor.fit(train_en_df,
               presets='multilingual',
               hyperparameters={

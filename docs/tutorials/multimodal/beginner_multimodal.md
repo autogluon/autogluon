@@ -84,8 +84,8 @@ display(pil_img)
 Now let's fit the predictor with the training data. Here we set a tight time budget for a quick demo.
 
 ```{.python .input}
-from autogluon.multimodal import AutoMMPredictor
-predictor = AutoMMPredictor(label=label_col)
+from autogluon.multimodal import MultiModalPredictor
+predictor = MultiModalPredictor(label=label_col)
 predictor.fit(
     train_data=train_data,
     time_limit=120, # seconds
@@ -138,7 +138,7 @@ It is also convenient to save a predictor and re-load it.
 
 ```{.python .input}
 predictor.save('my_saved_dir')
-loaded_predictor = AutoMMPredictor.load('my_saved_dir')
+loaded_predictor = MultiModalPredictor.load('my_saved_dir')
 scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
 scores2
 ```

@@ -1,7 +1,7 @@
 # AutoMM for Image Classification - Quick Start
 :label:`sec_automm_imageclassification_beginner`
 
-In this quick start, we'll use the task of image classification to illustrate how to use **AutoMMPredictor**. Once the data is prepared in [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) format, a single call to `AutoMMPredictor.fit()` will take care of the model training for you.
+In this quick start, we'll use the task of image classification to illustrate how to use **MultiModalPredictor**. Once the data is prepared in [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) format, a single call to `MultiModalPredictor.fit()` will take care of the model training for you.
 
 
 ## Create Image Dataset
@@ -28,8 +28,8 @@ We can see there are 800 rows and 2 columns in this training dataframe. The 2 co
 Now, we fit a classifier using AutoMM as follows:
 
 ```{.python .input}
-from autogluon.multimodal import AutoMMPredictor
-predictor = AutoMMPredictor(label="label", path="./automm_imgcls")
+from autogluon.multimodal import MultiModalPredictor
+predictor = MultiModalPredictor(label="label", path="./automm_imgcls")
 predictor.fit(
     train_data=train_dataset,
     time_limit=30, # seconds
@@ -90,7 +90,7 @@ print(feature[0].shape)
 The trained predictor is automatically saved at the end of `fit()`, and you can easily reload it.
 
 ```{.python .input}
-loaded_predictor = AutoMMPredictor.load('automm_imgcls')
+loaded_predictor = MultiModalPredictor.load('automm_imgcls')
 load_proba = loaded_predictor.predict_proba({'image': [image_path]})
 print(load_proba)
 ```
