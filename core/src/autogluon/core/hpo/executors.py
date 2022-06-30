@@ -19,12 +19,20 @@ class HpoExecutor(ABC):
     
     def __init__(self):
         self.search_space = None
-        self.time_limit = None
+        self._time_limit = None
     
     @property
     @abstractmethod
     def executor_type(self):
         raise NotImplementedError
+    
+    @property
+    def time_limit(self):
+        return self._time_limit
+    
+    @time_limit.setter
+    def time_limit(self, value):
+        self._time_limit = value
 
     @abstractmethod
     def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
@@ -136,7 +144,8 @@ class RayHpoExecutor(HpoExecutor):
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
             model_estimate_memory_usage=model_estimate_memory_usage,
-            time_budget_s=self.time_limit
+            time_budget_s=self.time_limit,
+            verbose=0,
         )
         self.analysis = analysis
         
@@ -170,6 +179,16 @@ class CustomHpoExecutor(HpoExecutor):
     @property
     def executor_type(self):
         return CUSTOM_BACKEND
+    
+    @property
+    def time_limit(self):
+        return self._time_limit
+    
+    @time_limit.setter
+    def time_limit(self, value):
+        assert self.scheduler_options is not None
+        self.scheduler_options[1]['time_out'] = value
+        self._time_limit = value
     
     def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
         if not isinstance(hyperparameter_tune_kwargs, tuple):

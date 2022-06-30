@@ -1027,7 +1027,7 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
     # FIXME: with use_bag_holdout=True, the fold-1 scores that are logged are of the inner validation score, not the holdout score.
     #  Fix this by passing X_val, y_val into this method
-    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, preprocess_kwargs=None, groups=None, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, hpo_executor, preprocess_kwargs=None, groups=None, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
@@ -1061,11 +1061,18 @@ class BaggedEnsembleModel(AbstractModel):
             train_index, test_index = kfolds[0]
             X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
             y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
-        orig_time = scheduler_options[1]['time_out']
+        orig_time = hpo_executor.time_limit
         if orig_time:
-            scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_model_performances, hpo_results = model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
-        scheduler_options[1]['time_out'] = orig_time
+            hpo_executor.time_limit = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
+        hpo_models, hpo_results = model_base.hyperparameter_tune(
+            X=X_fold,
+            y=y_fold,
+            X_val=X_val_fold,
+            y_val=y_val_fold,
+            hyperparameter_tune_kwargs=None,
+            hpo_executor=hpo_executor,
+            **kwargs)
+        hpo_executor.time_limit = orig_time
 
         bags = {}
         bags_performance = {}
@@ -1117,10 +1124,9 @@ class BaggedEnsembleModel(AbstractModel):
 
             bag.save()
             bags[bag.name] = bag.path
-            bags_performance[bag.name] = bag.val_score
 
         # TODO: hpo_results likely not correct because no renames
-        return bags, bags_performance, hpo_results
+        return bags, hpo_results
 
     def _more_tags(self):
         return {

@@ -924,11 +924,14 @@ class AbstractModel:
 
         return template
 
-    def hyperparameter_tune(self, hyperparameter_tune_kwargs, time_limit=None, **kwargs):
-        backend = self._get_hpo_backend()
-        hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
-        default_num_trials = kwargs.pop('default_num_trials', None)
-        time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
+    def hyperparameter_tune(self, hyperparameter_tune_kwargs, hpo_executor=None, time_limit=None, **kwargs):
+        if hpo_executor is None:
+            backend = self._get_model_base()._get_hpo_backend()  # If ensemble, will use the base model to determine backend
+            hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
+            default_num_trials = kwargs.pop('default_num_trials', None)
+            time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
+        else:  # ensemble has already created the hpo_executor
+            time_limit = hpo_executor.time_limit
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
@@ -1256,3 +1259,6 @@ class AbstractModel:
 
     def _more_tags(self):
         return _DEFAULT_TAGS
+    
+    def _get_model_base(self):
+        return self
