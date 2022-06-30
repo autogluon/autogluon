@@ -143,6 +143,9 @@ scores2 = loaded_predictor.evaluate(test_data, metrics=["roc_auc"])
 scores2
 ```
 
-## More Examples and Customization
+## Other Examples
 
-To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+## Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

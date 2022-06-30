@@ -229,4 +229,9 @@ Unlike `TabularPredictor` which trains/ensembles different types of models,
 Internally, it integrates with [timm](https://github.com/rwightman/pytorch-image-models) , [huggingface/transformers](https://github.com/huggingface/transformers), 
 [openai/clip](https://github.com/openai/CLIP) as the model zoo.
 
-To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+## Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+## Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

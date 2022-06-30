@@ -96,3 +96,10 @@ print(load_proba)
 ```
 
 We can see the predicted class probabilities are still the same as above, which means same model!
+
+## Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+## Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

@@ -156,4 +156,9 @@ print(score_in_jp)
 ```
 Amazingly, the model also works for Japanese!
 
-To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+## Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+## Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.
