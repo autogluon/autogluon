@@ -27,8 +27,9 @@ class XShiftDetector:
     >>> pred = TabularPredictor(label='class') #class is the Y variable
     >>> xshiftd = XShiftDetector(pred)
     >>> xshiftd.fit(train.drop(columns = 'class'), test.drop(columns = 'class'))
-    >>> res = xshiftd.infer()
-    >>> res.print()
+    >>> if xshiftd.decision() == 'detected':
+    >>>     res = xshiftd.infer()
+    >>>     res.print()
     """
 
     def __init__(self, predictor, method="C2ST"):
@@ -51,6 +52,23 @@ class XShiftDetector:
             - a tuple of training dataframe and test dataframe
         """
         self._is_fit = True
+        pass
+
+    def decision(self, teststat_thresh = 0.55, pvalue_thresh = 1e-3):
+        """Decision function for testing XShift
+
+        Parameters
+        ----------
+        teststat_thresh: float
+            the threshold for the test statistic
+
+        pvalue_thresh: float
+            the pvalue threshold for the permutation test
+
+        Returns
+        -------
+        One of ['detected', 'not detected']
+        """
         pass
 
     def infer(self):
