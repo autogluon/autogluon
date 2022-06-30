@@ -1859,5 +1859,7 @@ class MultiModalPredictor:
 
 class AutoMMPredictor(MultiModalPredictor):
     def __init__(self, **kwargs):
-        warnings.warn('AutoMMPredictor has been renamed as "MultiModalPredictor". Consider to use the ')
+        warnings.warn('AutoMMPredictor has been renamed as "MultiModalPredictor". '
+                      'Consider to use MultiModalPredictor instead. Using AutoMMPredictor will '
+                      'raise an exception starting in v0.7.')
         super(AutoMMPredictor, self).__init__(**kwargs)
