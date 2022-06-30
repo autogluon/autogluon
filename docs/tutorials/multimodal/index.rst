@@ -7,7 +7,7 @@ that automatically selects and fuses deep learning backbones from popular packag
 `CLIP <https://github.com/openai/CLIP>`_, etc. You can use it to build models for multimodal problems that involve image, text, and tabular features, e.g., predicting the product price
 based on the items' description, photo, and other metadata, or matching images with text descriptions.
 
-In addition, being good at multimodal problems implies that the predictor will be good for **each specific modalities**. Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
+In addition, being good at multimodal problems implies that the predictor will be good for **each specific modality**. Thus, you can also use `AutoMM` to solve standard NLP/Vision tasks like sentiment classification,
 intent detection, paraphrase detection, image classification. Moreover, `AutoMM` can be used as a basic model in the multi-layer stack-ensemble of `TabularPredictor`.
 
 In the following, we prepared a few tutorials to help you learn how to use `AutoMM` to solve problems that involve image, text, and tabular data.
