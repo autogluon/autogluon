@@ -75,7 +75,9 @@ def test_when_sktime_models_fitted_then_allowed_hyperparameters_are_passed_to_sk
     hyperparameters.update(bad_params)
     model = model_class(hyperparameters=hyperparameters)
 
-    with mock.patch.object(target=sktime_forecaster_class, attribute="__init__") as const_mock:
+    with mock.patch.object(
+        target=sktime_forecaster_class, attribute="__init__"
+    ) as const_mock:
         try:
             model.fit(train_data=DUMMY_TS_DATAFRAME)
         except TypeError:
@@ -128,7 +130,9 @@ def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_skt_models_saved_then_forecasters_can_be_loaded(model_class, temp_model_path):
+def test_when_skt_models_saved_then_forecasters_can_be_loaded(
+    model_class, temp_model_path
+):
     model = model_class()
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
@@ -143,7 +147,10 @@ def test_when_skt_models_saved_then_forecasters_can_be_loaded(model_class, temp_
 @pytest.mark.parametrize(
     "train_data, test_data",
     [
-        (get_data_frame_with_item_index([0, 1, 2, 3]), get_data_frame_with_item_index([2, 3, 4, 5])),
+        (
+            get_data_frame_with_item_index([0, 1, 2, 3]),
+            get_data_frame_with_item_index([2, 3, 4, 5]),
+        ),
         (
             get_data_frame_with_item_index(["A", "B", "C"]),
             get_data_frame_with_item_index(["A", "B", "D"]),
@@ -163,7 +170,6 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
 ):
     model = model_class(
         path=temp_model_path,
-        freq="H",
         prediction_length=3,
     )
 
@@ -172,3 +178,43 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
 
         _ = model.predict(test_data)
         mock_fit.assert_called_with(test_data)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize(
+    "freqstr, ts_length, expected_sp",
+    [
+        ("H", 100, 24),
+        ("2H", 100, 12),
+        ("B", 100, 5),
+        ("M", 100, 12),
+        ("H", 5, 1),
+        ("2H", 5, 1),
+        ("B", 5, 1),
+        ("M", 5, 1),
+    ],
+)
+def test_when_fit_called_with_then_seasonality_period_set_correctly(
+    model_class,
+    temp_model_path,
+    freqstr,
+    ts_length,
+    expected_sp,
+):
+    if "sp" not in model_class.sktime_allowed_init_args:
+        return
+
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=3,
+    )
+
+    train_data = get_data_frame_with_item_index(
+        ["A", "B", "C"],
+        data_length=ts_length,
+        freq=freqstr,
+    )
+
+    model.fit(train_data=train_data)
+
+    assert model.skt_forecaster.sp == expected_sp

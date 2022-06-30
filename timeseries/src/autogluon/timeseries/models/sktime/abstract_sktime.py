@@ -6,12 +6,13 @@ from typing import Optional, List, Dict, Any, Type
 import numpy as np
 import pandas as pd
 import sktime
-from sklearn.exceptions import ConvergenceWarning
 from sktime.forecasting.base import BaseForecaster
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 
 from ... import TimeSeriesDataFrame
+from ...utils.seasonality import get_seasonality
 from ..abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
@@ -69,13 +70,15 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         self.skt_forecaster: Optional[BaseForecaster] = None
         self._fit_index: Optional[pd.Index] = None
 
-    def _get_skt_forecaster(self) -> BaseForecaster:
+    def _get_skt_forecaster(self, sp: Optional[int] = None) -> BaseForecaster:
         """Return the sktime forecaster object for the model"""
+        params = self._get_model_params().copy()
+        if sp:
+            params["sp"] = sp
+
         return self.sktime_forecaster_class(
             **{  # noqa
-                k: v
-                for k, v in self._get_model_params().items()
-                if k in self.sktime_allowed_init_args
+                k: v for k, v in params.items() if k in self.sktime_allowed_init_args
             }
         )
 
@@ -93,7 +96,9 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             ),
         )
 
-    def _to_time_series_data_frame(self, data: pd.DataFrame, freq: Optional[str] = None) -> TimeSeriesDataFrame:
+    def _to_time_series_data_frame(
+        self, data: pd.DataFrame, freq: Optional[str] = None
+    ) -> TimeSeriesDataFrame:
         df = data.copy(deep=False)
         df.set_index(
             [
@@ -119,7 +124,12 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
 
-        self.skt_forecaster = self._get_skt_forecaster()
+        min_length = min(len(train_data.loc[i]) for i in train_data.iter_items())
+        period = get_seasonality(train_data.freq)
+        self.skt_forecaster = self._get_skt_forecaster(
+            sp=period if min_length > 2 * period else None
+        )
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
