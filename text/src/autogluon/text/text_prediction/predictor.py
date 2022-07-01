@@ -2,7 +2,7 @@ import os
 import warnings
 from typing import Union
 
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import parse_dotlist_conf
 from autogluon.multimodal.presets import get_basic_automm_config
 from .presets import get_text_preset
@@ -69,7 +69,7 @@ class TextPredictor:
         """
         self.verbosity = verbosity
         if backend == PYTORCH:
-            predictor_cls = AutoMMPredictor
+            predictor_cls = MultiModalPredictor
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
             predictor_cls = MXTextPredictor
@@ -165,7 +165,7 @@ class TextPredictor:
             plot_results=None,
             holdout_frac=None,
             save_path=None,
-            teacher_predictor: Union[str, AutoMMPredictor] = None,
+            teacher_predictor: Union[str, MultiModalPredictor] = None,
             seed=123):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
@@ -389,7 +389,7 @@ class TextPredictor:
         standalone: bool, default = False
             Whether to save the downloaded model for offline deployment. 
             If `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
-            Also, see `AutoMMPredictor.save()` for more detials. 
+            Also, see `MultiModalPredictor.save()` for more detials.
             Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
@@ -420,7 +420,7 @@ class TextPredictor:
 
         """
         if backend == PYTORCH:
-            _predictor = AutoMMPredictor.load(
+            _predictor = MultiModalPredictor.load(
                 path=path,
                 resume=resume,
             )

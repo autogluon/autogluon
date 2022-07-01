@@ -18,12 +18,12 @@ To run the example:
 ### 1.2 Datasets
 We borrowed 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in the original paper [1] to name each datasets. 
 The datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
-These Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `AutoMMPredictor`. 
+These Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `MultiModalPredictor`. 
 All Data can be automatically downloaded from s3 (online connection is necessary) if it does not exisit with the given dataset path `dataset_dir`. 
 
 
 ### 1.3 FT-Transformer
-We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
+We categorize the original FT_Transformer to two models in `MultiModalPredictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
    - `out_features` is the output feature size.
    - `d_token` is the dimension of the embedding tokens.
    - `num_trans_blocks` is the number of transformer blocks.
@@ -34,7 +34,7 @@ We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, na
 `numerical_transformer` supports an additional feature:
    - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
   
-These features can be tuned using `hyperparameters` in `AutoMMPredictor. For example: 
+These features can be tuned using `hyperparameters` in `MultiModalPredictor. For example: 
 ```python
 hyperparameters = {
    "model.names": ["categorical_transformer","numerical_transformer","fusion_transformer"],

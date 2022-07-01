@@ -1,5 +1,5 @@
 import argparse
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 from datasets import load_dataset
 
 from time import time
@@ -39,7 +39,7 @@ def main(args):
         valid_df = dataset["validation"].to_pandas()
 
     ### Train and evaluate the teacher model
-    teacher_predictor = AutoMMPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+    teacher_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
     teacher_predictor.fit(
         train_df,
         hyperparameters={
@@ -56,7 +56,7 @@ def main(args):
     teacher_usedtime = time() - start
 
     ### Train and evaluate a smaller pretrained model
-    nodistill_predictor = AutoMMPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+    nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
     nodistill_predictor.fit(
         train_df,
         hyperparameters={
@@ -80,7 +80,7 @@ def main(args):
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
-    student_predictor = AutoMMPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+    student_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
     student_predictor.fit(
         train_df,
         config=config,
