@@ -1034,7 +1034,8 @@ class BaggedEnsembleModel(AbstractModel):
         kwargs['feature_metadata'] = self.feature_metadata
         kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
         model_base = self._get_model_base()
-        model_base.set_contexts(self.path + 'hpo' + os.path.sep)
+        hpo_context = self.path + 'hpo' + os.path.sep
+        model_base.set_contexts(hpo_context)
 
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
@@ -1118,6 +1119,17 @@ class BaggedEnsembleModel(AbstractModel):
             bag.save()
             bags[bag.name] = bag.path
             bags_performance[bag.name] = bag.val_score
+
+            # delete original child from its disk location since it is being saved to a new location in the bag
+            child: AbstractModel = self._child_type.load(path=model_path)
+            child.delete_from_disk(silent=True)
+
+        # cleanup artifacts
+        for artifact_dir in [model_base._path_v2, model_base.path_root]:
+            try:
+                os.rmdir(artifact_dir)
+            except OSError:
+                pass
 
         # TODO: hpo_results likely not correct because no renames
         return bags, bags_performance, hpo_results
