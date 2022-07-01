@@ -8,6 +8,9 @@ from autogluon.core.utils.early_stopping import AdaptiveES
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PATIENCE = 20
+
+
 class EpochCounter(Callback):
     def __init__(self):
         self.count = 0
