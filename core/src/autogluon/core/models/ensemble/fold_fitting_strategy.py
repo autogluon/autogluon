@@ -404,15 +404,19 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         return num_cpus
 
     def schedule_fold_model_fit(self, fold_ctx):
+        self.jobs.append(fold_ctx)
+
+    def after_all_folds_scheduled(self):
+        num_jobs = len(self.jobs)
+        # TODO: investigate why ray will hang after hpo if only one fold will be trained in parallel
+        # This is a hack to avoid ray hanging after hpo. It only happens when there is only one fold
+        if self.ray.is_initialized() and num_jobs == 1:
+            self.ray.shutdown()
         if not self.ray.is_initialized():
             ray_init_args = dict(num_cpus=self.num_cpus, log_to_driver=False)
             if self.num_gpus > 0:
                 ray_init_args['num_gpus'] = self.num_gpus
             self.ray.init(**ray_init_args)
-        self.jobs.append(fold_ctx)
-
-    def after_all_folds_scheduled(self):
-        num_jobs = len(self.jobs)
         job_refs = []
         job_fold_map = {}
         # prepare shared data

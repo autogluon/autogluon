@@ -995,7 +995,6 @@ class AbstractModel:
             minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0.1),
             model_estimate_memory_usage=model_estimate_memory_usage,
         )
-        hpo_executor.terminate()
 
         return hpo_executor.get_hpo_results(
             model_name=self.name,
