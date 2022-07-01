@@ -8,9 +8,6 @@ from autogluon.core.utils.early_stopping import AdaptiveES
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_PATIENCE = 20
-
-
 class EpochCounter(Callback):
     def __init__(self):
         self.count = 0
@@ -49,7 +46,7 @@ class GluonTSEarlyStoppingCallback(Callback):
     the loss is always minimized.
     """
 
-    def __init__(self, patience=DEFAULT_PATIENCE):
+    def __init__(self, patience):
         self.patience = patience
         self.best_round = 0
         self.best_loss = float("inf")

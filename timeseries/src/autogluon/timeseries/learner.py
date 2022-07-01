@@ -31,6 +31,7 @@ class TimeSeriesLearner(AbstractLearner):
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
+        early_stopping_patience: Optional[int] = None,
         **kwargs,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
@@ -38,6 +39,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.trainer_type = trainer_type
         self.target = target
         self.prediction_length = prediction_length
+        self.early_stopping_patience = early_stopping_patience
         self.quantile_levels = kwargs.get(
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
@@ -92,6 +94,7 @@ class TimeSeriesLearner(AbstractLearner):
                 scheduler_options=scheduler_options,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
+                early_stopping_patience=self.early_stopping_patience,
                 verbosity=kwargs.get("verbosity", 2)
             )
         )

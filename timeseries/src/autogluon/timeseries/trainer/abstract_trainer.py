@@ -293,6 +293,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
+        early_stopping_patience: Optional[int] = None,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -307,6 +308,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.enable_ensemble = enable_ensemble
 
         self.verbosity = verbosity
+        self.early_stopping_patience = early_stopping_patience
         set_logger_verbosity(self.verbosity, logger=logger)
 
         # Dict of normal model -> FULL model. FULL models are produced by
