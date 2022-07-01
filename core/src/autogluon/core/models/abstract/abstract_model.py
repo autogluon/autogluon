@@ -935,7 +935,7 @@ class AbstractModel:
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        hpo_executor.register_resources(self._preprocess_fit_resources(silent=True))
+        hpo_executor.register_resources(self)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
     def _hyperparameter_tune(self, X, y, X_val, y_val, hpo_executor, **kwargs):

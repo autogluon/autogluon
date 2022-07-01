@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
-from ...ray.resources_calculator import ResourceCalculatorFactory
+from ...ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NotEnoughCudaMemoryError
 from ...utils import get_cpu_count, get_gpu_count_all
 from ...utils.try_import import try_import_ray
@@ -362,7 +362,6 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.num_gpus = self._get_gpu_count()
         self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs, num_folds_parallel)
 
-
     def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
@@ -377,41 +376,28 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         y_mem = get_approximate_df_mem_usage(self.y.to_frame()).sum()
         return X_mem + y_mem
 
-    # TODO: Move to generic location, re-use in parallel HPO
     def _get_gpu_count(self):
         _user_gpu_count = self._initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
         resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
+        
+        return ResourceCalculator.get_total_gpu_count(
+            user_specified_num_gpus=_user_gpu_count,
+            model_default_num_gpus=resource_kwargs['num_gpus'],
+        )
 
-        if _user_gpu_count is not None:
-            num_gpus = min(_user_gpu_count, get_gpu_count_all())
-        elif resource_kwargs['num_gpus'] > 0:
-            num_gpus = get_gpu_count_all()
-        else:
-            num_gpus = 0
-        return num_gpus
-
-    # TODO: Move to generic location, re-use in parallel HPO
     def _get_cpu_count(self):
         _user_cpu_count = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
         resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
 
-        if _user_cpu_count is not None:
-            num_cpus = min(_user_cpu_count, get_cpu_count())
-        elif resource_kwargs['num_cpus'] > 0:
-            num_cpus = get_cpu_count()
-        else:
-            num_cpus = 0
-        return num_cpus
+        return ResourceCalculator.get_total_cpu_count(
+            user_specified_num_cpus=_user_cpu_count,
+            model_default_num_cpus=resource_kwargs['num_cpus'],
+        )
 
     def schedule_fold_model_fit(self, fold_ctx):
         self.jobs.append(fold_ctx)
 
     def after_all_folds_scheduled(self):
-        num_jobs = len(self.jobs)
-        # TODO: investigate why ray will hang after hpo if only one fold will be trained in parallel
-        # This is a hack to avoid ray hanging after hpo. It only happens when there is only one fold
-        if self.ray.is_initialized() and num_jobs == 1:
-            self.ray.shutdown()
         if not self.ray.is_initialized():
             ray_init_args = dict(num_cpus=self.num_cpus, log_to_driver=False)
             if self.num_gpus > 0:
