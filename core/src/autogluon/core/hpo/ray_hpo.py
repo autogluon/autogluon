@@ -209,10 +209,8 @@ def run(
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
     search_space = _convert_search_space(search_space)
 
-    if ray.is_initialized():
-        # shutdown to reinitialize resources because different model might require different total resources
-        ray.shutdown()
-    ray.init(log_to_driver=False, **total_resources)
+    if not ray.is_initialized():
+        ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(

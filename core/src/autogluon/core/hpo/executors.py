@@ -55,6 +55,10 @@ class HpoExecutor(ABC):
         raise NotImplementedError
     
     @abstractmethod
+    def terminate(self):
+        raise NotImplementedError
+    
+    @abstractmethod
     def get_hpo_results(self, model_name, model_path_root, **kwargs):
         raise NotImplementedError
 
@@ -153,6 +157,11 @@ class RayHpoExecutor(HpoExecutor):
         from ray import tune
         tune.report(**kwargs)
         
+    def terminate(self):
+        import ray
+        if ray.is_initialized():
+            ray.shutdown()
+        
     def get_hpo_results(self, model_name, model_path_root, **kwargs):
         assert self.analysis is not None, 'Call `execute()` before `get_hpo_results()`'
         hpo_models = {}
@@ -237,7 +246,10 @@ class CustomHpoExecutor(HpoExecutor):
     
     def report(self, reporter, **kwargs):
         assert reporter is not None
-        reporter(**kwargs)    
+        reporter(**kwargs)   
+        
+    def terminate(self):
+        pass
         
     def get_hpo_results(self, model_name, model_path_root, time_start, **kwargs):
         assert self.scheduler is not None, 'Call `execute()` before `get_hpo_results()`'

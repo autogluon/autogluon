@@ -404,16 +404,11 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         return num_cpus
 
     def schedule_fold_model_fit(self, fold_ctx):
-        if self.ray.is_initialized():
-        # shutdown to reinitialize resources because different model might require different total resources
-        # also, when doing bagging + hpo, ray parallel bagging would freeze if only 1 fold remains. Shutdown address the issue.
-        # TODO: need a different strategy when dealing with cluster
-        # TODO: better way to address ray freezing?
-            self.ray.shutdown()
-        ray_init_args = dict(log_to_driver=False)
-        if self.num_gpus > 0:
-            ray_init_args['num_gpus'] = self.num_gpus
-        self.ray.init(**ray_init_args)
+        if not self.ray.is_initialized():
+            ray_init_args = dict(num_cpus=self.num_cpus, log_to_driver=False)
+            if self.num_gpus > 0:
+                ray_init_args['num_gpus'] = self.num_gpus
+            self.ray.init(**ray_init_args)
         self.jobs.append(fold_ctx)
 
     def after_all_folds_scheduled(self):
