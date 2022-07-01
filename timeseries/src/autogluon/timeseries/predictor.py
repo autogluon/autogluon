@@ -70,6 +70,9 @@ class TimeSeriesPredictor:
         List of increasing decimals that specifies which quantiles should be estimated
         when making distributional forecasts. Can alternatively be provided with the keyword
         argument ``quantiles``. If ``None``, defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
+    early_stopping_patience: int, default = ``DEFAULT_ES_PATIENCE`` as defined in autogluon.timeseries.models.presets
+        When validation loss is not improved for `early_stopping_patience` epochs, training will
+        be early stopped. By setting it to None, one will disable early stopping.
 
     Other Parameters
     ----------------
@@ -103,6 +106,7 @@ class TimeSeriesPredictor:
         verbosity: int = 2,
         prediction_length: int = 1,
         quantile_levels: Optional[List[float]] = None,
+        early_stopping_patience: Optional[int] = None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -121,7 +125,7 @@ class TimeSeriesPredictor:
         self.quantile_levels = quantile_levels or kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
-
+        self.early_stopping_patience = early_stopping_patience
         learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
         learner_kwargs = kwargs.pop("learner_kwargs", dict())
         learner_kwargs = learner_kwargs.copy()
@@ -132,6 +136,7 @@ class TimeSeriesPredictor:
                 target=self.target,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
+                early_stopping_patience=self.early_stopping_patience
             )
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
