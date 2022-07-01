@@ -9,6 +9,8 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import psutil
+import shutil
+from pathlib import Path
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 
@@ -109,6 +111,11 @@ class AbstractTrainer:
     @property
     def path_utils(self) -> str:
         return self.path_root + 'utils' + os.path.sep
+
+    @property
+    def _path_attr(self) -> str:
+        """Path to cached model graph attributes"""
+        return f'{self.path_utils}attr{os.path.sep}'
 
     @property
     def path_data(self) -> str:
@@ -472,7 +479,7 @@ class AbstractTrainer:
         logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
-            X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
+            X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_val_cache=True)
         compute_score = not refit_full
         if refit_full and X_val is not None:
             X_init = pd.concat([X_init, X_val])
@@ -493,7 +500,7 @@ class AbstractTrainer:
     # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
                             fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True,
-                            infer_limit=None, infer_limit_batch_size=None) -> List[str]:
+                            infer_limit=None, infer_limit_batch_size=None, use_val_cache=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -509,7 +516,7 @@ class AbstractTrainer:
             ag_args_fit['predict_1_batch_size'] = infer_limit_batch_size
         else:
             ag_args_fit = None
-        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
+        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache)
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
@@ -582,7 +589,14 @@ class AbstractTrainer:
     # Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
     # fit = get oof pred proba
     # if record_pred_time is `True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
-    def get_model_pred_proba_dict(self, X, models, model_pred_proba_dict=None, model_pred_time_dict=None, fit=False, record_pred_time=False):
+    def get_model_pred_proba_dict(self,
+                                  X,
+                                  models,
+                                  model_pred_proba_dict=None,
+                                  model_pred_time_dict=None,
+                                  fit=False,
+                                  record_pred_time=False,
+                                  use_val_cache: bool = False):
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         if model_pred_time_dict is None:
@@ -591,13 +605,17 @@ class AbstractTrainer:
         if fit:
             model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
         else:
+            if use_val_cache:
+                _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
             model_set = set()
             for model in models:
-                if model in model_set:
+                if model in model_set or model in model_pred_proba_dict:
                     continue
                 min_model_set = set(self.get_minimum_model_set(model))
                 model_set = model_set.union(min_model_set)
             model_set = model_set.difference(set(model_pred_proba_dict.keys()))
+            if use_val_cache:
+                model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=model_set, model_pred_proba_dict=model_pred_proba_dict)
             models_to_load = list(model_set)
             subgraph = nx.subgraph(self.model_graph, models_to_load)
 
@@ -644,12 +662,32 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
+    def _update_pred_proba_dict_with_val_cache(self, model_set: set, model_pred_proba_dict):
+        """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
+        for model in model_set:
+            y_pred_proba = self.get_model_attribute(model, attribute='cached_y_pred_proba_val', default=None)
+            if isinstance(y_pred_proba, bool) and y_pred_proba:
+                if y_pred_proba:
+                    try:
+                        y_pred_proba = self._load_model_y_pred_proba_val(model)
+                    except FileNotFoundError:
+                        y_pred_proba = None
+                else:
+                    y_pred_proba = None
+            if y_pred_proba is not None:
+                model_pred_proba_dict[model] = y_pred_proba
+        model_set = model_set.difference(set(model_pred_proba_dict.keys()))
+        return model_set, model_pred_proba_dict
+
     # TODO: Remove _get_inputs_to_stacker_legacy eventually, move logic internally into this function instead
-    def get_inputs_to_stacker(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True):
+    def get_inputs_to_stacker(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True, use_val_cache=False):
         if base_models is None:
             base_models = []
         if not fit:
-            model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=base_models, model_pred_proba_dict=model_pred_proba_dict)
+            model_pred_proba_dict = self.get_model_pred_proba_dict(X=X,
+                                                                   models=base_models,
+                                                                   model_pred_proba_dict=model_pred_proba_dict,
+                                                                   use_val_cache=use_val_cache)
             model_pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
         else:
             # TODO: After _get_inputs_to_stacker_legacy is removed, this if/else is not necessary, instead pass fit param to get_model_pred_proba_dict()
@@ -1059,6 +1097,7 @@ class AbstractTrainer:
         fit_start_time = time.time()
         time_limit = model_fit_kwargs.get('time_limit', None)
         model_names_trained = []
+        y_pred_proba_val = None
         try:
             fit_log_message = f'Fitting model: {model.name} ...'
             if time_limit is not None:
@@ -1097,14 +1136,16 @@ class AbstractTrainer:
                 model.predict_time = None
             elif isinstance(model, BaggedEnsembleModel):
                 if X_val is not None and y_val is not None:
-                    score = model.score(X=X_val, y=y_val, sample_weight=w_val)
+                    y_pred_proba_val = model.predict_proba(X_val)
+                    score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
                 elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
                 else:
                     score = None
             else:
                 if X_val is not None and y_val is not None:
-                    score = model.score(X=X_val, y=y_val, sample_weight=w_val)
+                    y_pred_proba_val = model.predict_proba(X_val)
+                    score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
                 else:
                     score = None
             pred_end_time = time.time()
@@ -1146,13 +1187,13 @@ class AbstractTrainer:
                 logger.exception('Detailed Traceback:')
             del model
         else:
-            self._add_model(model=model, stack_name=stack_name, level=level)
+            self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val)
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         return model_names_trained
 
-    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 1) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 1, y_pred_proba_val=None) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -1185,6 +1226,13 @@ class AbstractTrainer:
         predict_child_time = model.predict_time / num_children if model.predict_time is not None else None
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
+
+        extra_attributes = dict()
+        if y_pred_proba_val is not None:
+            # Cache y_pred_proba_val for later reuse to avoid redundant predict calls
+            self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
+            extra_attributes['cached_y_pred_proba_val'] = True
+
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
@@ -1203,6 +1251,7 @@ class AbstractTrainer:
             level=level,
             num_children=num_children,
             **fit_metadata,
+            **extra_attributes,
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
@@ -1218,6 +1267,22 @@ class AbstractTrainer:
         if self.low_memory:
             del model
         return True
+
+    def _path_attr_model(self, model: str):
+        """Returns directory where attributes are cached"""
+        return f'{self._path_attr}{model}{os.path.sep}'
+
+    def _path_to_model_attr(self, model: str, attribute: str):
+        """Returns pkl file path for a cached model attribute"""
+        return f'{self._path_attr_model(model)}{attribute}.pkl'
+
+    def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
+        """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
+        save_pkl.save(path=self._path_to_model_attr(model=model, attribute='y_pred_proba_val'), object=y_pred_proba_val)
+
+    def _load_model_y_pred_proba_val(self, model: str):
+        """Load cached y_pred_proba_val for a given model"""
+        return load_pkl.load(path=self._path_to_model_attr(model=model, attribute='y_pred_proba_val'))
 
     # TODO: Once Python min-version is 3.8, can refactor to use positional-only argument for model
     #  https://peps.python.org/pep-0570/#empowering-library-authors
@@ -2151,6 +2216,7 @@ class AbstractTrainer:
                 os.rmdir(self.path_data)
             except OSError:
                 pass
+            shutil.rmtree(path=Path(self._path_attr), ignore_errors=True)
             try:
                 os.rmdir(self.path_utils)
             except OSError:
@@ -2207,10 +2273,8 @@ class AbstractTrainer:
                 model = self.load_model(model)
                 model.delete_from_disk()
 
-        self.model_graph.remove_nodes_from(models_to_remove)
         for model in models_to_remove:
-            if model in self.models:
-                self.models.pop(model)
+            self._delete_model_from_graph(model=model)
 
         models_kept = self.get_model_names()
 
@@ -2222,6 +2286,13 @@ class AbstractTrainer:
 
         # TODO: Delete from all the other model dicts
         self.save()
+
+    def _delete_model_from_graph(self, model: str):
+        self.model_graph.remove_node(model)
+        if model in self.models:
+            self.models.pop(model)
+        path_attr_model = Path(self._path_attr_model(model))
+        shutil.rmtree(path=path_attr_model, ignore_errors=True)
 
     @classmethod
     def load(cls, path, reset_paths=False):
