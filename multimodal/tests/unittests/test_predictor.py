@@ -42,11 +42,12 @@ ALL_DATASETS = {
 
 
 def verify_predictor_save_load(predictor, df,
-                               verify_embedding=True):
+                               verify_embedding=True,
+                               cls=MultiModalPredictor):
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictions = predictor.predict(df, as_pandas=False)
-        loaded_predictor = MultiModalPredictor.load(root)
+        loaded_predictor = cls.load(root)
         predictions2 = loaded_predictor.predict(df, as_pandas=False)
         predictions2_df = loaded_predictor.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)

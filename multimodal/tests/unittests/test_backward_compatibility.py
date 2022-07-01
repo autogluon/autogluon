@@ -12,26 +12,7 @@ from utils import (
     protected_zip_extraction,
     get_home_dir,
 )
-
-
-def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiModalPredictor):
-    with tempfile.TemporaryDirectory() as root:
-        predictor.save(root)
-        predictions = predictor.predict(df, as_pandas=False)
-        loaded_predictor = cls.load(root)
-        predictions2 = loaded_predictor.predict(df, as_pandas=False)
-        predictions2_df = loaded_predictor.predict(df, as_pandas=True)
-        npt.assert_equal(predictions, predictions2)
-        npt.assert_equal(predictions2, predictions2_df.to_numpy())
-        if predictor.problem_type in [BINARY, MULTICLASS]:
-            predictions_prob = predictor.predict_proba(df, as_pandas=False)
-            predictions2_prob = loaded_predictor.predict_proba(df, as_pandas=False)
-            predictions2_prob_df = loaded_predictor.predict_proba(df, as_pandas=True)
-            npt.assert_equal(predictions_prob, predictions2_prob)
-            npt.assert_equal(predictions2_prob, predictions2_prob_df.to_numpy())
-        if verify_embedding:
-            embeddings = predictor.extract_embedding(df)
-            assert embeddings.shape[0] == len(df)
+from test_predictor import verify_predictor_save_load
 
 
 @pytest.mark.parametrize("cls", [MultiModalPredictor, AutoMMPredictor])
