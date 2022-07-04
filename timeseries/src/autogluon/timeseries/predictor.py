@@ -70,9 +70,9 @@ class TimeSeriesPredictor:
         List of increasing decimals that specifies which quantiles should be estimated
         when making distributional forecasts. Can alternatively be provided with the keyword
         argument ``quantiles``. If ``None``, defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
-    early_stopping_patience: int, default = ``DEFAULT_ES_PATIENCE`` as defined in autogluon.timeseries.models.presets
+    early_stopping_patience: int, default = None
         When validation loss is not improved for `early_stopping_patience` epochs, training will
-        be early stopped. By setting it to None, one will disable early stopping.
+        be early stopped. By setting it to ``None``, one will disable early stopping.
 
     Other Parameters
     ----------------

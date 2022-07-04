@@ -97,7 +97,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: str = None,
-        early_stopping_patience: Optional[int] = 10,
+        early_stopping_patience: Optional[int] = None,
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
