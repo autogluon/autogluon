@@ -20,19 +20,27 @@ class XShiftDetector:
     -------
     fit: fits the detector on training and test covariate data
 
-    infer: outputs the results of XShift detection
+    json, print: outputs the results of XShift detection
+    - test statistic
+    - pvalue (optional, if compute_pvalue=True in .fit)
+    - detector feature importances
+    - top k anomalous samples
 
     Usage
     -----
-    >>> pred = TabularPredictor(label='class') #class is the Y variable
-    >>> xshiftd = XShiftDetector(pred)
-    >>> xshiftd.fit(train.drop(columns = 'class'), test.drop(columns = 'class'))
-    >>> if xshiftd.decision() == 'detected':
-    >>>     res = xshiftd.infer()
-    >>>     res.print()
+    >>> pred = TabularPredictor() #class is the Y variable
+    >>> xshiftd = XShiftDetector(predictor = pred)
+    Alternatively, specify the predictor class...
+    >>> xshiftd = XShiftDetector(predictor_class = TabularPredictor)
+    Input the binary classification metric for evaluating the test set detector (if method='C2ST')...
+    >>> xshiftd = XShiftDetector(predictor_class = TabularPredictor, metric = "F1")
+    Fit the detector...
+    >>> xshiftd.fit(Xtrain, Xtest)
+    Print the results...
+    >>> xshiftd.print()
     """
 
-    def __init__(self, predictor, method="C2ST"):
+    def __init__(self, predictor = None, predictor_class = None, method="C2ST", metric = 'balanced accuracy'):
         valid_methods = [
             "C2ST"
         ]
@@ -41,7 +49,7 @@ class XShiftDetector:
         ## for classifier in C2ST
         pass
 
-    def fit(self, data):
+    def fit(self, data, compute_pvalue = False):
         """Fit the XShift detector.
 
         Parameters
@@ -54,7 +62,7 @@ class XShiftDetector:
         self._is_fit = True
         pass
 
-    def decision(self, teststat_thresh = 0.55, pvalue_thresh = 1e-3):
+    def decision(self, teststat_thresh = 0.55, pvalue_thresh = None):
         """Decision function for testing XShift
 
         Parameters
@@ -71,15 +79,12 @@ class XShiftDetector:
         """
         pass
 
-    def infer(self):
-        """Return the results of the XShift detection
-
-        Returns
-        -------
-        XShiftInferer instance which will have methods
-            - .json(): output json object of the results
-            - .print(): print the results in a nice format
+    def json(self):
+        """output the results in json format
         """
-        assert self._is_fit, "Need to call .fit() before inference"
-        inferrer = sft.XShiftInferrer(self)
-        return inferrer
+        pass
+
+    def print(self):
+        """print the results to screen
+        """
+        pass
