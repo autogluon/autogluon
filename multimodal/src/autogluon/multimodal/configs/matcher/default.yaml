@@ -1,0 +1,35 @@
+matcher:
+  match_label: 0
+  matches:
+      - loss:
+          type: "contrastive_loss"
+          pos_margin: 0.8
+          neg_margin: 0.2
+          weight: 1
+        distance:
+          type: "cosine_similarity"
+        miner:
+          type: "pair_margin_miner"
+          pos_margin: 0.6
+          neg_margin: 0.4
+        use_label: True
+        pair:
+          - "Previous Image"
+          - "Current Image"
+# TODO: temporarily keep the commented config for more experiments.
+#      - loss:
+#          type: "contrastive_loss"
+#          pos_margin: 0.8
+#          neg_margin: 0.2
+#          weight: 1
+#        distance:
+#          type: "cosine_similarity"
+#        miner:
+#          type: "pair_margin_miner"
+#          pos_margin: 0.6
+#          neg_margin: 0.4
+#        use_label: False
+#        pair:
+#          - "Previous Image"
+#          - - "Product Title"
+#            - "Product Type"

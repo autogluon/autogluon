@@ -518,7 +518,7 @@ class MXTextPredictor:
             output = pd.DataFrame(output, index=index)
         return output
 
-    def save(self, path):
+    def save(self, path, standalone = False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -537,6 +537,7 @@ class MXTextPredictor:
         """
         assert self._model is not None, 'Model does not seem to have been constructed.' \
                                         ' Have you called fit(), or load()?'
+        if standalone: logger.info('Standalone=True only works for backen=pytorch, and does nothing with backen=mxnet.')
         os.makedirs(path, exist_ok=True)
         with open(os.path.join(path, 'text_predictor_assets.json'), 'w') as of:
             json.dump({'backend': self._backend,

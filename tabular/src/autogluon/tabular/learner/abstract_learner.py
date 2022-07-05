@@ -1,9 +1,6 @@
 import copy
 import json
 import logging
-import os
-import random
-import sys
 import time
 from collections.abc import Iterable
 
@@ -14,12 +11,10 @@ from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from autogluon.core.learner import AbstractLearner
 from autogluon.core.metrics import confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
-from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df, infer_problem_type
 from autogluon.features.generators import PipelineFeatureGenerator
 
@@ -30,15 +25,13 @@ logger = logging.getLogger(__name__)
 # TODO: - Minimize memory usage of DataFrames (convert int64 -> uint8 when possible etc.)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 # TODO: Loading learner from S3 on Windows may cause issues due to os.path.sep
-class AbstractLearner:
-    learner_file_name = 'learner.pkl'
-    learner_info_name = 'info.pkl'
-    learner_info_json_name = 'info.json'
+class AbstractTabularLearner(AbstractLearner):
 
-    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator, ignored_columns: list = None, label_count_threshold=10,
-                 problem_type=None, quantile_levels=None, eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False,
-                 random_state=0, sample_weight=None, weight_evaluation=False, groups=None):
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
+    def __init__(self, path_context: str, label: str, feature_generator: PipelineFeatureGenerator,
+                 ignored_columns: list = None, label_count_threshold=10, problem_type=None, quantile_levels=None,
+                 eval_metric=None, positive_class=None, cache_data=True, is_trainer_present=False, random_state=0,
+                 sample_weight=None, weight_evaluation=False, groups=None):
+        super().__init__(path_context=path_context, random_state=random_state)
         self.label = label
         self.ignored_columns = ignored_columns
         if self.ignored_columns is None:
@@ -63,17 +56,10 @@ class AbstractLearner:
         if not self.cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
         self.is_trainer_present = is_trainer_present
-        if random_state is None:
-            random_state = random.randint(0, 1000000)
-        self.random_state = random_state
+
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
-
-        self.trainer: AbstractTrainer = None
-        self.trainer_type = None
-        self.trainer_path = None
-        self.reset_paths = False
 
         self._pre_X_rows = None
         self._post_X_rows = None
@@ -87,12 +73,6 @@ class AbstractLearner:
             raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
         if groups is not None and not isinstance(groups, str):
             raise ValueError('groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data.')
-        try:
-            from ..version import __version__
-            self.version = __version__
-        except:
-            self.version = None
-        self._python_version = f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}'
 
     # TODO: Possibly rename to features_in or consider refactoring all feature_generators features_in -> features
     @property
@@ -110,10 +90,6 @@ class AbstractLearner:
     @property
     def class_labels(self):
         return self.label_cleaner.ordered_class_labels
-
-    @property
-    def is_fit(self):
-        return self.trainer_path is not None or self.trainer is not None
 
     @property
     def positive_class(self):
@@ -135,14 +111,6 @@ class AbstractLearner:
             return None
         return self.label_cleaner.cat_mappings_dependent_var[1]
 
-    def set_contexts(self, path_context):
-        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
-
-    def create_contexts(self, path_context):
-        model_context = path_context + 'models' + os.path.sep
-        save_path = path_context + self.learner_file_name
-        return path_context, model_context, save_path
-
     def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
         if self.is_fit:
             raise AssertionError('Learner is already fit.')
@@ -153,7 +121,7 @@ class AbstractLearner:
              feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
-    def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True):
+    def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True, transform_features=True):
         if as_pandas:
             X_index = copy.deepcopy(X.index)
         else:
@@ -161,7 +129,9 @@ class AbstractLearner:
         if X.empty:
             y_pred_proba = np.array([])
         else:
-            y_pred_proba = self.load_trainer().predict_proba(self.transform_features(X), model=model)
+            if transform_features:
+                X = self.transform_features(X)
+            y_pred_proba = self.load_trainer().predict_proba(X, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_multiclass and (self.problem_type == BINARY):
@@ -175,12 +145,12 @@ class AbstractLearner:
                 y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=X_index)
         return y_pred_proba
 
-    def predict(self, X: DataFrame, model=None, as_pandas=True):
+    def predict(self, X: DataFrame, model=None, as_pandas=True, transform_features=True):
         if as_pandas:
             X_index = copy.deepcopy(X.index)
         else:
             X_index = None
-        y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False)
+        y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False, transform_features=transform_features)
         problem_type = self.label_cleaner.problem_type_transform or self.problem_type
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
         if problem_type != QUANTILE:
@@ -445,8 +415,11 @@ class AbstractLearner:
                                y_internal,
                                y_pred_proba_internal,
                                metric,
-                               sample_weight=None):
+                               sample_weight=None,
+                               weight_evaluation=None):
         metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+        if weight_evaluation is None:
+            weight_evaluation = self.weight_evaluation
         if metric.needs_pred:
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
@@ -461,15 +434,18 @@ class AbstractLearner:
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
             y_tmp = y_internal
-        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _score_with_pred(self,
                          y,
                          y_internal,
                          y_pred_internal,
                          metric,
-                         sample_weight=None):
+                         sample_weight=None,
+                         weight_evaluation=None):
         metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
+        if weight_evaluation is None:
+            weight_evaluation = self.weight_evaluation
         if self.problem_type == BINARY:
             # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
             y_pred = y_pred_internal
@@ -477,7 +453,7 @@ class AbstractLearner:
         else:
             y_pred = self.label_cleaner.inverse_transform(y_pred_internal)
             y_tmp = y
-        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _validate_class_labels(self, y: Series):
         null_count = y.isnull().sum()
@@ -494,7 +470,7 @@ class AbstractLearner:
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
-    def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=True, detailed_report=False):
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False):
         """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
@@ -504,9 +480,6 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
-
-        if self.weight_evaluation:
-            raise AssertionError('evaluate_predictions does not support `weight_evaluation=True`. Use `predictor.leaderboard` instead.')
 
         is_proba = False
         assert isinstance(y_true, (np.ndarray, pd.Series))
@@ -575,8 +548,12 @@ class AbstractLearner:
         scoring_args = dict(
             y=y_true,
             y_internal=y_true_internal,
-            # sample_weight=sample_weight,  # TODO: add sample_weight support
+            weight_evaluation=False,
         )
+
+        if sample_weight is not None:
+            scoring_args['sample_weight'] = sample_weight
+            scoring_args['weight_evaluation'] = True
 
         for aux_metric in auxiliary_metrics_lst:
             if isinstance(aux_metric, str):
@@ -670,7 +647,7 @@ class AbstractLearner:
     # model: model (str) to get feature importances for, if None will choose best model.
     # features: list of feature names that feature importances are calculated for and returned, specify None to get all feature importances.
     # feature_stage: Whether to compute feature importance on raw original features ('original'), transformed features ('transformed') or on the features used by the particular model ('transformed_model').
-    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, feature_stage='original', subsample_size=1000, silent=False, **kwargs) -> DataFrame:
+    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, feature_stage='original', subsample_size=5000, silent=False, **kwargs) -> DataFrame:
         valid_feature_stages = ['original', 'transformed', 'transformed_model']
         if feature_stage not in valid_feature_stages:
             raise ValueError(f'feature_stage must be one of: {valid_feature_stages}, but was {feature_stage}.')
@@ -704,53 +681,23 @@ class AbstractLearner:
             X = X.loc[y.index]
         return X, y
 
+    def infer_problem_type(self, y: Series, silent=False):
+        problem_type = self._infer_problem_type(y, silent=silent)
+        if problem_type == QUANTILE:
+            if self.quantile_levels is None:
+                raise AssertionError(f'problem_type is inferred to be {QUANTILE}, yet quantile_levels is not specified.')
+        elif self.quantile_levels is not None:
+            if problem_type == REGRESSION:
+                problem_type = QUANTILE
+            else:
+                raise AssertionError(f"autogluon infers this to be classification problem ('{problem_type}'), yet quantile_levels is not None."
+                                     "If it is truly a quantile regression problem, "
+                                     f"please specify problem_type='{QUANTILE}'.")
+        return problem_type
+
     @staticmethod
-    def infer_problem_type(y: Series):
-        return infer_problem_type(y=y)
-
-    def save(self):
-        trainer = None
-        if self.trainer is not None:
-            if not self.is_trainer_present:
-                self.trainer.save()
-                trainer = self.trainer
-                self.trainer = None
-        save_pkl.save(path=self.save_path, object=self)
-        self.trainer = trainer
-
-    # reset_paths=True if the learner files have changed location since fitting.
-    # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
-    # TODO: path_context -> path for v0.1
-    @classmethod
-    def load(cls, path_context, reset_paths=True):
-        load_path = path_context + cls.learner_file_name
-        obj = load_pkl.load(path=load_path)
-        if reset_paths:
-            obj.set_contexts(path_context)
-            if obj.trainer_path is not None:
-                obj.trainer_path = obj.model_context
-            obj.reset_paths = reset_paths
-            # TODO: Still have to change paths of models in trainer + trainer object path variables
-            return obj
-        else:
-            obj.set_contexts(obj.path_context)
-            return obj
-
-    def save_trainer(self, trainer):
-        if self.is_trainer_present:
-            self.trainer = trainer
-            self.save()
-        else:
-            self.trainer_path = trainer.path
-            trainer.save()
-
-    def load_trainer(self) -> AbstractTrainer:
-        if self.trainer is not None:
-            return self.trainer
-        else:
-            if self.trainer_path is None:
-                raise AssertionError('Trainer does not exist.')
-            return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
+    def _infer_problem_type(y: Series, silent=False):
+        return infer_problem_type(y=y, silent=silent)
 
     # Loads models in memory so that they don't have to be loaded during predictions
     def persist_trainer(self, low_memory=False, models='all', with_ancestors=False, max_memory=None) -> list:
@@ -795,25 +742,6 @@ class AbstractLearner:
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
         return distilled_model_names
-
-    @classmethod
-    def load_info(cls, path, reset_paths=True, load_model_if_required=True):
-        load_path = path + cls.learner_info_name
-        try:
-            return load_pkl.load(path=load_path)
-        except Exception as e:
-            if load_model_if_required:
-                learner = cls.load(path_context=path, reset_paths=reset_paths)
-                return learner.get_info()
-            else:
-                raise e
-
-    def save_info(self, include_model_info=False):
-        info = self.get_info(include_model_info=include_model_info)
-
-        save_pkl.save(path=self.path + self.learner_info_name, object=info)
-        save_json.save(path=self.path + self.learner_info_json_name, obj=info)
-        return info
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output

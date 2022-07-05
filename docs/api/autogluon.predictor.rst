@@ -26,6 +26,28 @@ AutoGluon Predictors
 
    >>> leaderboard = predictor.leaderboard(test_data)
 
+.. admonition:: Example (Deep learning predictor for image, text and multimodal data):
+
+   Import MultiModalPredictor:
+
+   >>> from autogluon.multimodal import MultiModalPredictor
+   >>> from datasets import load_dataset
+
+   Load a multimodal data table:
+
+   >>> train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1)
+
+   Fit classification models predicting the "class" column:
+
+   >>> predictor = MultiModalPredictor(label="label").fit(train_data)
+
+   Load test data:
+
+   >>> test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
+
+   Evaluate predictions on test data:
+
+   >>> score = predictor.evaluate(test_data)
 
 
 Predictors
@@ -38,6 +60,12 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
    :nosignatures:
 
    TabularPredictor
+
+.. automodule:: autogluon.multimodal
+.. autosummary::
+   :nosignatures:
+
+   MultiModalPredictor
 
 .. automodule:: autogluon.vision
 .. autosummary::
@@ -52,6 +80,12 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 
    TextPredictor
 
+.. automodule:: autogluon.timeseries
+.. autosummary::
+   :nosignatures:
+
+   TimeSeriesPredictor
+
 
 :hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,6 +99,20 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
     .. rubric:: Methods
 
     .. autoautosummary:: TabularPredictor
+        :methods:
+
+
+:hidden:`MultiModalPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.multimodal
+
+.. autoclass:: MultiModalPredictor
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: MultiModalPredictor
         :methods:
 
 
@@ -112,6 +160,20 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
         :methods:
 
 
+:hidden:`TimeSeriesPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.timeseries
+
+.. autoclass:: TimeSeriesPredictor
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TimeSeriesPredictor
+        :methods:
+
+
 Additional Tabular APIs
 -----------------------
 
@@ -132,3 +194,15 @@ Additional Tabular APIs
    :members:
    :inherited-members:
 
+
+Additional Time Series APIs
+---------------------------
+
+.. automodule:: autogluon.timeseries
+
+:hidden:`TimeSeriesDataFrame`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TimeSeriesDataFrame
+    :members: freq, from_iterable_dataset, from_data_frame, from_pickle,
+              split_by_time, split_by_item, slice_by_timestep, subsequence

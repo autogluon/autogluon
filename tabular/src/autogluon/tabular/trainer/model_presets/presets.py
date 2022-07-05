@@ -10,7 +10,8 @@ from autogluon.core.trainer.utils import process_hyperparameters
 from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
-    ImagePredictorModel, VowpalWabbitModel
+    ImagePredictorModel, VowpalWabbitModel, \
+    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel, MultiModalPredictorModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -31,8 +32,16 @@ DEFAULT_MODEL_PRIORITY = dict(
     FASTTEXT=0,
     AG_TEXT_NN=0,
     AG_IMAGE_NN=0,
+    AG_AUTOMM=0,
     TRANSF=0,
     custom=0,
+
+    # interpretable models
+    IM_RULEFIT=0,
+    IM_GREEDYTREE=0,
+    IM_FIGS=0,
+    IM_HSTREE=0,
+    IM_BOOSTEDRULES=0,
 )
 
 # Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
@@ -68,11 +77,20 @@ MODEL_TYPES = dict(
     TRANSF=TabTransformerModel,
     AG_TEXT_NN=TextPredictorModel,
     AG_IMAGE_NN=ImagePredictorModel,
+    AG_AUTOMM=MultiModalPredictorModel,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
+
+    # interpretable models
+    IM_RULEFIT=RuleFitModel,
+    IM_GREEDYTREE=GreedyTreeModel,
+    IM_FIGS=FigsModel,
+    IM_HSTREE=HSTreeModel,
+    IM_BOOSTEDRULES=BoostedRulesModel,
     VW=VowpalWabbitModel
 )
+
 
 DEFAULT_MODEL_NAMES = {
     RFModel: 'RandomForest',
@@ -88,10 +106,18 @@ DEFAULT_MODEL_NAMES = {
     TabTransformerModel: 'Transformer',
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
+    MultiModalPredictorModel: 'MultiModalPredictor',
     FastTextModel: 'FastText',
     VowpalWabbitModel: 'VowpalWabbit',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
     SimpleWeightedEnsembleModel: 'WeightedEnsemble',
+
+    # Interpretable models
+    RuleFitModel: 'RuleFit',
+    GreedyTreeModel: 'GreedyTree',
+    FigsModel: 'Figs',
+    HSTreeModel: 'HierarchicalShrinkageTree',
+    BoostedRulesModel: 'BoostedRules',
 }
 
 
@@ -157,9 +183,9 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     if 'NN' in model_type_list:
-        # TODO: Remove in v0.5.0
+        # TODO: Remove in v0.6.0
         logger.log(30, '\tWARNING: "NN" model has been deprecated in v0.4.0 and renamed to "NN_MXNET". '
-                       'Starting in v0.5.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
+                       'Starting in v0.6.0, specifying "NN" or "NN_MXNET" will raise an exception. Consider instead specifying "NN_TORCH".')
     for model_type in model_type_list:
         if problem_type == QUANTILE:
             if model_type not in DEFAULT_QUANTILE_MODEL:
@@ -174,14 +200,14 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters,
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
         if model_type == 'NN':
-            # TODO: Remove in v0.5.0
+            # TODO: Remove in v0.6.0
             model_type = 'NN_MXNET'
         for model_cfg in models_of_type:
             if model_type in invalid_type_set:
                 logger.log(20, f"\tFound '{model_type}' model in hyperparameters, but '{model_type}' is present in `excluded_model_types` and will be removed.")
                 continue  # Don't include excluded models
             if isinstance(model_cfg, str):
-                if model_type == 'AG_TEXT_NN':
+                if model_type == 'AG_TEXT_NN' or model_type == 'AG_AUTOMM':
                     model_cfgs_to_process.append({})
                 else:
                     model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)

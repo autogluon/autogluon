@@ -1,0 +1,25 @@
+data:
+  image:
+    missing_value_strategy: "skip"  # How to deal with missing images. By default, we skip a sample with missing images. We also support choice "zero", i.e., using a zero image to replace a missing image.
+  text:
+  categorical:
+    minimum_cat_count: 100  # The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
+    maximum_num_cat: 20  # The maximum amount of categories that can be considered non-rare.
+    convert_to_text: True  # Whether to convert the feature to text.
+  numerical:
+    convert_to_text: False  # Whether to convert the feature to text.
+    scaler_with_mean: True  # Whether to normalize with mean.
+    scaler_with_std: True  # Whether to normalize with std.
+  label:
+    numerical_label_preprocessing: "standardscaler"  # The mode of label preprocessing for . Support "standardscaler" or "minmaxscaler" or "none" / None (means no transform).
+  pos_label:  # The name of binary classification's positive class. It's used in computing some metrics, e.g., roc_auc. If not provided, then use label_encoder.classes_[1],
+  mixup:
+    turn_on: False  # The total control of mixup.
+    mixup_alpha: 0.8  # Mixup alpha.
+    cutmix_alpha: 1.0  # Cutmix alpha.
+    cutmix_minmax:  # Cutmix min/max ratio, it will override cutmix alpha if set, a list/tuple with size two.
+    prob: 1.0  # The probability of conducting mixup/cutmix if enable.
+    switch_prob: 0.5  # The probability of switching mixup to cutmix if both enable.
+    mode: "batch"  # Perform mixup/cutmix on "batch" or "pair" or "elem".
+    turn_off_epoch: 5  # The epoch when the mixup will be turned off.
+    label_smoothing: 0.1  # Label smoothing.

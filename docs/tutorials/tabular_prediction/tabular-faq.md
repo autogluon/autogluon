@@ -9,8 +9,7 @@ See ["Maximizing predictive performance" in the Quick Start Tutorial](tabular-qu
 
 ### Can I run AutoGluon Tabular on Mac/Windows?
 
-Yes! The only functionality that may not work is hyperparameter tuning with the NN model (this should be resolved in the next MXNet update).
-
+Yes!
 
 ### Can I use GPUs for model training?
 
@@ -174,6 +173,9 @@ You can also limit the number of cores used by a specific model:
 # We use 1 core for CatBoost model, 4 cores for XGBoost model, and all cores for lightGBM model here.
 predictor = TabularPredictor(...).fit(..., hyperparameters= {'CAT': {'ag_args_fit': {'num_cpus': 1}}, 'XGB': {'ag_args_fit': {'num_cpus': 4}}, 'GBM': {}},)
 ```
+
+### My custom metric is raising `_pickle.PicklingError: Can't pickle` errors
+See ["Ensuring Metric is Serializable" in Custom Metric Tutorial](tabular-custom-metric.html#ensuring-metric-is-serializable).
 
 ### No space left error on SageMaker Notebook
 If you are using AutoGluon on SageMaker Notebook, it is likely that you will encounter such error: `OSError: [Errno 28] No space left on device`. This is because the default disk size of a SageMaker Notebook instance is 5 GiB regardless of the type. AutoGluon training on some large datasets could end up with artifacts that's larger than 5GiB.

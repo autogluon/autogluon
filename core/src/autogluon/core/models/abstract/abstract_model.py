@@ -7,7 +7,7 @@ import pickle
 import psutil
 import sys
 import time
-from typing import Union
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -370,10 +370,10 @@ class AbstractModel:
         error_if_no_features = self.params_aux.get('error_if_no_features', True)
         if error_if_no_features and not self.features:
             raise NoValidFeatures
-        # FIXME: Consider counting NaNs as unique values, if unique_counts == 2 (including NaN), then treat as boolean
+        # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         if self.params_aux.get('drop_unique', True):
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
-            unique_counts = X[self.features].nunique(axis=0)
+            unique_counts = X[self.features].nunique(axis=0, dropna=False)
             columns_to_drop = list(unique_counts[unique_counts < 2].index)
             features_to_drop_internal = columns_to_drop
             if not features_to_drop_internal:
@@ -381,6 +381,7 @@ class AbstractModel:
         else:
             features_to_drop_internal = None
         if features_to_drop_internal is not None:
+            logger.log(10, f'\tDropped {len(features_to_drop_internal)} of {len(self.features)} internal features: {features_to_drop_internal}')
             self._features_internal = [feature for feature in self.features if feature not in features_to_drop_internal]
             self._feature_metadata = self.feature_metadata.keep_features(self._features_internal)
             self._is_features_in_same_as_ex = False
@@ -573,6 +574,7 @@ class AbstractModel:
             raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
+        self.validate_fit_resources(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
         out = self._fit(**kwargs)
         if out is None:
@@ -1061,6 +1063,33 @@ class AbstractModel:
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
+
+    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', **kwargs):
+        """
+        Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
+        Raises an AssertionError if not sufficient.
+        """
+        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, silent=True)
+        self._validate_fit_resources(**resources)
+
+    def _validate_fit_resources(self, **resources):
+        res_min = self.get_minimum_resources()
+        for resource_name in res_min:
+            if resource_name not in resources:
+                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.')
+            elif res_min[resource_name] > resources[resource_name]:
+                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        """
+        Returns a dictionary of minimum resource requirements to fit the model.
+        Subclass should consider overriding this method if it requires more resources to train.
+        If a resource is not part of the output dictionary, it is considered unnecessary.
+        Valid keys: 'num_cpus', 'num_gpus'.
+        """
+        return {
+            'num_cpus': 1,
+        }
 
     def _estimate_memory_usage(self, X, **kwargs) -> int:
         """

@@ -13,7 +13,7 @@ from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExcee
 from autogluon.core.utils import try_import_catboost
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
-from .catboost_utils import construct_custom_catboost_metric
+from .catboost_utils import get_catboost_metric_from_ag_metric
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 
@@ -39,7 +39,7 @@ class CatBoostModel(AbstractModel):
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training by default
         if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
-            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric.needs_pred, self.problem_type))
+            self._set_default_param_value('eval_metric', get_catboost_metric_from_ag_metric(self.stopping_metric, self.problem_type))
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)

@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Dict, Optional
 import logging
 import os
 import pickle
@@ -230,6 +230,12 @@ class ImagePredictorModel(AbstractModel):
         from autogluon.vision import ImagePredictor
         num_gpus = ImagePredictor._get_num_gpus_available()
         return num_cpus, num_gpus
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        return {
+            'num_cpus': 1,
+            'num_gpus': 1,
+        }
 
     def _more_tags(self):
         # `can_refit_full=False` because ImagePredictor does not communicate how to train until the best epoch in refit_full.

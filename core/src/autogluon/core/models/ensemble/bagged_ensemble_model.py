@@ -398,8 +398,8 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             try:
                 try_import_ray()
-            except Exception:
-                warning_msg = 'Will use sequential fold fitting strategy because ray>=1.7.0,<1.8.0 is not installed.'
+            except Exception as e:
+                warning_msg = f'Will use sequential fold fitting strategy because import of ray failed. Reason: {str(e)}'
                 dup_filter.attach_filter_targets(warning_msg)
                 logger.warning(warning_msg)
                 fold_fitting_strategy = 'sequential_local'
@@ -471,8 +471,9 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
         models = []
 
+        num_folds = len(fold_fit_args_list)
         if num_folds_parallel == 'auto':
-            num_folds_parallel = len(fold_fit_args_list)
+            num_folds_parallel = num_folds
         fold_fitting_strategy_args = dict(
             model_base=model_base, model_base_kwargs=kwargs,
             bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
@@ -482,12 +483,12 @@ class BaggedEnsembleModel(AbstractModel):
         )
         # noinspection PyCallingNonCallable
         if fold_fitting_strategy == ParallelLocalFoldFittingStrategy:
+            fold_fitting_strategy_args['num_jobs'] = num_folds
             fold_fitting_strategy_args['num_folds_parallel'] = num_folds_parallel
         fold_fitting_strategy = fold_fitting_strategy(**fold_fitting_strategy_args)
 
-        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient(num_folds_parallel):
+        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():
             # If memory is not sufficient, fall back to sequential fold strategy
-            fold_fitting_strategy_args.pop('num_folds_parallel', None)
             fold_fitting_strategy: AbstractFoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
             logger.log(30, f'\tMemory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead. '
                            f'\tConsider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling predictor.fit')
@@ -987,6 +988,12 @@ class BaggedEnsembleModel(AbstractModel):
         self.models = models
         return memory_size
 
+    def validate_fit_resources(self, **kwargs):
+        self._get_model_base().validate_fit_resources(**kwargs)
+
+    def get_minimum_resources(self) -> Dict[str, int]:
+        return self._get_model_base().get_minimum_resources()
+
     def _validate_fit_memory_usage(self, **kwargs):
         # memory is checked downstream on the child model
         pass
@@ -1026,7 +1033,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         kwargs['feature_metadata'] = self.feature_metadata
         kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
-        self.model_base.set_contexts(self.path + 'hpo' + os.path.sep)
+        model_base = self._get_model_base()
+        model_base.set_contexts(self.path + 'hpo' + os.path.sep)
 
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
@@ -1056,7 +1064,7 @@ class BaggedEnsembleModel(AbstractModel):
         orig_time = scheduler_options[1]['time_out']
         if orig_time:
             scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
+        hpo_models, hpo_model_performances, hpo_results = model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
         scheduler_options[1]['time_out'] = orig_time
 
         bags = {}

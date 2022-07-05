@@ -39,3 +39,12 @@
 * Does AutoGluon support ARM/M1 Mac?
   
   AutoGluon does not officially support ARM/M1 Mac. For more information, refer to https://github.com/awslabs/autogluon/issues/1242
+
+* Why do the install instructions use `pip3` instead of `pip`?
+
+    When you type `pip` in the console, the system looks for an executable file with that name in the current folder and then in the folders specified in the system PATH variable.
+    If you have multiple Python installations and all of them are in your PATH, you cannot be sure which directory will be searched first.
+    Therefore, if you have Python 2 installed and it is earlier in your PATH, `pip` would refer to `pip2` rather than `pip3`.
+    By explicitly using `pip3`, we guard against this issue.
+    Further, if Python 4 releases, the install instructions for Python 3 versions of AutoGluon will continue to work even if `pip` begins referring to `pip4`.
+    For more information, refer to https://techwithtech.com/python-pip-vs-pip3/

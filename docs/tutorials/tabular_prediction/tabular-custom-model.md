@@ -380,3 +380,5 @@ predictor.leaderboard(test_data, silent=True)
 That's all it takes to add a custom model to AutoGluon. If you create a custom model, consider [submitting a PR](https://github.com/awslabs/autogluon/pulls) so that we can add it officially to AutoGluon!
 
 For more tutorials, refer to :ref:`sec_tabularquick` and :ref:`sec_tabularadvanced`.
+
+For a tutorial on advanced custom models, refer to :ref:`sec_tabularcustommodeladvanced`

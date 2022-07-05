@@ -1,9 +1,11 @@
 import os
 import warnings
+from typing import Union
 
-from ..automm import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.utils import parse_dotlist_conf
+from autogluon.multimodal.presets import get_basic_automm_config
 from .presets import get_text_preset
-from ..automm.utils import parse_dotlist_conf
 from .constants import PYTORCH, MXNET
 
 
@@ -67,7 +69,7 @@ class TextPredictor:
         """
         self.verbosity = verbosity
         if backend == PYTORCH:
-            predictor_cls = AutoMMPredictor
+            predictor_cls = MultiModalPredictor
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
             predictor_cls = MXTextPredictor
@@ -163,6 +165,7 @@ class TextPredictor:
             plot_results=None,
             holdout_frac=None,
             save_path=None,
+            teacher_predictor: Union[str, MultiModalPredictor] = None,
             seed=123):
         """
         Fit Transformer models to predict label column of a data table based on the other columns (which may contain text or numeric/categorical features).
@@ -215,6 +218,9 @@ class TextPredictor:
             Default value (if None) is selected based on the number of rows in the training data and whether hyperparameter-tuning is utilized.
         save_path : str, default = None
             The path for auto-saving the models' weights
+        teacher_predictor
+            The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
+            knowledge to a student predictor, i.e., the current predictor.
         seed : int, default = 0
             The random seed to use for this training run. If None, no seed will be specified and repeated runs will produce different results.
 
@@ -223,31 +229,37 @@ class TextPredictor:
         :class:`TextPredictor` object. Returns self.
         """
         if self._backend == PYTORCH:
-            if presets is None:
-                presets = "default"
             if self._predictor._config is None:
-                config, overrides = get_text_preset(presets)
+                if presets is None:
+                    presets = "default"
+                overrides = get_text_preset(preset=presets)
             else:
                 # Continue training setting
-                config, overrides = self._predictor._config, dict()
+                overrides = dict()
+
             if hyperparameters is not None:
                 hyperparameters = parse_dotlist_conf(hyperparameters)
                 overrides.update(hyperparameters)
+
             if num_gpus is not None:
                 overrides.update({"env.num_gpus": int(num_gpus)})
+
+            if isinstance(teacher_predictor, TextPredictor):
+                teacher_predictor = teacher_predictor._predictor
+
             self._predictor.fit(
                 train_data=train_data,
-                config=config,
                 tuning_data=tuning_data,
                 time_limit=time_limit,
                 hyperparameters=overrides,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
                 save_path=save_path,
+                teacher_predictor=teacher_predictor,
                 seed=seed,
             )
         else:
-            warnings.warn(f'MXNet backend will be removed deprecated in AutoGluon 0.5. '
+            warnings.warn(f'MXNet backend will be deprecated in AutoGluon 0.5. '
                           f'You may try to switch to use backend="{PYTORCH}".', DeprecationWarning, stacklevel=1)
             self._predictor.fit(
                 train_data=train_data,
@@ -358,7 +370,7 @@ class TextPredictor:
             as_pandas=as_pandas,
         )
 
-    def save(self, path):
+    def save(self, path, standalone=False):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -372,15 +384,19 @@ class TextPredictor:
 
         Parameters
         ----------
-        path, str
+        path: str
             The path to directory in which to save this Predictor.
+        standalone: bool, default = False
+            Whether to save the downloaded model for offline deployment. 
+            If `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
+            Also, see `MultiModalPredictor.save()` for more detials.
+            Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """
 
-        self._predictor.save(path=path)
+        self._predictor.save(path=path, standalone=standalone)
 
-    @classmethod
+    @staticmethod
     def load(
-            cls,
             path: str,
             verbosity: int = None,
             backend: str = PYTORCH,
@@ -404,17 +420,23 @@ class TextPredictor:
 
         """
         if backend == PYTORCH:
-            predictor = AutoMMPredictor.load(
+            _predictor = MultiModalPredictor.load(
                 path=path,
                 resume=resume,
             )
         elif backend == MXNET:
             from .mx_predictor import MXTextPredictor
-            predictor = MXTextPredictor.load(
+            _predictor = MXTextPredictor.load(
                 path=path,
                 verbosity=verbosity,
             )
         else:
             raise ValueError(f"Unknown backend: {backend}")
+
+        predictor = TextPredictor(
+            label=_predictor.label,
+        )
+        predictor._backend = backend
+        predictor._predictor = _predictor
 
         return predictor
