@@ -22,20 +22,20 @@ class FairPareto:
         self._classifier = classifier
 
     def fit(self,
-            test_data,
+            validation_data,
             protected_attribute,
             aggregatated_metrics):
         """Compute the Pareto frontier of protected group specific metrics for a classifier.
 
         Parameters
         ----------
-        test_data: pd.DataFrame
-            test data (what would be used in predict())
+        validation_data: pd.DataFrame
+            validation data (what would be used in predict())
 
         protected_attribute: str or pd.Series
             the protected attribute (categorical) either as
-            - a column name in test_data (str)
-            - or the column variable with same index as test_data (pd.Series)
+            - a column name in validation_data (str)
+            - or the column variable with same index as validation_data (pd.Series)
 
         aggregated_metrics: list of tuples
             list of (aggregation, metric) pairs
@@ -56,6 +56,7 @@ class FairPareto:
     def plot(self):
         """Plot the Pareto frontier for aggregation, metric pairs
         """
+        pass
 
     def select(self, model_id):
         """Select a model by model_id
@@ -64,3 +65,4 @@ class FairPareto:
         -------
         Classifier
         """
+        pass
