@@ -666,7 +666,7 @@ class AbstractTrainer:
         """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
         for model in model_set:
             y_pred_proba = self.get_model_attribute(model, attribute='cached_y_pred_proba_val', default=None)
-            if isinstance(y_pred_proba, bool) and y_pred_proba:
+            if isinstance(y_pred_proba, bool):
                 if y_pred_proba:
                     try:
                         y_pred_proba = self._load_model_y_pred_proba_val(model)
