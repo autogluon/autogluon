@@ -2052,7 +2052,7 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 1 and non-bagged
-    def _get_feature_importance_raw(self, X, y, model: str, eval_metric=None, **kwargs) -> pd.DataFrame:
+    def _get_feature_importance_raw(self, X, y, model, eval_metric=None, **kwargs) -> pd.DataFrame:
         if eval_metric is None:
             eval_metric = self.eval_metric
         if model is None:
@@ -2061,6 +2061,7 @@ class AbstractTrainer:
             predict_func = self.predict
         else:
             predict_func = self.predict_proba
+        model: AbstractModel = self.load_model(model)
         predict_func_kwargs = dict(model=model)
         return compute_permutation_feature_importance(
             X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, quantile_levels=self.quantile_levels, **kwargs
