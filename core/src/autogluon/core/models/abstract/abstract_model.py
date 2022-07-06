@@ -996,7 +996,21 @@ class AbstractModel:
         scheduler.run()
         scheduler.join_jobs()
 
-        return self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
+        hpo_results = self._get_hpo_results(scheduler=scheduler, scheduler_params=scheduler_params, time_start=time_start)
+
+        # cleanup artifacts
+        for data_file in [train_path, val_path]:
+            try:
+                os.remove(data_file)
+            except FileNotFoundError:
+                pass
+
+        return hpo_results
+
+    @property
+    def _path_v2(self) -> str:
+        """Path as a property, replace old path logic with this eventually"""
+        return self.path_root + self.path_suffix
 
     def _get_hpo_results(self, scheduler, scheduler_params: dict, time_start):
         # Store results / models from this HPO run:
