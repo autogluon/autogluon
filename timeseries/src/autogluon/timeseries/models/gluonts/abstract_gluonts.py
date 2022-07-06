@@ -78,9 +78,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         Name of the model. Also, name of subdirectory inside path where model will be saved.
     eval_metric: str
         objective function the model intends to optimize, will use mean_wQuantileLoss by default.
-    early_stopping_patience: int
-        When validation loss is not improved for `early_stopping_patience` epochs, training will
-        be early stopped. By setting it to None, one will disable early stopping.
     hyperparameters:
         various hyperparameters that will be used by model (can be search spaces instead of
         fixed values). See *Other Parameters* in each inheriting model's documentation for
@@ -97,7 +94,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         path: Optional[str] = None,
         name: Optional[str] = None,
         eval_metric: str = None,
-        early_stopping_patience: Optional[int] = None,
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
@@ -114,7 +110,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
-        self.early_stopping_patience = early_stopping_patience
         self.callbacks = []
 
     def save(self, path: str = None, **kwargs) -> str:
@@ -217,8 +212,10 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._check_fit_params()
 
         callbacks = [TimeLimitCallback(time_limit)]
-        if self.early_stopping_patience:
-            callbacks.append(GluonTSEarlyStoppingCallback(self.early_stopping_patience))
+
+        early_stopping_patience = self._get_model_params().get("early_stopping_patience", None)
+        if early_stopping_patience:
+            callbacks.append(GluonTSEarlyStoppingCallback(early_stopping_patience))
 
         # update auxiliary parameters
         self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)

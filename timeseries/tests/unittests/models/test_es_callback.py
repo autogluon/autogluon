@@ -8,6 +8,7 @@ from autogluon.timeseries.models.gluonts.callback import (
 )
 
 from ..common import DUMMY_TS_DATAFRAME
+from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 
 
 @pytest.mark.parametrize(
@@ -60,26 +61,56 @@ def test_adaptive_early_stopping_update_patience(best_round, patience):
     assert es.es._update_patience(best_round) == patience
 
 
+@pytest.mark.parametrize("model_class", GLUONTS_TESTABLE_MODELS)
+def test_model_save_load_with_adaptive_es(model_class, temp_model_path):
+    model = model_class(
+        path=temp_model_path,
+        freq="H",
+        quantile_levels=[0.1, 0.9],
+        hyperparameters={
+            "epochs": 1,
+        },
+    )
+    model.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+    )
+
+    model.callbacks.append(GluonTSAdaptiveEarlyStoppingCallback())
+    assert len(model.callbacks) == 2
+    model.save()
+
+    loaded_model = model.__class__.load(path=model.path)
+    assert len(loaded_model.callbacks) == 2
+    assert isinstance(loaded_model.callbacks[1], GluonTSAdaptiveEarlyStoppingCallback)
+    assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
+    assert loaded_model.gts_predictor == model.gts_predictor
+
+
 def test_early_stopping_patience_passed_to_model(temp_model_path):
     patience = 5
-    predictor = TimeSeriesPredictor(path=temp_model_path, early_stopping_patience=patience)
-    assert predictor.early_stopping_patience == patience
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+
+    hps = {
+        "SimpleFeedForward": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+        "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+        "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5, "early_stopping_patience": patience},
+    }
 
     # call fit to create trainer
-    predictor.fit(DUMMY_TS_DATAFRAME, time_limit=1)
-
+    predictor.fit(DUMMY_TS_DATAFRAME, time_limit=1, hyperparameters=hps)
     for m_name in predictor._trainer.get_model_names():
         m = predictor._trainer.load_model(m_name)
         if isinstance(m, AbstractGluonTSModel):
-            assert m.early_stopping_patience == patience
             assert len(m.callbacks) == 2
 
-    # setting early_stopping_patience to None to disable early stopping
-    predictor = TimeSeriesPredictor(path=temp_model_path, early_stopping_patience=None)
+    # without passing early_stopping_patience will not use early stopping callback
+    hps["SimpleFeedForward"].pop("early_stopping_patience")
+    hps["MQCNN"].pop("early_stopping_patience")
+    hps["DeepAR"].pop("early_stopping_patience")
+    predictor = TimeSeriesPredictor(path=temp_model_path, hyperparameters=hps)
     predictor.fit(DUMMY_TS_DATAFRAME, time_limit=1)
 
     for m_name in predictor._trainer.get_model_names():
         m = predictor._trainer.load_model(m_name)
         if isinstance(m, AbstractGluonTSModel):
-            assert m.early_stopping_patience is None
             assert len(m.callbacks) == 1

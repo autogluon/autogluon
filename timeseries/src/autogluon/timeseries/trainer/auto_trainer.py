@@ -13,7 +13,6 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         eval_metric = kwargs.pop("eval_metric", self.eval_metric)
         quantile_levels = kwargs.pop("quantile_levels", self.quantile_levels)
         hyperparameter_tune = kwargs.get("hyperparameter_tune", False)
-        early_stopping_patience = kwargs.get("early_stopping_patience", self.early_stopping_patience)
         return get_preset_models(
             path=path,
             eval_metric=eval_metric,
@@ -22,7 +21,6 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
             quantiles=quantile_levels,
-            early_stopping_patience=early_stopping_patience,
             invalid_model_names=self._get_banned_model_names(),
             target=self.target,
         )
