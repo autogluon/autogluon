@@ -9,6 +9,7 @@ IMAGE_PATH = "image_path"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
+ZERO_SHOT = "zero_shot"
 
 # Input keys
 IMAGE = "image"

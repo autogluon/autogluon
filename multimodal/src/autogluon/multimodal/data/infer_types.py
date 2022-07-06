@@ -189,26 +189,23 @@ def check_if_nlp_feature(X: pd.Series) -> bool:
     return True
 
 
-def infer_column_problem_types(
-    train_df: pd.DataFrame,
-    valid_df: pd.DataFrame,
-    label_columns: Union[str, List[str]],
-    problem_type: Optional[str] = None,
+def infer_column_types(
+    data: pd.DataFrame,
+    valid_data: Optional[pd.DataFrame] = None,
+    label_columns: Union[str, List[str]] = None,
     provided_column_types: Optional[Dict] = None,
-) -> Tuple[collections.OrderedDict, str, int]:
+) -> Dict:
     """
-    Infer the column types of a multimodal pd.DataFrame and the problem type.
+    Infer the column types of a multimodal pd.DataFrame.
 
     Parameters
     ----------
-    train_df
+    data
         The multimodal pd.DataFrame for training.
-    valid_df
+    valid_data
         The multimodal pd.DataFrame for validation.
     label_columns
         The label column names.
-    problem_type
-        Type of problem.
     provided_column_types
         Additional dictionary that you can use to specify the columns types that you know.
         {'col_name': TYPE, ...}
@@ -218,88 +215,117 @@ def infer_column_problem_types(
     column_types
         A dictionary containing the mappings from column names to their modality types.
         If the column does not contain any useful information, we will set its column type NULL.
-    problem_type
-        The inferred problem type.
-    output_shape
-        Shape of output.
     """
+    if label_columns is None:
+        label_columns = []
     if isinstance(label_columns, str):
         label_columns = [label_columns]
-    elif isinstance(label_columns, (list, tuple)):
-        pass
-    else:
-        raise NotImplementedError(f"label_columns is not supported. label_columns={label_columns}.")
-    label_set = set(label_columns)
-    assert len(label_set) == 1, "Currently, only a single label column is supported."
-    column_types = collections.OrderedDict()
-    # Process all feature columns
 
-    for col_name in train_df.columns:
-        is_label = col_name in label_set
+    column_types = collections.OrderedDict()
+
+    if valid_data is None:
+        valid_data = data
+        is_training = False
+    else:
+        is_training = True
+
+    for col_name in data.columns:
         if provided_column_types is not None and col_name in provided_column_types:
             column_types[col_name] = provided_column_types[col_name]
             continue
-        if is_label:
-            num_train_missing = train_df[col_name].isnull().sum()
-            num_valid_missing = valid_df[col_name].isnull().sum()
-            if num_train_missing > 0:
-                raise ValueError(
-                    f"Label column '{col_name}' contains missing values in the "
-                    "training data frame. You may want to filter your data because "
-                    "missing label is currently not supported."
-                )
-            if num_valid_missing > 0:
-                raise ValueError(
-                    f"Label column '{col_name}' contains missing values in the "
-                    "validation data frame. You may want to filter your data because "
-                    "missing label is currently not supported."
-                )
-            if problem_type == MULTICLASS or problem_type == BINARY:
-                column_types[col_name] = CATEGORICAL
-                continue
-            elif problem_type == REGRESSION:
-                column_types[col_name] = NUMERICAL
-                continue
         # Identify columns that provide no information
-        idx = train_df[col_name].first_valid_index()
-        if idx is None or len(train_df[col_name].unique()) == 1:
+        idx = data[col_name].first_valid_index()
+        if idx is None:
             # No valid index, thus, we will just ignore the column
-            if not is_label:
-                column_types[col_name] = NULL
-            else:
-                warnings.warn(
-                    f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
-                )
-        # Use the following way for type inference
-        # 1) Infer categorical column
-        # 2) Infer numerical column
-        # 3) Infer image-path column
-        # 4) Infer text column
-        # 4) All the other columns are treated as categorical
-        if is_categorical_column(train_df[col_name], valid_df[col_name], is_label=is_label):
-            column_types[col_name] = CATEGORICAL
-        elif is_numerical_column(train_df[col_name], valid_df[col_name]):
-            column_types[col_name] = NUMERICAL
-        elif is_imagepath_column(train_df[col_name], col_name):
+            column_types[col_name] = NULL
+            continue
+        if len(data[col_name].unique()) == 1 and is_training:
+            column_types[col_name] = NULL
+            continue
+
+        if is_imagepath_column(data[col_name], col_name):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
-        elif check_if_nlp_feature(train_df[col_name]):
-            column_types[col_name] = TEXT
-        else:
+        elif is_categorical_column(data[col_name], valid_data[col_name], is_label=col_name in label_columns):  # Infer categorical column
             column_types[col_name] = CATEGORICAL
-    problem_type, output_shape = infer_problem_type_output_shape(
-        column_types=column_types,
-        label_column=label_columns[0],
-        data_df=train_df,
-        provided_problem_type=problem_type,
-    )
-    return column_types, problem_type, output_shape
+        elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
+            column_types[col_name] = NUMERICAL
+        elif check_if_nlp_feature(data[col_name]):  # Infer text column
+            column_types[col_name] = TEXT
+        else:  # All the other columns are treated as categorical
+            column_types[col_name] = CATEGORICAL
+
+    return column_types
+
+
+def check_missing_values(
+        data: pd.DataFrame,
+        column_name: str,
+        split: Optional[str] = "",
+):
+    num_missing_values = data[column_name].isnull().sum()
+    if num_missing_values > 0:
+        raise ValueError(
+            f"Label column '{column_name}' contains missing values in the "
+            f"{split} dataframe. You may want to filter your data because "
+            "missing label is currently not supported."
+        )
+
+
+def infer_label_column_type_by_problem_type(
+    column_types: Dict,
+    label_columns: Union[str, List[str]],
+    problem_type: str,
+    data: Optional[pd.DataFrame] = None,
+    valid_data: Optional[pd.DataFrame] = None,
+):
+    """
+    Infer the label column types based on problem type.
+
+    Parameters
+    ----------
+    column_types
+        Types of columns in a pd.DataFrame.
+    label_columns
+        The label columns in a pd.DataFrame.
+    problem_type
+        Type of problem.
+    data
+        A pd.DataFrame.
+    valid_data
+        A validation pd.DataFrame.
+
+    Returns
+    -------
+    Column types with the label columns' types inferred from the problem type.
+    """
+    if isinstance(label_columns, str):
+        label_columns = [label_columns]
+
+    for col_name in label_columns:
+        # Make sure the provided label columns are in the dataframe.
+        assert col_name in column_types, \
+            f"Column {col_name} is not in {column_types.keys()}. Make sure calling `infer_column_types()` first."
+        if data is not None:
+            check_missing_values(data=data, column_name=col_name, split="training")
+        if valid_data is not None:
+            check_missing_values(data=valid_data, column_name=col_name, split="validation")
+        if col_name in column_types and column_types[col_name] == NULL:
+            warnings.warn(
+                f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
+            )
+        if problem_type == MULTICLASS or problem_type == BINARY:
+            column_types[col_name] = CATEGORICAL
+        elif problem_type == REGRESSION:
+            column_types[col_name] = NUMERICAL
+
+    return column_types
 
 
 def infer_problem_type_output_shape(
-    column_types: dict,
     label_column: str,
-    data_df: pd.DataFrame,
-    provided_problem_type=None,
+    column_types: Optional[Dict] = None,
+    data: Optional[pd.DataFrame] = None,
+    provided_problem_type: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Infer the problem type and output shape based on the label column type and training data.
@@ -312,7 +338,7 @@ def infer_problem_type_output_shape(
         Types of columns in a multimodal pd.DataFrame.
     label_column
         The label column in a multimodal pd.DataFrame.
-    data_df
+    data
         The multimodal pd.DataFrame for training.
     provided_problem_type
         The provided problem type.
@@ -326,7 +352,7 @@ def infer_problem_type_output_shape(
     """
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
-            class_num = len(data_df[label_column].unique())
+            class_num = len(data[label_column].unique())
             err_msg = (
                 f"Provided problem type is '{provided_problem_type}' while the number of "
                 f"unique values in the label column is {class_num}."
@@ -339,14 +365,16 @@ def infer_problem_type_output_shape(
         if provided_problem_type == BINARY:
             return BINARY, 2
         elif provided_problem_type == MULTICLASS:
-            class_num = len(data_df[label_column].value_counts())
+            class_num = len(data[label_column].value_counts())
             return MULTICLASS, class_num
-        else:
+        elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
+        else:
+            raise ValueError(f"Problem type {provided_problem_type} doesn't have a valid output shape for training.")
 
     else:
         if column_types[label_column] == CATEGORICAL:
-            class_num = len(data_df[label_column].unique())
+            class_num = len(data[label_column].unique())
             if class_num == 2:
                 return BINARY, 2
             else:

@@ -192,8 +192,10 @@ class BaseDataModule(LightningDataModule):
         A "Dict" collator wrapping other collators.
         """
         collate_fn = {}
-        for per_data_processors_group in self.data_processors:
+        for per_preprocessor, per_data_processors_group in zip(self.df_preprocessor, self.data_processors):
             for per_modality in per_data_processors_group:
-                for per_model_processor in per_data_processors_group[per_modality]:
-                    collate_fn.update(per_model_processor.collate_fn())
+                per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
+                if per_modality_column_names:
+                    for per_model_processor in per_data_processors_group[per_modality]:
+                        collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
         return Dict(collate_fn)

@@ -147,7 +147,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             column_name_prefix=self.text_column_prefix,
             features=outputs.last_hidden_state,
             valid_lengths=text_valid_length,
-            has_cls_feature=True,
+            cls_feature=cls_features,
         )
         ret[COLUMN_FEATURES][FEATURES].update(column_features)
         ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)

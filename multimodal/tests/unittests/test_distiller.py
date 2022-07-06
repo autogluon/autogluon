@@ -2,23 +2,7 @@ import os
 import shutil
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    DISTILLER,
-    BINARY,
-    MULTICLASS,
-    UNIFORM_SOUP,
-    GREEDY_SOUP,
-    BEST,
-    NORM_FIT,
-    BIT_FIT,
-    LORA,
-    LORA_BIAS,
-    LORA_NORM,
-)
+
 from datasets import (
     PetFinderDataset,
     HatefulMeMesDataset,

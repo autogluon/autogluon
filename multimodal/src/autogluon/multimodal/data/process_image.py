@@ -41,7 +41,6 @@ class ImageProcessor:
         prefix: str,
         train_transform_types: List[str],
         val_transform_types: List[str],
-        image_column_names: List[str],
         checkpoint_name: Optional[str] = None,
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
@@ -58,8 +57,6 @@ class ImageProcessor:
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
-        image_column_names
-            Image column names in a multimodal pd.DataFrame.
         checkpoint_name
             Name of a pre-trained checkpoint, which can be from either timm or huggingface.
             It is required to extract some default hyper-parameters.
@@ -95,7 +92,7 @@ class ImageProcessor:
         self.val_transform_types = val_transform_types
         logger.debug(f"image training transform type: {train_transform_types}")
         logger.debug(f"image validation transform type: {val_transform_types}")
-        self.image_column_names = image_column_names
+
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
         self.size = None
@@ -143,7 +140,7 @@ class ImageProcessor:
     def image_column_prefix(self):
         return f"{self.image_key}_{COLUMN}"
 
-    def collate_fn(self) -> Dict:
+    def collate_fn(self, image_column_names: Optional[List] = None) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
         vary from sample to sample. Samples with less images will be padded zeros.
@@ -156,7 +153,8 @@ class ImageProcessor:
         """
         fn = {}
         if self.requires_column_info:
-            for col_name in self.image_column_names:
+            assert image_column_names, "Empty image column names."
+            for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
         fn.update(
@@ -375,7 +373,7 @@ class ImageProcessor:
 
         ret.update(
             {
-                self.image_key: torch.stack(images + zero_images, dim=0),
+                self.image_key: torch.tensor([]) if len(images + zero_images) == 0 else torch.stack(images + zero_images, dim=0),
                 self.image_valid_num_key: len(images),
             }
         )

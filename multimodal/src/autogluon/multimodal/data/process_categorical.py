@@ -15,7 +15,6 @@ class CategoricalProcessor:
     def __init__(
         self,
         prefix: str,
-        categorical_column_names: List[str],
         requires_column_info: bool = False,
     ):
         """
@@ -23,13 +22,10 @@ class CategoricalProcessor:
         ----------
         prefix
             The prefix connecting a processor to its corresponding model.
-        categorical_column_names
-            Categorical column names in a multimodal pd.DataFrame.
         requires_column_info
             Whether to require feature column information in dataloader.
         """
         self.prefix = prefix
-        self.categorical_column_names = categorical_column_names
         self.requires_column_info = requires_column_info
 
     @property
@@ -40,7 +36,7 @@ class CategoricalProcessor:
     def categorical_column_prefix(self):
         return f"{self.categorical_key}_{COLUMN}"
 
-    def collate_fn(self) -> Dict:
+    def collate_fn(self, categorical_column_names: Optional[List] = None) -> Dict:
         """
         Collate individual samples into a batch. It stacks categorical features of
         each column independently. This function will be used when creating Pytorch DataLoader.
@@ -50,12 +46,12 @@ class CategoricalProcessor:
         A dictionary containing one model's collator function for categorical features.
         """
         fn = {}
-
         if self.requires_column_info:
-            for col_name in self.categorical_column_names:
+            assert categorical_column_names, "Empty categorical column names."
+            for col_name in categorical_column_names:
                 fn[f"{self.categorical_column_prefix}_{col_name}"] = Stack()
 
-        fn[self.categorical_key] = Tuple([Stack() for _ in range(len(self.categorical_column_names))])
+        fn[self.categorical_key] = Tuple([Stack() for _ in range(len(categorical_column_names))])
 
         return fn
 
