@@ -243,14 +243,14 @@ def infer_column_types(
             column_types[col_name] = NULL
             continue
 
-        if is_imagepath_column(data[col_name], col_name):  # Infer image-path column
-            column_types[col_name] = IMAGE_PATH
-        elif is_categorical_column(
+        if is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
+        elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
+            column_types[col_name] = IMAGE_PATH
         elif check_if_nlp_feature(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
