@@ -345,8 +345,16 @@ def _add_scorer_to_metric_dict(metric_dict, scorer):
         metric_dict[alias] = scorer
 
 
-def make_scorer(name, score_func, optimum=1, greater_is_better=True,
-                needs_proba=False, needs_threshold=False, needs_quantile=False, **kwargs) -> Scorer:
+def make_scorer(name,
+                score_func,
+                *,
+                optimum=1,
+                greater_is_better=True,
+                needs_proba=False,
+                needs_threshold=False,
+                needs_quantile=False,
+                metric_kwargs: dict = None,
+                **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
     Factory inspired by scikit-learn which wraps scikit-learn scoring functions
@@ -379,6 +387,10 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         Whether score_func is based on quantile predictions.
         This only works for quantile regression.
 
+    metric_kwargs : dict
+        Additional parameters to be passed to score_func, merged with kwargs if both are present.
+        metric_kwargs keys will override kwargs keys if keys are shared between them.
+
     **kwargs : additional arguments
         Additional parameters to be passed to score_func.
 
@@ -396,6 +408,8 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         cls = _QuantileScorer
     else:
         cls = _PredictScorer
+    if metric_kwargs is not None:
+        kwargs.update(metric_kwargs)
     return cls(
         name=name,
         score_func=score_func,
