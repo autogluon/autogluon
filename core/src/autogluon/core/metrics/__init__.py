@@ -47,7 +47,7 @@ class Scorer(object, metaclass=ABCMeta):
         return self._sign * score
 
     @abstractmethod
-    def __call__(self, y_true, y_pred, sample_weight=None):
+    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs):
         pass
 
     def __repr__(self):
@@ -80,7 +80,7 @@ class Scorer(object, metaclass=ABCMeta):
 
 
 class _PredictScorer(Scorer):
-    def __call__(self, y_true, y_pred, sample_weight=None):
+    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs):
         """Evaluate predicted target values for X relative to y_true.
 
         Parameters
@@ -93,6 +93,9 @@ class _PredictScorer(Scorer):
 
         sample_weight : array-like, optional (default=None)
             Sample weights.
+
+        **kwargs : dict
+            Keyword arguments passed to the inner metric __call__ method.
 
         Returns
         -------
@@ -122,10 +125,12 @@ class _PredictScorer(Scorer):
         if sample_weight is not None:
             return self._sign * self._score_func(y_true, y_pred,
                                                  sample_weight=sample_weight,
-                                                 **self._kwargs)
+                                                 **self._kwargs,
+                                                 **kwargs)
         else:
             return self._sign * self._score_func(y_true, y_pred,
-                                                 **self._kwargs)
+                                                 **self._kwargs,
+                                                 **kwargs)
 
     @property
     def needs_pred(self):
@@ -145,7 +150,7 @@ class _PredictScorer(Scorer):
 
 
 class _ProbaScorer(Scorer):
-    def __call__(self, y_true, y_pred, sample_weight=None):
+    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs):
         """Evaluate predicted probabilities for X relative to y_true.
         Parameters
         ----------
@@ -159,6 +164,9 @@ class _ProbaScorer(Scorer):
         sample_weight : array-like, optional (default=None)
             Sample weights.
 
+        **kwargs : dict
+            Keyword arguments passed to the inner metric __call__ method.
+
         Returns
         -------
         score : float
@@ -167,9 +175,12 @@ class _ProbaScorer(Scorer):
         if sample_weight is not None:
             return self._sign * self._score_func(y_true, y_pred,
                                                  sample_weight=sample_weight,
-                                                 **self._kwargs)
+                                                 **self._kwargs,
+                                                 **kwargs)
         else:
-            return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+            return self._sign * self._score_func(y_true, y_pred,
+                                                 **self._kwargs,
+                                                 **kwargs)
 
     @property
     def needs_pred(self):
@@ -189,7 +200,7 @@ class _ProbaScorer(Scorer):
 
 
 class _ThresholdScorer(Scorer):
-    def __call__(self, y_true, y_pred, sample_weight=None):
+    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs):
         """Evaluate decision function output for X relative to y_true.
 
         Parameters
@@ -203,6 +214,9 @@ class _ThresholdScorer(Scorer):
 
         sample_weight : array-like, optional (default=None)
             Sample weights.
+
+        **kwargs : dict
+            Keyword arguments passed to the inner metric __call__ method.
 
         Returns
         -------
@@ -226,9 +240,12 @@ class _ThresholdScorer(Scorer):
         if sample_weight is not None:
             return self._sign * self._score_func(y_true, y_pred,
                                                  sample_weight=sample_weight,
-                                                 **self._kwargs)
+                                                 **self._kwargs,
+                                                 **kwargs)
         else:
-            return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+            return self._sign * self._score_func(y_true, y_pred,
+                                                 **self._kwargs,
+                                                 **kwargs)
 
     @property
     def needs_pred(self):
@@ -248,7 +265,7 @@ class _ThresholdScorer(Scorer):
 
 
 class _QuantileScorer(Scorer):
-    def __call__(self, y_true, y_pred, quantile_levels, sample_weight=None):
+    def __call__(self, y_true, y_pred, quantile_levels, sample_weight=None, **kwargs):
         """Evaluate predicted quantile target values for X relative to y_true.
 
         Parameters
@@ -264,6 +281,9 @@ class _QuantileScorer(Scorer):
 
         sample_weight : array-like, optional (default=None)
             Sample weights.
+
+        **kwargs : dict
+            Keyword arguments passed to the inner metric __call__ method.
 
         Returns
         -------
@@ -288,11 +308,13 @@ class _QuantileScorer(Scorer):
             return self._sign * self._score_func(y_true, y_pred,
                                                  quantile_levels,
                                                  sample_weight=sample_weight,
-                                                 **self._kwargs)
+                                                 **self._kwargs,
+                                                 **kwargs)
         else:
             return self._sign * self._score_func(y_true, y_pred,
                                                  quantile_levels,
-                                                 **self._kwargs)
+                                                 **self._kwargs,
+                                                 **kwargs)
 
     @property
     def needs_pred(self):
@@ -374,7 +396,13 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         cls = _QuantileScorer
     else:
         cls = _PredictScorer
-    return cls(name, score_func, optimum, sign, kwargs)
+    return cls(
+        name=name,
+        score_func=score_func,
+        optimum=optimum,
+        sign=sign,
+        kwargs=kwargs,
+    )
 
 
 # Standard regression scores
