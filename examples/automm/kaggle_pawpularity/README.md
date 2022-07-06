@@ -1,16 +1,16 @@
 ﻿# How to obtain top 1% in Petfinder Pawpularity with AutoMM
 
-Take [Petfinder Pawpularity competition](https://www.kaggle.com/competitions/petfinder-pawpularity-score/overview) as an example showing how to use AutoMMPredictor to complete a competition.
+Take [Petfinder Pawpularity competition](https://www.kaggle.com/competitions/petfinder-pawpularity-score/overview) as an example showing how to use MultiModalPredictor to complete a competition.
 
-## 1. AutoMMPredictor for Training
+## 1. MultiModalPredictor for Training
 
-AutoMMPredictor is a tool that can handle diverse data including images, text, numerical data and categorical data. It can automatically identify data types and fuse the pretrained DL backbones. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
+MultiModalPredictor is a tool that can handle diverse data including images, text, numerical data and categorical data. It can automatically identify data types and fuse the pretrained DL backbones. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
 
-### 1.1 Build the AutoMMPredictor
+### 1.1 Build the MultiModalPredictor
 
 You can build the predictor as follow.
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
 	    label="Pawpularity", 
 	    problem_type="regression", 
 	    eval_metric="rmse", 
@@ -21,12 +21,12 @@ You can build the predictor as follow.
  - `label` indicates the target value in training data.
  - `problem_type` indicates the type of the problem. That can be "Multiclass", "Binary" or "Regression".
  - `eval_metric` indicates the evaluation index of the model which is always the evaluation of the competition.
- - `path` indicates the path to save AutoMMPredictor models.
+ - `path` indicates the path to save MultiModalPredictor models.
  - `verbosity` controls how much information is printed.
 
-### 1.2 Train the AutoMMPredictor
+### 1.2 Train the MultiModalPredictor
 
-Then, you can train the AutoMMPredictor with `.fit()`.
+Then, you can train the MultiModalPredictor with `.fit()`.
 
     predictor.fit(  
 	    train_data=training_df,
@@ -61,7 +61,7 @@ Then, you can train the AutoMMPredictor with `.fit()`.
  - `seed` determines the random seed.
 
 ### 1.3 Save Standalone Model
-In AutoMMPredictor, some pre-trained models will be downloaded during training. These models also need to be saved for use in predicting after submission. You can specify the predictor to save a “standalone” model that can be loaded without internet access.
+In MultiModalPredictor, some pre-trained models will be downloaded during training. These models also need to be saved for use in predicting after submission. You can specify the predictor to save a “standalone” model that can be loaded without internet access.
 
     predictor.save(path=save_standalone_path, standalone=True)
 
@@ -102,8 +102,8 @@ Using the saved standalone model can avoid downloading models in submission. You
 
 ## 3. Prediction in Kaggle Competitions
 
-Next, let's upload the predictor to Kaggle and use it to generate predictions on the test set. You should upload the AutoMMPredictor standalone save files as a dataset to Kaggle and put it in the input data sources of your prediction code. 
-You can load the AutoMMPredictor using the code following.
+Next, let's upload the predictor to Kaggle and use it to generate predictions on the test set. You should upload the MultiModalPredictor standalone save files as a dataset to Kaggle and put it in the input data sources of your prediction code. 
+You can load the MultiModalPredictor using the code following.
 
     pretrained_model = predictor.load(path=save_standalone_path)
 
@@ -138,7 +138,7 @@ It is obvious that the model using fusion usually has better results.
 | vit_large_patch16_384 | 17.3740541397068 | 17.5162709909151 | 
 | beit_large_patch16_384 | 17.530005178868 | 17.6423355406175 |
 
-With AutoMMPredictor, You can easily use fusion through modifying hyper parameters instead of changing codes.
+With MultiModalPredictor, You can easily use fusion through modifying hyper parameters instead of changing codes.
 
 The results of model ensemble are as follows.
 

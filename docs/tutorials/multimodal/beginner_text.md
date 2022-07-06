@@ -1,7 +1,7 @@
 # AutoMM for Text - Quick Start
 :label:`sec_automm_textprediction_beginner`
 
-`AutoMMPredictor` can solve problems where the data are either image, text, numerical values, or categorical features. 
+`MultiModalPredictor` can solve problems where the data are either image, text, numerical values, or categorical features. 
 To get started, we first demonstrate how to use it to solve problems that only contain text. We pick two classical NLP problems for the purpose of demonstration:
 
 - [Sentiment Analysis](https://en.wikipedia.org/wiki/Sentiment_analysis)
@@ -51,9 +51,9 @@ To achieve reasonable performance in your applications, you are recommended to s
 
 
 ```{.python .input}
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 
-predictor = AutoMMPredictor(label='label', eval_metric='acc', path='./automm_sst')
+predictor = MultiModalPredictor(label='label', eval_metric='acc', path='./automm_sst')
 predictor.fit(train_data, time_limit=60)
 ```
 
@@ -114,7 +114,7 @@ The trained predictor is automatically saved at the end of `fit()`, and you can 
 
 
 ```{.python .input}
-loaded_predictor = AutoMMPredictor.load('automm_sst')
+loaded_predictor = MultiModalPredictor.load('automm_sst')
 loaded_predictor.predict_proba({'sentence': [sentence1, sentence2]})
 ```
 
@@ -123,7 +123,7 @@ You can also save the predictor to any location by calling `.save()`.
 
 ```{.python .input}
 loaded_predictor.save('my_saved_dir')
-loaded_predictor2 = AutoMMPredictor.load('my_saved_dir')
+loaded_predictor2 = MultiModalPredictor.load('my_saved_dir')
 loaded_predictor2.predict_proba({'sentence': [sentence1, sentence2]})
 ```
 
@@ -157,7 +157,7 @@ You can also load a predictor and call `.fit()` again to continue training the s
 
 
 ```{.python .input}
-new_predictor = AutoMMPredictor.load('automm_sst')
+new_predictor = MultiModalPredictor.load('automm_sst')
 new_predictor.fit(train_data, time_limit=30, save_path='automm_sst_continue_train')
 test_score = new_predictor.evaluate(test_data, metrics=['acc', 'f1'])
 print(test_score)
@@ -165,7 +165,7 @@ print(test_score)
 
 ## Sentence Similarity Task
 
-Next, let's use AutoMMPredictor to train a model for evaluating how semantically similar two sentences are.
+Next, let's use MultiModalPredictor to train a model for evaluating how semantically similar two sentences are.
 We use the [Semantic Textual Similarity Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset for illustration.
 
 
@@ -186,7 +186,7 @@ Let's train a regression model to predict these scores. Note that we only need t
 
 
 ```{.python .input}
-predictor_sts = AutoMMPredictor(label='score', path='./automm_sts')
+predictor_sts = MultiModalPredictor(label='score', path='./automm_sts')
 predictor_sts.fit(sts_train_data, time_limit=60)
 ```
 
@@ -220,13 +220,18 @@ score3 = predictor_sts.predict({'sentence1': [sentences[0]],
 print(score1, score2, score3)
 ```
 
-Although the `AutoMMPredictor` currently supports classification and regression tasks, it can directly be used for 
+Although the `MultiModalPredictor` currently supports classification and regression tasks, it can directly be used for 
 many NLP tasks if you properly format them into a data table. Note that there can be many text columns in this data table. 
-Refer to the [AutoMMPredictor documentation](../../api/autogluon.predictor.html#autogluon.multimodal.AutoMMPredictor.fit) to see all available methods/options.
+Refer to the [MultiModalPredictor documentation](../../api/autogluon.predictor.html#autogluon.multimodal.MultiModalPredictor.fit) to see all available methods/options.
 
 Unlike `TabularPredictor` which trains/ensembles different types of models,
-`AutoMMPredictor` focuses on selecting and finetuning deep learning based models. 
+`MultiModalPredictor` focuses on selecting and finetuning deep learning based models. 
 Internally, it integrates with [timm](https://github.com/rwightman/pytorch-image-models) , [huggingface/transformers](https://github.com/huggingface/transformers), 
 [openai/clip](https://github.com/openai/CLIP) as the model zoo.
 
-To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+## Other Examples
+
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
+
+## Customization
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

@@ -28,9 +28,9 @@ AutoGluon Predictors
 
 .. admonition:: Example (Deep learning predictor for image, text and multimodal data):
 
-   Import AutoMMPredictor:
+   Import MultiModalPredictor:
 
-   >>> from autogluon.multimodal import AutoMMPredictor
+   >>> from autogluon.multimodal import MultiModalPredictor
    >>> from datasets import load_dataset
 
    Load a multimodal data table:
@@ -39,7 +39,7 @@ AutoGluon Predictors
 
    Fit classification models predicting the "class" column:
 
-   >>> predictor = AutoMMPredictor(label="label").fit(train_data)
+   >>> predictor = MultiModalPredictor(label="label").fit(train_data)
 
    Load test data:
 
@@ -65,7 +65,7 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
 .. autosummary::
    :nosignatures:
 
-   AutoMMPredictor
+   MultiModalPredictor
 
 .. automodule:: autogluon.vision
 .. autosummary::
@@ -102,17 +102,17 @@ Predictors built into AutoGluon such that a single call to `fit()` can produce h
         :methods:
 
 
-:hidden:`AutoMMPredictor`
+:hidden:`MultiModalPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. automodule:: autogluon.multimodal
 
-.. autoclass:: AutoMMPredictor
+.. autoclass:: MultiModalPredictor
    :members:
    :inherited-members:
 
     .. rubric:: Methods
 
-    .. autoautosummary:: AutoMMPredictor
+    .. autoautosummary:: MultiModalPredictor
         :methods:
 
 

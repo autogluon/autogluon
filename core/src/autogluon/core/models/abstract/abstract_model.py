@@ -996,15 +996,29 @@ class AbstractModel:
             model_estimate_memory_usage=model_estimate_memory_usage,
         )
 
-        return hpo_executor.get_hpo_results(
+        hpo_results =  hpo_executor.get_hpo_results(
             model_name=self.name,
             model_path_root=self.path_root,
             time_start=time_start,
         )
+        
+        # cleanup artifacts
+        for data_file in [train_path, val_path]:
+            try:
+                os.remove(data_file)
+            except FileNotFoundError:
+                pass
+        
+        return hpo_results
     
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return CUSTOM_BACKEND
+    
+    @property
+    def _path_v2(self) -> str:
+        """Path as a property, replace old path logic with this eventually"""
+        return self.path_root + self.path_suffix
 
     # Resets metrics for the model
     def reset_metrics(self):

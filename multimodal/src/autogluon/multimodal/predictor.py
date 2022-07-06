@@ -123,11 +123,11 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         self.to_yaml()
 
 
-class AutoMMPredictor:
+class MultiModalPredictor:
     """
-    AutoMMPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
+    MultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
     are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
-    and the AutoMMPredictor can predict the values of one column conditioned on the features from the other columns.
+    and the MultiModalPredictor can predict the values of one column conditioned on the features from the other columns.
 
     The prediction can be either classification or regression. The feature columns can contain
     image paths, text, numerical, and categorical values.
@@ -1713,8 +1713,9 @@ class AutoMMPredictor:
 
         return predictor
 
-    @staticmethod
+    @classmethod
     def load(
+        cls,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -1742,8 +1743,8 @@ class AutoMMPredictor:
         """
         path = os.path.expanduser(path)
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        predictor = AutoMMPredictor(label="dummy_label")
-        predictor = AutoMMPredictor._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
+        predictor = cls(label="dummy_label")
+        predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
         model = create_model(
             config=predictor._config,
@@ -1790,7 +1791,7 @@ class AutoMMPredictor:
             logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
             ckpt_path = None  # must set None since we do not resume training
 
-        model = AutoMMPredictor._load_state_dict(
+        model = cls._load_state_dict(
             model=model,
             path=load_path,
         )
@@ -1854,3 +1855,13 @@ class AutoMMPredictor:
             return None
         else:
             return self.class_labels[1]
+
+
+class AutoMMPredictor(MultiModalPredictor):
+    def __init__(self, **kwargs):
+        warnings.warn(
+            "AutoMMPredictor has been renamed as 'MultiModalPredictor'. "
+            "Consider to use MultiModalPredictor instead. Using AutoMMPredictor will "
+            "raise an exception starting in v0.7."
+        )
+        super(AutoMMPredictor, self).__init__(**kwargs)
