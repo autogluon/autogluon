@@ -366,14 +366,15 @@ class AbstractTimeSeriesModel(AbstractModel):
         
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
-            model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
+            model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
             minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
-            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0.1),
+            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
+            adapter_type='timeseries',
         )
 
         return hpo_executor.get_hpo_results(

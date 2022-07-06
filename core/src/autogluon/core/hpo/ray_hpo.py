@@ -55,6 +55,11 @@ class RayTuneAdapter(ABC):
         self.cpu_per_job = None
         self.gpu_per_job = None
         self.resources_per_trial = None
+        
+    @property
+    @abstractmethod
+    def adapter_type(self):
+        raise NotImplementedError
    
     def get_supported_searchers(self) -> list:
         """
@@ -372,6 +377,10 @@ class TabularRayTuneAdapter(RayTuneAdapter):
     supported_searchers = ['random', 'bayes']
     supported_schedulers = ['FIFO']
     
+    @property
+    def adapter_type(self):
+        return 'tabular'
+    
     def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
             return resources_per_trial 
@@ -392,6 +401,10 @@ class AutommRayTuneAdapter(RayTuneAdapter):
     
     def __init__(self):
         super().__init__()
+        
+    @property
+    def adapter_type(self):
+        return 'automm'
         
     def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
@@ -421,6 +434,10 @@ class AutommRayTuneLightningAdapter(RayTuneAdapter):
         super().__init__()
         self.num_workers = None
         self.cpu_per_worker = None
+        
+    @property
+    def adapter_type(self):
+        return 'automm_ray_lightning'
         
     def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
@@ -452,7 +469,29 @@ class AutommRayTuneLightningAdapter(RayTuneAdapter):
         return trainable_args
 
 
-class ForecastingRayTuneAdapter(TabularRayTuneAdapter):
+class TimeSeriesRayTuneAdapter(TabularRayTuneAdapter):
     
     supported_searchers = ['random', 'bayes']
     supported_schedulers = ['FIFO']
+    
+    @property
+    def adapter_type(self):
+        return 'timeseries'
+
+
+class RayTuneAdapterFactory:
+    
+    __supported_adapters = [
+        TabularRayTuneAdapter,
+        TimeSeriesRayTuneAdapter,
+        AutommRayTuneAdapter,
+        AutommRayTuneLightningAdapter,
+    ]
+    
+    __type_to_adapter = {cls().adapter_type: cls for cls in __supported_adapters}
+
+    @staticmethod
+    def get_adapter(adapter_type: str) -> RayTuneAdapter:
+        """Return the executor"""
+        assert adapter_type in RayTuneAdapterFactory.__type_to_adapter, f'{adapter_type} not supported'
+        return RayTuneAdapterFactory.__type_to_adapter[adapter_type]

@@ -992,8 +992,9 @@ class AbstractModel:
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
             minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
-            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0.1),
+            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
+            adapter_type='tabular',
         )
 
         hpo_results =  hpo_executor.get_hpo_results(

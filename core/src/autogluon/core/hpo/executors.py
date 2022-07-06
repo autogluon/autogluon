@@ -4,6 +4,7 @@ import os
 import time
 
 from abc import ABC, abstractmethod
+from typing import Optional, List, Dict, Union
 
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
@@ -25,10 +26,12 @@ class HpoExecutor(ABC):
     @property
     @abstractmethod
     def executor_type(self):
+        """Type of the executor"""
         raise NotImplementedError
     
     @property
     def time_limit(self):
+        """Time limit for the hpo experiment"""
         return self._time_limit
     
     @time_limit.setter
@@ -36,35 +39,93 @@ class HpoExecutor(ABC):
         self._time_limit = value
 
     @abstractmethod
-    def initialize(self, hyperparameter_tune_kwargs, default_num_trials=None, time_limit=None):
+    def initialize(
+            self,
+            hyperparameter_tune_kwargs: Union[str, dict],
+            default_num_trials: Optional[int] = None,
+            time_limit: Optional[float] = None
+        ):
+        """
+        Parse `hyperparameter_tune_kwargs` and initialize the executor
+        
+        Parameters
+        ----------
+        hyperparameter_tune_kwargs
+            User specified parameters to perform HPO experiment
+        default_num_trials
+            If user didn't provide `num_trials` in `hyperparameter_tune_kwargs`, will use this value instead.
+            If None and user didn't provide `num_trials`, will do 1000 trials when there is no time limit, and 1 trial if there is time limit.
+        time_limit
+            Time limit provided to the experiment.
+        """
         raise NotImplementedError
     
     @abstractmethod
-    def register_resources(self, resources):
+    def register_resources(self, resources: dict):
+        """
+        Register total resources used for the experiment
+        
+        Parameters
+        ----------
+        resources
+            Total resources available for the experiment
+        """
         raise NotImplementedError
     
     @abstractmethod
-    def validate_search_space(self, search_space, model_name):
+    def validate_search_space(
+            self,
+            search_space: dict,
+            model_name: str,
+        ):
+        """
+        Validate the search space for the experiment
+        
+        Parameters
+        ----------
+        search_space
+            Search space provided to the experiment.
+        model_name
+            The model name of the hpo experiment is tuning. This is only used for logging purpose
+        """
         raise NotImplementedError
     
     @abstractmethod
     def execute(self, **kwargs):
+        """Execute the experiment"""
         raise NotImplementedError
     
     @abstractmethod
-    def report(self, reporter, **kwargs):
+    def report(
+            self,
+            reporter: 'LocalReporter',
+            **kwargs
+        ):
+        """Report result of the experiment to the reporter. If no reporter needed, pass in None"""
         raise NotImplementedError
     
     @abstractmethod
-    def terminate(self):
-        raise NotImplementedError
-    
-    @abstractmethod
-    def get_hpo_results(self, model_name, model_path_root, **kwargs):
+    def get_hpo_results(
+            self,
+            model_name: str,
+            model_path_root: str,
+            **kwargs
+        ):
+        """
+        Retrieve hpo results
+        
+        Parameters
+        ----------
+        model_name
+            The model name of the hpo experiment is tuning.
+        model_path_root
+            Root path of the model
+        """
         raise NotImplementedError
 
 
 class RayHpoExecutor(HpoExecutor):
+    """Implementation of HpoExecutor Interface, where ray tune is used as the backend"""
     
     custom_to_ray_preset_map = {
         'auto': {'scheduler': 'FIFO', 'searcher': 'bayes'},
@@ -143,11 +204,12 @@ class RayHpoExecutor(HpoExecutor):
             directory,
             minimum_cpu_per_trial,
             minimum_gpu_per_trial,
-            model_estimate_memory_usage
+            model_estimate_memory_usage,
+            adapter_type,
         ):
         from .ray_hpo import (
             run,
-            TabularRayTuneAdapter
+            RayTuneAdapterFactory
         )
         analysis = run(
             trainable=model_trial,
@@ -157,7 +219,7 @@ class RayHpoExecutor(HpoExecutor):
             metric='validation_performance',
             mode='max',
             save_dir=directory,
-            ray_tune_adapter=TabularRayTuneAdapter(),
+            ray_tune_adapter=RayTuneAdapterFactory.get_adapter(adapter_type)(),
             total_resources=self.resources,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
@@ -170,11 +232,6 @@ class RayHpoExecutor(HpoExecutor):
     def report(self, reporter, **kwargs):
         from ray import tune
         tune.report(**kwargs)
-        
-    def terminate(self):
-        import ray
-        if ray.is_initialized():
-            ray.shutdown()
         
     def get_hpo_results(self, model_name, model_path_root, **kwargs):
         assert self.analysis is not None, 'Call `execute()` before `get_hpo_results()`'
@@ -194,6 +251,7 @@ class RayHpoExecutor(HpoExecutor):
 
 
 class CustomHpoExecutor(HpoExecutor):
+    """Implementation of HpoExecutor Interface, where our custom logic is used as the backend"""
     
     def __init__(self):
         self.scheduler_options = None
@@ -260,9 +318,6 @@ class CustomHpoExecutor(HpoExecutor):
     def report(self, reporter, **kwargs):
         assert reporter is not None
         reporter(**kwargs)   
-        
-    def terminate(self):
-        pass
         
     def get_hpo_results(self, model_name, model_path_root, time_start, **kwargs):
         assert self.scheduler is not None, 'Call `execute()` before `get_hpo_results()`'
