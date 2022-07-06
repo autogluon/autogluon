@@ -1444,19 +1444,21 @@ class MultiModalPredictor:
             return results
 
     def _match_queries_and_candidates(
-            self,
-            query_data: Union[pd.DataFrame, dict, list],
-            candidate_data: Union[pd.DataFrame, dict, list],
-            return_prob: Optional[bool] = False,
+        self,
+        query_data: Union[pd.DataFrame, dict, list],
+        candidate_data: Union[pd.DataFrame, dict, list],
+        return_prob: Optional[bool] = False,
     ):
         query_embeddings = self.extract_embedding(query_data, as_tensor=True)
-        assert len(query_embeddings) == 1, \
-            f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
+        assert (
+            len(query_embeddings) == 1
+        ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
         query_embeddings = list(query_embeddings.values())[0]
 
         candidate_embeddings = self.extract_embedding(candidate_data, as_tensor=True)
-        assert len(candidate_embeddings) == 1, \
-            f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
+        assert (
+            len(candidate_embeddings) == 1
+        ), f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
         candidate_embeddings = list(candidate_embeddings.values())[0]
 
         if return_prob:

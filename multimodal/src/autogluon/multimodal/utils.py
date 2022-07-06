@@ -1645,8 +1645,9 @@ def init_zero_shot(
     """
     config = get_config(overrides=hyperparameters)
 
-    assert len(config.model.names) == 1, \
-        f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
+    assert (
+        len(config.model.names) == 1
+    ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
     model = create_model(config=config)
 
     data_processors = init_data_processors(

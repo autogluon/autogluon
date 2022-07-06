@@ -245,7 +245,9 @@ def infer_column_types(
 
         if is_imagepath_column(data[col_name], col_name):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
-        elif is_categorical_column(data[col_name], valid_data[col_name], is_label=col_name in label_columns):  # Infer categorical column
+        elif is_categorical_column(
+            data[col_name], valid_data[col_name], is_label=col_name in label_columns
+        ):  # Infer categorical column
             column_types[col_name] = CATEGORICAL
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
@@ -258,9 +260,9 @@ def infer_column_types(
 
 
 def check_missing_values(
-        data: pd.DataFrame,
-        column_name: str,
-        split: Optional[str] = "",
+    data: pd.DataFrame,
+    column_name: str,
+    split: Optional[str] = "",
 ):
     num_missing_values = data[column_name].isnull().sum()
     if num_missing_values > 0:
@@ -303,8 +305,9 @@ def infer_label_column_type_by_problem_type(
 
     for col_name in label_columns:
         # Make sure the provided label columns are in the dataframe.
-        assert col_name in column_types, \
-            f"Column {col_name} is not in {column_types.keys()}. Make sure calling `infer_column_types()` first."
+        assert (
+            col_name in column_types
+        ), f"Column {col_name} is not in {column_types.keys()}. Make sure calling `infer_column_types()` first."
         if data is not None:
             check_missing_values(data=data, column_name=col_name, split="training")
         if valid_data is not None:

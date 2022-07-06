@@ -373,7 +373,9 @@ class ImageProcessor:
 
         ret.update(
             {
-                self.image_key: torch.tensor([]) if len(images + zero_images) == 0 else torch.stack(images + zero_images, dim=0),
+                self.image_key: torch.tensor([])
+                if len(images + zero_images) == 0
+                else torch.stack(images + zero_images, dim=0),
                 self.image_valid_num_key: len(images),
             }
         )

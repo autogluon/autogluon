@@ -352,7 +352,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the numerical features (a dictionary of np.ndarray).
         """
-        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform_numerical."
+        assert (
+            self._fit_called
+        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_numerical."
         numerical_features = {}
         for col_name in self._numerical_feature_names:
             generator = self._feature_generators[col_name]
@@ -380,7 +382,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the categorical encodings (a dictionary of np.ndarray).
         """
-        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform_categorical."
+        assert (
+            self._fit_called
+        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_categorical."
         categorical_features = {}
         for col_name, num_category in zip(self._categorical_feature_names, self._categorical_num_categories):
             col_value = df[col_name]
@@ -413,7 +417,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         All the labels (a dictionary of np.ndarray).
         """
-        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform_label."
+        assert (
+            self._fit_called
+        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_label."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             y = self._label_generator.transform(y_df)
@@ -443,7 +449,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Ground-truth labels ready to compute metric scores.
         """
-        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform_label_for_metric."
+        assert (
+            self._fit_called
+        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_label_for_metric."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             # need to encode to integer labels
@@ -478,7 +486,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Predicted labels ready to compute metric scores.
         """
-        assert self._fit_called, "You will need to first call preprocessor.fit before calling preprocessor.transform_prediction."
+        assert (
+            self._fit_called
+        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_prediction."
 
         if self.label_type == CATEGORICAL:
             assert y_pred.shape[1] >= 2
