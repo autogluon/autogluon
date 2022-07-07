@@ -119,6 +119,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
                 )
 
+        self._fit_called = False
         self._fit_x_called = False
         self._fit_y_called = False
 
@@ -312,7 +313,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         All the text data stored in a dictionary.
         """
         assert (
-            self._fit_x_called
+            self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_text."
         text_features = {}
         for col_name in self._text_feature_names:
@@ -350,7 +351,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         All the image paths stored in a dictionary.
         """
         assert (
-            self._fit_x_called
+            self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
         image_paths = {}
         for col_name in self._image_path_names:
@@ -377,7 +378,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         All the numerical features (a dictionary of np.ndarray).
         """
         assert (
-            self._fit_x_called
+            self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit before calling preprocessor.transform_numerical."
         numerical_features = {}
         for col_name in self._numerical_feature_names:
@@ -407,7 +408,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         All the categorical encodings (a dictionary of np.ndarray).
         """
         assert (
-            self._fit_x_called
+            self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit before calling preprocessor.transform_categorical."
         categorical_features = {}
         for col_name, num_category in zip(self._categorical_feature_names, self._categorical_num_categories):
@@ -442,7 +443,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         All the labels (a dictionary of np.ndarray).
         """
         assert (
-            self._fit_y_called
+            self._fit_called or self._fit_y_called
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
@@ -474,7 +475,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         Ground-truth labels ready to compute metric scores.
         """
         assert (
-            self._fit_y_called
+            self._fit_called or self._fit_y_called
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
@@ -511,7 +512,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         Predicted labels ready to compute metric scores.
         """
         assert (
-            self._fit_y_called
+            self._fit_called or self._fit_y_called
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_prediction."
 
         if self.label_type == CATEGORICAL:
