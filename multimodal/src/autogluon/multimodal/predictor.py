@@ -1348,6 +1348,9 @@ class MultiModalPredictor:
             df_preprocessor = init_df_preprocessor(
                 config=config.data,
                 column_types=column_types,
+                label_column=self._label_column,
+                train_df_x=data,
+                train_df_y=data[self._label_column] if self._label_column else None,
             )
         else:  # called .fit() or .load()
             df_preprocessor = self._df_preprocessor
@@ -1607,8 +1610,8 @@ class MultiModalPredictor:
             The data to extract embeddings for. Should contain same column names as training dataset and
             follow same format (except for the `label` column).
         return_masks
-            Whether to return the masks indicating whether the corresponding features are valid.
-            If one sample's some column have empty input, then the sample has mask 0 for that column.
+            If true, returns a mask dictionary, whose keys are the same as those in the features dictionary.
+            If a sample has empty input in feature column `image_0`, the sample will has mask 0 under key `image_0`.
         as_tensor
             Whether to return a Pytorch tensor.
         as_pandas

@@ -157,7 +157,7 @@ def is_imagepath_column(
         return False
 
 
-def check_if_nlp_feature(X: pd.Series) -> bool:
+def is_text_column(X: pd.Series) -> bool:
     """
     Identify if a column is one text column.
 
@@ -251,7 +251,7 @@ def infer_column_types(
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
             column_types[col_name] = IMAGE_PATH
-        elif check_if_nlp_feature(data[col_name]):  # Infer text column
+        elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL

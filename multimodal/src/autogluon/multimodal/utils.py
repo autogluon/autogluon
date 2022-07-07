@@ -551,11 +551,10 @@ def init_df_preprocessor(
         column_types=column_types,
         label_column=label_column,
     )
-    if train_df_x is not None and train_df_y is not None:
-        df_preprocessor.fit(
-            X=train_df_x,
-            y=train_df_y,
-        )
+    if train_df_x is not None:
+        df_preprocessor.fit_x(X=train_df_x)
+    if train_df_y is not None:
+        df_preprocessor.fit_y(y=train_df_y)
 
     return df_preprocessor
 
