@@ -90,7 +90,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == IMAGE_PATH:
                 self._image_path_names.append(col_name)
             elif col_type == CATEGORICAL:
-                self._categorical_feature_names.append(col_name)
+                # we don't add col_name in the _categorical_feature_names here
+                # because we need to operate _categorical_feature_names and _categorical_num_categories
+                # simultaneously to ensure their items have the correct correspondences.
                 generator = CategoryFeatureGenerator(
                     cat_order="count",
                     minimum_cat_count=config.categorical.minimum_cat_count,
@@ -230,7 +232,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     # Convert categorical column as text column
                     col_value = col_value.astype("object")
                     processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
-                    self._categorical_feature_names.remove(col_name)
+                    if col_name in self._categorical_feature_names:
+                        self._categorical_feature_names.remove(col_name)
                     del self._feature_generators[col_name]
                     if len(processed_data.unique()) == 1:
                         self._ignore_columns_set.add(col_name)
@@ -243,12 +246,13 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                         col_name
                     ].cat.codes.to_numpy(np.int32, copy=True)
                     if len(np.unique(processed_data)) == 1:
-                        self._categorical_feature_names.remove(col_name)
+                        if col_name in self._categorical_feature_names:
+                            self._categorical_feature_names.remove(col_name)
                         del self._feature_generators[col_name]
                         self._ignore_columns_set.add(col_name)
                         continue
                     num_categories = len(generator.category_map[col_name])
-                    # Add one unknown category
+                    self._categorical_feature_names.append(col_name)
                     self._categorical_num_categories.append(num_categories + 1)
 
             elif col_type == NUMERICAL:
