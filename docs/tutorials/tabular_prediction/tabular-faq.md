@@ -139,6 +139,17 @@ task.fit(..., excluded_model_types=['KNN','RF','XT'])
 
 To learn how to add your own custom models to the set that AutoGluon trains, tunes, and ensembles, review :ref:`sec_tabularcustommodel`.
 
+### How can I reproduce the results of model XYZ without using AutoGluon?
+
+Exactly reproducing the results of AutoGluon models without using AutoGluon is extremely challenging.
+(Ex: Trying to replicate the results of AutoGluon's LightGBM without depending on AutoGluon)
+AutoGluon uses a variety of techniques not present in the model frameworks it builds upon such as data preprocessing,
+edge case handling, custom early stopping, and custom architectures. These are all used to enhance the performance
+and simplify usage beyond what exists in the original model framework (such as LightGBM, XGBoost, FastAI, etc.).
+This is a core benefit of AutoML frameworks and is inherently complicated to replicate
+(you would have to reimplement much of what AutoGluon does behind the scenes).
+If you still wish to try to replicate results, you must dive into the source code for a given model
+without guidance from the AutoGluon devs.
 
 ### How can I add my own custom data preprocessing or feature engineering?
 
