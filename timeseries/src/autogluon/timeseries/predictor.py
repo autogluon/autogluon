@@ -121,6 +121,7 @@ class TimeSeriesPredictor:
         self.quantile_levels = quantile_levels or kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
+
         learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
         learner_kwargs = kwargs.pop("learner_kwargs", dict())
         learner_kwargs = learner_kwargs.copy()
@@ -130,7 +131,7 @@ class TimeSeriesPredictor:
                 eval_metric=eval_metric,
                 target=self.target,
                 prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels
+                quantile_levels=self.quantile_levels,
             )
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
@@ -224,6 +225,7 @@ class TimeSeriesPredictor:
             )
         if hyperparameters is None:
             hyperparameters = "default"
+
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
         if presets is not None:
