@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Dict
+from typing import List, Any, Dict
 import numpy as np
 from nptyping import NDArray
 from ..constants import CATEGORICAL, COLUMN

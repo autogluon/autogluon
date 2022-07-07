@@ -28,11 +28,8 @@ from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalcul
 from ray import tune
 from ray.tune import PlacementGroupFactory
 from ray.tune.sample import Domain
-from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler, PopulationBasedTraining
-from ray.tune.schedulers.pb2 import PB2
+from ray.tune.schedulers import TrialScheduler
 from ray.tune.suggest import SearchAlgorithm, Searcher
-from ray.tune.suggest.basic_variant import BasicVariantGenerator
-from ray.tune.suggest.hyperopt import HyperOptSearch
 
 
 logger = logging.getLogger(__name__)

@@ -8,9 +8,8 @@ import struct
 import sys
 import tarfile
 import zipfile
-import tempfile
 import warnings
-from contextlib import closing, contextmanager
+from contextlib import closing
 
 if sys.version_info[0] == 2:
     import cPickle as pickle

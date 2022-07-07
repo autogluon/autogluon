@@ -15,7 +15,6 @@ import pandas as pd
 import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.log_utils import DuplicateFilter
