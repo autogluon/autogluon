@@ -1477,7 +1477,7 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        as_pandas: Optional[bool] = False,
+        as_pandas: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -1521,15 +1521,16 @@ class MultiModalPredictor:
             else:
                 pred = logits_or_prob
 
-        if as_pandas or isinstance(data, pd.DataFrame):
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
+
         return pred
 
     def predict_proba(
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        as_pandas: Optional[bool] = False,
+        as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
     ):
         """
@@ -1590,8 +1591,10 @@ class MultiModalPredictor:
                     problem_type=self._problem_type,
                 )
                 prob = prob[:, pos_label]
-        if as_pandas or isinstance(data, pd.DataFrame):
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
+
         return prob
 
     def extract_embedding(
