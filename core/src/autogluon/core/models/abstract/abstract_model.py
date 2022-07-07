@@ -925,13 +925,12 @@ class AbstractModel:
         return template
 
     def hyperparameter_tune(self, hyperparameter_tune_kwargs, hpo_executor=None, time_limit=None, **kwargs):
+        # if hpo_executor is not None, ensemble has already created the hpo_executor
         if hpo_executor is None:
             backend = self._get_model_base()._get_hpo_backend()  # If ensemble, will use the base model to determine backend
             hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
             default_num_trials = kwargs.pop('default_num_trials', None)
-            time_limit = hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
-        else:  # ensemble has already created the hpo_executor
-            time_limit = hpo_executor.time_limit
+            hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
@@ -987,17 +986,18 @@ class AbstractModel:
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
+        minimum_resources = self.get_minimum_resources()
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
-            minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
-            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0),
+            minimum_cpu_per_trial=minimum_resources.get('num_cpus', 1),
+            minimum_gpu_per_trial=minimum_resources.get('num_gpus', 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
             adapter_type='tabular',
         )
 
-        hpo_results =  hpo_executor.get_hpo_results(
+        hpo_results = hpo_executor.get_hpo_results(
             model_name=self.name,
             model_path_root=self.path_root,
             time_start=time_start,

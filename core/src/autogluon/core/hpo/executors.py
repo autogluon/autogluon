@@ -167,7 +167,6 @@ class RayHpoExecutor(HpoExecutor):
         if 'num_trials' not in hyperparameter_tune_kwargs and default_num_trials is not None:
             hyperparameter_tune_kwargs['num_trials'] = default_num_trials
         self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
-        return time_limit
     
     def register_resources(self, initialized_model_base):
         user_cpu_count = initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
@@ -199,14 +198,36 @@ class RayHpoExecutor(HpoExecutor):
                     
     def execute(
             self,
+            *,  # Force kwargs to avoid bugs
             model_trial,
-            train_fn_kwargs,
-            directory,
-            minimum_cpu_per_trial,
-            minimum_gpu_per_trial,
-            model_estimate_memory_usage,
-            adapter_type,
+            train_fn_kwargs: dict,
+            directory: str,
+            minimum_cpu_per_trial: int,
+            minimum_gpu_per_trial: float,
+            model_estimate_memory_usage: float,
+            adapter_type: str,
         ):
+        """
+        Execute ray hpo experiment
+        
+        Parameters
+        ----------
+        model_trial
+            A function conducting individual trial
+        train_fn_kwargs
+            A dict containing kwargs passed to model_trial
+        directory:
+            Directory to save ray tune results. Ray will write artifacts to directory/trial_dir/
+            While HPO, ray will chdir to this directory. Therefore, it's important to provide dataset or model saving path as absolute path.
+            After HPO, we change back to the original working directory.
+        minimum_cpu_per_trial
+            Minimum number of cpu required to perform a trial
+        minimum_gpu_per_trial
+            Minimum number of gpu required to perform a trial. If not needed, provide 0
+        adapter_type
+            Type of adapter used by ray hpo experiment.
+            Valid values are ['tabular', 'timeseries', 'automm', 'automm_ray_lightning']
+        """
         from .ray_hpo import (
             run,
             RayTuneAdapterFactory
@@ -285,8 +306,6 @@ class CustomHpoExecutor(HpoExecutor):
             time_limit = hyperparameter_tune_kwargs[1]['time_out']
         self.scheduler_options = hyperparameter_tune_kwargs
         self.time_limit = time_limit
-        
-        return time_limit
     
     def register_resources(self, resources):
         assert self.scheduler_options is not None, 'Call `initialize()` before register resources'
