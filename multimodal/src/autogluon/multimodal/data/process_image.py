@@ -18,6 +18,7 @@ from transformers import AutoConfig
 
 try:
     from torchvision.transforms import InterpolationMode
+
     BICUBIC = InterpolationMode.BICUBIC
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
