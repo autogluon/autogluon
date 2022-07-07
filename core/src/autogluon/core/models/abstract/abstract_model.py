@@ -4,6 +4,7 @@ import inspect
 import logging
 import os
 import pickle
+from autogluon.core.utils import try_import
 import psutil
 import sys
 import time
@@ -17,6 +18,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.log_utils import DuplicateFilter
 
 from .model_trial import model_trial, skip_hpo
 from ._tags import _DEFAULT_TAGS
@@ -33,8 +35,12 @@ from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMem
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
+from ...utils.try_import import try_import_ray
+
 
 logger = logging.getLogger(__name__)
+dup_filter = DuplicateFilter()
+logger.addFilter(dup_filter)
 
 
 class AbstractModel:
@@ -928,6 +934,14 @@ class AbstractModel:
         # if hpo_executor is not None, ensemble has already created the hpo_executor
         if hpo_executor is None:
             backend = self._get_model_base()._get_hpo_backend()  # If ensemble, will use the base model to determine backend
+            if backend == RAY_BACKEND:
+                try:
+                    try_import_ray()
+                except Exception as e:
+                    warning_msg = f'Will use custom hpo logic because ray import failed. Reason: {str(e)}'
+                    dup_filter.attach_filter_targets(warning_msg)
+                    logger.warning(warning_msg)
+                    backend = CUSTOM_BACKEND
             hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
             default_num_trials = kwargs.pop('default_num_trials', None)
             hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)

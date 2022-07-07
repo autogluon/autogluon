@@ -53,7 +53,6 @@ class TimeSeriesLearner(AbstractLearner):
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame = None,
         hyperparameters: Union[str, Dict] = None,
-        hyperparameter_tune: bool = False,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         **kwargs,
     ) -> None:
@@ -61,7 +60,6 @@ class TimeSeriesLearner(AbstractLearner):
             train_data=train_data,
             val_data=val_data,
             hyperparameters=hyperparameters,
-            hyperparameter_tune=hyperparameter_tune,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             **kwargs,
         )

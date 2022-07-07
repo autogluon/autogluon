@@ -4,7 +4,7 @@ import os
 import time
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, Callable
 
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
@@ -155,7 +155,7 @@ class RayHpoExecutor(HpoExecutor):
         if isinstance(hyperparameter_tune_kwargs, dict):
             hyperparameter_tune_kwargs = hyperparameter_tune_kwargs.copy()
         if isinstance(hyperparameter_tune_kwargs, str):
-            hyperparameter_tune_kwargs = self.custom_to_ray_preset_map[hyperparameter_tune_kwargs]
+            hyperparameter_tune_kwargs: dict = self.custom_to_ray_preset_map[hyperparameter_tune_kwargs].copy()
         hyperparameter_tune_kwargs['scheduler'] = self.custom_to_ray_scheduler_preset_map.get(
             hyperparameter_tune_kwargs['scheduler'],
             hyperparameter_tune_kwargs['scheduler']
@@ -199,7 +199,7 @@ class RayHpoExecutor(HpoExecutor):
     def execute(
             self,
             *,  # Force kwargs to avoid bugs
-            model_trial,
+            model_trial: Callable,
             train_fn_kwargs: dict,
             directory: str,
             minimum_cpu_per_trial: int,
@@ -212,20 +212,23 @@ class RayHpoExecutor(HpoExecutor):
         
         Parameters
         ----------
-        model_trial
+        model_trial: Callable
             A function conducting individual trial
-        train_fn_kwargs
+        train_fn_kwargs: dict
             A dict containing kwargs passed to model_trial
-        directory:
+        directory: str
             Directory to save ray tune results. Ray will write artifacts to directory/trial_dir/
             While HPO, ray will chdir to this directory. Therefore, it's important to provide dataset or model saving path as absolute path.
             After HPO, we change back to the original working directory.
-        minimum_cpu_per_trial
-            Minimum number of cpu required to perform a trial
-        minimum_gpu_per_trial
-            Minimum number of gpu required to perform a trial. If not needed, provide 0
-        adapter_type
+        minimum_cpu_per_trial: int
+            Minimum number of cpu required to perform a trial. Must be >= 1
+        minimum_gpu_per_trial: float
+            Minimum number of gpu required to perform a trial. You are allowed to provide fractional gpu with a float.
+            If not needed, provide 0
+        adapter_type: str
             Type of adapter used by ray hpo experiment.
+            Adapters are used to provide custom info or behavior that's module specific to the ray hpo experiment.
+            For more info, please refer to `autogluon/core/hpo/ray_hpo`
             Valid values are ['tabular', 'timeseries', 'automm', 'automm_ray_lightning']
         """
         from .ray_hpo import (
