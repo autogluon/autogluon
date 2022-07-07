@@ -1,3 +1,4 @@
+import copy
 import pandas as pd
 
 from autogluon.core.constants import BINARY, MULTICLASS
@@ -5,11 +6,16 @@ from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.text import TextPredictor
 from io import BytesIO, StringIO
 
+"""Serving script for autogluon v0.4+ because text predictor switched backend to automm and had some internal api changes when fetching column names"""
+
 
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TextPredictor.load(model_dir)
-    globals()["column_names"] = model._model.feature_columns
+    label_column = model._predictor._label_column
+    column_types = copy.copy(model._predictor._column_types)
+    column_types.pop(label_column)
+    globals()["column_names"] = list(column_types.keys())
 
     return model
 

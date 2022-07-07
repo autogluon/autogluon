@@ -6,6 +6,8 @@ import logging
 import pandas as pd
 import boto3
 import sagemaker
+
+from abc import ABC, abstractmethod
 from datetime import datetime
 
 from autogluon.common.loaders import load_pd
@@ -24,7 +26,7 @@ from ..utils.ag_sagemaker import (
     AutoGluonRealtimePredictor,
     AutoGluonBatchPredictor
 )
-from ..utils.aws_utils import create_sagemaker_role_and_attach_policies
+from ..utils.aws_utils import setup_sagemaker_role_and_policy
 from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
 from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.s3_utils import download_s3_file
@@ -34,20 +36,28 @@ from ..utils.utils import unzip_file, rename_file_with_uuid
 logger = logging.getLogger(__name__)
 
 
-class CloudPredictor:
+class CloudPredictor(ABC):
 
     predictor_file_name = 'CloudPredictor.pkl'
 
     def __init__(
         self,
+        cloud_output_path,
         role_arn=None,
         local_output_path=None,
-        cloud_output_path=None,
         verbosity=2
     ):
         """
         Parameters
         ----------
+        cloud_output_path: str
+            Path to s3 location where intermediate artifacts will be uploaded and trained models should be saved.
+            This has to be provided because s3 buckets are unique globally, so it is hard to create one for you.
+            If you only provided the bucket but not the subfolder, a time-stamped folder called "YOUR_BUCKET/ag-[TIMESTAMP]" will be created.
+            If you provided both the bucket and the subfolder, then we will use that instead.
+            Note: To call `fit()` twice and save all results of each fit,
+            you must either specify different `cloud_output_path` locations or only provide the bucket but not the subfolder.
+            Otherwise files from first `fit()` will be overwritten by second `fit()`.
         role_arn: str
             The role_arn you want to use to grant cloud predictor necessary permission. 
             This role must have permission on AmazonS3FullAccess and AmazonSageMakerFullAccess.
@@ -56,11 +66,6 @@ class CloudPredictor:
             Path to directory where downloaded trained predictor, batch transform results, and intermediate outputs should be saved
             If unspecified, a time-stamped folder called "AutogluonCloudPredictor/ag-[TIMESTAMP]" will be created in the working directory to store all downloaded trained predictor, batch transform results, and intermediate outputs.
             Note: To call `fit()` twice and save all results of each fit, you must specify different `local_output_path` locations or don't specify `local_output_path` at all.
-            Otherwise files from first `fit()` will be overwritten by second `fit()`.
-        cloud_output_path: str
-            Path to s3 location where intermediate artifacts will be uploaded and trained models should be saved.
-            If unspecified, a time-stamped folder called "s3://ag-cloud-predictor/[TIMESTAMP]" will be created in the s3 bucket to store all models and intermediate artifacts.
-            Note: To call `fit()` twice and save all results of each fit, you must specify different `cloud_output_path` locations or don't specify `cloud_output_path` at all.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
@@ -72,7 +77,7 @@ class CloudPredictor:
         set_logger_verbosity(self.verbosity)
         self.role_arn = role_arn
         if not self.role_arn:
-            self.role_arn = create_sagemaker_role_and_attach_policies(
+            self.role_arn = setup_sagemaker_role_and_policy(
                 role_name='ag_cloud_predictor_role',
                 trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
                 policies=SAGEMAKER_POLICIES
@@ -86,7 +91,10 @@ class CloudPredictor:
         self._fit_job = SageMakerFitJob(session=self.sagemaker_session)
         self._batch_transform_jobs = MostRecentInsertedOrderedDict()
 
-        self._setup_predictor_type()
+    @property
+    @abstractmethod
+    def predictor_type(self):
+        raise NotImplementedError
 
     @property
     def is_fit(self):
@@ -116,7 +124,6 @@ class CloudPredictor:
         return info
 
     def _setup_predictor_type(self):
-        self.predictor_type = None
         self._train_script_path = None
         self._serve_script_path = None
 
@@ -134,10 +141,17 @@ class CloudPredictor:
         return os.path.abspath(path)
 
     def _setup_cloud_output_path(self, path):
-        if path is None:
-            return f's3://ag-cloud-predictor/{sagemaker.utils.sagemaker_timestamp()}'
         if path.endswith('/'):
             path = path[:-1]
+        path_cleaned = path
+        try:
+            path_cleaned = path.split('://', 1)[1]
+        except:
+            pass
+        path_split = path_cleaned.split('/', 1)
+        # If user only provided the bucket, we create a subfolder with timestamp for them
+        if len(path_split) == 1:
+            path = os.path.join(path, f'ag-{sagemaker.utils.sagemaker_timestamp()}')
         if is_s3_url(path):
             return path
         return 's3://' + path
@@ -183,7 +197,6 @@ class CloudPredictor:
                 }
             )
 
-    # FIXME: Remember to change output_type back to parquet when parquet is fixed in the gpu container
     def _prepare_data(self, data, filename, output_type='csv'):
         path = os.path.join(self.local_output_path, 'utils')
         converter = FormatConverterFactory.get_converter(output_type)
@@ -236,7 +249,7 @@ class CloudPredictor:
         job_name=None,
         instance_type='ml.m5.2xlarge',
         instance_count=1,
-        volume_size=30,
+        volume_size=100,
         wait=True,
         autogluon_sagemaker_estimator_kwargs=dict(),
         **kwargs
@@ -288,6 +301,7 @@ class CloudPredictor:
         train_data = predictor_fit_args.pop('train_data')
         tune_data = predictor_fit_args.pop('tuning_data', None)
         framework_version, py_version = self._parse_framework_version(framework_version, 'training')
+        logger.log(20, f'Training with framework_version=={framework_version}')
 
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor")
@@ -296,6 +310,7 @@ class CloudPredictor:
         output_path = self.cloud_output_path + '/output'
         cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
 
+        self._train_script_path = ScriptManager.get_train_script(self.predictor_type, framework_version)
         entry_point = self._train_script_path
         user_entry_point = autogluon_sagemaker_estimator_kwargs.pop(entry_point, None)
         if user_entry_point:
@@ -478,8 +493,9 @@ class CloudPredictor:
         if not endpoint_name:
             endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
         framework_version, py_version = self._parse_framework_version(framework_version, 'inference')
+        logger.log(20, f'Deploying with framework_version=={framework_version}')
 
-        assert self._serve_script_path is not None
+        self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
@@ -541,7 +557,7 @@ class CloudPredictor:
         -------
         `AutoGluonRealtimePredictor` object.
         """
-        assert self.endpoint is not None
+        assert self.endpoint is not None, 'There is no attached endpoint'
         detached_endpoint = self.endpoint
         self.endpoint = None
         return detached_endpoint
@@ -636,6 +652,7 @@ class CloudPredictor:
             assert predictor_path, 'No cloud trained model found.'
 
         framework_version, py_version = self._parse_framework_version(framework_version, 'inference')
+        logger.log(20, f'Predicting with framework_version=={framework_version}')
 
         output_path = kwargs.get('output_path', None)
         if not output_path:
@@ -662,7 +679,7 @@ class CloudPredictor:
         else:
             test_input = test_data
 
-        assert self._serve_script_path is not None
+        self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
@@ -858,10 +875,9 @@ class TabularCloudPredictor(CloudPredictor):
 
     predictor_file_name = 'TabularCloudPredictor.pkl'
 
-    def _setup_predictor_type(self):
-        self.predictor_type = 'tabular'
-        self._train_script_path = ScriptManager.get_train_script('tabular')
-        self._serve_script_path = ScriptManager.get_serve_script('tabular')
+    @property
+    def predictor_type(self):
+        return 'tabular'
 
     def _get_local_predictor_cls(self):
         from autogluon.tabular import TabularPredictor
@@ -873,10 +889,9 @@ class TextCloudPredictor(CloudPredictor):
 
     predictor_file_name = 'TextCloudPredictor.pkl'
 
-    def _setup_predictor_type(self):
-        self.predictor_type = 'text'
-        self._train_script_path = ScriptManager.get_train_script('text')
-        self._serve_script_path = ScriptManager.get_serve_script('text')
+    @property
+    def predictor_type(self):
+        return 'text'
 
     def _get_local_predictor_cls(self):
         from autogluon.text import TextPredictor

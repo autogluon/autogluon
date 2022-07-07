@@ -18,10 +18,10 @@ version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 submodule = 'cloud'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
-    'autogluon.common<0.5'
+    'autogluon.common<0.6'
     'boto3',
     'pandas',
-    'sagemaker>=2.66.1',
+    'sagemaker>=2.94',
 ]
 
 extras_require = dict()

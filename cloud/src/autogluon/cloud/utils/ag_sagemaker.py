@@ -143,29 +143,3 @@ class AutoGluonSagemakerInferenceModel(MXNetModel):
             assemble_with=assemble_with,
             **kwargs
         )
-
-    # def prepare_container_def(self, instance_type=None, accelerator_type=None):
-    #     """Return a container definition with framework configuration.
-
-    #     Framework configuration is set in model environment variables.
-
-    #     Args:
-    #         instance_type (str): The EC2 instance type to deploy this Model to.
-    #             For example, 'ml.p2.xlarge'.
-    #         accelerator_type (str): The Elastic Inference accelerator type to
-    #             deploy to the instance for loading and making inferences to the
-    #             model. For example, 'ml.eia1.medium'.
-
-    #     Returns:
-    #         dict[str, str]: A container definition object usable with the
-    #         CreateModel API.
-    #     """
-    #     deploy_image = self.image_uri
-    #     deploy_key_prefix = model_code_key_prefix(self.key_prefix, self.name, deploy_image)
-    #     self._upload_code(deploy_key_prefix, True)
-    #     deploy_env = dict(self.env)
-    #     deploy_env.update(self._framework_env_vars())
-
-    #     return sagemaker.container_def(
-    #         deploy_image, self.repacked_model_data or self.model_data, deploy_env
-    #     )

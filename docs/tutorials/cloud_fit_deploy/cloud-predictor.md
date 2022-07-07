@@ -27,7 +27,7 @@ predictor_fit_args = dict(
 Then we init the TabularCloudPredictor and call `fit` on it:
 ```{.python}
 from autogluon.cloud import TabularCloudPredictor
-tabular_cloud_predictor = TabularCloudPredictor().fit(
+tabular_cloud_predictor = TabularCloudPredictor(cloud_output_path='s3://YOUR_BUCKET').fit(
     predictor_init_args,
     predictor_fit_args,
     framework_version='latest',
@@ -56,7 +56,7 @@ Deploy an endpoint with the previously trained CloudPredictor is simple:
 tabular_cloud_predictor.deploy(
     instance_type='ml.m5.large',
     framework_version='latest',
-    )
+)
 ```
 
 Once the model is deployed, we can call `predict_real_time()` on it:

@@ -46,7 +46,7 @@ def create_iam_policy(policy_name: str, policy_document: str, policy_description
     return policy_arn
 
 
-def setup_sagemaker_role_and_policy(role_name: str, trust_relationship: dict, policies: List[Union[str, CustomIamPolicy]], cloud_version: str):
+def setup_sagemaker_role_and_policy(role_name: str, trust_relationship: dict, policies: List[Union[str, CustomIamPolicy]]):
     iam = boto3.client('iam')
     role_arn = None
     # create policies based on cloud module version if passed in a CustomIamPolicy
@@ -61,7 +61,7 @@ def setup_sagemaker_role_and_policy(role_name: str, trust_relationship: dict, po
         policies_to_attach.append(policy)
     # create IAM role
     try:
-        role_arn = create_iam_role(
+        create_iam_role(
             role_name=role_name,
             trust_relationship=json.dumps(trust_relationship),
             description='AutoGluon CloudPredictor role'
@@ -84,31 +84,5 @@ def setup_sagemaker_role_and_policy(role_name: str, trust_relationship: dict, po
             RoleName=role_name
         )
 
-    return role_arn
-
-
-def create_sagemaker_role_and_attach_policies(role_name: str, trust_relationship: dict, policies: List[str]):
-    '''This function will create the IAM role (if not already exists) and attach all the policies'''
-    try:
-        create_iam_role(
-            role_name=role_name,
-            trust_relationship=json.dumps(trust_relationship),
-            description='AutoGluon CloudPredictor role'
-        )
-    except ClientError as e:
-        if not e.response['Error']['Code'] == 'EntityAlreadyExists':
-            raise e
-    for policy in policies:
-        try:
-            # This does nothing if the policy is already attached
-            iam.attach_role_policy(
-                PolicyArn=policy,
-                RoleName=role_name
-            )
-        except ClientError as e:
-            iam.delete_role(
-                RoleName=role_name
-            )
-            raise e
     role_arn = iam.get_role(RoleName=role_name)['Role']['Arn']
     return role_arn
