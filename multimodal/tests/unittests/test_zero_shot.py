@@ -65,19 +65,19 @@ def test_clip_zero_shot():
     embedding = predictor.extract_embedding({"123": [dog_image_name, cat_image_name]})
     assert list(embedding.keys()) == ["123"]
     for v in embedding.values():
-        assert v.shape == (2, 512)
+        assert v.shape == (2, 512) or v.shape == (2, 768)
 
     # extract text embeddings.
     embedding = predictor.extract_embedding({"xyz": [bird_text, dog_text, cat_text]})
     assert list(embedding.keys()) == ["xyz"]
     for v in embedding.values():
-        assert v.shape == (3, 512)
+        assert v.shape == (3, 512) or v.shape == (3, 768)
 
     # extract embeddings for both images and texts.
     embedding = predictor.extract_embedding({"image": [cat_image_name, dog_image_name], "text": [bird_text, dog_text]})
     assert list(embedding.keys()).sort() == ["image", "text"].sort()
     for v in embedding.values():
-        assert v.shape == (2, 512)
+        assert v.shape == (2, 512) or v.shape == (2, 768)
 
     # invalid API usage 1: passing one dictionary, but different keys have inconsistent list lengths.
     with pytest.raises(ValueError):
