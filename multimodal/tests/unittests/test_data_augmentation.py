@@ -94,6 +94,7 @@ def test_textagumentor_deepcopy():
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
         "model.hf_text.text_trivial_aug_maxscale": 0.05,
+        "model.hf_text.text_train_augment_types": ["identity"],
         "optimization.top_k_average_method": "uniform_soup",
     }
 
