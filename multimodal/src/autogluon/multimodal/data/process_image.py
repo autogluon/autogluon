@@ -15,6 +15,13 @@ from timm.data.constants import (
     IMAGENET_INCEPTION_STD,
 )
 from transformers import AutoConfig
+
+try:
+    from torchvision.transforms import InterpolationMode
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = PIL.Image.BICUBIC
+
 from ..constants import (
     IMAGE,
     IMAGE_VALID_NUM,
@@ -270,9 +277,9 @@ class ImageProcessor:
                 trans_mode = trans_type
 
             if trans_mode == "resize_to_square":
-                processor.append(transforms.Resize((self.size, self.size)))
+                processor.append(transforms.Resize((self.size, self.size), interpolation=BICUBIC))
             elif trans_mode == "resize_shorter_side":
-                processor.append(transforms.Resize(self.size))
+                processor.append(transforms.Resize(self.size, interpolation=BICUBIC))
             elif trans_mode == "center_crop":
                 processor.append(transforms.CenterCrop(self.size))
             elif trans_mode == "horizontal_flip":

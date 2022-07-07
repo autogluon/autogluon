@@ -106,10 +106,10 @@ def test_textagumentor_deepcopy():
             hyperparameters=hyperparameters,
         )
 
-    # Deep copy data preprocessor
+    # Deepcopy data processors
     predictor._data_processors = copy.deepcopy(predictor._data_processors)
 
-    # Test for copied preprocessor
+    # Test copied data processors
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
@@ -117,10 +117,10 @@ def test_textagumentor_deepcopy():
         time_limit=10,
     )
 
-    # Copy data preprocessor via pickle + load
+    # Copy data processors via pickle + load
     predictor._data_processors = pickle.loads(pickle.dumps(predictor._data_processors))
 
-    # Test for copied preprocessor
+    # Test copied data processors
     predictor.fit(
         train_data=dataset.train_df,
         config=config,
