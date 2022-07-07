@@ -1521,7 +1521,7 @@ class MultiModalPredictor:
             else:
                 pred = logits_or_prob
 
-        if as_pandas:
+        if as_pandas or isinstance(data, pd.DataFrame):
             pred = self._as_pandas(data=data, to_be_converted=pred)
         return pred
 
@@ -1590,7 +1590,7 @@ class MultiModalPredictor:
                     problem_type=self._problem_type,
                 )
                 prob = prob[:, pos_label]
-        if as_pandas:
+        if as_pandas or isinstance(data, pd.DataFrame):
             prob = self._as_pandas(data=data, to_be_converted=prob)
         return prob
 
