@@ -36,9 +36,5 @@ def test_metric_kwargs_init():
     assert score_pos_label_0_og == score_pos_label_0_v2
     assert score_pos_label_0_og == score_pos_label_0_test_override
 
-    try:
-        f1_pos_label_0(y_true, y_pred, pos_label=1)
-    except TypeError:
-        pass  # TypeError is expected
-    else:
-        raise AssertionError('metric should raise TypeError if keyword argument is specified in both init and call.')
+    # assert that kwargs passed during call override init kwargs
+    assert score_og == f1_pos_label_0(y_true, y_pred, pos_label=1)

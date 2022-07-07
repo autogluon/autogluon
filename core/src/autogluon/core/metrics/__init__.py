@@ -61,7 +61,7 @@ class Scorer(object, metaclass=ABCMeta):
             Model predictions
         sample_weight : array-like, optional (default=None)
             Sample weights.
-        **kwargs : dict
+        **kwargs :
             Keyword arguments passed to the inner metric __call__ method.
             If keys are shared with kwargs in Scorer.__init__, this will take priority.
 
