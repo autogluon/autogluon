@@ -15,13 +15,78 @@ from . import quantile_metrics
 
 
 class Scorer(object, metaclass=ABCMeta):
-    def __init__(self, name, score_func, optimum, sign, kwargs):
+    """
+    Scorer wraps an external or custom metric function to align it with AutoGluon's metric logic and API.
+
+    Parameters
+    ----------
+    name : str
+        Name of the metric. Used in logs and as a key in dictionaries when multiple metric outputs are computed.
+    score_func :
+        Scoring metric function that will be called internally to score.
+        Required to be a callable with the first two arguments corresponding to y_true, y_pred that returns a float indicating the metric value.
+    optimum : float
+        The highest/best value the metric can return. For example, optimal=1 for accuracy, optimal=0 for mean_squared_error.
+        This is used to calculate regret / error. For example, a score of 1 for accuracy would have an error of 0.
+    sign : int
+        Valid values are 1 and -1.
+        The sign of the metric to ensure greater_is_better.
+        For score metrics such as accuracy and r2, the sign should be 1.
+        For error metrics such as log_loss and mean_squared_error, the sign should be -1.
+    kwargs : dict, optional
+        kwargs to pass to score_func when called.
+        For example, kwargs = {"beta": 2} when using sklearn.metrics.fbeta_score where beta is a required argument.
+    """
+    def __init__(self, name: str, score_func, optimum: float, sign: int, kwargs: dict = None):
         self.name = name
+        if kwargs is None:
+            kwargs = dict()
         self._kwargs = kwargs
         self._score_func = score_func
         self._optimum = optimum
+        if sign != 1 and sign != -1:
+            raise ValueError(f'sign must be one of [1, -1], but was instead {sign}')
         self._sign = sign
         self.alias = set()
+
+    def __call__(self, y_true, y_pred, sample_weight=None, **kwargs):
+        """
+        Evaluate predicted target values for X relative to y_true.
+
+        Parameters
+        ----------
+        y_true : array-like
+            Gold standard target values for X.
+        y_pred : array-like, [n_samples x n_classes]
+            Model predictions
+        sample_weight : array-like, optional (default=None)
+            Sample weights.
+        **kwargs :
+            Keyword arguments passed to the inner metric __call__ method.
+            If keys are shared with kwargs in Scorer.__init__, this will take priority.
+
+        Returns
+        -------
+        score : float
+            Score function applied to prediction of estimator on X.
+        """
+        if kwargs is None:
+            k = self._kwargs.copy()
+        elif self._kwargs is None:
+            k = kwargs
+        else:
+            k = self._kwargs.copy()
+            k.update(kwargs)
+        if k is None:
+            k = dict()
+        if sample_weight is not None:
+            k['sample_weight'] = sample_weight
+
+        return self._score(y_true=y_true, y_pred=y_pred, **k)
+
+    def _score(self, y_true, y_pred, **kwargs):
+        y_true, y_pred, kwargs = self._preprocess(y_true=y_true, y_pred=y_pred, **kwargs)
+        return self._sign * self._score_func(y_true, y_pred, **kwargs)
 
     def add_alias(self, alias):
         if alias == self.name:
@@ -47,8 +112,8 @@ class Scorer(object, metaclass=ABCMeta):
         return self._sign * score
 
     @abstractmethod
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        pass
+    def _preprocess(self, y_true, y_pred, **kwargs):
+        raise NotImplementedError
 
     def __repr__(self):
         return self.name
@@ -80,26 +145,7 @@ class Scorer(object, metaclass=ABCMeta):
 
 
 class _PredictScorer(Scorer):
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        """Evaluate predicted target values for X relative to y_true.
-
-        Parameters
-        ----------
-        y_true : array-like
-            Gold standard target values for X.
-
-        y_pred : array-like, [n_samples x n_classes]
-            Model predictions
-
-        sample_weight : array-like, optional (default=None)
-            Sample weights.
-
-        Returns
-        -------
-        score : float
-            Score function applied to prediction of estimator on X.
-        """
-
+    def _preprocess(self, y_true, y_pred, **kwargs):
         if isinstance(y_true, list):
             y_true = np.array(y_true)
         if isinstance(y_pred, list):
@@ -118,14 +164,7 @@ class _PredictScorer(Scorer):
                 y_pred[y_pred <= 0.5] = 0.0
             else:
                 raise ValueError(type_true)
-
-        if sample_weight is not None:
-            return self._sign * self._score_func(y_true, y_pred,
-                                                 sample_weight=sample_weight,
-                                                 **self._kwargs)
-        else:
-            return self._sign * self._score_func(y_true, y_pred,
-                                                 **self._kwargs)
+        return y_true, y_pred, kwargs
 
     @property
     def needs_pred(self):
@@ -145,31 +184,8 @@ class _PredictScorer(Scorer):
 
 
 class _ProbaScorer(Scorer):
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        """Evaluate predicted probabilities for X relative to y_true.
-        Parameters
-        ----------
-        y_true : array-like
-            Gold standard target values for X. These must be class labels,
-            not probabilities.
-
-        y_pred : array-like, [n_samples x n_classes]
-            Model predictions
-
-        sample_weight : array-like, optional (default=None)
-            Sample weights.
-
-        Returns
-        -------
-        score : float
-            Score function applied to prediction of estimator on X.
-        """
-        if sample_weight is not None:
-            return self._sign * self._score_func(y_true, y_pred,
-                                                 sample_weight=sample_weight,
-                                                 **self._kwargs)
-        else:
-            return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+    def _preprocess(self, y_true, y_pred, **kwargs):
+        return y_true, y_pred, kwargs
 
     @property
     def needs_pred(self):
@@ -189,26 +205,7 @@ class _ProbaScorer(Scorer):
 
 
 class _ThresholdScorer(Scorer):
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        """Evaluate decision function output for X relative to y_true.
-
-        Parameters
-        ----------
-        y_true : array-like
-            Gold standard target values for X. These must be class labels,
-            not probabilities.
-
-        y_pred : array-like, [n_samples x n_classes]
-            Model predictions
-
-        sample_weight : array-like, optional (default=None)
-            Sample weights.
-
-        Returns
-        -------
-        score : float
-            Score function applied to prediction of estimator on X.
-        """
+    def _preprocess(self, y_true, y_pred, **kwargs):
         if isinstance(y_true, list):
             y_true = np.array(y_true)
         if isinstance(y_pred, list):
@@ -222,13 +219,7 @@ class _ThresholdScorer(Scorer):
             # y_pred = y_pred[:, 1]
         elif isinstance(y_pred, list):
             y_pred = np.vstack([p[:, -1] for p in y_pred]).T
-
-        if sample_weight is not None:
-            return self._sign * self._score_func(y_true, y_pred,
-                                                 sample_weight=sample_weight,
-                                                 **self._kwargs)
-        else:
-            return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+        return y_true, y_pred, kwargs
 
     @property
     def needs_pred(self):
@@ -248,51 +239,23 @@ class _ThresholdScorer(Scorer):
 
 
 class _QuantileScorer(Scorer):
-    def __call__(self, y_true, y_pred, quantile_levels, sample_weight=None):
-        """Evaluate predicted quantile target values for X relative to y_true.
-
-        Parameters
-        ----------
-        y_true : array-like
-            Gold standard target values for X.
-
-        y_pred : array-like, [n_samples x n_quantiles]
-            Model quantile predictions
-
-        quantile_levels : array-like
-            List of quantile levels
-
-        sample_weight : array-like, optional (default=None)
-            Sample weights.
-
-        Returns
-        -------
-        score : float
-            Score function applied to prediction of estimator on X.
-        """
-
+    def _preprocess(self, y_true, y_pred, **kwargs):
         if isinstance(y_true, list):
             y_true = np.array(y_true)
         if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
-        if isinstance(quantile_levels, list):
-            quantile_levels = np.array(quantile_levels)
+        if 'quantile_levels' not in kwargs:
+            raise AssertionError('quantile_levels is required to score quantile metrics')
+        if isinstance(kwargs['quantile_levels'], list):
+            kwargs['quantile_levels'] = np.array(kwargs['quantile_levels'])
+
         type_true = type_of_target(y_true)
 
         if len(y_pred.shape) == 2 or y_pred.shape[1] >= 1 or type_true == 'continuous':
             pass  # must be quantile regression, all other task types would return at least two probabilities
         else:
             raise ValueError(type_true)
-
-        if sample_weight is not None:
-            return self._sign * self._score_func(y_true, y_pred,
-                                                 quantile_levels,
-                                                 sample_weight=sample_weight,
-                                                 **self._kwargs)
-        else:
-            return self._sign * self._score_func(y_true, y_pred,
-                                                 quantile_levels,
-                                                 **self._kwargs)
+        return y_true, y_pred, kwargs
 
     @property
     def needs_pred(self):
@@ -323,8 +286,16 @@ def _add_scorer_to_metric_dict(metric_dict, scorer):
         metric_dict[alias] = scorer
 
 
-def make_scorer(name, score_func, optimum=1, greater_is_better=True,
-                needs_proba=False, needs_threshold=False, needs_quantile=False, **kwargs) -> Scorer:
+def make_scorer(name,
+                score_func,
+                *,
+                optimum=1,
+                greater_is_better=True,
+                needs_proba=False,
+                needs_threshold=False,
+                needs_quantile=False,
+                metric_kwargs: dict = None,
+                **kwargs) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
     Factory inspired by scikit-learn which wraps scikit-learn scoring functions
@@ -357,6 +328,10 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         Whether score_func is based on quantile predictions.
         This only works for quantile regression.
 
+    metric_kwargs : dict
+        Additional parameters to be passed to score_func, merged with kwargs if both are present.
+        metric_kwargs keys will override kwargs keys if keys are shared between them.
+
     **kwargs : additional arguments
         Additional parameters to be passed to score_func.
 
@@ -374,7 +349,15 @@ def make_scorer(name, score_func, optimum=1, greater_is_better=True,
         cls = _QuantileScorer
     else:
         cls = _PredictScorer
-    return cls(name, score_func, optimum, sign, kwargs)
+    if metric_kwargs is not None:
+        kwargs.update(metric_kwargs)
+    return cls(
+        name=name,
+        score_func=score_func,
+        optimum=optimum,
+        sign=sign,
+        kwargs=kwargs,
+    )
 
 
 # Standard regression scores
