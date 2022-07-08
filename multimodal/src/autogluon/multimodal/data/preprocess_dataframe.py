@@ -33,7 +33,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def __init__(
         self,
         config: DictConfig,
-        column_types: collections.OrderedDict,
+        column_types: Dict,
         label_column: Optional[str] = None,
         label_generator: Optional[LabelEncoder] = None,
     ):
@@ -196,7 +196,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
-    def fit_x(self, X: pd.DataFrame):
+    def _fit_x(self, X: pd.DataFrame):
         """
         Fit the pd.DataFrame by grouping column names by their modality types. For example, all the
         names of text columns will be put in a list. The CategoryFeatureGenerator, SimpleImputer, and
@@ -263,7 +263,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
                 )
 
-    def fit_y(self, y: pd.Series):
+    def _fit_y(self, y: pd.Series):
         """
         Fit the label column data to initialize the label encoder or scalar.
 
@@ -271,7 +271,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         ----------
         y
             The Label column data.
-
         """
         if self._fit_y_called:
             raise RuntimeError("fit_y() has been called. Please create a new preprocessor and call it again!")
@@ -284,6 +283,22 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
+
+    def fit(self, X: Optional[pd.DataFrame] = None, y: Optional[pd.Series] = None):
+        """
+        Fit the dataframe preprocessor with features X and labels y.
+
+        Parameters
+        ----------
+        X
+            The multimodal features in the format of pd.DataFrame.
+        y
+            The Label data in the format of pd.Series.
+        """
+        if X is not None:
+            self._fit_x(X=X)
+        if y is not None:
+            self._fit_y(y=y)
 
     def transform_text(
         self,
