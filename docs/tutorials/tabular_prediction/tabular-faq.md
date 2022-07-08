@@ -141,15 +141,24 @@ To learn how to add your own custom models to the set that AutoGluon trains, tun
 
 ### How can I reproduce the results of model XYZ without using AutoGluon?
 
-Exactly reproducing the results of AutoGluon models without using AutoGluon is extremely challenging.
-(Ex: Trying to replicate the results of AutoGluon's LightGBM without depending on AutoGluon)
+Exactly reproducing the results of AutoGluon models without using AutoGluon can be challenging
+(Ex: Trying to replicate the results of AutoGluon's LightGBM without depending on AutoGluon).
 AutoGluon uses a variety of techniques not present in the model frameworks it builds upon such as data preprocessing,
 edge case handling, custom early stopping, and custom architectures. These are all used to enhance the performance
 and simplify usage beyond what exists in the original model framework (such as LightGBM, XGBoost, FastAI, etc.).
 This is a core benefit of AutoML frameworks and is inherently complicated to replicate
 (you would have to reimplement much of what AutoGluon does behind the scenes).
-If you still wish to try to replicate results, you must dive into the source code for a given model
-without guidance from the AutoGluon devs.
+If you still wish to try to replicate results, the logic can be derived from the source code.
+
+### Why was XYZ design decision chosen?
+
+Usually the answer boils down to
+"because it performed better on average than the alternatives we tested across a wide variety of benchmark datasets"
+and/or "because it is simple and easy to implement while likely performing similarly to more complex methods"
+and/or "because it worked well enough and we haven't investigated further options".
+AutoML is inherently an empirically oriented field rather than a theoretical one.
+This is because theoretically explaining why the various AutoML components work together better than numerous
+alternatives in practice is not particularly feasible nor generalizable.
 
 ### How can I add my own custom data preprocessing or feature engineering?
 
