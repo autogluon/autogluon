@@ -732,6 +732,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
             for model_name in model_names:
                 try:
+                    # TODO: time only prediction and not score for pred_time_val and pred_time_test
                     time_start_test_score = time.time()
                     model_info[model_name]["score_test"] = self.score(data, model_name)
                     model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
