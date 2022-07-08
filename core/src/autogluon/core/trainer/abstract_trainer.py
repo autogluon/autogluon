@@ -712,44 +712,23 @@ class AbstractTrainer:
             raise AssertionError('Cascade is not valid when model_pred_proba_dict is specified.')
         if cascade and self.problem_type not in [BINARY, MULTICLASS]:
             raise AssertionError(f'Ensemble Cascade not implemented for problem_type=={self.problem_type}')
-
+        if cascade and use_val_cache:
+            raise AssertionError('cascade and use_val_cache cannot both be True.')
         if fit:
             if cascade:
                 raise AssertionError(f'Ensemble Cascade not implemented when `fit==True')
             model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
-        # elif not model_pred_proba_dict:
-        #     # TODO: Pre-construct order if cascade, otherwise this will slow down prediction having to recompute each inference call.
-        #     model_pred_order = self._construct_model_pred_order(models)
-        # else:
-        #     model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
         else:
             if use_val_cache:
                 _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
-            model_set = set()
-            for model in models:
-                if model in model_set or model in model_pred_proba_dict:
-                    continue
-                min_model_set = set(self.get_minimum_model_set(model))
-                model_set = model_set.union(min_model_set)
-            model_set = model_set.difference(set(model_pred_proba_dict.keys()))
+            if not model_pred_proba_dict:
+                # TODO: Pre-construct order if cascade, otherwise this will slow down prediction having to recompute each inference call.
+                model_pred_order = self._construct_model_pred_order(models)
+            else:
+                model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
             if use_val_cache:
-                model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=model_set, model_pred_proba_dict=model_pred_proba_dict)
-            models_to_load = list(model_set)
-            subgraph = nx.subgraph(self.model_graph, models_to_load)
-
-            # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
-            models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
-            while models_to_ignore:
-                model = models_to_ignore[0]
-                predecessors = list(subgraph.predecessors(model))
-                subgraph.remove_node(model)
-                models_to_ignore = models_to_ignore[1:]
-                for predecessor in predecessors:
-                    if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
-                        models_to_ignore.append(predecessor)
-
-            # Get model prediction order
-            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+                model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(model_pred_order), model_pred_proba_dict=model_pred_proba_dict)
+                model_pred_order = [model for model in model_pred_order if model in model_set]
 
         iloc_model_dict = dict()
         model_pred_proba_dict_cascade = dict()
