@@ -21,7 +21,8 @@ from ...dataset import TimeSeriesDataFrame
 from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
 from ...utils.warning_filters import disable_root_logger
 from ..abstract import AbstractTimeSeriesModel
-from .callback import TimeLimitCallback
+from .callback import TimeLimitCallback, GluonTSEarlyStoppingCallback
+
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
@@ -153,8 +154,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     "during initialization. Please provide a `freq` string to `fit`."
                 )
 
-        if "callback" in kwargs:
-            self.callbacks.append(kwargs["callback"])
+        if "callbacks" in kwargs:
+            self.callbacks += kwargs["callbacks"]
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
@@ -210,10 +211,14 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
 
+        callbacks = [TimeLimitCallback(time_limit)]
+
+        early_stopping_patience = self._get_model_params().get("early_stopping_patience", None)
+        if early_stopping_patience:
+            callbacks.append(GluonTSEarlyStoppingCallback(early_stopping_patience))
+
         # update auxiliary parameters
-        self._deferred_init_params_aux(
-            dataset=train_data, callback=TimeLimitCallback(time_limit), **kwargs
-        )
+        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
 
         estimator = self._get_estimator()
         with warning_filter(), disable_root_logger():
