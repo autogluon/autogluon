@@ -554,7 +554,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
-                hyperparameter_tune=hyperparameter_tune_kwargs is not None,
+                hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
             )
 
