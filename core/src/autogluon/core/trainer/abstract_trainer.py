@@ -687,10 +687,6 @@ class AbstractTrainer:
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
     #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
     # TODO: Add memory optimal topological ordering -> Minimize amount of pred_probas in memory at a time, delete pred probas that are no longer required
-    # Optimally computes pred_probas for each model in `models`. Will compute each necessary model only once and store its predictions in a dictionary.
-    # Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
-    # fit = get oof pred proba
-    # if record_pred_time is `True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
     def get_model_pred_proba_dict(self,
                                   X: pd.DataFrame,
                                   models: List[str],
@@ -701,6 +697,59 @@ class AbstractTrainer:
                                   use_val_cache: bool = False,
                                   cascade: bool = False,
                                   cascade_threshold: float = 0.9):
+        """
+        Optimally computes pred_probas (or predictions if regression) for each model in `models`.
+        Will compute each necessary model only once and store predictions in a `model_pred_proba_dict` dictionary.
+        Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data to predict on.
+            Ignored if `fit=True`.
+        models : List[str]
+            The list of models to predict with.
+            Note that if models have dependency models, their dependencies will also be predicted with and included in the output.
+        model_pred_proba_dict : dict, optional
+            A dict of predict_probas that could have been computed by a prior call to `get_model_pred_proba_dict` to avoid redundant computations.
+            Models already present in model_pred_proba_dict will not be predicted on.
+            get_model_pred_proba_dict(X, models=['A', 'B', 'C']) is equivalent to
+            get_model_pred_proba_dict(X, models=['C'], model_pred_proba_dict=get_model_pred_proba_dict(X, models=['A', 'B']))
+            Note: Mutated in-place to minimize memory usage
+        model_pred_time_dict : dict, optional
+            If `record_pred_time==True`, this is a dict of model name to marginal time taken in seconds for the prediction of X.
+            Must be specified alongside `model_pred_proba_dict` if `record_pred_time=True` and `model_pred_proba_dict != None`.
+            Ignored if `record_pred_time=False`.
+            Note: Mutated in-place to minimize memory usage
+        fit : bool, default = False
+            # TODO: Maybe move to a separate method to avoid confusion
+            Whether to fetch the predictions as if at fit time (Ignore X, return out-of-fold pred_proba). Only valid if in bag mode.
+            If True, actual computation is skipped and cached out-of-fold results are simply loaded and used.
+            Incompatible with `cascade=True`.
+        record_pred_time : bool, default = False
+            Whether to store marginal inference times of each model as an extra output `model_pred_time_dict`.
+        use_val_cache : bool, default = False
+            Whether to fetch cached val prediction probabilities for models instead of predicting on the data.
+            Only set to True if X is equal to the validation data and you want to skip live predictions.
+        cascade : bool, default = False
+            [Experimental] Whether to perform an ensemble cascade.
+            If True, the cascade is performed from left to right on the models specified in `models`.
+            For each row of input data in X:
+                After a model in `models` predicts on it:
+                    If the prediction probability is confident (determined by `cascade_threshold`) then use that prediction probability as final result and don't predict on that row with further models.
+                    Else continue predicting with later models (unless the model is the final model, in which case use that prediction probability).
+            This process should speed up prediction compared to predicting on the last model for all rows, assuming earlier models are part of the dependency graph of the final model.
+            Only valid for binary and multiclass classification.
+            Note: When True, only the output of the final model in `models` in `model_pred_proba_dict` should be used.
+        cascade_threshold : float, default = 0.9
+            # TODO: Placeholder logic, replace with more complex option
+            Threshold to use for determining if a row should exit the cascaded prediction early.
+            If any one class has pred_proba>=cascade_threshold, then it exits early.
+            Ignored if `cascade=False`.
+
+        Returns
+        -------
+        If `record_pred_time==True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
+        """
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         if model_pred_time_dict is None:
