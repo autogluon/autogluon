@@ -53,15 +53,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._label_column = label_column
         self._config = config
         self._feature_generators = dict()
-        # Some columns will be ignored
-        self._ignore_columns_set = set()
-        self._text_feature_names = []
-        self._categorical_feature_names = []
-        self._categorical_num_categories = []
-        self._numerical_feature_names = []
-        self._image_path_names = []
-
-        # Label encoder for categorical labels
         if label_generator is None:
             self._label_generator = LabelEncoder()
         else:
@@ -83,16 +74,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type == NULL:
-                self._ignore_columns_set.add(col_name)
-            elif col_type == TEXT:
-                self._text_feature_names.append(col_name)
-            elif col_type == IMAGE_PATH:
-                self._image_path_names.append(col_name)
+            if col_type in [TEXT, IMAGE_PATH, NULL]:
+                continue
             elif col_type == CATEGORICAL:
-                # we don't add col_name in the _categorical_feature_names here
-                # because we need to operate _categorical_feature_names and _categorical_num_categories
-                # simultaneously to ensure their items have the correct correspondences.
                 generator = CategoryFeatureGenerator(
                     cat_order="count",
                     minimum_cat_count=config.categorical.minimum_cat_count,
@@ -101,7 +85,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 )
                 self._feature_generators[col_name] = generator
             elif col_type == NUMERICAL:
-                self._numerical_feature_names.append(col_name)
                 generator = Pipeline(
                     [
                         ("imputer", SimpleImputer()),
@@ -124,6 +107,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._fit_called = False
         self._fit_x_called = False
         self._fit_y_called = False
+
+        # Some columns will be ignored
+        self._ignore_columns_set = set()
+        self._text_feature_names = []
+        self._categorical_feature_names = []
+        self._categorical_num_categories = []
+        self._numerical_feature_names = []
+        self._image_path_names = []
 
     @property
     def label_column(self):
@@ -207,7 +198,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     def fit_x(self, X: pd.DataFrame):
         """
-        Fit a pd.DataFrame to initialize the CategoryFeatureGenerator, SimpleImputer, or StandardScaler.
+        Fit the pd.DataFrame by grouping column names by their modality types. For example, all the
+        names of text columns will be put in a list. The CategoryFeatureGenerator, SimpleImputer, and
+        StandardScaler will also be initialized.
 
         Parameters
         ----------
@@ -226,15 +219,15 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_type = self._column_types[col_name]
             logger.debug(f'Process col "{col_name}" with type "{col_type}"')
             col_value = X[col_name]
-
-            if col_type == CATEGORICAL:
+            if col_type == NULL:
+                self._ignore_columns_set.add(col_name)
+            elif col_type == TEXT:
+                self._text_feature_names.append(col_name)
+            elif col_type == CATEGORICAL:
                 if self._config.categorical.convert_to_text:
                     # Convert categorical column as text column
                     col_value = col_value.astype("object")
                     processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
-                    if col_name in self._categorical_feature_names:
-                        self._categorical_feature_names.remove(col_name)
-                    del self._feature_generators[col_name]
                     if len(processed_data.unique()) == 1:
                         self._ignore_columns_set.add(col_name)
                         continue
@@ -246,31 +239,25 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                         col_name
                     ].cat.codes.to_numpy(np.int32, copy=True)
                     if len(np.unique(processed_data)) == 1:
-                        if col_name in self._categorical_feature_names:
-                            self._categorical_feature_names.remove(col_name)
-                        del self._feature_generators[col_name]
                         self._ignore_columns_set.add(col_name)
                         continue
                     num_categories = len(generator.category_map[col_name])
-                    self._categorical_feature_names.append(col_name)
+                    # Add one unknown category
                     self._categorical_num_categories.append(num_categories + 1)
-
+                    self._categorical_feature_names.append(col_name)
             elif col_type == NUMERICAL:
                 processed_data = pd.to_numeric(col_value)
                 if len(processed_data.unique()) == 1:
-                    self._numerical_feature_names.remove(col_name)
-                    del self._feature_generators[col_name]
                     self._ignore_columns_set.add(col_name)
                     continue
                 if self._config.numerical.convert_to_text:
-                    self._numerical_feature_names.remove(col_name)
-                    del self._feature_generators[col_name]
                     self._text_feature_names.append(col_name)
                 else:
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
-            elif col_type in [IMAGE_PATH, TEXT, NULL]:
-                continue
+                    self._numerical_feature_names.append(col_name)
+            elif col_type == IMAGE_PATH:
+                self._image_path_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
