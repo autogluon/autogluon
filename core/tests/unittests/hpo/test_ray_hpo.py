@@ -19,6 +19,10 @@ class DummyAdapter(RayTuneAdapter):
     supported_searchers = list(SEARCHER_PRESETS.keys())
     supported_schedulers = list(SCHEDULER_PRESETS.keys())
     
+    @property
+    def adapter_type(self):
+        return 'dummy'
+    
     def get_resource_calculator(self, **kwargs):
         pass
     

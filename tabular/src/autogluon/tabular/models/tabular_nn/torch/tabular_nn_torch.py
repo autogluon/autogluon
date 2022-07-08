@@ -10,6 +10,7 @@ import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
@@ -596,6 +597,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
+    
+    def _get_hpo_backend(self):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        return RAY_BACKEND
 
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:

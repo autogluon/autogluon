@@ -12,20 +12,22 @@ logger = logging.getLogger("autogluon.timeseries.trainer")
 
 def model_trial(
     args,
-    reporter,
     model_cls,
     init_params,
     train_path,
     val_path,
     time_start,
+    hpo_executor,
+    reporter=None,  # reporter only used by custom strategy, hence optional
     time_limit=None,
     fit_kwargs=None,
+    checkpoint_dir=None,  # Timeseries doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
 ):
     """Runs a single trial of a hyperparameter tuning. Replaces
     `core.models.abstract.model_trial.model_trial` for timeseries models.
     """
     try:
-        model = init_model(args, model_cls, init_params)
+        model = init_model(args, model_cls, init_params, backend=hpo_executor.executor_type)
         model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
 
         train_data = load_pkl.load(train_path)
@@ -46,9 +48,12 @@ def model_trial(
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
-        reporter.terminate()
+        # In case of TimeLimitExceed, val_score could be None
+        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score if model.val_score is not None else float('-inf'))
+        if reporter is not None:
+            reporter.terminate()
     else:
-        reporter(epoch=1, validation_performance=model.val_score)
+        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score)
 
 
 def fit_and_save_model(
@@ -97,5 +102,6 @@ def skip_hpo(model, train_data, val_data, time_limit=None):
     )
     hpo_results = {"total_time": model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
+    hpo_results['hpo_model_performances'] = hpo_model_performances
     hpo_models = {model.name: model.path}
-    return hpo_models, hpo_model_performances, hpo_results
+    return hpo_models, hpo_results

@@ -4,6 +4,7 @@ import psutil
 
 from abc import ABC, abstractmethod
 
+from ..utils import get_cpu_count, get_gpu_count_all
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,26 @@ class ResourceCalculator(ABC):
     def calc_type(self):
         """Type of the resource calculator"""
         raise NotImplementedError
+    
+    @staticmethod
+    def get_total_gpu_count(user_specified_num_gpus: int, model_default_num_gpus: int):
+        if user_specified_num_gpus is not None:
+            num_gpus = min(user_specified_num_gpus, get_gpu_count_all())
+        elif model_default_num_gpus > 0:
+            num_gpus = get_gpu_count_all()
+        else:
+            num_gpus = 0
+        return num_gpus
+
+    @staticmethod
+    def get_total_cpu_count(user_specified_num_cpus: int, model_default_num_cpus: int):
+        if user_specified_num_cpus is not None:
+            num_cpus = min(user_specified_num_cpus, get_cpu_count())
+        elif model_default_num_cpus > 0:
+            num_cpus = get_cpu_count()
+        else:
+            num_cpus = 0
+        return num_cpus
     
     @abstractmethod
     def get_resources_per_job(self, **kwargs) -> dict:
