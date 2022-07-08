@@ -69,7 +69,6 @@ def test_data_process_image(augmentations):
     image = PIL.Image.open(dataset.train_df.Images[0]).convert("RGB")
 
     image_processor=ImageProcessor(
-        image_column_names=['Images'],
         prefix="timm_image",
         train_transform_types=augmentations["model.timm_image.train_transform_types"],
         val_transform_types=augmentations["model.timm_image.val_transform_types"],

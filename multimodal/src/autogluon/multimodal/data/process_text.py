@@ -86,7 +86,6 @@ class TextProcessor:
         self,
         prefix: str,
         checkpoint_name: str,
-        text_column_names: List[str],
         tokenizer_name: Optional[str] = "hf_auto",
         max_len: Optional[int] = None,
         insert_sep: Optional[bool] = True,
@@ -104,8 +103,6 @@ class TextProcessor:
             The prefix connecting a processor to its corresponding model.
         checkpoint_name
             Name of the pretrained huggingface checkpoint, e.g., "microsoft/deberta-v3-small"
-        text_column_names
-            Text column names in a multimodal pd.DataFrame.
         tokenizer_name
             Name of the huggingface tokenizer type (default "hf_auto").
         max_len
@@ -130,7 +127,6 @@ class TextProcessor:
         self.prefix = prefix
         self.tokenizer_name = tokenizer_name
         self.checkpoint_name = checkpoint_name
-        self.text_column_names = text_column_names
         self.requires_column_info = requires_column_info
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
@@ -200,7 +196,7 @@ class TextProcessor:
     def text_column_prefix(self):
         return f"{self.text_token_ids_key}_{COLUMN}"
 
-    def collate_fn(self) -> Dict:
+    def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
         Collate text features into a batch.
         This function will be used when creating Pytorch DataLoader.
@@ -211,7 +207,8 @@ class TextProcessor:
         """
         fn = {}
         if self.requires_column_info:
-            for col_name in self.text_column_names:
+            assert text_column_names, "Empty text column names."
+            for col_name in text_column_names:
                 fn[f"{self.text_column_prefix}_{col_name}"] = Stack()
 
         fn.update(

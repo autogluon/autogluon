@@ -87,8 +87,8 @@ And you can easily obtain predictions from these models by calling `predictor.pr
 sentence1 = "it's a charming and often affecting journey."
 sentence2 = "It's slow, very, very, very slow."
 predictions = predictor.predict({'sentence': [sentence1, sentence2]})
-print('"Sentence":', sentence1, '"Predicted Sentiment":', predictions.iloc[0])
-print('"Sentence":', sentence2, '"Predicted Sentiment":', predictions.iloc[1])
+print('"Sentence":', sentence1, '"Predicted Sentiment":', predictions[0])
+print('"Sentence":', sentence2, '"Predicted Sentiment":', predictions[1])
 ```
 
 For classification tasks, you can ask for predicted class-probabilities instead of predicted classes.
@@ -96,8 +96,8 @@ For classification tasks, you can ask for predicted class-probabilities instead 
 
 ```{.python .input}
 probs = predictor.predict_proba({'sentence': [sentence1, sentence2]})
-print('"Sentence":', sentence1, '"Predicted Class-Probabilities":', probs.iloc[0])
-print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs.iloc[1])
+print('"Sentence":', sentence1, '"Predicted Class-Probabilities":', probs[0])
+print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs[1])
 ```
 
 We can just as easily produce predictions over an entire dataset.
@@ -135,7 +135,7 @@ You can also use a trained predictor to extract embeddings that maps each row of
 
 ```{.python .input}
 embeddings = predictor.extract_embedding(test_data)
-print(embeddings)
+print(embeddings.shape)
 ```
 
 Here, we use TSNE to visualize these extracted embeddings. We can see that there are two clusters corresponding to our two labels, since this network has been trained to discriminate between these labels.

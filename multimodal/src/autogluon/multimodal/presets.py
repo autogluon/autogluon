@@ -55,6 +55,14 @@ def multilingual():
     }
 
 
+@automm_presets.register()
+def zero_shot():
+    return {
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14",
+        "model.clip.max_text_len": 0,
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
