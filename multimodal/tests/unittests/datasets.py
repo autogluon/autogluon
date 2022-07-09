@@ -7,8 +7,8 @@ from autogluon.multimodal.constants import (
     BINARY,
     REGRESSION,
 )
+from autogluon.multimodal.utils import download
 from utils import (
-    download,
     get_data_home_dir,
     get_repo_url,
     protected_zip_extraction,

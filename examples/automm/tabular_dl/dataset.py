@@ -10,7 +10,7 @@ from autogluon.multimodal.constants import (
     CATEGORICAL,
     NUMERICAL,
 )
-from utils import download
+from autogluon.multimodal.utils import download
 
 
 # TODO: release the auto_mm_bench package or reuse the huggingface datasets API

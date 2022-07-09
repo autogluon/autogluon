@@ -25,6 +25,8 @@ install_requires = [
     'Pillow',
     'tqdm',
     'boto3',
+    'requests',
+    'uuid',
     'timm<0.6.0',
     'torch>=1.0,<1.12',
     'fairscale>=0.4.5,<0.5.0',
