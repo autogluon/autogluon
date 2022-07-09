@@ -29,6 +29,7 @@ from .constants import (
     LABEL,
     BINARY,
     MULTICLASS,
+    CLASSIFICATION,
     REGRESSION,
     Y_PRED,
     Y_PRED_PROB,
@@ -398,7 +399,7 @@ class MultiModalPredictor:
 
         # Generate general info that's not config specific
         if tuning_data is None:
-            if self._problem_type in [BINARY, MULTICLASS]:
+            if self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION]:
                 stratify = train_data[self._label_column]
             else:
                 stratify = None
@@ -446,6 +447,9 @@ class MultiModalPredictor:
             column_types = self._column_types
 
         if self._problem_type is not None:
+            if self._problem_type == CLASSIFICATION:
+                # Set the problem type to be inferred problem type
+                self._problem_type = problem_type
             assert self._problem_type == problem_type, (
                 f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
             )

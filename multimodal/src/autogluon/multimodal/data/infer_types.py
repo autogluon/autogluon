@@ -317,7 +317,7 @@ def infer_label_column_type_by_problem_type(
             warnings.warn(
                 f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
             )
-        if problem_type == MULTICLASS or problem_type == BINARY:
+        if problem_type == MULTICLASS or problem_type == BINARY or problem_type == CLASSIFICATION:
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
