@@ -519,8 +519,6 @@ def apply_layerwise_lr_decay(
                 if pattern in ele_name:
                     within_automm_custom_layer = True
                     break
-            if within_automm_custom_layer:
-                break
         if within_automm_custom_layer:
             param.requires_grad = True
         else:
@@ -544,6 +542,10 @@ def apply_layerwise_lr_decay(
                 # For LoRA adapation we fine-tune LoRA and normalization and bias layers
                 if "lora_" not in name and name not in norm_param_names and "bias" not in name:
                     param.requires_grad = False
+            elif efficient_finetune is not None:
+                raise NotImplementedError(f"The efficient finetuning strategy '{efficient_finetune}'"
+                                          f" is not supported. We only support"
+                                          f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}'.")
 
         if not param.requires_grad:
             continue  # frozen weights
