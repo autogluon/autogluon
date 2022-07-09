@@ -143,4 +143,4 @@ LAST_CHECKPOINT = "last.ckpt"
 MODEL_CHECKPOINT = "model.ckpt"
 
 # url
-S3_PREFIX = 's3://'
+S3_PREFIX = "s3://"
