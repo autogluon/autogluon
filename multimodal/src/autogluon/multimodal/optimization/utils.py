@@ -507,27 +507,43 @@ def apply_layerwise_lr_decay(
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
     norm_param_names = get_norm_layer_param_names(model)
+    # Patterns that detect if the layer is a custom layer (not loaded from a pretraining network)
+    # TODO(?) Currently it is a workaround. We need to fix it in the future, i.e., supporting tabular encoders
+    automm_custom_layer_patterns = ["head", "fusion_mlp", "adapter"]
+
     for name, param in model.named_parameters():
-        if efficient_finetune == BIT_FIT:
-            # For bit_fit, we disable tuning everything except the bias terms
-            if "bias" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == NORM_FIT:
-            # For norm-fit, we finetune all the normalization layers and bias layers
-            if name not in norm_param_names and "bias" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == LORA:
-            # For LoRA adaptation we only fine-tune LoRA weights
-            if "lora_" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == LORA_BIAS:
-            # For LoRA adapation we fine-tune LoRA and all bias weights
-            if "lora_" not in name and "bias" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == LORA_NORM:
-            # For LoRA adapation we fine-tune LoRA and normalization and bias layers
-            if "lora_" not in name and name not in norm_param_names and "bias" not in name:
-                param.requires_grad = False
+        within_automm_custom_layer = False
+        name_split = name.split('.')
+        for ele_name in name_split[:3]:
+            for pattern in automm_custom_layer_patterns:
+                if pattern in ele_name:
+                    within_automm_custom_layer = True
+                    break
+            if within_automm_custom_layer:
+                break
+        if within_automm_custom_layer:
+            param.requires_grad = True
+        else:
+            if efficient_finetune == BIT_FIT:
+                # For bit_fit, we disable tuning everything except the bias terms
+                if "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == NORM_FIT:
+                # For norm-fit, we finetune all the normalization layers and bias layers
+                if name not in norm_param_names and "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == LORA:
+                # For LoRA adaptation we only fine-tune LoRA weights
+                if "lora_" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == LORA_BIAS:
+                # For LoRA adapation we fine-tune LoRA and all bias weights
+                if "lora_" not in name and "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == LORA_NORM:
+                # For LoRA adapation we fine-tune LoRA and normalization and bias layers
+                if "lora_" not in name and name not in norm_param_names and "bias" not in name:
+                    param.requires_grad = False
 
         if not param.requires_grad:
             continue  # frozen weights

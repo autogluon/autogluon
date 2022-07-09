@@ -25,6 +25,10 @@ optimization:
     filter: # Default fine-tune only query and value attention weights, recommended in https://arxiv.org/abs/2106.09685
       - "query"
       - "value"
+      - "^q$"  # The filter can also be a regex. We will use re.match(filter, name) to determine if LoRA should be applied.
+      - "^v$"
+      - "^k$"
+      - "^o$"
   loss_function: "auto" # The replaced loss for regresssion. Can only support loss function in torch.nn.
     # example
     # "BCEWithLogitsLoss" or "nn.BCEWithLogitsloss"

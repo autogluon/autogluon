@@ -1,3 +1,4 @@
+import re
 from typing import Optional, Union, Tuple, List, Dict
 import torch
 from torch import nn
@@ -418,12 +419,13 @@ def inject_lora_to_linear_layer(
         if len(list(module.children())) > 0:
             inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
 
-        if isinstance(module, nn.Linear) and (not filter or any(x in n for x in filter)):
+        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
             lora_layer = LoRALinear(
                 module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
             )
-            lora_layer.weight = module.weight
-            lora_layer.bias = module.bias
+            lora_layer.weight.data.copy_(module.weight.data)
+            if module.bias is not None:
+                lora_layer.bias.data.copy_(module.bias.data)
             setattr(model, n, lora_layer)
 
     return model  # return model to enable method chaining
