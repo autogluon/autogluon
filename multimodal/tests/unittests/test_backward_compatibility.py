@@ -6,7 +6,7 @@ import pytest
 
 from autogluon.multimodal import MultiModalPredictor, AutoMMPredictor
 from autogluon.multimodal.utils import download
-from datasets import AmazonReviewSentimentCrossLingualDataset
+from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from utils import (
     protected_zip_extraction,
     get_home_dir,

@@ -3,7 +3,7 @@ import shutil
 
 from autogluon.multimodal import MultiModalPredictor
 
-from datasets import (
+from unittest_datasets import (
     PetFinderDataset,
     HatefulMeMesDataset,
     AEDataset,

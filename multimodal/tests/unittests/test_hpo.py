@@ -6,7 +6,7 @@ from ray import tune
 from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 
-from datasets import PetFinderDataset
+from unittest_datasets import PetFinderDataset
 from utils import get_home_dir
 from test_predictor import verify_predictor_save_load
 
