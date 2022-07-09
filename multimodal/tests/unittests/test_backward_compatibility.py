@@ -4,11 +4,10 @@ import tempfile
 import numpy.testing as npt
 import pytest
 
-from autogluon.multimodal.constants import BINARY, MULTICLASS
 from autogluon.multimodal import MultiModalPredictor, AutoMMPredictor
+from autogluon.multimodal.utils import download
 from datasets import AmazonReviewSentimentCrossLingualDataset
 from utils import (
-    download,
     protected_zip_extraction,
     get_home_dir,
 )
