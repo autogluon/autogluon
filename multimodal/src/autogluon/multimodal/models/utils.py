@@ -423,9 +423,8 @@ def inject_lora_to_linear_layer(
             lora_layer = LoRALinear(
                 module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
             )
-            lora_layer.weight.data.copy_(module.weight.data)
-            if module.bias is not None:
-                lora_layer.bias.data.copy_(module.bias.data)
+            lora_layer.weight = module.weight
+            lora_layer.bias = module.bias
             setattr(model, n, lora_layer)
 
     return model  # return model to enable method chaining
