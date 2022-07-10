@@ -55,5 +55,5 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
                   })
     predictions = predictor.predict(test_data)
     tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
-    npt.assert_allclose(tunable_ratio, expected_ratio)
+    npt.assert_allclose(tunable_ratio, expected_ratio, 1e-05, 1e-05)
     shutil.rmtree(save_path)
