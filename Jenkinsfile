@@ -220,7 +220,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade pytest-xdist
 
           cd multimodal/
-          python3 -m pytest --junitxml=results.xml --forked --runslow tests
+          python3 -m pytest --junitxml=results.xml --runslow tests
           """
         }
       }
@@ -252,7 +252,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade pytest-xdist
 
           cd text/
-          python3 -m pytest --junitxml=results.xml --forked --runslow tests
+          python3 -m pytest --junitxml=results.xml --runslow tests
           """
         }
       }
