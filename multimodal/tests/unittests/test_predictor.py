@@ -548,8 +548,19 @@ def test_modifying_duplicate_model_names():
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
+        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+    }
+
     teacher_predictor.fit(
         train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
         config=config,
         time_limit=1,
     )
