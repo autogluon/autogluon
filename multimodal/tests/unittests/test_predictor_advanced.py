@@ -5,8 +5,8 @@ from autogluon.multimodal.constants import LORA_BIAS, LORA_NORM, NORM_FIT, BIT_F
 
 
 @pytest.mark.parametrize("backbone,efficient_finetuning,pooling_mode,precision",
-                         [('google/mt5-small', True, LORA_NORM, 'mean', 'bf16'),
-                          ('microsoft/deberta-v3-small', True, BIT_FIT, 'mean', '16')])
+                         [('google/mt5-small', LORA_NORM, 'mean', 'bf16'),
+                          ('microsoft/deberta-v3-small', BIT_FIT, 'mean', '16')])
 def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, pooling_mode, precision):
     dataset = AmazonReviewSentimentCrossLingualDataset()
     train_data = dataset.train_df.sample(200)
