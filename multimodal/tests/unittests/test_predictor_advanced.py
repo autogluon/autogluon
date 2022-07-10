@@ -1,3 +1,4 @@
+import os
 import pytest
 from autogluon.multimodal import MultiModalPredictor
 from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
@@ -11,7 +12,9 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     dataset = AmazonReviewSentimentCrossLingualDataset()
     train_data = dataset.train_df.sample(200)
     test_data = dataset.test_df.sample(50)
-    predictor = MultiModalPredictor(label=dataset.label_columns[0])
+    save_path = f'gradient_checkpointing_{backbone}_{efficient_finetuning}_{pooling_mode}_{precision}'
+    predictor = MultiModalPredictor(label=dataset.label_columns[0],
+                                    path=save_path)
     predictor.fit(train_data,
                   hyperparameters={
                       "model.hf_text.checkpoint_name": backbone,
@@ -24,3 +27,4 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
                       "env.num_gpus": 1,
                   })
     predictions = predictor.predict(test_data)
+    os.remove(save_path)
