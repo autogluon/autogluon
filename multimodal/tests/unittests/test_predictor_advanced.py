@@ -8,7 +8,7 @@ from torch import Tensor
 from autogluon.multimodal import MultiModalPredictor
 from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from autogluon.multimodal.constants import LORA_BIAS, LORA_NORM, NORM_FIT, BIT_FIT
-from pytorch_lightning.utilities.model_summary import ModelSummary
+
 
 def _is_lazy_weight_tensor(p: Tensor) -> bool:
     from torch.nn.parameter import UninitializedParameter
