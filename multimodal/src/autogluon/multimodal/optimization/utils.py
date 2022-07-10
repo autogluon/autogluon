@@ -513,7 +513,7 @@ def apply_layerwise_lr_decay(
 
     for name, param in model.named_parameters():
         within_automm_custom_layer = False
-        name_split = name.split('.')
+        name_split = name.split(".")
         for ele_name in name_split[:3]:
             for pattern in automm_custom_layer_patterns:
                 if pattern in ele_name:
@@ -543,9 +543,11 @@ def apply_layerwise_lr_decay(
                 if "lora_" not in name and name not in norm_param_names and "bias" not in name:
                     param.requires_grad = False
             elif efficient_finetune is not None:
-                raise NotImplementedError(f"The efficient finetuning strategy '{efficient_finetune}'"
-                                          f" is not supported. We only support"
-                                          f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}'.")
+                raise NotImplementedError(
+                    f"The efficient finetuning strategy '{efficient_finetune}'"
+                    f" is not supported. We only support"
+                    f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}'."
+                )
 
         if not param.requires_grad:
             continue  # frozen weights

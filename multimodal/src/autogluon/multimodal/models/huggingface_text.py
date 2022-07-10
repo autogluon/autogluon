@@ -48,7 +48,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         prefix: str,
         checkpoint_name: str = "microsoft/deberta-v3-base",
         num_classes: Optional[int] = 0,
-        pooling_mode: Optional[str] = 'cls',
+        pooling_mode: Optional[str] = "cls",
         gradient_checkpointing: Optional[bool] = False,
     ):
         """
@@ -182,15 +182,15 @@ class HFAutoModelForTextPrediction(nn.Module):
                 token_type_ids=text_segment_ids,
                 attention_mask=text_masks,
             )
-        if self.pooling_mode == 'cls':
+        if self.pooling_mode == "cls":
             pooled_features = outputs.last_hidden_state[:, 0, :]
-        elif self.pooling_mode == 'mean':
+        elif self.pooling_mode == "mean":
             pooled_features = (outputs.last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
             sum_mask = text_masks.unsqueeze(-1).sum(1)
             sum_mask = torch.clamp(sum_mask, min=1e-9)
             pooled_features = pooled_features / sum_mask
         else:
-            raise NotImplementedError(f'Pooling mode={self.pooling_mode} is not supported.')
+            raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
         logits = self.head(pooled_features)
 
@@ -230,8 +230,15 @@ class HFAutoModelForTextPrediction(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         model_prefix = "model"
-        pre_encoder_patterns = ("embeddings", "LayerNorm", "wte", "wpe", "shared.weight",
-                                "encoder.conv.conv", 'dummy_layer')
+        pre_encoder_patterns = (
+            "embeddings",
+            "LayerNorm",
+            "wte",
+            "wpe",
+            "shared.weight",
+            "encoder.conv.conv",
+            'dummy_layer'
+        )
         post_encoder_patterns = ("head", "pooler", "ln_f", "final_layer_norm")
         names = [n for n, _ in self.named_parameters()]
 
