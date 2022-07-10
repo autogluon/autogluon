@@ -1,5 +1,6 @@
 import os
 import pytest
+import shutil
 from autogluon.multimodal import MultiModalPredictor
 from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from autogluon.multimodal.constants import LORA_BIAS, LORA_NORM, NORM_FIT, BIT_FIT
@@ -27,4 +28,4 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
                       "env.num_gpus": 1,
                   })
     predictions = predictor.predict(test_data)
-    os.remove(save_path)
+    shutil.rmtree(save_path)
