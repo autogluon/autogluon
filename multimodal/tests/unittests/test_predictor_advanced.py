@@ -51,6 +51,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
                       "optimization.lr_decay": 1.0,
                       "optimization.learning_rate": 1e-03,
                       "optimization.max_epochs": 1,
+                      "env.per_gpu_batch_size": 2,
                       "env.num_gpus": 1,
                   })
     predictions = predictor.predict(test_data)
