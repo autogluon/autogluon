@@ -5,12 +5,9 @@ from autogluon.multimodal.constants import LORA_BIAS, LORA_NORM, NORM_FIT, BIT_F
 
 
 @pytest.mark.parametrize("backbone,gradient_checkpointing,efficient_finetuning,pooling_mode,precision",
-                         [('google/mt5-small', False, LORA_BIAS, 'cls', 'bf16'),
-                          ('google/mt5-small', True, LORA_NORM, 'mean', 'bf16'),
-                          ('microsoft/deberta-v3-small', False, NORM_FIT, 'cls', '16'),
+                         [('google/mt5-small', True, LORA_NORM, 'mean', 'bf16'),
                           ('microsoft/deberta-v3-small', True, BIT_FIT, 'mean', '16')])
-def test_predictor_efficient_finetune(backbone, gradient_checkpointing, efficient_finetuning,
-                                      pooling_mode, precision):
+def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, pooling_mode, precision):
     dataset = AmazonReviewSentimentCrossLingualDataset()
     train_data = dataset.train_df.sample(200)
     test_data = dataset.test_df.sample(50)
@@ -19,7 +16,7 @@ def test_predictor_efficient_finetune(backbone, gradient_checkpointing, efficien
                   hyperparameters={
                       "model.hf_text.checkpoint_name": backbone,
                       "model.hf_text.pooling_mode": pooling_mode,
-                      "model.hf_text.gradient_checkpointing": gradient_checkpointing,
+                      "model.hf_text.gradient_checkpointing": True,
                       "optimization.efficient_finetune": efficient_finetuning,
                       "optimization.lr_decay": 1.0,
                       "optimization.learning_rate": 1e-03,
