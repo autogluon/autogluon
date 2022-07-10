@@ -237,7 +237,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             "wpe",
             "shared.weight",
             "encoder.conv.conv",
-            'dummy_layer'
+            "dummy_layer",
         )
         post_encoder_patterns = ("head", "pooler", "ln_f", "final_layer_norm")
         names = [n for n, _ in self.named_parameters()]

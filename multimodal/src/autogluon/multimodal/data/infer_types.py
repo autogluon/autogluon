@@ -14,7 +14,7 @@ from ..constants import (
     BINARY,
     CLASSIFICATION,
     REGRESSION,
-    AUTOMM
+    AUTOMM,
 )
 
 logger = logging.getLogger(AUTOMM)
