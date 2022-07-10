@@ -33,7 +33,7 @@ def trainable_parameters(model) -> int:
 
 
 @pytest.mark.parametrize("backbone,efficient_finetuning,pooling_mode,precision,expected_ratio",
-                         [('google/t5-small', LORA_NORM, 'mean', 'bf16', 0.001567),
+                         [('t5-small', LORA_NORM, 'mean', 'bf16', 0.001567),
                           ('microsoft/deberta-v3-small', LORA_BIAS, 'mean', '16', 0.001422)])
 def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, pooling_mode, precision, expected_ratio):
     dataset = AmazonReviewSentimentCrossLingualDataset()
