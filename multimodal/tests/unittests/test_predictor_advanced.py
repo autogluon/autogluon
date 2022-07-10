@@ -1,15 +1,41 @@
 import os
 import pytest
 import shutil
+import warnings
+import numpy.testing as npt
+from torch import Tensor
+
 from autogluon.multimodal import MultiModalPredictor
 from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from autogluon.multimodal.constants import LORA_BIAS, LORA_NORM, NORM_FIT, BIT_FIT
+from pytorch_lightning.utilities.model_summary import ModelSummary
+
+def _is_lazy_weight_tensor(p: Tensor) -> bool:
+    from torch.nn.parameter import UninitializedParameter
+
+    if isinstance(p, UninitializedParameter):
+        warnings.warn(
+            "A layer with UninitializedParameter was found. "
+            "Thus, the total number of parameters detected may be inaccurate."
+        )
+        return True
+    return False
 
 
-@pytest.mark.parametrize("backbone,efficient_finetuning,pooling_mode,precision",
-                         [('google/mt5-small', LORA_NORM, 'mean', 'bf16'),
-                          ('microsoft/deberta-v3-small', LORA_BIAS, 'mean', '16')])
-def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, pooling_mode, precision):
+def total_parameters(model) -> int:
+    return sum(p.numel() if not _is_lazy_weight_tensor(p) else 0 for p in model.parameters())
+
+
+def trainable_parameters(model) -> int:
+    return sum(
+        p.numel() if not _is_lazy_weight_tensor(p) else 0 for p in model.parameters() if p.requires_grad
+    )
+
+
+@pytest.mark.parametrize("backbone,efficient_finetuning,pooling_mode,precision,expected_ratio",
+                         [('google/mt5-small', LORA_NORM, 'mean', 'bf16', 0.001567),
+                          ('microsoft/deberta-v3-small', LORA_BIAS, 'mean', '16', 0.001422)])
+def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, pooling_mode, precision, expected_ratio):
     dataset = AmazonReviewSentimentCrossLingualDataset()
     train_data = dataset.train_df.sample(200)
     test_data = dataset.test_df.sample(50)
@@ -28,4 +54,6 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
                       "env.num_gpus": 1,
                   })
     predictions = predictor.predict(test_data)
+    tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
+    npt.assert_allclose(tunable_ratio, expected_ratio)
     shutil.rmtree(save_path)
