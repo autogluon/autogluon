@@ -542,7 +542,7 @@ def apply_layerwise_lr_decay(
                 # For LoRA adapation we fine-tune LoRA and normalization and bias layers
                 if "lora_" not in name and name not in norm_param_names and "bias" not in name:
                     param.requires_grad = False
-            elif efficient_finetune is not None:
+            elif efficient_finetune is not None and efficient_finetune != "None":
                 raise NotImplementedError(
                     f"The efficient finetuning strategy '{efficient_finetune}'"
                     f" is not supported. We only support"
