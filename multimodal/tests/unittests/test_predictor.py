@@ -449,7 +449,7 @@ def test_model_configs():
                     'merge': 'concat'
                 },
                 'hf_text': {
-                    'checkpoint_name': 'google/electra-base-discriminator',
+                    'checkpoint_name': 'google/electra-small-discriminator',
                     'data_types': ['text'],
                     'tokenizer_name': 'hf_auto',
                     'max_text_len': 512,
@@ -461,7 +461,7 @@ def test_model_configs():
                     'test_train_augment_types' : ["synonym_replacement(0.1)"],
                 },
                 'timm_image': {
-                    'checkpoint_name': 'swin_base_patch4_window7_224',
+                    'checkpoint_name': 'swin_tiny_patch4_window7_224',
                     'mix_choice': 'all_logits',
                     'data_types': ['image'],
                     'train_transform_types': ['resize_shorter_side', 'center_crop'],
