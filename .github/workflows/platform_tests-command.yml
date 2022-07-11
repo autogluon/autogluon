@@ -6,7 +6,6 @@ on:
 
 jobs:
   tabular:
-    needs: setup
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
