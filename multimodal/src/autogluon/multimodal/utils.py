@@ -5,7 +5,6 @@ import functools
 import logging
 import pandas as pd
 import pickle
-import collections
 import copy
 import sys
 import torch
@@ -13,10 +12,18 @@ from torch import nn
 import warnings
 from contextlib import contextmanager
 from typing import Optional, List, Any, Dict, Tuple, Union
-from nptyping import NDArray
+import numpy as np
+import uuid
+import hashlib
+import requests
+import boto3
+import tqdm
+from scipy.special import softmax
 from omegaconf import OmegaConf, DictConfig
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import f1_score
+import pytorch_lightning as pl
+from pytorch_lightning.utilities.types import _METRIC
 from autogluon.core.metrics import get_metric
 from autogluon.core.utils.loaders import load_pd
 
@@ -72,6 +79,12 @@ from .constants import (
     METRIC_MODE_MAP,
     VALID_METRICS,
     VALID_CONFIG_KEYS,
+    LOGITS,
+    PROBABILITY,
+    COLUMN_FEATURES,
+    FEATURES,
+    MASKS,
+    S3_PREFIX,
 )
 from .presets import get_automm_presets, get_basic_automm_config
 
@@ -509,10 +522,10 @@ def select_model(
 
 def init_df_preprocessor(
     config: DictConfig,
-    column_types: collections.OrderedDict,
-    label_column: str,
-    train_df_x: pd.DataFrame,
-    train_df_y: pd.Series,
+    column_types: Dict,
+    label_column: Optional[str] = None,
+    train_df_x: Optional[pd.DataFrame] = None,
+    train_df_y: Optional[pd.Series] = None,
 ):
     """
     Initialize the dataframe preprocessor by calling .fit().
@@ -532,6 +545,7 @@ def init_df_preprocessor(
         A pd.DataFrame containing only the feature columns.
     train_df_y
         A pd.Series object containing only the label column.
+
     Returns
     -------
     Initialized dataframe preprocessor.
@@ -551,7 +565,6 @@ def init_df_preprocessor(
 
 def init_data_processors(
     config: DictConfig,
-    df_preprocessor: MultiModalFeaturePreprocessor,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -566,8 +579,6 @@ def init_data_processors(
     ----------
     config
         A DictConfig object. The model config should be accessible by "config.model".
-    df_preprocessor
-        The dataframe preprocessor.
 
     Returns
     -------
@@ -599,7 +610,6 @@ def init_data_processors(
                         checkpoint_name=model_config.checkpoint_name,
                         train_transform_types=model_config.train_transform_types,
                         val_transform_types=model_config.val_transform_types,
-                        image_column_names=df_preprocessor.image_path_names,
                         norm_type=model_config.image_norm,
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
@@ -612,7 +622,6 @@ def init_data_processors(
                         prefix=model_name,
                         tokenizer_name=model_config.tokenizer_name,
                         checkpoint_name=model_config.checkpoint_name,
-                        text_column_names=df_preprocessor.text_feature_names,
                         max_len=model_config.max_text_len,
                         insert_sep=model_config.insert_sep,
                         text_segment_num=model_config.text_segment_num,
@@ -626,14 +635,12 @@ def init_data_processors(
                 data_processors[CATEGORICAL].append(
                     CategoricalProcessor(
                         prefix=model_name,
-                        categorical_column_names=df_preprocessor.categorical_feature_names,
                     )
                 )
             elif d_type == NUMERICAL:
                 data_processors[NUMERICAL].append(
                     NumericalProcessor(
                         prefix=model_name,
-                        numerical_column_names=df_preprocessor.numerical_feature_names,
                         merge=model_config.merge,
                     )
                 )
@@ -649,7 +656,7 @@ def init_data_processors(
 
 def create_model(
     config: DictConfig,
-    num_classes: int,
+    num_classes: Optional[int] = None,
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
@@ -1359,18 +1366,12 @@ def turn_on_off_feature_column_info(
         The data processors.
     flag
         True/False
-
-    Returns
-    -------
-    The data processors with the flag on or off.
     """
     for per_modality_processors in data_processors.values():
         for per_model_processor in per_modality_processors:
             # label processor doesn't have requires_column_info.
             if hasattr(per_model_processor, "requires_column_info"):
                 per_model_processor.requires_column_info = flag
-
-    return data_processors
 
 
 def try_to_infer_pos_label(
@@ -1482,8 +1483,8 @@ class CustomUnpickler(pickle.Unpickler):
 
 def data_to_df(
     data: Union[pd.DataFrame, Dict, List],
-    required_columns: List,
-    all_columns: List,
+    required_columns: Optional[List] = None,
+    all_columns: Optional[List] = None,
 ):
     """
     Convert the input data to a dataframe.
@@ -1513,27 +1514,402 @@ def data_to_df(
             f'We have type(data)="{type(data)}", but a pd.DataFrame was required.'
         )
 
-    detected_columns = data.columns.values.tolist()
-    missing_columns = []
-    for per_col in required_columns:
-        if per_col not in detected_columns:
-            missing_columns.append(per_col)
+    if required_columns and all_columns:
+        detected_columns = data.columns.values.tolist()
+        missing_columns = []
+        for per_col in required_columns:
+            if per_col not in detected_columns:
+                missing_columns.append(per_col)
 
-    if len(missing_columns) > 0:
-        # assume no column names are provided and users organize data in the same column order of training data.
-        if len(detected_columns) == len(all_columns):
-            warnings.warn(
-                f"Replacing detected dataframe columns `{detected_columns}` with columns "
-                f"`{all_columns}` from training data."
-                "Double check the correspondences between them to avoid unexpected behaviors.",
-                UserWarning,
-            )
-            data.rename(dict(zip(detected_columns, required_columns)), axis=1, inplace=True)
-        else:
-            raise ValueError(
-                f"Dataframe columns `{detected_columns}` are detected, but columns `{missing_columns}` are missing. "
-                f"Please double check your input data to provide all the "
-                f"required columns `{required_columns}`."
-            )
+        if len(missing_columns) > 0:
+            # assume no column names are provided and users organize data in the same column order of training data.
+            if len(detected_columns) == len(all_columns):
+                warnings.warn(
+                    f"Replacing detected dataframe columns `{detected_columns}` with columns "
+                    f"`{all_columns}` from training data."
+                    "Double check the correspondences between them to avoid unexpected behaviors.",
+                    UserWarning,
+                )
+                data.rename(dict(zip(detected_columns, required_columns)), axis=1, inplace=True)
+            else:
+                raise ValueError(
+                    f"Dataframe columns `{detected_columns}` are detected, but columns `{missing_columns}` are missing. "
+                    f"Please double check your input data to provide all the "
+                    f"required columns `{required_columns}`."
+                )
 
     return data
+
+
+def logits_to_prob(logits: np.ndarray):
+    """
+    Convert logits to probabilities.
+
+    Parameters
+    ----------
+    logits
+        The logits output of a classification head.
+
+    Returns
+    -------
+    Probabilities.
+    """
+    assert logits.ndim == 2
+    prob = softmax(logits, axis=1)
+    return prob
+
+
+def tensor_to_ndarray(tensor: torch.Tensor):
+    """
+    Convert Pytorch tensor to numpy array.
+
+    Parameters
+    ----------
+    tensor
+        A Pytorch tensor.
+
+    Returns
+    -------
+    A ndarray.
+    """
+    return tensor.detach().cpu().float().numpy()
+
+
+def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
+    """
+    Extract desired information, e.g., logits or features, from a list of model outputs.
+    Support returning a concatenated tensor/ndarray or a dictionary of tensors/ndarrays.
+
+    Parameters
+    ----------
+    ret_type
+        What kind of information to extract from model outputs.
+    outputs
+        A list of model outputs.
+    as_ndarray
+        Whether to convert Pytorch tensor to numpy array. (Default True)
+
+    Returns
+    -------
+    The desired information from model outputs.
+    """
+    if ret_type == LOGITS:
+        logits = [ele[LOGITS] for ele in outputs]
+        ret = torch.cat(logits)
+    elif ret_type == PROBABILITY:
+        probability = [ele[PROBABILITY] for ele in outputs]
+        ret = torch.cat(probability)
+    elif ret_type == FEATURES:
+        features = [ele[FEATURES] for ele in outputs]
+        ret = torch.cat(features)
+    elif ret_type == COLUMN_FEATURES:
+        ret = {}
+        column_features = [ele[COLUMN_FEATURES][FEATURES] for ele in outputs]  # a list of dicts
+        for feature_name in column_features[0].keys():
+            ret[feature_name] = torch.cat([ele[feature_name] for ele in column_features])
+    elif ret_type == MASKS:
+        ret = {}
+        feature_masks = [ele[COLUMN_FEATURES][MASKS] for ele in outputs]  # a list of dicts
+        for feature_name in feature_masks[0].keys():
+            ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
+    else:
+        raise ValueError(f"Unknown return type: {ret_type}")
+
+    if as_ndarray:
+        if isinstance(ret, torch.Tensor):
+            ret = tensor_to_ndarray(ret)
+        elif isinstance(ret, dict):
+            ret = {k: tensor_to_ndarray(v) for k, v in ret.items()}
+        else:
+            raise ValueError(f"Unsupported ret type: {type(ret)}")
+    return ret
+
+
+def init_zero_shot(
+    hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+):
+    """
+    Zero shot initialization.
+
+    Parameters
+    ----------
+    hyperparameters
+        The customized hyperparameters used to override the default.
+        Users need to use it to choose one model, e.g., {"model.names": ["clip"]}.
+
+    Returns
+    -------
+    config
+        A DictConfig object containing the configurations for zero-shot learning.
+    model
+        The model with pre-trained weights.
+    data_processors
+        The data processors associated with the pre-trained model.
+    """
+    config = get_config(presets="zero_shot", overrides=hyperparameters)
+    assert (
+        len(config.model.names) == 1
+    ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
+    model = create_model(config=config)
+
+    data_processors = init_data_processors(
+        config=config,
+    )
+
+    return config, model, data_processors
+
+
+class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
+    """
+    Class that inherits pl.callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.
+
+    - Issue1:
+
+    It solves the issue described in https://github.com/PyTorchLightning/pytorch-lightning/issues/5582.
+    For ddp_spawn, the checkpoint_callback.best_k_models will be empty.
+    Here, we resolve it by storing the best_models to "SAVE_DIR/best_k_models.yaml".
+
+    """
+
+    def _update_best_and_save(
+        self,
+        current: torch.Tensor,
+        trainer: "pl.Trainer",
+        monitor_candidates: Dict[str, _METRIC],
+    ) -> None:
+        super(AutoMMModelCheckpoint, self)._update_best_and_save(
+            current=current, trainer=trainer, monitor_candidates=monitor_candidates
+        )
+        self.to_yaml()
+
+
+def download(
+    url: str,
+    path: Optional[str] = None,
+    overwrite: Optional[bool] = False,
+    sha1_hash: Optional[str] = None,
+    retries: Optional[int] = 5,
+    verify_ssl: Optional[bool] = True,
+) -> str:
+    """
+    Download a file from a given URL. Some util functions are also included in this function.
+    https://github.com/sxjscience/automl_multimodal_benchmark/blob/main/multimodal_text_benchmark/src/auto_mm_bench/utils.py
+
+    Parameters
+    ----------
+    url
+        URL to download
+    path
+        Destination path to store downloaded file. By default stores to the
+        current directory with same name as in url.
+    overwrite
+        Whether to overwrite destination file if already exists.
+    sha1_hash
+        Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
+        but doesn't match.
+    retries
+        The number of times to attempt the download in case of failure or non 200 return codes
+    verify_ssl
+        Verify SSL certificates.
+
+    Returns
+    -------
+    fname
+        The file path of the downloaded file.
+    """
+
+    if not sys.platform.startswith("win32"):
+        # refer to https://github.com/untitaker/python-atomicwrites
+        def replace_file(src, dst):
+            """Implement atomic os.replace with linux and OSX.
+            Parameters
+            ----------
+            src : source file path
+            dst : destination file path
+            """
+            try:
+                os.rename(src, dst)
+            except OSError:
+                try:
+                    os.remove(src)
+                except OSError:
+                    pass
+                finally:
+                    raise OSError(
+                        "Moving downloaded temp file - {}, to {} failed. \
+                        Please retry the download.".format(
+                            src, dst
+                        )
+                    )
+
+    else:
+        import ctypes
+
+        _MOVEFILE_REPLACE_EXISTING = 0x1
+        # Setting this value guarantees that a move performed as a copy
+        # and delete operation is flushed to disk before the function returns.
+        # The flush occurs at the end of the copy operation.
+        _MOVEFILE_WRITE_THROUGH = 0x8
+        _windows_default_flags = _MOVEFILE_WRITE_THROUGH
+
+        def _str_to_unicode(x):
+            """Handle text decoding. Internal use only"""
+            if not isinstance(x, str):
+                return x.decode(sys.getfilesystemencoding())
+            return x
+
+        def _handle_errors(rv, src):
+            """Handle WinError. Internal use only"""
+            if not rv:
+                msg = ctypes.FormatError(ctypes.GetLastError())
+                # if the MoveFileExW fails(e.g. fail to acquire file lock), removes the tempfile
+                try:
+                    os.remove(src)
+                except OSError:
+                    pass
+                finally:
+                    raise OSError(msg)
+
+        def replace_file(src, dst):
+            """Implement atomic os.replace with windows.
+            refer to https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-movefileexw
+            The function fails when one of the process(copy, flush, delete) fails.
+            Parameters
+            ----------
+            src : source file path
+            dst : destination file path
+            """
+            _handle_errors(
+                ctypes.windll.kernel32.MoveFileExW(
+                    _str_to_unicode(src), _str_to_unicode(dst), _windows_default_flags | _MOVEFILE_REPLACE_EXISTING
+                ),
+                src,
+            )
+
+    def sha1sum(filename: str):
+        """
+        Calculate the sha1sum of a file.
+
+        Parameters
+        ----------
+        filename
+            Name of the file
+
+        Returns
+        -------
+        ret
+            The sha1sum
+        """
+        with open(filename, mode="rb") as f:
+            d = hashlib.sha1()
+            for buf in iter(functools.partial(f.read, 1024 * 100), b""):
+                d.update(buf)
+        return d.hexdigest()
+
+    is_s3 = url.startswith(S3_PREFIX)
+    if is_s3:
+        s3 = boto3.resource("s3")
+        if boto3.session.Session().get_credentials() is None:
+            from botocore.handlers import disable_signing
+
+            s3.meta.client.meta.events.register("choose-signer.s3.*", disable_signing)
+        components = url[len(S3_PREFIX) :].split("/")
+        if len(components) < 2:
+            raise ValueError("Invalid S3 url. Received url={}".format(url))
+        s3_bucket_name = components[0]
+        s3_key = "/".join(components[1:])
+    if path is None:
+        fname = url.split("/")[-1]
+        # Empty filenames are invalid
+        assert fname, "Can't construct file-name from this URL. " "Please set the `path` option manually."
+    else:
+        path = os.path.expanduser(path)
+        if os.path.isdir(path):
+            fname = os.path.join(path, url.split("/")[-1])
+        else:
+            fname = path
+    assert retries >= 0, "Number of retries should be at least 0, currently it's {}".format(retries)
+
+    if not verify_ssl:
+        warnings.warn(
+            "Unverified HTTPS request is being made (verify_ssl=False). "
+            "Adding certificate verification is strongly advised."
+        )
+
+    if overwrite or not os.path.exists(fname) or (sha1_hash and not sha1sum(fname) == sha1_hash):
+        dirname = os.path.dirname(os.path.abspath(os.path.expanduser(fname)))
+        if not os.path.exists(dirname):
+            os.makedirs(dirname, exist_ok=True)
+        while retries + 1 > 0:
+            # Disable pyling too broad Exception
+            # pylint: disable=W0703
+            try:
+                print("Downloading {} from {}...".format(fname, url))
+                if is_s3:
+                    response = s3.meta.client.head_object(Bucket=s3_bucket_name, Key=s3_key)
+                    total_size = int(response.get("ContentLength", 0))
+                    random_uuid = str(uuid.uuid4())
+                    tmp_path = "{}.{}".format(fname, random_uuid)
+                    if tqdm is not None:
+
+                        def hook(t_obj):
+                            def inner(bytes_amount):
+                                t_obj.update(bytes_amount)
+
+                            return inner
+
+                        with tqdm.tqdm(total=total_size, unit="iB", unit_scale=True) as t:
+                            s3.meta.client.download_file(s3_bucket_name, s3_key, tmp_path, Callback=hook(t))
+                    else:
+                        s3.meta.client.download_file(s3_bucket_name, s3_key, tmp_path)
+                else:
+                    r = requests.get(url, stream=True, verify=verify_ssl)
+                    if r.status_code != 200:
+                        raise RuntimeError("Failed downloading url {}".format(url))
+                    # create uuid for temporary files
+                    random_uuid = str(uuid.uuid4())
+                    total_size = int(r.headers.get("content-length", 0))
+                    chunk_size = 1024
+                    if tqdm is not None:
+                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True)
+                    with open("{}.{}".format(fname, random_uuid), "wb") as f:
+                        for chunk in r.iter_content(chunk_size=chunk_size):
+                            if chunk:  # filter out keep-alive new chunks
+                                if tqdm is not None:
+                                    t.update(len(chunk))
+                                f.write(chunk)
+                    if tqdm is not None:
+                        t.close()
+                # if the target file exists(created by other processes)
+                # and have the same hash with target file
+                # delete the temporary file
+                if not os.path.exists(fname) or (sha1_hash and not sha1sum(fname) == sha1_hash):
+                    # atomic operation in the same file system
+                    replace_file("{}.{}".format(fname, random_uuid), fname)
+                else:
+                    try:
+                        os.remove("{}.{}".format(fname, random_uuid))
+                    except OSError:
+                        pass
+                    finally:
+                        warnings.warn("File {} exists in file system so the downloaded file is deleted".format(fname))
+                if sha1_hash and not sha1sum(fname) == sha1_hash:
+                    raise UserWarning(
+                        "File {} is downloaded but the content hash does not match."
+                        " The repo may be outdated or download may be incomplete. "
+                        'If the "repo_url" is overridden, consider switching to '
+                        "the default repo.".format(fname)
+                    )
+                break
+            except Exception as e:
+                retries -= 1
+                if retries <= 0:
+                    raise e
+
+                print(
+                    "download failed due to {}, retrying, {} attempt{} left".format(
+                        repr(e), retries, "s" if retries > 1 else ""
+                    )
+                )
+
+    return fname

@@ -398,25 +398,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Union[str, dict] = "auto",
     ):
-        scheduler_cls, scheduler_options = scheduler_factory(
-            hyperparameter_tune_kwargs, time_out=time_limit
-        )
-        if all(scheduler_options.get(s) is None for s in ["num_trials", "time_out"]):
-            scheduler_options["num_trials"] = 10
-
-        logger.debug(
-            f"\tTuning hyperparameters of {model.name}. scheduler "
-            f"options: {scheduler_cls.__name__}, {pprint.pformat(scheduler_options, indent=10)}. "
-        )
+        default_num_trials = None
+        if time_limit is None and ("num_samples" not in hyperparameter_tune_kwargs or isinstance(hyperparameter_tune_kwargs, str)):
+            default_num_trials = 10
 
         with disable_tqdm():
-            hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+            hpo_models, hpo_results = model.hyperparameter_tune(
                 train_data=train_data,
                 val_data=val_data,
-                scheduler_options=(scheduler_cls, scheduler_options),
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
+                default_num_trials=default_num_trials,
             )
-        hpo_results.pop("search_strategy", None)
+
         self.hpo_results[model.name] = hpo_results
         model_names_trained = []
         # add each of the trained HPO configurations to the trained models
@@ -431,7 +425,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             f"\tTrained {len(model_names_trained)} models while tuning {model.name}."
         )
 
-        if hpo_results:
+        # TODO: log result for ray backend
+        if hpo_results and isinstance(hpo_results, dict):
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
                 sign_str = '-'
             else:
@@ -535,7 +530,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameters: Optional[Union[str, Dict]] = None,
         models: Optional[List[AbstractTimeSeriesModel]] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune: bool = False,
+        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
 
@@ -559,7 +554,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
-                hyperparameter_tune=hyperparameter_tune,
+                hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
             )
 
@@ -571,7 +566,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_names_trained = []
         for i, model in enumerate(models):
-            if hyperparameter_tune:
+            if hyperparameter_tune_kwargs is not None:
                 time_left = time_limit_model_split
 
                 fit_log_message = f"Hyperparameter tuning model: {model.name}. "
@@ -588,6 +583,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                         time_limit=time_left,
                         train_data=train_data,
                         val_data=val_data,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                     )
             else:
                 time_left = None
@@ -865,7 +861,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 train_data=refit_full_data,
                 val_data=None,
                 hyperparameters=None,
-                hyperparameter_tune=False,
+                hyperparameter_tune_kwargs=None,
                 models=[model_full],
             )
 

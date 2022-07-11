@@ -5,7 +5,7 @@ from .ray_hpo import (
     EmptySearchSpace,
     RayTuneAdapter,
     TabularRayTuneAdapter,
-    ForecastingRayTuneAdapter,
+    TimeSeriesRayTuneAdapter,
     AutommRayTuneAdapter,
     AutommRayTuneLightningAdapter,
 )
