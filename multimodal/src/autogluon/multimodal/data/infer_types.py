@@ -404,11 +404,7 @@ def infer_problem_type_output_shape(
             )
 
 
-def set_fallback_column_type(
-    column_types: Dict,
-    allowable_column_types: List[str],
-    fallback_column_type: str
-) -> Dict:
+def set_fallback_column_type(column_types: Dict, allowable_column_types: List[str], fallback_column_type: str) -> Dict:
     """
     Filter the auto-detected column types to make sure that all column types are allowable.
     Use the fallback type to replace those out of the allowable_column_types.
