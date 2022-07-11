@@ -61,6 +61,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     npt.assert_allclose(tunable_ratio, expected_ratio, 1e-05, 1e-05)
     shutil.rmtree(save_path)
     predictor.save(save_path)
-    new_predictor = predictor.load(save_path)
+    del predictor
+    new_predictor = MultiModalPredictor.load(save_path)
     new_predictions = new_predictor.predict(test_data, as_pandas=False)
     npt.assert_allclose(new_predictions, predictions)
