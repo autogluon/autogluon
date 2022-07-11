@@ -20,7 +20,7 @@ def _test_endpoint(cloud_predictor, test_data):
         raise e
 
 
-def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, test_data, fit_instance_type=None):
+def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, cloud_predictor_no_train, test_data, fit_instance_type=None):
     if not fit_instance_type:
         fit_instance_type = 'ml.m5.2xlarge'
     cloud_predictor.fit(
@@ -54,6 +54,14 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
     info = cloud_predictor.info()
     assert info['recent_transform_job']['status'] == 'Completed'
 
+    # Test deploy with already trained predictor
+    trained_predictor_path = cloud_predictor._fit_job.get_output_path()
+    cloud_predictor_no_train.deploy(predictor_path=trained_predictor_path)
+    _test_endpoint(cloud_predictor_no_train, test_data)
+    cloud_predictor_no_train.predict(test_data, predictor_path=trained_predictor_path)
+    info = cloud_predictor_no_train.info()
+    assert info['recent_transform_job']['status'] == 'Completed'
+
 
 @pytest.mark.cloud
 def test_tabular():
@@ -74,7 +82,8 @@ def test_tabular():
             time_limit=time_limit,
         )
         cloud_predictor = TabularCloudPredictor(cloud_output_path='s3://ag-cloud-predictor/test-tabular', local_output_path='test_tabular_cloud_predictor')
-        _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, test_data)
+        cloud_predictor_no_train = TabularCloudPredictor(cloud_output_path='s3://ag-cloud-predictor/test-tabular-no-train', local_output_path='test_tabular_cloud_predictor_no_train')
+        _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, cloud_predictor_no_train, test_data)
 
 
 @pytest.mark.cloud
@@ -96,4 +105,5 @@ def test_text():
             time_limit=time_limit
         )
         cloud_predictor = TextCloudPredictor(cloud_output_path='s3://ag-cloud-predictor/test-text', local_output_path='test_text_cloud_predictor')
-        _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, test_data, fit_instance_type='ml.g4dn.2xlarge')
+        cloud_predictor_no_train = TextCloudPredictor(cloud_output_path='s3://ag-cloud-predictor/test-text-no-train', local_output_path='test_text_cloud_predictor_no_train')
+        _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, cloud_predictor_no_train, test_data, fit_instance_type='ml.g4dn.2xlarge')
