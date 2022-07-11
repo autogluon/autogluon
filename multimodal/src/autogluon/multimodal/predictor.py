@@ -94,6 +94,7 @@ from .utils import (
     extract_from_output,
     init_zero_shot,
     tensor_to_ndarray,
+    infer_dtypes_by_model_names,
 )
 from .optimization.utils import (
     get_metric,
@@ -1340,7 +1341,8 @@ class MultiModalPredictor:
         data = data_to_df(data=data)
 
         if self._column_types is None:
-            column_types = infer_column_types(data=data)
+            allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
+            column_types = infer_column_types(data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype)
         else:  # called .fit() or .load()
             column_types = self._column_types
 

@@ -74,7 +74,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type in [TEXT, IMAGE_PATH, NULL]:
+            if col_type in [TEXT, IMAGE, IMAGE_PATH, NULL]:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -256,7 +256,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type == IMAGE_PATH:
+            elif col_type == IMAGE or col_type == IMAGE_PATH:
                 self._image_path_names.append(col_name)
             else:
                 raise NotImplementedError(
