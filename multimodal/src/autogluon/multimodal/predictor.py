@@ -1753,9 +1753,11 @@ class MultiModalPredictor:
                 shutil.copy(model_path, path)
             else:
                 # FIXME(?) Fix the saving logic
-                RuntimeError(f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
-                             f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
-                             f"removed.")
+                RuntimeError(
+                    f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
+                    f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
+                    f"removed."
+                )
 
     @staticmethod
     def _load_metadata(
