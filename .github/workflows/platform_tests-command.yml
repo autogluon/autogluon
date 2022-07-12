@@ -68,6 +68,7 @@ jobs:
           env
           cd common/
           python3 -m pytest --junitxml=results.xml --runslow tests
+
   core:
     needs: setup
     runs-on: ${{ matrix.os }}
@@ -102,6 +103,7 @@ jobs:
           env
           cd core/
           python3 -m pytest --junitxml=results.xml --runslow tests
+
   features:
     needs: setup
     runs-on: ${{ matrix.os }}
@@ -136,6 +138,7 @@ jobs:
           env
           cd features/
           python3 -m pytest --junitxml=results.xml --runslow tests
+
   tabular:
     needs: setup
     runs-on: ${{ matrix.os }}
@@ -181,6 +184,7 @@ jobs:
           env
           cd tabular/
           python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
+
   install:
     needs: setup
     runs-on: ${{ matrix.os }}
