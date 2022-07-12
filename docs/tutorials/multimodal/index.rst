@@ -45,6 +45,12 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
 
    .. card::
+      :title: CLIP in AutoMM - Zero-Shot Image Classification 
+      :link: clip_zeroshot.html
+
+      How to use CLIP for zero-shot image classification. 
+
+   .. card::
       :title: Customize AutoMM
       :link: customization.html
 
@@ -60,4 +66,5 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
    multilingual_text
    multimodal_text_tabular
    beginner_multimodal
+   clip_zeroshot
    customization
