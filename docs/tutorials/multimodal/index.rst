@@ -48,7 +48,7 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       :title: CLIP in AutoMM - Zero-Shot Image Classification 
       :link: clip_zeroshot.html
 
-      How to Use CLIP for Zero-Shot Image Classification. 
+      How to use CLIP for zero-shot image classification. 
 
    .. card::
       :title: Customize AutoMM
