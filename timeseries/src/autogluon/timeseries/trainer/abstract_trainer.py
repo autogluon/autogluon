@@ -1,4 +1,5 @@
 import copy
+import gc
 import logging
 import os
 import pprint
@@ -488,7 +489,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
-        except Exception as err:
+        except (Exception, MemoryError) as err:
             logger.error(
                 f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
             )

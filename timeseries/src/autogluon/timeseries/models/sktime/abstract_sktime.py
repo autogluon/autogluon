@@ -36,7 +36,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
     name: str
         Name of the model. Also, name of subdirectory inside path where model will be saved.
     eval_metric: str
-        objective function the model intends to optimize, will use MAPE by default.
+        objective function the model will be scored on, will use mean_wQuantileLoss by default.
     hyperparameters:
         various hyperparameters that will be used by model (can be search spaces instead of
         fixed values). See *Other Parameters* in each inheriting model's documentation for
@@ -75,6 +75,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         params = self._get_model_params().copy()
         if sp:
             params["sp"] = sp
+            params["seasonal"] = "add"
 
         return self.sktime_forecaster_class(
             **{  # noqa
