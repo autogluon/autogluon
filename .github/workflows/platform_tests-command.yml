@@ -13,7 +13,7 @@ jobs:
         shell: bash
     strategy:
       matrix:
-        os: [macos-latest]
+        os: [windows-latest]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
