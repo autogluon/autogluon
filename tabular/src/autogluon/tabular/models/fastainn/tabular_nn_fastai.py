@@ -197,10 +197,10 @@ class NNFastAiTabularModel(AbstractModel):
         if num_gpus is not None:
             # TODO: Control CPU vs GPU usage during inference
             if num_gpus == 0:
-                torch_core.default_device(use_cuda=False)
+                torch_core.default_device(False)
             else:
                 # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
-                torch_core.default_device(use_cuda=True)
+                torch_core.default_device(True)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X, y, X_val, y_val)

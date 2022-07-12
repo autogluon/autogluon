@@ -329,7 +329,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             # validation
             if val_dataset is not None:
                 # compute validation score
-                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
                 if np.isnan(val_metric):
                     if best_epoch == 0:
                         raise RuntimeError(f"NaNs encountered in {self.__class__.__name__} training. "
@@ -396,9 +396,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
     #  If this isn't here, inference speed is slowed down massively.
     #  Remove once upgraded to XGBoost>=1.6
-    def _predict_proba(self, X, **kwargs):
-        from ..._utils.torch_utils import TorchThreadManager
-        with TorchThreadManager(num_threads=self._num_cpus_infer):
+    def _predict_proba(self, X, _reset_threads=True, **kwargs):
+        if _reset_threads:
+            from ..._utils.torch_utils import TorchThreadManager
+            with TorchThreadManager(num_threads=self._num_cpus_infer):
+                pred_proba = self._predict_proba_internal(X=X, **kwargs)
+        else:
             pred_proba = self._predict_proba_internal(X=X, **kwargs)
         return pred_proba
 
