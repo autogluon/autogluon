@@ -4,6 +4,7 @@ from autogluon.core.constants import REGRESSION, SOFTCLASS
 from autogluon.core.utils.try_import import try_import_rapids_cuml
 
 from .rf_model import RFModel
+from .._utils.rapids_utils import RapidsModelMixin
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 #  but a higher max_depth (e.g., approximating unlimited depth)
 #  results in a RFRapidsModel that is significantly slower than RFModel. 
 #  Refer to https://github.com/rapidsai/cuml/issues/1977
-class RFRapidsModel(RFModel):
+class RFRapidsModel(RapidsModelMixin, RFModel):
     """
     RAPIDS Random Forest model : https://rapids.ai/start.html
 
@@ -48,14 +49,3 @@ class RFRapidsModel(RFModel):
         self.model = self._get_model_type()(**self._get_model_params())
         self.model = self.model.fit(X, y)
         self.params_trained['n_estimators'] = self.model.n_estimators
-
-    # FIXME: Efficient OOF doesn't work in RAPIDS
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'use_child_oof': False}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
-
-    def _more_tags(self):
-        return {'valid_oof': False}
