@@ -9,20 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create URL to the run output
-        if: (github.event_name == 'workflow_dispatch')
-        id: vars
-        run: echo ::set-output name=run-url::https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-
-      - name: Create comment
-        if: (github.event_name == 'workflow_dispatch')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          token: ${{ secrets.PAT }}
-          repository: ${{ github.event.inputs.repository }}
-          comment-id: ${{ github.event.inputs.comment-id }}
-          body: |
-            [Platform Tests Output][1]
-            [1]: ${{ steps.vars.outputs.run-url }}
+        run: echo temp
   common:
     needs: setup
     runs-on: ${{ matrix.os }}
