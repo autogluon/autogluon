@@ -509,7 +509,7 @@ class MultiModalPredictor:
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
-        from autogluon.core.hpo import (
+        from autogluon.core.hpo.ray_hpo import (
             run,
             cleanup_trials,
             cleanup_checkpoints,

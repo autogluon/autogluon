@@ -2,7 +2,7 @@ import psutil
 import pytest
 import tempfile
 
-from autogluon.core.hpo import (
+from autogluon.core.hpo.ray_hpo import (
     RayTuneAdapter,
     TabularRayTuneAdapter,
     AutommRayTuneAdapter,
@@ -10,7 +10,7 @@ from autogluon.core.hpo import (
     run,
 )
 from autogluon.core.utils import get_cpu_count, get_gpu_count_all
-from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
+from autogluon.core.hpo.ray_tune_constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from ray import tune
 
 
