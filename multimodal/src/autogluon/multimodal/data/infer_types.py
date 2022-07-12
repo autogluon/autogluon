@@ -9,7 +9,7 @@ from ..constants import (
     CATEGORICAL,
     NUMERICAL,
     TEXT,
-    IMAGE_PATH,
+    IMAGE,
     MULTICLASS,
     BINARY,
     CLASSIFICATION,
