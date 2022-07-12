@@ -9,7 +9,7 @@ setup_mxnet_gpu = """
 """
 
 setup_torch_gpu = """
-    python3 -m pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+    python3 -m pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
 """
 
 install_common = """
@@ -220,7 +220,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade pytest-xdist
 
           cd multimodal/
-          python3 -m pytest --junitxml=results.xml --forked --runslow tests
+          python3 -m pytest --junitxml=results.xml --runslow tests
           """
         }
       }
@@ -252,7 +252,7 @@ stage("Unit Test") {
           python3 -m pip install --upgrade pytest-xdist
 
           cd text/
-          python3 -m pytest --junitxml=results.xml --forked --runslow tests
+          python3 -m pytest --junitxml=results.xml --runslow tests
           """
         }
       }

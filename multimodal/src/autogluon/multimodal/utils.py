@@ -711,6 +711,8 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
+                pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(

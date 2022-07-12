@@ -57,6 +57,8 @@ model:
     merge: "concat"
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
+    gradient_checkpointing: False
+    pooling_mode: 'cls'  # The pooling mode, can be 'cls' or 'mean'
     data_types:
       - "text"
     tokenizer_name: "hf_auto"
