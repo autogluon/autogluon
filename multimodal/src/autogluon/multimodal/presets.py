@@ -60,6 +60,7 @@ def zero_shot():
     return {
         "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
         "model.clip.max_text_len": 0,
+        "env.eval_batch_size_ratio": 1,
     }
 
 
