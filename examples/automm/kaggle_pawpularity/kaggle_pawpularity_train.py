@@ -1,4 +1,4 @@
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import mean_squared_error
 import argparse
@@ -9,7 +9,7 @@ import os
 
 
 def get_args():
-    parser = argparse.ArgumentParser(description="The example for Kaggle competition Petfinder Pawpularity with AutoMMPredictor.")
+    parser = argparse.ArgumentParser(description="The example for Kaggle competition Petfinder Pawpularity with MultiModalPredictor.")
     parser.add_argument("--data_path", type=str,
                         help="The path of the competiton dataset.",
                         default="./data/")
@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
     for i in range(N_FOLDS):
         # The predictor in use.
-        predictor = AutoMMPredictor(
+        predictor = MultiModalPredictor(
             label=args.label_column,  # label indicates the target value
             problem_type=args.problem_type,  # problem_type indicates the type of the problem. It can choose "multiclass", # "binary" or "regression"
             eval_metric=args.eval_metric,  # eval_metric indicates the evaluation index of the model

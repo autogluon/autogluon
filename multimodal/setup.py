@@ -25,8 +25,9 @@ install_requires = [
     'Pillow',
     'tqdm',
     'boto3',
+    'requests',
     'timm<0.6.0',
-    'torch>=1.0,<1.12',
+    'torch>=1.9,<1.13',
     'fairscale>=0.4.5,<0.5.0',
     'scikit-image>=0.19.1,<0.20.0',
     'smart_open>=5.2.1,<5.3.0',
@@ -37,12 +38,11 @@ install_requires = [
     'omegaconf>=2.1.1,<2.2.0',
     'sentencepiece>=0.1.95,<0.2.0',
     'protobuf<=3.18.1',  # https://github.com/awslabs/autogluon/issues/1762
-    f'autogluon.core[ray_tune]=={version}',
+    f'autogluon.core[raytune]=={version}',
     f'autogluon.features=={version}',
     f'autogluon.common=={version}',
-    'autogluon-contrib-nlp==0.0.1b20220208',
     'pytorch-metric-learning>=1.3.0,<1.4.0',
-    'nlpaug>=1.1.10,<2.0.0',
+    'nlpaug>=1.1.10,<=1.1.10',
     'nltk>=3.4.5,<4.0.0',
 ]
 

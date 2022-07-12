@@ -9,4 +9,5 @@ from . import constants
 from . import utils
 from . import optimization
 from . import predictor
-from .predictor import AutoMMPredictor
+from .predictor import MultiModalPredictor, AutoMMPredictor
+from .utils import download

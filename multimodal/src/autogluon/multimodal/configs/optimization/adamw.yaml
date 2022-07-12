@@ -12,16 +12,23 @@ optimization:
   lr_mult: 1  # multiply lr for downstream heads
   patience: 10
   val_check_interval: 0.5
+  gradient_clip_val: 1
+  gradient_clip_algorithm: "norm"
+  log_every_n_steps: 10
   top_k: 3
   top_k_average_method: "greedy_soup"  # We support averaging method described in https://arxiv.org/pdf/2203.05482.pdf.
                                        # Currently support "uniform_soup", "greedy_soup", and "best".
-  efficient_finetune: null  # Can be 'bit_fit' (only finetune bias), 'norm_fit' (finetune the normalization terms + bias terms), lora (LoRA Adaptations only), lora_bias (LoRA Adaptation + bit_fit), lora_norm (LoRA Adaptation + norm_fit), or null
+  efficient_finetune:  # Can be 'bit_fit' (only finetune bias), 'norm_fit' (finetune the normalization terms + bias terms), lora (LoRA Adaptations only), lora_bias (LoRA Adaptation + bit_fit), lora_norm (LoRA Adaptation + norm_fit), or null
   lora:
     r: 8
     alpha: 8
     filter: # Default fine-tune only query and value attention weights, recommended in https://arxiv.org/abs/2106.09685
       - "query"
       - "value"
+      - "^q$"  # The filter can also be a regex. We will use re.match(filter, name) to determine if LoRA should be applied.
+      - "^v$"
+      - "^k$"
+      - "^o$"
   loss_function: "auto" # The replaced loss for regresssion. Can only support loss function in torch.nn.
     # example
     # "BCEWithLogitsLoss" or "nn.BCEWithLogitsloss"

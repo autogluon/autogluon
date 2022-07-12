@@ -70,19 +70,19 @@ Multimodal Prediction
       :title: Use AutoGluon Multimodal for Text Prediction: Quick Start
       :link: multimodal/beginner_text.html
 
-      How to train high-quality text prediction models with AutoMMPredictor in under 5 minutes.
+      How to train high-quality text prediction models with MultiModalPredictor in under 5 minutes.
 
    .. card::
       :title: Solving Multilingual Problems
       :link: multimodal/multilingual_text.html
 
-      How to use AutoMMPredictor to build models on datasets with languages other than English.
+      How to use MultiModalPredictor to build models on datasets with languages other than English.
 
    .. card::
       :title: Multimodal Data Tables with Text
       :link: multimodal/multimodal_text_tabular.html
 
-      How AutoMMPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
+      How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and categorical columns.
 
 
 Image Prediction

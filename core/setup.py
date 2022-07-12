@@ -40,7 +40,7 @@ extras_require = {
     'ray': [
         "ray>=1.13,<1.14",
     ],
-    'ray_tune': [
+    'raytune': [
         'ray[tune]>=1.13,<1.14',
         'hyperopt>=0.2.7,<0.2.8',
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
@@ -54,7 +54,7 @@ tests_require = [
 
 all_requires = []
 
-for extra_package in ['ray', 'ray_tune']:
+for extra_package in ['ray', 'raytune']:
     all_requires += extras_require[extra_package]
 tests_require = list(set(tests_require))
 all_requires = list(set(all_requires))

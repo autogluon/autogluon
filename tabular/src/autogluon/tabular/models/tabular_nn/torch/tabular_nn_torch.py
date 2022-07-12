@@ -10,6 +10,7 @@ import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
@@ -44,6 +45,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.optimizer = None
         self.device = None
         self.max_batch_size = None
+        self._num_cpus_infer = None
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -149,6 +151,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         processor_kwargs, optimizer_kwargs, fit_kwargs, loss_kwargs, params = self._prepare_params(params=params)
 
         seed_value = params.pop('seed_value', 0)
+
+        self._num_cpus_infer = params.pop('_num_cpus_infer', 1)
         if seed_value is not None:  # Set seeds
             random.seed(seed_value)
             np.random.seed(seed_value)
@@ -389,7 +393,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.params_trained['batch_size'] = batch_size
         self.params_trained['num_epochs'] = best_epoch
 
+    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
+    #  If this isn't here, inference speed is slowed down massively.
+    #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
+        from ..._utils.torch_utils import TorchThreadManager
+        with TorchThreadManager(num_threads=self._num_cpus_infer):
+            pred_proba = self._predict_proba_internal(X=X, **kwargs)
+        return pred_proba
+
+    def _predict_proba_internal(self, X, **kwargs):
         """ To align predict with abstract_model API.
             Preprocess here only refers to feature processing steps done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
@@ -584,6 +597,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
+    
+    def _get_hpo_backend(self):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        return RAY_BACKEND
 
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:

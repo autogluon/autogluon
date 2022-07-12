@@ -4,7 +4,7 @@ import sys
 sys.path.append('../input/autogluon-standalone-install/autogluon_standalone/antlr4-python3-runtime-4.8/antlr4-python3-runtime-4.8/src/')
 !pip install --no-deps --no-index --quiet ../input/autogluon-standalone-install/autogluon_standalone/*.whl --find-links autogluon_standalone
 
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 import pandas as pd
 import numpy as np
 import torch
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         save_standalone_path = perconfig["save_path"] + '_standalone'
         all_preds = []
         for fold in range(perconfig["N_fold"]):
-            predictor = AutoMMPredictor(
+            predictor = MultiModalPredictor(
                 label='Pawpularity',
                 problem_type='regression',
                 eval_metric='rmse',

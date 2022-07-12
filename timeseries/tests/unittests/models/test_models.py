@@ -1,22 +1,54 @@
 """Unit tests and utils common to all models"""
+import itertools
+import os
+import shutil
+import tempfile
+from functools import partial
 from unittest import mock
 
 import numpy as np
 import pytest
 from flaky import flaky
+from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 
 from autogluon.timeseries import TimeSeriesEvaluator, TimeSeriesDataFrame
+from autogluon.timeseries.models import DeepARModel, AutoETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
+TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS
+TESTABLE_PREDICTION_LENGTHS = [1, 5]
+
+
+@pytest.fixture(scope="module")
+def trained_models():
+    models = {}
+    model_paths = []
+    for model_class, prediction_length in itertools.product(TESTABLE_MODELS, TESTABLE_PREDICTION_LENGTHS):
+        temp_model_path = tempfile.mkdtemp()
+        model = model_class(
+            path=temp_model_path + os.path.sep,
+            freq="H",
+            prediction_length=prediction_length,
+            hyperparameters={"epochs": 1},
+        )
+
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
+        models[(prediction_length, repr(model_class))] = model
+        model_paths.append(temp_model_path)
+
+    yield models
+
+    for td in model_paths:
+        shutil.rmtree(td)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -29,16 +61,9 @@ def test_models_can_be_initialized(model_class, temp_model_path):
 @pytest.mark.parametrize("prediction_length", [1, 5])
 @pytest.mark.parametrize("metric", AVAILABLE_METRICS)
 def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
-    model_class, prediction_length, metric, temp_model_path
+    model_class, prediction_length, metric, trained_models
 ):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 2},
-    )
-
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model = trained_models[(prediction_length, repr(model_class))]
     score = model.score(DUMMY_TS_DATAFRAME, metric)
 
     assert isinstance(score, float)
@@ -47,40 +72,24 @@ def test_when_fit_called_then_models_train_and_all_scores_can_be_computed(
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 5])
 def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
-    model_class, prediction_length, temp_model_path
+    model_class, prediction_length, trained_models
 ):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 1},
-    )
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model = trained_models[(prediction_length, repr(model_class))]
 
     with mock.patch.object(model, "predict") as patch_method:
         _ = model.predict_for_scoring(DUMMY_TS_DATAFRAME)
 
-        call_df, = patch_method.call_args[0]
+        (call_df,) = patch_method.call_args[0]
 
         for j in DUMMY_TS_DATAFRAME.iter_items():
-            assert np.allclose(
-                call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length]
-            )
+            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length])
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        quantile_levels=[0.1, 0.9],
-        hyperparameters={
-            "epochs": 1,
-        },
-    )
-    model.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-    )
+@pytest.mark.parametrize("prediction_length", TESTABLE_PREDICTION_LENGTHS)
+def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, prediction_length):
+    model = trained_models[(prediction_length, repr(model_class))]
+
     model.save()
 
     loaded_model = model.__class__.load(path=model.path)
@@ -92,10 +101,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, temp_model_path)
 
 @flaky
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
-    model_class, temp_model_path
-):
-    scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
+def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
 
     model = model_class(
         path=temp_model_path,
@@ -106,9 +112,11 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         },
     )
 
-    _, _, results = model.hyperparameter_tune(
-        scheduler_options=scheduler_options,
-        time_limit=300,
+    hyperparameter_tune_kwargs = 'auto'
+
+    models, results = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        time_limit=100,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
@@ -130,9 +138,7 @@ def test_given_no_freq_argument_when_fit_called_with_freq_then_model_does_not_ra
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(
-    model_class, temp_model_path
-):
+def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,
         freq="H",
@@ -164,7 +170,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         prediction_length=3,
         quantile_levels=quantile_levels,
         hyperparameters={
-            "epochs": 2,
+            "epochs": 1,
         },
     )
 
@@ -175,26 +181,16 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
 
     predicted_item_index = predictions.index.levels[0]
     assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
-    assert all(
-        k in predictions.columns for k in ["mean"] + [str(q) for q in quantile_levels]
-    )
+    assert all(k in predictions.columns for k in ["mean"] + [str(q) for q in quantile_levels])
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [5, 10])
-@pytest.mark.parametrize("train_data", [
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_item_index([0, 1, 2, 3]),
-])
+@pytest.mark.parametrize("prediction_length", [1, 5])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_correct(
-    model_class, prediction_length, temp_model_path, train_data
+    model_class, prediction_length, trained_models
 ):
-    model = model_class(
-        path=temp_model_path,
-        freq="H",
-        prediction_length=prediction_length,
-        hyperparameters={"epochs": 1},
-    )
+    train_data = DUMMY_TS_DATAFRAME
+    model = trained_models[(prediction_length, repr(model_class))]
 
     model.fit(train_data=train_data)
 
@@ -208,7 +204,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize(
+    "model_class", [DeepARModel, AutoETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+)
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
     model_class, test_data_index, temp_model_path
@@ -233,37 +231,35 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     assert min_hour_in_pred == max_hour_in_test + 1
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [5, 10])
-@pytest.mark.parametrize("train_data, test_data", [
-    (
-        get_data_frame_with_item_index([0, 1, 2, 3]),
-        get_data_frame_with_item_index([0, 1, 2, 3])
-    ),
-    (
-        get_data_frame_with_item_index([0, 1, 2, 3]),
-        get_data_frame_with_item_index([2, 3, 4, 5])
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B", "C"]),
-        get_data_frame_with_item_index(["A", "B", "C"]),
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B", "C"]),
-        get_data_frame_with_item_index(["A", "B", "D"]),
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B", "C"]),
-        get_data_frame_with_item_index(["A", "B"]),
-    ),
-    (
-        get_data_frame_with_item_index(["A", "B"]),
-        get_data_frame_with_item_index(["A", "B", "C"]),
-    ),
-])
+@pytest.mark.parametrize(
+    "model_class", [DeepARModel, AutoETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+)
+@pytest.mark.parametrize(
+    "train_data, test_data",
+    [
+        (get_data_frame_with_item_index([0, 1, 2, 3]), get_data_frame_with_item_index([0, 1, 2, 3])),
+        (
+            get_data_frame_with_item_index(["A", "B", "C"]),
+            get_data_frame_with_item_index(["A", "B", "C"]),
+        ),
+        (
+            get_data_frame_with_item_index(["A", "B", "C"]),
+            get_data_frame_with_item_index(["A", "B", "D"]),
+        ),
+        (
+            get_data_frame_with_item_index(["A", "B", "C"]),
+            get_data_frame_with_item_index(["A", "B"]),
+        ),
+        (
+            get_data_frame_with_item_index(["A", "B"]),
+            get_data_frame_with_item_index(["A", "B", "C"]),
+        ),
+    ],
+)
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(
-    model_class, prediction_length, temp_model_path, train_data, test_data
+    model_class, temp_model_path, train_data, test_data
 ):
+    prediction_length = 5
     model = model_class(
         path=temp_model_path,
         freq="H",

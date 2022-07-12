@@ -1,0 +1,2 @@
+class EmptySearchSpace(Exception):
+    pass

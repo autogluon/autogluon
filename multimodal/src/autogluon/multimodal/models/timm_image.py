@@ -133,7 +133,6 @@ class TimmAutoModelForImagePrediction(nn.Module):
                 column_name_prefix=self.image_column_prefix,
                 features=features,
                 valid_lengths=image_valid_num,
-                has_cls_feature=False,
             )
             ret[COLUMN_FEATURES][FEATURES].update(column_features)
             ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)

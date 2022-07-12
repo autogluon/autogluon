@@ -1,6 +1,7 @@
-# Advanced Tabular DL models in AutoMMPredictor
+# Advanced Tabular DL models in AutoMM
 
 ## 1. Tabular Data
+
 
 ### 1.1 Example
 [`example_tabular.py`](./example_tabular.py) : This example provides a use case for the pure *tabular* data, including pure numerical features and numerical + categorical feartures, with FT_Transformer [1].
@@ -17,12 +18,12 @@ To run the example:
 ### 1.2 Datasets
 We borrowed 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in the original paper [1] to name each datasets. 
 The datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
-These Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `AutoMMPredictor`. 
+These Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `MultiModalPredictor`. 
 All Data can be automatically downloaded from s3 (online connection is necessary) if it does not exisit with the given dataset path `dataset_dir`. 
 
 
 ### 1.3 FT-Transformer
-We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
+We categorize the original FT_Transformer to two models in `MultiModalPredictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
    - `out_features` is the output feature size.
    - `d_token` is the dimension of the embedding tokens.
    - `num_trans_blocks` is the number of transformer blocks.
@@ -31,17 +32,16 @@ We categorize the original FT_Transformer to two models in `AutoMMPRedictor`, na
    - `ffn_activation` determines the activation fuction in feadforward layer. We support `relu`, `gelu`, `reglu` and `leaky_relu`.
    - `attention_dropout` is the dropout rate in attention layer.
 `numerical_transformer` supports an additional feature:
-   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Currently we support the following embedding layers: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
+   - `embedding_arch` is a list containing the names of embedding layers as described in [2]. Whatever the embedding layers are selected, the shape of the output embedding is `batch_size * number_of_numerical_features * d_token`.
   
-These features can be tuned using `hyperparameters` in `AutoMMPredictor. For example: 
+These features can be tuned using `hyperparameters` in `MultiModalPredictor. For example: 
 ```python
 hyperparameters = {
-   'model.names': ["categorical_transformer","numerical_transformer","fusion_transformer"],
-   'model.categorical_transformer.num_trans_blocks': 1,
-   'ffn_dropout': 0.0,
+   "model.names": ["categorical_transformer","numerical_transformer","fusion_transformer"],
+   "model.categorical_transformer.num_trans_blocks": 1,
+   "ffn_dropout": 0.0,
 }
 ```
-
 
 
 ### 1.4 Results
@@ -59,7 +59,6 @@ FT-Transformer in [1] | 0.459 | 0.859 | 0.391 | 0.732 | 0.729 | 0.960 | 0.8982 |
 AutoMM FT-Transformer | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761
 
 `FT-Transformer in [1]` row leverages parameters searching, and `AutoMM FT-Transformer` row use a fixed training configurations.
-
 
 You can reproduce the `AutoMM FT-Transformer` row by running:
 ```bash
@@ -97,7 +96,28 @@ unzip tabular_example_result.zip
 to download the our results.
 
 
+### 1.5 Ablations on Numerical Embedding Architectures
+
+We present ablations on `AutoMM FT-Transformer` with variours embedding architectures [2].
+
+We support the composition of the following architectures: {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'leaky_relu', 'layernorm'}.
+
+We can reproduce the following results by tuning `--embedding_arch` in `example_tabular.py`.
+
+Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi | Results
+----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----
+metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
+["linear" ] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip)
+["linear", "relu"] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 | 0.772 | 0.757 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result2.zip)
+["linear", "leaky_relu"] | 0.473 | 0.858 | 0.370 | 0.722 | 0.725 | 0.947 | RuntimeError | 8.915 | 0.965 | 0.771 | 0.776 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result3.zip)
+["linear", "relu", "linear"] | 0.468 | 0.858 | 0.374 | 0.721 | 0.723 | 0.951 | RuntimeError | 8.941 | 0.965 | 0.769\* | 0.770 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result4.zip)
+["positional", "linear"] | 0.467 | 0.864 | 0.347 | 0.694 | 0.709 | 0.951 | RuntimeError | 9.120 | 0.967 | 0.773\* | 0.761 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result5.zip)
+
+\* denotes adjusting `env.per_gpu_batch_size` from `128` to `64` to support runing a larger model on our device.
+
+---
+
 ### Reference
 [1] Revisiting Deep Learning Models for Tabular Data, 2021, https://arxiv.org/pdf/2106.11959.pdf
 
-[2] On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+[2] On Embeddings for Numerical Features in Tabular Deep Learning, 2022, https://arxiv.org/abs/2203.05556

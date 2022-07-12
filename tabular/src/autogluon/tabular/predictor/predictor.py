@@ -785,10 +785,18 @@ class TabularPredictor:
         self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata,
                                     init_kwargs=feature_generator_init_kwargs)
 
+        if self.problem_type is not None:
+            inferred_problem_type = self.problem_type
+        else:
+            inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
+
         num_bag_folds, num_bag_sets, num_stack_levels = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
-            time_limit=time_limit, auto_stack=auto_stack, num_train_rows=len(train_data),
+            time_limit=time_limit, auto_stack=auto_stack, num_train_rows=len(train_data), problem_type=inferred_problem_type,
         )
+        if auto_stack:
+            logger.log(20, f'Stack configuration (auto_stack={auto_stack}): '
+                           f'num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds}, num_bag_sets={num_bag_sets}')
 
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data),
@@ -2766,8 +2774,6 @@ class TabularPredictor:
                     'hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
             else:
                 ag_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
-        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
-            ag_args.pop('hyperparameter_tune_kwargs', None)
         if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
             logger.log(30,
                        'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')
@@ -3132,14 +3138,24 @@ class TabularPredictor:
                                                                         init_kwargs=init_kwargs)
 
     def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack,
-                             num_train_rows):
+                             num_train_rows, problem_type):
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bag_folds is None:
                 num_bag_folds = min(8, max(5, math.floor(num_train_rows / 100)))
+            # TODO: Leverage use_bag_holdout when data is large to enable multi-layer stacking
+            #  if num_train_rows >= 100000 and num_val_rows is None and use_bag_holdout is None:
+            #      use_bag_holdout = True
             if num_stack_levels is None:
-                num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                if problem_type == BINARY:
+                    # Disable multi-layer stacking to avoid stack info leakage
+                    num_stack_levels = 0
+                    # TODO:
+                    #  if use_bag_holdout:
+                    #      num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                else:
+                    num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bag_folds is None:
             num_bag_folds = 0
         if num_stack_levels is None:

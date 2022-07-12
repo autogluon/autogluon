@@ -27,7 +27,7 @@ class LabelProcessor:
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
-    def collate_fn(self) -> Dict:
+    def collate_fn(self, label_column_names: Optional[List] = None) -> Dict:
         """
         Collate individual labels into a batch. Here it stacks labels.
         This function will be used when creating Pytorch DataLoader.

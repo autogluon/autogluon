@@ -13,14 +13,17 @@ from typing import Optional, Callable, Union, List
 from .constants import (
     MIN,
     MAX,
+)
+from .ray_tune_constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
-from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
-from .scheduler_factory import SchedulerFactory
-from .searcher_factory import SearcherFactory
+from .exceptions import EmptySearchSpace
+from .ray_tune_scheduler_factory import SchedulerFactory
+from .ray_tune_searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
 from .. import Space
+from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 
 from ray import tune
 from ray.tune import PlacementGroupFactory
@@ -33,10 +36,6 @@ from ray.tune.suggest.hyperopt import HyperOptSearch
 
 
 logger = logging.getLogger(__name__)
-
-
-class EmptySearchSpace(Exception):
-    pass
 
 
 class RayTuneAdapter(ABC):
@@ -58,6 +57,11 @@ class RayTuneAdapter(ABC):
         self.cpu_per_job = None
         self.gpu_per_job = None
         self.resources_per_trial = None
+        
+    @property
+    @abstractmethod
+    def adapter_type(self):
+        raise NotImplementedError
    
     def get_supported_searchers(self) -> list:
         """
@@ -212,10 +216,8 @@ def run(
     scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
     search_space = _convert_search_space(search_space)
 
-    if ray.is_initialized():
-        # shutdown to reinitialize resources because different model might require different total resources
-        ray.shutdown()
-    ray.init(log_to_driver=False, **total_resources)
+    if not ray.is_initialized():
+        ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -377,6 +379,10 @@ class TabularRayTuneAdapter(RayTuneAdapter):
     supported_searchers = ['random', 'bayes']
     supported_schedulers = ['FIFO']
     
+    @property
+    def adapter_type(self):
+        return 'tabular'
+    
     def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
             return resources_per_trial 
@@ -397,6 +403,10 @@ class AutommRayTuneAdapter(RayTuneAdapter):
     
     def __init__(self):
         super().__init__()
+        
+    @property
+    def adapter_type(self):
+        return 'automm'
         
     def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
@@ -426,6 +436,10 @@ class AutommRayTuneLightningAdapter(RayTuneAdapter):
         super().__init__()
         self.num_workers = None
         self.cpu_per_worker = None
+        
+    @property
+    def adapter_type(self):
+        return 'automm_ray_lightning'
         
     def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
         if resources_per_trial is not None:
@@ -457,7 +471,29 @@ class AutommRayTuneLightningAdapter(RayTuneAdapter):
         return trainable_args
 
 
-class ForecastingRayTuneAdapter(TabularRayTuneAdapter):
+class TimeSeriesRayTuneAdapter(TabularRayTuneAdapter):
     
     supported_searchers = ['random', 'bayes']
     supported_schedulers = ['FIFO']
+    
+    @property
+    def adapter_type(self):
+        return 'timeseries'
+
+
+class RayTuneAdapterFactory:
+    
+    __supported_adapters = [
+        TabularRayTuneAdapter,
+        TimeSeriesRayTuneAdapter,
+        AutommRayTuneAdapter,
+        AutommRayTuneLightningAdapter,
+    ]
+    
+    __type_to_adapter = {cls().adapter_type: cls for cls in __supported_adapters}
+
+    @staticmethod
+    def get_adapter(adapter_type: str) -> RayTuneAdapter:
+        """Return the executor"""
+        assert adapter_type in RayTuneAdapterFactory.__type_to_adapter, f'{adapter_type} not supported'
+        return RayTuneAdapterFactory.__type_to_adapter[adapter_type]

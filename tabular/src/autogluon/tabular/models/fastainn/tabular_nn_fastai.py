@@ -11,6 +11,7 @@ import sklearn
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import try_import_fastai
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
@@ -79,6 +80,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.y_scaler = None
         self._cont_normalization = None
         self._load_model = None  # Whether to load inner model when loading.
+        self._num_cpus_infer = None
 
     def _preprocess_train(self, X, y, X_val, y_val):
         from fastai.tabular.core import TabularPandas
@@ -181,6 +183,7 @@ class NNFastAiTabularModel(AbstractModel):
             logger.log(15, "sample_weight not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
 
         params = self._get_model_params()
+        self._num_cpus_infer = params.pop('_num_cpus_infer', 1)
 
         self.y_scaler = params.get('y_scaler', None)
         if self.y_scaler is None:
@@ -377,7 +380,16 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
+    # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
+    #  If this isn't here, inference speed is slowed down massively.
+    #  Remove once upgraded to XGBoost>=1.6
     def _predict_proba(self, X, **kwargs):
+        from .._utils.torch_utils import TorchThreadManager
+        with TorchThreadManager(num_threads=self._num_cpus_infer):
+            pred_proba = self._predict_proba_internal(X=X, **kwargs)
+        return pred_proba
+
+    def _predict_proba_internal(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
 
         single_row = len(X) == 1
@@ -501,6 +513,10 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         return 10 * get_approximate_df_mem_usage(X).sum()
+    
+    def _get_hpo_backend(self):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        return RAY_BACKEND
 
     def _more_tags(self):
         return {'can_refit_full': True}
