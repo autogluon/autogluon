@@ -27,7 +27,14 @@ jobs:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
-          python-version: 3.9
+          python-version: 3.8
+      - name: Setup OMP
+        if: matrix.os == 'macos-latest'
+        shell: bash -l {0}
+        run: |
+          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+          brew install libomp.rb
+          rm libomp.rb
       - name: unit-test
         shell: bash -l {0}
         run: |
