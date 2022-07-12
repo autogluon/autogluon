@@ -206,6 +206,8 @@ def infer_column_types(
     valid_data: Optional[pd.DataFrame] = None,
     label_columns: Union[str, List[str]] = None,
     provided_column_types: Optional[Dict] = None,
+    allowable_column_types: Optional[List[str]] = None,
+    fallback_column_type: Optional[str] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -221,6 +223,10 @@ def infer_column_types(
     provided_column_types
         Additional dictionary that you can use to specify the columns types that you know.
         {'col_name': TYPE, ...}
+    allowable_column_types
+        What column types are allowed. This is the prior knowledge inferred from the model type.
+    fallback_column_type
+        What's the fallback column type if the detected type if out of the allowable_column_types.
 
     Returns
     -------
@@ -262,11 +268,18 @@ def infer_column_types(
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
-            column_types[col_name] = IMAGE_PATH
+            column_types[col_name] = IMAGE
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL
+
+    if allowable_column_types and fallback_column_type:
+        column_types = set_fallback_column_type(
+            column_types=column_types,
+            allowable_column_types=allowable_column_types,
+            fallback_column_type=fallback_column_type,
+        )
 
     return column_types
 
@@ -411,3 +424,28 @@ def infer_problem_type_output_shape(
                 f"The label column '{label_column}' has type"
                 f" '{column_types[label_column]}', which is not supported yet."
             )
+
+
+def set_fallback_column_type(column_types: Dict, allowable_column_types: List[str], fallback_column_type: str) -> Dict:
+    """
+    Filter the auto-detected column types to make sure that all column types are allowable.
+    Use the fallback type to replace those out of the allowable_column_types.
+
+    Parameters
+    ----------
+    column_types
+        The inferred column types.
+    allowable_column_types
+        The column types which are allowed by the model type.
+    fallback_column_type
+        Fallback to this type if some invalid column type is found.
+
+    Returns
+    -------
+    The filtered column types.
+    """
+    for col_name, col_type in column_types.items():
+        if col_type not in allowable_column_types:
+            column_types[col_name] = fallback_column_type
+
+    return column_types

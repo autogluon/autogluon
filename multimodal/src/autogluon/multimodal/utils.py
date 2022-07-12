@@ -1915,3 +1915,30 @@ def download(
                 )
 
     return fname
+
+
+def infer_dtypes_by_model_names(model_config: DictConfig):
+    """
+    Get data types according to model types.
+
+    Parameters
+    ----------
+    model_config
+        Model config from `config.model`.
+
+    Returns
+    -------
+    The data types allowed by models and the default fallback data type.
+    """
+    allowable_dtypes = []
+    fallback_dtype = None
+    for per_model in model_config.names:
+        per_model_dtypes = OmegaConf.select(model_config, f"{per_model}.data_types")
+        if per_model_dtypes:
+            allowable_dtypes.extend(per_model_dtypes)
+
+    allowable_dtypes = set(allowable_dtypes)
+    if allowable_dtypes == set([IMAGE, TEXT]):
+        fallback_dtype = TEXT
+
+    return allowable_dtypes, fallback_dtype

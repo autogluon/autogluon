@@ -3,7 +3,7 @@ import shutil
 import pytest
 from ray import tune
 
-from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
+from autogluon.core.hpo.ray_tune_constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 
 from unittest_datasets import PetFinderDataset
