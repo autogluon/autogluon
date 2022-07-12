@@ -212,6 +212,7 @@ class MultiModalPredictor:
         self._model = None
         self._resume = False
         self._continuous_training = False
+        self._is_distill = False
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -479,6 +480,7 @@ class MultiModalPredictor:
         self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
+        self._is_distill = (teacher_predictor is not None)
 
         _fit_args = dict(
             train_df=train_data,
@@ -1746,11 +1748,14 @@ class MultiModalPredictor:
                 fp,
                 ensure_ascii=True,
             )
-        # In case that users save to a path, which is not the original save_path.
-        if os.path.abspath(path) != os.path.abspath(self._save_path):
-            model_path = os.path.join(self._save_path, "model.ckpt")
-            if os.path.isfile(model_path):
-                shutil.copy(model_path, path)
+        state_dict = self._model.state_dict()
+        if self._is_distill:
+            state_dict = self._replace_model_name_prefix(
+                state_dict=state_dict,
+                old_prefix="student_model",
+                new_prefix="model",
+            )
+        torch.save({"state_dict": state_dict}, os.path.join(path, MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(
