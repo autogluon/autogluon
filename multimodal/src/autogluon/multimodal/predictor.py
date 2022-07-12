@@ -1316,7 +1316,6 @@ class MultiModalPredictor:
                 enable_progress_bar=self._enable_progress_bar,
                 deterministic=self._config.env.deterministic,
                 logger=False,
-                max_epochs=-1,
             )
 
             with warnings.catch_warnings():

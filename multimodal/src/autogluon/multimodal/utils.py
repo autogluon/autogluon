@@ -1871,7 +1871,7 @@ def download(
                     total_size = int(r.headers.get("content-length", 0))
                     chunk_size = 1024
                     if tqdm is not None:
-                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True)
+                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True, leave=False)
                     with open("{}.{}".format(fname, random_uuid), "wb") as f:
                         for chunk in r.iter_content(chunk_size=chunk_size):
                             if chunk:  # filter out keep-alive new chunks
