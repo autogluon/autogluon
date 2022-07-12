@@ -11,4 +11,4 @@ install_features
 install_multimodal
 
 cd multimodal/
-python3 -m pytest --junitxml=results.xml --forked --runslow tests
+python3 -m pytest --junitxml=results.xml --runslow tests

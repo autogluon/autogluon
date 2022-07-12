@@ -29,6 +29,7 @@ from .constants import (
     LABEL,
     BINARY,
     MULTICLASS,
+    CLASSIFICATION,
     REGRESSION,
     Y_PRED,
     Y_PRED_PROB,
@@ -255,12 +256,12 @@ class MultiModalPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, AutoMMPredictor] = None,
+        teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
         hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
-        Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
+        Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
         which may contain image path, text, numeric, or categorical features.
 
         Parameters
@@ -360,7 +361,7 @@ class MultiModalPredictor:
 
         Returns
         -------
-        An "AutoMMPredictor" object (itself).
+        An "MultiModalPredictor" object (itself).
         """
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -399,7 +400,7 @@ class MultiModalPredictor:
 
         # Generate general info that's not config specific
         if tuning_data is None:
-            if self._problem_type in [BINARY, MULTICLASS]:
+            if self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION]:
                 stratify = train_data[self._label_column]
             else:
                 stratify = None
@@ -447,6 +448,9 @@ class MultiModalPredictor:
             column_types = self._column_types
 
         if self._problem_type is not None:
+            if self._problem_type == CLASSIFICATION:
+                # Set the problem type to be inferred problem type
+                self._problem_type = problem_type
             assert self._problem_type == problem_type, (
                 f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
             )
@@ -560,7 +564,7 @@ class MultiModalPredictor:
             )
             if best_trial is None:
                 raise ValueError(
-                    "AutoMMPredictor wasn't able to find the best trial."
+                    "MultiModalPredictor wasn't able to find the best trial."
                     "Either all trials failed or"
                     "it's likely that the time is not enough to train a single epoch for trials."
                 )
@@ -569,7 +573,7 @@ class MultiModalPredictor:
             cleanup_trials(save_path, best_trial.trial_id)
             best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
-            predictor = AutoMMPredictor._load_metadata(predictor=self, path=best_trial_path)
+            predictor = MultiModalPredictor._load_metadata(predictor=self, path=best_trial_path)
             # construct the model
             model = create_model(
                 config=predictor._config,
@@ -628,7 +632,7 @@ class MultiModalPredictor:
 
     def _setup_distillation(
         self,
-        teacher_predictor: Union[str, AutoMMPredictor],
+        teacher_predictor: Union[str, MultiModalPredictor],
     ):
         """
         Prepare for distillation. It verifies whether the student and teacher predictors have consistent
@@ -656,7 +660,7 @@ class MultiModalPredictor:
         """
         logger.debug("setting up distillation...")
         if isinstance(teacher_predictor, str):
-            teacher_predictor = AutoMMPredictor.load(teacher_predictor)
+            teacher_predictor = MultiModalPredictor.load(teacher_predictor)
 
         # verify that student and teacher configs are consistent.
         assert self._problem_type == teacher_predictor._problem_type
@@ -739,7 +743,7 @@ class MultiModalPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        teacher_predictor: Union[str, AutoMMPredictor] = None,
+        teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
@@ -994,10 +998,10 @@ class MultiModalPredictor:
 
         if is_interactive() and num_gpus > 1:
             warnings.warn(
-                "Interactive environment is detected. Currently, AutoMMPredictor does not support multi-gpu "
+                "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
                 "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
                 "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-                "AutoMMPredictor in a script.",
+                "MultiModalPredictor in a script.",
                 UserWarning,
             )
             num_gpus = 1
@@ -1005,7 +1009,7 @@ class MultiModalPredictor:
         if num_gpus == 0:  # CPU only training
             warnings.warn(
                 "Only CPU is detected in the instance. "
-                "AutoMMPredictor will be trained with CPU only. "
+                "MultiModalPredictor will be trained with CPU only. "
                 "This may results in slow training speed. "
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
@@ -1070,6 +1074,7 @@ class MultiModalPredictor:
                 log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
                 enable_progress_bar=enable_progress_bar,
                 fast_dev_run=config.env.fast_dev_run,
+                track_grad_norm=OmegaConf.select(config, "environment.track_grad_norm", default=2),
                 val_check_interval=config.optimization.val_check_interval,
             )
 
@@ -1240,7 +1245,7 @@ class MultiModalPredictor:
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
                 "Only CPU is detected in the instance. "
-                "AutoMMPredictor will predict with CPU only. "
+                "MultiModalPredictor will predict with CPU only. "
                 "This may results in slow prediction speed. "
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
@@ -1315,6 +1320,7 @@ class MultiModalPredictor:
                 benchmark=False,
                 enable_progress_bar=self._enable_progress_bar,
                 deterministic=self._config.env.deterministic,
+                max_epochs=-1,  # Add max_epochs to disable warning
                 logger=False,
             )
 
@@ -1750,10 +1756,17 @@ class MultiModalPredictor:
             model_path = os.path.join(self._save_path, "model.ckpt")
             if os.path.isfile(model_path):
                 shutil.copy(model_path, path)
+            else:
+                # FIXME(?) Fix the saving logic
+                RuntimeError(
+                    f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
+                    f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
+                    f"removed."
+                )
 
     @staticmethod
     def _load_metadata(
-        predictor: AutoMMPredictor,
+        predictor: MultiModalPredictor,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,

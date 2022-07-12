@@ -20,7 +20,7 @@ from autogluon.multimodal.constants import (
     LORA_BIAS,
     LORA_NORM,
 )
-from datasets import (
+from unittest_datasets import (
     PetFinderDataset,
     HatefulMeMesDataset,
     AEDataset,
