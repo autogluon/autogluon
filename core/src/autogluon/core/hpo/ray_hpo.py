@@ -13,12 +13,14 @@ from typing import Optional, Callable, Union, List
 from .constants import (
     MIN,
     MAX,
+)
+from .ray_tune_constants import (
     SEARCHER_PRESETS,
     SCHEDULER_PRESETS
 )
 from .exceptions import EmptySearchSpace
-from .scheduler_factory import SchedulerFactory
-from .searcher_factory import SearcherFactory
+from .ray_tune_scheduler_factory import SchedulerFactory
+from .ray_tune_searcher_factory import SearcherFactory
 from .space_converter import RaySpaceConverterFactory
 from .. import Space
 from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
