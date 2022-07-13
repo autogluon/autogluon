@@ -1,6 +1,6 @@
 ## This is the public API that should be exposed to the general user
 
-import shift as sft
+import autogluon.shift as sft
 
 class XShiftDetector:
     """Detect a change in covariate (X) distribution between training and test, which we call XShift.  This should be
@@ -36,31 +36,56 @@ class XShiftDetector:
     >>> xshiftd = XShiftDetector(predictor_class = TabularPredictor, metric = "F1")
     Fit the detector...
     >>> xshiftd.fit(Xtrain, Xtest)
-    Print the results...
-    >>> xshiftd.print()
+    Output the decision...
+    >>> xshiftd.decision()
     """
 
-    def __init__(self, predictor = None, predictor_class = None, method="C2ST", metric = 'balanced accuracy'):
+    def __init__(self,
+                 PredictorClass,
+                 method="C2ST",
+                 metric = 'balanced accuracy'):
         valid_methods = [
             "C2ST"
         ]
         assert method in valid_methods, f"method {method} is not one of " + ", ".join(valid_methods)
-        ## Initialize classifier by checking Class of predictor?  So if tabular then you know to use tabular predictor
-        ## for classifier in C2ST
-        pass
+        if PredictorClass:
+            pred = PredictorClass(label='xshift_label')
+            self.C2ST = sft.Classifier2ST(pred)
+        else:
+            assert False, 'One of predictor or PredictorClass must be specified'
+        self.metric = metric
 
-    def fit(self, data, compute_pvalue = False):
+    def fit(self, Xtrain, Xtest, label=None, compute_pvalue = False):
         """Fit the XShift detector.
 
         Parameters
         ----------
-        data : pd.DataFrame, or tuple
-            either
-            - a dataframe with a label column where 1 = target and 0 = source
-            - a tuple of training dataframe and test dataframe
+        Xtrain, Xtest : pd.DataFrame
+            tuple of training dataframe and test dataframe
+
+        label: str
+            the Y variable that is to be predicted (needs to be removed)
+
+        compute_pvalue: bool
+            whether to compute the p-value or not
         """
+        assert 'xshift_label' not in Xtrain.columns, 'your data columns contain "xshift_label" which is used internally'
+        assert compute_pvalue == False, 'compute_pvalue not supported'
+        if label:
+            Xtrain = Xtrain.drop(columns=[label])
+            Xtest = Xtest.drop(columns=[label])
+
+        self.C2ST.fit((Xtrain, Xtest), sample_label='xshift_label')
+
+        ## Sample anomalies
+        as_top = self.C2ST.sample_anomaly_scores(how='top')
+        as_top = as_top[[1]].rename(columns={1: 'xshift_test_proba'})
+        self.anomalies = as_top.join(Xtest)
+
+        ## Feature importance
+        self.fi_scores = self.C2ST.feature_importance()
+
         self._is_fit = True
-        pass
 
     def decision(self, teststat_thresh = 0.55, pvalue_thresh = None):
         """Decision function for testing XShift
@@ -77,14 +102,43 @@ class XShiftDetector:
         -------
         One of ['detected', 'not detected']
         """
-        pass
+        self.teststat_thresh = teststat_thresh
+        if self.C2ST.test_stat > teststat_thresh: # what to do with p-value?
+            return 'detected'
+        else:
+            return 'not detected'
 
     def json(self):
         """output the results in json format
         """
-        pass
+        return {
+            'detection status': self.decision(),
+            'test statistic': self.C2ST.test_stat,
+            'feature importance': self.fi_scores,
+            'sample anomalies': self.anomalies
+        }
 
-    def print(self):
+    def summary(self, format = "markdown"):
         """print the results to screen
         """
-        pass
+        assert format == 'markdown', 'Only markdown format is supported'
+        if self.decision() == 'not detected':
+            ret_md = (
+                f"# Detecting distribution shift"
+                f"We did not detect a substantial difference between the training and test X distributions."
+                )
+        else:
+            ret_md = (
+                f"# Detecting distribution shift\n"
+                f"We detected a substantial difference between the training and test X distributions,\n" 
+                f"a type of distribution shift.\n"
+                f"\n"
+                f"## Test results\n"
+                f"We can predict whether a sample is in the test vs. training set with a {self.metric} of\n"
+                f"{self.C2ST.test_stat} (larger than the threshold of {self.teststat_thresh}).\n"
+                f"\n"
+                f"## Feature importances\n"
+                f"The variables that are the most responsible for this shift are those with high feature importance:\n"
+                f"{self.fi_scores.to_markdown()}"
+            )
+        return ret_md

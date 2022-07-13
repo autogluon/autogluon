@@ -37,7 +37,7 @@ class Classifier2ST:
 
     def fit(self,
             data,
-            sample_label = 'label',
+            sample_label = 'shift_label',
             accuracy_metric = accuracy_score,
             split=0.5):
         """Fit the classifier for predicting if source or target and compute the 2-sample test statistic.
@@ -133,17 +133,17 @@ class Classifier2ST:
         """
         how_valid = ['top', 'rand']
         assert how in how_valid, 'how is not in valid set: ' + ' '.join(how_valid)
-        test = self._test.loc[self._test['label']==1]
+        test = self._test.loc[self._test[self._sample_label]==1]
         if how == 'rand':
             test = test.sample(sample_size)
             phat = self._classifier.predict_proba(test)
             phat = phat.sort_values(1, ascending=False)
-            phat['rank'] = np.linspace(1, 0, sample_size)
+            # phat['rank'] = np.linspace(1, 0, sample_size)
         if how == 'top':
             phat = self._classifier.predict_proba(test)
             phat = phat.sort_values(1, ascending=False)
-            phat = phat.iloc[-sample_size:]
-            phat['rank'] = np.linspace(1, 0, sample_size)
+            phat = phat.iloc[:sample_size]
+            # phat['rank'] = np.linspace(1, 0, sample_size)
         return phat
 
     def feature_importance(self):
