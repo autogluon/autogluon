@@ -19,7 +19,13 @@ def test_clip_zero_shot():
     dog_text = "a photo of a dog"
     bird_text = "a photo of a bird"
 
-    predictor = MultiModalPredictor(hyperparameters={"model.names": ["clip"]}, problem_type="zero_shot")
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.names": ["clip"],
+            "model.clip": "openai/clip-vit-base-patch32",
+            "env.num_workers_evaluation": 0,
+        },
+        problem_type="zero_shot")
 
     # compute the cosine similarity of one image-text pair.
     pred = predictor.predict({"image": [cat_image_name], "text": [cat_text]})
