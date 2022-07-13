@@ -543,6 +543,7 @@ class MultiModalPredictor:
                 save_dir=save_path,
                 ray_tune_adapter=ray_tune_adapter,
                 total_resources=resources,
+                minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
                 time_budget_s=time_budget_s,
                 keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
                 checkpoint_score_attr=metric,
