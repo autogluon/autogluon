@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import os
@@ -11,6 +13,11 @@ from .exceptions import EmptySearchSpace
 from .. import Space
 from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..models import AbstractModel
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +68,7 @@ class HpoExecutor(ABC):
         """
         raise NotImplementedError
     
-    def register_resources(self, initialized_model: "AbstractModel"):
+    def register_resources(self, initialized_model: AbstractModel):
         """
         Register total resources used for the experiment
         
