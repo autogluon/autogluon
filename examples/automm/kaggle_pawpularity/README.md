@@ -91,7 +91,8 @@ Currently, these libraries need to be imported manually:
  - antlr4
  - nlpaug
 
-You can also get [simplified standalone install tool](http://automl-mm-bench.s3.amazonaws.com/0.5release/autogluon_standalone/autogluon_standalone.tar.gz), unzip and upload it into a kaggle dataset. 
+You can refer to [Kaggle notebook](https://www.kaggle.com/code/linuxdex/get-autogluon-standalone) and run the notebook to get autogluon.multimodal standalone. Missing dependent packages will be downloaded as .whl or .tar.gz in autogluon_standalone. You can download the zip of the folder and create this as a Dataset in Kaggle.
+
 Use the code following to install AutoGluon without network in the kaggle notebook. 
 
     import sys
