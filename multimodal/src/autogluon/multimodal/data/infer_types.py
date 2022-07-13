@@ -304,6 +304,8 @@ def infer_label_column_type_by_problem_type(
     problem_type: str,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL),
+    fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
     Infer the label column types based on problem type.
@@ -320,6 +322,10 @@ def infer_label_column_type_by_problem_type(
         A pd.DataFrame.
     valid_data
         A validation pd.DataFrame.
+    allowable_label_types
+        Which label types are allowed.
+    fallback_label_type
+        If a label type is not within the allowable_label_types, replace it with this fallback_label_type.
 
     Returns
     -------
@@ -341,10 +347,13 @@ def infer_label_column_type_by_problem_type(
             warnings.warn(
                 f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
             )
-        if problem_type == MULTICLASS or problem_type == BINARY or problem_type == CLASSIFICATION:
+        if problem_type in [MULTICLASS, BINARY, CLASSIFICATION]:
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
+
+        if column_types[col_name] not in allowable_label_types:
+            column_types[col_name] = fallback_label_type
 
     return column_types
 
