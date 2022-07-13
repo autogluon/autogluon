@@ -2,7 +2,7 @@ import pytest
 import PIL
 from autogluon.multimodal.data.process_image import ImageProcessor
 
-from datasets import (
+from unittest_datasets import (
     PetFinderDataset,
     HatefulMeMesDataset,
     AEDataset,

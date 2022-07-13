@@ -711,6 +711,8 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
+                pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
@@ -1871,7 +1873,7 @@ def download(
                     total_size = int(r.headers.get("content-length", 0))
                     chunk_size = 1024
                     if tqdm is not None:
-                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True)
+                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True, leave=False)
                     with open("{}.{}".format(fname, random_uuid), "wb") as f:
                         for chunk in r.iter_content(chunk_size=chunk_size):
                             if chunk:  # filter out keep-alive new chunks

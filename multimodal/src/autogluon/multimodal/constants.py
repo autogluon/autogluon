@@ -6,6 +6,7 @@ NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 
 # Problem types
+CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"

@@ -4,7 +4,18 @@ import pandas as pd
 import warnings
 import PIL
 from typing import Union, Optional, List, Dict, Tuple
-from ..constants import NULL, CATEGORICAL, NUMERICAL, TEXT, IMAGE, MULTICLASS, BINARY, REGRESSION, AUTOMM
+from ..constants import (
+    NULL,
+    CATEGORICAL,
+    NUMERICAL,
+    TEXT,
+    IMAGE,
+    MULTICLASS,
+    BINARY,
+    CLASSIFICATION,
+    REGRESSION,
+    AUTOMM,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -51,6 +62,7 @@ def is_categorical_column(
     else:
         if threshold is None:
             if is_label:
+                # TODO(?) The following logic will be problematic if the task is few-shot learning.
                 threshold = 100
                 oov_ratio_threshold = 0
                 ratio = 0.1
@@ -329,7 +341,7 @@ def infer_label_column_type_by_problem_type(
             warnings.warn(
                 f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
             )
-        if problem_type == MULTICLASS or problem_type == BINARY:
+        if problem_type == MULTICLASS or problem_type == BINARY or problem_type == CLASSIFICATION:
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
@@ -383,10 +395,20 @@ def infer_problem_type_output_shape(
         elif provided_problem_type == MULTICLASS:
             class_num = len(data[label_column].value_counts())
             return MULTICLASS, class_num
+        elif provided_problem_type == CLASSIFICATION:
+            class_num = len(data[label_column].value_counts())
+            if class_num == 2:
+                return BINARY, 2
+            else:
+                return MULTICLASS, class_num
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
         else:
-            raise ValueError(f"Problem type {provided_problem_type} doesn't have a valid output shape for training.")
+            raise ValueError(
+                f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
+                f"for training. The supported problem types are"
+                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}'"
+            )
 
     else:
         if column_types[label_column] == CATEGORICAL:
