@@ -1,4 +1,4 @@
-from typing import Any, Union, Dict
+from typing import Any, Union, Dict, Optional, List
 from nptyping import NDArray
 from ..constants import LABEL
 from .collator import Stack
