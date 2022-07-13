@@ -42,7 +42,7 @@ extras_require = {
     ],
     'fastai': [
         'torch>=1.0,<1.13',
-        'fastai>=2.3.1,<2.6',
+        'fastai>=2.3.1,<2.8',
     ],
     'skex': [
         'scikit-learn-intelex>=2021.5,<2021.6',
