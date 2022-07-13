@@ -74,7 +74,7 @@ class HpoExecutor(ABC):
         
         Parameters
         ----------
-        model
+        initialized_model
             The model that will be performed HPO. This model MUST be initialized
         """
         user_cpu_count = initialized_model._get_child_aux_val(key='num_cpus', default=None)
