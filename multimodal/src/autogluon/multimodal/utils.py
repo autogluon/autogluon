@@ -11,7 +11,7 @@ import torch
 from torch import nn
 import warnings
 from contextlib import contextmanager
-from typing import Optional, List, Any, Dict, Tuple, Union
+from typing import Optional, List, Dict, Tuple, Union
 import numpy as np
 import uuid
 import hashlib

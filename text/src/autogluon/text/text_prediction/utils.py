@@ -1,6 +1,4 @@
 import numpy as np
-import pandas as pd
-import functools
 import logging
 import os
 import multiprocessing as mp

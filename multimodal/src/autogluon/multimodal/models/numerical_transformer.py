@@ -1,7 +1,6 @@
 from torch import nn
 from torch import Tensor
-import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import List, Optional
 from .ft_transformer import FT_Transformer, _TokenInitialization, CLSToken
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
 import torch

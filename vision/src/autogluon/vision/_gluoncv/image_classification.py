@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import autogluon.core as ag
 from autocfg import dataclass
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import MULTICLASS
 from autogluon.core.utils import get_cpu_count, get_gpu_count_all
 from autogluon.core.task.base import BaseTask
 from autogluon.core.searcher import DummySearcher

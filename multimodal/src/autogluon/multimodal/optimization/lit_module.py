@@ -11,7 +11,7 @@ from .utils import (
     apply_single_lr,
 )
 from ..constants import LOGITS, WEIGHT, AUTOMM
-from typing import Union, Optional, List, Dict, Callable
+from typing import Union, Optional, Dict, Callable
 from ..data.mixup import MixupModule, multimodel_mixup
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator

@@ -13,11 +13,9 @@ import copy
 import yaml
 import torch
 from torch import nn
-from torch.nn.modules.loss import _Loss
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.types import _METRIC
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.try_import import try_import_ray_lightning

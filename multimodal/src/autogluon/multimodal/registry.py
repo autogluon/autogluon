@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import List
 import json
 from json import JSONDecodeError
 

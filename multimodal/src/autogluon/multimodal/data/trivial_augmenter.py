@@ -6,8 +6,7 @@ Code is partically adapted from its official implementation https://github.com/a
 
 import random
 import logging
-from selectors import EpollSelector
-from PIL import ImageOps, ImageEnhance, ImageFilter, Image, ImageDraw
+from PIL import ImageOps, ImageEnhance, Image
 import nlpaug.augmenter.word as naw
 from .utils import InsertPunctuation
 import nltk

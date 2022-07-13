@@ -2,8 +2,7 @@ import math
 import numpy as np
 
 from catboost import MultiRegressionCustomMetric, MultiRegressionCustomObjective
-from autogluon.core.metrics.softclass_metrics import soft_log_loss, EPS
-from autogluon.core.utils import try_import_catboost
+from autogluon.core.metrics.softclass_metrics import EPS
 from .catboost_utils import CustomMetric
 
 
