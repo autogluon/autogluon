@@ -1076,8 +1076,8 @@ class BaggedEnsembleModel(AbstractModel):
         hpo_executor.time_limit = orig_time
 
         bags = {}
-        bags_performance = {}
-        for i, (model_name, model_path) in enumerate(hpo_models.items()):
+        for i, (model_name, model_info) in enumerate(hpo_models.items()):
+            model_path = model_info['path']
             child: AbstractModel = self._child_type.load(path=model_path)
 
             # TODO: Create new Ensemble Here
@@ -1124,7 +1124,8 @@ class BaggedEnsembleModel(AbstractModel):
                 bag._cv_splitters = [cv_splitter]
 
             bag.save()
-            bags[bag.name] = bag.path
+            bags[bag.name] = dict(**model_info)
+            bags[bag.name]['path'] = bag.path
 
             # delete original child from its disk location since it is being saved to a new location in the bag
             child: AbstractModel = self._child_type.load(path=model_path)

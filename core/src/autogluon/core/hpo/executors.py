@@ -273,7 +273,16 @@ class RayHpoExecutor(HpoExecutor):
             file_id = trial_id  # unique identifier to files from this trial
             trial_model_name = model_name + os.path.sep + file_id
             trial_model_path = model_path_root + trial_model_name + os.path.sep
-            hpo_models[trial_model_name] = trial_model_path
+            hpo_models[trial_model_name] = dict(
+                path=trial_model_path
+            )
+
+            hpo_models[trial_model_name] = dict(
+                path=trial_model_path,
+                val_score=validation_performance,
+                trial=trial,
+                # hyperparameters=???  # TODO: how to get hyperparameters of a trial with ray?
+            )
 
         return hpo_models, self.analysis
 
@@ -369,7 +378,13 @@ class CustomHpoExecutor(HpoExecutor):
             trial_model_path = model_path_root + trial_model_name + os.path.sep
             trial_reward = self.scheduler.searcher.get_reward(hpo_results['config_history'][trial])
 
-            hpo_models[trial_model_name] = trial_model_path
+            hpo_models[trial_model_name] = dict(
+                path=trial_model_path,
+                val_score=trial_reward,
+                trial=trial,
+                hyperparameters=hpo_results['config_history'][trial]
+            )
+
             hpo_model_performances[trial_model_name] = trial_reward
         
         hpo_results['hpo_model_performances'] = hpo_model_performances

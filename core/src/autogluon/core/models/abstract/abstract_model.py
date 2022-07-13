@@ -26,7 +26,7 @@ from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_S
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
-from ...hpo.executors import HpoExecutorFactory
+from ...hpo.executors import HpoExecutor, HpoExecutorFactory
 from ...scheduler import LocalSequentialScheduler
 from ...utils import get_cpu_count, get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
     compute_permutation_feature_importance, compute_weighted_metric
@@ -551,7 +551,7 @@ class AbstractModel:
             The training data sample weights.
             Models may optionally leverage sample weights during fit.
             If None, model decides. Typically, models assume uniform sample weight.
-        sample_weights_val : Series, default = None
+        sample_weight_val : Series, default = None
             The validation data sample weights.
             If None, model decides. Typically, models assume uniform sample weight.
         num_cpus : int, default = 'auto'
@@ -929,19 +929,54 @@ class AbstractModel:
 
         return template
 
-    def hyperparameter_tune(self, hyperparameter_tune_kwargs, hpo_executor=None, time_limit=None, **kwargs):
+    def hyperparameter_tune(self,
+                            hyperparameter_tune_kwargs='auto',
+                            hpo_executor: HpoExecutor = None,
+                            time_limit: float = None,
+                            **kwargs):
+        """
+        Perform hyperparameter tuning of the model, fitting multiple variants of the model based on the search space provided in `hyperparameters` during init.
+
+        Parameters
+        ----------
+        hyperparameter_tune_kwargs : str or dict, default='auto'
+            TODO: Add docstring
+        hpo_executor : HpoExecutor, default None
+            TODO: Add docstring
+        time_limit : float, default None
+            In general, this is the time limit in seconds to run HPO for.
+            In reality, this is the time limit in seconds budget to fully train all trials executed by HPO.
+            For example, BaggedEnsemble will only use a fraction of the time limit during HPO because it needs the remaining time later to fit all of the folds of the trials.
+        **kwargs :
+            Same kwargs you would pass to fit call, such as:
+                X
+                y
+                X_val
+                y_val
+                feature_metadata
+                sample_weight
+                sample_weight_val
+
+        Returns
+        -------
+        Tuple of (hpo_results: Dict[str, dict], hpo_info: Any)
+        hpo_results: Dict[str, dict]
+            A dictionary of trial model names to a dictionary containing:
+                path: str
+                    Absolute path to the trained model artifact. Used to load the model.
+                val_score: float
+                    val_score of the model
+                trial: int
+                    Trial number of the model, starting at 0.
+                hyperparameters: dict
+                    Hyperparameter config of the model trial.
+        hpo_info: Any
+            Advanced output with scheduler specific logic, primarily for debugging.
+
+        """
         # if hpo_executor is not None, ensemble has already created the hpo_executor
         if hpo_executor is None:
-            backend = self._get_model_base()._get_hpo_backend()  # If ensemble, will use the base model to determine backend
-            if backend == RAY_BACKEND:
-                try:
-                    try_import_ray()
-                except Exception as e:
-                    warning_msg = f'Will use custom hpo logic because ray import failed. Reason: {str(e)}'
-                    dup_filter.attach_filter_targets(warning_msg)
-                    logger.warning(warning_msg)
-                    backend = CUSTOM_BACKEND
-            hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
+            hpo_executor = self._get_default_hpo_executor()
             default_num_trials = kwargs.pop('default_num_trials', None)
             hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
@@ -1022,13 +1057,26 @@ class AbstractModel:
                 os.remove(data_file)
             except FileNotFoundError:
                 pass
-        
+
         return hpo_results
     
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return CUSTOM_BACKEND
-    
+
+    def _get_default_hpo_executor(self) -> HpoExecutor:
+        backend = self._get_model_base()._get_hpo_backend()  # If ensemble, will use the base model to determine backend
+        if backend == RAY_BACKEND:
+            try:
+                try_import_ray()
+            except Exception as e:
+                warning_msg = f'Will use custom hpo logic because ray import failed. Reason: {str(e)}'
+                dup_filter.attach_filter_targets(warning_msg)
+                logger.warning(warning_msg)
+                backend = CUSTOM_BACKEND
+        hpo_executor = HpoExecutorFactory.get_hpo_executor(backend)()
+        return hpo_executor
+
     @property
     def _path_v2(self) -> str:
         """Path as a property, replace old path logic with this eventually"""

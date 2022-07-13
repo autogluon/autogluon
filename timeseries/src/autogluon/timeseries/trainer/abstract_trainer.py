@@ -414,9 +414,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.hpo_results[model.name] = hpo_results
         model_names_trained = []
         # add each of the trained HPO configurations to the trained models
-        for model_hpo_name, model_path in hpo_models.items():
+        for model_hpo_name, model_info in hpo_models.items():
             model_hpo = self.load_model(
-                model_hpo_name, path=model_path, model_type=type(model)
+                model_hpo_name, path=model_info['path'], model_type=type(model)
             )
             self._add_model(model_hpo)
             model_names_trained.append(model_hpo.name)
