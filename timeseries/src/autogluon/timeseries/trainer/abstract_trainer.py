@@ -5,6 +5,7 @@ import os
 import pprint
 import time
 import traceback
+from pathlib import Path
 from typing import Optional, Tuple, List, Any, Dict, Union, Type
 from warnings import warn
 
@@ -400,7 +401,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameter_tune_kwargs: Union[str, dict] = "auto",
     ):
         default_num_trials = None
-        if time_limit is None and ("num_samples" not in hyperparameter_tune_kwargs or isinstance(hyperparameter_tune_kwargs, str)):
+        if time_limit is None and (
+            "num_samples" not in hyperparameter_tune_kwargs
+            or isinstance(hyperparameter_tune_kwargs, str)
+        ):
             default_num_trials = 10
 
         with disable_tqdm():
@@ -414,13 +418,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.hpo_results[model.name] = hpo_results
         model_names_trained = []
+        # TODO: Does this code still work if all model configurations failed?
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
-            model_hpo = self.load_model(
-                model_hpo_name, path=model_info['path'], model_type=type(model)
-            )
-            self._add_model(model_hpo)
-            model_names_trained.append(model_hpo.name)
+            model_path = model_info["path"]
+            # Only load model configurations that didn't fail
+            if Path(model_path).exists():
+                model_hpo = self.load_model(
+                    model_hpo_name, path=model_path, model_type=type(model)
+                )
+                self._add_model(model_hpo)
+                model_names_trained.append(model_hpo.name)
 
         logger.info(
             f"\tTrained {len(model_names_trained)} models while tuning {model.name}."

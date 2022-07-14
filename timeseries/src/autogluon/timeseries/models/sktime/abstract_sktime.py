@@ -73,7 +73,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
     def _get_skt_forecaster(self, sp: Optional[int] = None) -> BaseForecaster:
         """Return the sktime forecaster object for the model"""
         params = self._get_model_params().copy()
-        if sp:
+        if sp is not None and sp > 1:
             params["sp"] = sp
             params["seasonal"] = "add"
 
