@@ -1,7 +1,7 @@
 ## This API should be assumed to be private and only exposed to developers
 ## for the public API look at learners
 
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
 import numpy as np
 import pandas as pd
 
@@ -45,7 +45,7 @@ class Classifier2ST:
     def fit(self,
             data,
             sample_label = 'shift_label',
-            accuracy_metric = accuracy_score,
+            accuracy_metric = balanced_accuracy_score,
             split=0.5):
         """Fit the classifier for predicting if source or target and compute the 2-sample test statistic.
 

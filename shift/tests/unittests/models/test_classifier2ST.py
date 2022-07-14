@@ -5,7 +5,8 @@ import os
 import numpy as np
 import math
 
-data_dir = os.path.join('..','..','data')
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(THIS_DIR,'..','..','data')
 
 def load_adult_data():
     adult_data_dir = os.path.join(data_dir,'AdultIncomeBinaryClassification')
@@ -33,6 +34,7 @@ def test_make_source_target_label():
     data = get_dogs_data()
     source, target = data.query('label == 0'), data.query('label == 1')
     data2 = Classifier2ST._make_source_target_label((source, target), 'shift_label')
+    assert target.shape[0] == data2['shift_label'].sum()
 
 def test_classifier2ST_fit():
     tst = fit_tst()

@@ -1,7 +1,7 @@
 ## This is the public API that should be exposed to the general user
 
 import autogluon.shift as sft
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
 import warnings
 
 class XShiftDetector:
@@ -44,9 +44,9 @@ class XShiftDetector:
     def __init__(self,
                  PredictorClass,
                  label=None,
-                 classification_metric = 'accuracy'):
+                 classification_metric = 'balanced accuracy'):
         named_metrics = {
-            'accuracy' : accuracy_score,
+            'balanced accuracy' : balanced_accuracy_score,
         }
         assert classification_metric in named_metrics.keys(), \
             'classification_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
@@ -76,8 +76,6 @@ class XShiftDetector:
             training dataframe and test dataframe
         """
         assert 'xshift_label' not in Xtrain.columns, 'your data columns contain "xshift_label" which is used internally'
-
-
 
         if self.label:
             Xtrain = Xtrain.drop(columns=[self.label])

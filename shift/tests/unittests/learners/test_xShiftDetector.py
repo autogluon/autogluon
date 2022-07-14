@@ -1,10 +1,10 @@
 import pandas as pd
-from autogluon.shift import Classifier2ST, XShiftDetector, XShiftInferrer
+from autogluon.shift import XShiftDetector
 from autogluon.tabular import TabularPredictor
 import os
-from sklearn.metrics import roc_auc_score
 
-data_dir = os.path.join('..','..','data')
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(THIS_DIR,'..','..','data')
 
 def load_adult_data():
     adult_data_dir = os.path.join(data_dir,'AdultIncomeBinaryClassification')
@@ -30,6 +30,7 @@ def test_xsd_cs():
     xsd.fit(train, test)
     sumry = xsd.summary()
     js = xsd.json()
+    assert xsd.decision() == 'detected'
 
 def test_xsd():
     train, test = load_adult_data()
@@ -37,10 +38,4 @@ def test_xsd():
     xsd.fit(train, test)
     sumry = xsd.summary()
     js = xsd.json()
-
-def test_label_flag():
-    train, test = load_adult_data()
-    xsd = XShiftDetector(TabularPredictor)
-    xsd.fit(train, test)
-    sumry = xsd.summary()
-    js = xsd.json()
+    assert xsd.decision() == 'not detected'
