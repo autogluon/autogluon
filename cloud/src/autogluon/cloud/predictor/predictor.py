@@ -24,6 +24,7 @@ from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
     AutoGluonSagemakerInferenceModel,
     AutoGluonRealtimePredictor,
+    AutoGluonImageRealtimePredictor,
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import setup_sagemaker_role_and_policy
@@ -31,7 +32,7 @@ from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES,
 from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.s3_utils import download_s3_file
 from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_py_versions, retrieve_latest_framework_version
-from ..utils.utils import unzip_file, rename_file_with_uuid
+from ..utils.utils import zipfolder, is_compressed_file, unzip_file, rename_file_with_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,10 @@ class CloudPredictor(ABC):
     @abstractmethod
     def predictor_type(self):
         raise NotImplementedError
+
+    @property
+    def _realtime_predictor_cls(self):
+        return AutoGluonRealtimePredictor
 
     @property
     def is_fit(self):
@@ -206,7 +211,8 @@ class CloudPredictor(ABC):
         self,
         train_data,
         tune_data,
-        config
+        config,
+        images=None,
     ):
         cloud_bucket, cloud_key_prefix = s3_path_to_bucket_prefix(self.cloud_output_path)
         util_key_prefix = cloud_key_prefix + '/utils'
@@ -238,12 +244,39 @@ class CloudPredictor(ABC):
             bucket=cloud_bucket,
             key_prefix=util_key_prefix
         )
-        return train_input, tune_input, config_input
+
+        images_input = images
+        if images is not None:
+            if is_s3_url(images):
+                fileexts = ('.tar.gz', '.bz2', '.zip')  # More extensions?
+                assert images.endswith(fileexts), 'Please provide a s3 path to a compressed file'
+            else:
+                image_zip_filename = images
+                if os.path.isdir(images):
+                    image_zip_filename = os.path.basename(os.path.normpath(images))
+                    zipfolder(image_zip_filename, images)
+                else:
+                    assert is_compressed_file(images), 'Please provide a compressed file or a folder containing the images'
+                logger.log(20, 'Uploading images ...')
+                images_input = self.sagemaker_session.upload_data(
+                    path=image_zip_filename + '.zip',
+                    bucket=cloud_bucket,
+                    key_prefix=util_key_prefix
+                )
+                logger.log(20, 'Images uploaded successfully')
+        inputs = dict(train=train_input, config=config_input)
+        if tune_input is not None:
+            inputs['tune'] = tune_input
+        if images_input is not None:
+            inputs['images'] = images_input
+
+        return inputs
 
     def fit(
         self,
         predictor_init_args,
         predictor_fit_args,
+        image_path=None,
         leaderboard=True,
         framework_version='latest',
         job_name=None,
@@ -265,6 +298,11 @@ class CloudPredictor(ABC):
             Init args for the predictor
         predictor_fit_args: dict
             Fit args for the predictor
+        image_path: str, default = None
+            A local path or s3 path to the images. If you provided this parameter, the image path inside your train/tune data MUST be relative.
+            If local path, path needs to be either a compressed file containing the images or a folder containing the images.
+            If it's a folder, we will zip it for you and upload it to the s3.
+            If s3 path, the path needs to be a path to a compressed file containing the images
         leaderboard: bool, default = True
             Whether to include the leaderboard in the output artifact
         framework_version: str, default = `latest`
@@ -322,17 +360,12 @@ class CloudPredictor(ABC):
 
         self._setup_bucket(cloud_bucket)
         config = self._construct_config(predictor_init_args, predictor_fit_args, leaderboard)
-        train_input, tune_input, config_input = self._upload_fit_artifact(
+        inputs = self._upload_fit_artifact(
             train_data,
             tune_data,
-            config
+            config,
+            image_path,
         )
-        inputs = dict(
-            config=config_input,
-            train=train_input,
-        )
-        if tune_input:
-            inputs['tune'] = tune_input
 
         self._fit_job.run(
             role=self.role_arn,
@@ -502,7 +535,7 @@ class CloudPredictor(ABC):
             logger.warning(f'Providing a custom entry point could break the deployment. Please refer to `{entry_point}` for our implementation')
             entry_point = user_entry_point
 
-        predictor_cls = AutoGluonRealtimePredictor
+        predictor_cls = self._realtime_predictor_cls
         user_predictor_cls = autogluon_sagemaker_inference_model_kwargs.pop('predictor_cls', None)
         if user_predictor_cls:
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonRealtimePredictor` for how to provide a custom predictor')
@@ -535,19 +568,19 @@ class CloudPredictor(ABC):
 
         Parameters
         ----------
-        endpoint: str or  :class:`AutoGluonRealtimePredictor`
+        endpoint: str or  :class:`AutoGluonRealtimePredictor` or :class:`AutoGluonImageRealtimePredictor`
             If str is passed, it should be the name of the endpoint being attached to.
         """
         assert self.endpoint is None, 'There is an endpoint already attached. Either detach it with `detach` or clean it up with `cleanup_deployment`'
         if type(endpoint) == str:
-            self.endpoint = AutoGluonRealtimePredictor(
+            self.endpoint = self._realtime_predictor_cls(
                 endpoint_name=endpoint,
                 sagemaker_session=self.sagemaker_session,
             )
-        elif isinstance(endpoint, AutoGluonRealtimePredictor):
+        elif isinstance(endpoint, self._realtime_predictor_cls):
             self.endpoint = endpoint
         else:
-            raise ValueError('Please provide either an endpoint name or an endpoint of type `AutoGluonRealtimePredictor`')
+            raise ValueError(f'Please provide either an endpoint name or an endpoint of type `{self._realtime_predictor_cls.__name__}`')
 
     def detach_endpoint(self):
         """
@@ -555,7 +588,7 @@ class CloudPredictor(ABC):
 
         Returns
         -------
-        `AutoGluonRealtimePredictor` object.
+        `AutoGluonRealtimePredictor` or `AutoGluonImageRealtimePredictor` object.
         """
         assert self.endpoint is not None, 'There is no attached endpoint'
         detached_endpoint = self.endpoint
@@ -897,3 +930,63 @@ class TextCloudPredictor(CloudPredictor):
         from autogluon.text import TextPredictor
         predictor_cls = TextPredictor
         return predictor_cls
+
+
+class ImageCloudPredictor(CloudPredictor):
+
+    predictor_file_name = 'ImageCloudPredictor.pkl'
+
+    @property
+    def predictor_type(self):
+        return 'image'
+
+    @property
+    def _realtime_predictor_cls(self):
+        return AutoGluonImageRealtimePredictor
+
+    def _get_local_predictor_cls(self):
+        from autogluon.vision import ImagePredictor
+        predictor_cls = ImagePredictor
+        return predictor_cls
+
+    def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
+        """
+        Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
+        This is intended to provide a low latency inference.
+        If you want to inference on a large dataset, use `predict()` instead.
+
+        Parameters
+        ----------
+        test_data: Union(str, pandas.DataFrame)
+            The test data to be inferenced.
+            Can be a pandas.DataFrame, a numpy.ndarray, a local path or a s3 path to a csv file containing paths of test images.
+        accept: str, default = application/x-parquet
+            Type of accept output content.
+            Valid options are application/x-parquet, text/csv, application/json
+
+        Returns
+        -------
+        Pandas.DataFrame
+        Predict results in DataFrame
+        """
+        assert self.endpoint, 'Please call `deploy()` to deploy an endpoint first.'
+        assert accept in VALID_ACCEPT, f'Invalid accept type. Options are {VALID_ACCEPT}.'
+
+        import cv2
+        import numpy as np
+
+        if isinstance(test_data, str):
+            test_data = load_pd.load(test_data)
+        if isinstance(test_data, pd.DataFrame):
+            assert test_data_image_column is not None, 'Please specify a image column name'
+            assert test_data_image_column in test_data, 'Please specify a valid image column name'
+
+            # Convert test data to be numpy array for network transfer
+            test_data = test_data[test_data_image_column].apply(lambda path: cv2.imread(path)).to_numpy()
+        assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
+
+        memory_usage = test_data.nbytes
+        if memory_usage > 5e6:
+            logger.warning(f'Large test data detected({memory_usage // 10e6} MB). SageMaker endpoint could only take maximum 5MB. The prediction is likely to fail')
+            logger.warning('Please consider reduce test data size or use `predict()` instead.')
+        return self.endpoint.predict(test_data, initial_args={'Accept': accept})

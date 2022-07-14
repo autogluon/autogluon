@@ -40,7 +40,7 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
     cloud_predictor.attach_endpoint(detached_endpoint)
     _test_endpoint(cloud_predictor, test_data)
     cloud_predictor.save()
-    cloud_predictor = cloud_predictor.load(cloud_predictor.local_output_path)
+    cloud_predictor = cloud_predictor.__class__.load(cloud_predictor.local_output_path)
     _test_endpoint(cloud_predictor, test_data)
     cloud_predictor.cleanup_deployment()
 
@@ -58,6 +58,7 @@ def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args
     trained_predictor_path = cloud_predictor._fit_job.get_output_path()
     cloud_predictor_no_train.deploy(predictor_path=trained_predictor_path)
     _test_endpoint(cloud_predictor_no_train, test_data)
+    cloud_predictor_no_train.cleanup_deployment()
     cloud_predictor_no_train.predict(test_data, predictor_path=trained_predictor_path)
     info = cloud_predictor_no_train.info()
     assert info['recent_transform_job']['status'] == 'Completed'
