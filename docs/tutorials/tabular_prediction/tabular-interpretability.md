@@ -1,7 +1,7 @@
 # Interpretable rule-based modeling
 :label:`sec_tabularinterpretability`
 
-*Note*: This addition was made through collaboration with [the Yu Group of Statistics and EECS from UC Berkeley](https://www.stat.berkeley.edu/~yugroup/) at UC Berkeley.
+*Note*: This addition was made through collaboration with [the Yu Group](https://www.stat.berkeley.edu/~yugroup/) of Statistics and EECS from UC Berkeley.
 
 **Tip**: Prior to reading this tutorial, it is recommended to have a basic understanding of the TabularPredictor API covered in :ref:`sec_tabularquick`.
 
