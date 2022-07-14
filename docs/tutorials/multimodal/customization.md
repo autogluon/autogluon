@@ -2,12 +2,13 @@
 :label:`sec_automm_customization`
 
 AutoMM has a powerful yet easy-to-use configuration design.
-This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of four parts:
+This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of several parts:
 
 - optimization
 - environment
 - model
 - data
+- distiller
 
 ## Optimization
 
@@ -135,6 +136,15 @@ Gradient clipping value, which can be the absolute value or gradient norm depend
 predictor.fit(hyperparameters={"optimization.gradient_clip_val": 1})
 # cap the gradients to 5
 predictor.fit(hyperparameters={"optimization.gradient_clip_val": 5})
+```
+
+### optimization.track_grad_norm
+Track the p-norm of gradients during training. May be set to ‘inf’ infinity-norm. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
+```
+# default used by AutoMM (no tracking)
+predictor.fit(hyperparameters={"optimization.track_grad_norm": -1})
+# track the 2-norm
+predictor.fit(hyperparameters={"optimization.track_grad_norm": 2})
 ```
 
 ### optimization.log_every_n_steps
@@ -470,3 +480,42 @@ predictor.fit(hyperparameters={"data.mixup.turn_off_epoch": 5})
 predictor.fit(hyperparameters={"data.mixup.turn_off_epoch": 7})
 ```
 
+## Distiller
+
+### distiller.soft_label_loss_type
+What loss to compute when using teacher's output (logits) to supervise student's.
+
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.soft_label_loss_type": "cross_entropy"})
+# default used by AutoMM for regression
+predictor.fit(hyperparameters={"distiller.soft_label_loss_type": "mse"})
+```
+
+### distiller.temperature
+Before computing the soft label loss, scale the teacher and student logits with it (teacher_logits / temperature, student_logits / temperature).
+
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.temperature": 5})
+# set temperature to 1
+predictor.fit(hyperparameters={"distiller.temperature": 1})
+```
+
+### distiller.hard_label_weight
+Scale the student's hard label (groundtruth) loss with this weight (hard_label_loss * hard_label_weight).
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.hard_label_weight": 0.2})
+# set not to scale the hard label loss
+predictor.fit(hyperparameters={"distiller.hard_label_weight": 1})
+```
+
+### distiller.soft_label_weight
+Scale the student's soft label (teacher's output) loss with this weight (soft_label_loss * soft_label_weight).
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.soft_label_weight": 50})
+# set not to scale the soft label loss
+predictor.fit(hyperparameters={"distiller.soft_label_weight": 1})
+```
