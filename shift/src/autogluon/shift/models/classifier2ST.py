@@ -26,6 +26,13 @@ class Classifier2ST:
         self._classifier = classifier
         self._is_fit = False
 
+    def _post_fit(func):
+        """decorator for post-fit methods"""
+        def pff_wrapper(self, *args, **kwargs):
+            assert self._is_fit, f'.fit needs to be called prior to .{func.__name__}'
+            return func(self, *args, **kwargs)
+        return pff_wrapper
+
     @staticmethod
     def _make_source_target_label(data, sample_label):
         """turn a source, target pain into a single dataframe with label column"""
@@ -54,21 +61,26 @@ class Classifier2ST:
         if isinstance(data, pd.DataFrame):
             assert sample_label in data.columns, "sample_label needs to be a column of data"
             assert split, "sample_label requires the split parameter"
-            train = data.sample(frac=split)
-            test = data.drop(train.index)
         else:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
             data = self._make_source_target_label(data, sample_label)
-            train = data.sample(frac=split)
-            test = data.drop(train.index)
+        if data.index.has_duplicates:
+            self.original_index = data.index
+            data.index = pd.RangeIndex(data.shape[0])
+        else:
+            self.original_index = None
+        train = data.sample(frac=split)
+        test = data.drop(train.index)
         self._classifier.fit(train)
         yhat = self._classifier.predict(test)
         self._accuracy_metric = accuracy_metric
         self._sample_label = sample_label
         self.test_stat = accuracy_metric(test[sample_label], yhat)
-        self._test = test
+        self._test = test # for feature importance and sample anomalies
+        self.has_fi = getattr(self._classifier, "feature_importance", None)
         self._is_fit = True
 
+    @_post_fit
     def _pvalue_half_permutation(self,
                                  num_permutations=1000):
         """The half permutation method for computing p-values.
@@ -86,6 +98,7 @@ class Classifier2ST:
         p_val = (self.test_stat <= np.array(perm_stats)).mean()
         return p_val
 
+    @_post_fit
     def pvalue(self,
                method='half permutation',
                num_permutations=1000):
@@ -112,9 +125,10 @@ class Classifier2ST:
                 num_permutations=num_permutations)
         return pval
 
+    @_post_fit
     def sample_anomaly_scores(self,
-                              sample_size = 100,
-                              how = 'rand'):
+                              sample_size=100,
+                              how='rand'):
         """Return anomaly ranks for a subset of test datapoint from target set.  Rank of 1 means most like the target
         set and unlike source set, rank of 0 means opposite.
 
@@ -133,24 +147,21 @@ class Classifier2ST:
         """
         how_valid = ['top', 'rand']
         assert how in how_valid, 'how is not in valid set: ' + ' '.join(how_valid)
-        test = self._test.loc[self._test[self._sample_label]==1]
+        test = self._test.loc[self._test[self._sample_label]==1].copy()
         if how == 'rand':
             test = test.sample(sample_size)
             phat = self._classifier.predict_proba(test)
-            phat = phat.sort_values(1, ascending=False)
-            # phat['rank'] = np.linspace(1, 0, sample_size)
+            phat_samp = phat.sort_values(1, ascending=False)
         if how == 'top':
             phat = self._classifier.predict_proba(test)
             phat = phat.sort_values(1, ascending=False)
-            phat = phat.iloc[:sample_size]
-            # phat['rank'] = np.linspace(1, 0, sample_size)
-        return phat
+            phat_samp = phat.iloc[:sample_size,:]
+        return phat_samp
 
+    @_post_fit
     def feature_importance(self):
         """Returns the feature importances for the trained classifier for source v. target
         """
-        has_fi = getattr(self._classifier, "feature_importance", None)
-        assert has_fi, "Classifier class does not have feature_importance method"
-        assert self._is_fit, ".fit() not called yet"
+        assert self.has_fi, "Classifier class does not have feature_importance method"
         fi_scores = self._classifier.feature_importance(self._test)
         return fi_scores

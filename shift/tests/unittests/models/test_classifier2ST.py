@@ -43,7 +43,7 @@ def test_classifier2ST_fit():
 
 def test_sample_anomaly_score():
     tst = fit_tst()
-    as_rand = tst.sample_anomaly_scores()
+    as_rand = tst.sample_anomaly_scores(how='top')
     assert as_rand.shape[0] == 100
     idx = as_rand.index[[0, -1]]
     test_s = tst._test.loc[idx]
@@ -71,5 +71,3 @@ def test_classifier2ST_pvalue():
     tst = fit_tst()
     pval = tst.pvalue(num_permutations=100)
     assert pval < 0.05
-
-# def test_feature_importance():

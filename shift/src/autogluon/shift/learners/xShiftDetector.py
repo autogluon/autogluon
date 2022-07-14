@@ -1,26 +1,30 @@
 ## This is the public API that should be exposed to the general user
 
 import autogluon.shift as sft
+from sklearn.metrics import accuracy_score
+import warnings
 
 class XShiftDetector:
     """Detect a change in covariate (X) distribution between training and test, which we call XShift.  This should be
     used after the predictor is instantiated, but before the predictor is fit.  It can tell you if your training set is
-    not representative of your test set distribution.
+    not representative of your test set distribution.  It does this using a Classifier 2-sample test (C2ST).
 
     Parameters
     ----------
-    predictor: an AutoGluon predictor, such as instance of autogluon.tabular.Predictor
+    PredictorClass: an AutoGluon predictor, such as instance of autogluon.tabular.Predictor
         The predictor that will be fit on training set and predict the test set
 
-    method: str
-        one of
-        - "C2ST": performs classifier two sample test to detect XShift
+    label: str
+        the Y variable that is to be predicted (if it appears in the train/test data then it will be removed)
+
+    classification_metric: str
+        the metric used for the C2ST, it must be one of ['accuracy']
 
     Methods
     -------
     fit: fits the detector on training and test covariate data
 
-    json, print: outputs the results of XShift detection
+    json, summary: outputs the results of XShift detection
     - test statistic
     - pvalue (optional, if compute_pvalue=True in .fit)
     - detector feature importances
@@ -28,54 +32,58 @@ class XShiftDetector:
 
     Usage
     -----
-    >>> pred = TabularPredictor() #class is the Y variable
-    >>> xshiftd = XShiftDetector(predictor = pred)
-    Alternatively, specify the predictor class...
-    >>> xshiftd = XShiftDetector(predictor_class = TabularPredictor)
-    Input the binary classification metric for evaluating the test set detector (if method='C2ST')...
-    >>> xshiftd = XShiftDetector(predictor_class = TabularPredictor, metric = "F1")
+    >>> xshiftd = XShiftDetector(TabularPredictor, label='class')
     Fit the detector...
     >>> xshiftd.fit(Xtrain, Xtest)
     Output the decision...
     >>> xshiftd.decision()
+    Output the summary...
+    >>> xshiftd.summary()
     """
 
     def __init__(self,
                  PredictorClass,
-                 method="C2ST",
-                 metric = 'balanced accuracy'):
-        valid_methods = [
-            "C2ST"
-        ]
-        assert method in valid_methods, f"method {method} is not one of " + ", ".join(valid_methods)
-        if PredictorClass:
-            pred = PredictorClass(label='xshift_label')
-            self.C2ST = sft.Classifier2ST(pred)
-        else:
-            assert False, 'One of predictor or PredictorClass must be specified'
-        self.metric = metric
+                 label=None,
+                 classification_metric = 'accuracy'):
+        named_metrics = {
+            'accuracy' : accuracy_score,
+        }
+        assert classification_metric in named_metrics.keys(), \
+            'classification_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
+        pred = PredictorClass(label='xshift_label')
+        self.C2ST = sft.Classifier2ST(pred)
+        self.cmetric = named_metrics[classification_metric]
+        self.cmetric_name = classification_metric
+        if not label:
+            warnings.warn('label is not specified, please ensure that Xtrain, Xtest do not have the Y (label) '
+                          'variable')
+        self.label = label
+        self._is_fit = False
 
-    def fit(self, Xtrain, Xtest, label=None, compute_pvalue = False):
+    def _post_fit(func):
+        """decorator for post-fit methods"""
+        def pff_wrapper(self, *args, **kwargs):
+            assert self._is_fit, f'.fit needs to be called prior to .{func.__name__}'
+            return func(self, *args, **kwargs)
+        return pff_wrapper
+
+    def fit(self, Xtrain, Xtest):
         """Fit the XShift detector.
 
         Parameters
         ----------
         Xtrain, Xtest : pd.DataFrame
-            tuple of training dataframe and test dataframe
-
-        label: str
-            the Y variable that is to be predicted (needs to be removed)
-
-        compute_pvalue: bool
-            whether to compute the p-value or not
+            training dataframe and test dataframe
         """
         assert 'xshift_label' not in Xtrain.columns, 'your data columns contain "xshift_label" which is used internally'
-        assert compute_pvalue == False, 'compute_pvalue not supported'
-        if label:
-            Xtrain = Xtrain.drop(columns=[label])
-            Xtest = Xtest.drop(columns=[label])
 
-        self.C2ST.fit((Xtrain, Xtest), sample_label='xshift_label')
+
+
+        if self.label:
+            Xtrain = Xtrain.drop(columns=[self.label])
+            Xtest = Xtest.drop(columns=[self.label])
+
+        self.C2ST.fit((Xtrain, Xtest), sample_label='xshift_label', accuracy_metric=self.cmetric)
 
         ## Sample anomalies
         as_top = self.C2ST.sample_anomaly_scores(how='top')
@@ -83,31 +91,34 @@ class XShiftDetector:
         self.anomalies = as_top.join(Xtest)
 
         ## Feature importance
-        self.fi_scores = self.C2ST.feature_importance()
+        if self.C2ST.has_fi:
+            self.fi_scores = self.C2ST.feature_importance()
+        else:
+            self.fi_scores = None
 
         self._is_fit = True
 
-    def decision(self, teststat_thresh = 0.55, pvalue_thresh = None):
-        """Decision function for testing XShift
+    @_post_fit
+    def decision(self, teststat_thresh = 0.55):
+        """Decision function for testing XShift.  Uncertainty quantification is currently not supported.
 
         Parameters
         ----------
         teststat_thresh: float
             the threshold for the test statistic
 
-        pvalue_thresh: float
-            the pvalue threshold for the permutation test
-
         Returns
         -------
         One of ['detected', 'not detected']
         """
+        ## default teststat_thresh by metric
         self.teststat_thresh = teststat_thresh
-        if self.C2ST.test_stat > teststat_thresh: # what to do with p-value?
+        if self.C2ST.test_stat > teststat_thresh:
             return 'detected'
         else:
             return 'not detected'
 
+    @_post_fit
     def json(self):
         """output the results in json format
         """
@@ -118,6 +129,7 @@ class XShiftDetector:
             'sample anomalies': self.anomalies
         }
 
+    @_post_fit
     def summary(self, format = "markdown"):
         """print the results to screen
         """
@@ -134,7 +146,7 @@ class XShiftDetector:
                 f"a type of distribution shift.\n"
                 f"\n"
                 f"## Test results\n"
-                f"We can predict whether a sample is in the test vs. training set with a {self.metric} of\n"
+                f"We can predict whether a sample is in the test vs. training set with a {self.cmetric_name} of\n"
                 f"{self.C2ST.test_stat} (larger than the threshold of {self.teststat_thresh}).\n"
                 f"\n"
                 f"## Feature importances\n"
