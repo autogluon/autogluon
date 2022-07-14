@@ -29,7 +29,6 @@ install_requires = [
     'timm<0.6.0',
     'torch>=1.9,<1.13',
     'torchvision<0.14.0',
-    'torchtext<0.14.0',
     'fairscale>=0.4.5,<0.5.0',
     'scikit-image>=0.19.1,<0.20.0',
     'smart_open>=5.2.1,<5.3.0',
