@@ -940,9 +940,24 @@ class AbstractModel:
         Parameters
         ----------
         hyperparameter_tune_kwargs : str or dict, default='auto'
-            TODO: Add docstring
+            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
+            Valid keys:
+                'num_trials': Number of hpo trials you want to perform.
+                'scheduler': Scheduler used by hpo experiment.
+                    Valid values:
+                        'local': Local FIFO scheduler. Sequential if Custom backend and parallel if Ray Tune backend.
+                'searcher': Search algorithm used by hpo experiment.
+                    Valid values:
+                        'auto': Random search.
+                        'random': Random search.
+                        'bayes': Bayes Optimization. Only supported by Ray Tune backend.
+            Valid preset values:
+                'auto': Uses the 'random' preset.
+                'random': Performs HPO via random search using local scheduler.
+            The 'searcher' key is required when providing a dict.
         hpo_executor : HpoExecutor, default None
-            TODO: Add docstring
+            Executor to perform HPO experiment. This implements the interface for different HPO backends.
+            For more info, please refer to `HpoExecutor` under `core/hpo/executors.py`
         time_limit : float, default None
             In general, this is the time limit in seconds to run HPO for.
             In reality, this is the time limit in seconds budget to fully train all trials executed by HPO.
@@ -972,7 +987,7 @@ class AbstractModel:
                     Hyperparameter config of the model trial.
         hpo_info: Any
             Advanced output with scheduler specific logic, primarily for debugging.
-
+            In case of Ray Tune backend, this will be an Analysis object: https://docs.ray.io/en/latest/tune/api_docs/analysis.html
         """
         # if hpo_executor is not None, ensemble has already created the hpo_executor
         if hpo_executor is None:
