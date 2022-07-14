@@ -96,11 +96,11 @@ from .utils import (
     init_zero_shot,
     tensor_to_ndarray,
     infer_dtypes_by_model_names,
+    update_config_by_rules,
 )
 from .optimization.utils import (
     get_metric,
     get_loss_func,
-    update_config_by_rules,
 )
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
@@ -685,7 +685,7 @@ class MultiModalPredictor:
             else:
                 assert self._output_shape > 1
                 soft_label_loss_func = nn.CrossEntropyLoss()
-        elif self._config.distiller.soft_label_loss_type == "mean_square_error":
+        elif self._config.distiller.soft_label_loss_type == "mse":
             soft_label_loss_func = nn.MSELoss()
         elif self._config.distiller.soft_label_loss_type == "cross_entropy":
             soft_label_loss_func = nn.CrossEntropyLoss()
