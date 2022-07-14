@@ -281,7 +281,7 @@ class RayHpoExecutor(HpoExecutor):
                 path=trial_model_path,
                 val_score=validation_performance,
                 trial=trial,
-                # hyperparameters=???  # TODO: how to get hyperparameters of a trial with ray?
+                hyperparameters= details['config'],
             )
 
         return hpo_models, self.analysis
