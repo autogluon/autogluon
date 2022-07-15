@@ -17,6 +17,7 @@ from .utils import (
 )
 from ..constants import (
     LOGITS,
+    FEATURES,
     WEIGHT,
     AUTOMM,
 )
@@ -41,6 +42,7 @@ class DistillerLitModule(pl.LightningModule):
         hard_label_weight: float,
         soft_label_weight: float,
         temperature: float,
+        embedding_loss_weight: float,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
         lr_schedule: Optional[str] = None,
@@ -52,6 +54,7 @@ class DistillerLitModule(pl.LightningModule):
         warmup_steps: Optional[int] = None,
         hard_label_loss_func: Optional[_Loss] = None,
         soft_label_loss_func: Optional[_Loss] = None,
+        embedding_loss_func: Optional[_Loss] = None,
         validation_metric: Optional[torchmetrics.Metric] = None,
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
@@ -76,6 +79,8 @@ class DistillerLitModule(pl.LightningModule):
             Weight for soft label loss.
         temperature
             A scalar to scale teacher and student logits in soft label loss.
+        embedding_loss_weight
+            Weight for embedding loss.
         optim_type
             Optimizer type. We now support:
             - adamw
@@ -114,6 +119,8 @@ class DistillerLitModule(pl.LightningModule):
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for hard labels.
         soft_label_loss_func
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for soft labels.
+        embedding_loss_func
+            A Pytorch loss module, e.g., nn.MSELoss(), for embedding's distance.
         validation_metric
             A torchmetrics module used in the validation stage, e.g., torchmetrics.Accuracy().
         validation_metric_name
@@ -154,8 +161,10 @@ class DistillerLitModule(pl.LightningModule):
         self.temperature = temperature
         self.hard_label_weight = hard_label_weight
         self.soft_label_weight = soft_label_weight
+        self.embedding_loss_weight = embedding_loss_weight
         self.hard_label_loss_func = hard_label_loss_func
         self.soft_label_loss_func = soft_label_loss_func
+        self.embedding_loss_func = embedding_loss_func
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
@@ -178,6 +187,7 @@ class DistillerLitModule(pl.LightningModule):
                 )
                 * weight
             )
+
         return loss
 
     def _compute_soft_label_loss(
@@ -185,17 +195,32 @@ class DistillerLitModule(pl.LightningModule):
         student_output: dict,
         teacher_output: dict,
     ):
-        student_logits = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
-        soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
-        student_logits = student_logits / self.temperature
-        soft_labels = soft_labels / self.temperature
+        student_result = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
+        student_result = student_result / self.temperature
+        teacher_result = teacher_result / self.temperature
 
         if isinstance(self.soft_label_loss_func, nn.CrossEntropyLoss):
-            soft_labels = F.softmax(soft_labels, dim=-1)
+            teacher_result = F.softmax(teacher_result, dim=-1)
 
         loss = self.soft_label_loss_func(
-            input=student_logits,
-            target=soft_labels,
+            input=student_result,
+            target=teacher_result,
+        )
+        return loss
+
+
+    def _compute_embedding_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
+
+        loss = self.embedding_loss_func(
+            input=student_result,
+            target=teacher_result,
         )
         return loss
 
@@ -217,6 +242,12 @@ class DistillerLitModule(pl.LightningModule):
             teacher_output=teacher_output,
         )
         loss += soft_label_loss * self.soft_label_weight
+
+        embedding_loss = self._compute_embedding_loss(
+            student_output=student_output,
+            teacher_output=teacher_output,
+        )
+        loss += embedding_loss * self.embedding_loss_weight
 
         return loss
 

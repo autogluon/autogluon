@@ -93,6 +93,8 @@ def main(args):
             "distiller.temperature": args.temperature,
             "distiller.hard_label_weight": args.hard_label_weight,
             "distiller.soft_label_weight": args.soft_label_weight,
+            "distiller.embedding_loss_weight": args.embedding_loss_weight,
+            "distiller.embedding_loss_type": args.embedding_loss_type,
             'model.hf_text.text_trivial_aug_maxscale': 0.0,
         },
         teacher_predictor=teacher_predictor,
@@ -136,6 +138,8 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", default=5.0, type=float)
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
+    parser.add_argument("--embedding_loss_weight", default=0.5, type=float)
+    parser.add_argument("--embedding_loss_type", default="mean_square_error", type=str)
     args = parser.parse_args()
 
     main(args)
