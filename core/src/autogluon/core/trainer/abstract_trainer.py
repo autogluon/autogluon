@@ -854,6 +854,8 @@ class AbstractTrainer:
     def refit_ensemble_full(self, model='all') -> dict:
         if model == 'all':
             ensemble_set = self.get_model_names()
+        elif isinstance(model, list):
+            ensemble_set = self.get_minimum_models_set(model)
         else:
             if model == 'best':
                 model = self.get_model_best()
@@ -1094,7 +1096,7 @@ class AbstractTrainer:
                 else:
                     best_score = self.get_model_attribute(self.model_best, 'val_score')
                     cur_score = self.get_model_attribute(weighted_ensemble_model_name, 'val_score')
-                    if cur_score > best_score:
+                    if best_score is not None and cur_score > best_score:
                         # new best model
                         self.model_best = weighted_ensemble_model_name
         return models
