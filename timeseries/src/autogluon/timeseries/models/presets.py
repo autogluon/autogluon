@@ -15,7 +15,7 @@ from .gluonts import (
     SimpleFeedForwardModel,
     TransformerModel,
 )
-from .sktime import AutoARIMAModel, AutoETSModel
+from .sktime import AutoARIMAModel, AutoETSModel, ARIMAModel
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    ARIMA=ARIMAModel,
     AutoARIMA=AutoARIMAModel,
     AutoETS=AutoETSModel
 )
@@ -42,6 +43,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     Prophet=10,
     AutoTabular=10,
     AutoARIMA=20,
+    ARIMA=50,
     AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
@@ -51,65 +53,70 @@ def get_default_hps(key, prediction_length):
     default_model_hps = {
         "toy": {
             "SimpleFeedForward": {
-                "epochs": 5,
+                "epochs": 10,
                 "num_batches_per_epoch": 10,
                 "context_length": 5,
             },
-            "MQCNN": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
-            "DeepAR": {"epochs": 5, "num_batches_per_epoch": 10, "context_length": 5},
-            "AutoETS": {},
-        },
-        "toy_hpo": {
-            "SimpleFeedForward": {
-                "epochs": 5,
-                "num_batches_per_epoch": 10,
-                "context_length": ag.Int(5, 25),
-            },
-            "MQCNN": {
-                "epochs": 5,
-                "num_batches_per_epoch": 10,
-                "context_length": ag.Int(5, 25),
-            },
-            "DeepAR": {
-                "epochs": 5,
-                "num_batches_per_epoch": 10,
-                "context_length": ag.Int(5, 25),
+            "Transformer": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
+            "DeepAR": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
+            "AutoETS": {"maxiter": 20},
+            "ARIMA": {
+                "maxiter": 10,
+                "order": (1, 0, 0),
+                "suppress_warnings": True,
             },
         },
         "default": {
-            "AutoETS": {},
-            # "AutoARIMA": {},
-            "SimpleFeedForward": {},
-            "MQCNN": {},
-            "MQRNN": {},
-            "DeepAR": {},
-            "Transformer": {},
-            # "AutoTabular": {} # AutoTabular model is experimental.
-        },
-        "default_hpo": {
-            "MQCNN": {
-                "context_length": ag.Int(
-                    min(prediction_length, max(10, 2 * prediction_length), 250),
-                    max(min(500, 12 * prediction_length), 4 * prediction_length),
-                    default=prediction_length * 4,
-                ),
+            "AutoETS": {
+                "maxiter": 200,
+                "trend": "add",
+                "auto": False,
+                "initialization_method": "estimated",
             },
-            "DeepAR": {
-                "context_length": ag.Int(
-                    min(prediction_length, max(10, 2 * prediction_length), 250),
-                    max(min(500, 12 * prediction_length), prediction_length),
-                    default=prediction_length,
-                ),
+            "ARIMA": {
+                "maxiter": 50,
+                "order": (1, 1, 1),
+                "seasonal_order": (0, 0, 0, 0),
+                "suppress_warnings": True,
             },
             "SimpleFeedForward": {
-                "context_length": ag.Int(
-                    min(prediction_length, max(10, 2 * prediction_length), 250),
-                    max(min(500, 12 * prediction_length), prediction_length),
-                    default=prediction_length,
-                ),
+                "context_length": prediction_length * 2,
             },
-            "AutoETS": {"error": ag.Categorical("add", "mul")},
-            # "AutoARIMA": {"max_p": ag.Int(2, 4)}
+            "Transformer": {
+                "context_length": prediction_length * 2,
+            },
+            "DeepAR": {
+                "context_length": prediction_length * 2,
+            },
+        },
+        "default_hpo": {
+            "DeepAR": {
+                "cell_type": ag.Categorical("gru", "lstm"),
+                "num_layers": ag.Int(1, 4),
+                "num_cells": ag.Categorical(20, 30, 40, 50),
+                "context_length": prediction_length * 2,
+            },
+            "SimpleFeedForward": {
+                "batch_normalization": ag.Categorical(True, False),
+                "context_length": prediction_length * 2,
+            },
+            "Transformer": {
+                "model_dim": ag.Categorical(8, 16, 32),
+                "context_length": prediction_length * 2,
+            },
+            "AutoETS": {
+                "error": ag.Categorical("add", "mul"),
+                "trend": ag.Categorical("add", "mul"),
+                "auto": False,
+                "initialization_method": "estimated",
+                "maxiter": 200,
+            },
+            "ARIMA": {
+                "maxiter": ag.Categorical(50),
+                "order": (1, 1, 1),
+                "seasonal_order": (0, 0, 0, 0),
+                "suppress_warnings": True,
+            },
         },
     }
     return default_model_hps[key]
