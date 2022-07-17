@@ -52,6 +52,8 @@ prob = predictor.predict_proba({"image": [segway_image]}, {"text": ['segway', 'b
 print("Label probs:", prob)
 ```
 
+This is amazing, right? Now a bit knowledge on why and how CLIP works. CLIP is called Contrastive Language-Image Pre-training. It is trained on a massive number of data (400M image-text pairs). By using a simple loss objective, CLIP tries to predict which out of a set of randomly sampled text is actually paired with an given image in the training dateset. As a result, CLIP models can then be applied to nearly arbitrary visual classification tasks just like the examples we have shown above.
+
 
 ## More about CLIP
 
