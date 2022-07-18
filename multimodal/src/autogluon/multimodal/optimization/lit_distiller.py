@@ -243,11 +243,11 @@ class DistillerLitModule(pl.LightningModule):
         )
         loss += soft_label_loss * self.soft_label_weight
 
-        embedding_loss = self._compute_embedding_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
-        loss += embedding_loss * self.embedding_loss_weight
+        #embedding_loss = self._compute_embedding_loss(
+        #    student_output=student_output,
+        #    teacher_output=teacher_output,
+        #)
+        #loss += embedding_loss * self.embedding_loss_weight
 
         return loss
 

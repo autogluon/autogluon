@@ -3,6 +3,7 @@ from autogluon.multimodal import MultiModalPredictor
 from datasets import load_dataset
 
 from time import time
+import os
 
 GLUE_METRICS = {
     "mnli": {"val": "accuracy", "eval": ["accuracy"]},
@@ -38,37 +39,60 @@ def main(args):
     else:
         valid_df = dataset["validation"].to_pandas()
 
+    teacher_predictor_name = f"{args.glue_task}-{args.teacher_model.replace('/', '-')}"
+    teacher_predictor_path = os.path.join(args.finetuned_model_cache_folder, teacher_predictor_name)
+    nodistill_predictor_name = f"{args.glue_task}-{args.student_model.replace('/', '-')}"
+    nodistill_predictor_path = os.path.join(args.finetuned_model_cache_folder, nodistill_predictor_name)
+
     ### Train and evaluate the teacher model
-    teacher_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
-    teacher_predictor.fit(
-        train_df,
-        hyperparameters={
-            "env.num_gpus": args.num_gpu,
-            "model.hf_text.checkpoint_name": args.teacher_model,
-            "optimization.learning_rate": 1.0e-4,
-            "optimization.weight_decay": 1.0e-3,
-        },
-        time_limit=args.time_limit,
-        seed=args.seed,
-    )
+    retrain_teacher = args.retrain
+    try:
+        teacher_predictor = MultiModalPredictor.load(teacher_predictor_path)
+        print("Using pretrained teacher model: %s" % teacher_predictor_path)
+    except:
+        retrain_teacher = True
+        print("No pretrained model at: %s" % teacher_predictor_path)
+    if retrain_teacher:
+        teacher_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+        teacher_predictor.fit(
+            train_df,
+            hyperparameters={
+                "env.num_gpus": args.num_gpu,
+                "model.hf_text.checkpoint_name": args.teacher_model,
+                "optimization.learning_rate": 1.0e-4,
+                "optimization.weight_decay": 1.0e-3,
+            },
+            time_limit=args.time_limit,
+            seed=args.seed,
+        )
+        teacher_predictor.save(teacher_predictor_path)
     start = time()
     teacher_result = teacher_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
     teacher_usedtime = time() - start
 
     ### Train and evaluate a smaller pretrained model
-    nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
-    nodistill_predictor.fit(
-        train_df,
-        hyperparameters={
-            "env.num_gpus": args.num_gpu,
-            "optimization.max_epochs": args.max_epochs,
-            "model.hf_text.checkpoint_name": args.student_model,
-            "optimization.learning_rate": 1.0e-4,
-            "optimization.weight_decay": 1.0e-3,
-        },
-        time_limit=args.time_limit,
-        seed=args.seed,
-    )
+    retrain_nodistill = args.retrain
+    try:
+        nodistill_predictor = MultiModalPredictor.load(nodistill_predictor_path)
+        print("Using pretrained nodistill model: %s" % nodistill_predictor_path)
+    except:
+        print("No pretrained model at: %s" % nodistill_predictor_path)
+        retrain_nodistill = True
+    if retrain_nodistill:
+        nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+        nodistill_predictor.fit(
+            train_df,
+            hyperparameters={
+                "env.num_gpus": args.num_gpu,
+                "optimization.max_epochs": args.max_epochs,
+                "model.hf_text.checkpoint_name": args.student_model,
+                "optimization.learning_rate": 1.0e-4,
+                "optimization.weight_decay": 1.0e-3,
+            },
+            time_limit=args.time_limit,
+            seed=args.seed,
+        )
+        nodistill_predictor.save(nodistill_predictor_path)
     nodistill_result = nodistill_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
 
     ### Distill and evaluate a student model
@@ -138,8 +162,10 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", default=5.0, type=float)
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
-    parser.add_argument("--embedding_loss_weight", default=0.5, type=float)
+    parser.add_argument("--embedding_loss_weight", default=0, type=float)
     parser.add_argument("--embedding_loss_type", default="mean_square_error", type=str)
+    parser.add_argument("--finetuned_model_cache_folder", default="/media/code/autogluon/examples/automm/distillation/AutogluonModels/cache_finetuned", type=str)
+    parser.add_argument("--retrain", action="store_true")
     args = parser.parse_args()
 
     main(args)
