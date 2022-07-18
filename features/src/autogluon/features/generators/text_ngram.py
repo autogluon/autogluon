@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 # TODO: Add argument to define the text preprocessing logic
 # TODO: Add argument to output ngrams as a sparse matrix
 # TODO: Add HashingVectorizer support
-# TODO: Add TFIDF support
 # TODO: Documentation
 class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     """
@@ -27,8 +26,9 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer` or :class:`sklearn.feature_extraction.text.TfidfVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer which is used to generate the ngrams given the text data.
+        Can also specify a TfidfVectorizer, but note that memory usage will increase by 4-8x relative to CountVectorizer.
     vectorizer_strategy : str, default 'combined'
         If 'combined', all text features are concatenated together to fit the vectorizer. Features generated in this way have their names prepended with '__nlp__.'.
         If 'separate', all text features are fit separately with their own copy of the vectorizer. Their ngram features are then concatenated together to form the output.

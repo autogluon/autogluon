@@ -4,6 +4,7 @@ from autogluon.core.constants import REGRESSION
 from autogluon.core.utils.try_import import try_import_rapids_cuml
 
 from .knn_model import KNNModel
+from .._utils.rapids_utils import RapidsModelMixin
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 #  "2021_02_26/autogluon_hpo_auto.openml_s_271.1h8c.aws.20210228T000327/aws.openml_s_271.1h8c.covertype.0.autogluon_hpo_auto/"
 #  Noticed: different input data types, investigate locally with openml dataset version and dtypes.
 # TODO: Given this is so fast, consider doing rapid feature pruning
-class KNNRapidsModel(KNNModel):
+class KNNRapidsModel(RapidsModelMixin, KNNModel):
     """
     RAPIDS KNearestNeighbors model : https://rapids.ai/start.html
 
@@ -31,18 +32,3 @@ class KNNRapidsModel(KNNModel):
             return KNeighborsRegressor
         else:
             return KNeighborsClassifier
-
-    def _set_default_params(self):
-        default_params = {'weights': 'uniform'}
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'use_child_oof': False}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
-
-    def _more_tags(self):
-        return {'valid_oof': False}

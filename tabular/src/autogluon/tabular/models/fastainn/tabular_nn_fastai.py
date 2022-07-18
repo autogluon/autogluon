@@ -14,7 +14,7 @@ from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import try_import_fastai
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -197,10 +197,10 @@ class NNFastAiTabularModel(AbstractModel):
         if num_gpus is not None:
             # TODO: Control CPU vs GPU usage during inference
             if num_gpus == 0:
-                torch_core.default_device(use_cuda=False)
+                torch_core.default_device(False)
             else:
                 # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
-                torch_core.default_device(use_cuda=True)
+                torch_core.default_device(True)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X, y, X_val, y_val)

@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from typing import Union, Optional, List, Dict, Callable
+from typing import Union, Optional, List, Callable
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator
 from torch.nn.modules.loss import _Loss

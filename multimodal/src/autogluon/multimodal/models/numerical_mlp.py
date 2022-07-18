@@ -1,5 +1,3 @@
-import torch
-import json
 from torch import nn
 from .mlp import MLP
 from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES

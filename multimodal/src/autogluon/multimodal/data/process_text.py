@@ -1,11 +1,9 @@
 import os
 import logging
-import pickle
 from typing import Optional, List, Any, Dict
 import numpy as np
 from nptyping import NDArray
 import warnings
-import nltk
 from transformers import (
     BertTokenizer,
     CLIPTokenizer,
@@ -15,11 +13,9 @@ from transformers import (
 )
 from ..constants import TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, AUTOMM, COLUMN, TEXT
 from .collator import Stack, Pad
-from .utils import extract_value_from_config, InsertPunctuation
+from .utils import extract_value_from_config
 import ast
-from copy import copy, deepcopy
-import nlpaug.flow as naf
-import nlpaug.augmenter.word as naw
+from copy import deepcopy
 from .trivial_augmenter import TrivialAugment
 
 

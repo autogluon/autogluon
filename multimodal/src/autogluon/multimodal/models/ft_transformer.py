@@ -4,8 +4,7 @@ from torch import Tensor
 import torch.nn.functional as F
 import math
 import enum
-import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Callable, Dict, List, Optional, Tuple, Union, cast
 import warnings
 
 ModuleType = Union[str, Callable[..., nn.Module]]

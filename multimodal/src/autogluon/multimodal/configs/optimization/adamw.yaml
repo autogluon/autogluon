@@ -14,6 +14,7 @@ optimization:
   val_check_interval: 0.5
   gradient_clip_val: 1
   gradient_clip_algorithm: "norm"
+  track_grad_norm: -1  # Whether to check gradient norm. We can set it to 2 to check for gradient norm.
   log_every_n_steps: 10
   top_k: 3
   top_k_average_method: "greedy_soup"  # We support averaging method described in https://arxiv.org/pdf/2203.05482.pdf.

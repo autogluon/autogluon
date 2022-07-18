@@ -1,9 +1,11 @@
 import copy
+import gc
 import logging
 import os
 import pprint
 import time
 import traceback
+from pathlib import Path
 from typing import Optional, Tuple, List, Any, Dict, Union, Type
 from warnings import warn
 
@@ -399,7 +401,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameter_tune_kwargs: Union[str, dict] = "auto",
     ):
         default_num_trials = None
-        if time_limit is None and ("num_samples" not in hyperparameter_tune_kwargs or isinstance(hyperparameter_tune_kwargs, str)):
+        if time_limit is None and (
+            "num_samples" not in hyperparameter_tune_kwargs
+            or isinstance(hyperparameter_tune_kwargs, str)
+        ):
             default_num_trials = 10
 
         with disable_tqdm():
@@ -413,13 +418,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.hpo_results[model.name] = hpo_results
         model_names_trained = []
+        # TODO: Does this code still work if all model configurations failed?
         # add each of the trained HPO configurations to the trained models
-        for model_hpo_name, model_path in hpo_models.items():
-            model_hpo = self.load_model(
-                model_hpo_name, path=model_path, model_type=type(model)
-            )
-            self._add_model(model_hpo)
-            model_names_trained.append(model_hpo.name)
+        for model_hpo_name, model_info in hpo_models.items():
+            model_path = model_info["path"]
+            # Only load model configurations that didn't fail
+            if Path(model_path).exists():
+                model_hpo = self.load_model(
+                    model_hpo_name, path=model_path, model_type=type(model)
+                )
+                self._add_model(model_hpo)
+                model_names_trained.append(model_hpo.name)
 
         logger.info(
             f"\tTrained {len(model_names_trained)} models while tuning {model.name}."
@@ -488,7 +497,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
-        except Exception as err:
+        except (Exception, MemoryError) as err:
             logger.error(
                 f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
             )
@@ -732,12 +741,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
             for model_name in model_names:
                 try:
+                    # TODO: time only prediction and not score for pred_time_val and pred_time_test
+                    time_start_test_score = time.time()
                     model_info[model_name]["score_test"] = self.score(data, model_name)
+                    model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
                 except Exception as e:  # noqa
                     logger.error(
                         f"Cannot score with model {model_name}. An error occurred: {str(e)}"
                     )
                     model_info[model_name]["score_test"] = float("nan")
+                    model_info[model_name]["pred_time_test"] = float("nan")
 
         df = pd.DataFrame(model_info.values())
 
@@ -751,6 +764,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "model",
             "score_test",
             "score_val",
+            "pred_time_test",
             "pred_time_val",
             "fit_time_marginal",
             "fit_order",

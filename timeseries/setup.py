@@ -48,7 +48,7 @@ except (ImportError, AssertionError):
 
 extras_require = {
     "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1"],
-    "sktime": ["sktime~=0.12", "pmdarima~=1.8", "tbats~=1.1"],
+    "sktime": ["sktime~=0.11.4", "pmdarima~=1.8.2", "tbats~=1.1"],
 }
 
 all_requires = []
