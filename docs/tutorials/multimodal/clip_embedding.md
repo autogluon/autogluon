@@ -32,6 +32,9 @@ print(image_paths)
 Let's extract some image embedding from the CLIP vision encoder,
 
 ```{.python .input}
+from autogluon.multimodal import MultiModalPredictor
+predictor = MultiModalPredictor(hyperparameters={"model.names": ["clip"]}, problem_type="zero_shot")
+
 # extract image embeddings.
 image_embeddings = predictor.extract_embedding({"image": image_paths})
 for k, v in image_embeddings.items():
