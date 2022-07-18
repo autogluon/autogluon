@@ -53,10 +53,11 @@ automm_hyperparameters = {
 }
 
 hyperparameter_tune_kwargs = {
-        "searcher": 'random',
-        "scheduler": 'FIFO',
-        "num_trials": 50,
+    "searcher": "random",
+    "scheduler": "FIFO",
+    "num_trials": 50,
 }
+
 
 def main(args):
 
@@ -115,9 +116,9 @@ def main(args):
         automm_hyperparameters["model.numerical_transformer.ffn_dropout"] = tune.uniform(0.0, 0.5)
         automm_hyperparameters["model.numerical_transformer.attention_dropout"] = tune.uniform(0.0, 0.5)
         automm_hyperparameters["model.numerical_transformer.residual_dropout"] = tune.uniform(0.0, 0.2)
-        automm_hyperparameters["optimization.learning_rate"] = tune.uniform(0.00001, 0.001),
+        automm_hyperparameters["optimization.learning_rate"] = tune.uniform(0.00001, 0.001)
         automm_hyperparameters["optimization.end_lr"] = 1e-5
-        
+
         ### model initalization
         predictor = MultiModalPredictor(
             label=train_data.label_column,
@@ -184,9 +185,20 @@ if __name__ == "__main__":
     parser.add_argument("--exp_dir", default=None, type=str, help="Path to the outputs.")
     parser.add_argument("--lr", default=1e-04, type=float, help="Initial learning rate.")
     parser.add_argument("--end_lr", default=1e-04, type=float, help="End learning rate.")
-    parser.add_argument("--mode", choices=["single", "single_hpo", "weighted", "single_bag5", "stack5"], default="single", help="Method to run with.")
+    parser.add_argument(
+        "--mode",
+        choices=["single", "single_hpo", "weighted", "single_bag5", "stack5"],
+        default="single",
+        help="Method to run with.",
+    )
     parser.add_argument("--seed", default=0, type=int)
-    parser.add_argument("--embedding_arch", type=str, nargs="+", default=None, help="Embedding architecture for numerical features in FT_Transformer.")
+    parser.add_argument(
+        "--embedding_arch",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Embedding architecture for numerical features in FT_Transformer.",
+    )
     args = parser.parse_args()
 
     if args.exp_dir is None:
