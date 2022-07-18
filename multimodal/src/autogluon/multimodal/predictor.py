@@ -13,11 +13,9 @@ import copy
 import yaml
 import torch
 from torch import nn
-from torch.nn.modules.loss import _Loss
 from omegaconf import OmegaConf, DictConfig
 import operator
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.types import _METRIC
 from typing import Optional, List, Dict, Union, Callable
 from sklearn.model_selection import train_test_split
 from autogluon.core.utils.try_import import try_import_ray_lightning
@@ -96,11 +94,11 @@ from .utils import (
     init_zero_shot,
     tensor_to_ndarray,
     infer_dtypes_by_model_names,
+    update_config_by_rules,
 )
 from .optimization.utils import (
     get_metric,
     get_loss_func,
-    update_config_by_rules,
 )
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
@@ -545,6 +543,7 @@ class MultiModalPredictor:
                 save_dir=save_path,
                 ray_tune_adapter=ray_tune_adapter,
                 total_resources=resources,
+                minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
                 time_budget_s=time_budget_s,
                 keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
                 checkpoint_score_attr=metric,
@@ -685,7 +684,7 @@ class MultiModalPredictor:
             else:
                 assert self._output_shape > 1
                 soft_label_loss_func = nn.CrossEntropyLoss()
-        elif self._config.distiller.soft_label_loss_type == "mean_square_error":
+        elif self._config.distiller.soft_label_loss_type == "mse":
             soft_label_loss_func = nn.MSELoss()
         elif self._config.distiller.soft_label_loss_type == "cross_entropy":
             soft_label_loss_func = nn.CrossEntropyLoss()
@@ -1074,7 +1073,7 @@ class MultiModalPredictor:
                 log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
                 enable_progress_bar=enable_progress_bar,
                 fast_dev_run=config.env.fast_dev_run,
-                track_grad_norm=OmegaConf.select(config, "environment.track_grad_norm", default=2),
+                track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
             )
 

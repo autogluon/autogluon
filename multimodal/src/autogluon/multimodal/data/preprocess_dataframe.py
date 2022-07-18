@@ -1,9 +1,8 @@
 import logging
 import pandas as pd
 import numpy as np
+from typing import Optional, List, Any, Dict
 from omegaconf import DictConfig
-import collections
-from typing import Callable, Iterator, Union, Optional, List, Any, Dict
 from nptyping import NDArray
 from autogluon.features import CategoryFeatureGenerator
 from omegaconf import OmegaConf

@@ -51,6 +51,12 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use CLIP for zero-shot image classification. 
 
    .. card::
+      :title: CLIP in AutoMM - Extract Embeddings
+      :link: clip_embedding.html
+
+      How to use CLIP to extract embeddings for retrieval problem.
+
+   .. card::
       :title: Customize AutoMM
       :link: customization.html
 
@@ -67,4 +73,5 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
    multimodal_text_tabular
    beginner_multimodal
    clip_zeroshot
+   clip_embedding
    customization

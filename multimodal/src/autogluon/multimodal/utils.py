@@ -11,7 +11,7 @@ import torch
 from torch import nn
 import warnings
 from contextlib import contextmanager
-from typing import Optional, List, Any, Dict, Tuple, Union
+from typing import Optional, List, Dict, Tuple, Union
 import numpy as np
 import uuid
 import hashlib
@@ -1942,3 +1942,37 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
         fallback_dtype = TEXT
 
     return allowable_dtypes, fallback_dtype
+
+
+def update_config_by_rules(
+    problem_type: str,
+    config: DictConfig,
+):
+    """
+    Modify configs based on the need of loss func.
+    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
+
+    Parameters
+    ----------
+    problem_type
+        The type of the problem of the project.
+    config
+        The config of the project. It is a Dictconfig object.
+
+    Returns
+    -------
+    The modified config.
+    """
+    loss_func = OmegaConf.select(config, "optimization.loss_function")
+    if loss_func is not None:
+        if problem_type == REGRESSION and "bce" in loss_func.lower():
+            # We are using BCELoss for regression problems. Need to first scale the labels.
+            config.data.label.numerical_label_preprocessing = "minmaxscaler"
+        elif loss_func != "auto":
+            warnings.warn(
+                f"Received loss function={loss_func} for problem={problem_type}. "
+                "Currently, we only support using BCE loss for regression problems and choose "
+                "the loss_function automatically otherwise.",
+                UserWarning,
+            )
+    return config

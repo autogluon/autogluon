@@ -11,5 +11,4 @@ env:
   fast_dev_run: False
   deterministic: False
   auto_select_gpus: True
-  track_grad_norm: 2  # Whether to check gradient norm. We can set it to 2 to check for gradient norm.
   strategy: "ddp_spawn"

@@ -1,5 +1,4 @@
 import logging
-import numpy as np
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 

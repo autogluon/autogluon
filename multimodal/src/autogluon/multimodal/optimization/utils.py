@@ -18,8 +18,6 @@ from ..constants import (
     BINARY,
     MULTICLASS,
     REGRESSION,
-    MAX,
-    MIN,
     NORM_FIT,
     BIT_FIT,
     ACC,
@@ -40,7 +38,6 @@ from ..constants import (
     PAIR_MARGIN_MINER,
     COLUMN_FEATURES,
     FEATURES,
-    MASKS,
     AUTOMM,
     COSINE_EMBEDDING_LOSS,
     LORA,
@@ -579,40 +576,6 @@ def apply_layerwise_lr_decay(
         parameter_group_names[group_name]["params"].append(name)
 
     return list(parameter_group_vars.values())
-
-
-def update_config_by_rules(
-    problem_type: str,
-    config: DictConfig,
-):
-    """
-    Modify configs based on the need of loss func.
-    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
-
-    Parameters
-    ----------
-    problem_type
-        The type of the problem of the project.
-    config
-        The config of the project. It is a Dictconfig object.
-
-    Returns
-    -------
-    The modified config.
-    """
-    loss_func = OmegaConf.select(config, "optimization.loss_function")
-    if loss_func is not None:
-        if problem_type == REGRESSION and "bce" in loss_func.lower():
-            # We are using BCELoss for regression problems. Need to first scale the labels.
-            config.data.label.numerical_label_preprocessing = "minmaxscaler"
-        elif loss_func != "auto":
-            warnings.warn(
-                f"Received loss function={loss_func} for problem={problem_type}. "
-                "Currently, we only support using BCE loss for regression problems and choose "
-                "the loss_function automatically otherwise.",
-                UserWarning,
-            )
-    return config
 
 
 def gather_column_features(

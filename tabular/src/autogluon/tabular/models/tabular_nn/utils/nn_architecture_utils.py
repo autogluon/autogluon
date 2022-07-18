@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import REGRESSION
 
 
 def get_embed_sizes(train_dataset, params, num_categs_per_feature):

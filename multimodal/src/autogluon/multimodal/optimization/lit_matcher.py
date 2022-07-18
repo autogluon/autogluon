@@ -1,7 +1,6 @@
 import logging
 import torch
 from torch import nn
-import torch.nn.functional as F
 import pytorch_lightning as pl
 from .utils import (
     get_optimizer,
@@ -16,7 +15,7 @@ from .utils import (
     compute_probability,
 )
 from omegaconf import DictConfig
-from ..constants import LOGITS, WEIGHT, PROBABILITY, AUTOMM
+from ..constants import PROBABILITY, AUTOMM
 from typing import Union, Optional, List, Dict, Callable
 import torchmetrics
 from torchmetrics.aggregation import BaseAggregator

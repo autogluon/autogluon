@@ -28,11 +28,8 @@ from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalcul
 from ray import tune
 from ray.tune import PlacementGroupFactory
 from ray.tune.sample import Domain
-from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler, PopulationBasedTraining
-from ray.tune.schedulers.pb2 import PB2
+from ray.tune.schedulers import TrialScheduler
 from ray.tune.suggest import SearchAlgorithm, Searcher
-from ray.tune.suggest.basic_variant import BasicVariantGenerator
-from ray.tune.suggest.hyperopt import HyperOptSearch
 
 
 logger = logging.getLogger(__name__)
@@ -101,7 +98,7 @@ class RayTuneAdapter(ABC):
         num_samples: int,
         resources_per_trial: Optional[dict] = None,
         minimum_cpu_per_trial: int = 1,
-        minimum_gpu_per_trial: float = 1.0,
+        minimum_gpu_per_trial: float = 0.0,
         model_estimate_memory_usage: Optional[int] = None,
         **kwargs
     ) -> Union[dict, PlacementGroupFactory]:
@@ -110,11 +107,15 @@ class RayTuneAdapter(ABC):
         """
         self.check_user_provided_resources_per_trial(resources_per_trial)
         assert isinstance(minimum_cpu_per_trial, int) and minimum_cpu_per_trial >= 1, 'minimum_cpu_per_trial must be a integer that is larger than 0'
-        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial > 0, 'minimum_gpu_per_trial must be a integer or float that is larger than 0'
+        assert isinstance(minimum_gpu_per_trial, (int, float)) and minimum_gpu_per_trial >= 0, 'minimum_gpu_per_trial must be an integer or float that is equal to or larger than 0'
         num_cpus = total_resources.get('num_cpus', psutil.cpu_count())
         num_gpus = total_resources.get('num_gpus', 0)
+        assert num_gpus >= minimum_gpu_per_trial, 'Total num_gpus available must be greater or equal to minimum_gpu_per_trial'
         
-        resources_calculator = self.get_resource_calculator(num_gpus=num_gpus)
+        if minimum_gpu_per_trial > 0:
+            resources_calculator = self.get_resource_calculator(num_gpus=num_gpus)
+        else:
+            resources_calculator = self.get_resource_calculator(num_gpus=0)
         resources_info = resources_calculator.get_resources_per_job(
             total_num_cpus=num_cpus,
             total_num_gpus=num_gpus,
@@ -148,7 +149,7 @@ def run(
     ray_tune_adapter: RayTuneAdapter,
     total_resources: Optional[dict] = dict(),
     minimum_cpu_per_trial: int = 1,
-    minimum_gpu_per_trial: float = 1.0,
+    minimum_gpu_per_trial: float = 0.0,
     model_estimate_memory_usage: Optional[int] = None,
     time_budget_s: Optional[float] = None,
     verbose: int = 1,
