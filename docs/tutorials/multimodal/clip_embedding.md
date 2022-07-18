@@ -37,19 +37,17 @@ predictor = MultiModalPredictor(hyperparameters={"model.names": ["clip"]}, probl
 
 # extract image embeddings.
 image_embeddings = predictor.extract_embedding({"image": image_paths})
-for k, v in image_embeddings.items():
-    print(k, v.shape)  # image (5, 768)
+print(image_embeddings['image'].shape)  # image (5, 768)
 ```
 
 The output has a shape of (5, 768), because there are 5 images, each of the image embedding has a dimension of 768. 
 
-Similarly, you can also extract text embeddings for other tasks, 
+Similarly, you can also extract text embeddings from the CLIP text encoder, 
 
 ```{.python .input}
 # extract text embeddings.
 text_embeddings = predictor.extract_embedding({"text": ['There is a carriage in the image']})
-for k, v in text_embeddings.items():
-    print(k, v.shape)  # text (1, 768)
+print(text_embeddings['text'].shape)  # text (1, 768)
 ```
 
 Then you can use the embeddings for a range of tasks such as image retrieval, text retrieval, image-text retrieval and matching/ranking. 
@@ -67,14 +65,10 @@ Let's reuse the example we have above. We already have 5 image embeddings in **i
 image_features = image_embeddings['image']
 text_features = text_embeddings['text']
 
-from numpy import linalg as LA
 import numpy as np
-image_features /= LA.norm(image_features, axis=-1, keepdims=True)
-text_features /= LA.norm(text_features, axis=-1, keepdims=True)
 
 similarity = 100.0 * np.matmul(image_features, text_features.T)
-from scipy.special import softmax
-print(softmax(similarity))
+print(np.argmax(similarity))
 ```
 
 We can see that we successfully find the image with a carriage in it. 
@@ -89,12 +83,9 @@ If we want to switch to another text query, we simply re-compute text embeddings
 
 ```{.python .input}
 text_embeddings = predictor.extract_embedding({"text": ['There is an airplane over a car.']})
-
 text_features = text_embeddings['text']
-text_features /= LA.norm(text_features, axis=-1, keepdims=True)
-
 similarity = 100.0 * np.matmul(image_features, text_features.T)
-print(softmax(similarity))
+print(np.argmax(similarity))
 ```
 
 Now we find the image most corresponding to the text query. 
