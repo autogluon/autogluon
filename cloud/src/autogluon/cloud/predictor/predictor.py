@@ -75,7 +75,7 @@ class CloudPredictor(ABC):
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
         """
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity)
+        set_logger_verbosity(self.verbosity, logger=logger)
         self.role_arn = role_arn
         if not self.role_arn:
             self.role_arn = setup_sagemaker_role_and_policy(
@@ -626,6 +626,20 @@ class CloudPredictor(ABC):
             raise ValueError('test_data must be either a pandas.DataFrame, a local path or a s3 path')
         return self.endpoint.predict(test_data, initial_args={'Accept': accept})
 
+    def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
+        if isinstance(test_data, pd.DataFrame) or not is_s3_url(test_data):
+            test_data = self._prepare_data(test_data, 'test', output_type='csv')
+            logger.log(20, 'Uploading data...')
+            test_input = self.sagemaker_session.upload_data(
+                path=test_data,
+                bucket=bucket,
+                key_prefix=key_prefix + '/data'
+            )
+            logger.log(20, 'Data uploaded successfully')
+        else:
+            test_input = test_data
+        return test_input
+
     def predict(
         self,
         test_data,
@@ -700,17 +714,7 @@ class CloudPredictor(ABC):
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor-batch-transform")
 
-        if isinstance(test_data, pd.DataFrame) or not is_s3_url(test_data):
-            test_data = self._prepare_data(test_data, 'test', output_type='csv')
-            logger.log(20, 'Uploading data...')
-            test_input = self.sagemaker_session.upload_data(
-                path=test_data,
-                bucket=cloud_bucket,
-                key_prefix=cloud_key_prefix + '/data'
-            )
-            logger.log(20, 'Data uploaded successfully')
-        else:
-            test_input = test_data
+        test_input = self._upload_batch_predict_data(test_data, cloud_bucket, cloud_key_prefix)
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
@@ -724,10 +728,11 @@ class CloudPredictor(ABC):
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonBatchPredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
 
-        split_type = kwargs.pop('split_type', None)
         content_type = kwargs.pop('content_type', None)
-        if not split_type:
+        if 'split_type' not in kwargs:
             split_type = 'Line'
+        else:
+            split_type = kwargs.pop('split_type')
         if not content_type:
             content_type = 'text/csv'
 
@@ -978,7 +983,7 @@ class ImageCloudPredictor(CloudPredictor):
         if isinstance(test_data, str):
             test_data = load_pd.load(test_data)
         if isinstance(test_data, pd.DataFrame):
-            assert test_data_image_column is not None, 'Please specify a image column name'
+            assert test_data_image_column is not None, 'Please specify an image column name'
             assert test_data_image_column in test_data, 'Please specify a valid image column name'
 
             # Convert test data to be numpy array for network transfer
@@ -990,3 +995,40 @@ class ImageCloudPredictor(CloudPredictor):
             logger.warning(f'Large test data detected({memory_usage // 10e6} MB). SageMaker endpoint could only take maximum 5MB. The prediction is likely to fail')
             logger.warning('Please consider reduce test data size or use `predict()` instead.')
         return self.endpoint.predict(test_data, initial_args={'Accept': accept})
+
+    def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
+        if not is_s3_url(test_data):
+            assert os.path.isdir(test_data), 'Please provide a folder containing the test images'
+            logger.log(20, 'Uploading data...')
+            test_input = self.sagemaker_session.upload_data(
+                path=test_data,
+                bucket=bucket,
+                key_prefix=key_prefix + '/data'
+            )
+            logger.log(20, 'Data uploaded successfully')
+        else:
+            test_input = test_data
+        return test_input
+
+    def predict(
+        self,
+        test_data,
+        predictor_path=None,
+        framework_version='latest',
+        job_name=None,
+        instance_type='ml.m5.2xlarge',
+        instance_count=1,
+        wait=True,
+        autogluon_sagemaker_inference_model_kwargs=dict(),
+        transformer_kwargs=dict(),
+        **kwargs,
+    ):
+        split_type = None
+        content_type = 'application/x-image'
+        transformer_kwargs['strategy'] = 'SingleRecord'
+        super().predict(
+            test_data,
+            split_type=split_type,
+            content_type=content_type,
+            transformer_kwargs=transformer_kwargs,
+        )

@@ -26,6 +26,13 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             im_name = f'{i}.jpeg'
             im.save(im_name)
             image_paths.append(im_name)
+    elif input_content_type == "application/x-image":
+        buf = BytesIO(request_body)
+        im = Image.open(buf)
+        image_paths = []
+        im_name = 'test.jpeg'
+        im.save(im_name)
+        image_paths.append(im_name)
     else:
         raise Exception(
             f'{input_content_type} input content type not supported.'
