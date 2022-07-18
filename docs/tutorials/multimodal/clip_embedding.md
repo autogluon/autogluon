@@ -67,7 +67,7 @@ text_features = text_embeddings['text']
 
 import numpy as np
 
-similarity = 100.0 * np.matmul(image_features, text_features.T)
+similarity = np.matmul(image_features, text_features.T)
 print(np.argmax(similarity))
 ```
 
@@ -84,7 +84,7 @@ If we want to switch to another text query, we simply re-compute text embeddings
 ```{.python .input}
 text_embeddings = predictor.extract_embedding({"text": ['There is an airplane over a car.']})
 text_features = text_embeddings['text']
-similarity = 100.0 * np.matmul(image_features, text_features.T)
+similarity = np.matmul(image_features, text_features.T)
 print(np.argmax(similarity))
 ```
 
