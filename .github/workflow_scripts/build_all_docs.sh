@@ -15,7 +15,7 @@ source $(dirname "$0")/write_to_s3.sh
 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
-    bucket='autogluon-doc-staging'
+    bucket='autogluon-staging'
     if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER; else path=$BRANCH; fi
     site=$bucket.s3-website-us-west-2.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
 else
@@ -30,7 +30,7 @@ else
             path=$BRANCH
         fi
     fi
-    bucket='autogluon-website'
+    bucket='autogluon.mxnet.io'
     site=$bucket/$path
 fi
 

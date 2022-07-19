@@ -273,4 +273,4 @@ jobs:
           issue-number: ${{ github.event.number }}
           body: |
             Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
-            Docs are uploaded to http://autogluon-doc-staging.s3.amazonaws.com/staging/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
+            Docs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
