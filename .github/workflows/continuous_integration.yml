@@ -250,6 +250,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
