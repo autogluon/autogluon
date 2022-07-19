@@ -250,6 +250,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -273,4 +275,4 @@ jobs:
           issue-number: ${{ github.event.number }}
           body: |
             Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
-            Docs are uploaded to http://autogluon-doc-staging.s3.amazonaws.com/staging/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
+            Docs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
