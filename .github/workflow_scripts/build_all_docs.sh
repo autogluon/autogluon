@@ -17,7 +17,7 @@ if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
     bucket='autogluon-doc-staging'
     if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER; else path=$BRANCH; fi
-    site=$bucket.s3.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
+    site=$bucket.s3-website-us-west-2.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
 else
     if [[ $BRANCH == 'master' ]]
     then
@@ -78,7 +78,7 @@ DOC_PATH=_build/html/
 # Write docs to s3
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 # Write root_index to s3 if master
-if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
+if [[ ($BRANCH == 'master') && ($GIT_REPO == awslabs/autogluon) ]]
 then
     write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/root_index.html
 fi

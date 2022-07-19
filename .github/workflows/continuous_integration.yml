@@ -6,6 +6,7 @@ on:
 
 permissions:
   id-token: write
+  pull-requests: write
 
 defaults:
   run:
@@ -243,33 +244,33 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-BuildAllDocs
           command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh ${{ env.BRANCH }} ${{ env.GIT_REPO }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-  # copy-docs:
-  #   needs: build_all_docs
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v2
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         role-to-assume: arn:aws:iam::087278669274:role/AutoGluonWebCiRole
-  #         role-duration-seconds: 7200
-  #         aws-region: us-east-1
-  #     - name: Copy Docs to Bucket(For push)
-  #       if: ${{ github.event_name == 'push' }}
-  #       run: |
-  #         chmod +x ./.github/workflow_scripts/copy_docs.sh
-  #         ./.github/workflow_scripts/copy_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}
-  #     - name: Copy Docs to Bucket(For pull request)
-  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-  #       run: |
-  #         chmod +x ./.github/workflow_scripts/copy_docs.sh
-  #         ./.github/workflow_scripts/copy_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}
-  #     - name: Comment on PR
-  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-  #       uses: peter-evans/create-or-update-comment@v1.4.5
-  #       with:
-  #         issue-number: ${{ github.event.number }}
-  #         body: |
-  #           Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
-  #           Docs are uploaded to http://autogluon-doc-staging.s3.amazonaws.com/staging/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
+  copy-docs:
+    needs: build_all_docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiCopyDocs
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Copy Docs to Bucket(For push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          chmod +x ./.github/workflow_scripts/copy_docs.sh
+          ./.github/workflow_scripts/copy_docs.sh ${{ github.ref }} ${{ github.repository }} ${{ env.SHORT_SHA }}
+      - name: Copy Docs to Bucket(For pull request)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        run: |
+          chmod +x ./.github/workflow_scripts/copy_docs.sh
+          ./.github/workflow_scripts/copy_docs.sh ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.repo.full_name }} ${{ env.SHORT_SHA }} PR-${{ github.event.number }}
+      - name: Comment on PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: peter-evans/create-or-update-comment@v2.0.0
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
+            Docs are uploaded to http://autogluon-doc-staging.s3.amazonaws.com/staging/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
