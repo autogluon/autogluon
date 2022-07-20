@@ -50,7 +50,7 @@ then
 else
     BUCKET=autogluon-ci-push
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
-    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all
+    S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all
 fi
 
 mkdir -p docs/_build/rst/tutorials/
@@ -80,5 +80,5 @@ write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 # Write root_index to s3 if master
 if [[ ($BRANCH == 'master') && ($GIT_REPO == awslabs/autogluon) ]]
 then
-    write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/root_index.html
+    write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/root_index.html
 fi
