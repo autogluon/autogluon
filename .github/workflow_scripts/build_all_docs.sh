@@ -31,7 +31,7 @@ else
         fi
     fi
     bucket='autogluon.mxnet.io'
-    site=$bucket/$path  # Needed for sed substitution
+    site=$bucket/$path  # site is the actual bucket location that will serve the doc
 fi
 
 other_doc_version_text='Stable Version Documentation'
