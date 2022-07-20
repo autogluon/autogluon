@@ -31,7 +31,7 @@ else
         fi
     fi
     bucket='autogluon.mxnet.io'
-    site=$bucket/$path
+    site=$bucket/$path  # Needed for sed substitution
 fi
 
 other_doc_version_text='Stable Version Documentation'
@@ -50,7 +50,7 @@ then
 else
     BUCKET=autogluon-ci-push
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
-    S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all
+    S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all  # We still write to BRANCH so copy_docs.sh knows where to find it
 fi
 
 mkdir -p docs/_build/rst/tutorials/
