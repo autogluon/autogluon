@@ -5,8 +5,8 @@ from torch import nn
 from timm import create_model
 from .utils import (
     assign_layer_ids,
-    init_weights,
     get_column_features,
+    get_model_head,
 )
 from ..constants import (
     IMAGE,
@@ -65,12 +65,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
         self.num_classes = self.model.num_classes
         self.out_features = self.model.num_features
-        if hasattr(self.model, "head"):
-            self.head = self.model.head  # move the head outside
-        elif hasattr(self.model, "last_linear"):
-            self.head = self.model.last_linear
-        else:
-            raise ValueError(f"Model {checkpoint_name} doesn't have head. Need to check its TIMM implementation.")
+        self.head = get_model_head(model=self.model)
         self.model.reset_classifier(0)  # remove the internal head
 
         self.mix_choice = mix_choice
