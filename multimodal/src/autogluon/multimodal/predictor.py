@@ -1528,7 +1528,10 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                pred = logits_or_prob
+                if logits_or_prob.ndim == 2:
+                    pred = logits_or_prob.argmax(axis=1)
+                else:
+                    pred = logits_or_prob
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)

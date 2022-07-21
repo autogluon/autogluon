@@ -33,7 +33,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self,
         prefix: str,
         checkpoint_name: str,
-        num_classes: Optional[int] = 0,
+        num_classes: Optional[int] = None,
         mix_choice: Optional[str] = "all_logits",
         pretrained: Optional[bool] = True,
     ):
@@ -61,11 +61,12 @@ class TimmAutoModelForImagePrediction(nn.Module):
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
-        self.num_classes = num_classes
-        self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=0)
+        self.pretrained = pretrained
+        self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
+        self.num_classes = self.model.num_classes
         self.out_features = self.model.num_features
-        self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
-        self.head.apply(init_weights)
+        self.head = self.model.head  # move the head outside
+        self.model.reset_classifier(0)  # remove the internal head
 
         self.mix_choice = mix_choice
         logger.debug(f"mix_choice: {mix_choice}")
@@ -114,7 +115,9 @@ class TimmAutoModelForImagePrediction(nn.Module):
         image_valid_num = batch[self.image_valid_num_key]
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         if self.mix_choice == "all_images":  # mix inputs
-            mixed_images = images.sum(dim=1) / image_valid_num[:, None, None, None]  # mixed shape: (b, 3, h, w)
+            mixed_images = (
+                images.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None, None, None]
+            )  # mixed shape: (b, 3, h, w)
             features = self.model(mixed_images)
             logits = self.head(features)
 
@@ -137,18 +140,15 @@ class TimmAutoModelForImagePrediction(nn.Module):
             ret[COLUMN_FEATURES][FEATURES].update(column_features)
             ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
-            features = features.sum(dim=1)  # (b, num_features)
-            logits = logits.sum(dim=1)  # (b, num_classes)
+            features = features.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_features)
+            logits = logits.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_classes)
 
         else:
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
 
-        ret.update(
-            {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        )
+        ret[FEATURES] = features
+        if self.num_classes > 0:
+            ret[LOGITS] = logits
 
         return {self.prefix: ret}
 

@@ -1,12 +1,11 @@
 from PIL import Image
 import requests
 import pytest
+import numpy as np
 from autogluon.multimodal import MultiModalPredictor
 
-pytest.skip("Temporarily skip this test to pass the Jenkins build.", allow_module_level=True)
 
-
-def test_clip_zero_shot():
+def download_sample_images():
     url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
     cat_image_name = "cat.jpg"
@@ -16,6 +15,12 @@ def test_clip_zero_shot():
     image = Image.open(requests.get(url, stream=True).raw)
     dog_image_name = "dog.jpg"
     image.save(dog_image_name)
+
+    return cat_image_name, dog_image_name
+
+
+def test_clip_zero_shot():
+    cat_image_name, dog_image_name = download_sample_images()
 
     cat_text = "a photo of a cat"
     dog_text = "a photo of a dog"
@@ -98,3 +103,36 @@ def test_clip_zero_shot():
     # invalid API usage 2: predicting probability with only one dictionary as input.
     with pytest.raises(AssertionError):
         prob = predictor.predict_proba({"image": [cat_image_name], "text": [cat_text]})
+
+
+def test_timm_zero_shot():
+    cat_image_name, dog_image_name = download_sample_images()
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.names": ["timm_image"],
+            "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        },
+        problem_type="zero_shot",
+    )
+
+    pred = predictor.predict({"image": [cat_image_name, dog_image_name]})
+    assert pred.shape == (2,)
+
+    prob = predictor.predict_proba({"image": [cat_image_name, dog_image_name]})
+    assert prob.shape == (2, 1000)
+
+    features = predictor.extract_embedding({"abc": [cat_image_name, dog_image_name]})
+    assert features["abc"].shape == (2, 768)
+
+    features, masks = predictor.extract_embedding({"abc": [cat_image_name, dog_image_name]}, return_masks=True)
+    assert features["abc"].shape == (2, 768)
+    assert np.all(masks["abc"] == np.array([1, 1]))
+
+    features, masks = predictor.extract_embedding(
+        {"abc": [cat_image_name], "123": [dog_image_name]}, return_masks=True
+    )
+    assert features["abc"].shape == (1, 768)
+    assert features["123"].shape == (1, 768)
+    assert np.all(masks["abc"] == np.array([1]))
+    assert np.all(masks["123"] == np.array([1]))
