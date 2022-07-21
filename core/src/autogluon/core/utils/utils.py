@@ -572,7 +572,8 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
                                            silent=False,
                                            log_prefix='',
                                            importance_as_list=False,
-                                           random_state=0) -> pd.DataFrame:
+                                           random_state=0,
+                                           **kwargs) -> pd.DataFrame:
     """
     Computes a trained model's feature importance via permutation shuffling (https://explained.ai/rf-importance/).
     A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -709,7 +710,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
             time_start_score = time.time()
             X_transformed = X if transform_func is None else transform_func(X, **transform_func_kwargs)
             y_pred = predict_func(X_transformed, **predict_func_kwargs)
-            score_baseline = eval_metric(y, y_pred)
+            score_baseline = eval_metric(y, y_pred, **kwargs)
             if shuffle_repeat == 0:
                 if not silent:
                     time_score = time.time() - time_start_score
@@ -762,7 +763,7 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
                 # calculating importance score for given feature
                 row_index_end = row_index + row_count
                 y_pred_cur = y_pred[row_index:row_index_end]
-                score = eval_metric(y, y_pred_cur)
+                score = eval_metric(y, y_pred_cur, **kwargs)
                 fi[feature_name] = score_baseline - score
 
                 # resetting to original values for processed feature
