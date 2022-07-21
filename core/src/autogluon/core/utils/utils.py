@@ -658,6 +658,9 @@ def compute_permutation_feature_importance(X: pd.DataFrame,
             A p-value of 0.99 indicates that there is a 99% chance that the feature is useless or harmful, and a 1% chance that the feature is useful.
         'n': The number of shuffles performed to estimate importance score (corresponds to sample-size used to determine confidence interval for true score).
     """
+    if not eval_metric.needs_quantile:
+        kwargs.pop('quantile_levels', None)
+
     if num_shuffle_sets is None:
         num_shuffle_sets = 1 if time_limit is None else 10
 
