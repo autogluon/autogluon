@@ -105,13 +105,22 @@ def test_clip_zero_shot():
         prob = predictor.predict_proba({"image": [cat_image_name], "text": [cat_text]})
 
 
-def test_timm_zero_shot():
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "swin_tiny_patch4_window7_224",
+        "vit_tiny_patch16_224",
+        "resnet18",
+        "legacy_seresnet18",
+    ],
+)
+def test_timm_zero_shot(checkpoint_name):
     cat_image_name, dog_image_name = download_sample_images()
 
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.names": ["timm_image"],
-            "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+            "model.timm_image.checkpoint_name": checkpoint_name,
         },
         problem_type="zero_shot",
     )
@@ -123,16 +132,16 @@ def test_timm_zero_shot():
     assert prob.shape == (2, 1000)
 
     features = predictor.extract_embedding({"abc": [cat_image_name, dog_image_name]})
-    assert features["abc"].shape == (2, 768)
+    assert features["abc"].ndim == 2 and features["abc"].shape[0] == 2
 
     features, masks = predictor.extract_embedding({"abc": [cat_image_name, dog_image_name]}, return_masks=True)
-    assert features["abc"].shape == (2, 768)
+    assert features["abc"].ndim == 2 and features["abc"].shape[0] == 2
     assert np.all(masks["abc"] == np.array([1, 1]))
 
     features, masks = predictor.extract_embedding(
         {"abc": [cat_image_name], "123": [dog_image_name]}, return_masks=True
     )
-    assert features["abc"].shape == (1, 768)
-    assert features["123"].shape == (1, 768)
+    assert features["abc"].ndim == 2 and features["abc"].shape[0] == 1
+    assert features["123"].ndim == 2 and features["123"].shape[0] == 1
     assert np.all(masks["abc"] == np.array([1]))
     assert np.all(masks["123"] == np.array([1]))
