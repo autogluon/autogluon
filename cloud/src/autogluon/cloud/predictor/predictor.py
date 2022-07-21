@@ -30,7 +30,6 @@ from ..utils.ag_sagemaker import (
 from ..utils.aws_utils import setup_sagemaker_role_and_policy
 from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
 from ..utils.misc import MostRecentInsertedOrderedDict
-from ..utils.s3_utils import download_s3_file
 from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_py_versions, retrieve_latest_framework_version
 from ..utils.utils import zipfolder, is_compressed_file, unzip_file, rename_file_with_uuid
 
@@ -793,7 +792,11 @@ class CloudPredictor(ABC):
             file_name = rename_file_with_uuid(file_name)
         results_save_path = os.path.join(results_save_path, file_name)
         results_bucket, results_key_prefix = s3_path_to_bucket_prefix(result_path)
-        download_s3_file(results_bucket, results_key_prefix, results_save_path)
+        self.sagemaker_session.download_data(
+            path=results_save_path,
+            bucket=results_bucket,
+            key_prefix=results_key_prefix
+        )
 
     def get_batch_transform_job_status(self, job_name=None):
         """
@@ -842,7 +845,11 @@ class CloudPredictor(ABC):
         logger.log(20, 'Downloading trained models to local directory')
         predictor_bucket, predictor_key_prefix = s3_path_to_bucket_prefix(path)
         tarball_path = os.path.join(save_path, 'model.tar.gz')
-        download_s3_file(predictor_bucket, predictor_key_prefix, tarball_path)
+        self.sagemaker_session.download_data(
+            path=tarball_path,
+            bucket=predictor_bucket,
+            key_prefix=predictor_key_prefix,
+        )
         logger.log(20, 'Extracting the trained model tarball')
         save_path = os.path.join(save_path, 'AutogluonModels')
         unzip_file(tarball_path, save_path)
@@ -965,6 +972,8 @@ class ImageCloudPredictor(CloudPredictor):
         test_data: Union(str, pandas.DataFrame)
             The test data to be inferenced.
             Can be a pandas.DataFrame, a numpy.ndarray, a local path or a s3 path to a csv file containing paths of test images.
+            Or a path to a single image file.
+            Or a list of paths to image files.
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -981,7 +990,14 @@ class ImageCloudPredictor(CloudPredictor):
         import numpy as np
 
         if isinstance(test_data, str):
-            test_data = load_pd.load(test_data)
+            test_data = cv2.imread(test_data)
+            if test_data is None:  # not an image
+                test_data = load_pd.load(test_data)
+        if isinstance(test_data, list):
+            images = []
+            for image in test_data:
+                images.append(cv2.imread(image))
+            test_data = np.array(images, dtype=object)
         if isinstance(test_data, pd.DataFrame):
             assert test_data_image_column is not None, 'Please specify an image column name'
             assert test_data_image_column in test_data, 'Please specify a valid image column name'
@@ -998,7 +1014,8 @@ class ImageCloudPredictor(CloudPredictor):
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
         if not is_s3_url(test_data):
-            assert os.path.isdir(test_data), 'Please provide a folder containing the test images'
+            if not os.path.isdir(test_data):
+                logger.warning('Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead')
             logger.log(20, 'Uploading data...')
             test_input = self.sagemaker_session.upload_data(
                 path=test_data,
@@ -1013,13 +1030,6 @@ class ImageCloudPredictor(CloudPredictor):
     def predict(
         self,
         test_data,
-        predictor_path=None,
-        framework_version='latest',
-        job_name=None,
-        instance_type='ml.m5.2xlarge',
-        instance_count=1,
-        wait=True,
-        autogluon_sagemaker_inference_model_kwargs=dict(),
         transformer_kwargs=dict(),
         **kwargs,
     ):
@@ -1031,4 +1041,5 @@ class ImageCloudPredictor(CloudPredictor):
             split_type=split_type,
             content_type=content_type,
             transformer_kwargs=transformer_kwargs,
+            **kwargs,
         )
