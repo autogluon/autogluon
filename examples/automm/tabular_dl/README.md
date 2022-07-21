@@ -10,10 +10,10 @@ To run the example:
    - `dataset_name` determines which dataset to run the experinments, refers to [Dataset Section](###2.-Datasets).
    - `dataset_dir` is the path to the dataset(s). If the datasets do not present in this path, it will be automatically downloaded.
    - `exp_dir` is the output path to store the weights and loggings. 
-   - `--gpu_id` specifies the GPU to use (optional).
+   - `gpu_id` specifies the GPU to use (optional).
    - `seed` determines the random seed (optional). Default is 0.
-   - `--lr` specifies the inital learning rate (optional). Default is `1e-04`.
-   - `--end_lr` specifies the end learning rate (optional). Default is `1e-04`.
+   - `lr` specifies the inital learning rate (optional). Default is `1e-04`.
+   - `end_lr` specifies the end learning rate (optional). Default is `1e-04`.
 
 
 ### 2. Datasets
