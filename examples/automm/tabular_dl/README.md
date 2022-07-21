@@ -1,4 +1,4 @@
-# Advanced models in autogluon.multimodal for tabular data
+# Advanced Tabular DL models in AutoMM
 
 
 ### 1. Run Example
