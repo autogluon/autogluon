@@ -65,7 +65,12 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
         self.num_classes = self.model.num_classes
         self.out_features = self.model.num_features
-        self.head = self.model.head  # move the head outside
+        if hasattr(self.model, "head"):
+            self.head = self.model.head  # move the head outside
+        elif hasattr(self.model, "last_linear"):
+            self.head = self.model.last_linear
+        else:
+            raise ValueError(f"Model {checkpoint_name} doesn't have head. Need to check its TIMM implementation.")
         self.model.reset_classifier(0)  # remove the internal head
 
         self.mix_choice = mix_choice
