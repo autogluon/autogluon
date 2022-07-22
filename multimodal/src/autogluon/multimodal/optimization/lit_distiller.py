@@ -195,17 +195,17 @@ class DistillerLitModule(pl.LightningModule):
         student_output: dict,
         teacher_output: dict,
     ):
-        student_result = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
-        teacher_result = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
-        student_result = student_result / self.temperature
-        teacher_result = teacher_result / self.temperature
+        student_logits = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
+        soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
+        student_logits = student_logits / self.temperature
+        soft_labels = soft_labels / self.temperature
 
         if isinstance(self.soft_label_loss_func, nn.CrossEntropyLoss):
-            teacher_result = F.softmax(teacher_result, dim=-1)
+            soft_labels = F.softmax(soft_labels, dim=-1)
 
         loss = self.soft_label_loss_func(
-            input=student_result,
-            target=teacher_result,
+            input=student_logits,
+            target=soft_labels,
         )
         return loss
 
