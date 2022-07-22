@@ -113,9 +113,11 @@ def main(args):
             json.dump(scores, f)
         print(scores)
     elif args.mode == "single_hpo":
-        automm_hyperparameters["model.numerical_transformer.ffn_dropout"] = tune.uniform(0.0, 0.5)
-        automm_hyperparameters["model.numerical_transformer.attention_dropout"] = tune.uniform(0.0, 0.5)
-        automm_hyperparameters["model.numerical_transformer.residual_dropout"] = tune.uniform(0.0, 0.2)
+        automm_hyperparameters["model.fusion_transformer.ffn_dropout"] = tune.uniform(0.0, 0.5)
+        automm_hyperparameters["model.fusion_transformer.attention_dropout"] = tune.uniform(0.0, 0.5)
+        automm_hyperparameters["model.fusion_transformer.residual_dropout"] = tune.uniform(0.0, 0.2)
+        automm_hyperparameters["model.fusion_transformer.ffn_d_hidden"] = tune.randint(150, 300)
+        automm_hyperparameters["model.numerical_transformer.ffn_d_hidden"] = tune.randint(150, 300)
         automm_hyperparameters["optimization.learning_rate"] = tune.uniform(0.00001, 0.001)
         automm_hyperparameters["optimization.end_lr"] = 1e-5
 
