@@ -935,7 +935,7 @@ class MultiModalPredictor:
                 embedding_loss_weight=config.distiller.embedding_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
-                embedding_loss_func=soft_label_loss_func,
+                embedding_loss_func=embedding_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )

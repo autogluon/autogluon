@@ -162,7 +162,7 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", default=5.0, type=float)
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
-    parser.add_argument("--embedding_loss_weight", default=0.001, type=float)
+    parser.add_argument("--embedding_loss_weight", default=0.01, type=float)
     parser.add_argument("--embedding_loss_type", default="mean_square_error", type=str)
     parser.add_argument("--finetuned_model_cache_folder", default="/media/code/autogluon/examples/automm/distillation/AutogluonModels/cache_finetuned", type=str)
     parser.add_argument("--retrain", action="store_true")
