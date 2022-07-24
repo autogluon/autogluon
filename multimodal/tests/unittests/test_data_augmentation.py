@@ -1,6 +1,8 @@
+import os
 import tempfile
 import copy
 import pickle
+import shutil
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
@@ -60,10 +62,12 @@ def test_mixup():
     }
 
     with tempfile.TemporaryDirectory() as save_path:
+        if os.path.isdir(save_path):
+            shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            time_limit=30,
+            time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )
@@ -99,6 +103,8 @@ def test_textagumentor_deepcopy():
     }
 
     with tempfile.TemporaryDirectory() as save_path:
+        if os.path.isdir(save_path):
+            shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
@@ -159,10 +165,12 @@ def test_trivialaugment():
     }
 
     with tempfile.TemporaryDirectory() as save_path:
+        if os.path.isdir(save_path):
+            shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            time_limit=30,
+            time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )
