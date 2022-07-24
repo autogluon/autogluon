@@ -700,7 +700,6 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown embedding_loss_type: {self._config.distiller.embedding_loss_type}")
 
-
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
