@@ -18,8 +18,12 @@ To run the example:
    - `time_limit` determines the max time to train each model. The unit is second.
    - `num_gpu` determines num of gpu used to train the models. Default is -1 which means using all.
    - `temperature` determines the temperature for soft cross entropy.
-   - `hard_label_weight` determines the weight of hard labels (ground truth logits).
-   - `soft_label_weight` determines the weight of soft labels (teacher model's output).
+   - `hard_label_weight` determines the weight of hard label loss (ground truth logits).
+   - `soft_label_weight` determines the weight of soft label loess (teacher model's output).
+   - `intermediate_loss_weight` determines the weight of intermediate loss
+   - `intermediate_loss_type` determines the loss function of intermediate loss, currently support "mean_square_error" and "cosine_distance"
+   - `finetuned_model_cache_folder` is the path to cache models trained without distillation.
+   -  `retrain` determines if the models without distillation should be retrained or load from cache.
 
 ### 1.2 Dataset
 We borrow 7 NLP tasks in GLUE [1], and use identically the same abbreviation as in [1] to name each tasks,
@@ -32,6 +36,57 @@ In GLUE, labels in test sets are private and thus we use training set for traini
 ### 1.3 Distillation Loss
 The student model's loss is defined by 
 ```
+    def _compute_hard_label_loss(
+        self,
+        output: dict,
+        label: torch.Tensor,
+    ):
+        loss = 0
+        for per_output in output.values():
+            weight = per_output[WEIGHT] if WEIGHT in per_output else 1
+            loss += (
+                self.hard_label_loss_func(
+                    input=per_output[LOGITS].squeeze(dim=1),
+                    target=label,
+                )
+                * weight
+            )
+
+        return loss
+
+    def _compute_soft_label_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_logits = student_output[self.student_model.prefix][LOGITS].squeeze(dim=1)
+        soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
+        student_logits = student_logits / self.temperature
+        soft_labels = soft_labels / self.temperature
+
+        if isinstance(self.soft_label_loss_func, nn.CrossEntropyLoss):
+            soft_labels = F.softmax(soft_labels, dim=-1)
+
+        loss = self.soft_label_loss_func(
+            input=student_logits,
+            target=soft_labels,
+        )
+        return loss
+
+    def _compute_intermediate_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
+
+        loss = self.intermediate_loss_func(
+            input=student_result,
+            target=teacher_result,
+        )
+        return loss
+
     def _compute_loss(
         self,
         student_output: dict,
@@ -50,6 +105,14 @@ The student model's loss is defined by
             teacher_output=teacher_output,
         )
         loss += soft_label_loss * self.soft_label_weight
+
+        intermediate_loss = self._compute_intermediate_loss(
+            student_output=student_output,
+            teacher_output=teacher_output,
+        )
+        loss += intermediate_loss * self.intermediate_loss_weight
+
+        return loss
 ```
 
 ### 1.4 Performance
@@ -58,21 +121,22 @@ glue_task = qnli
 Teacher Model = google/bert_uncased_L-12_H-768_A-12
 Student Model = google/bert_uncased_L-6_H-768_A-12
 seed = 123
-max_epoch = 8
-time_limit = 3600
+max_epoch = 12
 metric = "accuracy"
+temperature = 5
+hard_label_weight = 0.1
+soft_label_weight = 1
 ```
 
 `python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 --student_model google/bert_uncased_L-6_H-768_A-12 --seed 123 --max_epoch 8 --hard_label_weight 0.5 --soft_label_weight 5`
 
-temperature | hard_label_weight | soft_label_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio | Speed Up 
-------------|-------------------|-------------------|-------------------|----------------------|-------------------|--------------------|----
-5           | 0.2               | 50                | 0.91067           | 0.89420              | 0.90244           | 0.50               | 1.08x
-3           | 0.4               | 10                | 0.91067           | 0.89420              | 0.90189           | 0.47               | 1.08x
-5           | 0.5               | 5                 | 0.91067           | 0.89420              | 0.90646           | 0.74               | 1.08x
+intermediate_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio | Speed Up 
+----------------------|-------------------|----------------------|-------------------|--------------------|----
+0                     | 0.91726           | 0.89401              | 0.89713           | 0.13               | 3.52x
+0.01                  | 0.91726           | 0.89401              | 0.90298           | 0.39               | 3.52x
+0.1                   | 0.91726           | 0.89401              | 0.89365           | -0.02              | 3.52x
 
 ### 1.5 TODOs for Distillation
-- Add intermediate distillation.
 - Find a better hyperparameter setting (or autotuning) for distillation.
 
 ### Reference
