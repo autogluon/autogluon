@@ -43,19 +43,19 @@ def main(args):
         valid_df = dataset["validation"].to_pandas()
 
     teacher_predictor_name = f"{args.glue_task}-{args.teacher_model.replace('/', '-')}"
-    teacher_predictor_path = os.path.join(args.finetuned_model_cache_folder, teacher_predictor_name)
+    teacher_predictor_path = os.path.join(args.save_path, teacher_predictor_name)
     nodistill_predictor_name = f"{args.glue_task}-{args.student_model.replace('/', '-')}"
-    nodistill_predictor_path = os.path.join(args.finetuned_model_cache_folder, nodistill_predictor_name)
+    nodistill_predictor_path = os.path.join(args.save_path, nodistill_predictor_name)
 
     ### Train and evaluate the teacher model
-    retrain_teacher = args.retrain
+    resume_teacher = args.resume
     try:
         teacher_predictor = MultiModalPredictor.load(teacher_predictor_path)
         print("Using pretrained teacher model: %s" % teacher_predictor_path)
     except:
-        retrain_teacher = True
+        resume_teacher = True
         print("No pretrained model at: %s" % teacher_predictor_path)
-    if retrain_teacher:
+    if resume_teacher:
         teacher_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
         teacher_predictor.fit(
             train_df,
@@ -74,14 +74,14 @@ def main(args):
     teacher_usedtime = time() - start
 
     ### Train and evaluate a smaller pretrained model
-    retrain_nodistill = args.retrain
+    resume_nodistill = args.resume
     try:
         nodistill_predictor = MultiModalPredictor.load(nodistill_predictor_path)
         print("Using pretrained nodistill model: %s" % nodistill_predictor_path)
     except:
         print("No pretrained model at: %s" % nodistill_predictor_path)
-        retrain_nodistill = True
-    if retrain_nodistill:
+        resume_nodistill = True
+    if resume_nodistill:
         nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
         nodistill_predictor.fit(
             train_df,
@@ -168,11 +168,11 @@ if __name__ == "__main__":
     parser.add_argument("--intermediate_loss_weight", default=0.01, type=float)
     parser.add_argument("--intermediate_loss_type", default="mse", type=str)
     parser.add_argument(
-        "--finetuned_model_cache_folder",
-        default="/media/code/autogluon/examples/automm/distillation/AutogluonModels/cache_finetuned",
+        "--save_path",
+        default="./AutogluonModels/cache_finetuned",
         type=str,
     )
-    parser.add_argument("--retrain", action="store_true")
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
 
     main(args)
