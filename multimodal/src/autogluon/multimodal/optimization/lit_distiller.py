@@ -21,6 +21,10 @@ from ..constants import (
     WEIGHT,
     AUTOMM,
 )
+from .RKDLoss import (
+    RKDDistance,
+    RKDAngle
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -181,6 +185,9 @@ class DistillerLitModule(pl.LightningModule):
             else nn.Identity()
         )
 
+        self.rkd_distance = RKDDistance()
+        self.rkd_angle = RKDAngle()
+
     def _compute_hard_label_loss(
         self,
         output: dict,
@@ -234,6 +241,39 @@ class DistillerLitModule(pl.LightningModule):
         )
         return loss
 
+    def _compute_rkd_distance_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
+
+        teacher_result = self.intermediate_adaptor(teacher_result)
+
+        loss = self.rkd_distance(
+            student=student_result,
+            teacher=teacher_result,
+        )
+        return loss
+
+
+    def _compute_rkd_angle_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
+
+        teacher_result = self.intermediate_adaptor(teacher_result)
+
+        loss = self.rkd_angle(
+            student=student_result,
+            teacher=teacher_result,
+        )
+        return loss
+
     def _compute_loss(
         self,
         student_output: dict,
@@ -258,6 +298,18 @@ class DistillerLitModule(pl.LightningModule):
             teacher_output=teacher_output,
         )
         loss += intermediate_loss * self.intermediate_loss_weight
+
+        rkd_distance_loss = self._compute_rkd_distance_loss(
+            student_output=student_output,
+            teacher_output=teacher_output,
+        )
+        loss += rkd_distance_loss * 0.1 #TODO: hardcode only for test
+
+        rkd_angle_loss = self._compute_rkd_angle_loss(
+            student_output=student_output,
+            teacher_output=teacher_output,
+        )
+        loss += rkd_angle_loss * 0.1 #TODO: hardcode only for test
 
         return loss
 

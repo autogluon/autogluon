@@ -799,3 +799,16 @@ def compute_probability(
         prob = 1 - prob
 
     return prob
+
+# Reference: https://github.com/lenscloth/RKD/blob/0a6c3c0c190722d428322bf71703c0ae86c25242/metric/utils.py#L6
+def pdist(e, squared=False, eps=1e-12):
+    e_square = e.pow(2).sum(dim=1)
+    prod = e @ e.t()
+    res = (e_square.unsqueeze(1) + e_square.unsqueeze(0) - 2 * prod).clamp(min=eps)
+
+    if not squared:
+        res = res.sqrt()
+
+    res = res.clone()
+    res[range(len(e)), range(len(e))] = 0
+    return res

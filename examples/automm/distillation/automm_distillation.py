@@ -53,9 +53,9 @@ def main(args):
         teacher_predictor = MultiModalPredictor.load(teacher_predictor_path)
         print("Using pretrained teacher model: %s" % teacher_predictor_path)
     except:
-        resume_teacher = True
+        resume_teacher = False
         print("No pretrained model at: %s" % teacher_predictor_path)
-    if resume_teacher:
+    if not resume_teacher:
         teacher_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
         teacher_predictor.fit(
             train_df,
@@ -80,8 +80,8 @@ def main(args):
         print("Using pretrained nodistill model: %s" % nodistill_predictor_path)
     except:
         print("No pretrained model at: %s" % nodistill_predictor_path)
-        resume_nodistill = True
-    if resume_nodistill:
+        resume_nodistill = False
+    if not resume_nodistill:
         nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
         nodistill_predictor.fit(
             train_df,
@@ -154,10 +154,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--glue_task", default="qnli", type=str)
-    parser.add_argument("--teacher_model", default="microsoft/mdeberta-v3-base", type=str)
-    parser.add_argument(
-        "--student_model", default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", type=str
-    )
+    parser.add_argument("--teacher_model", default="google/bert_uncased_L-12_H-768_A-12", type=str)
+    parser.add_argument("--student_model", default="google/bert_uncased_L-6_H-768_A-12", type=str)
     parser.add_argument("--seed", default=123, type=int)
     parser.add_argument("--max_epochs", default=1000, type=int)
     parser.add_argument("--time_limit", default=None, type=int)
