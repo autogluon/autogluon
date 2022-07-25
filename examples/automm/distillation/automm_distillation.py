@@ -10,7 +10,10 @@ GLUE_METRICS = {
     "qqp": {"val": "accuracy", "eval": ["accuracy", "f1"]},
     "qnli": {"val": "accuracy", "eval": ["accuracy"]},
     "sst2": {"val": "accuracy", "eval": ["accuracy"]},
-    "stsb": {"val": "pearsonr", "eval": ["pearsonr", "spearmanr"]},  # Current default soft label loss func is for classification, should automatically select loss_func
+    "stsb": {
+        "val": "pearsonr",
+        "eval": ["pearsonr", "spearmanr"],
+    },  # Current default soft label loss func is for classification, should automatically select loss_func
     "mrpc": {"val": "accuracy", "eval": ["accuracy"]},
     "rte": {"val": "accuracy", "eval": ["accuracy"]},
     # "cola": "", #phi coeffiecient is not implemented
@@ -18,7 +21,7 @@ GLUE_METRICS = {
 
 
 def main(args):
-    assert args.glue_task in (list(GLUE_METRICS.keys()) + ["mnlim", "mnlimm"]), 'Unsupported dataset name.'
+    assert args.glue_task in (list(GLUE_METRICS.keys()) + ["mnlim", "mnlimm"]), "Unsupported dataset name."
 
     ### Dataset Loading
     if args.glue_task == "mnlimm":
@@ -97,6 +100,7 @@ def main(args):
 
     ### Distill and evaluate a student model
     from autogluon.multimodal.constants import MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER
+
     config = {
         MODEL: f"fusion_mlp_image_text_tabular",
         DATA: "default",
@@ -119,7 +123,7 @@ def main(args):
             "distiller.soft_label_weight": args.soft_label_weight,
             "distiller.intermediate_loss_weight": args.intermediate_loss_weight,
             "distiller.intermediate_loss_type": args.intermediate_loss_type,
-            'model.hf_text.text_trivial_aug_maxscale': 0.0,
+            "model.hf_text.text_trivial_aug_maxscale": 0.0,
         },
         teacher_predictor=teacher_predictor,
         time_limit=args.time_limit,
@@ -140,10 +144,7 @@ def main(args):
         print("Student Model's %s: %.6f" % (k, student_result[k]))
         print(
             "Distillation Ratio (the fraction of the teacher's performance achieved by the student): %.6f"
-            % (
-                float(student_result[k] - nodistill_result[k])
-                / float(teacher_result[k] - nodistill_result[k])
-            )
+            % (float(student_result[k] - nodistill_result[k]) / float(teacher_result[k] - nodistill_result[k]))
         )
     print("Teacher Model's time: %.6f" % teacher_usedtime)
     print("Student Model's time: %.6f" % student_usedtime)
@@ -153,8 +154,10 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--glue_task", default="qnli", type=str)
-    parser.add_argument("--teacher_model", default="google/bert_uncased_L-12_H-768_A-12", type=str)
-    parser.add_argument("--student_model", default="google/bert_uncased_L-6_H-768_A-12", type=str)
+    parser.add_argument("--teacher_model", default="microsoft/mdeberta-v3-base", type=str)
+    parser.add_argument(
+        "--student_model", default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", type=str
+    )
     parser.add_argument("--seed", default=123, type=int)
     parser.add_argument("--max_epochs", default=1000, type=int)
     parser.add_argument("--time_limit", default=None, type=int)
@@ -164,7 +167,11 @@ if __name__ == "__main__":
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
     parser.add_argument("--intermediate_loss_weight", default=0.01, type=float)
     parser.add_argument("--intermediate_loss_type", default="mse", type=str)
-    parser.add_argument("--finetuned_model_cache_folder", default="/media/code/autogluon/examples/automm/distillation/AutogluonModels/cache_finetuned", type=str)
+    parser.add_argument(
+        "--finetuned_model_cache_folder",
+        default="/media/code/autogluon/examples/automm/distillation/AutogluonModels/cache_finetuned",
+        type=str,
+    )
     parser.add_argument("--retrain", action="store_true")
     args = parser.parse_args()
 

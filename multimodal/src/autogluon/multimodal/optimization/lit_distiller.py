@@ -175,7 +175,11 @@ class DistillerLitModule(pl.LightningModule):
         # Adapt student's intermediate feature to teacher's
         teacher_model_dim = self.teacher_model.text_feature_dim
         student_model_dim = self.student_model.text_feature_dim
-        self.intermediate_adaptor = nn.Linear(teacher_model_dim, student_model_dim) if teacher_model_dim != student_model_dim else nn.Identity()
+        self.intermediate_adaptor = (
+            nn.Linear(teacher_model_dim, student_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
 
     def _compute_hard_label_loss(
         self,
