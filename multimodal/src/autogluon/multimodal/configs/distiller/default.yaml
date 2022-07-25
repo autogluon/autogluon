@@ -1,8 +1,8 @@
 distiller:
   soft_label_loss_type: ""
-  embedding_loss_type: "mean_square_error"
+  intermediate_loss_type: "mse"
   temperature: 5.
   hard_label_weight: 0.2
   soft_label_weight: 50.
-  embedding_loss_weight: 0.
+  intermediate_loss_weight: 0.01
   matches:

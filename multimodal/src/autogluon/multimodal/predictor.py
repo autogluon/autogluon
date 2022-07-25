@@ -652,8 +652,8 @@ class MultiModalPredictor:
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
-        embedding_loss_func
-            The loss function using minimize distance between embedding of teacher and student.
+        intermediate_loss_func
+            The loss function using minimize distance between intermediate of teacher and student.
         df_preprocessor
             The teacher predictor's dataframe preprocessor.
         data_processors
@@ -693,12 +693,12 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
-        if self._config.distiller.embedding_loss_type == "cosine_distance":
-            embedding_loss_func = nn.CosineEmbeddingLoss()
-        elif self._config.distiller.embedding_loss_type == "mean_square_error":
-            embedding_loss_func = nn.MSELoss()
+        if self._config.distiller.intermediate_loss_type == "cos":
+            intermediate_loss_func = nn.CosineEmbeddingLoss()
+        elif self._config.distiller.intermediate_loss_type == "mse":
+            intermediate_loss_func = nn.MSELoss()
         else:
-            raise ValueError(f"Unknown embedding_loss_type: {self._config.distiller.embedding_loss_type}")
+            raise ValueError(f"Unknown intermediate_loss_type: {self._config.distiller.intermediate_loss_type}")
 
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
@@ -733,7 +733,7 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
-            embedding_loss_func,
+            intermediate_loss_func,
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
@@ -872,7 +872,7 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
-                embedding_loss_func,
+                intermediate_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = self._setup_distillation(
@@ -884,7 +884,7 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
-                embedding_loss_func,
+                intermediate_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = (None, None, None, None, None, None, None)
@@ -931,10 +931,10 @@ class MultiModalPredictor:
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
-                embedding_loss_weight=config.distiller.embedding_loss_weight,
+                intermediate_loss_weight=config.distiller.intermediate_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
-                embedding_loss_func=embedding_loss_func,
+                intermediate_loss_func=intermediate_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
