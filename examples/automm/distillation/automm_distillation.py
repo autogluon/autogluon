@@ -166,8 +166,8 @@ if __name__ == "__main__":
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
     parser.add_argument("--intermediate_loss_weight", default=0.01, type=float)
-    parser.add_argument("--rkd_distance_loss_weight", default=0.01, type=float)
-    parser.add_argument("--rkd_angle_loss_weight", default=0.01, type=float)
+    parser.add_argument("--rkd_distance_loss_weight", default=0., type=float)
+    parser.add_argument("--rkd_angle_loss_weight", default=0., type=float)
     parser.add_argument("--intermediate_loss_type", default="mse", type=str)
     parser.add_argument(
         "--save_path",

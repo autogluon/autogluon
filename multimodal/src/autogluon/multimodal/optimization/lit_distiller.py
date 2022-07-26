@@ -182,21 +182,15 @@ class DistillerLitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
 
         # Adapt student's intermediate feature to teacher's
-        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(
-            self.teacher_model, MultimodalFusionTransformer
-        ):
-            pass  # skip fusion model for now
-        else:
-            teacher_model_dim = self.teacher_model.out_features
-            student_model_dim = self.student_model.out_features
-            self.intermediate_adaptor = (
-                nn.Linear(teacher_model_dim, student_model_dim)
-                if teacher_model_dim != student_model_dim
-                else nn.Identity()
-            )
-
-            self.rkd_distance = RKDDistance()
-            self.rkd_angle = RKDAngle()
+        teacher_model_dim = self.teacher_model.out_features
+        student_model_dim = self.student_model.out_features
+        self.intermediate_adaptor = (
+            nn.Linear(student_model_dim, teacher_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
+        self.rkd_distance = RKDDistance()
+        self.rkd_angle = RKDAngle()
 
     def _compute_hard_label_loss(
         self,
@@ -243,7 +237,7 @@ class DistillerLitModule(pl.LightningModule):
         student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
         teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
 
-        teacher_result = self.intermediate_adaptor(teacher_result)
+        student_result = self.intermediate_adaptor(student_result)
 
         loss = self.intermediate_loss_func(
             input=student_result,
