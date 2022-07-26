@@ -560,7 +560,7 @@ def apply_layerwise_lr_decay(
         group_name = "layer_%d_%s" % (layer_id, group_name)
 
         if group_name not in parameter_group_names:
-            scale = lr_decay**layer_id
+            scale = lr_decay ** layer_id
             parameter_group_names[group_name] = {
                 "weight_decay": this_weight_decay,
                 "params": [],
@@ -800,15 +800,32 @@ def compute_probability(
 
     return prob
 
+
 # Reference: https://github.com/lenscloth/RKD/blob/0a6c3c0c190722d428322bf71703c0ae86c25242/metric/utils.py#L6
-def pdist(e, squared=False, eps=1e-12):
-    e_square = e.pow(2).sum(dim=1)
-    prod = e @ e.t()
-    res = (e_square.unsqueeze(1) + e_square.unsqueeze(0) - 2 * prod).clamp(min=eps)
+def pdist(embeddings: Optional[torch.Tensor], squared: Optional[bool] = False, eps: Optional[float] = 1e-12):
+    """
+    Compute pairwise Euclidean distances between embeddings in n-dimensional space.
+
+    Parameters
+    ----------
+    embeddings
+        The embeddings to compute pairwise distance between.
+    squared
+        If the result is square of Euclidean distance.
+    eps
+        Min value of each entry.
+
+    Returns
+    -------
+    Pairwise Euclidean distances.
+    """
+    embeddings_square = embeddings.pow(2).sum(dim=1)
+    prod = embeddings @ embeddings.t()
+    res = (embeddings_square.unsqueeze(1) + embeddings_square.unsqueeze(0) - 2 * prod).clamp(min=eps)
 
     if not squared:
         res = res.sqrt()
 
     res = res.clone()
-    res[range(len(e)), range(len(e))] = 0
+    res[range(len(embeddings_square)), range(len(embeddings_square))] = 0
     return res
