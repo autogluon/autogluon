@@ -25,6 +25,10 @@ from .RKDLoss import (
     RKDDistance,
     RKDAngle
 )
+from ..models.fusion import (
+    MultimodalFusionMLP,
+    MultimodalFusionTransformer,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -47,6 +51,8 @@ class DistillerLitModule(pl.LightningModule):
         soft_label_weight: float,
         temperature: float,
         intermediate_loss_weight: float,
+        rkd_distance_loss_weight: float,
+        rkd_angle_loss_weight: float,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
         lr_schedule: Optional[str] = None,
@@ -166,6 +172,8 @@ class DistillerLitModule(pl.LightningModule):
         self.hard_label_weight = hard_label_weight
         self.soft_label_weight = soft_label_weight
         self.intermediate_loss_weight = intermediate_loss_weight
+        self.rkd_distance_loss_weight = rkd_distance_loss_weight
+        self.rkd_angle_loss_weight = rkd_angle_loss_weight
         self.hard_label_loss_func = hard_label_loss_func
         self.soft_label_loss_func = soft_label_loss_func
         self.intermediate_loss_func = intermediate_loss_func
@@ -177,16 +185,19 @@ class DistillerLitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
 
         # Adapt student's intermediate feature to teacher's
-        teacher_model_dim = self.teacher_model.text_feature_dim
-        student_model_dim = self.student_model.text_feature_dim
-        self.intermediate_adaptor = (
-            nn.Linear(teacher_model_dim, student_model_dim)
-            if teacher_model_dim != student_model_dim
-            else nn.Identity()
-        )
+        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(self.teacher_model, MultimodalFusionTransformer):
+            pass # skip fusion model for now
+        else:
+            teacher_model_dim = self.teacher_model.out_features
+            student_model_dim = self.student_model.out_features
+            self.intermediate_adaptor = (
+                nn.Linear(teacher_model_dim, student_model_dim)
+                if teacher_model_dim != student_model_dim
+                else nn.Identity()
+            )
 
-        self.rkd_distance = RKDDistance()
-        self.rkd_angle = RKDAngle()
+            self.rkd_distance = RKDDistance()
+            self.rkd_angle = RKDAngle()
 
     def _compute_hard_label_loss(
         self,
@@ -293,23 +304,26 @@ class DistillerLitModule(pl.LightningModule):
         )
         loss += soft_label_loss * self.soft_label_weight
 
-        intermediate_loss = self._compute_intermediate_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
-        loss += intermediate_loss * self.intermediate_loss_weight
+        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(self.teacher_model, MultimodalFusionTransformer):
+            pass # skip fusion model for now
+        else:
+            intermediate_loss = self._compute_intermediate_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += intermediate_loss * self.intermediate_loss_weight
 
-        rkd_distance_loss = self._compute_rkd_distance_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
-        loss += rkd_distance_loss * 0.1 #TODO: hardcode only for test
+            rkd_distance_loss = self._compute_rkd_distance_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += rkd_distance_loss * self.rkd_distance_loss_weight
 
-        rkd_angle_loss = self._compute_rkd_angle_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
-        loss += rkd_angle_loss * 0.1 #TODO: hardcode only for test
+            rkd_angle_loss = self._compute_rkd_angle_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += rkd_angle_loss * self.rkd_angle_loss_weight
 
         return loss
 

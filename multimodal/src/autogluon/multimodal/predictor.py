@@ -932,6 +932,8 @@ class MultiModalPredictor:
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
                 intermediate_loss_weight=config.distiller.intermediate_loss_weight,
+                rkd_distance_loss_weight=config.distiller.rkd_distance_loss_weight,
+                rkd_angle_loss_weight=config.distiller.rkd_angle_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
                 intermediate_loss_func=intermediate_loss_func,

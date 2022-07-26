@@ -98,7 +98,7 @@ class HFAutoModelForTextPrediction(nn.Module):
 
         self.out_features = self.model.config.hidden_size
 
-        self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(self.out_features, num_classes) if num_classes else nn.Identity()
         self.head.apply(init_weights)
 
         self.prefix = prefix

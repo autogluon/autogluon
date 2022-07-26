@@ -2,7 +2,9 @@ distiller:
   soft_label_loss_type: ""
   intermediate_loss_type: "mse"
   temperature: 5.
-  hard_label_weight: 0.2
-  soft_label_weight: 50.
+  hard_label_weight: 0.1
+  soft_label_weight: 1.
   intermediate_loss_weight: 0.01
+  rkd_distance_loss_weight: 0.01
+  rkd_angle_loss_weight: 0.01
   matches:
