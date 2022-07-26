@@ -2,7 +2,7 @@ import logging
 import pprint
 import time
 from pathlib import Path
-from typing import Optional, Type, Any, Union, Dict, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
@@ -111,8 +111,7 @@ class TimeSeriesPredictor:
 
         if target is not None and kwargs.get("label") is not None:
             raise ValueError(
-                "Both `label` and `target` are specified. Please specify at most one of these. "
-                "arguments."
+                "Both `label` and `target` are specified. Please specify at most one of these. " "arguments."
             )
         self.target = target or kwargs.get("label", "target")
 
@@ -211,18 +210,12 @@ class TimeSeriesPredictor:
         """
         time_start = time.time()
         if self._learner.is_fit:
-            raise AssertionError(
-                "Predictor is already fit! To fit additional models create a new `Predictor`."
-            )
+            raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
         if self.target not in train_data.columns:
-            raise ValueError(
-                f"Target column `{self.target}` not found in the training data set."
-            )
+            raise ValueError(f"Target column `{self.target}` not found in the training data set.")
         if tuning_data is not None and self.target not in tuning_data.columns:
-            raise ValueError(
-                f"Target column `{self.target}` not found in the tuning data set."
-            )
+            raise ValueError(f"Target column `{self.target}` not found in the tuning data set.")
         if hyperparameters is None:
             hyperparameters = "default"
 
@@ -269,13 +262,9 @@ class TimeSeriesPredictor:
                 f"time steps out to use as validation set.",
             )
             tuning_data = train_data
-            train_data = train_data.slice_by_timestep(
-                slice(None, -self.prediction_length)
-            )
+            train_data = train_data.slice_by_timestep(slice(None, -self.prediction_length))
 
-        time_left = (
-            None if time_limit is None else time_limit - (time.time() - time_start)
-        )
+        time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
             val_data=tuning_data,
@@ -322,17 +311,11 @@ class TimeSeriesPredictor:
         )
 
         if scheduler_params["num_trials"] == 1:
-            logger.warning(
-                "Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. "
-            )
+            logger.warning("Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. ")
             return None, None
 
         scheduler_ngpus = scheduler_params["resource"].get("num_gpus", 0)
-        if (
-            scheduler_ngpus is not None
-            and isinstance(scheduler_ngpus, int)
-            and scheduler_ngpus > 1
-        ):
+        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
             logger.warning(
                 f"Warning: TimeSeriesPredictor currently doesn't use >1 GPU per training run. "
                 f"Detected {scheduler_ngpus} GPUs."
@@ -469,7 +452,7 @@ class TimeSeriesPredictor:
         """
         leaderboard = self._learner.leaderboard(data)
         if not silent:
-            with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+            with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
 
@@ -524,6 +507,4 @@ class TimeSeriesPredictor:
 
     # TODO
     def refit_full(self, models="all"):
-        raise NotImplementedError(
-            "Refitting logic not yet implemented in autogluon.timeseries"
-        )
+        raise NotImplementedError("Refitting logic not yet implemented in autogluon.timeseries")
