@@ -693,7 +693,7 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
-        if self._config.distiller.intermediate_loss_type == "cos":
+        if self._config.distiller.intermediate_loss_type == "cosine":
             intermediate_loss_func = nn.CosineEmbeddingLoss()
         elif self._config.distiller.intermediate_loss_type == "mse":
             intermediate_loss_func = nn.MSELoss()

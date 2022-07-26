@@ -828,4 +828,5 @@ def pdist(embeddings: Optional[torch.Tensor], squared: Optional[bool] = False, e
 
     res = res.clone()
     res[range(len(embeddings_square)), range(len(embeddings_square))] = 0
+
     return res
