@@ -5,6 +5,6 @@ distiller:
   hard_label_weight: 0.1
   soft_label_weight: 1.
   intermediate_loss_weight: 0.01
-  rkd_distance_loss_weight: 0.01
-  rkd_angle_loss_weight: 0.01
+  rkd_distance_loss_weight: 0.
+  rkd_angle_loss_weight: 0.
   matches:
