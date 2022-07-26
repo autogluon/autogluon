@@ -130,11 +130,11 @@ soft_label_weight = 1
 
 `python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 --student_model google/bert_uncased_L-6_H-768_A-12 --seed 123 --max_epoch 8 --hard_label_weight 0.5 --soft_label_weight 5`
 
-intermediate_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio | Speed Up 
-----------------------|-------------------|----------------------|-------------------|--------------------|----
-0                     | 0.91726           | 0.89401              | 0.89713           | 0.13               | 3.52x
-0.01                  | 0.91726           | 0.89401              | 0.90298           | 0.39               | 3.52x
-0.1                   | 0.91726           | 0.89401              | 0.89365           | -0.02              | 3.52x
+intermediate_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio [2] | Speed Up 
+----------------------|-------------------|----------------------|-------------------|------------------------|----
+0                     | 0.91726           | 0.89401              | 0.89713           | 0.13                   | 3.52x
+0.01                  | 0.91726           | 0.89401              | 0.90298           | 0.39                   | 3.52x
+0.1                   | 0.91726           | 0.89401              | 0.89365           | -0.02                  | 3.52x
 
 ### 1.5 TODOs for Distillation
 - Find a better hyperparameter setting (or autotuning) for distillation.
@@ -143,3 +143,7 @@ intermediate_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Mo
 [1] Wang A, Singh A, Michael J, et al. 
 GLUE: A multi-task benchmark and analysis platform for natural language understanding[J]. 
 arXiv preprint arXiv:1804.07461, 2018.
+
+[2] H He, X Shi, J Mueller, S Zha, M Li, G Karypis
+[Towards Automated Distillation: A Systematic Study of Knowledge Distillation in Natural Language Processing.](https://automl.cc/wp-content/uploads/2022/07/towards_automated_distillation.pdf)
+International Conference on Automated Machine Learning: Late-Breaking Workshop, 2022 
