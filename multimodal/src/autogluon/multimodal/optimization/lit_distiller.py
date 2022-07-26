@@ -21,10 +21,7 @@ from ..constants import (
     WEIGHT,
     AUTOMM,
 )
-from .RKDLoss import (
-    RKDDistance,
-    RKDAngle
-)
+from .RKDLoss import RKDDistance, RKDAngle
 from ..models.fusion import (
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
@@ -185,8 +182,10 @@ class DistillerLitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
 
         # Adapt student's intermediate feature to teacher's
-        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(self.teacher_model, MultimodalFusionTransformer):
-            pass # skip fusion model for now
+        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(
+            self.teacher_model, MultimodalFusionTransformer
+        ):
+            pass  # skip fusion model for now
         else:
             teacher_model_dim = self.teacher_model.out_features
             student_model_dim = self.student_model.out_features
@@ -268,7 +267,6 @@ class DistillerLitModule(pl.LightningModule):
         )
         return loss
 
-
     def _compute_rkd_angle_loss(
         self,
         student_output: dict,
@@ -304,8 +302,10 @@ class DistillerLitModule(pl.LightningModule):
         )
         loss += soft_label_loss * self.soft_label_weight
 
-        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(self.teacher_model, MultimodalFusionTransformer):
-            pass # skip fusion model for now
+        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(
+            self.teacher_model, MultimodalFusionTransformer
+        ):
+            pass  # skip fusion model for now
         else:
             intermediate_loss = self._compute_intermediate_loss(
                 student_output=student_output,
