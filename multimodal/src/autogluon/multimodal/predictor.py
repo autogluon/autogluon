@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 import os
 import numpy as np
 import json
@@ -991,7 +992,11 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
+        num_gpus = (
+            math.floor(config.env.num_gpus)
+            if isinstance(config.env.num_gpus, (int, float))
+            else len(config.env.num_gpus)
+        )
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
 
@@ -1236,7 +1241,9 @@ class MultiModalPredictor:
         )
 
         num_gpus = (
-            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
+            math.floor(self._config.env.num_gpus)
+            if isinstance(self._config.env.num_gpus, (int, float))
+            else len(self._config.env.num_gpus)
         )
         if num_gpus < 0:
             num_gpus = torch.cuda.device_count()
