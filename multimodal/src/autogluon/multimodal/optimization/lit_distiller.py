@@ -280,28 +280,11 @@ class DistillerLitModule(pl.LightningModule):
         )
         loss += soft_label_loss * self.soft_label_weight
 
-        if isinstance(self.teacher_model, MultimodalFusionMLP) or isinstance(
-            self.teacher_model, MultimodalFusionTransformer
-        ):
-            pass  # skip fusion model for now
-        else:
-            output_feature_loss = self._compute_output_feature_loss(
-                student_output=student_output,
-                teacher_output=teacher_output,
-            )
-            loss += output_feature_loss * self.output_feature_loss_weight
-
-            rkd_loss = self._compute_rkd_loss(
-                student_output=student_output,
-                teacher_output=teacher_output,
-            )
-            loss += rkd_loss
-
-            rkd_angle_loss = self._compute_rkd_angle_loss(
-                student_output=student_output,
-                teacher_output=teacher_output,
-            )
-            loss += rkd_angle_loss * self.rkd_angle_loss_weight
+        rkd_loss = self._compute_rkd_loss(
+            student_output=student_output,
+            teacher_output=teacher_output,
+        )
+        loss += rkd_loss
 
         return loss
 
