@@ -913,7 +913,7 @@ class MultiModalPredictor:
                 rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
