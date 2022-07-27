@@ -98,6 +98,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
+          python3 -m pip install ray_lightning==0.2.0  # TODO Change this line once we support ray_lightning 0.3.0
           python3 -m pip install --upgrade -e common/[tests]
           python3 -m pip install --upgrade -e core/[all,tests]
           env
