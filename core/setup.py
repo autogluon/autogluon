@@ -49,7 +49,7 @@ extras_require = {
 
 tests_require = [
     'pytest',
-    'ray_lightning>=0.2.0,<0.3.0',  # test ray lightning resource calculation
+    # TODO(Re-enable ray_lightning once it released 0.3.0) 'ray_lightning>=0.2.0,<0.3.0'
 ]
 
 all_requires = []
