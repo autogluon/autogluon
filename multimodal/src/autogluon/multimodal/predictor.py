@@ -716,7 +716,9 @@ class MultiModalPredictor:
             else nn.Identity()
         )
 
-        rkd_loss_func = RKDLoss(self._config.distiller.rkd_distance_loss_weight, self._config.distiller.rkd_angle_loss_weight)
+        rkd_loss_func = RKDLoss(
+            self._config.distiller.rkd_distance_loss_weight, self._config.distiller.rkd_angle_loss_weight
+        )
 
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
