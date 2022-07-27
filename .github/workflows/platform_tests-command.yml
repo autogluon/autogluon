@@ -64,10 +64,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          env
-          cd common/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+         chmod +x ./.github/workflow_scripts/test_common.sh && ./.github/workflow_scripts/test_common.sh
 
   core:
     needs: setup
@@ -98,12 +95,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install ray_lightning==0.2.0  # TODO Change this line once we support ray_lightning 0.3.0
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e core/[all,tests]
-          env
-          cd core/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          chmod +x ./.github/workflow_scripts/test_core.sh && ./.github/workflow_scripts/test_core.sh
 
   features:
     needs: setup
@@ -134,11 +126,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e features/
-          env
-          cd features/
-          python3 -m pytest --junitxml=results.xml --runslow tests
+          chmod +x ./.github/workflow_scripts/test_features.sh && ./.github/workflow_scripts/test_features.sh
 
   tabular:
     needs: setup
@@ -178,13 +166,7 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e core/[all]
-          python3 -m pip install --upgrade -e features/
-          python3 -m pip install --upgrade -e tabular/[all,tests]
-          env
-          cd tabular/
-          python3 -m pytest --junitxml=results.xml --runslow -m "not gpu" tests
+          chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh "-m not gpu"
 
   install:
     needs: setup
@@ -215,12 +197,4 @@ jobs:
       - name: unit-test
         shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade -e common/[tests]
-          python3 -m pip install --upgrade -e core/[all]
-          python3 -m pip install --upgrade -e features/
-          python3 -m pip install --upgrade -e tabular/[all,tests]
-          python3 -m pip install --upgrade -e multimodal/
-          python3 -m pip install --upgrade -e text/
-          python3 -m pip install --upgrade -e vision/
-          python3 -m pip install --upgrade -e timeseries/
-          python3 -m pip install --upgrade -e autogluon/
+          chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
