@@ -153,6 +153,9 @@ class DistillerLitModule(pl.LightningModule):
                 "matches",
                 "critics",
                 "baseline_funcs",
+                "output_feature_adaptor",
+                "output_feature_loss_func",
+                "rkd_loss_func",
             ]
         )
         if matches:

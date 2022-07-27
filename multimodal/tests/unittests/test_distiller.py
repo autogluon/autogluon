@@ -102,4 +102,5 @@ def test_distillation():
         time_limit=30,
         save_path=student_save_path,
     )
+
     verify_predictor_save_load(predictor, dataset.test_df)

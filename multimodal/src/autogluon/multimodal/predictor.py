@@ -162,7 +162,7 @@ class MultiModalPredictor:
                             "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
                         }
         path
-            Path to directory where models and output_feature outputs should be saved.
+            Path to directory where models and intermediate outputs should be saved.
             If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
             will be created in the working directory to store all models.
             Note: To call `fit()` twice and save all results of each fit,
@@ -304,7 +304,7 @@ class MultiModalPredictor:
             How long `fit()` should run for (wall clock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
         save_path
-            Path to directory where models and output_feature outputs should be saved.
+            Path to directory where models and intermediate outputs should be saved.
         hyperparameters
             This is to override some default configurations.
             For example, changing the text and image backbones can be done by formatting:
