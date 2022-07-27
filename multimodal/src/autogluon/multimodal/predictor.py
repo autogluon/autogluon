@@ -104,6 +104,8 @@ from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 
+from .optimization.rkd_loss import RKDLoss
+
 from . import version as ag_version
 
 logger = logging.getLogger(AUTOMM)
@@ -652,8 +654,12 @@ class MultiModalPredictor:
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
+        output_feature_adaptor
+            The adaptor used to adapt student output feature to the shape of teacher's.
         output_feature_loss_func
             The loss function using minimize distance between output_feature of teacher and student.
+        rkd_loss_func
+            The loss function using rkd distance and angle loss between output_feature of teacher and student.
         df_preprocessor
             The teacher predictor's dataframe preprocessor.
         data_processors
@@ -700,6 +706,18 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown output_feature_loss_type: {self._config.distiller.output_feature_loss_type}")
 
+        # Adapt student's output_feature feature to teacher's
+        # Refer to FitNet: https://arxiv.org/abs/1412.6550
+        teacher_model_dim = teacher_predictor._model.out_features
+        student_model_dim = self._model.out_features
+        output_feature_adaptor = (
+            nn.Linear(student_model_dim, teacher_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
+
+        rkd_loss_func = RKDLoss(self._config.distiller.rkd_distance_loss_weight, self._config.distiller.rkd_angle_loss_weight)
+
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
@@ -733,7 +751,9 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            output_feature_adaptor,
             output_feature_loss_func,
+            rkd_loss_func,
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
@@ -872,7 +892,9 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                output_feature_adaptor,
                 output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = self._setup_distillation(
@@ -884,10 +906,12 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                output_feature_adaptor,
                 output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -932,11 +956,11 @@ class MultiModalPredictor:
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
                 output_feature_loss_weight=config.distiller.output_feature_loss_weight,
-                rkd_distance_loss_weight=config.distiller.rkd_distance_loss_weight,
-                rkd_angle_loss_weight=config.distiller.rkd_angle_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                output_feature_adaptor=output_feature_adaptor,
                 output_feature_loss_func=output_feature_loss_func,
+                rkd_loss_func=rkd_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )

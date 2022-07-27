@@ -22,10 +22,6 @@ from ..constants import (
     AUTOMM,
 )
 from .rkd_loss import RKDLoss
-from ..models.fusion import (
-    MultimodalFusionMLP,
-    MultimodalFusionTransformer,
-)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -48,8 +44,6 @@ class DistillerLitModule(pl.LightningModule):
         soft_label_weight: float,
         temperature: float,
         output_feature_loss_weight: float,
-        rkd_distance_loss_weight: float,
-        rkd_angle_loss_weight: float,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
         lr_schedule: Optional[str] = None,
@@ -61,7 +55,9 @@ class DistillerLitModule(pl.LightningModule):
         warmup_steps: Optional[int] = None,
         hard_label_loss_func: Optional[_Loss] = None,
         soft_label_loss_func: Optional[_Loss] = None,
+        output_feature_adaptor: Optional[nn.Module] = None,
         output_feature_loss_func: Optional[_Loss] = None,
+        rkd_loss_func: Optional[nn.Module] = None,
         validation_metric: Optional[torchmetrics.Metric] = None,
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
@@ -126,8 +122,12 @@ class DistillerLitModule(pl.LightningModule):
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for hard labels.
         soft_label_loss_func
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for soft labels.
+        output_feature_adaptor
+            A Pytorch Module, e.g. nn.Linear, for adapting student output feature to the shape of teacher's.
         output_feature_loss_func
-            A Pytorch loss module, e.g., nn.MSELoss(), for output_feature layer output's distance.
+            A Pytorch loss module, e.g., nn.MSELoss(), for output_feature distance between teacher and student.
+        rkd_loss_func
+            A Pytorch loss module, i.e., RKDLoss in .rkd_loss, for rkd loss of output_feature between teacher and student.
         validation_metric
             A torchmetrics module used in the validation stage, e.g., torchmetrics.Accuracy().
         validation_metric_name
@@ -169,8 +169,6 @@ class DistillerLitModule(pl.LightningModule):
         self.hard_label_weight = hard_label_weight
         self.soft_label_weight = soft_label_weight
         self.output_feature_loss_weight = output_feature_loss_weight
-        self.rkd_distance_loss_weight = rkd_distance_loss_weight
-        self.rkd_angle_loss_weight = rkd_angle_loss_weight
         self.hard_label_loss_func = hard_label_loss_func
         self.soft_label_loss_func = soft_label_loss_func
         self.output_feature_loss_func = output_feature_loss_func
@@ -181,16 +179,8 @@ class DistillerLitModule(pl.LightningModule):
             )
         self.custom_metric_func = custom_metric_func
 
-        # Adapt student's output_feature feature to teacher's
-        # Refer to FitNet: https://arxiv.org/abs/1412.6550
-        teacher_model_dim = self.teacher_model.out_features
-        student_model_dim = self.student_model.out_features
-        self.output_feature_adaptor = (
-            nn.Linear(student_model_dim, teacher_model_dim)
-            if teacher_model_dim != student_model_dim
-            else nn.Identity()
-        )
-        self.rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
+        self.output_feature_adaptor = output_feature_adaptor
+        self.rkd_loss_func = rkd_loss_func
 
     def _compute_hard_label_loss(
         self,
