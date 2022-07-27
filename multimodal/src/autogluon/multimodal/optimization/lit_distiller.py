@@ -182,6 +182,7 @@ class DistillerLitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
 
         # Adapt student's output_feature feature to teacher's
+        # Refer to FitNet: https://arxiv.org/abs/1412.6550
         teacher_model_dim = self.teacher_model.out_features
         student_model_dim = self.student_model.out_features
         self.output_feature_adaptor = (
@@ -252,7 +253,7 @@ class DistillerLitModule(pl.LightningModule):
         student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
         teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
 
-        teacher_result = self.output_feature_adaptor(teacher_result)
+        student_result = self.output_feature_adaptor(student_result)
 
         loss = self.rkd_loss_func(
             feature_student=student_result,

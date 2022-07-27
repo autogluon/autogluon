@@ -40,7 +40,7 @@ class RKDLoss(nn.Module):
         -------
         The RKD Loss between teacher and student
         """
-        # RKD distance loss
+        # RKD loss
         with torch.no_grad():
             t_dist = self.pdist(feature_teacher, squared=False)
             mean_td = t_dist[t_dist > 0].mean()
@@ -76,7 +76,7 @@ class RKDLoss(nn.Module):
         Parameters
         ----------
         embeddings
-            The embeddings to compute pairwise distance between.
+            The embeddings to compute pairwise distance between. Shape: (N,D)
         squared
             If the result is square of Euclidean distance.
         eps
@@ -84,7 +84,7 @@ class RKDLoss(nn.Module):
 
         Returns
         -------
-        Pairwise Euclidean distances.
+        Pairwise Euclidean distances. Shape: (N,N)
         """
         e_square = embeddings.pow(2).sum(dim=1)
         prod = embeddings @ embeddings.t()
@@ -93,6 +93,7 @@ class RKDLoss(nn.Module):
         if not squared:
             res = res.sqrt()
 
+        res = res.clone()
         res[range(len(embeddings)), range(len(embeddings))] = 0
 
         return res
