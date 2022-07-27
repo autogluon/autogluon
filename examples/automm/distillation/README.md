@@ -20,8 +20,8 @@ To run the example:
    - `temperature` determines the temperature for soft cross entropy.
    - `hard_label_weight` determines the weight of hard label loss (ground truth logits).
    - `soft_label_weight` determines the weight of soft label loess (teacher model's output).
-   - `intermediate_loss_weight` determines the weight of intermediate loss
-   - `intermediate_loss_type` determines the loss function of intermediate loss, currently support "mean_square_error" and "cosine_distance"
+   - `output_feature_loss_weight` determines the weight of output_feature loss
+   - `output_feature_loss_type` determines the loss function of output_feature loss, currently support "mean_square_error" and "cosine_distance"
    - `finetuned_model_cache_folder` is the path to cache models trained without distillation.
    -  `retrain` determines if the models without distillation should be retrained or load from cache.
 
@@ -73,7 +73,7 @@ The student model's loss is defined by
         )
         return loss
 
-    def _compute_intermediate_loss(
+    def _compute_output_feature_loss(
         self,
         student_output: dict,
         teacher_output: dict,
@@ -81,7 +81,7 @@ The student model's loss is defined by
         student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
         teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
 
-        loss = self.intermediate_loss_func(
+        loss = self.output_feature_loss_func(
             input=student_result,
             target=teacher_result,
         )
@@ -106,11 +106,11 @@ The student model's loss is defined by
         )
         loss += soft_label_loss * self.soft_label_weight
 
-        intermediate_loss = self._compute_intermediate_loss(
+        output_feature_loss = self._compute_output_feature_loss(
             student_output=student_output,
             teacher_output=teacher_output,
         )
-        loss += intermediate_loss * self.intermediate_loss_weight
+        loss += output_feature_loss * self.output_feature_loss_weight
 
         return loss
 ```
@@ -130,7 +130,7 @@ soft_label_weight = 1
 
 `python3 automm_distillation.py --teacher_model google/bert_uncased_L-12_H-768_A-12 --student_model google/bert_uncased_L-6_H-768_A-12 --seed 123 --max_epoch 8 --hard_label_weight 0.5 --soft_label_weight 5`
 
-intermediate_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio [2] | Speed Up 
+output_feature_loss_weight | Teacher Model Acc | Pretrained Model Acc | Student Model Acc | Distillation Ratio [2] | Speed Up 
 ----------------------|-------------------|----------------------|-------------------|------------------------|----
 0                     | 0.91726           | 0.89401              | 0.89713           | 0.13                   | 3.52x
 0.01                  | 0.91726           | 0.89401              | 0.90298           | 0.39                   | 3.52x

@@ -1,10 +1,10 @@
 distiller:
   soft_label_loss_type: ""
-  intermediate_loss_type: "mse"
+  output_feature_loss_type: "mse"
   temperature: 5.
   hard_label_weight: 0.1
   soft_label_weight: 1.
-  intermediate_loss_weight: 0.01
+  output_feature_loss_weight: 0.01
   # RKD Paper: https://arxiv.org/abs/1904.05068
   rkd_distance_loss_weight: 0.
   rkd_angle_loss_weight: 0.
