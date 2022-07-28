@@ -1804,7 +1804,9 @@ def download(
             The sha1sum
         """
         with open(filename, mode="rb") as f:
-            d = hashlib.sha1()
+            # Disable bandit check because we are using sha1sum for evaluating the checksums.
+            # It is not used for hosting credentials.
+            d = hashlib.new("sha1", usedforsecurity=False)  # nosec(sxjscience)
             for buf in iter(functools.partial(f.read, 1024 * 100), b""):
                 d.update(buf)
         return d.hexdigest()
