@@ -274,11 +274,19 @@ class DistillerLitModule(pl.LightningModule):
         )
         loss += soft_label_loss * self.soft_label_weight
 
-        rkd_loss = self._compute_rkd_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
-        loss += rkd_loss
+        if self.output_feature_loss_weight > 0:
+            output_feature_loss = self._compute_output_feature_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += output_feature_loss * self.output_feature_loss_weight
+
+        if self.rkd_loss_func.distance_loss_weight > 0 or self.rkd_loss_func.angle_loss_weight > 0:
+            rkd_loss = self._compute_rkd_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += rkd_loss
 
         return loss
 

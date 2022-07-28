@@ -41,30 +41,34 @@ class RKDLoss(nn.Module):
         The RKD Loss between teacher and student
         """
         # RKD loss
-        with torch.no_grad():
-            t_dist = self.pdist(feature_teacher, squared=False)
-            mean_td = t_dist[t_dist > 0].mean()
-            t_dist = t_dist / mean_td
+        if self.distance_loss_weight > 0:
+            with torch.no_grad():
+                t_dist = self.pdist(feature_teacher, squared=False)
+                mean_td = t_dist[t_dist > 0].mean()
+                t_dist = t_dist / mean_td
 
-        s_dist = self.pdist(feature_student, squared=False)
-        mean_d = s_dist[s_dist > 0].mean()
-        s_dist = s_dist / mean_d
+            s_dist = self.pdist(feature_student, squared=False)
+            mean_d = s_dist[s_dist > 0].mean()
+            s_dist = s_dist / mean_d
 
-        loss_distance = F.smooth_l1_loss(s_dist, t_dist)
+            loss_distance = F.smooth_l1_loss(s_dist, t_dist)
 
         # RKD Angle loss
-        with torch.no_grad():
-            td = feature_teacher.unsqueeze(0) - feature_teacher.unsqueeze(1)
-            norm_td = F.normalize(td, p=2, dim=2)
-            t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2)).view(-1)
+        if self.angle_loss_weight > 0:
+            with torch.no_grad():
+                td = feature_teacher.unsqueeze(0) - feature_teacher.unsqueeze(1)
+                norm_td = F.normalize(td, p=2, dim=2)
+                t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2)).view(-1)
 
-        sd = feature_student.unsqueeze(0) - feature_student.unsqueeze(1)
-        norm_sd = F.normalize(sd, p=2, dim=2)
-        s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2)).view(-1)
+            sd = feature_student.unsqueeze(0) - feature_student.unsqueeze(1)
+            norm_sd = F.normalize(sd, p=2, dim=2)
+            s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2)).view(-1)
 
-        loss_angle = F.smooth_l1_loss(s_angle, t_angle)
+            loss_angle = F.smooth_l1_loss(s_angle, t_angle)
 
-        loss = self.distance_loss_weight * loss_distance + self.angle_loss_weight * loss_angle
+        loss = ((self.distance_loss_weight * loss_distance) if self.distance_loss_weight > 0 else 0) + (
+            (self.angle_loss_weight * loss_angle) if self.angle_loss_weight > 0 else 0
+        )
 
         return loss
 
