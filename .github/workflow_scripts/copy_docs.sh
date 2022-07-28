@@ -14,9 +14,9 @@ if [[ -n $PR_NUMBER ]]; then BUILD_DOCS_PATH=s3://autogluon-ci/build_docs/$PR_NU
 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
-    bucket='autogluon-doc-staging'
-    if [[ -n $PR_NUMBER ]]; then path=staging/$PR_NUMBER/$COMMIT_SHA; else path=staging/$BRANCH/$COMMIT_SHA; fi
-    site=$bucket.s3.amazonaws.com/$path
+    bucket='autogluon-staging'
+    if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER/$COMMIT_SHA; else path=$BRANCH/$COMMIT_SHA; fi
+    site=$bucket.s3-website-us-west-2.amazonaws.com/$path
     flags='--delete'
     cacheControl=''
 else
@@ -31,9 +31,9 @@ else
             path=$BRANCH
         fi
     fi
-    bucket='autogluon-website'
+    bucket='autogluon.mxnet.io'
     site=$bucket/$path
-    if [[ $BRANCH == 'master' ]]; then flags=''; else flags=--delete; fi
+    if [[ $BRANCH == 'master' ]]; then flags=''; else flags='--delete'; fi
     cacheControl='--cache-control max-age=7200'
 fi
 
@@ -42,10 +42,10 @@ if [ $COMMAND_EXIT_CODE -ne 0 ]; then
     exit COMMAND_EXIT_CODE
 fi
 
-aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all s3://${bucket}/${path} --acl public-read ${cacheControl}
+aws s3 sync ${flags} ${BUILD_DOCS_PATH}/all/ s3://${bucket}/${path} --acl public-read ${cacheControl}
 echo "Uploaded doc to http://${site}/index.html"
 
-if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
+if [[ ($BRANCH == 'master') && ($GIT_REPO == awslabs/autogluon) ]]
 then
     aws s3 cp ${BUILD_DOCS_PATH}/root_index.html s3://${bucket}/index.html --acl public-read ${cacheControl}
     echo "Uploaded root_index.html s3://${bucket}/index.html"
