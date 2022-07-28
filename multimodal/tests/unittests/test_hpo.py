@@ -3,19 +3,12 @@ import shutil
 import pytest
 from ray import tune
 
-from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
+from autogluon.core.hpo.ray_tune_constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 
-from datasets import PetFinderDataset
+from unittest_datasets import PetFinderDataset
 from utils import get_home_dir
 from test_predictor import verify_predictor_save_load
-
-pytest.skip(
-    "HPO testing fails due to RuntimeError: CUDA error: out of memory, "
-    "but the GPU memory usage is low. Something seems wrong with ray. "
-    "Need to investigate the reasons. Skip the tests for now.",
-    allow_module_level=True
-)
 
 
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))

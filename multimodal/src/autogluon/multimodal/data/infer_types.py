@@ -4,7 +4,18 @@ import pandas as pd
 import warnings
 import PIL
 from typing import Union, Optional, List, Dict, Tuple
-from ..constants import NULL, CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH, MULTICLASS, BINARY, REGRESSION, AUTOMM
+from ..constants import (
+    NULL,
+    CATEGORICAL,
+    NUMERICAL,
+    TEXT,
+    IMAGE,
+    MULTICLASS,
+    BINARY,
+    CLASSIFICATION,
+    REGRESSION,
+    AUTOMM,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -51,6 +62,7 @@ def is_categorical_column(
     else:
         if threshold is None:
             if is_label:
+                # TODO(?) The following logic will be problematic if the task is few-shot learning.
                 threshold = 100
                 oov_ratio_threshold = 0
                 ratio = 0.1
@@ -194,6 +206,8 @@ def infer_column_types(
     valid_data: Optional[pd.DataFrame] = None,
     label_columns: Union[str, List[str]] = None,
     provided_column_types: Optional[Dict] = None,
+    allowable_column_types: Optional[List[str]] = None,
+    fallback_column_type: Optional[str] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -209,6 +223,10 @@ def infer_column_types(
     provided_column_types
         Additional dictionary that you can use to specify the columns types that you know.
         {'col_name': TYPE, ...}
+    allowable_column_types
+        What column types are allowed. This is the prior knowledge inferred from the model type.
+    fallback_column_type
+        What's the fallback column type if the detected type if out of the allowable_column_types.
 
     Returns
     -------
@@ -250,11 +268,18 @@ def infer_column_types(
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
-            column_types[col_name] = IMAGE_PATH
+            column_types[col_name] = IMAGE
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL
+
+    if allowable_column_types and fallback_column_type:
+        column_types = set_fallback_column_type(
+            column_types=column_types,
+            allowable_column_types=allowable_column_types,
+            fallback_column_type=fallback_column_type,
+        )
 
     return column_types
 
@@ -279,6 +304,8 @@ def infer_label_column_type_by_problem_type(
     problem_type: str,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL),
+    fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
     Infer the label column types based on problem type.
@@ -295,6 +322,10 @@ def infer_label_column_type_by_problem_type(
         A pd.DataFrame.
     valid_data
         A validation pd.DataFrame.
+    allowable_label_types
+        Which label types are allowed.
+    fallback_label_type
+        If a label type is not within the allowable_label_types, replace it with this fallback_label_type.
 
     Returns
     -------
@@ -316,10 +347,13 @@ def infer_label_column_type_by_problem_type(
             warnings.warn(
                 f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
             )
-        if problem_type == MULTICLASS or problem_type == BINARY:
+        if problem_type in [MULTICLASS, BINARY, CLASSIFICATION]:
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
+
+        if column_types[col_name] not in allowable_label_types:
+            column_types[col_name] = fallback_label_type
 
     return column_types
 
@@ -370,10 +404,20 @@ def infer_problem_type_output_shape(
         elif provided_problem_type == MULTICLASS:
             class_num = len(data[label_column].value_counts())
             return MULTICLASS, class_num
+        elif provided_problem_type == CLASSIFICATION:
+            class_num = len(data[label_column].value_counts())
+            if class_num == 2:
+                return BINARY, 2
+            else:
+                return MULTICLASS, class_num
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
         else:
-            raise ValueError(f"Problem type {provided_problem_type} doesn't have a valid output shape for training.")
+            raise ValueError(
+                f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
+                f"for training. The supported problem types are"
+                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}'"
+            )
 
     else:
         if column_types[label_column] == CATEGORICAL:
@@ -389,3 +433,28 @@ def infer_problem_type_output_shape(
                 f"The label column '{label_column}' has type"
                 f" '{column_types[label_column]}', which is not supported yet."
             )
+
+
+def set_fallback_column_type(column_types: Dict, allowable_column_types: List[str], fallback_column_type: str) -> Dict:
+    """
+    Filter the auto-detected column types to make sure that all column types are allowable.
+    Use the fallback type to replace those out of the allowable_column_types.
+
+    Parameters
+    ----------
+    column_types
+        The inferred column types.
+    allowable_column_types
+        The column types which are allowed by the model type.
+    fallback_column_type
+        Fallback to this type if some invalid column type is found.
+
+    Returns
+    -------
+    The filtered column types.
+    """
+    for col_name, col_type in column_types.items():
+        if col_type not in allowable_column_types:
+            column_types[col_name] = fallback_column_type
+
+    return column_types

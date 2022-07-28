@@ -28,13 +28,21 @@ DUMMY_DATASET = ListDataset(
 )
 
 
-def get_data_frame_with_item_index(item_list: List[Union[str, int]], data_length: int = 20):
+def get_data_frame_with_item_index(
+    item_list: List[Union[str, int]],
+    data_length: int = 20,
+    freq: str = "H",
+):
     return TimeSeriesDataFrame(
         pd.DataFrame(
             index=pd.MultiIndex.from_product(
                 [
                     item_list,
-                    pd.date_range(pd.Timestamp("2022-01-01"), freq="H", periods=data_length),  # noqa
+                    pd.date_range(
+                        pd.Timestamp("2022-01-01"),  # noqa
+                        freq=freq,
+                        periods=data_length,
+                    ),
                 ],
                 names=(ITEMID, TIMESTAMP),
             ),
@@ -59,6 +67,8 @@ def dict_equal_primitive(this, that):
         if isinstance(v, dict):
             equal_fields.append(dict_equal_primitive(v, that[k]))
         if isinstance(v, list):
-            equal_fields.append(dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k]))))
+            equal_fields.append(
+                dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k])))
+            )
 
     return all(equal_fields)

@@ -30,12 +30,4 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     },
     medium_quality={"hyperparameters": "default"},
     low_quality={"hyperparameters": "toy"},
-    low_quality_hpo={
-        "hyperparameters": "toy_hpo",
-        "hyperparameter_tune_kwargs": {
-            "scheduler": "local",
-            "searcher": "random",
-            "num_trials": 2,
-        },
-    },
 )

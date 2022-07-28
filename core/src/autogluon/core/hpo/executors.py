@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import os
@@ -12,6 +14,11 @@ from .. import Space
 from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..models import AbstractModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +27,7 @@ class HpoExecutor(ABC):
     """Interface for abstract model to executor HPO runs"""
     
     def __init__(self):
+        self.resources = None
         self.search_space = None
         self._time_limit = None
     
@@ -60,17 +68,29 @@ class HpoExecutor(ABC):
         """
         raise NotImplementedError
     
-    @abstractmethod
-    def register_resources(self, resources: dict):
+    def register_resources(self, initialized_model: AbstractModel):
         """
         Register total resources used for the experiment
         
         Parameters
         ----------
-        resources
-            Total resources available for the experiment
+        initialized_model
+            The model that will be performed HPO. This model MUST be initialized
         """
-        raise NotImplementedError
+        user_cpu_count = initialized_model._get_child_aux_val(key='num_cpus', default=None)
+        user_gpu_count = initialized_model._get_child_aux_val(key='num_gpus', default=None)
+        resource_kwargs = initialized_model._preprocess_fit_resources()
+
+        num_gpus = ResourceCalculator.get_total_gpu_count(
+            user_specified_num_gpus=user_gpu_count,
+            model_default_num_gpus=resource_kwargs.get('num_gpus', 0),
+        )
+        num_cpus = ResourceCalculator.get_total_cpu_count(
+            user_specified_num_cpus=user_cpu_count,
+            model_default_num_cpus=resource_kwargs.get('num_cpus', 0),
+        )
+
+        self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
     
     @abstractmethod
     def validate_search_space(
@@ -167,22 +187,6 @@ class RayHpoExecutor(HpoExecutor):
         if 'num_trials' not in hyperparameter_tune_kwargs and default_num_trials is not None:
             hyperparameter_tune_kwargs['num_trials'] = default_num_trials
         self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
-    
-    def register_resources(self, initialized_model_base):
-        user_cpu_count = initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
-        user_gpu_count = initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
-        resource_kwargs = initialized_model_base._preprocess_fit_resources()
-
-        num_gpus = ResourceCalculator.get_total_gpu_count(
-            user_specified_num_gpus=user_gpu_count,
-            model_default_num_gpus=resource_kwargs.get('num_gpus', 0),
-        )
-        num_cpus = ResourceCalculator.get_total_cpu_count(
-            user_specified_num_cpus=user_cpu_count,
-            model_default_num_cpus=resource_kwargs.get('num_cpus', 0),
-        )
-        
-        self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
         
     def validate_search_space(self, search_space, model_name):
         from ray.tune.sample import Domain
@@ -269,7 +273,16 @@ class RayHpoExecutor(HpoExecutor):
             file_id = trial_id  # unique identifier to files from this trial
             trial_model_name = model_name + os.path.sep + file_id
             trial_model_path = model_path_root + trial_model_name + os.path.sep
-            hpo_models[trial_model_name] = trial_model_path
+            hpo_models[trial_model_name] = dict(
+                path=trial_model_path
+            )
+
+            hpo_models[trial_model_name] = dict(
+                path=trial_model_path,
+                val_score=validation_performance,
+                trial=trial,
+                hyperparameters= details['config'],
+            )
 
         return hpo_models, self.analysis
 
@@ -310,9 +323,10 @@ class CustomHpoExecutor(HpoExecutor):
         self.scheduler_options = hyperparameter_tune_kwargs
         self.time_limit = time_limit
     
-    def register_resources(self, resources):
+    def register_resources(self, initialized_model):
         assert self.scheduler_options is not None, 'Call `initialize()` before register resources'
-        self.scheduler_options[1]['resources'] = resources
+        super().register_resources(initialized_model)
+        self.scheduler_options[1]['resources'] = self.resources
         
     def validate_search_space(self, search_space, model_name):
         if not any(isinstance(search_space[hyperparam], Space) for hyperparam in search_space):
@@ -364,7 +378,13 @@ class CustomHpoExecutor(HpoExecutor):
             trial_model_path = model_path_root + trial_model_name + os.path.sep
             trial_reward = self.scheduler.searcher.get_reward(hpo_results['config_history'][trial])
 
-            hpo_models[trial_model_name] = trial_model_path
+            hpo_models[trial_model_name] = dict(
+                path=trial_model_path,
+                val_score=trial_reward,
+                trial=trial,
+                hyperparameters=hpo_results['config_history'][trial]
+            )
+
             hpo_model_performances[trial_model_name] = trial_reward
         
         hpo_results['hpo_model_performances'] = hpo_model_performances

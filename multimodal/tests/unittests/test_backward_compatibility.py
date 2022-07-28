@@ -6,7 +6,7 @@ import pytest
 
 from autogluon.multimodal import MultiModalPredictor, AutoMMPredictor
 from autogluon.multimodal.utils import download
-from datasets import AmazonReviewSentimentCrossLingualDataset
+from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from utils import (
     protected_zip_extraction,
     get_home_dir,
@@ -41,7 +41,7 @@ def test_load_old_checkpoint(cls):
     predictor.fit(
         dataset.train_df,
         presets="multilingual",
-        time_limit=10,
+        time_limit=30,
         hyperparameters={"optimization.top_k_average_method": "uniform_soup"},
     )
     verify_predictor_save_load(predictor, dataset.test_df, cls=cls)

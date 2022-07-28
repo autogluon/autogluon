@@ -18,8 +18,6 @@ from ..constants import (
     BINARY,
     MULTICLASS,
     REGRESSION,
-    MAX,
-    MIN,
     NORM_FIT,
     BIT_FIT,
     ACC,
@@ -40,7 +38,6 @@ from ..constants import (
     PAIR_MARGIN_MINER,
     COLUMN_FEATURES,
     FEATURES,
-    MASKS,
     AUTOMM,
     COSINE_EMBEDDING_LOSS,
     LORA,
@@ -507,27 +504,47 @@ def apply_layerwise_lr_decay(
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
     norm_param_names = get_norm_layer_param_names(model)
+    # Patterns that detect if the layer is a custom layer (not loaded from a pretraining network)
+    # TODO(?) Currently it is a workaround. We need to fix it in the future, i.e., supporting tabular encoders
+    automm_custom_layer_patterns = ["head", "fusion_mlp", "adapter"]
+
     for name, param in model.named_parameters():
-        if efficient_finetune == BIT_FIT:
-            # For bit_fit, we disable tuning everything except the bias terms
-            if "bias" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == NORM_FIT:
-            # For norm-fit, we finetune all the normalization layers and bias layers
-            if name not in norm_param_names and "bias" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == LORA:
-            # For LoRA adaptation we only fine-tune LoRA weights
-            if "lora_" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == LORA_BIAS:
-            # For LoRA adapation we fine-tune LoRA and all bias weights
-            if "lora_" not in name and "bias" not in name:
-                param.requires_grad = False
-        elif efficient_finetune == LORA_NORM:
-            # For LoRA adapation we fine-tune LoRA and normalization and bias layers
-            if "lora_" not in name and name not in norm_param_names and "bias" not in name:
-                param.requires_grad = False
+        within_automm_custom_layer = False
+        name_split = name.split(".")
+        for ele_name in name_split[:3]:
+            for pattern in automm_custom_layer_patterns:
+                if pattern in ele_name:
+                    within_automm_custom_layer = True
+                    break
+        if within_automm_custom_layer:
+            param.requires_grad = True
+        else:
+            if efficient_finetune == BIT_FIT:
+                # For bit_fit, we disable tuning everything except the bias terms
+                if "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == NORM_FIT:
+                # For norm-fit, we finetune all the normalization layers and bias layers
+                if name not in norm_param_names and "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == LORA:
+                # For LoRA adaptation we only fine-tune LoRA weights
+                if "lora_" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == LORA_BIAS:
+                # For LoRA adapation we fine-tune LoRA and all bias weights
+                if "lora_" not in name and "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune == LORA_NORM:
+                # For LoRA adapation we fine-tune LoRA and normalization and bias layers
+                if "lora_" not in name and name not in norm_param_names and "bias" not in name:
+                    param.requires_grad = False
+            elif efficient_finetune is not None and efficient_finetune != "None":
+                raise NotImplementedError(
+                    f"The efficient finetuning strategy '{efficient_finetune}'"
+                    f" is not supported. We only support"
+                    f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}'."
+                )
 
         if not param.requires_grad:
             continue  # frozen weights
@@ -559,40 +576,6 @@ def apply_layerwise_lr_decay(
         parameter_group_names[group_name]["params"].append(name)
 
     return list(parameter_group_vars.values())
-
-
-def update_config_by_rules(
-    problem_type: str,
-    config: DictConfig,
-):
-    """
-    Modify configs based on the need of loss func.
-    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
-
-    Parameters
-    ----------
-    problem_type
-        The type of the problem of the project.
-    config
-        The config of the project. It is a Dictconfig object.
-
-    Returns
-    -------
-    The modified config.
-    """
-    loss_func = OmegaConf.select(config, "optimization.loss_function")
-    if loss_func is not None:
-        if problem_type == REGRESSION and "bce" in loss_func.lower():
-            # We are using BCELoss for regression problems. Need to first scale the labels.
-            config.data.label.numerical_label_preprocessing = "minmaxscaler"
-        elif loss_func != "auto":
-            warnings.warn(
-                f"Received loss function={loss_func} for problem={problem_type}. "
-                "Currently, we only support using BCE loss for regression problems and choose "
-                "the loss_function automatically otherwise.",
-                UserWarning,
-            )
-    return config
 
 
 def gather_column_features(

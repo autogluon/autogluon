@@ -1,11 +1,9 @@
 import os
 import logging
-import pickle
 from typing import Optional, List, Any, Dict
 import numpy as np
 from nptyping import NDArray
 import warnings
-import nltk
 from transformers import (
     BertTokenizer,
     CLIPTokenizer,
@@ -15,11 +13,9 @@ from transformers import (
 )
 from ..constants import TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, AUTOMM, COLUMN, TEXT
 from .collator import Stack, Pad
-from .utils import extract_value_from_config, InsertPunctuation
+from .utils import extract_value_from_config
 import ast
-from copy import copy, deepcopy
-import nlpaug.flow as naf
-import nlpaug.augmenter.word as naw
+from copy import deepcopy
 from .trivial_augmenter import TrivialAugment
 
 
@@ -150,6 +146,7 @@ class TextProcessor:
         logger.debug(f"text max length: {self.max_len}")
 
         self.insert_sep = insert_sep
+        self.eos_only = self.cls_token_id == self.sep_token_id == self.eos_token_id
 
         config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
         extracted = extract_value_from_config(config=config, keys=("type_vocab_size",))
@@ -243,13 +240,23 @@ class TextProcessor:
             max_length = self.max_len - (len(text_tokens) + 1)
         else:
             max_length = self.max_len - 2
+        if self.eos_only:
+            # For EOS-only, the tokens will be combined as
+            # [Field1 Tokens] [EOS] [Field2 Tokens] [EOS] [Field3 Tokens] [EOS]
+            # Otherwise, the tokens will be combined as
+            # [CLS] [Field1 Tokens] [SEP] [Field2 Tokens] [SEP] [Field3 Tokens] [EOS]
+            max_length += 1
         trimmed_lengths = self.get_trimmed_lengths(
             [len(txt_token) for txt_token in text_tokens.values()],
             max_length,
             do_merge=True,
         )
         seg = 0
-        token_ids = [self.cls_token_id]
+        if self.eos_only:
+            # There is no cls token in the EOS-only mode
+            token_ids = []
+        else:
+            token_ids = [self.cls_token_id]
         segment_ids = [seg]
         ret = {}
         for (col_name, txt_token), trim_length in zip(text_tokens.items(), trimmed_lengths):
@@ -350,6 +357,11 @@ class TextProcessor:
             # CLIP uses eos_token's feature as the pooled output.
             # See https://github.com/huggingface/transformers/blob/v4.14.1/src/transformers/models/clip/modeling_clip.py#L657
             cls_id, sep_id, eos_id = tokenizer.bos_token_id, tokenizer.bos_token_id, tokenizer.eos_token_id
+
+        if cls_id is None and sep_id is None:
+            # Special treatment for T5 (EOS-only).
+            cls_id = sep_id = eos_id
+
         if cls_id is None or sep_id is None or eos_id is None:
             raise ValueError(f"tokenizer class: {tokenizer.__class__.__name__} has no valid cls, sep, and eos ids.")
         return cls_id, sep_id, eos_id

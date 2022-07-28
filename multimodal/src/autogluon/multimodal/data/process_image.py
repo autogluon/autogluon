@@ -235,7 +235,7 @@ class ImageProcessor:
                 )
                 if len(extracted) == 0:
                     image_size = None
-                elif len(extracted) == 1:
+                elif len(extracted) >= 1:
                     image_size = extracted[0]
                     if isinstance(image_size, tuple):
                         image_size = image_size[-1]

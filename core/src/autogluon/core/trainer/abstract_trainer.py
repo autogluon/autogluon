@@ -1403,8 +1403,8 @@ class AbstractTrainer:
                 # self.hpo_results[model.name] = hpo_results
                 model_names_trained = []
                 self._extra_banned_names.add(model.name)
-                for model_hpo_name, model_path in hpo_models.items():
-                    model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+                for model_hpo_name, model_info in hpo_models.items():
+                    model_hpo = self.load_model(model_hpo_name, path=model_info['path'], model_type=type(model))
                     logger.log(20, f'Fitted model: {model_hpo.name} ...')
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)

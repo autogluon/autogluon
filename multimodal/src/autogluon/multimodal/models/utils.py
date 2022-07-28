@@ -1,7 +1,7 @@
-from typing import Optional, Union, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict
 import torch
+import re
 from torch import nn
-from ..constants import MASKS, COLUMN_FEATURES, FEATURES
 from .lora_layers import LoRALinear
 
 
@@ -418,7 +418,7 @@ def inject_lora_to_linear_layer(
         if len(list(module.children())) > 0:
             inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
 
-        if isinstance(module, nn.Linear) and (not filter or any(x in n for x in filter)):
+        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
             lora_layer = LoRALinear(
                 module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
             )
@@ -427,3 +427,28 @@ def inject_lora_to_linear_layer(
             setattr(model, n, lora_layer)
 
     return model  # return model to enable method chaining
+
+
+def get_model_head(model: nn.Module):
+    """
+    Return the model's head. Different models may have different head names.
+
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+
+    Returns
+    -------
+    The model's head.
+    """
+    if hasattr(model, "head"):
+        head = model.head  # move the head outside
+    elif hasattr(model, "last_linear"):
+        head = model.last_linear
+    elif hasattr(model, "fc"):
+        head = model.fc
+    else:
+        raise ValueError(f"Model {type(model)} doesn't have head. Need to check its implementation.")
+
+    return head

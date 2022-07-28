@@ -1,10 +1,11 @@
 from PIL import Image
 import requests
 import pytest
+import numpy as np
 from autogluon.multimodal import MultiModalPredictor
 
 
-def test_clip_zero_shot():
+def download_sample_images():
     url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
     cat_image_name = "cat.jpg"
@@ -15,11 +16,20 @@ def test_clip_zero_shot():
     dog_image_name = "dog.jpg"
     image.save(dog_image_name)
 
+    return cat_image_name, dog_image_name
+
+
+def test_clip_zero_shot():
+    cat_image_name, dog_image_name = download_sample_images()
+
     cat_text = "a photo of a cat"
     dog_text = "a photo of a dog"
     bird_text = "a photo of a bird"
 
-    predictor = MultiModalPredictor(hyperparameters={"model.names": ["clip"]}, problem_type="zero_shot")
+    predictor = MultiModalPredictor(
+        hyperparameters={"model.names": ["clip"], "model.clip.checkpoint_name": "openai/clip-vit-base-patch32"},
+        problem_type="zero_shot",
+    )
 
     # compute the cosine similarity of one image-text pair.
     pred = predictor.predict({"image": [cat_image_name], "text": [cat_text]})
@@ -34,7 +44,9 @@ def test_clip_zero_shot():
     assert pred.shape == (2,)
 
     # match texts in a given image pool and output the matched image index (starting from 0) for each text.
-    pred = predictor.predict({"query": [dog_text, cat_text, bird_text]}, {"candidates": [cat_image_name, dog_image_name]})
+    pred = predictor.predict(
+        {"query": [dog_text, cat_text, bird_text]}, {"candidates": [cat_image_name, dog_image_name]}
+    )
     assert pred.shape == (3,)
 
     # predict the probabilities of one image matching several texts.
@@ -44,7 +56,9 @@ def test_clip_zero_shot():
         assert pytest.approx(sum(per_row_prob), 1e-6) == 1
 
     # given two or more images, we can get the probabilities of matching each image with a pool of texts.
-    prob = predictor.predict_proba({"image": [dog_image_name, cat_image_name]}, {"text": [bird_text, cat_text, dog_text]})
+    prob = predictor.predict_proba(
+        {"image": [dog_image_name, cat_image_name]}, {"text": [bird_text, cat_text, dog_text]}
+    )
     assert prob.shape == (2, 3)
     for per_row_prob in prob:
         assert pytest.approx(sum(per_row_prob), 1e-6) == 1
@@ -89,3 +103,45 @@ def test_clip_zero_shot():
     # invalid API usage 2: predicting probability with only one dictionary as input.
     with pytest.raises(AssertionError):
         prob = predictor.predict_proba({"image": [cat_image_name], "text": [cat_text]})
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "swin_tiny_patch4_window7_224",
+        "vit_tiny_patch16_224",
+        "resnet18",
+        "legacy_seresnet18",
+    ],
+)
+def test_timm_zero_shot(checkpoint_name):
+    cat_image_name, dog_image_name = download_sample_images()
+
+    predictor = MultiModalPredictor(
+        hyperparameters={
+            "model.names": ["timm_image"],
+            "model.timm_image.checkpoint_name": checkpoint_name,
+        },
+        problem_type="zero_shot",
+    )
+
+    pred = predictor.predict({"image": [cat_image_name, dog_image_name]})
+    assert pred.shape == (2,)
+
+    prob = predictor.predict_proba({"image": [cat_image_name, dog_image_name]})
+    assert prob.shape == (2, 1000)
+
+    features = predictor.extract_embedding({"abc": [cat_image_name, dog_image_name]})
+    assert features["abc"].ndim == 2 and features["abc"].shape[0] == 2
+
+    features, masks = predictor.extract_embedding({"abc": [cat_image_name, dog_image_name]}, return_masks=True)
+    assert features["abc"].ndim == 2 and features["abc"].shape[0] == 2
+    assert np.all(masks["abc"] == np.array([1, 1]))
+
+    features, masks = predictor.extract_embedding(
+        {"abc": [cat_image_name], "123": [dog_image_name]}, return_masks=True
+    )
+    assert features["abc"].ndim == 2 and features["abc"].shape[0] == 1
+    assert features["123"].ndim == 2 and features["123"].shape[0] == 1
+    assert np.all(masks["abc"] == np.array([1]))
+    assert np.all(masks["123"] == np.array([1]))

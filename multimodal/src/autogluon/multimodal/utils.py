@@ -11,7 +11,7 @@ import torch
 from torch import nn
 import warnings
 from contextlib import contextmanager
-from typing import Optional, List, Any, Dict, Tuple, Union
+from typing import Optional, List, Dict, Tuple, Union
 import numpy as np
 import uuid
 import hashlib
@@ -85,6 +85,7 @@ from .constants import (
     FEATURES,
     MASKS,
     S3_PREFIX,
+    LAST_CHECKPOINT,
 )
 from .presets import get_automm_presets, get_basic_automm_config
 
@@ -711,6 +712,8 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
+                pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
@@ -1650,7 +1653,7 @@ def init_zero_shot(
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
-    model = create_model(config=config)
+    model = create_model(config=config, pretrained=True)
 
     data_processors = init_data_processors(
         config=config,
@@ -1801,7 +1804,9 @@ def download(
             The sha1sum
         """
         with open(filename, mode="rb") as f:
-            d = hashlib.sha1()
+            # Disable bandit check because we are using sha1sum for evaluating the checksums.
+            # It is not used for hosting credentials.
+            d = hashlib.new("sha1", usedforsecurity=False)  # nosec(sxjscience)
             for buf in iter(functools.partial(f.read, 1024 * 100), b""):
                 d.update(buf)
         return d.hexdigest()
@@ -1871,7 +1876,7 @@ def download(
                     total_size = int(r.headers.get("content-length", 0))
                     chunk_size = 1024
                     if tqdm is not None:
-                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True)
+                        t = tqdm.tqdm(total=total_size, unit="iB", unit_scale=True, leave=False)
                     with open("{}.{}".format(fname, random_uuid), "wb") as f:
                         for chunk in r.iter_content(chunk_size=chunk_size):
                             if chunk:  # filter out keep-alive new chunks
@@ -1913,3 +1918,102 @@ def download(
                 )
 
     return fname
+
+
+def infer_dtypes_by_model_names(model_config: DictConfig):
+    """
+    Get data types according to model types.
+
+    Parameters
+    ----------
+    model_config
+        Model config from `config.model`.
+
+    Returns
+    -------
+    The data types allowed by models and the default fallback data type.
+    """
+    allowable_dtypes = []
+    fallback_dtype = None
+    for per_model in model_config.names:
+        per_model_dtypes = OmegaConf.select(model_config, f"{per_model}.data_types")
+        if per_model_dtypes:
+            allowable_dtypes.extend(per_model_dtypes)
+
+    allowable_dtypes = set(allowable_dtypes)
+    if allowable_dtypes == set([IMAGE, TEXT]):
+        fallback_dtype = TEXT
+
+    return allowable_dtypes, fallback_dtype
+
+
+def update_config_by_rules(
+    problem_type: str,
+    config: DictConfig,
+):
+    """
+    Modify configs based on the need of loss func.
+    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
+
+    Parameters
+    ----------
+    problem_type
+        The type of the problem of the project.
+    config
+        The config of the project. It is a Dictconfig object.
+
+    Returns
+    -------
+    The modified config.
+    """
+    loss_func = OmegaConf.select(config, "optimization.loss_function")
+    if loss_func is not None:
+        if problem_type == REGRESSION and "bce" in loss_func.lower():
+            # We are using BCELoss for regression problems. Need to first scale the labels.
+            config.data.label.numerical_label_preprocessing = "minmaxscaler"
+        elif loss_func != "auto":
+            warnings.warn(
+                f"Received loss function={loss_func} for problem={problem_type}. "
+                "Currently, we only support using BCE loss for regression problems and choose "
+                "the loss_function automatically otherwise.",
+                UserWarning,
+            )
+    return config
+
+
+def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Optional[bool] = True):
+    """
+    Convert the provided path to an absolute path and check whether it is valid.
+    If a path exists, either raise error or return None.
+    A None path can be identified by the `setup_outputdir` to generate a random path.
+
+    Parameters
+    ----------
+    path
+        A provided path.
+    resume
+        Whether this is a path to resume training.
+    raise_if_exist
+        Whether to raise error if the path exists.
+
+    Returns
+    -------
+    A complete and verified path or None.
+    """
+    path = os.path.abspath(os.path.expanduser(path))
+    if resume:
+        assert os.path.isfile(os.path.join(path, LAST_CHECKPOINT)), (
+            f"Trying to resume training from '{path}'. "
+            f"However, it does not contain the last checkpoint file: '{LAST_CHECKPOINT}'. "
+            "Are you using a correct path?"
+        )
+    elif os.path.isdir(path):
+        if raise_if_exist:
+            raise ValueError(
+                f"Path {path} already exists."
+                "Specify a new path to avoid accidentally overwriting a saved predictor."
+            )
+        else:
+            path = None
+
+    return path
