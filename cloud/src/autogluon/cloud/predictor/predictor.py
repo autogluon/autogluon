@@ -8,6 +8,7 @@ import boto3
 import sagemaker
 
 from abc import ABC, abstractmethod
+from botocore.exceptions import ClientError
 from datetime import datetime
 
 from autogluon.common.loaders import load_pd
@@ -254,11 +255,12 @@ class CloudPredictor(ABC):
                 if os.path.isdir(images):
                     image_zip_filename = os.path.basename(os.path.normpath(images))
                     zipfolder(image_zip_filename, images)
+                    image_zip_filename += '.zip'
                 else:
                     assert is_compressed_file(images), 'Please provide a compressed file or a folder containing the images'
                 logger.log(20, 'Uploading images ...')
                 images_input = self.sagemaker_session.upload_data(
-                    path=image_zip_filename + '.zip',
+                    path=image_zip_filename,
                     bucket=cloud_bucket,
                     key_prefix=util_key_prefix
                 )
@@ -594,6 +596,16 @@ class CloudPredictor(ABC):
         self.endpoint = None
         return detached_endpoint
 
+    def _predict_realtime(self, test_data, accept):
+        try:
+            return self.endpoint.predict(test_data, initial_args={'Accept': accept})
+        except ClientError as e:
+            if not e.response['Error']['Code'] == '413':  # Error code for pay load too large
+                raise e
+            else:
+                logger.warning('The invocation of endpoint failed with Error Code 413. This is likely due to pay load size being too large.')
+                logger.warning('SageMaker endpoint could only take maximum 5MB. Please consider reduce test data size or use `predict()` instead.')
+
     def predict_real_time(self, test_data, accept='application/x-parquet'):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
@@ -617,13 +629,10 @@ class CloudPredictor(ABC):
         assert accept in VALID_ACCEPT, f'Invalid accept type. Options are {VALID_ACCEPT}.'
         if type(test_data) == str:
             test_data = load_pd.load(test_data)
-        memory_usage = test_data.memory_usage(index=False, deep=True).sum()
-        if memory_usage > 5e6:
-            logger.warning(f'Large test data detected({memory_usage // 10e6} MB). SageMaker endpoint could only take maximum 5MB. The prediction is likely to fail')
-            logger.warning('Please consider reduce test data size or use `predict()` instead.')
         if not isinstance(test_data, pd.DataFrame):
             raise ValueError('test_data must be either a pandas.DataFrame, a local path or a s3 path')
-        return self.endpoint.predict(test_data, initial_args={'Accept': accept})
+
+        return self._predict_realtime(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
         if isinstance(test_data, pd.DataFrame) or not is_s3_url(test_data):
@@ -972,8 +981,10 @@ class ImageCloudPredictor(CloudPredictor):
         test_data: Union(str, pandas.DataFrame)
             The test data to be inferenced.
             Can be a pandas.DataFrame, a numpy.ndarray, a local path or a s3 path to a csv file containing paths of test images.
-            Or a path to a single image file.
-            Or a list of paths to image files.
+            Or a local path to a single image file.
+            Or a list of local paths to image files.
+        test_data_image_column: Optional(str)
+            If provided a pandas.DataFrame as the test_data, you must specify the column name corresponding to image paths
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -990,9 +1001,11 @@ class ImageCloudPredictor(CloudPredictor):
         import numpy as np
 
         if isinstance(test_data, str):
-            test_data = cv2.imread(test_data)
-            if test_data is None:  # not an image
+            image = cv2.imread(test_data)
+            if image is None:  # not an image
                 test_data = load_pd.load(test_data)
+            else:
+                test_data = image
         if isinstance(test_data, list):
             images = []
             for image in test_data:
@@ -1006,11 +1019,7 @@ class ImageCloudPredictor(CloudPredictor):
             test_data = test_data[test_data_image_column].apply(lambda path: cv2.imread(path)).to_numpy()
         assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
 
-        memory_usage = test_data.nbytes
-        if memory_usage > 5e6:
-            logger.warning(f'Large test data detected({memory_usage // 10e6} MB). SageMaker endpoint could only take maximum 5MB. The prediction is likely to fail')
-            logger.warning('Please consider reduce test data size or use `predict()` instead.')
-        return self.endpoint.predict(test_data, initial_args={'Accept': accept})
+        return self._predict_realtime(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
         if not is_s3_url(test_data):
