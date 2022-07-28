@@ -220,9 +220,7 @@ def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, target
         (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "H"),
     ],
 )
-def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(
-    timestamps, expected_freq
-):
+def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(timestamps, expected_freq):
     df = pd.DataFrame(
         {
             "item_id": [0, 0, 0],
@@ -247,9 +245,7 @@ FREQ_TEST_CASES = [
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
-    start_time, freq
-):
+def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(start_time, freq):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time)} for _ in range(3)],  # type: ignore
         freq=freq,
@@ -261,7 +257,19 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(
+def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
+    item_list = ListDataset(
+        [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        freq=freq,
+    )
+
+    ts_df = TimeSeriesDataFrame(item_list)
+
+    assert ts_df.freq == freq
+
+
+@pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
+def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_cached_freq_is_persisted(
     start_time, freq
 ):
     item_list = ListDataset(
@@ -271,7 +279,15 @@ def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferre
 
     ts_df = TimeSeriesDataFrame(item_list)
 
-    assert ts_df.freq == freq
+    assert ts_df.freq == freq  # call freq once to cache
+
+    with tempfile.TemporaryDirectory() as td:
+        pkl_filename = Path(td) / "temp_pickle.pkl"
+        ts_df.to_pickle(str(pkl_filename))
+
+        read_df = TimeSeriesDataFrame.from_pickle(pkl_filename)
+
+    assert ts_df._cached_freq == freq == read_df._cached_freq
 
 
 @pytest.mark.parametrize(
@@ -295,7 +311,7 @@ def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferre
         ],
     ],
 )
-def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_raises(
+def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_raises_error(
     list_of_timestamps,
 ):
     df_tuples = []
@@ -428,9 +444,7 @@ def test_when_dataframe_class_copy_called_then_output_correct(input_df):
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 @pytest.mark.parametrize("inplace", [True, False])
 def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplace):
-    renamed_df = TimeSeriesDataFrame.rename(
-        input_df, columns={"target": "mytarget"}, inplace=inplace
-    )
+    renamed_df = TimeSeriesDataFrame.rename(input_df, columns={"target": "mytarget"}, inplace=inplace)
     if inplace:
         renamed_df = input_df
 

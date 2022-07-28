@@ -83,7 +83,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     """
 
     index: pd.MultiIndex
-    _metadata = ["_static_features"]
+    _metadata = ["_static_features", "_cached_freq"]
 
     def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
@@ -103,6 +103,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
             self.static_features = static_features
+
+        self._cached_freq: Optional[str] = None
 
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
@@ -136,17 +138,25 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
+        if self._cached_freq:
+            return self._cached_freq
+
         def get_freq(series):
             return series.index.freq or series.index.inferred_freq
-        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.iter_items()]
-        freq = freq_for_each_series[0]    
+
+        # check the frequencies of the first 100 items to see if frequencies are consistent and
+        # can be inferred
+        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self._item_index[:100]]
+        freq = freq_for_each_series[0]
         if len(set(freq_for_each_series)) > 1 or freq is None:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
                 "time index of the data being irregularly sampled. Please ensure that the "
                 "data set used has a uniform time index."
             )
-        return freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
+        freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
+        self._cached_freq = freq
+        return freq
 
     def iter_items(self) -> Iterable[Any]:
         return iter(self._item_index)
