@@ -54,6 +54,8 @@ from .constants import (
     COLUMN_FEATURES,
     MASKS,
     ZERO_SHOT,
+    ZERO_SHOT_SENTENCE_SIMILARITY,
+    ZERO_SHOT_ALL,
 )
 
 from .data.datamodule import BaseDataModule
@@ -222,8 +224,10 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if problem_type is not None and problem_type.lower() == ZERO_SHOT:
-            self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
+        if problem_type is not None and problem_type.lower() in ZERO_SHOT_ALL:
+            self._config, self._model, self._data_processors = init_zero_shot(
+                problem_type=problem_type, hyperparameters=hyperparameters
+            )
 
     @property
     def path(self):
@@ -1706,7 +1710,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=False,
         )
-        if self._problem_type in [ZERO_SHOT]:
+        if self._problem_type in ZERO_SHOT_ALL:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
             if return_masks:
                 masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)

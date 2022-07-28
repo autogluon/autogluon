@@ -11,6 +11,8 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 ZERO_SHOT = "zero_shot"
+ZERO_SHOT_SENTENCE_SIMILARITY = "zero_shot_sentence_similarity"
+ZERO_SHOT_ALL = [ZERO_SHOT, ZERO_SHOT_SENTENCE_SIMILARITY]
 
 # Input keys
 IMAGE = "image"

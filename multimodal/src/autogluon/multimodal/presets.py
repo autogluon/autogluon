@@ -64,6 +64,16 @@ def zero_shot():
     }
 
 
+@automm_presets.register()
+def zero_shot_sentence_similarity():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
+        "model.hf_text.pooling_mode": "mean",
+        "env.eval_batch_size_ratio": 1,
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.

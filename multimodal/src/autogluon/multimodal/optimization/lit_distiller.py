@@ -71,7 +71,7 @@ class DistillerLitModule(pl.LightningModule):
         teacher_model
             The teacher model in knowledge distillation.
         matches
-            Teacher/stduent layer matches to compute the output_feature loss.
+            Teacher/student layer matches to compute the intermediate loss.
         critics
             The critics used in computing mutual information loss.
         baseline_funcs
