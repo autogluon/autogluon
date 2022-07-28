@@ -699,12 +699,13 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
-        if self._config.distiller.output_feature_loss_type == "cosine":
+        output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
+        if output_feature_loss_type == "cosine":
             output_feature_loss_func = nn.CosineEmbeddingLoss()
-        elif self._config.distiller.output_feature_loss_type == "mse":
+        elif output_feature_loss_type == "mse":
             output_feature_loss_func = nn.MSELoss()
         else:
-            raise ValueError(f"Unknown output_feature_loss_type: {self._config.distiller.output_feature_loss_type}")
+            raise ValueError(f"Unknown output_feature_loss_type: {output_feature_loss_type}")
 
         # Adapt student's output_feature feature to teacher's
         # Refer to FitNet: https://arxiv.org/abs/1412.6550
@@ -716,8 +717,10 @@ class MultiModalPredictor:
             else nn.Identity()
         )
 
+        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.)
+        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.)
         rkd_loss_func = RKDLoss(
-            self._config.distiller.rkd_distance_loss_weight, self._config.distiller.rkd_angle_loss_weight
+            rkd_distance_loss_weight, rkd_angle_loss_weight
         )
 
         # turn on returning column information in data processors
@@ -948,6 +951,7 @@ class MultiModalPredictor:
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
+            output_feature_loss_weight = OmegaConf.select(self._config, "distiller.output_feature_loss_weight", default=0.01)
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
@@ -957,7 +961,7 @@ class MultiModalPredictor:
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
-                output_feature_loss_weight=config.distiller.output_feature_loss_weight,
+                output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
                 output_feature_adaptor=output_feature_adaptor,
