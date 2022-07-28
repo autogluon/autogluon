@@ -28,23 +28,15 @@ EMPTY_TARGETS = np.array([], dtype=np.int64)
 
 
 def _build_ts_dataframe(item_ids, datetime_index, target, static_features=None):
-    multi_inds = pd.MultiIndex.from_product(
-        [item_ids, datetime_index], names=["item_id", "timestamp"]
-    )
-    if static_features is not None:
-        return TimeSeriesDataFrame(
-            pd.Series(target, name="target", index=multi_inds).to_frame(),
-            static_features=static_features,
-        )
+    multi_inds = pd.MultiIndex.from_product([item_ids, datetime_index], names=["item_id", "timestamp"])
     return TimeSeriesDataFrame(
         pd.Series(target, name="target", index=multi_inds).to_frame(),
+        static_features=static_features,
     )
 
 
 SAMPLE_TS_DATAFRAME = _build_ts_dataframe(ITEM_IDS, DATETIME_INDEX, TARGETS)
-SAMPLE_TS_DATAFRAME_EMPTY = _build_ts_dataframe(
-    EMPTY_ITEM_IDS, EMPTY_DATETIME_INDEX, EMPTY_TARGETS
-)
+SAMPLE_TS_DATAFRAME_EMPTY = _build_ts_dataframe(EMPTY_ITEM_IDS, EMPTY_DATETIME_INDEX, EMPTY_TARGETS)
 SAMPLE_TS_DATAFRAME_STATIC = _build_ts_dataframe(
     item_ids=ITEM_IDS,
     datetime_index=DATETIME_INDEX,
@@ -134,9 +126,7 @@ def test_from_gluonts_list_dataset():
 
 def test_from_data_frame():
     tsdf_from_data_frame = TimeSeriesDataFrame(SAMPLE_DATAFRAME)
-    pd.testing.assert_frame_equal(
-        tsdf_from_data_frame, SAMPLE_TS_DATAFRAME, check_dtype=True
-    )
+    pd.testing.assert_frame_equal(tsdf_from_data_frame, SAMPLE_TS_DATAFRAME, check_dtype=True)
 
 
 @pytest.mark.parametrize(
@@ -235,9 +225,7 @@ def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, target
         (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "H"),
     ],
 )
-def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(
-    timestamps, expected_freq
-):
+def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(timestamps, expected_freq):
     df = pd.DataFrame(
         {
             "item_id": [0, 0, 0],
@@ -262,9 +250,7 @@ FREQ_TEST_CASES = [
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
-    start_time, freq
-):
+def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(start_time, freq):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time)} for _ in range(3)],  # type: ignore
         freq=freq,
@@ -276,9 +262,7 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(
-    start_time, freq
-):
+def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
         freq=freq,
@@ -443,9 +427,7 @@ def test_when_dataframe_class_copy_called_then_output_correct(input_df):
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 @pytest.mark.parametrize("inplace", [True, False])
 def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplace):
-    renamed_df = TimeSeriesDataFrame.rename(
-        input_df, columns={"target": "mytarget"}, inplace=inplace
-    )
+    renamed_df = TimeSeriesDataFrame.rename(input_df, columns={"target": "mytarget"}, inplace=inplace)
     if inplace:
         renamed_df = input_df
 
@@ -519,9 +501,7 @@ def test_when_dataframe_stdlib_copy_called_then_static_features_are_correct():
 @pytest.mark.parametrize("inplace", [True, False])
 def test_when_dataframe_class_rename_called_then_static_features_are_correct(inplace):
     input_df = SAMPLE_TS_DATAFRAME_STATIC
-    renamed_df = TimeSeriesDataFrame.rename(
-        input_df, columns={"target": "mytarget"}, inplace=inplace
-    )
+    renamed_df = TimeSeriesDataFrame.rename(input_df, columns={"target": "mytarget"}, inplace=inplace)
     if inplace:
         renamed_df = input_df
 
@@ -571,9 +551,7 @@ def test_when_dataset_subsequenced_then_static_features_are_correct():
 
 
 def test_when_dataset_split_by_time_then_static_features_are_correct():
-    left, right = SAMPLE_TS_DATAFRAME_STATIC.split_by_time(
-        START_TIMESTAMP + datetime.timedelta(days=1)
-    )
+    left, right = SAMPLE_TS_DATAFRAME_STATIC.split_by_time(START_TIMESTAMP + datetime.timedelta(days=1))
 
     assert len(left) == 1 * len(SAMPLE_TS_DATAFRAME_STATIC.index.levels[0])
     assert len(right) == 2 * len(SAMPLE_TS_DATAFRAME_STATIC.index.levels[0])
@@ -596,18 +574,19 @@ def test_given_correct_static_feature_index_when_constructing_data_frame_then_er
     try:
         TimeSeriesDataFrame(data=SAMPLE_DATAFRAME, static_features=static_features)
     except Exception as e:  # noqa
-        pytest.fail(
-            f"Exception raised: {str(e)} \n Traceback:\n {traceback.format_exc()}"
-        )
+        pytest.fail(f"Exception raised: {str(e)} \n Traceback:\n {traceback.format_exc()}")
 
 
-@pytest.mark.parametrize("static_feature_index", [
-    (1, 2, 3, 4),
-    (1, 2),
-    (6, 7),
-    (),
-    ("A", "B"),
-])
+@pytest.mark.parametrize(
+    "static_feature_index",
+    [
+        (1, 2, 3, 4),
+        (1, 2),
+        (6, 7),
+        (),
+        ("A", "B"),
+    ],
+)
 def test_given_wrong_static_feature_index_when_constructing_data_frame_then_error_raised(
     static_feature_index,
 ):
@@ -622,14 +601,15 @@ def test_given_wrong_static_feature_index_when_constructing_data_frame_then_erro
         TimeSeriesDataFrame(data=SAMPLE_DATAFRAME, static_features=static_features)
 
 
-@pytest.mark.parametrize("left_index, right_index", [
-    ([0, 1], [2]),
-    ([0], [1, 2]),
-    ([], [0, 1, 2]),
-])
-def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consistent(
-    left_index, right_index
-):
+@pytest.mark.parametrize(
+    "left_index, right_index",
+    [
+        ([0, 1], [2]),
+        ([0], [1, 2]),
+        ([], [0, 1, 2]),
+    ],
+)
+def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consistent(left_index, right_index):
     df = SAMPLE_TS_DATAFRAME_STATIC
     left, right = df.loc[left_index], df.loc[right_index]
 
