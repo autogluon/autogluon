@@ -717,11 +717,9 @@ class MultiModalPredictor:
             else nn.Identity()
         )
 
-        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.)
-        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.)
-        rkd_loss_func = RKDLoss(
-            rkd_distance_loss_weight, rkd_angle_loss_weight
-        )
+        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.0)
+        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.0)
+        rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
 
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
@@ -951,7 +949,9 @@ class MultiModalPredictor:
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
-            output_feature_loss_weight = OmegaConf.select(self._config, "distiller.output_feature_loss_weight", default=0.01)
+            output_feature_loss_weight = OmegaConf.select(
+                self._config, "distiller.output_feature_loss_weight", default=0.01
+            )
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
