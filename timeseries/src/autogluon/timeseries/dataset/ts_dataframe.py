@@ -136,20 +136,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
-        ts_index = self.index.levels[1]  # noqa
-        freq = (
-            ts_index.freq
-            or ts_index.inferred_freq
-            or self.loc[0].index.freq  # fall back to freq of first item
-            or self.loc[0].index.inferred_freq
-        )
-        if freq is None:
-            raise ValueError("Frequency not provided and cannot be inferred")
-        if isinstance(freq, str):
-            return freq
-        elif isinstance(freq, pd._libs.tslibs.BaseOffset):
-            return freq.freqstr
-        return freq
+        def get_freq(series):
+            return series.index.freq or series.index.inferred_freq
+        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.iter_items()]
+        freq = freq_for_each_series[0]    
+        if len(set(freq_for_each_series)) > 1 or freq is None:
+            raise ValueError(
+                "Frequency not provided and cannot be inferred. This is often due to the "
+                "time index of the data being irregularly sampled. Please ensure that the "
+                "data set used has a uniform time index."
+            )
+        return freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
 
     def iter_items(self) -> Iterable[Any]:
         return iter(self._item_index)

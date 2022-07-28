@@ -220,7 +220,9 @@ def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, target
         (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "H"),
     ],
 )
-def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(timestamps, expected_freq):
+def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(
+    timestamps, expected_freq
+):
     df = pd.DataFrame(
         {
             "item_id": [0, 0, 0],
@@ -245,7 +247,9 @@ FREQ_TEST_CASES = [
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(start_time, freq):
+def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
+    start_time, freq
+):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time)} for _ in range(3)],  # type: ignore
         freq=freq,
@@ -257,7 +261,9 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
-def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
+def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(
+    start_time, freq
+):
     item_list = ListDataset(
         [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
         freq=freq,
@@ -268,7 +274,6 @@ def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferre
     assert ts_df.freq == freq
 
 
-@pytest.mark.skip("Skipped until re-enabling regularity check.")
 @pytest.mark.parametrize(
     "list_of_timestamps",
     [
@@ -300,8 +305,9 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_rai
 
     df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
 
-    with pytest.raises(ValueError, match="uniformly sampled"):
-        TimeSeriesDataFrame.from_data_frame(df)
+    with pytest.raises(ValueError, match="irregularly sampled"):
+        tsdf = TimeSeriesDataFrame.from_data_frame(df)
+        _ = tsdf.freq
 
 
 SAMPLE_ITERABLE_2 = [
@@ -422,7 +428,9 @@ def test_when_dataframe_class_copy_called_then_output_correct(input_df):
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 @pytest.mark.parametrize("inplace", [True, False])
 def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplace):
-    renamed_df = TimeSeriesDataFrame.rename(input_df, columns={"target": "mytarget"}, inplace=inplace)
+    renamed_df = TimeSeriesDataFrame.rename(
+        input_df, columns={"target": "mytarget"}, inplace=inplace
+    )
     if inplace:
         renamed_df = input_df
 
