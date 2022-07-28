@@ -28,7 +28,7 @@ install_requires = [
     'setuptools<=59.5.0',
     'timm<0.6.0',
     'torch>=1.0,<1.11',
-    'fairscale>=0.4.5,<0.5.0',
+    'fairscale>=0.4.5,<=0.4.6',
     'scikit-image>=0.19.1,<0.20.0',
     'smart_open>=5.2.1,<5.3.0',
     'pytorch_lightning>=1.5.10,<1.7.0',
