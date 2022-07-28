@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 import os
 import numpy as np
 import json
@@ -95,6 +96,7 @@ from .utils import (
     tensor_to_ndarray,
     infer_dtypes_by_model_names,
     update_config_by_rules,
+    process_save_path,
 )
 from .optimization.utils import (
     get_metric,
@@ -197,6 +199,9 @@ class MultiModalPredictor:
 
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
+
+        if path is not None:
+            path = process_save_path(path=path)
 
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
@@ -383,19 +388,21 @@ class MultiModalPredictor:
 
         pl.seed_everything(seed, workers=True)
 
-        if self._resume or save_path is None:
-            save_path = self._save_path
-        else:
-            save_path = os.path.expanduser(save_path)
+        if self._resume:
+            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
+            save_path = process_save_path(path=self._save_path, resume=True)
+        elif save_path is not None:
+            save_path = process_save_path(path=save_path)
+        elif self._save_path is not None:
+            save_path = process_save_path(path=self._save_path, raise_if_exist=False)
 
         if not self._resume:
             save_path = setup_outputdir(
                 path=save_path,
                 warn_if_exist=self._warn_if_exist,
             )
-        else:
-            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
-        save_path = os.path.abspath(save_path)
+
+        save_path = os.path.abspath(os.path.expanduser(save_path))
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
@@ -1037,7 +1044,11 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
+        num_gpus = (
+            math.floor(config.env.num_gpus)
+            if isinstance(config.env.num_gpus, (int, float))
+            else len(config.env.num_gpus)
+        )
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
 
@@ -1167,7 +1178,8 @@ class MultiModalPredictor:
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
-                best_k_models = yaml.load(f, Loader=yaml.Loader)
+                best_k_models = yaml.safe_load(f)
+
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -1282,7 +1294,9 @@ class MultiModalPredictor:
         )
 
         num_gpus = (
-            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
+            math.floor(self._config.env.num_gpus)
+            if isinstance(self._config.env.num_gpus, (int, float))
+            else len(self._config.env.num_gpus)
         )
         if num_gpus < 0:
             num_gpus = torch.cuda.device_count()
@@ -1574,7 +1588,10 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                pred = logits_or_prob
+                if logits_or_prob.ndim == 2:
+                    pred = logits_or_prob.argmax(axis=1)
+                else:
+                    pred = logits_or_prob
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
@@ -1816,7 +1833,7 @@ class MultiModalPredictor:
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
@@ -1896,7 +1913,7 @@ class MultiModalPredictor:
         -------
         The loaded predictor object.
         """
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)

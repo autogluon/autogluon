@@ -7,7 +7,6 @@ import scipy.stats
 import sklearn.metrics
 
 from . import classification_metrics
-from .util import sanitize_array
 from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 from ..utils.miscs import warning_filter
 from .classification_metrics import *

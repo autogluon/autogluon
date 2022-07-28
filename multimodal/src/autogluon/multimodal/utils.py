@@ -85,6 +85,7 @@ from .constants import (
     FEATURES,
     MASKS,
     S3_PREFIX,
+    LAST_CHECKPOINT,
 )
 from .presets import get_automm_presets, get_basic_automm_config
 
@@ -1652,7 +1653,7 @@ def init_zero_shot(
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
-    model = create_model(config=config)
+    model = create_model(config=config, pretrained=True)
 
     data_processors = init_data_processors(
         config=config,
@@ -1976,3 +1977,41 @@ def update_config_by_rules(
                 UserWarning,
             )
     return config
+
+
+def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Optional[bool] = True):
+    """
+    Convert the provided path to an absolute path and check whether it is valid.
+    If a path exists, either raise error or return None.
+    A None path can be identified by the `setup_outputdir` to generate a random path.
+
+    Parameters
+    ----------
+    path
+        A provided path.
+    resume
+        Whether this is a path to resume training.
+    raise_if_exist
+        Whether to raise error if the path exists.
+
+    Returns
+    -------
+    A complete and verified path or None.
+    """
+    path = os.path.abspath(os.path.expanduser(path))
+    if resume:
+        assert os.path.isfile(os.path.join(path, LAST_CHECKPOINT)), (
+            f"Trying to resume training from '{path}'. "
+            f"However, it does not contain the last checkpoint file: '{LAST_CHECKPOINT}'. "
+            "Are you using a correct path?"
+        )
+    elif os.path.isdir(path):
+        if raise_if_exist:
+            raise ValueError(
+                f"Path {path} already exists."
+                "Specify a new path to avoid accidentally overwriting a saved predictor."
+            )
+        else:
+            path = None
+
+    return path
