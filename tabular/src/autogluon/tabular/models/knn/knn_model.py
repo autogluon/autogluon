@@ -28,14 +28,13 @@ class KNNModel(AbstractModel):
         if self.params_aux.get('use_daal', True):
             try:
                 # TODO: Add more granular switch, currently this affects all future KNN models even if they had `use_daal=False`
-                from sklearnex import patch_sklearn
-                patch_sklearn("knn_classifier")
-                patch_sklearn("knn_regressor")
+                from sklearnex.neighbors import KNeighborsClassifier, KNeighborsRegressor
                 # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
                 logger.log(15, '\tUsing sklearnex KNN backend...')
             except:
-                pass
-        from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+                from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+        else:
+            from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
         if self.problem_type == REGRESSION:
             return KNeighborsRegressor
         else:
