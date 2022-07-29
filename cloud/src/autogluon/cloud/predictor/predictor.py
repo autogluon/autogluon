@@ -970,6 +970,10 @@ class ImageCloudPredictor(CloudPredictor):
         predictor_cls = ImagePredictor
         return predictor_cls
 
+    def fit(**kwargs):
+        assert kwargs.get('image_path', None) is not None, "Image path must be provided to train ImageCloudPredictor"
+        super().fit(**kwargs)
+
     def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
