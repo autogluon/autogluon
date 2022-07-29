@@ -2,13 +2,12 @@ import copy
 import tempfile
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
-
 from gluonts.dataset.common import ListDataset
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")  # type: ignore

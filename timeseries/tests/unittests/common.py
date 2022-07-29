@@ -8,7 +8,6 @@ from gluonts.dataset.common import ListDataset
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 
-
 # TODO: add larger unit test data sets to S3
 
 DUMMY_DATASET = ListDataset(
@@ -67,8 +66,6 @@ def dict_equal_primitive(this, that):
         if isinstance(v, dict):
             equal_fields.append(dict_equal_primitive(v, that[k]))
         if isinstance(v, list):
-            equal_fields.append(
-                dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k])))
-            )
+            equal_fields.append(dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k]))))
 
     return all(equal_fields)

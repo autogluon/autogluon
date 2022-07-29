@@ -13,9 +13,8 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-
-from autogluon.timeseries import TimeSeriesEvaluator, TimeSeriesDataFrame
-from autogluon.timeseries.models import DeepARModel, AutoETSModel
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries.models import AutoETSModel, DeepARModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
@@ -112,7 +111,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         },
     )
 
-    hyperparameter_tune_kwargs = 'auto'
+    hyperparameter_tune_kwargs = "auto"
 
     models, results = model.hyperparameter_tune(
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,

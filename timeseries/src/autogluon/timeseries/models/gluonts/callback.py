@@ -2,8 +2,8 @@ import logging
 import time
 
 from gluonts.mx.trainer.callback import Callback
-from autogluon.core.utils.early_stopping import AdaptiveES
 
+from autogluon.core.utils.early_stopping import AdaptiveES
 
 logger = logging.getLogger(__name__)
 

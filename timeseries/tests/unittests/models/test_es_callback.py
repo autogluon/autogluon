@@ -1,11 +1,11 @@
 import pytest
 
-from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.models.gluonts.callback import (
-    GluonTSEarlyStoppingCallback,
     GluonTSAdaptiveEarlyStoppingCallback,
+    GluonTSEarlyStoppingCallback,
 )
+from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from ..common import DUMMY_TS_DATAFRAME
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
