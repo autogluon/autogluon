@@ -144,7 +144,7 @@ ca (rmse) | 0.482 | 0.577 | [link](https://autogluon.s3.us-west-2.amazonaws.com/
 he (acc) | 0.379 | 0.385 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_result.zip)
 ja (acc) | 0.721 | 0.729 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_result.zip)
 hi (acc) | 0.726 | 0.732 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_result.zip)
-ad (acc) | 0.859 | 0.857 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/al_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/al_hpo_result.zip)
+ad (acc) | 0.859 | 0.857 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ad_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ad_hpo_result.zip)
 
 ---
 
