@@ -2,18 +2,18 @@ import copy
 import logging
 import os
 import time
-from typing import Any, Dict, Union, Tuple, Optional, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import autogluon.core as ag
+from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
-from autogluon.common.savers import save_pkl
-from ... import TimeSeriesEvaluator
 
+from ... import TimeSeriesEvaluator
 from ...dataset import TimeSeriesDataFrame
 from ...utils.metadata import get_prototype_metadata_dict
-from .model_trial import skip_hpo, model_trial
+from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +87,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(
-            eval_metric
-        )
+        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
@@ -225,9 +223,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         quantiles = quantile_levels or self.quantile_levels
         if not all(0 < q < 1 for q in quantiles):
-            raise ValueError(
-                "Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive)."
-            )
+            raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
     def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
@@ -282,9 +278,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        return self.predict(
-            data.slice_by_timestep(slice(None, -self.prediction_length)), **kwargs
-        )
+        return self.predict(data.slice_by_timestep(slice(None, -self.prediction_length)), **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
@@ -332,11 +326,9 @@ class AbstractTimeSeriesModel(AbstractModel):
     ):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
-        logger.debug(
-            f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}"
-        )
+        logger.debug(f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}")
         search_space = self._get_search_space()
-        
+
         try:
             hpo_executor.validate_search_space(search_space, self.name)
         except EmptySearchSpace:
@@ -363,7 +355,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             val_path=val_path,
             hpo_executor=hpo_executor,
         )
-        
+
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
@@ -371,10 +363,10 @@ class AbstractTimeSeriesModel(AbstractModel):
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
-            minimum_cpu_per_trial=self.get_minimum_resources().get('num_cpus', 1),
-            minimum_gpu_per_trial=self.get_minimum_resources().get('num_gpus', 0),
+            minimum_cpu_per_trial=self.get_minimum_resources().get("num_cpus", 1),
+            minimum_gpu_per_trial=self.get_minimum_resources().get("num_gpus", 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
-            adapter_type='timeseries',
+            adapter_type="timeseries",
         )
 
         return hpo_executor.get_hpo_results(

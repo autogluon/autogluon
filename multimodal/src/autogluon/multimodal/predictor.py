@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 import os
 import numpy as np
 import json
@@ -95,6 +96,7 @@ from .utils import (
     tensor_to_ndarray,
     infer_dtypes_by_model_names,
     update_config_by_rules,
+    process_save_path,
 )
 from .optimization.utils import (
     get_metric,
@@ -103,6 +105,8 @@ from .optimization.utils import (
 from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
+
+from .optimization.rkd_loss import RKDLoss
 
 from . import version as ag_version
 
@@ -195,6 +199,9 @@ class MultiModalPredictor:
 
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
+
+        if path is not None:
+            path = process_save_path(path=path)
 
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
@@ -381,19 +388,21 @@ class MultiModalPredictor:
 
         pl.seed_everything(seed, workers=True)
 
-        if self._resume or save_path is None:
-            save_path = self._save_path
-        else:
-            save_path = os.path.expanduser(save_path)
+        if self._resume:
+            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
+            save_path = process_save_path(path=self._save_path, resume=True)
+        elif save_path is not None:
+            save_path = process_save_path(path=save_path)
+        elif self._save_path is not None:
+            save_path = process_save_path(path=self._save_path, raise_if_exist=False)
 
         if not self._resume:
             save_path = setup_outputdir(
                 path=save_path,
                 warn_if_exist=self._warn_if_exist,
             )
-        else:
-            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
-        save_path = os.path.abspath(save_path)
+
+        save_path = os.path.abspath(os.path.expanduser(save_path))
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
@@ -652,6 +661,12 @@ class MultiModalPredictor:
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
+        output_feature_adaptor
+            The adaptor used to adapt student output feature to the shape of teacher's.
+        output_feature_loss_func
+            The loss function using minimize distance between output_feature of teacher and student.
+        rkd_loss_func
+            The loss function using rkd distance and angle loss between output_feature of teacher and student.
         df_preprocessor
             The teacher predictor's dataframe preprocessor.
         data_processors
@@ -691,6 +706,28 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
+        output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
+        if output_feature_loss_type == "cosine":
+            output_feature_loss_func = nn.CosineEmbeddingLoss()
+        elif output_feature_loss_type == "mse":
+            output_feature_loss_func = nn.MSELoss()
+        else:
+            raise ValueError(f"Unknown output_feature_loss_type: {output_feature_loss_type}")
+
+        # Adapt student's output_feature feature to teacher's
+        # Refer to FitNet: https://arxiv.org/abs/1412.6550
+        teacher_model_dim = teacher_predictor._model.out_features
+        student_model_dim = self._model.out_features
+        output_feature_adaptor = (
+            nn.Linear(student_model_dim, teacher_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
+
+        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.0)
+        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.0)
+        rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
+
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
@@ -724,6 +761,9 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            output_feature_adaptor,
+            output_feature_loss_func,
+            rkd_loss_func,
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
@@ -862,6 +902,9 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = self._setup_distillation(
@@ -873,9 +916,12 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -910,6 +956,9 @@ class MultiModalPredictor:
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
+            output_feature_loss_weight = OmegaConf.select(
+                self._config, "distiller.output_feature_loss_weight", default=0.01
+            )
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
@@ -919,8 +968,12 @@ class MultiModalPredictor:
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
+                output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                output_feature_adaptor=output_feature_adaptor,
+                output_feature_loss_func=output_feature_loss_func,
+                rkd_loss_func=rkd_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -991,7 +1044,11 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
+        num_gpus = (
+            math.floor(config.env.num_gpus)
+            if isinstance(config.env.num_gpus, (int, float))
+            else len(config.env.num_gpus)
+        )
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
 
@@ -1121,7 +1178,8 @@ class MultiModalPredictor:
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
-                best_k_models = yaml.load(f, Loader=yaml.Loader)
+                best_k_models = yaml.safe_load(f)
+
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -1236,7 +1294,9 @@ class MultiModalPredictor:
         )
 
         num_gpus = (
-            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
+            math.floor(self._config.env.num_gpus)
+            if isinstance(self._config.env.num_gpus, (int, float))
+            else len(self._config.env.num_gpus)
         )
         if num_gpus < 0:
             num_gpus = torch.cuda.device_count()
@@ -1528,7 +1588,10 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                pred = logits_or_prob
+                if logits_or_prob.ndim == 2:
+                    pred = logits_or_prob.argmax(axis=1)
+                else:
+                    pred = logits_or_prob
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
@@ -1770,7 +1833,7 @@ class MultiModalPredictor:
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
@@ -1850,7 +1913,7 @@ class MultiModalPredictor:
         -------
         The loaded predictor object.
         """
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)

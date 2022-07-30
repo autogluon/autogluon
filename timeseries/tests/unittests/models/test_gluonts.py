@@ -1,22 +1,19 @@
 from functools import partial
 
 import pytest
-from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.model.prophet import PROPHET_IS_INSTALLED
 from gluonts.model.seq2seq import MQRNNEstimator
 from gluonts.model.transformer import TransformerEstimator
 
 import autogluon.core as ag
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.timeseries.models.gluonts import (
+from autogluon.timeseries.models.gluonts import (  # AutoTabularModel,; MQRNNModel,; TransformerModel,
     DeepARModel,
-    # AutoTabularModel,
     GenericGluonTSModel,
     MQCNNModel,
-    # MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
-    # TransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
@@ -151,7 +148,7 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
         prediction_length=4,
         hyperparameters={"growth": "linear", "n_changepoints": ag.Int(3, 4)},
     )
-    hyperparameter_tune_kwargs = 'auto'
+    hyperparameter_tune_kwargs = "auto"
 
     models, results = model.hyperparameter_tune(
         time_limit=100,

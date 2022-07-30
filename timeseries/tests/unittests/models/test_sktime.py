@@ -6,20 +6,20 @@ import pytest
 from autogluon.timeseries import TimeSeriesDataFrame
 
 try:
+    from sktime.forecasting.arima import ARIMA, AutoARIMA
     from sktime.forecasting.ets import AutoETS
-    from sktime.forecasting.arima import AutoARIMA, ARIMA
     from sktime.forecasting.tbats import TBATS
     from sktime.forecasting.theta import ThetaForecaster
 except ImportError:
     pytest.skip("sktime not available", allow_module_level=True)
 
 from autogluon.timeseries.models.sktime import (
+    AbstractSktimeModel,
     ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
     TBATSModel,
     ThetaModel,
-    AbstractSktimeModel,
 )
 
 from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
@@ -75,9 +75,7 @@ def test_when_sktime_models_fitted_then_allowed_hyperparameters_are_passed_to_sk
     hyperparameters.update(bad_params)
     model = model_class(hyperparameters=hyperparameters)
 
-    with mock.patch.object(
-        target=sktime_forecaster_class, attribute="__init__"
-    ) as const_mock:
+    with mock.patch.object(target=sktime_forecaster_class, attribute="__init__") as const_mock:
         try:
             model.fit(train_data=DUMMY_TS_DATAFRAME)
         except TypeError:
@@ -130,9 +128,7 @@ def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_skt_models_saved_then_forecasters_can_be_loaded(
-    model_class, temp_model_path
-):
+def test_when_skt_models_saved_then_forecasters_can_be_loaded(model_class, temp_model_path):
     model = model_class()
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()

@@ -1,11 +1,10 @@
+import logging
 import os
 import time
-import logging
 
 from autogluon.core.models.abstract.model_trial import init_model
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
-
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -49,16 +48,18 @@ def model_trial(
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
         # In case of TimeLimitExceed, val_score could be None
-        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score if model.val_score is not None else float('-inf'))
+        hpo_executor.report(
+            reporter=reporter,
+            epoch=1,
+            validation_performance=model.val_score if model.val_score is not None else float("-inf"),
+        )
         if reporter is not None:
             reporter.terminate()
     else:
         hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score)
 
 
-def fit_and_save_model(
-    model, fit_kwargs, train_data, val_data, eval_metric, time_start, time_limit=None
-):
+def fit_and_save_model(model, fit_kwargs, train_data, val_data, eval_metric, time_start, time_limit=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -69,9 +70,7 @@ def fit_and_save_model(
         time_left = None
 
     time_fit_start = time.time()
-    model.fit(
-        train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs
-    )
+    model.fit(train_data=train_data, val_data=val_data, time_limit=time_left, **fit_kwargs)
     time_fit_end = time.time()
     model.val_score = model.score(val_data, eval_metric)
     time_pred_end = time.time()
@@ -102,6 +101,6 @@ def skip_hpo(model, train_data, val_data, time_limit=None):
     )
     hpo_results = {"total_time": model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
-    hpo_results['hpo_model_performances'] = hpo_model_performances
+    hpo_results["hpo_model_performances"] = hpo_model_performances
     hpo_models = {model.name: model.path}
     return hpo_models, hpo_results

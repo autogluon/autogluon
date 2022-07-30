@@ -1,18 +1,15 @@
 import logging
 import time
-from typing import Type, Optional, Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
-from . import TimeSeriesEvaluator
 
+from . import TimeSeriesEvaluator
 from .dataset import TimeSeriesDataFrame
 from .models.abstract import AbstractTimeSeriesModel
-from .trainer import (
-    AutoTimeSeriesTrainer,
-    AbstractTimeSeriesTrainer,
-)
+from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +87,7 @@ class TimeSeriesLearner(AbstractLearner):
                 eval_metric=self.eval_metric,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
-                verbosity=kwargs.get("verbosity", 2)
+                verbosity=kwargs.get("verbosity", 2),
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -141,6 +138,4 @@ class TimeSeriesLearner(AbstractLearner):
     def refit_full(self, models="all"):
         # TODO: Implement refitting
         # return self.load_trainer().refit_full(models=models)
-        raise NotImplementedError(
-            "refitting logic currently not implemented in autogluon.timeseries"
-        )
+        raise NotImplementedError("refitting logic currently not implemented in autogluon.timeseries")

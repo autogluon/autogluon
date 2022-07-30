@@ -110,6 +110,8 @@ class MultimodalFusionMLP(nn.Module):
         self.fusion_mlp.apply(init_weights)
         self.head.apply(init_weights)
 
+        self.out_features = in_features
+
         self.prefix = prefix
 
         self.name_to_id = self.get_layer_ids()
@@ -298,6 +300,8 @@ class MultimodalFusionTransformer(nn.Module):
             d_token=in_features,
             initialization="uniform",
         )
+
+        self.out_features = in_features
 
         # init weights
         self.adapter.apply(init_weights)

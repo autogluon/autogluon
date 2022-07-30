@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 DEFAULT_SEASONALITIES = {
     "T": 60 * 24,
     "H": 24,
