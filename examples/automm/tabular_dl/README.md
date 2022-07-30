@@ -121,12 +121,14 @@ metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
 ### 6. Hyper-parameter optimization for FT_Transformer
 Set `--mode` in [`example_tabular.py`](./example_tabular.py) to `single_hpo` to run the HPO for FTTransformer. 
 The search spaces for FT_transformer are as follws:
-- "model.numerical_transformer.ffn_dropout": tune.uniform(0.0, 0.5), 
-- "model.numerical_transformer.attention_dropout": tune.uniform(0.0, 0.5),
-- "model.numerical_transformer.residual_dropout": tune.uniform(0.0, 0.2),
+- "model.fusion_transformer.ffn_dropout": tune.uniform(0.0, 0.5), 
+- "model.fusion_transformer.attention_dropout": tune.uniform(0.0, 0.5),
+- "model.fusion_transformer.residual_dropout": tune.uniform(0.0, 0.2),
+- "model.fusion_transformer.ffn_d_hidden": tune.randint(150, 300),
+- "model.numerical_transformer.ffn_d_hidden": tune.randint(150, 300)
 - "optimization.learning_rate": tune.uniform(0.00001, 0.001),
 
-with the tuning kwargs as follws:
+with the tuning kwargs as follows:
 ```python
 hyperparameter_tune_kwargs = {
         "searcher": 'random',
@@ -138,11 +140,11 @@ hyperparameter_tune_kwargs = {
 The results are as follws:
 Dataset (metric) | w/o HPO | w/ HPO | model_configs | results 
 ----  | ----  | ----  | ----  | ----  
-ca (rmse) | 0.482 | 0.579 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ca_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ca_hpo_result.zip)
-he (acc) | 0.379 | 0.381 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_result.zip)
-ja (acc) | 0.721 | 0.728 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_result.zip)
-hi (acc) | 0.726 | 0.727 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_result.zip)
-al (acc) | 0.949 | 0.953 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/al_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/al_hpo_result.zip)
+ca (rmse) | 0.482 | 0.577 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ca_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ca_hpo_result.zip)
+he (acc) | 0.379 | 0.385 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_result.zip)
+ja (acc) | 0.721 | 0.729 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_result.zip)
+hi (acc) | 0.726 | 0.732 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_result.zip)
+ad (acc) | 0.859 | 0.857 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/al_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/al_hpo_result.zip)
 
 ---
 
