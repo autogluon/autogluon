@@ -1,3 +1,5 @@
+import warnings
+
 from sktime.forecasting.arima import ARIMA, AutoARIMA
 from sktime.forecasting.ets import AutoETS
 from sktime.forecasting.tbats import TBATS
@@ -7,11 +9,94 @@ from . import AbstractSktimeModel
 
 
 class ThetaModel(AbstractSktimeModel):
+    """Theta model for forecasting.
+
+    This is a special case of AutoETS model that can only be applied to positive data.
+
+    See `AbstractSktimeModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    initial_level : float or None, default = None
+        The alpha value of the simple exponential smoothing, if the value is set then
+        this will be used, otherwise it will be estimated from the data.
+    deseasonalize : bool, default = True
+        If True, data is seasonally adjusted.
+    seasonal_period: int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For
+        example, 4 for quarterly data with an annual cycle, or 7 for daily data with a
+        weekly cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the
+        training data. Can also be specified manually by providing an integer > 1.
+    fail_if_misoconfigured: bool, default = False
+        If True, the model will raise an exception and fail when given an invalid
+        configuration (e.g., selected seasonality is incompatible with seasonal_period).
+        If False, the model will instead raise a warning and try to adjust the
+        configuration (e.g., turn off seasonality).
+        Setting this parameter to True is useful during HPO to avoid training multiple
+        models that all fall back to the same configuration.
+    """
+
     sktime_forecaster_class = ThetaForecaster
     sktime_allowed_init_args = ["initial_level", "deseasonalize", "sp"]
 
+    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
+        fail_if_misoconfigured = args.pop("fail_if_misconfigured", False)
+        deseasonalize = args.pop("deseasonalize", True)
+        seasonal_period = args.pop("seasonal_period", None)
+        # Handle the case when seasonal_period is intentionally set to None
+        if seasonal_period is None:
+            seasonal_period = inferred_period
+        args["deseasonalize"] = deseasonalize
+        args["sp"] = seasonal_period
+
+        if deseasonalize and (min_length < 2 * seasonal_period or seasonal_period <= 1):
+            error_message = (
+                f"{self.name} with deseasonalize = {deseasonalize} requires training series of length "
+                f"at least 2 * seasonal_period and seasonal_period > 1 "
+                f"(received min_length = {min_length} and seasonal_period = {seasonal_period})."
+            )
+            if fail_if_misoconfigured:
+                raise ValueError(error_message)
+            else:
+                warnings.warn(error_message + "\nSetting seasonality to None.")
+                args["deseasonalize"] = False
+                args["sp"] = 1
+        return args
+
 
 class TBATSModel(AbstractSktimeModel):
+    """TBATS forecaster with multiple seasonalities.
+
+    See `AbstractSktimeModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    use_box_cox: bool or None, default = None
+        Whether to use the Box-Cox transform of the data.
+        When None, both options are considered and the best one is chosed based on AIC.
+    use_trend: bool or None, default = None
+        Whether to use a trend component.
+        When None, both options are considered and the best one is chosed based on AIC.
+    use_damped_trend: bool or None, default = None
+        Whether to damp the trend component.
+        When None, both options are considered and the best one is chosed based on AIC.
+    use_arma_erros: bool or None, default = None
+        Whether to model the residuals with ARMA.
+        When None, both options are considered and the best one is chosed based on AIC.
+    seasonal_period: int, float, array or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For
+        example, 4 for quarterly data with an annual cycle, or 7 for daily data with a
+        weekly cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the
+        training data. Setting to 1 disables seasonality.
+        It's possible to capture multiple trend components by setting seasonal_period
+        to an array of frequencies.
+
+    Other parameters listed in `sktime_allowed_init_args` can be passed to the underlying
+    sktime model. See docstring of `sktime.forecasting.tbats.TBATS` for their description.
+    """
+
     sktime_forecaster_class = TBATS
     sktime_allowed_init_args = [
         "use_box_cox",
@@ -26,8 +111,58 @@ class TBATSModel(AbstractSktimeModel):
         "context",
     ]
 
+    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
+        seasonal_period = args.pop("seasonal_period", None)
+        # Handle the case when seasonal_period is intentionally set to None
+        if seasonal_period is None:
+            seasonal_period = inferred_period
+
+        if seasonal_period == 1:
+            args["sp"] = None
+        else:
+            args["sp"] = seasonal_period
+        return args
+
 
 class AutoETSModel(AbstractSktimeModel):
+    """AutoETS model from sktime.
+
+    See `AbstractSktimeModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    error: str, default = "add"
+        Error model. Allowed values are "add" and "mul".
+    trend: str or None, default = None
+        Trend component model. Allowed values are "add", "mul" and None.
+    damped_trend: bool, default = False
+        Whether or not the included trend component is damped.
+    seasonality: str or None, default = "add"
+        Seasonality model. Allowed values are "add", "mul" and None.
+    seasonal_period: int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For
+        example, 4 for quarterly data with an annual cycle, or 7 for daily data with a
+        weekly cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the
+        training data. Can also be specified manually by providing an integer > 1.
+    initialization_method: str, default = "estimated"
+        Method for initializing the model parameters. Allowed values:
+
+        * "estimated" - learn parameters from the data with maximum likelihood
+        * "heuristic" - select parameters with a heuristic. Faster than "estimated" but
+        can be less accurate and requires a series with at least 8 elements
+    fail_if_misoconfigured: bool, default = False
+        If True, the model will raise an exception and fail when given an invalid
+        configuration (e.g., selected seasonality is incompatible with seasonal_period).
+        If False, the model will instead raise a warning and try to adjust the
+        configuration (e.g., turn off seasonality).
+        Setting this parameter to True is useful during HPO to avoid training multiple
+        models that all fall back to the same configuration.
+
+    Other parameters listed in `sktime_allowed_init_args` can be passed to the underlying
+    sktime model. See docstring of `sktime.forecasting.ets.AutoETS` for their description.
+    """
+
     sktime_forecaster_class = AutoETS
     sktime_allowed_init_args = [
         "error",
@@ -59,8 +194,79 @@ class AutoETSModel(AbstractSktimeModel):
         "random_state",
     ]
 
+    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
+        fail_if_misoconfigured = args.pop("fail_if_misconfigured", False)
+
+        if min_length < 8 and args.get("initialization_method") == "heuristic":
+            error_message = f"{self.name}: Training series too short for initialization_method='heuristic'."
+            if fail_if_misoconfigured:
+                raise ValueError(error_message)
+            else:
+                warnings.warn(error_message + "\nFalling back to initialization_method='estimated'")
+                args["initialization_method"] = "estimated"
+
+        seasonality = args.pop("seasonality", "add")
+        if seasonality not in ["add", "mul", None]:
+            raise ValueError(
+                f"Invalid seasonality {seasonality} for model {self.name} (must be one of 'add', 'mul', None)"
+            )
+
+        seasonal_period = args.pop("seasonal_period", None)
+        # Handle the case when seasonal_period is intentionally set to None
+        if seasonal_period is None:
+            seasonal_period = inferred_period
+
+        args["seasonal"] = seasonality
+        args["sp"] = seasonal_period
+
+        # Check if seasonality and seasonal_period are compatible
+        if seasonality in ["add", "mul"]:
+            if min_length < 2 * seasonal_period or seasonal_period <= 1:
+                error_message = (
+                    f"{self.name} with seasonality {seasonality} requires training series of length "
+                    f"at least 2 * seasonal_period and seasonal_period > 1 "
+                    f"(received min_length = {min_length} and seasonal_period = {seasonal_period})."
+                )
+                if fail_if_misoconfigured:
+                    raise ValueError(error_message)
+                else:
+                    warnings.warn(error_message + "\nSetting seasonality to None.")
+                    args["seasonal"] = None
+                    args["sp"] = 1
+        return args
+
 
 class ARIMAModel(AbstractSktimeModel):
+    """ARIMA model from sktime.
+
+    See `AbstractSktimeModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    order: Tuple[int, int, int], default = (1, 0, 0)
+        The (p, d, q) order of the model for the number of AR parameters, differences,
+        and MA parameters to use.
+    seasonal_order: Tuple[int, int, int], default = (1, 0, 1)
+        The (P, D, Q) parameters of the seasonal ARIMA model. Setting to (0, 0, 0)
+        disables seasonality.
+    seasonal_period: int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For
+        example, 4 for quarterly data with an annual cycle or 7 for daily data with a
+        weekly cycle.
+        When set to None, seasonal period will be inferred from the frequency of the
+        training data. Can also be specified manually by providing an integer > 1.
+    fail_if_misoconfigured: bool, default = False
+        If True, the model will raise an exception and fail when given an invalid
+        configuration (e.g., selected seasonal_order is incompatible with seasonal_period).
+        If False, the model will instead raise a warning and try to adjust the
+        configuration (e.g., turn off seasonality).
+        Setting this parameter to True is useful during HPO to avoid training multiple
+        models that all fall back to the same configuration.
+
+    Other parameters listed in `sktime_allowed_init_args` can be passed to the underlying
+    sktime model. See docstring of `sktime.forecasting.arima.ARIMA` for their description.
+    """
+
     sktime_forecaster_class = ARIMA
     sktime_allowed_init_args = [
         "order",
@@ -84,8 +290,57 @@ class ARIMAModel(AbstractSktimeModel):
         "concentrate_scale",
     ]
 
+    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
+        fail_if_misoconfigured = args.pop("fail_if_misconfigured", False)
+        seasonal_order = args.pop("seasonal_order", (1, 0, 1))
+        seasonal_period = args.pop("seasonal_period", None)
+        # Handle the case when seasonal_period is intentionally set to None
+        if seasonal_period is None:
+            seasonal_period = inferred_period
+
+        seasonal_order_is_valid = len(seasonal_order) == 3 and all(isinstance(p, int) for p in seasonal_order)
+        if not seasonal_order_is_valid:
+            raise ValueError(
+                f"{self.name} can't interpret received seasonal_order {seasonal_order} as a "
+                "tuple with 3 nonnegative integers (P, D, Q)."
+            )
+
+        args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
+
+        if seasonal_period <= 1 and any(s > 0 for s in seasonal_order):
+            error_message = (
+                f"{self.name} with seasonal_order {seasonal_order} expects "
+                f"seasonal_period > 1 (received seasonal_period = {seasonal_period})."
+            )
+            if fail_if_misoconfigured:
+                raise ValueError(error_message)
+            else:
+                warnings.warn(error_message + "\nSetting seasonal_order to (0, 0, 0).")
+                args["seasonal_order"] = (0, 0, 0, 0)
+
+        return args
+
 
 class AutoARIMAModel(AbstractSktimeModel):
+    """AutoARIMA model from sktime.
+
+    This model automatically selects the (p, d, q) and (P, D, Q) parameters of ARIMA by
+    fitting multiple models with different configurations and choosing the best one
+    based on the AIC criterion.
+
+    Other Parameters
+    ----------------
+    seasonal_period: int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For
+        example, 4 for quarterly data with an annual cycle or 7 for daily data with a
+        weekly cycle.
+        When set to None, seasonal period will be inferred from the frequency of the
+        training data. Can also be specified manually by providing an integer > 1.
+
+    Other parameters listed in `sktime_allowed_init_args` can be passed to the underlying
+    sktime model. See docstring of `sktime.forecasting.arima.AutoARIMA` for their description.
+    """
+
     sktime_forecaster_class = AutoARIMA
     sktime_allowed_init_args = [
         "start_p",
@@ -135,3 +390,12 @@ class AutoARIMAModel(AbstractSktimeModel):
         "hamilton_representation",
         "concentrate_scale",
     ]
+
+    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
+        seasonal_period = args.pop("seasonal_period", None)
+        # Handle the case when seasonal_period is intentionally set to None
+        if seasonal_period is None:
+            seasonal_period = inferred_period
+
+        args["sp"] = seasonal_period
+        return args

@@ -33,57 +33,6 @@ TESTABLE_MODELS = [
 ]
 
 
-@pytest.mark.parametrize(
-    "model_class, sktime_forecaster_class, good_params, bad_params",
-    [
-        (
-            ThetaModel,
-            ThetaForecaster,
-            dict(sp=2),
-            dict(some_bad_param="A"),
-        ),
-        (
-            AutoARIMAModel,
-            AutoARIMA,
-            dict(sp=2, max_q=4),
-            dict(some_bad_param="A", some_other_bad_param=10),
-        ),
-        (
-            ARIMAModel,
-            ARIMA,
-            dict(order=(1, 1, 1)),
-            dict(some_bad_param="A", some_other_bad_param=10),
-        ),
-        (
-            TBATSModel,
-            TBATS,
-            dict(use_box_cox=False),
-            dict(some_bad_param="A", some_other_bad_param=10),
-        ),
-        (
-            AutoETSModel,
-            AutoETS,
-            dict(error="mul", trend=None),
-            dict(some_bad_param="A"),
-        ),
-    ],
-)
-def test_when_sktime_models_fitted_then_allowed_hyperparameters_are_passed_to_sktime_forecasters(
-    model_class, sktime_forecaster_class, good_params, bad_params
-):
-    hyperparameters = good_params.copy()
-    hyperparameters.update(bad_params)
-    model = model_class(hyperparameters=hyperparameters)
-
-    with mock.patch.object(target=sktime_forecaster_class, attribute="__init__") as const_mock:
-        try:
-            model.fit(train_data=DUMMY_TS_DATAFRAME)
-        except TypeError:
-            pass
-        finally:
-            const_mock.assert_called_with(**good_params)
-
-
 def test_when_sktime_converts_dataframe_then_data_not_duplicated_and_index_correct():
     model = AutoETSModel()
 

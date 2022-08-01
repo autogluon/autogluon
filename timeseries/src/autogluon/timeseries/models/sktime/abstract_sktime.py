@@ -70,15 +70,24 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         self.skt_forecaster: Optional[BaseForecaster] = None
         self._fit_index: Optional[pd.Index] = None
 
-    def _get_skt_forecaster(self, sp: Optional[int] = None) -> BaseForecaster:
-        """Return the sktime forecaster object for the model"""
-        params = self._get_model_params().copy()
-        if sp is not None and sp > 1:
-            params["sp"] = sp
-            params["seasonal"] = "add"
+    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
+        """Get arguments that will be passed to the sktime forecaster.
+
+        These may be modified based on the length of training series and inferred seasonality.
+        """
+        return args
+
+    def _get_skt_forecaster(self, args: dict) -> BaseForecaster:
+        """Create an sktime forecaster object for the model with given args."""
+        unused_args = [k for k in args.keys() if k not in self.sktime_allowed_init_args]
+        if len(unused_args) > 0:
+            warnings.warn(
+                f"{self.name} ignores following arguments: {unused_args}. "
+                f"See `{self.name}.sktime_allowed_init_args` for the list of allowed arguments."
+            )
 
         return self.sktime_forecaster_class(
-            **{k: v for k, v in params.items() if k in self.sktime_allowed_init_args}  # noqa
+            **{k: v for k, v in args.items() if k in self.sktime_allowed_init_args}  # noqa
         )
 
     def _to_skt_data_frame(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
@@ -122,8 +131,12 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         self._check_fit_params()
 
         min_length = min(len(train_data.loc[i]) for i in train_data.iter_items())
-        period = get_seasonality(train_data.freq)
-        self.skt_forecaster = self._get_skt_forecaster(sp=period if min_length > 2 * period else None)
+        inferred_period = get_seasonality(train_data.freq)
+        initial_args = self._get_model_params().copy()
+        skt_forecaster_args = self._get_skt_forecaster_args(
+            args=initial_args, min_length=min_length, inferred_period=inferred_period
+        )
+        self.skt_forecaster = self._get_skt_forecaster(skt_forecaster_args)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
@@ -149,11 +162,16 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             )
             self._fit(data)
 
-        mean_predictions = self.skt_forecaster.predict(fh=self._fh())
+        with warnings.catch_warnings():
+            # Models in statsmodels may run into numerical issues for some datasets - ignore these
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+
+            mean_predictions = self.skt_forecaster.predict(fh=self._fh())
+            quantile_predictions = self.skt_forecaster.predict_quantiles(
+                fh=self._fh(), alpha=quantile_levels or self.quantile_levels
+            )
+
         mean_predictions.columns = ["mean"]
-        quantile_predictions = self.skt_forecaster.predict_quantiles(
-            fh=self._fh(), alpha=quantile_levels or self.quantile_levels
-        )
         quantile_predictions.columns = [str(q) for q in quantile_predictions.columns.levels[1]]  # noqa
 
         predictions = pd.concat([mean_predictions, quantile_predictions], axis=1)
