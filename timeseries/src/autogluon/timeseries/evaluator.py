@@ -121,6 +121,10 @@ class TimeSeriesEvaluator:
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
 
+    @property
+    def higher_is_better(self) -> bool:
+        return self.METRIC_COEFFICIENTS[self.eval_metric] > 0
+
     def _safemean(self, data: Any):
         data_filled = np.nan_to_num(data, neginf=np.nan, posinf=np.nan, nan=np.nan)
         return np.nanmean(data_filled)

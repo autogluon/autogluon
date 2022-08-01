@@ -569,10 +569,20 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
 
         if self.enable_ensemble:
-            try:
-                model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=model_names_trained))
-            except Exception as e:  # noqa
-                logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
+            if time_limit is not None:
+                time_left_for_ensemble = time_limit - (time.time() - time_start)
+                if time_left_for_ensemble <= 0:
+                    logger.info(
+                        "Not fitting ensemble due to lack of time remaining. "
+                        "Time left: {time_left_for_ensemble:.2f} seconds"
+                    )
+            else:
+                try:
+                    model_names_trained.append(
+                        self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
+                    )
+                except Exception as e:  # noqa
+                    logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
@@ -604,12 +614,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         time_start = time.time()
 
-        higher_is_better = TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == 1
         ensemble = TimeSeriesEnsembleSelection(
             ensemble_size=100,
             problem_type="regression",
             metric=evaluator,
-            higher_is_better=higher_is_better,
         )
         predictions = [model_preds[p] for p in model_names]
         ensemble.fit(predictions=predictions, labels=val_data)
