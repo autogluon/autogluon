@@ -102,6 +102,11 @@ Tutorials
 
       How to train time series models for forecasting.
 
+Launch Tutorial Notebooks
+-------------------------
+
+.. raw:: html
+   :file: static/platforms.html
 
 .. toctree::
    :maxdepth: 2
