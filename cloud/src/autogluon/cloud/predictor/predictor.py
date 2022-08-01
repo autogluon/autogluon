@@ -970,9 +970,19 @@ class ImageCloudPredictor(CloudPredictor):
         predictor_cls = ImagePredictor
         return predictor_cls
 
-    def fit(**kwargs):
-        assert kwargs.get('image_path', None) is not None, "Image path must be provided to train ImageCloudPredictor"
-        super().fit(**kwargs)
+    def fit(
+        self,
+        predictor_init_args,
+        predictor_fit_args,
+        image_path,
+        **kwargs
+    ):
+        super().fit(
+            predictor_init_args,
+            predictor_fit_args,
+            image_path=image_path,
+            **kwargs
+        )
 
     def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
         """
@@ -988,7 +998,8 @@ class ImageCloudPredictor(CloudPredictor):
             Or a local path to a single image file.
             Or a list of local paths to image files.
         test_data_image_column: Optional(str)
-            If provided a pandas.DataFrame as the test_data, you must specify the column name corresponding to image paths
+            If provided a pandas.DataFrame as the test_data, you must specify the column name corresponding to image paths.
+            Images has to live in the same directory specified by the column.
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -1046,6 +1057,12 @@ class ImageCloudPredictor(CloudPredictor):
         transformer_kwargs=dict(),
         **kwargs,
     ):
+        """
+        test_data: str
+            The test data to be inferenced. Can be a local path or a s3 path to a directory containing the images.
+        kwargs:
+            Refer to `CloudPredictor.predict()`
+        """
         split_type = None
         content_type = 'application/x-image'
         transformer_kwargs['strategy'] = 'SingleRecord'
