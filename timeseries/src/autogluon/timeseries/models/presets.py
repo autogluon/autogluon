@@ -58,10 +58,11 @@ def get_default_hps(key, prediction_length):
             },
             "Transformer": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
-            "AutoETS": {"maxiter": 20},
+            "AutoETS": {"maxiter": 20, "seasonality": None},
             "ARIMA": {
                 "maxiter": 10,
                 "order": (1, 0, 0),
+                "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
             },
         },
@@ -69,13 +70,14 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {
                 "maxiter": 200,
                 "trend": "add",
+                "seasonality": "add",
                 "auto": False,
-                "initialization_method": "estimated",
+                "initialization_method": "heuristic",
             },
             "ARIMA": {
                 "maxiter": 50,
                 "order": (1, 1, 1),
-                "seasonal_order": (0, 0, 0, 0),
+                "seasonal_order": (1, 0, 0),
                 "suppress_warnings": True,
             },
             "SimpleFeedForward": {
@@ -106,15 +108,18 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {
                 "error": ag.Categorical("add", "mul"),
                 "trend": ag.Categorical("add", "mul"),
+                "seasonality": ag.Categorical("add", "mul", None),
                 "auto": False,
                 "initialization_method": "estimated",
                 "maxiter": 200,
+                "fail_if_misconfigured": True,
             },
             "ARIMA": {
                 "maxiter": ag.Categorical(50),
-                "order": (1, 1, 1),
-                "seasonal_order": (0, 0, 0, 0),
+                "order": ag.Categorical((1, 1, 1), (2, 0, 1)),
+                "seasonal_order": ag.Categorical((1, 0, 0), (1, 0, 1), (1, 1, 1)),
                 "suppress_warnings": True,
+                "fail_if_misconfigured": True,
             },
         },
     }
