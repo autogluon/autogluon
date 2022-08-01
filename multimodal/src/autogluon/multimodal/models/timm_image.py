@@ -1,24 +1,12 @@
-import torch
 import logging
 from typing import Optional
-from torch import nn
+
+import torch
 from timm import create_model
-from .utils import (
-    assign_layer_ids,
-    get_column_features,
-    get_model_head,
-)
-from ..constants import (
-    IMAGE,
-    IMAGE_VALID_NUM,
-    LABEL,
-    LOGITS,
-    FEATURES,
-    AUTOMM,
-    COLUMN,
-    COLUMN_FEATURES,
-    MASKS,
-)
+from torch import nn
+
+from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
+from .utils import assign_layer_ids, get_column_features, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 

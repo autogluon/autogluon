@@ -1,26 +1,24 @@
-import torch
 import logging
+from typing import Optional
+
+import torch
 from torch import nn
 from transformers import CLIPModel
-from .utils import (
-    assign_layer_ids,
-    init_weights,
-    get_column_features,
-)
+
 from ..constants import (
-    IMAGE,
-    IMAGE_VALID_NUM,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    LABEL,
-    LOGITS,
-    FEATURES,
     AUTOMM,
     COLUMN,
     COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
     MASKS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
 )
-from typing import Optional
+from .utils import assign_layer_ids, get_column_features, init_weights
 
 logger = logging.getLogger(AUTOMM)
 

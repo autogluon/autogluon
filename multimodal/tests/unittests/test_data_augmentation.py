@@ -1,33 +1,30 @@
-import os
-import tempfile
 import copy
+import os
 import pickle
 import shutil
+import tempfile
+
+from test_predictor import verify_predictor_save_load
+from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    DISTILLER,
-    BINARY,
-    MULTICLASS,
-    UNIFORM_SOUP,
-    GREEDY_SOUP,
     BEST,
-    NORM_FIT,
+    BINARY,
     BIT_FIT,
+    DATA,
+    DISTILLER,
+    ENVIRONMENT,
+    GREEDY_SOUP,
     LORA,
     LORA_BIAS,
     LORA_NORM,
+    MODEL,
+    MULTICLASS,
+    NORM_FIT,
+    OPTIMIZATION,
+    UNIFORM_SOUP,
 )
-from unittest_datasets import (
-    PetFinderDataset,
-    HatefulMeMesDataset,
-    AEDataset,
-)
-from test_predictor import verify_predictor_save_load
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,

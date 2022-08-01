@@ -1,92 +1,94 @@
-import pytz
-import datetime
-import os
-import functools
-import logging
-import pandas as pd
-import pickle
 import copy
+import datetime
+import functools
+import hashlib
+import logging
+import os
+import pickle
 import sys
-import torch
-from torch import nn
+import uuid
 import warnings
 from contextlib import contextmanager
-from typing import Optional, List, Dict, Tuple, Union
-import numpy as np
-import uuid
-import hashlib
-import requests
+from typing import Dict, List, Optional, Tuple, Union
+
 import boto3
-import tqdm
-from scipy.special import softmax
-from omegaconf import OmegaConf, DictConfig
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import f1_score
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
+import pytz
+import requests
+import torch
+import tqdm
+from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.utilities.types import _METRIC
+from scipy.special import softmax
+from sklearn.metrics import f1_score
+from sklearn.preprocessing import LabelEncoder
+from torch import nn
+
 from autogluon.core.metrics import get_metric
 from autogluon.core.utils.loaders import load_pd
 
-from .models.utils import inject_lora_to_linear_layer
-from .models import (
-    HFAutoModelForTextPrediction,
-    TimmAutoModelForImagePrediction,
-    CLIPForImageText,
-    CategoricalMLP,
-    NumericalMLP,
-    MultimodalFusionMLP,
-    NumericalTransformer,
-    CategoricalTransformer,
-    MultimodalFusionTransformer,
-)
-from .data import (
-    ImageProcessor,
-    TextProcessor,
-    CategoricalProcessor,
-    NumericalProcessor,
-    LabelProcessor,
-    MultiModalFeaturePreprocessor,
-    MixupModule,
-)
 from .constants import (
     ACCURACY,
-    RMSE,
     ALL_MODALITIES,
-    IMAGE,
-    TEXT,
-    CATEGORICAL,
-    NUMERICAL,
-    LABEL,
-    MULTICLASS,
-    BINARY,
-    REGRESSION,
-    Y_PRED_PROB,
-    Y_PRED,
-    Y_TRUE,
     AUTOMM,
-    CLIP,
-    TIMM_IMAGE,
-    HF_TEXT,
-    NUMERICAL_MLP,
-    CATEGORICAL_MLP,
-    FUSION_MLP,
-    NUMERICAL_TRANSFORMER,
-    CATEGORICAL_TRANSFORMER,
-    FUSION_TRANSFORMER,
-    ROC_AUC,
     AVERAGE_PRECISION,
-    F1,
-    METRIC_MODE_MAP,
-    VALID_METRICS,
-    VALID_CONFIG_KEYS,
-    LOGITS,
-    PROBABILITY,
+    BINARY,
+    CATEGORICAL,
+    CATEGORICAL_MLP,
+    CATEGORICAL_TRANSFORMER,
+    CLIP,
     COLUMN_FEATURES,
+    F1,
     FEATURES,
-    MASKS,
-    S3_PREFIX,
+    FUSION_MLP,
+    FUSION_TRANSFORMER,
+    HF_TEXT,
+    IMAGE,
+    LABEL,
     LAST_CHECKPOINT,
+    LOGITS,
+    MASKS,
+    METRIC_MODE_MAP,
+    MULTICLASS,
+    NUMERICAL,
+    NUMERICAL_MLP,
+    NUMERICAL_TRANSFORMER,
+    PROBABILITY,
+    REGRESSION,
+    RMSE,
+    ROC_AUC,
+    S3_PREFIX,
+    TEXT,
+    TIMM_IMAGE,
+    VALID_CONFIG_KEYS,
+    VALID_METRICS,
+    Y_PRED,
+    Y_PRED_PROB,
+    Y_TRUE,
 )
+from .data import (
+    CategoricalProcessor,
+    ImageProcessor,
+    LabelProcessor,
+    MixupModule,
+    MultiModalFeaturePreprocessor,
+    NumericalProcessor,
+    TextProcessor,
+)
+from .models import (
+    CategoricalMLP,
+    CategoricalTransformer,
+    CLIPForImageText,
+    HFAutoModelForTextPrediction,
+    MultimodalFusionMLP,
+    MultimodalFusionTransformer,
+    NumericalMLP,
+    NumericalTransformer,
+    TimmAutoModelForImagePrediction,
+)
+from .models.utils import inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -198,8 +200,9 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     assert any(
         key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
-    from autogluon.core.space import Space
     from ray.tune.sample import Domain
+
+    from autogluon.core.space import Space
 
     hyperparameters = copy.deepcopy(hyperparameters)
     if isinstance(keys_to_filter, str):

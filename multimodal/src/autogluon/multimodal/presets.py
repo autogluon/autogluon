@@ -1,11 +1,6 @@
 from typing import Optional
-from .constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    DISTILLER,
-)
+
+from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")

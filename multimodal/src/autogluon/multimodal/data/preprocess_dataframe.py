@@ -1,23 +1,18 @@
 import logging
-import pandas as pd
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from typing import Optional, List, Any, Dict
-from omegaconf import DictConfig
+import pandas as pd
 from nptyping import NDArray
-from autogluon.features import CategoryFeatureGenerator
-from omegaconf import OmegaConf
-from sklearn.pipeline import Pipeline
+from omegaconf import DictConfig, OmegaConf
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import (
-    StandardScaler,
-    MinMaxScaler,
-    LabelEncoder,
-)
-from sklearn.base import (
-    TransformerMixin,
-    BaseEstimator,
-)
-from ..constants import CATEGORICAL, NUMERICAL, TEXT, IMAGE_PATH, LABEL, NULL, AUTOMM, IMAGE
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
+
+from autogluon.features import CategoryFeatureGenerator
+
+from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
