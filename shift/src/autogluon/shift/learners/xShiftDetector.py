@@ -134,7 +134,7 @@ class XShiftDetector:
         assert format == 'markdown', 'Only markdown format is supported'
         if self.decision() == 'not detected':
             ret_md = (
-                f"# Detecting distribution shift"
+                f"# Detecting distribution shift\n"
                 f"We did not detect a substantial difference between the training and test X distributions."
                 )
         else:

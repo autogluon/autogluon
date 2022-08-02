@@ -23,7 +23,7 @@ def get_dogs_data():
     return data
 
 def fit_tst():
-    data = get_dogs_data()
+    data = get_dogs_data(data_dir = data_dir)
     pred = ImagePredictor()
     tst = Classifier2ST(pred)
     tst.fit(data, sample_label='label')
@@ -31,7 +31,7 @@ def fit_tst():
 
 def test_make_source_target_label():
     split = 0.5
-    data = get_dogs_data()
+    data = get_dogs_data(data_dir = data_dir)
     source, target = data.query('label == 0'), data.query('label == 1')
     data2 = Classifier2ST._make_source_target_label((source, target), 'shift_label')
     assert target.shape[0] == data2['shift_label'].sum()
