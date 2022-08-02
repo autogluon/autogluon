@@ -16,6 +16,7 @@ from autogluon.core.utils.savers import save_pkl
 from .configs import TIMESERIES_PRESETS_CONFIGS
 from .dataset import TimeSeriesDataFrame
 from .learner import AbstractLearner, TimeSeriesLearner
+from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
 from .trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,9 @@ class TimeSeriesPredictor:
         and replace any input data indexes with dummy timestamps in second frequency. In this case, sktime models
         will not activate any seasonality inference if not specified explicitly in ``hyperparameters``, and the
         forecast output time indexes will be arbitrary values.
+    splitter: AbstractTimeSeriesSplitter, default = LastWindowSplitter()
+        An object that splits the training TimeSeriesDataFrame into train and validation parts.
+
 
     Attributes
     ----------
@@ -141,6 +145,7 @@ class TimeSeriesPredictor:
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
         self._learner_type = type(self._learner)
+        self._splitter: AbstractTimeSeriesSplitter = kwargs.pop("splitter", LastWindowSplitter())
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
@@ -287,8 +292,7 @@ class TimeSeriesPredictor:
                 f"Validation data is None, will hold the last prediction_length {self.prediction_length} "
                 f"time steps out to use as validation set.",
             )
-            tuning_data = train_data
-            train_data = train_data.slice_by_timestep(slice(None, -self.prediction_length))
+            train_data, tuning_data = self._splitter.split(train_data, prediction_length=self.prediction_length)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
