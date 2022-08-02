@@ -1,11 +1,13 @@
 import logging
+from typing import List, Optional
+
 import torch
 from torch import nn
-from typing import List, Optional
-from .utils import init_weights
-from ..constants import LABEL, LOGITS, FEATURES, WEIGHT, AUTOMM
+
+from ..constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
+from .ft_transformer import CLSToken, FT_Transformer
 from .mlp import MLP
-from .ft_transformer import FT_Transformer, CLSToken
+from .utils import init_weights
 
 logger = logging.getLogger(AUTOMM)
 

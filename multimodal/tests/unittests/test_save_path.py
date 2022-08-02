@@ -1,9 +1,10 @@
 import os
 import shutil
-import pytest
-from autogluon.multimodal import MultiModalPredictor
 
+import pytest
 from unittest_datasets import PetFinderDataset
+
+from autogluon.multimodal import MultiModalPredictor
 
 
 @pytest.mark.parametrize(

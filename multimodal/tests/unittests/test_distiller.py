@@ -1,15 +1,11 @@
 import os
 import shutil
 
-from autogluon.multimodal import MultiModalPredictor
-
-from unittest_datasets import (
-    PetFinderDataset,
-    HatefulMeMesDataset,
-    AEDataset,
-)
-from utils import get_home_dir
 from test_predictor import verify_predictor_save_load
+from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
+from utils import get_home_dir
+
+from autogluon.multimodal import MultiModalPredictor
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,

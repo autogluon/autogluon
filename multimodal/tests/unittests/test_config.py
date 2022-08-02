@@ -1,13 +1,10 @@
 import os
+
 import pytest
 from omegaconf import OmegaConf
+
+from autogluon.multimodal.constants import DATA, ENVIRONMENT, MODEL, OPTIMIZATION
 from autogluon.multimodal.utils import get_config
-from autogluon.multimodal.constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-)
 
 
 def test_config():
@@ -87,7 +84,7 @@ def test_config():
         ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
         ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
         ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
-    ]
+    ],
 )
 def test_model_selection(model_names):
     config = {
@@ -114,7 +111,7 @@ def test_model_selection(model_names):
         ["text"],
         ["numerical"],
         ["categorical"],
-    ]
+    ],
 )
 def test_invalid_model_selection(model_names):
     config = {

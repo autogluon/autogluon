@@ -1,114 +1,109 @@
 from __future__ import annotations
+
+import copy
+import json
 import logging
 import math
-import os
-import numpy as np
-import json
-import warnings
-import sys
-import shutil
-from datetime import timedelta
-import pandas as pd
-import pickle
-import copy
-import yaml
-import torch
-from torch import nn
-from omegaconf import OmegaConf, DictConfig
 import operator
+import os
+import pickle
+import shutil
+import sys
+import warnings
+from datetime import timedelta
+from typing import Callable, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
-from typing import Optional, List, Dict, Union, Callable
+import torch
+import yaml
+from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
-from autogluon.core.utils.try_import import try_import_ray_lightning
-from autogluon.core.utils.utils import default_holdout_frac
+from torch import nn
+
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.core.utils.try_import import try_import_ray_lightning
+from autogluon.core.utils.utils import default_holdout_frac
 
+from . import version as ag_version
 from .constants import (
-    LABEL,
+    AUTOMM,
+    AUTOMM_TUTORIAL_MODE,
+    BEST,
+    BEST_K_MODELS_FILE,
     BINARY,
-    MULTICLASS,
     CLASSIFICATION,
+    COLUMN_FEATURES,
+    DATA,
+    FEATURES,
+    GREEDY_SOUP,
+    LABEL,
+    LAST_CHECKPOINT,
+    LOGITS,
+    MASKS,
+    MATCHER,
+    MAX,
+    MIN,
+    MODEL,
+    MODEL_CHECKPOINT,
+    MULTICLASS,
+    PROBABILITY,
+    RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    TEXT,
+    UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    LOGITS,
-    FEATURES,
-    AUTOMM,
-    AUTOMM_TUTORIAL_MODE,
-    UNIFORM_SOUP,
-    GREEDY_SOUP,
-    BEST,
-    MIN,
-    MAX,
-    TEXT,
-    RAY_TUNE_CHECKPOINT,
-    BEST_K_MODELS_FILE,
-    LAST_CHECKPOINT,
-    MODEL_CHECKPOINT,
-    MODEL,
-    DATA,
-    PROBABILITY,
-    MATCHER,
-    COLUMN_FEATURES,
-    MASKS,
     ZERO_SHOT,
 )
-
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
-
-
-from .utils import (
-    create_model,
-    init_df_preprocessor,
-    init_data_processors,
-    select_model,
-    compute_score,
-    average_checkpoints,
-    infer_metrics,
-    get_minmax_mode,
-    filter_search_space,
-    get_config,
-    LogFilter,
-    apply_log_filter,
-    save_pretrained_models,
-    convert_checkpoint_name,
-    save_text_tokenizers,
-    load_text_tokenizers,
-    modify_duplicate_model_names,
-    assign_feature_column_names,
-    turn_on_off_feature_column_info,
-    try_to_infer_pos_label,
-    get_mixup,
-    CustomUnpickler,
-    is_interactive,
-    AutoMMModelCheckpoint,
-    data_to_df,
-    logits_to_prob,
-    extract_from_output,
-    init_zero_shot,
-    tensor_to_ndarray,
-    infer_dtypes_by_model_names,
-    update_config_by_rules,
-    process_save_path,
-)
-from .optimization.utils import (
-    get_metric,
-    get_loss_func,
-)
-from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
-
+from .optimization.lit_module import LitModule
 from .optimization.rkd_loss import RKDLoss
-
-from . import version as ag_version
+from .optimization.utils import get_loss_func, get_metric
+from .utils import (
+    AutoMMModelCheckpoint,
+    CustomUnpickler,
+    LogFilter,
+    apply_log_filter,
+    assign_feature_column_names,
+    average_checkpoints,
+    compute_score,
+    convert_checkpoint_name,
+    create_model,
+    data_to_df,
+    extract_from_output,
+    filter_search_space,
+    get_config,
+    get_minmax_mode,
+    get_mixup,
+    infer_dtypes_by_model_names,
+    infer_metrics,
+    init_data_processors,
+    init_df_preprocessor,
+    init_zero_shot,
+    is_interactive,
+    load_text_tokenizers,
+    logits_to_prob,
+    modify_duplicate_model_names,
+    process_save_path,
+    save_pretrained_models,
+    save_text_tokenizers,
+    select_model,
+    tensor_to_ndarray,
+    try_to_infer_pos_label,
+    turn_on_off_feature_column_info,
+    update_config_by_rules,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -522,12 +517,12 @@ class MultiModalPredictor:
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
         from autogluon.core.hpo.ray_hpo import (
-            run,
-            cleanup_trials,
-            cleanup_checkpoints,
-            EmptySearchSpace,
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
+            EmptySearchSpace,
+            cleanup_checkpoints,
+            cleanup_trials,
+            run,
         )
 
         ray_tune_adapter = AutommRayTuneAdapter()

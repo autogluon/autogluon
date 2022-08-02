@@ -1,20 +1,22 @@
-import logging
 import collections
-import pandas as pd
+import logging
 import warnings
+from typing import Dict, List, Optional, Tuple, Union
+
+import pandas as pd
 import PIL
-from typing import Union, Optional, List, Dict, Tuple
+
 from ..constants import (
-    NULL,
+    AUTOMM,
+    BINARY,
     CATEGORICAL,
-    NUMERICAL,
-    TEXT,
+    CLASSIFICATION,
     IMAGE,
     MULTICLASS,
-    BINARY,
-    CLASSIFICATION,
+    NULL,
+    NUMERICAL,
     REGRESSION,
-    AUTOMM,
+    TEXT,
 )
 
 logger = logging.getLogger(AUTOMM)

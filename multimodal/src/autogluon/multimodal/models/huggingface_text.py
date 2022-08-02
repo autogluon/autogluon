@@ -1,27 +1,25 @@
-import torch
 import logging
+from typing import List, Optional, Tuple
+
+import torch
 from torch import nn
 from transformers import AutoModel
 from transformers import logging as hf_logging
 from transformers.models.t5 import T5PreTrainedModel
+
 from ..constants import (
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    TEXT_SEGMENT_IDS,
-    LABEL,
-    LOGITS,
-    FEATURES,
     AUTOMM,
     COLUMN,
     COLUMN_FEATURES,
+    FEATURES,
+    LABEL,
+    LOGITS,
     MASKS,
+    TEXT_SEGMENT_IDS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
 )
-from typing import Optional, List, Tuple
-from .utils import (
-    assign_layer_ids,
-    init_weights,
-    get_column_features,
-)
+from .utils import assign_layer_ids, get_column_features, init_weights
 
 hf_logging.set_verbosity_error()
 

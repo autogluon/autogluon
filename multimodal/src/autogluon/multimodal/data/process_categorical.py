@@ -1,6 +1,8 @@
-from typing import Optional, List, Any, Dict
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 from nptyping import NDArray
+
 from ..constants import CATEGORICAL, COLUMN
 from .collator import Stack, Tuple
 
