@@ -37,55 +37,55 @@ def test_when_sktime_converts_dataframe_then_data_not_duplicated_and_index_corre
     model = AutoETSModel()
 
     df = DUMMY_TS_DATAFRAME.copy(deep=True)
-    skt_df = model._to_skt_data_frame(df)
+    sktime_df = model._to_sktime_data_frame(df)
 
-    assert isinstance(skt_df, pd.DataFrame)
-    assert not isinstance(skt_df, TimeSeriesDataFrame)
+    assert isinstance(sktime_df, pd.DataFrame)
+    assert not isinstance(sktime_df, TimeSeriesDataFrame)
 
-    assert len(df) == len(skt_df)
-    assert isinstance(skt_df.index.levels[-1], pd.PeriodIndex)
+    assert len(df) == len(sktime_df)
+    assert isinstance(sktime_df.index.levels[-1], pd.PeriodIndex)
     assert (
         a.to_timestamp() == b
         for a, b in zip(
-            skt_df.index.get_level_values(-1),
+            sktime_df.index.get_level_values(-1),
             df.index.get_level_values(-1),
         )
     )
 
     # data is not copied
-    assert df.values.base is skt_df.values.base
+    assert df.values.base is sktime_df.values.base
 
 
 def test_when_sktime_converts_from_dataframe_then_data_not_duplicated_and_index_correct():
     model = AutoETSModel()
 
-    skt_df = model._to_skt_data_frame(DUMMY_TS_DATAFRAME.copy(deep=True))
-    df = model._to_time_series_data_frame(skt_df)
+    sktime_df = model._to_sktime_data_frame(DUMMY_TS_DATAFRAME.copy(deep=True))
+    df = model._to_time_series_data_frame(sktime_df)
 
     assert isinstance(df, TimeSeriesDataFrame)
     assert isinstance(df.index.levels[-1], pd.DatetimeIndex)
     assert (
         a.to_timestamp() == b
         for a, b in zip(
-            skt_df.index.get_level_values(-1),
+            sktime_df.index.get_level_values(-1),
             df.index.get_level_values(-1),
         )
     )
 
     # data is not copied
-    assert df.values.base is skt_df.values.base
+    assert df.values.base is sktime_df.values.base
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_skt_models_saved_then_forecasters_can_be_loaded(model_class, temp_model_path):
+def test_when_sktime_models_saved_then_forecasters_can_be_loaded(model_class, temp_model_path):
     model = model_class()
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
 
     loaded_model = model.__class__.load(path=model.path)
 
-    assert isinstance(model.skt_forecaster, loaded_model.skt_forecaster.__class__)
-    assert repr(loaded_model.skt_forecaster) == repr(model.skt_forecaster)
+    assert isinstance(model.sktime_forecaster, loaded_model.sktime_forecaster.__class__)
+    assert repr(loaded_model.sktime_forecaster) == repr(model.sktime_forecaster)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -162,4 +162,4 @@ def test_when_fit_called_with_then_seasonality_period_set_correctly(
 
     model.fit(train_data=train_data)
 
-    assert model.skt_forecaster.sp == expected_sp
+    assert model.sktime_forecaster.sp == expected_sp

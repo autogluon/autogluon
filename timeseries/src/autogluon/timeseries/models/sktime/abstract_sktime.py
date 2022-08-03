@@ -16,7 +16,7 @@ from ...utils.seasonality import get_seasonality
 from ..abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
-skt_logger = logging.getLogger(sktime.__name__)
+sktime_logger = logging.getLogger(sktime.__name__)
 
 
 class AbstractSktimeModel(AbstractTimeSeriesModel):
@@ -67,30 +67,32 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        self.skt_forecaster: Optional[BaseForecaster] = None
+        self.sktime_forecaster: Optional[BaseForecaster] = None
         self._fit_index: Optional[pd.Index] = None
 
-    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
-        """Get arguments that will be passed to the sktime forecaster.
+    def _get_sktime_forecaster_init_args(
+        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
+    ):
+        """Get arguments that will be passed to the sktime forecaster at initialization.
 
-        These may be modified based on the length of training series and inferred seasonality.
+        model_params may be modified in-place based on the length of training series and inferred seasonality.
         """
-        return args
+        return model_params
 
-    def _get_skt_forecaster(self, args: dict) -> BaseForecaster:
+    def _get_sktime_forecaster(self, sktime_forecaster_init_args: dict) -> BaseForecaster:
         """Create an sktime forecaster object for the model with given args."""
-        unused_args = [k for k in args.keys() if k not in self.sktime_allowed_init_args]
+        unused_args = [k for k in sktime_forecaster_init_args.keys() if k not in self.sktime_allowed_init_args]
         if len(unused_args) > 0:
-            warnings.warn(
+            logger.warning(
                 f"{self.name} ignores following arguments: {unused_args}. "
                 f"See `{self.name}.sktime_allowed_init_args` for the list of allowed arguments."
             )
 
         return self.sktime_forecaster_class(
-            **{k: v for k, v in args.items() if k in self.sktime_allowed_init_args}  # noqa
+            **{k: v for k, v in sktime_forecaster_init_args.items() if k in self.sktime_allowed_init_args}  # noqa
         )
 
-    def _to_skt_data_frame(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
+    def _to_sktime_data_frame(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
         """Convert time series data frame's DateTimeIndex to PeriodIndex for use in
         sktime, and cast to pandas DataFrame.
         """
@@ -126,31 +128,30 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
     ) -> None:
         verbosity = kwargs.get("verbosity", 2)
         set_logger_verbosity(verbosity, logger=logger)
-        skt_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+        sktime_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         self._check_fit_params()
 
-        min_length = min(len(train_data.loc[i]) for i in train_data.iter_items())
+        min_length = train_data.index.get_level_values(0).value_counts(sort=False).min()
         inferred_period = get_seasonality(train_data.freq)
-        initial_args = self._get_model_params().copy()
-        skt_forecaster_args = self._get_skt_forecaster_args(
-            args=initial_args, min_length=min_length, inferred_period=inferred_period
+        sktime_forecaster_init_args = self._get_sktime_forecaster_init_args(
+            model_params=self._get_model_params().copy(), min_length=min_length, inferred_period=inferred_period
         )
-        self.skt_forecaster = self._get_skt_forecaster(skt_forecaster_args)
+        self.sktime_forecaster = self._get_sktime_forecaster(sktime_forecaster_init_args)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
             warnings.simplefilter("ignore", category=RuntimeWarning)
 
-            self.skt_forecaster.fit(self._to_skt_data_frame(train_data[[self.target]]), fh=self._fh())
+            self.sktime_forecaster.fit(self._to_sktime_data_frame(train_data[[self.target]]), fh=self._fh())
 
         self._fit_index = train_data.index.copy()
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data, quantile_levels=quantile_levels, **kwargs)
 
-        if not self.skt_forecaster:
+        if not self.sktime_forecaster:
             raise ValueError("No sktime forecaster found. Please fit the model first.")
 
         # TODO: reconsider when to refit the model. currently we refit whenever train and
@@ -166,8 +167,8 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             # Models in statsmodels may run into numerical issues for some datasets - ignore these
             warnings.simplefilter("ignore", category=RuntimeWarning)
 
-            mean_predictions = self.skt_forecaster.predict(fh=self._fh())
-            quantile_predictions = self.skt_forecaster.predict_quantiles(
+            mean_predictions = self.sktime_forecaster.predict(fh=self._fh())
+            quantile_predictions = self.sktime_forecaster.predict_quantiles(
                 fh=self._fh(), alpha=quantile_levels or self.quantile_levels
             )
 

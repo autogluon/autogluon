@@ -1,4 +1,5 @@
-import warnings
+import logging
+from typing import Any, Dict
 
 from sktime.forecasting.arima import ARIMA, AutoARIMA
 from sktime.forecasting.ets import AutoETS
@@ -6,6 +7,8 @@ from sktime.forecasting.tbats import TBATS
 from sktime.forecasting.theta import ThetaForecaster
 
 from . import AbstractSktimeModel
+
+logger = logging.getLogger(__name__)
 
 
 class ThetaModel(AbstractSktimeModel):
@@ -20,7 +23,7 @@ class ThetaModel(AbstractSktimeModel):
     initial_level : float or None, default = None
         The alpha value of the simple exponential smoothing, if the value is set then
         this will be used, otherwise it will be estimated from the data.
-    deseasonalize : bool, default = True
+    seasonal: bool, default = True
         If True, data is seasonally adjusted.
     seasonal_period: int or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For
@@ -28,7 +31,7 @@ class ThetaModel(AbstractSktimeModel):
         weekly cycle.
         When set to None, seasonal_period will be inferred from the frequency of the
         training data. Can also be specified manually by providing an integer > 1.
-    fail_if_misoconfigured: bool, default = False
+    fail_if_misconfigured: bool, default = False
         If True, the model will raise an exception and fail when given an invalid
         configuration (e.g., selected seasonality is incompatible with seasonal_period).
         If False, the model will instead raise a warning and try to adjust the
@@ -40,29 +43,31 @@ class ThetaModel(AbstractSktimeModel):
     sktime_forecaster_class = ThetaForecaster
     sktime_allowed_init_args = ["initial_level", "deseasonalize", "sp"]
 
-    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
-        fail_if_misoconfigured = args.pop("fail_if_misconfigured", False)
-        deseasonalize = args.pop("deseasonalize", True)
-        seasonal_period = args.pop("seasonal_period", None)
-        # Handle the case when seasonal_period is intentionally set to None
+    def _get_sktime_forecaster_init_args(
+        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
+    ):
+        fail_if_misconfigured = model_params.pop("fail_if_misconfigured", False)
+        seasonal_period = model_params.pop("seasonal_period", None)
+        # This code handles the case when seasonal_period is intentionally set to None
         if seasonal_period is None:
             seasonal_period = inferred_period
-        args["deseasonalize"] = deseasonalize
-        args["sp"] = seasonal_period
+        seasonal = model_params.pop("seasonal", True)
+        model_params["deseasonalize"] = seasonal
+        model_params["sp"] = seasonal_period
 
-        if deseasonalize and (min_length < 2 * seasonal_period or seasonal_period <= 1):
+        if seasonal and (min_length < 2 * seasonal_period or seasonal_period <= 1):
             error_message = (
-                f"{self.name} with deseasonalize = {deseasonalize} requires training series of length "
+                f"{self.name} with seasonal = {seasonal} requires training series of length "
                 f"at least 2 * seasonal_period and seasonal_period > 1 "
                 f"(received min_length = {min_length} and seasonal_period = {seasonal_period})."
             )
-            if fail_if_misoconfigured:
+            if fail_if_misconfigured:
                 raise ValueError(error_message)
             else:
-                warnings.warn(error_message + "\nSetting seasonality to None.")
-                args["deseasonalize"] = False
-                args["sp"] = 1
-        return args
+                logger.warning(error_message + "\nSetting seasonal to False.")
+                model_params["deseasonalize"] = False
+                model_params["sp"] = 1
+        return model_params
 
 
 class TBATSModel(AbstractSktimeModel):
@@ -111,17 +116,19 @@ class TBATSModel(AbstractSktimeModel):
         "context",
     ]
 
-    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
-        seasonal_period = args.pop("seasonal_period", None)
-        # Handle the case when seasonal_period is intentionally set to None
+    def _get_sktime_forecaster_init_args(
+        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
+    ):
+        seasonal_period = model_params.pop("seasonal_period", None)
+        # This code handles the case when seasonal_period is intentionally set to None
         if seasonal_period is None:
             seasonal_period = inferred_period
 
         if seasonal_period == 1:
-            args["sp"] = None
+            model_params["sp"] = None
         else:
-            args["sp"] = seasonal_period
-        return args
+            model_params["sp"] = seasonal_period
+        return model_params
 
 
 class AutoETSModel(AbstractSktimeModel):
@@ -137,7 +144,7 @@ class AutoETSModel(AbstractSktimeModel):
         Trend component model. Allowed values are "add", "mul" and None.
     damped_trend: bool, default = False
         Whether or not the included trend component is damped.
-    seasonality: str or None, default = "add"
+    seasonal: str or None, default = "add"
         Seasonality model. Allowed values are "add", "mul" and None.
     seasonal_period: int or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For
@@ -151,7 +158,7 @@ class AutoETSModel(AbstractSktimeModel):
         * "estimated" - learn parameters from the data with maximum likelihood
         * "heuristic" - select parameters with a heuristic. Faster than "estimated" but
         can be less accurate and requires a series with at least 8 elements
-    fail_if_misoconfigured: bool, default = False
+    fail_if_misconfigured: bool, default = False
         If True, the model will raise an exception and fail when given an invalid
         configuration (e.g., selected seasonality is incompatible with seasonal_period).
         If False, the model will instead raise a warning and try to adjust the
@@ -194,46 +201,46 @@ class AutoETSModel(AbstractSktimeModel):
         "random_state",
     ]
 
-    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
-        fail_if_misoconfigured = args.pop("fail_if_misconfigured", False)
+    def _get_sktime_forecaster_init_args(
+        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
+    ):
+        fail_if_misconfigured = model_params.pop("fail_if_misconfigured", False)
 
-        if min_length < 8 and args.get("initialization_method") == "heuristic":
+        if min_length < 8 and model_params.get("initialization_method") == "heuristic":
             error_message = f"{self.name}: Training series too short for initialization_method='heuristic'."
-            if fail_if_misoconfigured:
+            if fail_if_misconfigured:
                 raise ValueError(error_message)
             else:
-                warnings.warn(error_message + "\nFalling back to initialization_method='estimated'")
-                args["initialization_method"] = "estimated"
+                logger.warning(error_message + "\nFalling back to initialization_method='estimated'")
+                model_params["initialization_method"] = "estimated"
 
-        seasonality = args.pop("seasonality", "add")
-        if seasonality not in ["add", "mul", None]:
-            raise ValueError(
-                f"Invalid seasonality {seasonality} for model {self.name} (must be one of 'add', 'mul', None)"
-            )
+        seasonal = model_params.pop("seasonal", "add")
+        if seasonal not in ["add", "mul", None]:
+            raise ValueError(f"Invalid seasonal {seasonal} for model {self.name} (must be one of 'add', 'mul', None)")
 
-        seasonal_period = args.pop("seasonal_period", None)
-        # Handle the case when seasonal_period is intentionally set to None
+        seasonal_period = model_params.pop("seasonal_period", None)
+        # This code handles the case when seasonal_period is intentionally set to None
         if seasonal_period is None:
             seasonal_period = inferred_period
 
-        args["seasonal"] = seasonality
-        args["sp"] = seasonal_period
+        model_params["seasonal"] = seasonal
+        model_params["sp"] = seasonal_period
 
         # Check if seasonality and seasonal_period are compatible
-        if seasonality in ["add", "mul"]:
+        if seasonal in ["add", "mul"]:
             if min_length < 2 * seasonal_period or seasonal_period <= 1:
                 error_message = (
-                    f"{self.name} with seasonality {seasonality} requires training series of length "
+                    f"{self.name} with seasonal = {seasonal} requires training series of length "
                     f"at least 2 * seasonal_period and seasonal_period > 1 "
                     f"(received min_length = {min_length} and seasonal_period = {seasonal_period})."
                 )
-                if fail_if_misoconfigured:
+                if fail_if_misconfigured:
                     raise ValueError(error_message)
                 else:
-                    warnings.warn(error_message + "\nSetting seasonality to None.")
-                    args["seasonal"] = None
-                    args["sp"] = 1
-        return args
+                    logger.warning(error_message + "\nSetting seasonality to None.")
+                    model_params["seasonal"] = None
+                    model_params["sp"] = 1
+        return model_params
 
 
 class ARIMAModel(AbstractSktimeModel):
@@ -255,7 +262,7 @@ class ARIMAModel(AbstractSktimeModel):
         weekly cycle.
         When set to None, seasonal period will be inferred from the frequency of the
         training data. Can also be specified manually by providing an integer > 1.
-    fail_if_misoconfigured: bool, default = False
+    fail_if_misconfigured: bool, default = False
         If True, the model will raise an exception and fail when given an invalid
         configuration (e.g., selected seasonal_order is incompatible with seasonal_period).
         If False, the model will instead raise a warning and try to adjust the
@@ -290,11 +297,13 @@ class ARIMAModel(AbstractSktimeModel):
         "concentrate_scale",
     ]
 
-    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
-        fail_if_misoconfigured = args.pop("fail_if_misconfigured", False)
-        seasonal_order = args.pop("seasonal_order", (1, 0, 1))
-        seasonal_period = args.pop("seasonal_period", None)
-        # Handle the case when seasonal_period is intentionally set to None
+    def _get_sktime_forecaster_init_args(
+        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
+    ):
+        fail_if_misconfigured = model_params.pop("fail_if_misconfigured", False)
+        seasonal_order = model_params.pop("seasonal_order", (1, 0, 1))
+        seasonal_period = model_params.pop("seasonal_period", None)
+        # This code handles the case when seasonal_period is intentionally set to None
         if seasonal_period is None:
             seasonal_period = inferred_period
 
@@ -305,20 +314,20 @@ class ARIMAModel(AbstractSktimeModel):
                 "tuple with 3 nonnegative integers (P, D, Q)."
             )
 
-        args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
+        model_params["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
 
         if seasonal_period <= 1 and any(s > 0 for s in seasonal_order):
             error_message = (
                 f"{self.name} with seasonal_order {seasonal_order} expects "
                 f"seasonal_period > 1 (received seasonal_period = {seasonal_period})."
             )
-            if fail_if_misoconfigured:
+            if fail_if_misconfigured:
                 raise ValueError(error_message)
             else:
-                warnings.warn(error_message + "\nSetting seasonal_order to (0, 0, 0).")
-                args["seasonal_order"] = (0, 0, 0, 0)
+                logger.warning(error_message + "\nSetting seasonal_order to (0, 0, 0).")
+                model_params["seasonal_order"] = (0, 0, 0, 0)
 
-        return args
+        return model_params
 
 
 class AutoARIMAModel(AbstractSktimeModel):
@@ -391,11 +400,13 @@ class AutoARIMAModel(AbstractSktimeModel):
         "concentrate_scale",
     ]
 
-    def _get_skt_forecaster_args(self, args: dict, min_length: int, inferred_period: int = 1):
-        seasonal_period = args.pop("seasonal_period", None)
-        # Handle the case when seasonal_period is intentionally set to None
+    def _get_sktime_forecaster_init_args(
+        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
+    ):
+        seasonal_period = model_params.pop("seasonal_period", None)
+        # This code handles the case when seasonal_period is intentionally set to None
         if seasonal_period is None:
             seasonal_period = inferred_period
 
-        args["sp"] = seasonal_period
-        return args
+        model_params["sp"] = seasonal_period
+        return model_params

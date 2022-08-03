@@ -48,6 +48,7 @@ DEFAULT_MODEL_PRIORITY = dict(
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 
+# TODO: Should we include TBATS to the presets?
 def get_default_hps(key, prediction_length):
     default_model_hps = {
         "toy": {
@@ -58,7 +59,7 @@ def get_default_hps(key, prediction_length):
             },
             "Transformer": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
-            "AutoETS": {"maxiter": 20, "seasonality": None},
+            "AutoETS": {"maxiter": 20, "seasonal": None},
             "ARIMA": {
                 "maxiter": 10,
                 "order": (1, 0, 0),
@@ -70,7 +71,7 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {
                 "maxiter": 200,
                 "trend": "add",
-                "seasonality": "add",
+                "seasonal": "add",
                 "auto": False,
                 "initialization_method": "heuristic",
             },
@@ -108,14 +109,14 @@ def get_default_hps(key, prediction_length):
             "AutoETS": {
                 "error": ag.Categorical("add", "mul"),
                 "trend": ag.Categorical("add", "mul"),
-                "seasonality": ag.Categorical("add", "mul", None),
+                "seasonal": ag.Categorical("add", "mul", None),
                 "auto": False,
                 "initialization_method": "estimated",
                 "maxiter": 200,
                 "fail_if_misconfigured": True,
             },
             "ARIMA": {
-                "maxiter": ag.Categorical(50),
+                "maxiter": 50,
                 "order": ag.Categorical((1, 1, 1), (2, 0, 1)),
                 "seasonal_order": ag.Categorical((1, 0, 0), (1, 0, 1), (1, 1, 1)),
                 "suppress_warnings": True,
