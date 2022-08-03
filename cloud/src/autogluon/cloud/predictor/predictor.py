@@ -180,13 +180,14 @@ class CloudPredictor(ABC):
                 py_version = valid_py_versions[0]
         return framework_version, py_version
 
-    def _construct_config(self, predictor_init_args, predictor_fit_args, leaderboard):
+    def _construct_config(self, predictor_init_args, predictor_fit_args, leaderboard, **kwargs):
         assert self.predictor_type is not None
         config = dict(
             predictor_type=self.predictor_type,
             predictor_init_args=predictor_init_args,
             predictor_fit_args=predictor_fit_args,
             leaderboard=leaderboard,
+            **kwargs
         )
         path = os.path.join(self.local_output_path, 'utils', 'config.yaml')
         with open(path, 'w') as f:
