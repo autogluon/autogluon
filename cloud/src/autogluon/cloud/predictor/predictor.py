@@ -1,4 +1,5 @@
 import copy
+import cv2
 import os
 import yaml
 import tarfile
@@ -32,8 +33,18 @@ from ..utils.ag_sagemaker import (
 from ..utils.aws_utils import setup_sagemaker_role_and_policy
 from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
 from ..utils.misc import MostRecentInsertedOrderedDict
-from ..utils.sagemaker_utils import retrieve_available_framework_versions, retrieve_py_versions, retrieve_latest_framework_version
-from ..utils.utils import zipfolder, is_compressed_file, unzip_file, rename_file_with_uuid
+from ..utils.sagemaker_utils import (
+    retrieve_available_framework_versions,
+    retrieve_py_versions,
+    retrieve_latest_framework_version
+)
+from ..utils.utils import (
+    convert_image_path_to_numpy_array_in_dataframe,
+    zipfolder,
+    is_compressed_file,
+    unzip_file,
+    rename_file_with_uuid
+)
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +326,8 @@ class CloudPredictor(ABC):
         predictor_fit_args: dict
             Fit args for the predictor
         image_path: str, default = None
-            A local path or s3 path to the images. If you provided this parameter, the image path inside your train/tune data MUST be relative.
+            A local path or s3 path to the images. This parameter is REQUIRED if you want to train predictor with image modality.
+            If you provided this parameter, the image path inside your train/tune data MUST be relative.
             If local path, path needs to be either a compressed file containing the images or a folder containing the images.
             If it's a folder, we will zip it for you and upload it to the s3.
             If s3 path, the path needs to be a path to a compressed file containing the images
@@ -658,8 +670,20 @@ class CloudPredictor(ABC):
         return self._predict_real_time(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
-        if isinstance(test_data, pd.DataFrame) or not is_s3_url(test_data):
-            test_data = self._prepare_data(test_data, 'test', output_type='csv')
+        if is_s3_url(test_data):
+            test_input = test_data
+        else:
+            # If a directory of images, upload directly
+            if not os.path.isdir(test_data):
+                # either a file to a dataframe, or a file to an image
+                image = cv2.imread(test_data)
+                if image is None:  # not an image
+                    test_data = load_pd.load(test_data)
+                else:
+                    logger.warning('Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead')
+
+            if isinstance(test_data, pd.DataFrame):
+                test_data = self._prepare_data(test_data, 'test', output_type='csv')
             logger.log(20, 'Uploading data...')
             test_input = self.sagemaker_session.upload_data(
                 path=test_data,
@@ -667,13 +691,13 @@ class CloudPredictor(ABC):
                 key_prefix=key_prefix + '/data'
             )
             logger.log(20, 'Data uploaded successfully')
-        else:
-            test_input = test_data
+
         return test_input
 
     def predict(
         self,
         test_data,
+        test_data_image_column=None,
         predictor_path=None,
         framework_version='latest',
         job_name=None,
@@ -695,6 +719,9 @@ class CloudPredictor(ABC):
         ----------
         test_data: Union(str, pandas.DataFrame)
             The test data to be inferenced. Can be a pandas.DataFrame, a local path or a s3 path.
+        test_data_image_column: Optional(str)
+            If test_data involves image modality, you must specify the column name corresponding to image paths.
+            Images have to live in the same directory specified by the column.
         predictor_path: str
             Path to the predictor tarball you want to use to predict.
             Path can be both a local path or a S3 location.
@@ -745,6 +772,9 @@ class CloudPredictor(ABC):
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor-batch-transform")
 
+        if test_data_image_column is not None:
+            test_data = load_pd.load(test_data)
+            test_data = convert_image_path_to_numpy_array_in_dataframe(test_data, test_data_image_column)
         test_input = self._upload_batch_predict_data(test_data, cloud_bucket, cloud_key_prefix)
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
@@ -1025,7 +1055,7 @@ class ImageCloudPredictor(CloudPredictor):
             Or a list of local paths to image files.
         test_data_image_column: Optional(str)
             If provided a pandas.DataFrame as the test_data, you must specify the column name corresponding to image paths.
-            Images has to live in the same directory specified by the column.
+            Images have to live in the same directory specified by the column.
         accept: str, default = application/x-parquet
             Type of accept output content.
             Valid options are application/x-parquet, text/csv, application/json
@@ -1038,7 +1068,6 @@ class ImageCloudPredictor(CloudPredictor):
         assert self.endpoint, 'Please call `deploy()` to deploy an endpoint first.'
         assert accept in VALID_ACCEPT, f'Invalid accept type. Options are {VALID_ACCEPT}.'
 
-        import cv2
         import numpy as np
 
         if isinstance(test_data, str):
@@ -1061,21 +1090,6 @@ class ImageCloudPredictor(CloudPredictor):
         assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
 
         return self._predict_real_time(test_data=test_data, accept=accept)
-
-    def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
-        if not is_s3_url(test_data):
-            if not os.path.isdir(test_data):
-                logger.warning('Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead')
-            logger.log(20, 'Uploading data...')
-            test_input = self.sagemaker_session.upload_data(
-                path=test_data,
-                bucket=bucket,
-                key_prefix=key_prefix + '/data'
-            )
-            logger.log(20, 'Data uploaded successfully')
-        else:
-            test_input = test_data
-        return test_input
 
     def predict(
         self,
@@ -1100,3 +1114,125 @@ class ImageCloudPredictor(CloudPredictor):
             transformer_kwargs=transformer_kwargs,
             **kwargs,
         )
+
+
+class MultiModalCloudPredictor(CloudPredictor):
+
+    predictor_file_name = 'MultiModalCloudPredictor.pkl'
+
+    @property
+    def predictor_type(self):
+        return 'multimodal'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _get_local_predictor_cls(self):
+        from autogluon.multimodal import MultiModalPredictor
+        predictor_cls = MultiModalPredictor
+        return predictor_cls
+
+    def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
+        """
+        Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
+        This is intended to provide a low latency inference.
+        If you want to inference on a large dataset, use `predict()` instead.
+
+        Parameters
+        ----------
+        test_data: Union(str, pandas.DataFrame)
+            The test data to be inferenced.
+            Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
+            When predicting multimodality with image modality:
+                You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
+            When predicting with only images:
+                Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
+                    Similarly, You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
+                Or a local path to a single image file.
+                Or a list of local paths to image files.
+                Or a numpy.ndarray representing an array of images in ndarray form.
+        test_data_image_column: Optional(str)
+            If provided a pandas.DataFrame as the test_data and test_data involves image modality,
+            you must specify the column name corresponding to image paths.
+            Images have to live in the same directory specified by the column.
+        accept: str, default = application/x-parquet
+            Type of accept output content.
+            Valid options are application/x-parquet, text/csv, application/json
+
+        Returns
+        -------
+        Pandas.DataFrame
+        Predict results in DataFrame
+        """
+        assert self.endpoint, 'Please call `deploy()` to deploy an endpoint first.'
+        assert accept in VALID_ACCEPT, f'Invalid accept type. Options are {VALID_ACCEPT}.'
+
+        import numpy as np
+
+        if isinstance(test_data, str):
+            image = cv2.imread(test_data)
+            if image is None:  # not an image
+                test_data = load_pd.load(test_data)
+            else:
+                test_data = pd.DataFrame(dict(images=[image]))
+        if isinstance(test_data, list):
+            images = []
+            for image in test_data:
+                images.append(cv2.imread(image))
+            test_data = pd.DataFrame(dict(images=images))
+        if isinstance(test_data, np.ndarray):
+            test_data = pd.DataFrame(dict(images=test_data.tolist()))
+        if isinstance(test_data, pd.DataFrame):
+            if test_data_image_column is not None:
+                test_data = convert_image_path_to_numpy_array_in_dataframe(test_data, test_data_image_column)
+
+        assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
+
+        return self._predict_real_time(test_data=test_data, accept=accept)
+
+    def predict(
+        self,
+        test_data,
+        test_data_image_column=None,
+        image_modality_only=False,
+        **kwargs,
+    ):
+        """
+        test_data: str
+            The test data to be inferenced.
+            Can be a pandas.DataFrame, a local path or a s3 path to a csv file.
+            When predicting multimodality with image modality:
+                You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
+            When predicting with only images:
+                User has to specify `image_modality_only` for this mode.
+                Can be a local path or a s3 path to a directory containing the images.
+        test_data_image_column: Optional(str)
+            If test_data involves image modality, you must specify the column name corresponding to image paths.
+            Images have to live in the same directory specified by the column.
+        image_modality_only: Bool
+            Whether the test_data only contains image modality.
+            If so, test data can be a local path or a s3 path to a directory containing the images.
+            Otherwise, you can only provide a pandas.DataFrame, a local path or a s3 path to a csv file, and specify `test_data_image_column`.
+        kwargs:
+            Refer to `CloudPredictor.predict()`
+        """
+        if image_modality_only:
+            split_type = None
+            content_type = 'application/x-image'
+            kwargs = copy.deepcopy(kwargs)
+            transformer_kwargs = kwargs.pop('transformer_kwargs', dict())
+            transformer_kwargs['strategy'] = 'SingleRecord'
+            super().predict(
+                test_data,
+                test_data_image_column=test_data_image_column,
+                split_type=split_type,
+                content_type=content_type,
+                transformer_kwargs=transformer_kwargs,
+                **kwargs,
+            )
+        else:
+            super().predict(
+                test_data,
+                test_data_image_column=test_data_image_column,
+                **kwargs,
+            )

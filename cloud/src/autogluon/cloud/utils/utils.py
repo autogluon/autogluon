@@ -1,5 +1,6 @@
 import logging
 import os
+import cv2
 import tarfile
 import shutil
 import uuid
@@ -7,6 +8,13 @@ import zipfile
 
 
 logger = logging.getLogger(__name__)
+
+
+def convert_image_path_to_numpy_array_in_dataframe(dataframe, image_column):
+    assert image_column in dataframe, 'Please specify a valid image column name'
+    dataframe[image_column] = [cv2.imread(path) for path in dataframe[image_column]]
+
+    return dataframe
 
 
 def zipfolder(output_filename, dir_name):
