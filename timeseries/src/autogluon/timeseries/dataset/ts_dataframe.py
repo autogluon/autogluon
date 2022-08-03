@@ -85,9 +85,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     index: pd.MultiIndex
     _metadata = ["_static_features"]
 
-    def __init__(
-        self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs
-    ):
+    def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
             # necessary for copy constructor to work. see _constructor
             # and pandas.DataFrame
@@ -358,9 +356,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
         data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
-        return TimeSeriesDataFrame(
-            data_before, static_features=self.static_features
-        ), TimeSeriesDataFrame(data_after, static_features=self.static_features)
+        return TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
+            data_after, static_features=self.static_features
+        )
 
     def slice_by_timestep(self, time_step_slice: slice) -> TimeSeriesDataFrame:
         """Return a slice of time steps (with no regards to the actual timestamp) from within
