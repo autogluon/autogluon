@@ -22,8 +22,8 @@ def _test_endpoint(cloud_predictor, test_data):
 
 def _test_functionality(cloud_predictor, predictor_init_args, predictor_fit_args, cloud_predictor_no_train, test_data, image_path=None, fit_instance_type='ml.m5.2xlarge'):
     cloud_predictor.fit(
-        predictor_init_args,
-        predictor_fit_args,
+        predictor_init_args=predictor_init_args,
+        predictor_fit_args=predictor_fit_args,
         image_path=image_path,
         instance_type=fit_instance_type
     )

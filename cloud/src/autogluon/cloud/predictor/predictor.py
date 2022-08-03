@@ -1,3 +1,4 @@
+import copy
 import os
 import yaml
 import tarfile
@@ -207,6 +208,33 @@ class CloudPredictor(ABC):
         converter = FormatConverterFactory.get_converter(output_type)
         return converter.convert(data, path, filename)
 
+    def _upload_fit_image_artifact(
+        self,
+        images,
+        bucket,
+        key_prefix
+    ):
+        if images is not None:
+            if is_s3_url(images):
+                fileexts = ('.tar.gz', '.bz2', '.zip')  # More extensions?
+                assert images.endswith(fileexts), 'Please provide a s3 path to a compressed file'
+            else:
+                image_zip_filename = images
+                if os.path.isdir(images):
+                    image_zip_filename = os.path.basename(os.path.normpath(images))
+                    zipfolder(image_zip_filename, images)
+                    image_zip_filename += '.zip'
+                else:
+                    assert is_compressed_file(images), 'Please provide a compressed file or a folder containing the images'
+                logger.log(20, 'Uploading images ...')
+                images = self.sagemaker_session.upload_data(
+                    path=image_zip_filename,
+                    bucket=bucket,
+                    key_prefix=key_prefix,
+                )
+                logger.log(20, 'Images uploaded successfully')
+        return images
+
     def _upload_fit_artifact(
         self,
         train_data,
@@ -245,26 +273,11 @@ class CloudPredictor(ABC):
             key_prefix=util_key_prefix
         )
 
-        images_input = images
-        if images is not None:
-            if is_s3_url(images):
-                fileexts = ('.tar.gz', '.bz2', '.zip')  # More extensions?
-                assert images.endswith(fileexts), 'Please provide a s3 path to a compressed file'
-            else:
-                image_zip_filename = images
-                if os.path.isdir(images):
-                    image_zip_filename = os.path.basename(os.path.normpath(images))
-                    zipfolder(image_zip_filename, images)
-                    image_zip_filename += '.zip'
-                else:
-                    assert is_compressed_file(images), 'Please provide a compressed file or a folder containing the images'
-                logger.log(20, 'Uploading images ...')
-                images_input = self.sagemaker_session.upload_data(
-                    path=image_zip_filename,
-                    bucket=cloud_bucket,
-                    key_prefix=util_key_prefix
-                )
-                logger.log(20, 'Images uploaded successfully')
+        images_input = self._upload_fit_image_artifact(
+            images=images,
+            bucket=cloud_bucket,
+            key_prefix=util_key_prefix
+        )
         inputs = dict(train=train_input, config=config_input)
         if tune_input is not None:
             inputs['tune'] = tune_input
@@ -275,6 +288,7 @@ class CloudPredictor(ABC):
 
     def fit(
         self,
+        *,
         predictor_init_args,
         predictor_fit_args,
         image_path=None,
@@ -304,6 +318,11 @@ class CloudPredictor(ABC):
             If local path, path needs to be either a compressed file containing the images or a folder containing the images.
             If it's a folder, we will zip it for you and upload it to the s3.
             If s3 path, the path needs to be a path to a compressed file containing the images
+
+            Example:
+            If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
+            And you want to make sure in your training/tuning file, the column corresponding to the images is a relative path prefix with the root directory.
+            For example, `example_images/train/image1.png`. An absolute path will NOT work as the file will be moved to a remote system.
         leaderboard: bool, default = True
             Whether to include the leaderboard in the output artifact
         framework_version: str, default = `latest`
@@ -337,6 +356,7 @@ class CloudPredictor(ABC):
         """
         assert not self._fit_job.completed, 'Predictor is already fit! To fit additional models, create a new `CloudPredictor`'
         # TODO: Add warning for multi-model image not working properly
+        predictor_fit_args = copy.deepcopy(predictor_fit_args)
         train_data = predictor_fit_args.pop('train_data')
         tune_data = predictor_fit_args.pop('tuning_data', None)
         framework_version, py_version = self._parse_framework_version(framework_version, 'training')
@@ -345,6 +365,7 @@ class CloudPredictor(ABC):
         if not job_name:
             job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor")
 
+        autogluon_sagemaker_estimator_kwargs = copy.deepcopy(autogluon_sagemaker_estimator_kwargs)
         autogluon_sagemaker_estimator_kwargs.pop('output_path', None)
         output_path = self.cloud_output_path + '/output'
         cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
@@ -362,10 +383,10 @@ class CloudPredictor(ABC):
         self._setup_bucket(cloud_bucket)
         config = self._construct_config(predictor_init_args, predictor_fit_args, leaderboard)
         inputs = self._upload_fit_artifact(
-            train_data,
-            tune_data,
-            config,
-            image_path,
+            train_data=train_data,
+            tune_data=tune_data,
+            config=config,
+            images=image_path,
         )
 
         self._fit_job.run(
@@ -531,6 +552,7 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
+        autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the deployment. Please refer to `{entry_point}` for our implementation')
@@ -596,15 +618,15 @@ class CloudPredictor(ABC):
         self.endpoint = None
         return detached_endpoint
 
-    def _predict_realtime(self, test_data, accept):
+    def _predict_real_time(self, test_data, accept):
         try:
             return self.endpoint.predict(test_data, initial_args={'Accept': accept})
         except ClientError as e:
-            if not e.response['Error']['Code'] == '413':  # Error code for pay load too large
-                raise e
-            else:
+            if e.response['Error']['Code'] == '413':  # Error code for pay load too large
                 logger.warning('The invocation of endpoint failed with Error Code 413. This is likely due to pay load size being too large.')
                 logger.warning('SageMaker endpoint could only take maximum 5MB. Please consider reduce test data size or use `predict()` instead.')
+            raise e
+                
 
     def predict_real_time(self, test_data, accept='application/x-parquet'):
         """
@@ -632,7 +654,7 @@ class CloudPredictor(ABC):
         if not isinstance(test_data, pd.DataFrame):
             raise ValueError('test_data must be either a pandas.DataFrame, a local path or a s3 path')
 
-        return self._predict_realtime(test_data=test_data, accept=accept)
+        return self._predict_real_time(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
         if isinstance(test_data, pd.DataFrame) or not is_s3_url(test_data):
@@ -726,6 +748,7 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
+        autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
         if user_entry_point:
             entry_point = user_entry_point
@@ -736,6 +759,7 @@ class CloudPredictor(ABC):
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonBatchPredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
 
+        kwargs = copy.deepcopy(kwargs)
         content_type = kwargs.pop('content_type', None)
         if 'split_type' not in kwargs:
             split_type = 'Line'
@@ -972,14 +996,15 @@ class ImageCloudPredictor(CloudPredictor):
 
     def fit(
         self,
+        *,
         predictor_init_args,
         predictor_fit_args,
         image_path,
         **kwargs
     ):
         super().fit(
-            predictor_init_args,
-            predictor_fit_args,
+            predictor_init_args=predictor_init_args,
+            predictor_fit_args=predictor_fit_args,
             image_path=image_path,
             **kwargs
         )
@@ -1031,10 +1056,10 @@ class ImageCloudPredictor(CloudPredictor):
             assert test_data_image_column in test_data, 'Please specify a valid image column name'
 
             # Convert test data to be numpy array for network transfer
-            test_data = test_data[test_data_image_column].apply(lambda path: cv2.imread(path)).to_numpy()
+            test_data = np.asarray([cv2.imread(path) for path in test_data[test_data_image_column]])
         assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
 
-        return self._predict_realtime(test_data=test_data, accept=accept)
+        return self._predict_real_time(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
         if not is_s3_url(test_data):
@@ -1054,7 +1079,6 @@ class ImageCloudPredictor(CloudPredictor):
     def predict(
         self,
         test_data,
-        transformer_kwargs=dict(),
         **kwargs,
     ):
         """
@@ -1065,6 +1089,8 @@ class ImageCloudPredictor(CloudPredictor):
         """
         split_type = None
         content_type = 'application/x-image'
+        kwargs = copy.deepcopy(kwargs)
+        transformer_kwargs = kwargs.pop('transformer_kwargs', dict())
         transformer_kwargs['strategy'] = 'SingleRecord'
         super().predict(
             test_data,

@@ -21,7 +21,7 @@ install_requires = [
     'autogluon.common<0.6'
     'boto3',
     'numpy',
-    'opencv-python'
+    'opencv-python>=4.6,<4.7'
     'pandas',
     'sagemaker>=2.94',
 ]
