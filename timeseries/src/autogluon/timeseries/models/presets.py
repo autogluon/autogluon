@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Union, Dict, List
+from typing import Dict, List, Union
 
 import autogluon.core as ag
 
@@ -15,8 +15,7 @@ from .gluonts import (
     SimpleFeedForwardModel,
     TransformerModel,
 )
-from .sktime import AutoARIMAModel, AutoETSModel, ARIMAModel
-
+from .sktime import ARIMAModel, AutoARIMAModel, AutoETSModel
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ MODEL_TYPES = dict(
     Transformer=TransformerModel,
     ARIMA=ARIMAModel,
     AutoARIMA=AutoARIMAModel,
-    AutoETS=AutoETSModel
+    AutoETS=AutoETSModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -138,18 +137,14 @@ def get_preset_models(
     """
     models = []
     if isinstance(hyperparameters, str):
-        hyperparameters = copy.deepcopy(
-            get_default_hps(hyperparameters, prediction_length)
-        )
+        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
     else:
         hp_str = "default" if not hyperparameter_tune else "default_hpo"
         default_hps = copy.deepcopy(get_default_hps(hp_str, prediction_length))
 
         if hyperparameters is not None:
             # filter only default_hps for models with hyperparameters provided
-            default_hps = {
-                model: default_hps.get(model, {}) for model in hyperparameters
-            }
+            default_hps = {model: default_hps.get(model, {}) for model in hyperparameters}
             for model in hyperparameters:
                 default_hps[model].update(hyperparameters[model])
         hyperparameters = copy.deepcopy(default_hps)
@@ -162,11 +157,7 @@ def get_preset_models(
     invalid_model_names = set(invalid_model_names)
     all_assigned_names = set(invalid_model_names)
 
-    model_priority_list = sorted(
-        hyperparameters.keys(),
-        key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0),
-        reverse=True
-    )
+    model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
 
     for model in model_priority_list:
         model_hps = hyperparameters[model]
@@ -177,9 +168,7 @@ def get_preset_models(
         elif isinstance(model, AbstractTimeSeriesModelFactory):
             model_type = model
         elif not issubclass(model, AbstractTimeSeriesModel):
-            logger.warning(
-                f"Customized model {model} does not inherit from {AbstractTimeSeriesModel}"
-            )
+            logger.warning(f"Customized model {model} does not inherit from {AbstractTimeSeriesModel}")
             model_type = model
         else:
             logger.log(20, f"Custom Model Type Detected: {model}")

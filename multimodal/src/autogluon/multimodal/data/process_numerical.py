@@ -1,7 +1,9 @@
-from typing import Optional, List, Any, Dict
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 from nptyping import NDArray
-from ..constants import NUMERICAL, COLUMN
+
+from ..constants import COLUMN, NUMERICAL
 from .collator import Stack
 
 

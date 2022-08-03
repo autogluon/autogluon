@@ -1888,7 +1888,7 @@ class AbstractTrainer:
         model: AbstractModel = self.load_model(model)
         predict_func_kwargs = dict(model=model)
         return compute_permutation_feature_importance(
-            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, **kwargs
+            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, quantile_levels=self.quantile_levels, **kwargs
         )
 
     def _get_models_load_info(self, model_names):

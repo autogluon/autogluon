@@ -1,7 +1,7 @@
 import logging
 import re
 import warnings
-from typing import Optional, List, Dict, Any, Type
+from typing import Any, Dict, List, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -78,9 +78,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             params["seasonal"] = "add"
 
         return self.sktime_forecaster_class(
-            **{  # noqa
-                k: v for k, v in params.items() if k in self.sktime_allowed_init_args
-            }
+            **{k: v for k, v in params.items() if k in self.sktime_allowed_init_args}  # noqa
         )
 
     def _to_skt_data_frame(self, data: TimeSeriesDataFrame) -> pd.DataFrame:
@@ -97,9 +95,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             ),
         )
 
-    def _to_time_series_data_frame(
-        self, data: pd.DataFrame, freq: Optional[str] = None
-    ) -> TimeSeriesDataFrame:
+    def _to_time_series_data_frame(self, data: pd.DataFrame, freq: Optional[str] = None) -> TimeSeriesDataFrame:
         df = data.copy(deep=False)
         df.set_index(
             [
@@ -127,24 +123,18 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
 
         min_length = min(len(train_data.loc[i]) for i in train_data.iter_items())
         period = get_seasonality(train_data.freq)
-        self.skt_forecaster = self._get_skt_forecaster(
-            sp=period if min_length > 2 * period else None
-        )
+        self.skt_forecaster = self._get_skt_forecaster(sp=period if min_length > 2 * period else None)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             warnings.simplefilter("ignore", category=ConvergenceWarning)
             warnings.simplefilter("ignore", category=RuntimeWarning)
 
-            self.skt_forecaster.fit(
-                self._to_skt_data_frame(train_data[[self.target]]), fh=self._fh()
-            )
+            self.skt_forecaster.fit(self._to_skt_data_frame(train_data[[self.target]]), fh=self._fh())
 
         self._fit_index = train_data.index.copy()
 
-    def predict(
-        self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs
-    ) -> TimeSeriesDataFrame:
+    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data, quantile_levels=quantile_levels, **kwargs)
 
         if not self.skt_forecaster:
@@ -164,9 +154,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         quantile_predictions = self.skt_forecaster.predict_quantiles(
             fh=self._fh(), alpha=quantile_levels or self.quantile_levels
         )
-        quantile_predictions.columns = [
-            str(q) for q in quantile_predictions.columns.levels[1]  # noqa
-        ]
+        quantile_predictions.columns = [str(q) for q in quantile_predictions.columns.levels[1]]  # noqa
 
         predictions = pd.concat([mean_predictions, quantile_predictions], axis=1)
         return self._to_time_series_data_frame(predictions, freq=data.freq)

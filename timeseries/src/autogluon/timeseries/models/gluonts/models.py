@@ -4,6 +4,7 @@ from typing import Type
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
+
 from ..abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
@@ -59,6 +60,7 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
     """Abstract class for MQCNN and MQRNN which require hybridization to be turned off
     when fitting on the GPU.
     """
+
     gluonts_estimator_class: Type[GluonTSEstimator] = None
 
     def _get_estimator(self):
@@ -66,9 +68,7 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
             self.params["hybridize"] = False
 
         with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(
-                **self._get_estimator_init_args()
-            )
+            return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
 
 class MQCNNModel(AbstractGluonTSSeq2SeqModel):
@@ -119,6 +119,7 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     scaling: bool
         Whether to automatically scale the target values. (default: False if quantile_output is used, True otherwise)
     """
+
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
 
@@ -131,6 +132,7 @@ class MQRNNModel(AbstractGluonTSSeq2SeqModel):
     Other Parameters
     ----------------
     """
+
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
@@ -217,9 +219,7 @@ class GenericGluonTSModel(AbstractGluonTSModel):
 
     def __init__(self, gluonts_estimator_class: Type[GluonTSEstimator], **kwargs):
         self.gluonts_estimator_class = gluonts_estimator_class
-        gluonts_model_name = re.sub(
-            r"Estimator$", "", self.gluonts_estimator_class.__name__
-        )
+        gluonts_model_name = re.sub(r"Estimator$", "", self.gluonts_estimator_class.__name__)
 
         super().__init__(name=kwargs.pop("name", gluonts_model_name), **kwargs)
 
@@ -235,9 +235,7 @@ class GenericGluonTSModel(AbstractGluonTSModel):
             self.params["hybridize"] = False
 
         with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(
-                **self._get_estimator_init_args()
-            )
+            return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
 
 class GenericGluonTSModelFactory(AbstractTimeSeriesModelFactory):
@@ -302,11 +300,7 @@ class ProphetModel(AbstractGluonTSModel):
             predictor_cls=ProphetPredictor,
             freq=model_init_params["freq"],
             prediction_length=model_init_params["prediction_length"],
-            prophet_params={
-                k: v
-                for k, v in model_init_params.items()
-                if k in self.allowed_prophet_parameters
-            },
+            prophet_params={k: v for k, v in model_init_params.items() if k in self.allowed_prophet_parameters},
         )
 
 

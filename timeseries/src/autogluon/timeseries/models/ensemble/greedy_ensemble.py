@@ -5,11 +5,7 @@ from typing import List
 
 import numpy as np
 
-from autogluon.core.models.greedy_ensemble.ensemble_selection import (
-    AbstractWeightedEnsemble,
-    EnsembleSelection,
-)
-
+from autogluon.core.models.greedy_ensemble.ensemble_selection import AbstractWeightedEnsemble, EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
@@ -38,9 +34,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         self.bagging = bagging
         self.use_best = True
         if tie_breaker not in ["random", "second_metric"]:
-            raise ValueError(
-                f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']"
-            )
+            raise ValueError(f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']")
         self.tie_breaker = tie_breaker
         if random_state is not None:
             self.random_state = random_state
@@ -48,9 +42,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             self.random_state = np.random.RandomState(seed=0)
         self.quantile_levels = kwargs.get("quantile_levels", None)
 
-    def fit(
-        self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None
-    ):
+    def fit(self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError("Ensemble size cannot be less than one!")
@@ -95,9 +87,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
                 weighted_ensemble_prediction = (s / float(s + 1)) * ensemble_prediction
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
-                fant_ensemble_prediction[:] = (
-                    weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred.values
-                )
+                fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred.values
                 scores[j] = self._calculate_regret(
                     y_true=labels,
                     y_pred_proba=fant_ensemble_prediction,
@@ -166,9 +156,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
         logger.debug("Ensemble indices: " + str(self.indices_))
 
-    def _calculate_regret(  # noqa
-        self, y_true, y_pred_proba, metric, dummy_pred, sample_weight=None
-    ):
+    def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred, sample_weight=None):  # noqa
         dummy_pred = copy.deepcopy(dummy_pred)
         dummy_pred[list(dummy_pred.columns)] = y_pred_proba
         score = metric(y_true, dummy_pred)
@@ -233,8 +221,6 @@ class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):
         return self.model.weights_
 
     def predict(self, data: List[TimeSeriesDataFrame], **kwargs):
-        if isinstance(
-            data, dict
-        ):  # FIXME: HACK, unclear what the input to predict should be for weighted ensemble
+        if isinstance(data, dict):  # FIXME: HACK, unclear what the input to predict should be for weighted ensemble
             data = [data[m] for m in data.keys()]
         return self.model.predict(data)

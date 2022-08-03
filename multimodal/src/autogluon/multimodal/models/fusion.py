@@ -1,11 +1,13 @@
 import logging
+from typing import List, Optional
+
 import torch
 from torch import nn
-from typing import List, Optional
-from .utils import init_weights
-from ..constants import LABEL, LOGITS, FEATURES, WEIGHT, AUTOMM
+
+from ..constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
+from .ft_transformer import CLSToken, FT_Transformer
 from .mlp import MLP
-from .ft_transformer import FT_Transformer, CLSToken
+from .utils import init_weights
 
 logger = logging.getLogger(AUTOMM)
 
@@ -109,6 +111,8 @@ class MultimodalFusionMLP(nn.Module):
         self.adapter.apply(init_weights)
         self.fusion_mlp.apply(init_weights)
         self.head.apply(init_weights)
+
+        self.out_features = in_features
 
         self.prefix = prefix
 
@@ -298,6 +302,8 @@ class MultimodalFusionTransformer(nn.Module):
             d_token=in_features,
             initialization="uniform",
         )
+
+        self.out_features = in_features
 
         # init weights
         self.adapter.apply(init_weights)

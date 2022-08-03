@@ -1,8 +1,10 @@
+from typing import List, Optional
+
 import torch
 from torch import nn
+
+from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS
 from .mlp import MLP
-from ..constants import CATEGORICAL, LABEL, LOGITS, FEATURES
-from typing import Optional, List
 from .utils import init_weights
 
 

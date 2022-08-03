@@ -1,25 +1,18 @@
 import logging
-import torch
-from torch import nn
-import torch.nn.functional as F
+from typing import Callable, List, Optional, Union
+
 import pytorch_lightning as pl
-from typing import Union, Optional, List, Callable
+import torch
+import torch.nn.functional as F
 import torchmetrics
-from torchmetrics.aggregation import BaseAggregator
-from torch.nn.modules.loss import _Loss
 from omegaconf import DictConfig
-from .utils import (
-    get_optimizer,
-    get_lr_scheduler,
-    apply_two_stages_lr,
-    apply_layerwise_lr_decay,
-    apply_single_lr,
-)
-from ..constants import (
-    LOGITS,
-    WEIGHT,
-    AUTOMM,
-)
+from torch import nn
+from torch.nn.modules.loss import _Loss
+from torchmetrics.aggregation import BaseAggregator
+
+from ..constants import AUTOMM, FEATURES, LOGITS, WEIGHT
+from .rkd_loss import RKDLoss
+from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)
 
@@ -41,6 +34,7 @@ class DistillerLitModule(pl.LightningModule):
         hard_label_weight: float,
         soft_label_weight: float,
         temperature: float,
+        output_feature_loss_weight: float,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
         lr_schedule: Optional[str] = None,
@@ -52,6 +46,9 @@ class DistillerLitModule(pl.LightningModule):
         warmup_steps: Optional[int] = None,
         hard_label_loss_func: Optional[_Loss] = None,
         soft_label_loss_func: Optional[_Loss] = None,
+        output_feature_adaptor: Optional[nn.Module] = None,
+        output_feature_loss_func: Optional[_Loss] = None,
+        rkd_loss_func: Optional[nn.Module] = None,
         validation_metric: Optional[torchmetrics.Metric] = None,
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
@@ -65,7 +62,7 @@ class DistillerLitModule(pl.LightningModule):
         teacher_model
             The teacher model in knowledge distillation.
         matches
-            Teacher/stduent layer matches to compute the intermediate loss.
+            Teacher/stduent layer matches to compute the output_feature loss.
         critics
             The critics used in computing mutual information loss.
         baseline_funcs
@@ -76,6 +73,8 @@ class DistillerLitModule(pl.LightningModule):
             Weight for soft label loss.
         temperature
             A scalar to scale teacher and student logits in soft label loss.
+        output_feature_loss_weight
+            Weight for output_feature layer's loss.
         optim_type
             Optimizer type. We now support:
             - adamw
@@ -114,6 +113,12 @@ class DistillerLitModule(pl.LightningModule):
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for hard labels.
         soft_label_loss_func
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for soft labels.
+        output_feature_adaptor
+            A Pytorch Module, e.g. nn.Linear, for adapting student output feature to the shape of teacher's.
+        output_feature_loss_func
+            A Pytorch loss module, e.g., nn.MSELoss(), for output_feature distance between teacher and student.
+        rkd_loss_func
+            A Pytorch loss module, i.e., RKDLoss in .rkd_loss, for rkd loss of output_feature between teacher and student.
         validation_metric
             A torchmetrics module used in the validation stage, e.g., torchmetrics.Accuracy().
         validation_metric_name
@@ -139,6 +144,9 @@ class DistillerLitModule(pl.LightningModule):
                 "matches",
                 "critics",
                 "baseline_funcs",
+                "output_feature_adaptor",
+                "output_feature_loss_func",
+                "rkd_loss_func",
             ]
         )
         if matches:
@@ -154,14 +162,19 @@ class DistillerLitModule(pl.LightningModule):
         self.temperature = temperature
         self.hard_label_weight = hard_label_weight
         self.soft_label_weight = soft_label_weight
+        self.output_feature_loss_weight = output_feature_loss_weight
         self.hard_label_loss_func = hard_label_loss_func
         self.soft_label_loss_func = soft_label_loss_func
+        self.output_feature_loss_func = output_feature_loss_func
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
                 "which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
+
+        self.output_feature_adaptor = output_feature_adaptor
+        self.rkd_loss_func = rkd_loss_func
 
     def _compute_hard_label_loss(
         self,
@@ -178,6 +191,7 @@ class DistillerLitModule(pl.LightningModule):
                 )
                 * weight
             )
+
         return loss
 
     def _compute_soft_label_loss(
@@ -199,6 +213,39 @@ class DistillerLitModule(pl.LightningModule):
         )
         return loss
 
+    def _compute_output_feature_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
+
+        student_result = self.output_feature_adaptor(student_result)
+
+        loss = self.output_feature_loss_func(
+            input=student_result,
+            target=teacher_result,
+        )
+        return loss
+
+    def _compute_rkd_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_result = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        teacher_result = teacher_output[self.teacher_model.prefix][FEATURES].squeeze(dim=1)
+
+        student_result = self.output_feature_adaptor(student_result)
+
+        loss = self.rkd_loss_func(
+            feature_student=student_result,
+            feature_teacher=teacher_result,
+        )
+
+        return loss
+
     def _compute_loss(
         self,
         student_output: dict,
@@ -217,6 +264,20 @@ class DistillerLitModule(pl.LightningModule):
             teacher_output=teacher_output,
         )
         loss += soft_label_loss * self.soft_label_weight
+
+        if self.output_feature_loss_weight > 0:
+            output_feature_loss = self._compute_output_feature_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += output_feature_loss * self.output_feature_loss_weight
+
+        if self.rkd_loss_func.distance_loss_weight > 0 or self.rkd_loss_func.angle_loss_weight > 0:
+            rkd_loss = self._compute_rkd_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += rkd_loss
 
         return loss
 
@@ -360,6 +421,13 @@ class DistillerLitModule(pl.LightningModule):
                         weight_decay=self.hparams.weight_decay,
                     )
                     grouped_parameters.extend(baseline_func_params)
+
+        adaptor_params = apply_single_lr(
+            model=self.output_feature_adaptor,
+            lr=self.hparams.lr,
+            weight_decay=self.hparams.weight_decay,
+        )
+        grouped_parameters.extend(adaptor_params)
 
         optimizer = get_optimizer(
             optim_type=self.hparams.optim_type,

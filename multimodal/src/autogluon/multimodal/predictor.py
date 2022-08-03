@@ -1,111 +1,109 @@
 from __future__ import annotations
-import logging
-import os
-import numpy as np
-import json
-import warnings
-import sys
-import shutil
-from datetime import timedelta
-import pandas as pd
-import pickle
+
 import copy
-import yaml
-import torch
-from torch import nn
-from omegaconf import OmegaConf, DictConfig
+import json
+import logging
+import math
 import operator
+import os
+import pickle
+import shutil
+import sys
+import warnings
+from datetime import timedelta
+from typing import Callable, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
-from typing import Optional, List, Dict, Union, Callable
+import torch
+import yaml
+from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
-from autogluon.core.utils.try_import import try_import_ray_lightning
-from autogluon.core.utils.utils import default_holdout_frac
+from torch import nn
+
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.core.utils.try_import import try_import_ray_lightning
+from autogluon.core.utils.utils import default_holdout_frac
 
+from . import version as ag_version
 from .constants import (
-    LABEL,
+    AUTOMM,
+    AUTOMM_TUTORIAL_MODE,
+    BEST,
+    BEST_K_MODELS_FILE,
     BINARY,
-    MULTICLASS,
     CLASSIFICATION,
+    COLUMN_FEATURES,
+    DATA,
+    FEATURES,
+    GREEDY_SOUP,
+    LABEL,
+    LAST_CHECKPOINT,
+    LOGITS,
+    MASKS,
+    MATCHER,
+    MAX,
+    MIN,
+    MODEL,
+    MODEL_CHECKPOINT,
+    MULTICLASS,
+    PROBABILITY,
+    RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    TEXT,
+    UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    LOGITS,
-    FEATURES,
-    AUTOMM,
-    AUTOMM_TUTORIAL_MODE,
-    UNIFORM_SOUP,
-    GREEDY_SOUP,
-    BEST,
-    MIN,
-    MAX,
-    TEXT,
-    RAY_TUNE_CHECKPOINT,
-    BEST_K_MODELS_FILE,
-    LAST_CHECKPOINT,
-    MODEL_CHECKPOINT,
-    MODEL,
-    DATA,
-    PROBABILITY,
-    MATCHER,
-    COLUMN_FEATURES,
-    MASKS,
     ZERO_SHOT,
 )
-
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
-
-
-from .utils import (
-    create_model,
-    init_df_preprocessor,
-    init_data_processors,
-    select_model,
-    compute_score,
-    average_checkpoints,
-    infer_metrics,
-    get_minmax_mode,
-    filter_search_space,
-    get_config,
-    LogFilter,
-    apply_log_filter,
-    save_pretrained_models,
-    convert_checkpoint_name,
-    save_text_tokenizers,
-    load_text_tokenizers,
-    modify_duplicate_model_names,
-    assign_feature_column_names,
-    turn_on_off_feature_column_info,
-    try_to_infer_pos_label,
-    get_mixup,
-    CustomUnpickler,
-    is_interactive,
-    AutoMMModelCheckpoint,
-    data_to_df,
-    logits_to_prob,
-    extract_from_output,
-    init_zero_shot,
-    tensor_to_ndarray,
-    infer_dtypes_by_model_names,
-    update_config_by_rules,
-    process_save_path,
-)
-from .optimization.utils import (
-    get_metric,
-    get_loss_func,
-)
-from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
-
-from . import version as ag_version
+from .optimization.lit_module import LitModule
+from .optimization.rkd_loss import RKDLoss
+from .optimization.utils import get_loss_func, get_metric
+from .utils import (
+    AutoMMModelCheckpoint,
+    CustomUnpickler,
+    LogFilter,
+    apply_log_filter,
+    assign_feature_column_names,
+    average_checkpoints,
+    compute_score,
+    convert_checkpoint_name,
+    create_model,
+    data_to_df,
+    extract_from_output,
+    filter_search_space,
+    get_config,
+    get_minmax_mode,
+    get_mixup,
+    infer_dtypes_by_model_names,
+    infer_metrics,
+    init_data_processors,
+    init_df_preprocessor,
+    init_zero_shot,
+    is_interactive,
+    load_text_tokenizers,
+    logits_to_prob,
+    modify_duplicate_model_names,
+    process_save_path,
+    save_pretrained_models,
+    save_text_tokenizers,
+    select_model,
+    tensor_to_ndarray,
+    try_to_infer_pos_label,
+    turn_on_off_feature_column_info,
+    update_config_by_rules,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -519,12 +517,12 @@ class MultiModalPredictor:
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
         from autogluon.core.hpo.ray_hpo import (
-            run,
-            cleanup_trials,
-            cleanup_checkpoints,
-            EmptySearchSpace,
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
+            EmptySearchSpace,
+            cleanup_checkpoints,
+            cleanup_trials,
+            run,
         )
 
         ray_tune_adapter = AutommRayTuneAdapter()
@@ -658,6 +656,12 @@ class MultiModalPredictor:
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
+        output_feature_adaptor
+            The adaptor used to adapt student output feature to the shape of teacher's.
+        output_feature_loss_func
+            The loss function using minimize distance between output_feature of teacher and student.
+        rkd_loss_func
+            The loss function using rkd distance and angle loss between output_feature of teacher and student.
         df_preprocessor
             The teacher predictor's dataframe preprocessor.
         data_processors
@@ -697,6 +701,28 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
+        output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
+        if output_feature_loss_type == "cosine":
+            output_feature_loss_func = nn.CosineEmbeddingLoss()
+        elif output_feature_loss_type == "mse":
+            output_feature_loss_func = nn.MSELoss()
+        else:
+            raise ValueError(f"Unknown output_feature_loss_type: {output_feature_loss_type}")
+
+        # Adapt student's output_feature feature to teacher's
+        # Refer to FitNet: https://arxiv.org/abs/1412.6550
+        teacher_model_dim = teacher_predictor._model.out_features
+        student_model_dim = self._model.out_features
+        output_feature_adaptor = (
+            nn.Linear(student_model_dim, teacher_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
+
+        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.0)
+        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.0)
+        rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
+
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
@@ -730,6 +756,9 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            output_feature_adaptor,
+            output_feature_loss_func,
+            rkd_loss_func,
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
@@ -868,6 +897,9 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = self._setup_distillation(
@@ -879,9 +911,12 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -916,6 +951,9 @@ class MultiModalPredictor:
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
+            output_feature_loss_weight = OmegaConf.select(
+                self._config, "distiller.output_feature_loss_weight", default=0.01
+            )
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
@@ -925,8 +963,12 @@ class MultiModalPredictor:
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
                 temperature=config.distiller.temperature,
+                output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                output_feature_adaptor=output_feature_adaptor,
+                output_feature_loss_func=output_feature_loss_func,
+                rkd_loss_func=rkd_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -997,7 +1039,11 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
+        num_gpus = (
+            math.floor(config.env.num_gpus)
+            if isinstance(config.env.num_gpus, (int, float))
+            else len(config.env.num_gpus)
+        )
         if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
             num_gpus = torch.cuda.device_count()
 
@@ -1127,7 +1173,8 @@ class MultiModalPredictor:
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
-                best_k_models = yaml.load(f, Loader=yaml.Loader)
+                best_k_models = yaml.safe_load(f)
+
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -1242,7 +1289,9 @@ class MultiModalPredictor:
         )
 
         num_gpus = (
-            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
+            math.floor(self._config.env.num_gpus)
+            if isinstance(self._config.env.num_gpus, (int, float))
+            else len(self._config.env.num_gpus)
         )
         if num_gpus < 0:
             num_gpus = torch.cuda.device_count()

@@ -1,4 +1,4 @@
-from sktime.forecasting.arima import AutoARIMA, ARIMA
+from sktime.forecasting.arima import ARIMA, AutoARIMA
 from sktime.forecasting.ets import AutoETS
 from sktime.forecasting.tbats import TBATS
 from sktime.forecasting.theta import ThetaForecaster

@@ -1,5 +1,7 @@
-from typing import Any, Union, Dict, Optional, List
+from typing import Any, Dict, List, Optional, Union
+
 from nptyping import NDArray
+
 from ..constants import LABEL
 from .collator import Stack
 
