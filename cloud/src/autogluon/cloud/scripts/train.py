@@ -3,10 +3,20 @@ import os
 import shutil
 import yaml
 
+import autogluon.text
+
 from autogluon.tabular import TabularPredictor, TabularDataset
 from autogluon.text import TextPredictor
 from autogluon.vision import ImagePredictor
-from autogluon.multimodal import MultiModalPredictor
+
+from distutils.version import LooseVersion
+if LooseVersion(autogluon.text.__version__) < LooseVersion('0.5'):
+    from autogluon.text.automm import AutoMMPredictor
+    multimodal_predictor_cls = AutoMMPredictor
+else:
+    from autogluon.multimodal import MultiModalPredictor
+    multimodal_predictor_cls = MultiModalPredictor
+
 from pprint import pprint
 
 
@@ -81,7 +91,7 @@ if __name__ == "__main__":
     elif predictor_type == 'image':
         predictor_cls = ImagePredictor
     elif predictor_type == 'multimodal':
-        predictor_cls = MultiModalPredictor
+        predictor_cls = multimodal_predictor_cls
 
     train_file = get_input_path(args.training_dir)
     training_data = TabularDataset(train_file)

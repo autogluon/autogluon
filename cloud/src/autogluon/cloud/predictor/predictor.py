@@ -28,6 +28,7 @@ from ..utils.ag_sagemaker import (
     AutoGluonSagemakerInferenceModel,
     AutoGluonRealtimePredictor,
     AutoGluonImageRealtimePredictor,
+    AutoGluonMultiModalRealtimePredictor,
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import setup_sagemaker_role_and_policy
@@ -39,7 +40,8 @@ from ..utils.sagemaker_utils import (
     retrieve_latest_framework_version
 )
 from ..utils.utils import (
-    convert_image_path_to_numpy_array_in_dataframe,
+    read_image_bytes,
+    convert_image_path_to_bytes_in_dataframe,
     zipfolder,
     is_compressed_file,
     unzip_file,
@@ -631,15 +633,14 @@ class CloudPredictor(ABC):
         self.endpoint = None
         return detached_endpoint
 
-    def _predict_real_time(self, test_data, accept):
+    def _predict_real_time(self, test_data, accept, **initial_args):
         try:
-            return self.endpoint.predict(test_data, initial_args={'Accept': accept})
+            return self.endpoint.predict(test_data, initial_args={'Accept': accept, **initial_args})
         except ClientError as e:
             if e.response['Error']['Code'] == '413':  # Error code for pay load too large
                 logger.warning('The invocation of endpoint failed with Error Code 413. This is likely due to pay load size being too large.')
                 logger.warning('SageMaker endpoint could only take maximum 5MB. Please consider reduce test data size or use `predict()` instead.')
             raise e
-                
 
     def predict_real_time(self, test_data, accept='application/x-parquet'):
         """
@@ -1127,9 +1128,22 @@ class MultiModalCloudPredictor(CloudPredictor):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    @property
+    def _realtime_predictor_cls(self):
+        return AutoGluonMultiModalRealtimePredictor
+
     def _get_local_predictor_cls(self):
-        from autogluon.multimodal import MultiModalPredictor
-        predictor_cls = MultiModalPredictor
+        import autogluon.text
+        from distutils.version import LooseVersion
+
+        if LooseVersion(autogluon.text.__version__) < LooseVersion('0.5'):
+            from autogluon.text.automm import AutoMMPredictor
+            multimodal_predictor_cls = AutoMMPredictor
+        else:
+            from autogluon.multimodal import MultiModalPredictor
+            multimodal_predictor_cls = MultiModalPredictor
+
+        predictor_cls = multimodal_predictor_cls
         return predictor_cls
 
     def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
@@ -1150,7 +1164,6 @@ class MultiModalCloudPredictor(CloudPredictor):
                     Similarly, You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
                 Or a local path to a single image file.
                 Or a list of local paths to image files.
-                Or a numpy.ndarray representing an array of images in ndarray form.
         test_data_image_column: Optional(str)
             If provided a pandas.DataFrame as the test_data and test_data involves image modality,
             you must specify the column name corresponding to image paths.
@@ -1174,21 +1187,18 @@ class MultiModalCloudPredictor(CloudPredictor):
             if image is None:  # not an image
                 test_data = load_pd.load(test_data)
             else:
-                test_data = pd.DataFrame(dict(images=[image]))
+                test_data = np.array([read_image_bytes(test_data)], dtype='object')
+                content_type = 'application/x-npy'
         if isinstance(test_data, list):
             images = []
-            for image in test_data:
-                images.append(cv2.imread(image))
-            test_data = pd.DataFrame(dict(images=images))
-        if isinstance(test_data, np.ndarray):
-            test_data = pd.DataFrame(dict(images=test_data.tolist()))
+            test_data = np.array([read_image_bytes(image) for image in images], dtype='object')
+            content_type = 'application/x-npy'
         if isinstance(test_data, pd.DataFrame):
             if test_data_image_column is not None:
-                test_data = convert_image_path_to_numpy_array_in_dataframe(test_data, test_data_image_column)
+                test_data = convert_image_path_to_bytes_in_dataframe(test_data, test_data_image_column)
+            content_type = 'application/x-parquet'
 
-        assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
-
-        return self._predict_real_time(test_data=test_data, accept=accept)
+        return self._predict_real_time(test_data=test_data, accept=accept, ContentType=content_type)
 
     def predict(
         self,

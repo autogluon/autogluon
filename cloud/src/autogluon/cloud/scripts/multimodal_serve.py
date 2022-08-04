@@ -2,9 +2,19 @@ import copy
 import pandas as pd
 import numpy as np
 
+import autogluon.text  # Needed to check for multimodal version
+
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.utils import get_pred_from_proba_df
-from autogluon.multimodal import MultiModalPredictor
+
+from distutils.version import LooseVersion
+if LooseVersion(autogluon.text.__version__) < LooseVersion('0.5'):
+    from autogluon.text.automm import AutoMMPredictor
+    multimodal_predictor_cls = AutoMMPredictor
+else:
+    from autogluon.multimodal import MultiModalPredictor
+    multimodal_predictor_cls = MultiModalPredictor
+
 from io import BytesIO, StringIO
 from PIL import Image
 
@@ -12,9 +22,9 @@ from PIL import Image
 image_index = 0
 
 
-def _save_image_and_update_dataframe_column(image):
+def _save_image_and_update_dataframe_column(bytes):
     global image_index
-    im = Image.fromarray(image)
+    im = Image.open(BytesIO(bytes))
     im_name = f'multimodal_image_{image_index}.png'
     im.save(im_name)
 
@@ -23,7 +33,7 @@ def _save_image_and_update_dataframe_column(image):
 
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
-    model = MultiModalPredictor.load(model_dir)
+    model = multimodal_predictor_cls.load(model_dir)
     label_column = model._label_column
     column_types = copy.copy(model._column_types)
     column_types.pop(label_column)
@@ -54,8 +64,8 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = BytesIO(request_body)
         data = np.load(buf, allow_pickle=True)
         image_paths = []
-        for i, image in enumerate(data):
-            im = Image.fromarray(image)
+        for i, bytes in enumerate(data):
+            im = Image.open(BytesIO(bytes))
             im_name = f'{i}.png'
             im.save(im_name)
             image_paths.append(im_name)
@@ -98,10 +108,11 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             if column_type == 'image_path':
                 image_column = column_name
                 break
-        # save image column ndarray to disk and update the column with saved path
+        # save image column bytes to disk and update the column with saved path
         if image_column is not None:
             print(f'Detected image column {image_column}')
-            data[image_column] = [_save_image_and_update_dataframe_column(path) for path in data[image_column]]
+            assert input_content_type == 'application/x-parquet', "We only support multimodal prediction with image modality with 'application/x-parquet' format for now"
+            data[image_column] = [_save_image_and_update_dataframe_column(bytes) for bytes in data[image_column]]
 
     if model.problem_type == BINARY or model.problem_type == MULTICLASS:
         pred_proba = model.predict_proba(data)

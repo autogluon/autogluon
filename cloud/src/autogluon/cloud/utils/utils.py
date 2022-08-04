@@ -10,9 +10,17 @@ import zipfile
 logger = logging.getLogger(__name__)
 
 
-def convert_image_path_to_numpy_array_in_dataframe(dataframe, image_column):
+def read_image_bytes(image_path):
+    image_obj = open(image_path, 'rb')
+    image_bytes = image_obj.read()
+    image_obj.close()
+
+    return image_bytes
+
+
+def convert_image_path_to_bytes_in_dataframe(dataframe, image_column):
     assert image_column in dataframe, 'Please specify a valid image column name'
-    dataframe[image_column] = [cv2.imread(path) for path in dataframe[image_column]]
+    dataframe[image_column] = [read_image_bytes(path) for path in dataframe[image_column]]
 
     return dataframe
 
