@@ -16,7 +16,7 @@ class AbstractTimeSeriesSplitter:
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Split each series in the input dataset into one train and potentially multiple validation series.
 
-        The `item_id` of each validation series is a string of format `f"{idx}_slice({start}, {end})". Here `idx` is
+        The `item_id` of each validation series is a string of format `f"{idx}_[{start}:{end}]". Here `idx` is
         the `item_id` of the input series, and `start` and `end` correspond to the slice parameters used to generate
         the validation series.
 
