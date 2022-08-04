@@ -138,7 +138,7 @@ text/src/autogluon/text/version.py
 vision/src/autogluon/vision/version.py
 multimodal/src/autogluon/multimodal/version.py
 cloud/src/autogluon/cloud/version.py
-data/src/autogluon/data/version.py
+eda/src/autogluon/eda/version.py
 
 AutogluonModels
 VERSION.minor

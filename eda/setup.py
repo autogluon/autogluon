@@ -15,7 +15,7 @@ spec.loader.exec_module(ag)
 version = ag.load_version_file()
 version = ag.update_version(version, use_file_if_exists=False, create_file=True)
 
-submodule = 'data'
+submodule = 'eda'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
