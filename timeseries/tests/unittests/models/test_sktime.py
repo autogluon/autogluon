@@ -141,7 +141,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
         ("M", 5, 1, True),
     ],
 )
-def test_seasonal_period_is_inferred_correctly_when_set_to_none(
+def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     model_class,
     hyperparameters,
     temp_model_path,
@@ -169,7 +169,9 @@ def test_seasonal_period_is_inferred_correctly_when_set_to_none(
     with caplog.at_level(logging.WARNING):
         model.fit(train_data=train_data)
         if should_warn:
-            assert "WARNING" in caplog.text
+            assert (
+                "requires training series of length at least 2 * seasonal_period" in caplog.text
+            ), "Model should raise a warning since fail_if_misconfigured = False by default"
 
     assert model.sktime_forecaster.sp == expected_sp
 
@@ -185,7 +187,7 @@ def test_seasonal_period_is_inferred_correctly_when_set_to_none(
         ("H", 5, 1),
     ],
 )
-def test_seasonal_period_when_provided_overrides_the_inferred_period(
+def test_when_seasonal_period_is_provided_then_inferred_period_is_overriden(
     model_class,
     temp_model_path,
     freqstr,
@@ -213,10 +215,7 @@ def test_seasonal_period_when_provided_overrides_the_inferred_period(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_seasonality_fails_on_short_sequences_when_fail_if_misconfigured_is_true(
-    model_class,
-    temp_model_path,
-):
+def test_when_fail_if_misconfigured_is_true_then_seasonality_fails_on_short_sequences(model_class, temp_model_path):
     if "sp" not in model_class.sktime_allowed_init_args:
         return
 
@@ -234,15 +233,11 @@ def test_seasonality_fails_on_short_sequences_when_fail_if_misconfigured_is_true
 
     with pytest.raises(ValueError):
         model.fit(train_data=train_data)
-        raise Exception("Model should have failed because train_data too short and fail_if_misconfigured = True")
+        pytest.fail("Model should have failed because train_data too short and fail_if_misconfigured = True")
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_sktime_models_ignore_invalid_model_arguments(
-    model_class,
-    temp_model_path,
-    caplog,
-):
+def test_when_invalid_model_arguments_provided_then_sktime_ignores_them(model_class, temp_model_path, caplog):
     model = model_class(
         path=temp_model_path,
         prediction_length=3,
