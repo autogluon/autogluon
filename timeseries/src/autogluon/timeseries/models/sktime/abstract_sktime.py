@@ -70,14 +70,9 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         self.sktime_forecaster: Optional[BaseForecaster] = None
         self._fit_index: Optional[pd.Index] = None
 
-    def _get_sktime_forecaster_init_args(
-        self, model_params: Dict[str, Any], min_length: int, inferred_period: int = 1
-    ):
-        """Get arguments that will be passed to the sktime forecaster at initialization.
-
-        model_params may be modified in-place based on the length of training series and inferred seasonality.
-        """
-        return model_params
+    def _get_sktime_forecaster_init_args(self, min_length: int, inferred_period: int = 1):
+        """Get arguments that will be passed to the sktime forecaster at initialization."""
+        return self._get_model_params().copy()
 
     def _get_sktime_forecaster(self, sktime_forecaster_init_args: dict) -> BaseForecaster:
         """Create an sktime forecaster object for the model with given args."""
@@ -135,7 +130,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         min_length = train_data.index.get_level_values(0).value_counts(sort=False).min()
         inferred_period = get_seasonality(train_data.freq)
         sktime_forecaster_init_args = self._get_sktime_forecaster_init_args(
-            model_params=self._get_model_params().copy(), min_length=min_length, inferred_period=inferred_period
+            min_length=min_length, inferred_period=inferred_period
         )
         self.sktime_forecaster = self._get_sktime_forecaster(sktime_forecaster_init_args)
 

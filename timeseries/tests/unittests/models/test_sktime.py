@@ -1,3 +1,4 @@
+import logging
 from unittest import mock
 
 import pandas as pd
@@ -126,25 +127,29 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("hyperparameters", [{"seasonal_period": None}, {}])
 @pytest.mark.parametrize(
-    "freqstr, ts_length, expected_sp",
+    "freqstr, ts_length, expected_sp, should_warn",
     [
-        ("H", 100, 24),
-        ("2H", 100, 12),
-        ("B", 100, 5),
-        ("M", 100, 12),
-        ("H", 5, 1),
-        ("2H", 5, 1),
-        ("B", 5, 1),
-        ("M", 5, 1),
+        ("H", 100, 24, False),
+        ("2H", 100, 12, False),
+        ("B", 100, 5, False),
+        ("M", 100, 12, False),
+        ("H", 5, 1, True),
+        ("2H", 5, 1, True),
+        ("B", 5, 1, True),
+        ("M", 5, 1, True),
     ],
 )
-def test_when_fit_called_with_then_seasonality_period_set_correctly(
+def test_seasonal_period_is_inferred_correctly_when_set_to_none(
     model_class,
+    hyperparameters,
     temp_model_path,
     freqstr,
     ts_length,
     expected_sp,
+    should_warn,
+    caplog,
 ):
     if "sp" not in model_class.sktime_allowed_init_args:
         return
@@ -152,6 +157,48 @@ def test_when_fit_called_with_then_seasonality_period_set_correctly(
     model = model_class(
         path=temp_model_path,
         prediction_length=3,
+        hyperparameters=hyperparameters,
+    )
+
+    train_data = get_data_frame_with_item_index(
+        ["A", "B", "C"],
+        data_length=ts_length,
+        freq=freqstr,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        model.fit(train_data=train_data)
+        if should_warn:
+            assert "WARNING" in caplog.text
+
+    assert model.sktime_forecaster.sp == expected_sp
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize(
+    "freqstr, ts_length, provided_seasonal_period",
+    [
+        ("H", 100, 12),
+        ("2H", 100, 5),
+        ("B", 100, 10),
+        ("M", 100, 24),
+        ("H", 5, 1),
+    ],
+)
+def test_seasonal_period_when_provided_overrides_the_inferred_period(
+    model_class,
+    temp_model_path,
+    freqstr,
+    ts_length,
+    provided_seasonal_period,
+):
+    if "sp" not in model_class.sktime_allowed_init_args:
+        return
+
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=3,
+        hyperparameters={"seasonal_period": provided_seasonal_period},
     )
 
     train_data = get_data_frame_with_item_index(
@@ -162,4 +209,46 @@ def test_when_fit_called_with_then_seasonality_period_set_correctly(
 
     model.fit(train_data=train_data)
 
-    assert model.sktime_forecaster.sp == expected_sp
+    assert model.sktime_forecaster.sp == provided_seasonal_period
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_seasonality_fails_on_short_sequences_when_fail_if_misconfigured_is_true(
+    model_class,
+    temp_model_path,
+):
+    if "sp" not in model_class.sktime_allowed_init_args:
+        return
+
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=3,
+        hyperparameters={"fail_if_misconfigured": True},
+    )
+
+    train_data = get_data_frame_with_item_index(
+        ["A", "B", "C"],
+        data_length=40,
+        freq="H",
+    )
+
+    with pytest.raises(ValueError):
+        model.fit(train_data=train_data)
+        raise Exception("Model should have failed because train_data too short and fail_if_misconfigured = True")
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_sktime_models_ignore_invalid_model_arguments(
+    model_class,
+    temp_model_path,
+    caplog,
+):
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=3,
+        hyperparameters={"bad_argument": 33},
+    )
+    with caplog.at_level(logging.WARNING):
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
+        assert "ignores following arguments: ['bad_argument']" in caplog.text
+        assert "bad_argument" not in model.sktime_forecaster.get_params().keys()
