@@ -90,7 +90,7 @@ class TimeSeriesPredictor:
         and replace any input data indexes with dummy timestamps in second frequency. In this case, sktime models
         will not activate any seasonality inference if not specified explicitly in ``hyperparameters``, and the
         forecast output time indexes will be arbitrary values.
-    splitter: AbstractTimeSeriesSplitter, default = LastWindowSplitter()
+    splitter: AbstractTimeSeriesSplitter, default = ``autogluon.timeseries.splitter.LastWindowSplitter()``
         An object that splits the training TimeSeriesDataFrame into train and validation parts.
 
 
@@ -187,10 +187,9 @@ class TimeSeriesPredictor:
         train_data: TimeSeriesDataFrame
             Training data in the :class:``~autogluon.timeseries.TimeSeriesDataFrame`` format.
         tuning_data: TimeSeriesDataFrame, default = None
-            Data reserved for model selection and hyperparameter tuning, rather than training individual
-            models. If ``None``, AutoGluon will reserve the most recent ``prediction_length`` time steps of
-            each ``item_id`` in ``train_data`` for tuning. Validation
-            scores will by default be calculated on ``tuning_data``.
+            Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
+            used to compute the validation scores. If ``None``, AutoGluon will use a ``TimeSeriesSplitter`` to split
+            ``train_data`` into training and tuning subsets.
         time_limit: int, default = None
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run for (wall-clock
             time in seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
@@ -289,10 +288,12 @@ class TimeSeriesPredictor:
 
         if tuning_data is None:
             logger.warning(
-                f"Validation data is None, will hold the last prediction_length {self.prediction_length} "
-                f"time steps out to use as validation set.",
+                "Validation data is None. "
+                + self._splitter.describe_validation_strategy(prediction_length=self.prediction_length)
             )
-            train_data, tuning_data = self._splitter.split(train_data, prediction_length=self.prediction_length)
+            train_data, tuning_data = self._splitter.split(
+                ts_dataframe=train_data, prediction_length=self.prediction_length
+            )
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
