@@ -1321,11 +1321,11 @@ class AbstractTrainer:
             assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
             predict_1_time = model.predict_1_time
             predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
-            logger.log(20, f'\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
+            logger.log(20, f'\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)')
 
             predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute='predict_1_time')
             predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
-            logger.log(20, f'\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
+            logger.log(20, f'\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self,
