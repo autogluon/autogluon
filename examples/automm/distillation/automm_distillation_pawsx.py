@@ -63,7 +63,7 @@ def main(args):
             tuning_data=val_df,
             hyperparameters={
                 "env.num_gpus": args.num_gpu,
-                "env.per_gpu_batch_size": 6,
+                #"env.per_gpu_batch_size": 6,
                 "model.hf_text.checkpoint_name": args.teacher_model,
                 "optimization.learning_rate": 1.0e-4,
                 "optimization.weight_decay": 1.0e-3,
