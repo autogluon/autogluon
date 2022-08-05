@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
+from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data import LabelCleaner
 from autogluon.core.data.cleaner import Cleaner
@@ -76,21 +78,8 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
         X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
-        if infer_limit_batch_size is not None:
-            X_og_1 = sample_df_for_time_func(df=X_og, sample_size=infer_limit_batch_size)
-            infer_limit_batch_size_actual = len(X_og_1)
-            self.preprocess_1_time = time_func(f=self.transform_features, args=[X_og_1]) / infer_limit_batch_size_actual
-            logger.log(20, f'\t{round(self.preprocess_1_time, 4)}s\t= Feature Preprocessing Time (1 row | {infer_limit_batch_size} batch size)')
-
-            if infer_limit is not None:
-                infer_limit_new = infer_limit - self.preprocess_1_time
-                logger.log(20, f'\t\tFeature Preprocessing requires {round(self.preprocess_1_time/infer_limit*100, 2)}% '
-                               f'of the overall inference constraint ({infer_limit}s)\n'
-                               f'\t\t{round(infer_limit_new, 4)}s inference time budget remaining for models...')
-                if infer_limit_new <= 0:
-                    raise AssertionError('Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n'
-                                         'Consider using fewer features, relaxing the inference constraint, or simplifying the feature generator.')
-                infer_limit = infer_limit_new
+        if X_og is not None:
+            infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
 
         self._post_X_rows = len(X)
         time_preprocessing_end = time.time()
@@ -141,6 +130,32 @@ class DefaultLearner(AbstractTabularLearner):
         self._time_fit_training = time_end - time_preprocessing_end
         self._time_fit_total = time_end - time_preprocessing_start
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: "{trainer.model_best}"')
+
+    def _update_infer_limit(self, X, *, infer_limit_batch_size: int, infer_limit: float = None):
+        """
+        Calculates preprocessing time per row for a given unprocessed data X and infer_limit_batch_size
+        Returns an updated infer_limit if not None with preprocessing time per row subtracted
+        Raises an exception if preprocessing time is greater than or equal to the infer_limit
+        """
+        X_og_1 = sample_df_for_time_func(df=X, sample_size=infer_limit_batch_size)
+        infer_limit_batch_size_actual = len(X_og_1)
+        self.preprocess_1_time = time_func(f=self.transform_features, args=[X_og_1]) / infer_limit_batch_size_actual
+        preprocess_1_time_log, time_unit_preprocess_1_time = convert_time_in_s_to_log_friendly(self.preprocess_1_time)
+        logger.log(20, f'\t{round(preprocess_1_time_log, 3)}{time_unit_preprocess_1_time}\t= Feature Preprocessing Time (1 row | {infer_limit_batch_size} batch size)')
+
+        if infer_limit is not None:
+            infer_limit_new = infer_limit - self.preprocess_1_time
+            infer_limit_log, time_unit_infer_limit = convert_time_in_s_to_log_friendly(infer_limit)
+            infer_limit_new_log, time_unit_infer_limit_new = convert_time_in_s_to_log_friendly(infer_limit_new)
+
+            logger.log(20, f'\t\tFeature Preprocessing requires {round(self.preprocess_1_time/infer_limit*100, 2)}% '
+                           f'of the overall inference constraint ({infer_limit_log}{time_unit_infer_limit})\n'
+                           f'\t\t{round(infer_limit_new_log, 3)}{time_unit_infer_limit_new} inference time budget remaining for models...')
+            if infer_limit_new <= 0:
+                raise AssertionError('Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n'
+                                     'Consider using fewer features, relaxing the inference constraint, or simplifying the feature generator.')
+            infer_limit = infer_limit_new
+        return infer_limit
 
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int):
