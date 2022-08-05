@@ -1,12 +1,11 @@
-import logging
-import torch
-import warnings
-from typing import Optional, List, Dict
-from torchvision import transforms
-import PIL
-import numpy as np
 import ast
-from .randaug import RandAugment
+import logging
+import warnings
+from typing import Dict, List, Optional
+
+import numpy as np
+import PIL
+import torch
 from timm import create_model
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -14,7 +13,10 @@ from timm.data.constants import (
     IMAGENET_INCEPTION_MEAN,
     IMAGENET_INCEPTION_STD,
 )
+from torchvision import transforms
 from transformers import AutoConfig
+
+from .randaug import RandAugment
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -23,17 +25,10 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import (
-    IMAGE,
-    IMAGE_VALID_NUM,
-    CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD,
-    AUTOMM,
-    COLUMN,
-)
-from .collator import Stack, Pad
-from .utils import extract_value_from_config
+from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM
+from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
+from .utils import extract_value_from_config
 
 logger = logging.getLogger(AUTOMM)
 

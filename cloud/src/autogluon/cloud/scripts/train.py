@@ -1,10 +1,12 @@
 import argparse
 import os
-from pprint import pprint
-
+import shutil
 import yaml
+
 from autogluon.tabular import TabularPredictor, TabularDataset
 from autogluon.text import TextPredictor
+from autogluon.vision import ImagePredictor
+from pprint import pprint
 
 
 def get_input_path(path):
@@ -41,6 +43,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--tune_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_TUNE")
     )
+    parser.add_argument(
+        "--images_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_IMAGES")
+    )
     parser.add_argument("--ag_config", type=str, default=get_env_if_present("SM_CHANNEL_CONFIG"))
 
     args, _ = parser.parse_known_args()
@@ -66,20 +71,27 @@ if __name__ == "__main__":
     predictor_init_args = config["predictor_init_args"]
     predictor_init_args["path"] = save_path
     predictor_fit_args = config["predictor_fit_args"]
-    valid_predictor_types = ['tabular', 'text']
+    valid_predictor_types = ['tabular', 'text', 'image']
     assert predictor_type in valid_predictor_types, f'predictor_type {predictor_type} not supported. Valid options are {valid_predictor_types}'
     if predictor_type == 'tabular':
         predictor_cls = TabularPredictor
     elif predictor_type == 'text':
         predictor_cls = TextPredictor
+    elif predictor_type == 'image':
+        predictor_cls = ImagePredictor
 
     train_file = get_input_path(args.training_dir)
     training_data = TabularDataset(train_file)
 
-    tune_file = None
+    tuning_data = None
     if args.tune_dir:
         tune_file = get_input_path(args.tune_dir)
         tuning_data = TabularDataset(tune_file)
+
+    if args.images_dir:
+        image_compressed_file = get_input_path(args.images_dir)
+        shutil.unpack_archive(image_compressed_file)
+
     predictor = predictor_cls(**predictor_init_args).fit(training_data, tuning_data=tuning_data, **predictor_fit_args)
 
     # When use automm backend, predictor needs to be saved with standalone flag to avoid need of internet access when loading
@@ -90,6 +102,8 @@ if __name__ == "__main__":
             predictor.save(path=save_path+os.path.sep, standalone=True)
         except:
             predictor.save(path=save_path+os.path.sep)
+    elif predictor_type == 'image':
+        predictor.save()
 
     if predictor_cls == TabularPredictor:
         if config.get("leaderboard", False):

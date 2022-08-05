@@ -1,23 +1,18 @@
-import os
+import ast
 import logging
-from typing import Optional, List, Any, Dict
+import os
+import warnings
+from copy import deepcopy
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 from nptyping import NDArray
-import warnings
-from transformers import (
-    BertTokenizer,
-    CLIPTokenizer,
-    ElectraTokenizer,
-    AutoTokenizer,
-    AutoConfig,
-)
-from ..constants import TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, AUTOMM, COLUMN, TEXT
-from .collator import Stack, Pad
-from .utils import extract_value_from_config
-import ast
-from copy import deepcopy
-from .trivial_augmenter import TrivialAugment
+from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
+from ..constants import AUTOMM, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
+from .collator import Pad, Stack
+from .trivial_augmenter import TrivialAugment
+from .utils import extract_value_from_config
 
 logger = logging.getLogger(AUTOMM)
 

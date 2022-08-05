@@ -1,7 +1,8 @@
+import random
 from typing import Tuple
+
 from nlpaug import Augmenter
 from nlpaug.util import Method
-import random
 
 
 def extract_value_from_config(

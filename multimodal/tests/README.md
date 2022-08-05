@@ -5,8 +5,8 @@
 
 ## Code Style Check
 
-### Black
-[Black](https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html) is a PEP 8 compliant opinionated formatter with its own style. We use it to organize our code style. This is important to guarantee code quality as we have many developers work on the same codebase. The continuous integration (CI) would fail if your code doesn't meet `black`'s style.
+### black
+[black](https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html) is a PEP 8 compliant opinionated formatter with its own style. We use it to organize our code style. This is important to guarantee code quality as we have many developers work on the same codebase. The continuous integration (CI) would fail if your code doesn't meet `black`'s style.
 
 
 
@@ -25,6 +25,18 @@ We use line length 119 instead of the default. You can refer to the CI's [black 
 Note that if using `black` as a plugin in your IDE, the plugin may not use the configuration file `pyproject.toml` in our project. So, you need to configure the IDE plugin separately by following [here](https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file). 
 
 
+### isort
+[isort](https://pycqa.github.io/isort/#using-isort-to-verify-code) is a Python utility / library to sort imports alphabetically, and automatically separated into sections and by type.
+
+Also, to make your PR pass CI, you need install isort:
+
+```
+pip install "isort>=5.10"
+```
+and run it on your code:
+```
+isort source_file_or_directory
+```
 
 ## Unit Testing
  [Unit testing](https://en.wikipedia.org/wiki/Unit_testing) is necessary to automatically examine that our system's components meet their design and behave as intended.

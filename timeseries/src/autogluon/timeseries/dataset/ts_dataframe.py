@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import itertools
 from collections.abc import Iterable
 from typing import Any, Optional, Tuple, Type
@@ -60,6 +61,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
                         2019-01-02       7
                         2019-01-03       8
 
+    static_features: Optional[pd.DataFrame]
+        An optional data frame describing the metadata attributes of individual items in the item index. These
+        may be categorical or real valued attributes for each item. For example, if the item index refers to
+        time series data of individual households, static features may refer to time-independent demographic
+        features. When provided during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available
+        during prediction time. When provided, the index of the ``static_features`` index must match the item index
+        of the ``TimeSeriesDataFrame``.
+
+        ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization,
+        copy and slice operations although these features should be considered experimental.
+
     Attributes
     ----------
     freq: str
@@ -71,8 +83,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     """
 
     index: pd.MultiIndex
+    _metadata = ["_static_features"]
 
-    def __init__(self, data: Any, *args, **kwargs):
+    def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
             # necessary for copy constructor to work. see _constructor
             # and pandas.DataFrame
@@ -87,10 +100,39 @@ class TimeSeriesDataFrame(pd.DataFrame):
         else:
             raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
         super().__init__(data=data, *args, **kwargs)
+        self._static_features: Optional[pd.DataFrame] = None
+        if static_features is not None:
+            self.static_features = static_features
 
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
         return TimeSeriesDataFrame
+
+    @property
+    def _item_index(self) -> pd.Index:
+        return self.index.get_level_values(0).unique()
+
+    @property
+    def static_features(self):
+        return self._static_features
+
+    @static_features.setter
+    def static_features(self, value: Optional[pd.DataFrame]):
+        # if the current item index is not a multiindex, then we are dealing with a single
+        # item slice. this should only happen when the user explicitly requests only a
+        # single item or during `slice_by_timestep`. In this case we do not set static features
+        if not isinstance(self.index, pd.MultiIndex):
+            return
+
+        if value is not None and not set(value.index).issuperset(set(self._item_index)):
+            raise ValueError("Static features index should match item index")
+
+        # if static features being set are a strict superset of the item index, we take a
+        # subset to ensure consistency
+        if value is not None and len(set(value.index) - set(self._item_index)) > 0:
+            value = value.loc[self._item_index].copy()
+
+        self._static_features = value
 
     @property
     def freq(self):
@@ -110,11 +152,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return freq
 
     def iter_items(self) -> Iterable[Any]:
-        return iter(self.index.levels[0])
+        return iter(self._item_index)
 
     @property
     def num_items(self):
-        return len(self.index.levels[0])
+        return len(self._item_index)
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -275,6 +317,25 @@ class TimeSeriesDataFrame(pd.DataFrame):
             cls._construct_pandas_frame_from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
         )
 
+    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
+        obj = super().copy(deep=deep)
+
+        # also perform a deep copy for static features
+        if deep:
+            for k in obj._metadata:
+                setattr(obj, k, copy.deepcopy(getattr(obj, k)))
+        return obj
+
+    def __finalize__(  # noqa
+        self: TimeSeriesDataFrame, other, method: Optional[str] = None, **kwargs
+    ) -> TimeSeriesDataFrame:
+        super().__finalize__(other=other, method=method, **kwargs)
+        # when finalizing the copy/slice operation, we use the property setter to stay consistent
+        # with the item index
+        if hasattr(other, "_static_features"):
+            self.static_features = other._static_features
+        return self
+
     def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Split dataframe to two different ``TimeSeriesDataFrame`` s before and after a certain
         ``cutoff_time``.
@@ -295,27 +356,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
         data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
-        return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
-
-    def split_by_item(self, cutoff_item: int) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        """Split dataframe to two data frames containing items before and after a ``cutoff_item``.
-
-        Parameters
-        ----------
-        cutoff_item: int
-            The item_id to split the current data frame into two data frames.
-
-        Returns
-        -------
-        data_before: TimeSeriesDataFrame
-            Data frame containing time-series before the ``cutoff_item`` (exclude ``cutoff_item``).
-        data_after: TimeSeriesDataFrame
-            Data frame containing time-series after the ``cutoff_item`` (include ``cutoff_item``).
-        """
-
-        data_before = self.loc[(slice(None, cutoff_item - 1), slice(None)), :]
-        data_after = self.loc[(slice(cutoff_item, None), slice(None)), :]
-        return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
+        return TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
+            data_after, static_features=self.static_features
+        )
 
     def slice_by_timestep(self, time_step_slice: slice) -> TimeSeriesDataFrame:
         """Return a slice of time steps (with no regards to the actual timestamp) from within
@@ -357,13 +400,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Data frame containing only the time steps of each ``item_id`` sliced according to the
             input ``time_step_slice``.
         """
-        slice_gen = ((i, self.loc[i].iloc[time_step_slice]) for i in self.index.levels[0])
+        slice_gen = ((i, self.loc[i].iloc[time_step_slice]) for i in self._item_index)
         slices = []
         for ix, data_slice in slice_gen:
             idx = pd.MultiIndex.from_product([(ix,), data_slice.index], names=[ITEMID, TIMESTAMP])
             data_slice.set_index(idx, inplace=True)
             slices.append(data_slice)
-        return self.__class__(pd.concat(slices))
+        return self.__class__(pd.concat(slices), static_features=self.static_features)
 
     def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
         """Extract time-series between start (inclusive) and end (exclusive) time.
@@ -386,7 +429,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"end time {end} is earlier than stat time {start}")
 
         nanosecond_before_end = end - pd.Timedelta(nanoseconds=1)
-        return TimeSeriesDataFrame(self.loc[(slice(None), slice(start, nanosecond_before_end)), :])
+        return TimeSeriesDataFrame(
+            self.loc[(slice(None), slice(start, nanosecond_before_end)), :],
+            static_features=self.static_features,
+        )
 
     @classmethod
     def from_pickle(cls, filepath_or_buffer: Any) -> "TimeSeriesDataFrame":
