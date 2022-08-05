@@ -56,7 +56,7 @@ def multilingual():
 
 
 @automm_presets.register()
-def zero_shot():
+def image_classification():
     return {
         "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
         "model.clip.max_text_len": 0,
@@ -65,7 +65,7 @@ def zero_shot():
 
 
 @automm_presets.register()
-def zero_shot_sentence_similarity():
+def sentence_similarity():
     return {
         "model.names": ["hf_text"],
         "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",

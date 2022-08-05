@@ -53,9 +53,6 @@ from .constants import (
     MATCHER,
     COLUMN_FEATURES,
     MASKS,
-    ZERO_SHOT,
-    ZERO_SHOT_SENTENCE_SIMILARITY,
-    ZERO_SHOT_ALL,
 )
 
 from .data.datamodule import BaseDataModule
@@ -94,7 +91,7 @@ from .utils import (
     data_to_df,
     logits_to_prob,
     extract_from_output,
-    init_zero_shot,
+    init_pretrained,
     tensor_to_ndarray,
     infer_dtypes_by_model_names,
     update_config_by_rules,
@@ -130,6 +127,7 @@ class MultiModalPredictor:
         self,
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
+        zero_shot: Optional[bool] = False,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -145,8 +143,13 @@ class MultiModalPredictor:
         problem_type
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
             (options: 'binary', 'multiclass', 'regression').
+            This is further expanded to tasks like sentence_similarity, image_classification.
+            TODO: add more tasks (ref: https://huggingface.co/tasks)
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
+        zero_shot
+            Extract features per column if this is True.
+            TODO: disable training it is True?
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -207,6 +210,7 @@ class MultiModalPredictor:
 
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
+        self._zero_shot = zero_shot
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -224,10 +228,13 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if problem_type is not None and problem_type.lower() in ZERO_SHOT_ALL:
-            self._config, self._model, self._data_processors = init_zero_shot(
-                problem_type=problem_type, hyperparameters=hyperparameters
-            )
+        if problem_type is not None:
+            try:
+                self._config, self._model, self._data_processors = init_pretrained(
+                    problem_type=problem_type, hyperparameters=hyperparameters
+                )
+            except:
+                print(f"No pretrain model loaded for {problem_type}")
 
     @property
     def path(self):
@@ -1135,7 +1142,7 @@ class MultiModalPredictor:
             trainer = pl.Trainer(
                 gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
-                auto_scale_batch_size="binsearch",#TODO
+                auto_scale_batch_size="binsearch",  # TODO
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1730,7 +1737,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=False,
         )
-        if self._problem_type in ZERO_SHOT_ALL:
+        if self._zero_shot:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
             if return_masks:
                 masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)
