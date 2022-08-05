@@ -42,6 +42,7 @@ class DistillerLitModule(pl.LightningModule):
         baseline_funcs: nn.ModuleList,
         hard_label_weight: float,
         soft_label_weight: float,
+        softmax_regression_weight: float,
         temperature: float,
         output_feature_loss_weight: float,
         optim_type: Optional[str] = None,
@@ -55,6 +56,7 @@ class DistillerLitModule(pl.LightningModule):
         warmup_steps: Optional[int] = None,
         hard_label_loss_func: Optional[_Loss] = None,
         soft_label_loss_func: Optional[_Loss] = None,
+        softmax_regression_loss_func: Optional[_Loss] = None,
         output_feature_adaptor: Optional[nn.Module] = None,
         output_feature_loss_func: Optional[_Loss] = None,
         rkd_loss_func: Optional[nn.Module] = None,
@@ -80,6 +82,8 @@ class DistillerLitModule(pl.LightningModule):
             Weight for hard label loss.
         soft_label_weight
             Weight for soft label loss.
+        softmax_regression_weight_label_weight
+            Weight for softmax regression loss. Ref: https://www.adrianbulat.com/downloads/ICLR2021/knowledge_distillation_via_softmax_regression_representation_learning.pdf
         temperature
             A scalar to scale teacher and student logits in soft label loss.
         output_feature_loss_weight
@@ -122,6 +126,9 @@ class DistillerLitModule(pl.LightningModule):
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for hard labels.
         soft_label_loss_func
             A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for soft labels.
+        softmax_regression_loss_func
+            A Pytorch loss module, e.g., nn.CrossEntropyLoss(), for softmax regression.
+            Refer to: https://www.adrianbulat.com/downloads/ICLR2021/knowledge_distillation_via_softmax_regression_representation_learning.pdf
         output_feature_adaptor
             A Pytorch Module, e.g. nn.Linear, for adapting student output feature to the shape of teacher's.
         output_feature_loss_func
@@ -141,6 +148,7 @@ class DistillerLitModule(pl.LightningModule):
             A torchmetrics module used in the test stage, e.g., torchmetrics.Accuracy().
         """
         super().__init__()
+        self.optim_type = optim_type
         self.save_hyperparameters(
             ignore=[
                 "student_model",
@@ -171,9 +179,11 @@ class DistillerLitModule(pl.LightningModule):
         self.temperature = temperature
         self.hard_label_weight = hard_label_weight
         self.soft_label_weight = soft_label_weight
+        self.softmax_regression_weight = softmax_regression_weight
         self.output_feature_loss_weight = output_feature_loss_weight
         self.hard_label_loss_func = hard_label_loss_func
         self.soft_label_loss_func = soft_label_loss_func
+        self.softmax_regression_loss_func = softmax_regression_loss_func
         self.output_feature_loss_func = output_feature_loss_func
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
@@ -255,6 +265,29 @@ class DistillerLitModule(pl.LightningModule):
 
         return loss
 
+    def _compute_softmax_regression_loss(
+        self,
+        student_output: dict,
+        teacher_output: dict,
+    ):
+        student_feature = student_output[self.student_model.prefix][FEATURES].squeeze(dim=1)
+        student_feature = self.output_feature_adaptor(student_feature)
+
+        student_logits = self.teacher_model.head(student_feature)
+        soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
+
+        student_logits = student_logits / self.temperature
+        soft_labels = soft_labels / self.temperature
+
+        if isinstance(self.softmax_regression_loss_func, nn.CrossEntropyLoss):
+            soft_labels = F.softmax(soft_labels, dim=-1)
+
+        loss = self.softmax_regression_loss_func(
+            input=student_logits,
+            target=soft_labels,
+        )
+        return loss
+
     def _compute_loss(
         self,
         student_output: dict,
@@ -268,11 +301,19 @@ class DistillerLitModule(pl.LightningModule):
         )
         loss += hard_label_loss * self.hard_label_weight
 
-        soft_label_loss = self._compute_soft_label_loss(
-            student_output=student_output,
-            teacher_output=teacher_output,
-        )
-        loss += soft_label_loss * self.soft_label_weight
+        if self.soft_label_weight > 0:
+            soft_label_loss = self._compute_soft_label_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += soft_label_loss * self.soft_label_weight
+
+        if self.softmax_regression_weight > 0:
+            softmax_regression_loss = self._compute_softmax_regression_loss(
+                student_output=student_output,
+                teacher_output=teacher_output,
+            )
+            loss += softmax_regression_loss * self.softmax_regression_weight
 
         if self.output_feature_loss_weight > 0:
             output_feature_loss = self._compute_output_feature_loss(

@@ -710,6 +710,20 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
+        if not self._config.distiller.softmax_regression_loss_type:
+            # automatically infer loss func based on problem type if not specified
+            if self._problem_type == "regression":
+                softmax_regression_loss_func = nn.MSELoss()
+            else:
+                assert self._output_shape > 1
+                softmax_regression_loss_func = nn.CrossEntropyLoss()
+        elif self._config.distiller.softmax_regression_loss_type == "mse":
+            softmax_regression_loss_func = nn.MSELoss()
+        elif self._config.distiller.softmax_regression_loss_type == "cross_entropy":
+            softmax_regression_loss_func = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.softmax_regression_loss_type}")
+
         output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
         if output_feature_loss_type == "cosine":
             output_feature_loss_func = nn.CosineEmbeddingLoss()
@@ -765,6 +779,7 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            softmax_regression_loss_func,
             output_feature_adaptor,
             output_feature_loss_func,
             rkd_loss_func,
@@ -906,6 +921,7 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
                 output_feature_adaptor,
                 output_feature_loss_func,
                 rkd_loss_func,
@@ -920,12 +936,13 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
                 output_feature_adaptor,
                 output_feature_loss_func,
                 rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -971,10 +988,12 @@ class MultiModalPredictor:
                 baseline_funcs=baseline_funcs,
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
+                softmax_regression_weight=config.distiller.softmax_regression_weight,
                 temperature=config.distiller.temperature,
                 output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                softmax_regression_loss_func=softmax_regression_loss_func,
                 output_feature_adaptor=output_feature_adaptor,
                 output_feature_loss_func=output_feature_loss_func,
                 rkd_loss_func=rkd_loss_func,
@@ -1116,6 +1135,7 @@ class MultiModalPredictor:
             trainer = pl.Trainer(
                 gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
+                auto_scale_batch_size="binsearch",#TODO
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
