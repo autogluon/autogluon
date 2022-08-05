@@ -751,7 +751,7 @@ def create_model(
                 cls_token=True if len(names) == 1 else False,
                 embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
-                ffn_d_hidden=model_config.ffn_d_hidden,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
@@ -780,7 +780,7 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
-                ffn_d_hidden=model_config.ffn_d_hidden,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )
