@@ -37,6 +37,7 @@ class DefaultLearner(AbstractTabularLearner):
         self._time_fit_training = None
         self._time_limit = None
         self.preprocess_1_time = None  # Time required to preprocess 1 row of data
+        self.preprocess_1_batch_size = None  # Batch size used to calculate self.preprocess_1_time
 
     # TODO: v0.1 Document trainer_fit_kwargs
     def _fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac=0.1,
@@ -131,15 +132,16 @@ class DefaultLearner(AbstractTabularLearner):
         self._time_fit_total = time_end - time_preprocessing_start
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: "{trainer.model_best}"')
 
-    def _update_infer_limit(self, X, *, infer_limit_batch_size: int, infer_limit: float = None):
+    def _update_infer_limit(self, X: DataFrame, *, infer_limit_batch_size: int, infer_limit: float = None):
         """
         Calculates preprocessing time per row for a given unprocessed data X and infer_limit_batch_size
         Returns an updated infer_limit if not None with preprocessing time per row subtracted
         Raises an exception if preprocessing time is greater than or equal to the infer_limit
         """
-        X_og_1 = sample_df_for_time_func(df=X, sample_size=infer_limit_batch_size)
-        infer_limit_batch_size_actual = len(X_og_1)
-        self.preprocess_1_time = time_func(f=self.transform_features, args=[X_og_1]) / infer_limit_batch_size_actual
+        X_batch = sample_df_for_time_func(df=X, sample_size=infer_limit_batch_size)
+        infer_limit_batch_size_actual = len(X_batch)
+        self.preprocess_1_time = time_func(f=self.transform_features, args=[X_batch]) / infer_limit_batch_size_actual
+        self.preprocess_1_batch_size = infer_limit_batch_size
         preprocess_1_time_log, time_unit_preprocess_1_time = convert_time_in_s_to_log_friendly(self.preprocess_1_time)
         logger.log(20, f'\t{round(preprocess_1_time_log, 3)}{time_unit_preprocess_1_time}\t= Feature Preprocessing Time (1 row | {infer_limit_batch_size} batch size)')
 
