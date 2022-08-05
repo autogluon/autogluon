@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Union
+from abc import ABC, abstractmethod
+from typing import List, Union, Dict
 
-from autogluon.eda.analysis.univariate import UnivariateAnalysis
+from pandas import DataFrame
+
+from autogluon.eda.backend.base import RenderingBackend, EstimatorsBackend
+from autogluon.eda.backend.jupyter import SimpleJupyterBackend
 
 
 class Analysis:
@@ -10,29 +14,37 @@ class Analysis:
     VAL = 'val'
     TEST = 'test'
 
-    def __init__(self, **kwargs) -> None:
-        self.facets = []
-        self.ctx = {**kwargs}
+    def __init__(self, datasets: Dict[str, DataFrame], target_col: str, rendering_backend: str = 'default') -> None:
+        self.facets: List[Facet] = []
+        self.datasets = datasets
+        self.targe_col = target_col
 
-    def with_columns(self, columns: Union[str, List[str]] = '__all__') -> Analysis:
-        if columns:
-            self.ctx['columns'] = columns
-        else:
-            self.ctx.pop('columns')
-        return self
+        self.rendering_backend = {
+            'default': SimpleJupyterBackend,
+        }.get(rendering_backend, SimpleJupyterBackend)()
 
-    @property
-    def univariate(self) -> UnivariateAnalysis:
-        analysis = UnivariateAnalysis(self.ctx, parent=self)
-        return analysis
-
-    def __str__(self) -> str:
-        return '\n\t'.join([str(facet) for facet in self.facets])
+    def add_facets(self, facets: Union[Facet, List[Facet]]):
+        if facets is Facet:
+            facets = [facets]
+        for f in facets:
+            f.ctx = self
+        self.facets += facets
 
     def fit(self):
         for f in self.facets:
-            f.fit()
+            f.fit(ctx=self)
 
-    def render(self, engine='vega', **kwargs):
+    def render(self, **kwargs):
         for f in self.facets:
-            f.render(engine, **kwargs)
+            f.render(ctx=self, engine=self.rendering_backend, **kwargs)
+
+
+class Facet(ABC):
+
+    @abstractmethod
+    def fit(self, ctx: Analysis, engine: EstimatorsBackend, **kwargs):
+        raise NotImplemented
+
+    @abstractmethod
+    def render(self, ctx: Analysis, engine: RenderingBackend, **kwargs):
+        raise NotImplemented
