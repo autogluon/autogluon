@@ -39,6 +39,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         target_field_name: str = "target",
     ):
         assert time_series_df is not None
+        assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
 

@@ -2,11 +2,13 @@
 import copy
 
 import numpy as np
+import pandas as pd
 import pytest
 from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 from autogluon.timeseries.predictor import TimeSeriesPredictor
@@ -246,3 +248,140 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded
     assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
     assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
+
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ],
+    ],
+)
+def irregular_timestamp_data_frame(request):
+    df_tuples = []
+    for i, ts in enumerate(request.param):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+    return TimeSeriesDataFrame.from_data_frame(pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"]))
+
+
+def test_given_irregular_time_series_when_predictor_called_with_ignore_then_training_is_performed(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        ignore_time_index=True,
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        tuning_data=df,
+    )
+    assert "SimpleFeedForward" in predictor.get_model_names()
+
+
+def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_ignore_then_training_is_performed(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        ignore_time_index=True,
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        # tuning_data=df,
+    )
+    assert "SimpleFeedForward" in predictor.get_model_names()
+
+
+def test_given_irregular_time_series_when_predictor_called_without_ignore_then_training_fails(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        ignore_time_index=False,
+    )
+    with pytest.raises(ValueError):
+        predictor.fit(
+            train_data=df,
+            hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        )
+
+
+def test_given_irregular_time_series_when_predictor_called_with_ignore_then_predictor_can_predict(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        ignore_time_index=True,
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    predictions = predictor.predict(df)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
+
+    predicted_item_index = predictions._item_index
+    assert all(predicted_item_index == df._item_index)  # noqa
+    assert all(len(predictions.loc[i]) == 1 for i in predicted_item_index)
+    assert not np.any(np.isnan(predictions))
+
+
+def test_given_irregular_time_series_when_predictor_called_without_ignore_then_predictor_cannot_predict(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        ignore_time_index=False,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME.get_reindexed_view(),
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    with pytest.raises(ValueError, match="irregularly sampled"):
+        _ = predictor.predict(df)
+
+
+@pytest.mark.parametrize("ignore_time_index", [True, False])
+def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(temp_model_path, ignore_time_index):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        prediction_length=2,
+        ignore_time_index=ignore_time_index,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    predictor.save()
+    del predictor
+
+    loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
+    assert loaded_predictor.ignore_time_index == ignore_time_index

@@ -311,7 +311,7 @@ def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_c
         ],
     ],
 )
-def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_raises_error(
+def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_returns_none(
     list_of_timestamps,
 ):
     df_tuples = []
@@ -321,9 +321,8 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_raise
 
     df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
 
-    with pytest.raises(ValueError, match="irregularly sampled"):
-        tsdf = TimeSeriesDataFrame.from_data_frame(df)
-        _ = tsdf.freq
+    tsdf = TimeSeriesDataFrame.from_data_frame(df)
+    assert tsdf.freq is None
 
 
 SAMPLE_ITERABLE_2 = [
@@ -632,3 +631,8 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 
     assert set(left.static_features.index) == set(left_index)
     assert set(right.static_features.index) == set(right_index)
+
+
+def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
+    view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
+    assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
