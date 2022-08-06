@@ -156,7 +156,7 @@ class TimeSeriesPredictor:
                 data_frames.append(None)
             else:
                 if self.ignore_time_index:
-                    df = df.get_reindexed_view(freq="s")
+                    df = df.get_reindexed_view(freq="S")
                 if df.freq is None:
                     raise ValueError(
                         "Frequency not provided and cannot be inferred. This is often due to the "

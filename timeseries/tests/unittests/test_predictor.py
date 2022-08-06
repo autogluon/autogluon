@@ -290,10 +290,10 @@ def test_given_irregular_time_series_when_predictor_called_with_ignore_then_trai
     )
     predictor.fit(
         train_data=df,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters={"DeepAR": {"epochs": 1}},
         tuning_data=df,
     )
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "DeepAR" in predictor.get_model_names()
 
 
 def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_ignore_then_training_is_performed(
@@ -308,7 +308,6 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_ig
     predictor.fit(
         train_data=df,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-        # tuning_data=df,
     )
     assert "SimpleFeedForward" in predictor.get_model_names()
 

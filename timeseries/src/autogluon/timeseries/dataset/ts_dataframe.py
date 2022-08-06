@@ -468,7 +468,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         except Exception as err:  # noqa
             raise IOError(f"Could not load pickled data set due to error: {str(err)}")
 
-    def get_reindexed_view(self, freq: str = "s") -> TimeSeriesDataFrame:
+    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
         """Returns a new TimeSeriesDataFrame object with the same underlying data and
         static features as the current data frame, except the time index is replaced by
         a new "dummy" time series index with the given frequency. This is useful when
