@@ -40,8 +40,8 @@ from ..utils.sagemaker_utils import (
     retrieve_latest_framework_version
 )
 from ..utils.utils import (
-    read_image_bytes,
-    convert_image_path_to_bytes_in_dataframe,
+    read_image_bytes_and_encode,
+    convert_image_path_to_encoded_bytes_in_dataframe,
     zipfolder,
     is_compressed_file,
     unzip_file,
@@ -671,11 +671,11 @@ class CloudPredictor(ABC):
         return self._predict_real_time(test_data=test_data, accept=accept)
 
     def _upload_batch_predict_data(self, test_data, bucket, key_prefix):
-        if is_s3_url(test_data):
+        if isinstance(test_data, str) and is_s3_url(test_data):
             test_input = test_data
         else:
             # If a directory of images, upload directly
-            if not os.path.isdir(test_data):
+            if isinstance(test_data, str) and not os.path.isdir(test_data):
                 # either a file to a dataframe, or a file to an image
                 image = cv2.imread(test_data)
                 if image is None:  # not an image
@@ -775,7 +775,7 @@ class CloudPredictor(ABC):
 
         if test_data_image_column is not None:
             test_data = load_pd.load(test_data)
-            test_data = convert_image_path_to_numpy_array_in_dataframe(test_data, test_data_image_column)
+            test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
         test_input = self._upload_batch_predict_data(test_data, cloud_bucket, cloud_key_prefix)
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
@@ -1187,17 +1187,19 @@ class MultiModalCloudPredictor(CloudPredictor):
             if image is None:  # not an image
                 test_data = load_pd.load(test_data)
             else:
-                test_data = np.array([read_image_bytes(test_data)], dtype='object')
+                test_data = np.array([read_image_bytes_and_encode(test_data)], dtype='object')
                 content_type = 'application/x-npy'
         if isinstance(test_data, list):
             images = []
-            test_data = np.array([read_image_bytes(image) for image in images], dtype='object')
+            test_data = np.array([read_image_bytes_and_encode(image) for image in images], dtype='object')
             content_type = 'application/x-npy'
         if isinstance(test_data, pd.DataFrame):
             if test_data_image_column is not None:
-                test_data = convert_image_path_to_bytes_in_dataframe(test_data, test_data_image_column)
+                test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
             content_type = 'application/x-parquet'
 
+        # Providing content type here because sagemaker serializer doesn't support change content type dynamically.
+        # Pass to `endpoint.predict()` call as `initial_args` instead
         return self._predict_real_time(test_data=test_data, accept=accept, ContentType=content_type)
 
     def predict(

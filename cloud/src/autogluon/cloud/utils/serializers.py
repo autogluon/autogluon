@@ -51,7 +51,7 @@ class MultiModalSerializer(SimpleBaseSerializer):
                 request data (default: "application/x-parquet").
                 To BE NOTICED, ths content_type will not used by MultiModalSerializer
                 as it doesn't support dynamic updating. Instead, we pass expected content_type to
-                `init_args` of `predict()` call to endpoints.
+                `initial_args` of `predict()` call to endpoints.
         """
         super(MultiModalSerializer, self).__init__(content_type=content_type)
         self.parquet_serializer = ParquetSerializer()
@@ -68,14 +68,10 @@ class MultiModalSerializer(SimpleBaseSerializer):
             io.BytesIO: A buffer containing data serialzied in the .parquet or .npy format.
         """
         if isinstance(data, pd.DataFrame):
-            result = self.parquet_serializer.serialize(data)
-            self.content_type = 'application/x-parquet'
-            return result
+            return self.parquet_serializer.serialize(data)
 
         if isinstance(data, np.ndarray):
-            result = self.numpy_serializer.serialize(data)
-            self.content_type = 'application/x-npy'
-            return result
+            return self.numpy_serializer.serialize(data)
 
         raise ValueError(f'{data} format is not supported. Please provide a DataFrame, or numpy array.')
 

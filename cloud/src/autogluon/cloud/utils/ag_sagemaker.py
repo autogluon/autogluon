@@ -107,7 +107,7 @@ class AutoGluonBatchPredictor(Predictor):
     def __init__(self, *args, **kwargs):
         super().__init__(
             *args,
-            serializer=CSVSerializer(),
+            serializer=ParquetSerializer(),
             **kwargs
         )
 
