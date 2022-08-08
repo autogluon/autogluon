@@ -15,6 +15,9 @@ from timm.data.constants import (
 )
 from torchvision import transforms
 from transformers import AutoConfig
+import mmcv
+from mmcv.parallel import collate
+from mmdet.datasets.pipelines import Compose
 
 from .randaug import RandAugment
 
@@ -29,6 +32,7 @@ from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, 
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
+# from ..utils import download
 
 logger = logging.getLogger(AUTOMM)
 
@@ -128,9 +132,17 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = self.construct_processor(self.train_transform_types)
-        self.val_processor = self.construct_processor(self.val_transform_types)
-
+        self.task_type = "detection"
+        if self.task_type == "detection":
+            cfg = 'yolov3_mobilenetv2_320_300e_coco.py'
+            if isinstance(cfg, str):
+                cfg = mmcv.Config.fromfile(cfg)
+            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
+            self.val_processor = Compose(cfg.data.test.pipeline)
+        else:
+            self.train_processor = self.construct_processor(self.train_transform_types)
+            self.val_processor = self.construct_processor(self.val_transform_types)
+        
     @property
     def image_key(self):
         return f"{self.prefix}_{IMAGE}"
@@ -160,12 +172,19 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        fn.update(
+        if self.task_type == "detection":
+            fn.update(
             {
-                self.image_key: Pad(pad_val=0),
-                self.image_valid_num_key: Stack(),
+                self.image_key: collate,
             }
         )
+        else:
+            fn.update(
+                {
+                    self.image_key: Pad(pad_val=0),
+                    self.image_valid_num_key: Stack(),
+                }
+            )
 
         return fn
 
@@ -239,7 +258,17 @@ class ImageProcessor:
                 mean = None
                 std = None
             except Exception as exp2:
-                raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp2
+                try:
+                    # config_url = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/master/configs/yolo/yolov3_mobilenetv2_320_300e_coco.py'
+                    # config = download(config_url)
+                    config = 'yolov3_mobilenetv2_320_300e_coco.py'
+                    if isinstance(config, str):
+                        config = mmcv.Config.fromfile(config)
+                    image_size = config.test_pipeline[1]['img_scale'][0]
+                    mean = config.test_pipeline[1]['transforms'][2]['mean']
+                    std = config.test_pipeline[1]['transforms'][2]['std']
+                except Exception as exp3:
+                    raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp3
 
         return image_size, mean, std
 
@@ -339,33 +368,37 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message=(
-                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
-                        ),
-                    )
-                    is_zero_img = False
-                    try:
-                        img = PIL.Image.open(img_path).convert("RGB")
-                    except Exception as e:
-                        if self.missing_value_strategy.lower() == "zero":
-                            logger.debug(f"Using a zero image due to '{e}'")
-                            img = PIL.Image.new("RGB", (self.size, self.size), color=0)
-                            is_zero_img = True
-                        else:
-                            raise e
-
-                if is_training:
-                    img = self.train_processor(img)
+                if self.task_type == "detection":
+                    data = dict(img_info=dict(filename=img_path), img_prefix=None)
+                    images.append(self.val_processor(data))
                 else:
-                    img = self.val_processor(img)
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            "ignore",
+                            message=(
+                                "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                            ),
+                        )
+                        is_zero_img = False
+                        try:
+                            img = PIL.Image.open(img_path).convert("RGB")
+                        except Exception as e:
+                            if self.missing_value_strategy.lower() == "zero":
+                                logger.debug(f"Using a zero image due to '{e}'")
+                                img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                                is_zero_img = True
+                            else:
+                                raise e
 
-                if is_zero_img:
-                    zero_images.append(img)
-                else:
-                    images.append(img)
+                    if is_training:
+                        img = self.train_processor(img)
+                    else:
+                        img = self.val_processor(img)
+
+                    if is_zero_img:
+                        zero_images.append(img)
+                    else:
+                        images.append(img)
 
             if self.requires_column_info:
                 # only count the valid images since they are put ahead of the zero images in the below returning
@@ -373,15 +406,22 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-
-        ret.update(
+        if self.task_type == "detection":
+            ret.update(
             {
-                self.image_key: torch.tensor([])
-                if len(images + zero_images) == 0
-                else torch.stack(images + zero_images, dim=0),
-                self.image_valid_num_key: len(images),
+                self.image_key: images[0]
+    
             }
         )
+        else:
+            ret.update(
+                {
+                    self.image_key: torch.tensor([])
+                    if len(images + zero_images) == 0
+                    else torch.stack(images + zero_images, dim=0),
+                    self.image_valid_num_key: len(images),
+                }
+            )
         return ret
 
     def __call__(
