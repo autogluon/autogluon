@@ -5,10 +5,7 @@ from typing import List
 import numpy as np
 
 import autogluon.core as ag
-from autogluon.core.models.greedy_ensemble.ensemble_selection import (
-    AbstractWeightedEnsemble,
-    EnsembleSelection,
-)
+from autogluon.core.models.greedy_ensemble.ensemble_selection import AbstractWeightedEnsemble, EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 

@@ -578,9 +578,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
             else:
                 try:
-                    model_names_trained.append(
-                        self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
-                    )
+                    model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=model_names_trained))
                 except Exception as e:  # noqa
                     logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
 

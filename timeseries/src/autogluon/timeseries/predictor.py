@@ -252,7 +252,7 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs : str or dict, default = None
             # TODO
         enable_ensemble: bool, default = True
-            If True, the ``TimeSeriesPredictor`` will fit all models specified via ``hyperparameters``, and also fit a 
+            If True, the ``TimeSeriesPredictor`` will fit all models specified via ``hyperparameters``, and also fit a
             simple weighted ensemble on trained models.
         References
         ----------
