@@ -5,11 +5,14 @@ import itertools
 from collections.abc import Iterable
 from typing import Any, Optional, Tuple, Type
 
+import numpy as np
 import pandas as pd
 from pandas.core.internals import ArrayManager, BlockManager
 
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
+
+IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
@@ -82,8 +85,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Number of items (time series) in the data set.
     """
 
+    DUMMY_INDEX_START_TIME = pd.Timestamp("1900-01-01 00:00:00")
     index: pd.MultiIndex
-    _metadata = ["_static_features"]
+    _metadata = ["_static_features", "_cached_freq"]
 
     def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
@@ -103,6 +107,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
             self.static_features = static_features
+
+        # internal value for cached frequency values that are inferred. corresponds to either a
+        # pandas-compatible frequency string, the value IRREGULAR_TIME_INDEX_FREQSTR that signals
+        # the time series have irregular timestamps (in which case tsdf.freq returns None), or None
+        # if inference was not yet performed.
+        self._cached_freq: Optional[str] = None
 
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
@@ -136,19 +146,24 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
-        ts_index = self.index.levels[1]  # noqa
-        freq = (
-            ts_index.freq
-            or ts_index.inferred_freq
-            or self.loc[0].index.freq  # fall back to freq of first item
-            or self.loc[0].index.inferred_freq
-        )
-        if freq is None:
-            raise ValueError("Frequency not provided and cannot be inferred")
-        if isinstance(freq, str):
-            return freq
-        elif isinstance(freq, pd._libs.tslibs.BaseOffset):
-            return freq.freqstr
+        if self._cached_freq is not None and self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+            return None  # irregularly sampled time series
+        elif self._cached_freq:
+            return self._cached_freq
+
+        def get_freq(series):
+            return series.index.freq or series.index.inferred_freq
+
+        # check the frequencies of the first 100 items to see if frequencies are consistent and
+        # can be inferred
+        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self._item_index[:100]]
+        freq = freq_for_each_series[0]
+        if len(set(freq_for_each_series)) > 1 or freq is None:
+            self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
+            return None
+
+        freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
+        self._cached_freq = freq
         return freq
 
     def iter_items(self) -> Iterable[Any]:
@@ -334,6 +349,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # with the item index
         if hasattr(other, "_static_features"):
             self.static_features = other._static_features
+        if hasattr(other, "_cached_freq"):
+            self._cached_freq = other._cached_freq
         return self
 
     def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
@@ -356,9 +373,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
         data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
-        return TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
+        before, after = TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
             data_after, static_features=self.static_features
         )
+        before._cached_freq = self._cached_freq
+        after._cached_freq = self._cached_freq
+        return before, after
 
     def slice_by_timestep(self, time_step_slice: slice) -> TimeSeriesDataFrame:
         """Return a slice of time steps (with no regards to the actual timestamp) from within
@@ -400,13 +420,18 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Data frame containing only the time steps of each ``item_id`` sliced according to the
             input ``time_step_slice``.
         """
+        if time_step_slice.step is not None and time_step_slice != 1:
+            raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
+
         slice_gen = ((i, self.loc[i].iloc[time_step_slice]) for i in self._item_index)
         slices = []
         for ix, data_slice in slice_gen:
             idx = pd.MultiIndex.from_product([(ix,), data_slice.index], names=[ITEMID, TIMESTAMP])
             data_slice.set_index(idx, inplace=True)
             slices.append(data_slice)
-        return self.__class__(pd.concat(slices), static_features=self.static_features)
+        slice_df = self.__class__(pd.concat(slices), static_features=self.static_features)
+        slice_df._cached_freq = self._cached_freq
+        return slice_df
 
     def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
         """Extract time-series between start (inclusive) and end (exclusive) time.
@@ -454,3 +479,37 @@ class TimeSeriesDataFrame(pd.DataFrame):
             return data if isinstance(data, cls) else cls(data)
         except Exception as err:  # noqa
             raise IOError(f"Could not load pickled data set due to error: {str(err)}")
+
+    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
+        """Returns a new TimeSeriesDataFrame object with the same underlying data and
+        static features as the current data frame, except the time index is replaced by
+        a new "dummy" time series index with the given frequency. This is useful when
+        suggesting AutoGluon-TimeSeries to "ignore" the time information, for example when
+        dealing with irregularly sampled time series or sequences (e.g., financial time
+        series).
+
+        Parameters
+        ----------
+        freq: str
+            Frequency string of the new time series data index.
+
+        Returns
+            TimeSeriesDataFrame: the new view object with replaced index, but the same underlying
+            data. Note that the underlying data is not copied.
+        """
+        df_view = self.iloc[:]  # return a view without copying data
+
+        # build the surrogate index
+        indexes = []
+        for i in self._item_index:
+            idx = pd.MultiIndex.from_product(
+                [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)],
+                names=["item_id", "timestamp"],
+            )
+            indexes.append(idx)
+
+        new_index = pd.MultiIndex.from_tuples(np.concatenate(indexes))
+        df_view.set_index(new_index, inplace=True)
+        df_view._cached_freq = freq
+
+        return df_view
