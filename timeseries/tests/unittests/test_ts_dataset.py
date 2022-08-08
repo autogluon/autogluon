@@ -10,7 +10,12 @@ import pandas as pd
 import pytest
 from gluonts.dataset.common import ListDataset
 
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import (
+    IRREGULAR_TIME_INDEX_FREQSTR,
+    ITEMID,
+    TIMESTAMP,
+    TimeSeriesDataFrame,
+)
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")  # type: ignore
@@ -290,32 +295,32 @@ def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_c
     assert ts_df._cached_freq == freq == read_df._cached_freq
 
 
-@pytest.mark.parametrize(
-    "list_of_timestamps",
+IRREGULAR_TIME_INDEXES = [
     [
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-        ],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
     ],
-)
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+    ],
+]
+
+
+@pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)
 def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_returns_none(
-    list_of_timestamps,
+    irregular_index,
 ):
     df_tuples = []
-    for i, ts in enumerate(list_of_timestamps):
+    for i, ts in enumerate(irregular_index):
         for t in ts:
             df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
 
@@ -323,6 +328,22 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_retur
 
     tsdf = TimeSeriesDataFrame.from_data_frame(df)
     assert tsdf.freq is None
+
+
+@pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)
+def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_caches_irreg_freqstr(
+    irregular_index,
+):
+    df_tuples = []
+    for i, ts in enumerate(irregular_index):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+
+    df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
+
+    tsdf = TimeSeriesDataFrame.from_data_frame(df)
+    _ = tsdf.freq
+    assert tsdf._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR
 
 
 SAMPLE_ITERABLE_2 = [

@@ -146,25 +146,21 @@ class TimeSeriesPredictor:
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
-    def _check_and_prepare_data_frames(self, *args) -> Iterable[TimeSeriesDataFrame]:
+    def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Given a sequence of ``TimeSeriesDataFrame``s, replace their time indexes if
         ``self.ignore_time_index`` is set, and ensure their frequencies are available.
         """
-        data_frames = []
-        for df in args:
-            if df is None:
-                data_frames.append(None)
-            else:
-                if self.ignore_time_index:
-                    df = df.get_reindexed_view(freq="S")
-                if df.freq is None:
-                    raise ValueError(
-                        "Frequency not provided and cannot be inferred. This is often due to the "
-                        "time index of the data being irregularly sampled. Please ensure that the "
-                        "data set used has a uniform time index."
-                    )
-                data_frames.append(df)
-        return data_frames
+        if df is None:
+            return df
+        if self.ignore_time_index:
+            df = df.get_reindexed_view(freq="S")
+        if df.freq is None:
+            raise ValueError(
+                "Frequency not provided and cannot be inferred. This is often due to the "
+                "time index of the data being irregularly sampled. Please ensure that the "
+                "data set used has a uniform time index."
+            )
+        return df
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
@@ -245,7 +241,8 @@ class TimeSeriesPredictor:
         if hyperparameters is None:
             hyperparameters = "default"
 
-        train_data, tuning_data = self._check_and_prepare_data_frames(train_data, tuning_data)
+        train_data = self._check_and_prepare_data_frame(train_data)
+        tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
@@ -370,7 +367,7 @@ class TimeSeriesPredictor:
             Name of the model that you would like to use for forecasting. If None, it will by default use the
             best model from trainer.
         """
-        (data,) = self._check_and_prepare_data_frames(data)
+        data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
@@ -398,7 +395,7 @@ class TimeSeriesPredictor:
             A forecast accuracy score, where higher values indicate better quality. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
         """
-        (data,) = self._check_and_prepare_data_frames(data)
+        data = self._check_and_prepare_data_frame(data)
         return self._learner.score(data, **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, **kwargs):
@@ -479,7 +476,7 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             validation performance.
         """
-        (data,) = self._check_and_prepare_data_frames(data)
+        data = self._check_and_prepare_data_frame(data)
         leaderboard = self._learner.leaderboard(data)
         if not silent:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):

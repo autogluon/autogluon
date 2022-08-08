@@ -12,6 +12,8 @@ from pandas.core.internals import ArrayManager, BlockManager
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
 
+IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
+
 
 class TimeSeriesDataFrame(pd.DataFrame):
     """``TimeSeriesDataFrame`` s represent a collection of time series, where each row
@@ -106,6 +108,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if static_features is not None:
             self.static_features = static_features
 
+        # internal value for cached frequency values that are inferred. corresponds to either a
+        # pandas-compatible frequency string, the value IRREGULAR_TIME_INDEX_FREQSTR that signals
+        # the time series have irregular timestamps (in which case tsdf.freq returns None), or None
+        # if inference was not yet performed.
         self._cached_freq: Optional[str] = None
 
     @property
@@ -140,7 +146,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def freq(self):
-        if self._cached_freq:
+        if self._cached_freq is not None and self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+            return None  # irregularly sampled time series
+        elif self._cached_freq:
             return self._cached_freq
 
         def get_freq(series):
@@ -151,6 +159,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         freq_for_each_series = [get_freq(self.loc[idx]) for idx in self._item_index[:100]]
         freq = freq_for_each_series[0]
         if len(set(freq_for_each_series)) > 1 or freq is None:
+            self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
             return None
 
         freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
@@ -411,6 +420,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Data frame containing only the time steps of each ``item_id`` sliced according to the
             input ``time_step_slice``.
         """
+        if time_step_slice.step is not None and time_step_slice != 1:
+            raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
+
         slice_gen = ((i, self.loc[i].iloc[time_step_slice]) for i in self._item_index)
         slices = []
         for ix, data_slice in slice_gen:
