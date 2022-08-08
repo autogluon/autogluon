@@ -120,7 +120,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     @property
     def _item_index(self) -> pd.Index:
-        return self.index.get_level_values(0).unique()
+        return self.index.unique(level=ITEMID)
 
     @property
     def static_features(self):
@@ -172,6 +172,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def num_items(self):
         return len(self._item_index)
+
+    def num_timesteps_per_item(self) -> pd.Series:
+        return self.groupby(level=ITEMID).size()
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -423,13 +426,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if time_step_slice.step is not None and time_step_slice != 1:
             raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
 
-        slice_gen = ((i, self.loc[i].iloc[time_step_slice]) for i in self._item_index)
-        slices = []
-        for ix, data_slice in slice_gen:
-            idx = pd.MultiIndex.from_product([(ix,), data_slice.index], names=[ITEMID, TIMESTAMP])
-            data_slice.set_index(idx, inplace=True)
-            slices.append(data_slice)
-        slice_df = self.__class__(pd.concat(slices), static_features=self.static_features)
+        num_timesteps_per_item = self.num_timesteps_per_item()
+        # Create a boolean index that selects the correct slice in each timeseries
+        boolean_indicators = []
+        for length in num_timesteps_per_item:
+            indicator = np.zeros(length, dtype=bool)
+            indicator[time_step_slice] = True
+            boolean_indicators.append(indicator)
+        index = np.concatenate(boolean_indicators)
+        slice_df = self.__class__(self[index].copy(), static_features=self.static_features)
         slice_df._cached_freq = self._cached_freq
         return slice_df
 

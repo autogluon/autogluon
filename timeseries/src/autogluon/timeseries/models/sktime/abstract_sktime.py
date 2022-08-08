@@ -127,7 +127,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
 
-        min_length = train_data.index.get_level_values(0).value_counts(sort=False).min()
+        min_length = train_data.num_timesteps_per_item().min()
         inferred_period = get_seasonality(train_data.freq)
         sktime_forecaster_init_args = self._get_sktime_forecaster_init_args(
             min_length=min_length, inferred_period=inferred_period
