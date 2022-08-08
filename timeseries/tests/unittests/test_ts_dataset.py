@@ -437,6 +437,25 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
     assert all(ixval[1] == pd.Timestamp(expected_times[i]) for i, ixval in enumerate(dfv.index.values))  # type: ignore
 
 
+@pytest.mark.parametrize(
+    "input_iterable, input_slice",
+    [
+        (SAMPLE_ITERABLE, slice(None, 2)),
+        (SAMPLE_ITERABLE, slice(1, 2)),
+        (SAMPLE_ITERABLE_2, slice(None, 2)),
+        (SAMPLE_ITERABLE_2, slice(-2, None)),
+        (SAMPLE_ITERABLE_2, slice(-1000, 2)),
+    ],
+)
+def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input_iterable, input_slice):
+    df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
+    new_idx = df._item_index[::-1]
+    df.index = df.index.set_levels(new_idx, level=ITEMID)
+    dfv = df.slice_by_timestep(input_slice)
+
+    assert dfv._item_index.equals(new_idx)
+
+
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
 def test_when_dataframe_copy_called_on_instance_then_output_correct(input_df):
     copied_df = input_df.copy()
