@@ -5,7 +5,7 @@ import yaml
 
 import autogluon.text
 
-from autogluon.tabular import TabularPredictor, TabularDataset
+from autogluon.tabular import TabularPredictor, TabularDataset, FeatureMetadata
 from autogluon.text import TextPredictor
 from autogluon.vision import ImagePredictor
 
@@ -86,6 +86,8 @@ if __name__ == "__main__":
     assert predictor_type in valid_predictor_types, f'predictor_type {predictor_type} not supported. Valid options are {valid_predictor_types}'
     if predictor_type == 'tabular':
         predictor_cls = TabularPredictor
+        if 'feature_meatadata' in predictor_fit_args:
+            predictor_fit_args['feature_meatadata'] = FeatureMetadata(**predictor_fit_args['feature_meatadata'])
     elif predictor_type == 'text':
         predictor_cls = TextPredictor
     elif predictor_type == 'image':
