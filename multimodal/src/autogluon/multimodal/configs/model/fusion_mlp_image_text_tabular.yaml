@@ -17,6 +17,7 @@ model:
   categorical_transformer:
     out_features: 192
     d_token: 192
+    ffn_d_hidden: 192 
     num_trans_blocks: 0
     num_attn_heads: 8
     residual_dropout: 0.0
@@ -41,6 +42,7 @@ model:
   numerical_transformer:
     out_features: 192
     d_token: 192
+    ffn_d_hidden: 192 
     num_trans_blocks: 0
     num_attn_heads: 8
     residual_dropout: 0.0
