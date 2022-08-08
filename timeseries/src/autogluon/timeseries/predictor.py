@@ -158,7 +158,8 @@ class TimeSeriesPredictor:
             raise ValueError(
                 "Frequency not provided and cannot be inferred. This is often due to the "
                 "time index of the data being irregularly sampled. Please ensure that the "
-                "data set used has a uniform time index."
+                "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
+                "setting `ignore_time_index=True`."
             )
         return df
 
