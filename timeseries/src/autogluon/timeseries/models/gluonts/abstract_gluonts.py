@@ -2,27 +2,26 @@ import copy
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Type, Iterator
+from typing import Any, Dict, Iterator, List, Optional, Type
 
 import gluonts
 import numpy as np
 import pandas as pd
-from gluonts.env import env as gluonts_env
 from gluonts.dataset.common import Dataset as GluonTSDataset
+from gluonts.env import env as gluonts_env
 from gluonts.model.estimator import Estimator as GluonTSEstimator
-from gluonts.model.forecast import SampleForecast, QuantileForecast, Forecast
+from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils import warning_filter
+from autogluon.core.utils.savers import save_pkl
 
 from ...dataset import TimeSeriesDataFrame
-from ...dataset.ts_dataframe import TIMESTAMP, ITEMID
+from ...dataset.ts_dataframe import ITEMID, TIMESTAMP
 from ...utils.warning_filters import disable_root_logger
 from ..abstract import AbstractTimeSeriesModel
-from .callback import TimeLimitCallback, GluonTSEarlyStoppingCallback
-
+from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
@@ -40,6 +39,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         target_field_name: str = "target",
     ):
         assert time_series_df is not None
+        assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
 
@@ -97,9 +97,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         hyperparameters: Dict[str, Any] = None,
         **kwargs,  # noqa
     ):
-        name = name or re.sub(
-            r"Model$", "", self.__class__.__name__
-        )  # TODO: look name up from presets
+        name = name or re.sub(r"Model$", "", self.__class__.__name__)  # TODO: look name up from presets
         super().__init__(
             path=path,
             freq=freq,
@@ -132,13 +130,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         return str(path)
 
     @classmethod
-    def load(
-        cls, path: str, reset_paths: bool = True, verbose: bool = True
-    ) -> "AbstractGluonTSModel":
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
         model = super().load(path, reset_paths, verbose)
-        model.gts_predictor = GluonTSPredictor.deserialize(
-            Path(path) / cls.gluonts_model_path
-        )
+        model.gts_predictor = GluonTSPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
     def _deferred_init_params_aux(self, **kwargs) -> None:
@@ -179,17 +173,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_estimator(self) -> GluonTSEstimator:
         """Return the GluonTS Estimator object for the model"""
         with warning_filter():
-            return self.gluonts_estimator_class.from_hyperparameters(
-                **self._get_estimator_init_args()
-            )
+            return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
-    def _to_gluonts_dataset(
-        self, time_series_df: Optional[TimeSeriesDataFrame]
-    ) -> Optional[GluonTSDataset]:
+    def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
         return (
-            SimpleGluonTSDataset(time_series_df, target_field_name=self.target)
-            if time_series_df is not None
-            else None
+            SimpleGluonTSDataset(time_series_df, target_field_name=self.target) if time_series_df is not None else None
         )
 
     def _fit(
@@ -227,9 +215,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 validation_data=self._to_gluonts_dataset(val_data),
             )
 
-    def predict(
-        self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs
-    ) -> TimeSeriesDataFrame:
+    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
 
         logger.debug(f"Predicting with time series model {self.name}")
         logger.debug(
@@ -241,9 +227,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         with warning_filter():
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
-                raise ValueError(
-                    "Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive)."
-                )
+                raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
             predicted_targets = self._predict_gluonts_forecasts(data, **kwargs)
             if not isinstance(predicted_targets[0], (QuantileForecast, SampleForecast)):
@@ -259,17 +243,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 prediction_index_type = type(df.index.levels[0][0])
                 if prediction_index_type is not input_index_type:
                     df.set_index(
-                        df.index.set_levels(
-                            [input_index_type(i) for i in df.index.levels[0]], level=0
-                        ),
+                        df.index.set_levels([input_index_type(i) for i in df.index.levels[0]], level=0),
                         inplace=True,
                     )
 
         return df
 
-    def _predict_gluonts_forecasts(
-        self, data: TimeSeriesDataFrame, **kwargs
-    ) -> List[Forecast]:
+    def _predict_gluonts_forecasts(self, data: TimeSeriesDataFrame, **kwargs) -> List[Forecast]:
         gts_data = self._to_gluonts_dataset(data)
 
         predictor_kwargs = dict(dataset=gts_data)
@@ -317,9 +297,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             item_forecast_dict = dict(
                 mean=forecast_means[i]
                 if forecast_means
-                else (
-                    forecasts[i].quantile(0.5)  # assign P50 to mean if mean is missing
-                )
+                else (forecasts[i].quantile(0.5))  # assign P50 to mean if mean is missing
             )
             for quantile in quantiles:
                 item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))

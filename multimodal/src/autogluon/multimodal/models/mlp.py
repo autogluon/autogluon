@@ -1,7 +1,8 @@
-from torch import nn
 from typing import Optional
+
 import numpy as np
 import torch
+from torch import nn
 
 ALL_ACT_LAYERS = {
     "leaky_relu": nn.LeakyReLU,

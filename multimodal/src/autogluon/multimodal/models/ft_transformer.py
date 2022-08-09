@@ -1,11 +1,11 @@
-import torch
-from torch import nn
-from torch import Tensor
-import torch.nn.functional as F
-import math
 import enum
-from typing import Callable, Dict, List, Optional, Tuple, Union, cast
+import math
 import warnings
+from typing import Callable, Dict, List, Optional, Tuple, Union, cast
+
+import torch
+import torch.nn.functional as F
+from torch import Tensor, nn
 
 ModuleType = Union[str, Callable[..., nn.Module]]
 _INTERNAL_ERROR_MESSAGE = "Internal error. Please, open an issue."

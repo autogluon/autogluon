@@ -1,25 +1,27 @@
 import logging
-import torch
-from torch import nn
+from typing import Callable, Dict, List, Optional, Union
+
 import pytorch_lightning as pl
+import torch
+import torchmetrics
+from omegaconf import DictConfig
+from torch import nn
+from torch.nn.modules.loss import _Loss
+from torchmetrics.aggregation import BaseAggregator
+
+from ..constants import AUTOMM, PROBABILITY
 from .utils import (
-    get_optimizer,
-    get_lr_scheduler,
-    apply_two_stages_lr,
     apply_layerwise_lr_decay,
     apply_single_lr,
-    get_metric_learning_loss_funcs,
-    get_metric_learning_miner_funcs,
+    apply_two_stages_lr,
+    compute_probability,
     gather_column_features,
     generate_metric_learning_labels,
-    compute_probability,
+    get_lr_scheduler,
+    get_metric_learning_loss_funcs,
+    get_metric_learning_miner_funcs,
+    get_optimizer,
 )
-from omegaconf import DictConfig
-from ..constants import PROBABILITY, AUTOMM
-from typing import Union, Optional, List, Dict, Callable
-import torchmetrics
-from torchmetrics.aggregation import BaseAggregator
-from torch.nn.modules.loss import _Loss
 
 logger = logging.getLogger(AUTOMM)
 

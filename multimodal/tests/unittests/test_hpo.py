@@ -1,14 +1,14 @@
 import os
 import shutil
+
 import pytest
 from ray import tune
-
-from autogluon.core.hpo.ray_tune_constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
-from autogluon.multimodal import MultiModalPredictor
-
+from test_predictor import verify_predictor_save_load
 from unittest_datasets import PetFinderDataset
 from utils import get_home_dir
-from test_predictor import verify_predictor_save_load
+
+from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
+from autogluon.multimodal import MultiModalPredictor
 
 
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))

@@ -33,7 +33,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         data = pd.read_json(buf, orient='records', lines=True)
 
     else:
-        raise Exception(
+        raise ValueError(
             f'{input_content_type} input content type not supported.'
         )
     # no header
@@ -57,7 +57,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         pred_proba = model.predict_proba(data)
         pred = get_pred_from_proba_df(pred_proba, problem_type=model.problem_type)
         pred_proba.columns = [str(c) + '_proba' for c in pred_proba.columns]
-        pred.name = pred.name + '_pred' if pred.name is not None else 'pred'
+        pred.name = str(pred.name) + '_pred' if pred.name is not None else 'pred'
         prediction = pd.concat([pred, pred_proba], axis=1)
     else:
         prediction = model.predict(data)
@@ -72,6 +72,6 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
     elif output_content_type == "text/csv":
         output = prediction.to_csv(index=None)
     else:
-        raise Exception(f"{output_content_type} content type not supported")
+        raise ValueError(f"{output_content_type} content type not supported")
 
     return output, output_content_type

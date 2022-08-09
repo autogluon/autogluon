@@ -1,27 +1,18 @@
 import logging
-import torch
-from torch import nn
-import torch.nn.functional as F
+from typing import Callable, List, Optional, Union
+
 import pytorch_lightning as pl
-from typing import Union, Optional, List, Callable
+import torch
+import torch.nn.functional as F
 import torchmetrics
-from torchmetrics.aggregation import BaseAggregator
-from torch.nn.modules.loss import _Loss
 from omegaconf import DictConfig
-from .utils import (
-    get_optimizer,
-    get_lr_scheduler,
-    apply_two_stages_lr,
-    apply_layerwise_lr_decay,
-    apply_single_lr,
-)
-from ..constants import (
-    LOGITS,
-    FEATURES,
-    WEIGHT,
-    AUTOMM,
-)
+from torch import nn
+from torch.nn.modules.loss import _Loss
+from torchmetrics.aggregation import BaseAggregator
+
+from ..constants import AUTOMM, FEATURES, LOGITS, WEIGHT
 from .rkd_loss import RKDLoss
+from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)
 

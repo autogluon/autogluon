@@ -1,20 +1,22 @@
-import logging
 import collections
-import pandas as pd
+import logging
 import warnings
+from typing import Dict, List, Optional, Tuple, Union
+
+import pandas as pd
 import PIL
-from typing import Union, Optional, List, Dict, Tuple
+
 from ..constants import (
-    NULL,
+    AUTOMM,
+    BINARY,
     CATEGORICAL,
-    NUMERICAL,
-    TEXT,
+    CLASSIFICATION,
     IMAGE,
     MULTICLASS,
-    BINARY,
-    CLASSIFICATION,
+    NULL,
+    NUMERICAL,
     REGRESSION,
-    AUTOMM,
+    TEXT,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -343,9 +345,9 @@ def infer_label_column_type_by_problem_type(
             check_missing_values(data=data, column_name=col_name, split="training")
         if valid_data is not None:
             check_missing_values(data=valid_data, column_name=col_name, split="validation")
-        if col_name in column_types and column_types[col_name] == NULL:
-            warnings.warn(
-                f"Label column '{col_name}' contains only one label. You may need to check your dataset again."
+        if column_types[col_name] == NULL:
+            raise ValueError(
+                f"Label column '{col_name}' contains only one label class. Make sure it has at least two label classes."
             )
         if problem_type in [MULTICLASS, BINARY, CLASSIFICATION]:
             column_types[col_name] = CATEGORICAL

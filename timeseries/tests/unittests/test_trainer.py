@@ -189,7 +189,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == 2 + 1  # include ensemble
-    
+
     config_history = next(iter(trainer.hpo_results.values()))["config_history"]
     assert len(config_history) == 2
     assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
@@ -261,9 +261,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
         leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == 2 + 1  # include ensemble
-    assert all(
-        [1 <= v["params"]["epochs"] < 5 for k, v in trainer.model_graph.nodes.items()]
-    )
+    assert all([1 <= v["params"]["epochs"] < 5 for k, v in trainer.model_graph.nodes.items()])
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])

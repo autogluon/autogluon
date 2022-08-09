@@ -20,6 +20,8 @@ install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'autogluon.common<0.6'
     'boto3',
+    'numpy',
+    'opencv-python>=4.6,<4.7'
     'pandas',
     'sagemaker>=2.94',
 ]

@@ -95,3 +95,35 @@ def fix_logging_if_kaggle():
         _add_stream_handler()
     # After the fix is performed, or it is determined we are not in Kaggle, no need to fix again.
     __FIXED_KAGGLE_LOGGING = True
+
+
+def convert_time_in_s_to_log_friendly(time_in_sec: float, min_value: float = 0.01):
+    """
+    Converts a time in seconds to a logging friendly version with updated units.
+
+    Parameters
+    ----------
+    time_in_sec : float
+        The original time in seconds to convert.
+    min_value : float, default = 0.01
+        The minimum value time_adjusted should be.
+        If the value is greater than this, it will use a smaller time_unit until the value is greater than min_value or the smallest time_unit is reached.
+
+    Returns
+    -------
+    Returns a tuple of time_adjusted: float, time_unit: str that is the log friendly version of the time with corresponding time unit.
+
+    """
+    values = [
+        ('s', 1),
+        ('ms', 1e3),
+        ('μs', 1e6),
+        ('ns', 1e9),
+    ]
+    time_adjusted = time_in_sec
+    time_unit = 's'
+    for time_unit, time_factor in values:
+        time_adjusted = time_in_sec * time_factor
+        if time_adjusted >= min_value:
+            break
+    return time_adjusted, time_unit

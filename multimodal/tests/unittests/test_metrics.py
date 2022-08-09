@@ -1,10 +1,12 @@
-import pytest
 import random
+
+import pytest
 import torch
+from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric
-from sklearn.metrics import log_loss, f1_score
-from autogluon.multimodal.optimization.utils import get_metric, get_loss_func, CustomF1Score
+
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
+from autogluon.multimodal.optimization.utils import CustomF1Score, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
 
 

@@ -1,17 +1,8 @@
 import pytest
 from omegaconf import OmegaConf
-from autogluon.multimodal.presets import (
-    get_automm_presets,
-    list_automm_presets,
-    get_basic_automm_config,
-)
-from autogluon.multimodal.constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    DISTILLER,
-)
+
+from autogluon.multimodal.constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
+from autogluon.multimodal.presets import get_automm_presets, get_basic_automm_config, list_automm_presets
 from autogluon.multimodal.utils import get_config
 
 

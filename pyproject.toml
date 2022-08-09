@@ -1,3 +1,41 @@
 [tool.black]
 line-length = 119
 target-version = ['py37', 'py38', 'py39']
+
+[tool.isort]
+known_first_party = "autogluon"
+known_third_party = [
+    "gluonts",
+    "mxnet",
+    "networkx",
+    "numpy",
+    "pandas",
+    "psutil",
+    "pytest",
+    "scipy",
+    "sklearn",
+    "sktime",
+    "statsmodels",
+    "tqdm",
+    "Pillow",
+    "boto3",
+    "requests",
+    "timm",
+    "torch",
+    "torchvision",
+    "torchtext",
+    "fairscale",
+    "scikit-image",
+    "smart_open",
+    "pytorch_lightning",
+    "torchmetrics",
+    "transformers",
+    "nptyping",
+    "omegaconf",
+    "pytorch-metric-learning",
+    "nlpaug",
+    "nltk",
+]
+line_length = 119
+profile = "black"
+

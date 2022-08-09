@@ -2,7 +2,7 @@ import logging
 import pprint
 import time
 from pathlib import Path
-from typing import Optional, Type, Any, Union, Dict, Tuple, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
@@ -84,6 +84,11 @@ class TimeSeriesPredictor:
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
     quantiles: List[float]
         Alias for :attr:`quantile_levels`.
+    ignore_time_index: bool, default = False
+        If True, AutoGluon-TimeSeries will ignore any date time indexes given in any dataset in train and test time,
+        and replace any input data indexes with dummy timestamps in second frequency. In this case, sktime models
+        will not activate any seasonality inference if not specified explicitly in ``hyperparameters``, and the
+        forecast output time indexes will be arbitrary values.
 
     Attributes
     ----------
@@ -109,10 +114,10 @@ class TimeSeriesPredictor:
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
 
+        self.ignore_time_index = kwargs.get("ignore_time_index", False)
         if target is not None and kwargs.get("label") is not None:
             raise ValueError(
-                "Both `label` and `target` are specified. Please specify at most one of these. "
-                "arguments."
+                "Both `label` and `target` are specified. Please specify at most one of these. " "arguments."
             )
         self.target = target or kwargs.get("label", "target")
 
@@ -140,6 +145,23 @@ class TimeSeriesPredictor:
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
+
+    def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Given a sequence of ``TimeSeriesDataFrame``s, replace their time indexes if
+        ``self.ignore_time_index`` is set, and ensure their frequencies are available.
+        """
+        if df is None:
+            return df
+        if self.ignore_time_index:
+            df = df.get_reindexed_view(freq="S")
+        if df.freq is None:
+            raise ValueError(
+                "Frequency not provided and cannot be inferred. This is often due to the "
+                "time index of the data being irregularly sampled. Please ensure that the "
+                "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
+                "setting `ignore_time_index=True`."
+            )
+        return df
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
@@ -211,20 +233,17 @@ class TimeSeriesPredictor:
         """
         time_start = time.time()
         if self._learner.is_fit:
-            raise AssertionError(
-                "Predictor is already fit! To fit additional models create a new `Predictor`."
-            )
+            raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
         if self.target not in train_data.columns:
-            raise ValueError(
-                f"Target column `{self.target}` not found in the training data set."
-            )
+            raise ValueError(f"Target column `{self.target}` not found in the training data set.")
         if tuning_data is not None and self.target not in tuning_data.columns:
-            raise ValueError(
-                f"Target column `{self.target}` not found in the tuning data set."
-            )
+            raise ValueError(f"Target column `{self.target}` not found in the tuning data set.")
         if hyperparameters is None:
             hyperparameters = "default"
+
+        train_data = self._check_and_prepare_data_frame(train_data)
+        tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
@@ -269,13 +288,9 @@ class TimeSeriesPredictor:
                 f"time steps out to use as validation set.",
             )
             tuning_data = train_data
-            train_data = train_data.slice_by_timestep(
-                slice(None, -self.prediction_length)
-            )
+            train_data = train_data.slice_by_timestep(slice(None, -self.prediction_length))
 
-        time_left = (
-            None if time_limit is None else time_limit - (time.time() - time_start)
-        )
+        time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
             val_data=tuning_data,
@@ -322,17 +337,11 @@ class TimeSeriesPredictor:
         )
 
         if scheduler_params["num_trials"] == 1:
-            logger.warning(
-                "Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. "
-            )
+            logger.warning("Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. ")
             return None, None
 
         scheduler_ngpus = scheduler_params["resource"].get("num_gpus", 0)
-        if (
-            scheduler_ngpus is not None
-            and isinstance(scheduler_ngpus, int)
-            and scheduler_ngpus > 1
-        ):
+        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
             logger.warning(
                 f"Warning: TimeSeriesPredictor currently doesn't use >1 GPU per training run. "
                 f"Detected {scheduler_ngpus} GPUs."
@@ -359,6 +368,7 @@ class TimeSeriesPredictor:
             Name of the model that you would like to use for forecasting. If None, it will by default use the
             best model from trainer.
         """
+        data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, model=model, **kwargs)
 
     def evaluate(self, data: TimeSeriesDataFrame, **kwargs):
@@ -386,7 +396,7 @@ class TimeSeriesPredictor:
             A forecast accuracy score, where higher values indicate better quality. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
         """
-
+        data = self._check_and_prepare_data_frame(data)
         return self._learner.score(data, **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, **kwargs):
@@ -467,9 +477,10 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             validation performance.
         """
+        data = self._check_and_prepare_data_frame(data)
         leaderboard = self._learner.leaderboard(data)
         if not silent:
-            with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+            with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
 
@@ -524,6 +535,4 @@ class TimeSeriesPredictor:
 
     # TODO
     def refit_full(self, models="all"):
-        raise NotImplementedError(
-            "Refitting logic not yet implemented in autogluon.timeseries"
-        )
+        raise NotImplementedError("Refitting logic not yet implemented in autogluon.timeseries")

@@ -1,25 +1,18 @@
+import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 from ray import tune
 from sklearn.preprocessing import LabelEncoder
-import pandas as pd
 
+from autogluon.multimodal.constants import BINARY, DATA, ENVIRONMENT, MODEL, MULTICLASS, OPTIMIZATION
 from autogluon.multimodal.data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
-    filter_search_space,
-    parse_dotlist_conf,
-    get_config,
-    try_to_infer_pos_label,
     data_to_df,
-)
-from autogluon.multimodal.constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    BINARY,
-    MULTICLASS,
+    filter_search_space,
+    get_config,
+    parse_dotlist_conf,
+    try_to_infer_pos_label,
 )
 
 

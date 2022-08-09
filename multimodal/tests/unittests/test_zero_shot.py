@@ -1,7 +1,8 @@
-from PIL import Image
-import requests
-import pytest
 import numpy as np
+import pytest
+import requests
+from PIL import Image
+
 from autogluon.multimodal import MultiModalPredictor
 
 

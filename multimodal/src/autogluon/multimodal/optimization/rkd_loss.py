@@ -1,9 +1,10 @@
 # Reference: https://github.com/lenscloth/RKD/blob/master/metric/loss.py
 
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional
 
 
 class RKDLoss(nn.Module):
