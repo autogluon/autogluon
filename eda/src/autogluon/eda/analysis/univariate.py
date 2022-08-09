@@ -1,56 +1,86 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union, List
+from typing import Union, List, Type, Dict, Any
 
-from ..backend.base import RenderingBackend, EstimatorsBackend
+from pandas import DataFrame
 
-if TYPE_CHECKING:
-    from ..base import Analysis
-
-from ..base import Facet
+from ..backend.base import RenderingBackend
+from ..backend.jupyter import SimpleJupyterRenderingToolsMixin
+from ..base import AbstractAnalysis
 
 ALL = '__all__'
 
 
-class Histogram(Facet):
+class HistogramAnalysisRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
 
-    def __init__(self, datasets: Union[str, List[str]] = ALL, columns: Union[str, List[str]] = ALL, **kwargs):
-        self.datasets = datasets
+    def render(self, model: Dict[str, Any]):
+        for t, ds in model['datasets'].items():
+            self.render_text(f'Histogram for dataset: {t}', text_type='h2')
+            self.render_histogram(ds, **model['figure_kwargs'])
+
+
+class HistogramAnalysis(AbstractAnalysis):
+
+    def __init__(self,
+                 columns: Union[str, List[str]] = ALL,
+                 rendering_backend: Type[RenderingBackend] = HistogramAnalysisRenderer,
+                 figure_kwargs: Dict[str, Any] = {},
+                 **kwargs) -> None:
+
+        super().__init__(rendering_backend=rendering_backend, **kwargs)
+
         self.columns = columns
-        self._kwargs = kwargs
+        self.figure_kwargs = figure_kwargs
 
-    def fit(self, ctx: Analysis, engine: EstimatorsBackend, **kwargs):
-        self.model = {}
-        for t, ds in ctx.datasets.items():
-            cols = ds.columns
-            if self.columns != ALL:
-                cols = self.columns
-            ds = ds[cols]
-            self.model[t] = ds
+    def fit(self, **kwargs):
+        self.model = {
+            'datasets': {},
+            'figure_kwargs': self.figure_kwargs
+        }
+        for t, ds in self._datasets_as_map().items():
+            if ds is not None:
+                cols = ds.columns
+                if self.columns != ALL:
+                    cols = self.columns
+                ds = ds[cols]
+                self.model['datasets'][t] = ds
 
-    def render(self, engine: RenderingBackend, **kwargs):
-        for t, ds in self.model.items():
-            engine.render_text(f'Histogram for dataset: {t}', text_type='h2')
-            engine.render_histogram(ds, **self._kwargs)
+
+class DatasetSummaryAnalysisRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
+
+    def render(self, model: Dict[str, Any]):
+        for t, summary in model['datasets'].items():
+            self.render_text(f'Summary for dataset: {t}', text_type='h2')
+            self.render_table(summary)
 
 
-class Summary(Facet):
+class DatasetSummaryAnalysis(AbstractAnalysis):
 
-    def __init__(self, datasets: Union[str, List[str]] = ALL, columns: Union[str, List[str]] = ALL, **kwargs):
-        self.datasets = datasets
+    def __init__(self,
+                 train_data: Union[str, DataFrame] = None,
+                 test_data: Union[str, DataFrame] = None,
+                 tuning_data: Union[str, DataFrame] = None,
+                 columns: Union[str, List[str]] = ALL,
+                 rendering_backend: Type[RenderingBackend] = DatasetSummaryAnalysisRenderer,
+                 children: List[AbstractAnalysis] = [],
+                 **kwargs) -> None:
+
+        super().__init__(
+            train_data=train_data,
+            test_data=test_data,
+            tuning_data=tuning_data,
+            rendering_backend=rendering_backend,
+            children=children,
+            **kwargs)
+
         self.columns = columns
 
-    def fit(self, ctx: Analysis, engine: EstimatorsBackend, **kwargs):
-        self.model = {}
-        for t, ds in ctx.datasets.items():
-            if self.datasets == ALL or t in self.datasets:
+    def fit(self, **kwargs):
+        self.model = {'datasets': {}}
+        for t, ds in self._datasets_as_map().items():
+            if ds is not None:
                 summary = ds.describe(include='all')
                 if self.columns != ALL:
                     summary = summary[self.columns]
                 summary = summary.T
-                self.model[t] = summary
-
-    def render(self, engine: RenderingBackend, **kwargs):
-        for t, summary in self.model.items():
-            engine.render_text(f'Summary for dataset: {t}', text_type='h2')
-            engine.render_table(summary)
+                self.model['datasets'][t] = summary

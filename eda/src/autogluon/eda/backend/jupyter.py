@@ -3,10 +3,11 @@ import matplotlib.pyplot as plt
 from IPython.display import display, HTML
 from pandas import DataFrame
 
-from autogluon.eda.backend.base import RenderingBackend
 
-
-class SimpleJupyterBackend(RenderingBackend):
+class SimpleJupyterRenderingToolsMixin:
+    """
+    High-level helpers for jupyter widgets rendering
+    """
 
     def render_text(self, text, text_type=None):
         if text_type in [f'h{r}' for r in range(1, 7)]:
