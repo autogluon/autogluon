@@ -121,7 +121,7 @@ def test_timm_zero_shot(checkpoint_name):
             "model.names": ["timm_image"],
             "model.timm_image.checkpoint_name": checkpoint_name,
         },
-        problem_type="pipeline",
+        pipeline="zero_shot_image_classification",
     )
 
     pred = predictor.predict({"image": [cat_image_name, dog_image_name]})

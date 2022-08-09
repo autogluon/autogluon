@@ -233,7 +233,8 @@ class MultiModalPredictor:
                 self._config, self._model, self._data_processors = init_pretrained(
                     pipeline=pipeline, hyperparameters=hyperparameters
                 )
-            except:
+            except Exception as e:
+                print(e)
                 print(f"No pretrain model loaded for {pipeline}")
 
     @property
