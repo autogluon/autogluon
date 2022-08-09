@@ -1,8 +1,23 @@
+import base64
+import pandas as pd
+
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.tabular import TabularPredictor
 from io import BytesIO, StringIO
-import pandas as pd
+from PIL import Image
+
+
+image_index = 0
+
+
+def _save_image_and_update_dataframe_column(bytes):
+    global image_index
+    im = Image.open(BytesIO(base64.b64decode(bytes, validate=True)))
+    im_name = f'tabular_image_{image_index}.png'
+    im.save(im_name)
+
+    return im_name
 
 
 def model_fn(model_dir):
@@ -35,22 +50,18 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         raise ValueError(
             f'{input_content_type} input content type not supported.'
         )
-    # no header
-    test_columns = sorted(list(data.columns))
-    train_columns = sorted(column_names)
-    if test_columns != train_columns:
-        num_cols = len(data.columns)
+    # TODO: handle no header case when predictor supports retrieving original training columns
 
-        if num_cols != len(column_names):
-            raise Exception(
-                f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}"
-            )
-
-        else:
-            new_row = pd.DataFrame(data.columns).transpose()
-            old_rows = pd.DataFrame(data.values)
-            data = pd.concat([new_row, old_rows]).reset_index(drop=True)
-            data.columns = column_names
+    # find image column
+    image_column = None
+    for column_name, special_types in model.feature_metadata.get_type_map_special().items():
+        if 'image_path' in special_types:
+            image_column = column_name
+            break
+    # save image column bytes to disk and update the column with saved path
+    if image_column is not None:
+        print(f'Detected image column {image_column}')
+        data[image_column] = [_save_image_and_update_dataframe_column(bytes) for bytes in data[image_column]]
 
     if model.problem_type != REGRESSION:
         pred_proba = model.predict_proba(data)
