@@ -1143,7 +1143,7 @@ class MultiModalPredictor:
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         if init_only:
-            #finish all inits
+            # finish all inits
             return
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
@@ -1508,7 +1508,7 @@ class MultiModalPredictor:
                     self._problem_type = REGRESSION
             self._label_column = label
             self._eval_metric_name = eval_metric
-            self.fit(data,data,init_only=True)
+            self.fit(data, data, init_only=True)
 
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
