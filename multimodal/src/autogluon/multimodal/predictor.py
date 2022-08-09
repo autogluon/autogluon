@@ -58,6 +58,7 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT,
+    OBJECT_DETECTION,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -91,6 +92,7 @@ from .utils import (
     init_data_processors,
     init_df_preprocessor,
     init_zero_shot,
+    init_object_detection,
     is_interactive,
     load_text_tokenizers,
     logits_to_prob,
@@ -219,6 +221,9 @@ class MultiModalPredictor:
 
         if problem_type is not None and problem_type.lower() == ZERO_SHOT:
             self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
+
+        if problem_type is not None and problem_type.lower() == OBJECT_DETECTION:
+            self._config, self._model, self._data_processors = init_object_detection(hyperparameters=hyperparameters)
 
     @property
     def path(self):

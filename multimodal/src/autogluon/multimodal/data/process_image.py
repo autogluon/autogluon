@@ -134,6 +134,7 @@ class ImageProcessor:
 
         self.task_type = "detection"
         if self.task_type == "detection":
+            # TODO: change after fix in mmdet_image
             cfg = 'yolov3_mobilenetv2_320_300e_coco.py'
             if isinstance(cfg, str):
                 cfg = mmcv.Config.fromfile(cfg)
@@ -261,6 +262,7 @@ class ImageProcessor:
                 try:
                     # config_url = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/master/configs/yolo/yolov3_mobilenetv2_320_300e_coco.py'
                     # config = download(config_url)
+                    # TODO: change after fix in mmdet_image
                     config = 'yolov3_mobilenetv2_320_300e_coco.py'
                     if isinstance(config, str):
                         config = mmcv.Config.fromfile(config)

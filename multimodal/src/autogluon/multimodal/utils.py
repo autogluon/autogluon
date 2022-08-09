@@ -1665,6 +1665,40 @@ def init_zero_shot(
     return config, model, data_processors
 
 
+def init_object_detectin(
+    hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+):
+    """
+    Object detection initialization.
+
+    Parameters
+    ----------
+    hyperparameters
+        The customized hyperparameters used to override the default.
+        Users need to use it to choose one model, e.g., {"model.names": ["yolov3_mobilenetv2_320_300e_coco"]}.
+
+    Returns
+    -------
+    config
+        A DictConfig object containing the configurations for object detection.
+    model
+        The model with pre-trained weights.
+    data_processors
+        The data processors associated with the pre-trained model.
+    """
+    config = get_config(presets="zero_shot", overrides=hyperparameters)
+    assert (
+        len(config.model.names) == 1
+    ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
+    model = create_model(config=config, pretrained=True)
+
+    data_processors = init_data_processors(
+        config=config,
+    )
+
+    return config, model, data_processors
+
+
 class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
     """
     Class that inherits pl.callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.

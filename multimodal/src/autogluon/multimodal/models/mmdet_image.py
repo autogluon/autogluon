@@ -93,8 +93,6 @@ class MMdetAutoModelForObjectDetection(nn.Module):
         data['img'] = [img.data[0] for img in data['img']]
         with torch.no_grad():
             results = self.model(return_loss=False, rescale=True, **data)
-            print(results)
-            exit()
 
         return {self.prefix: ret}
 

@@ -11,6 +11,7 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 ZERO_SHOT = "zero_shot"
+OBJECT_DETECTION = "object_detection"
 
 # Input keys
 IMAGE = "image"
