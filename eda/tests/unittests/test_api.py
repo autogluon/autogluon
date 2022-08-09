@@ -1,4 +1,4 @@
-from autogluon.eda.base import Analysis
+from autogluon.eda.base import AbstractAnalysis
 
 
 def test_api():
@@ -7,11 +7,11 @@ def test_api():
     df_test = 'df_test'  # pd.DataFrame()
     target_col = 'y'
 
-    a = Analysis(
+    a = AbstractAnalysis(
         datasets={
-            Analysis.TRAIN: df_train,
-            Analysis.VAL: df_val,
-            Analysis.TEST: df_test,
+            AbstractAnalysis.TRAIN: df_train,
+            AbstractAnalysis.VAL: df_val,
+            AbstractAnalysis.TEST: df_test,
         },
         target=target_col
     )
