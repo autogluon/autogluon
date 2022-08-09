@@ -10,7 +10,27 @@ CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
-SENTENCE_SIMILARITY = "sentence_similarity"
+
+#Pipelines
+AUDIO_CLASSIFICATION = "audio_classification" #TODO
+AUTOMATIC_SPEECH_RECOGNITION = "automatic_speech_recognition" #TODO
+CONVERSATIONAL = "conversational" #TODO
+FEATURE_EXTRACTION = "feature_extraction"
+FILL_MASK = "fill_mask" #TODO
+IMAGE_CLASSIFICATION = "image_classification" #TODO
+IMAGE_SEGMENTATION = "image_segmentation" #TODO
+OBJECT_DETECTION = "object_detection" #TODO
+QUESTION_ANSWERING = "question_answering" #TODO
+SUMMARIZATION = "summarization" #TODO
+TABLE_QUESTION_ANSWERING = "table_question_answering" #TODO
+TEXT_CLASSIFICATION = "text_classification" #TODO
+TEXT_GENERATION = "text_generation" #TODO
+TEXT_TO_TEXT_GENERATION = "text_to_text_generation" #TODO
+TOKEN_CLASSIFICATION = "token_classification" #TODO
+TRANSLATION = "translation" #TODO
+VISUAL_QUESTION_ANSWERING = "visual_question_answering" #TODO
+ZERO_SHOT_CLASSIFICATION = "zero_shot_classification" #TODO
+ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 
 # Input keys
 IMAGE = "image"

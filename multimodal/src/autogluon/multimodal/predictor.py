@@ -30,6 +30,8 @@ from .constants import (
     MULTICLASS,
     CLASSIFICATION,
     REGRESSION,
+    FEATURE_EXTRACTION,
+    ZERO_SHOT_IMAGE_CLASSIFICATION,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
@@ -127,7 +129,7 @@ class MultiModalPredictor:
         self,
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
-        zero_shot: Optional[bool] = False,
+        pipeline: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -143,13 +145,11 @@ class MultiModalPredictor:
         problem_type
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
             (options: 'binary', 'multiclass', 'regression').
-            This is further expanded to tasks like sentence_similarity, image_classification.
-            TODO: add more tasks (ref: https://huggingface.co/tasks)
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
-        zero_shot
-            Extract features per column if this is True.
-            TODO: disable training it is True?
+        pipeline
+            This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
+            TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -210,7 +210,7 @@ class MultiModalPredictor:
 
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
-        self._zero_shot = zero_shot
+        self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -228,13 +228,13 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if problem_type is not None:
+        if pipeline is not None:
             try:
                 self._config, self._model, self._data_processors = init_pretrained(
-                    problem_type=problem_type, hyperparameters=hyperparameters
+                    pipeline=pipeline, hyperparameters=hyperparameters
                 )
             except:
-                print(f"No pretrain model loaded for {problem_type}")
+                print(f"No pretrain model loaded for {pipeline}")
 
     @property
     def path(self):
@@ -275,6 +275,7 @@ class MultiModalPredictor:
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
         hyperparameter_tune_kwargs: Optional[dict] = None,
+        init_only: Optional[bool] = False,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -361,7 +362,7 @@ class MultiModalPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                     num_trials: int
-                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs t o be specified.
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
                     scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
                         If str is passed, AutoGluon will create the scheduler for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
@@ -528,6 +529,7 @@ class MultiModalPredictor:
             )
             return predictor
 
+        _fit_args["init_only"] = init_only
         self._fit(**_fit_args)
         return self
 
@@ -810,6 +812,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
+        init_only: bool = False,
         **hpo_kwargs,
     ):
         if self._config is not None:  # continuous training
@@ -1138,6 +1141,9 @@ class MultiModalPredictor:
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
+        if init_only:
+            #finish all inits
+            return
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
@@ -1467,6 +1473,8 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
+        label: Optional[str] = None,
+        eval_metric: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1486,6 +1494,21 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        if label is not None:
+            for metric in metrics:
+                if metric is not None and not isinstance(metric, str):
+                    metric = metric.name
+                if metric is not None and metric.lower() in [
+                    "rmse",
+                    "r2",
+                    "pearsonr",
+                    "spearmanr",
+                ]:
+                    self._problem_type = REGRESSION
+            self._label_column = label
+            self._eval_metric_name = eval_metric
+            self.fit(data,data,init_only=True)
+
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
         else:
@@ -1737,7 +1760,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=False,
         )
-        if self._zero_shot:
+        if self._pipeline in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
             if return_masks:
                 masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)

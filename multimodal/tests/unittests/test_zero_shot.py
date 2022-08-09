@@ -27,8 +27,7 @@ def test_clip_zero_shot():
     bird_text = "a photo of a bird"
 
     predictor = MultiModalPredictor(
-        hyperparameters={"model.names": ["clip"], "model.clip.checkpoint_name": "openai/clip-vit-base-patch32"},
-        problem_type="zero_shot",
+        pipeline="zero_shot_image_classification",
     )
 
     # compute the cosine similarity of one image-text pair.
@@ -122,7 +121,7 @@ def test_timm_zero_shot(checkpoint_name):
             "model.names": ["timm_image"],
             "model.timm_image.checkpoint_name": checkpoint_name,
         },
-        problem_type="zero_shot",
+        problem_type="pipeline",
     )
 
     pred = predictor.predict({"image": [cat_image_name, dog_image_name]})

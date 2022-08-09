@@ -63,7 +63,8 @@ def main(args):
             tuning_data=val_df,
             hyperparameters={
                 "env.num_gpus": args.num_gpu,
-                #"env.per_gpu_batch_size": 6,
+                "env.precision": "bf16",
+                "env.per_gpu_batch_size": 6,
                 "model.hf_text.checkpoint_name": args.teacher_model,
                 "optimization.learning_rate": 1.0e-4,
                 "optimization.weight_decay": 1.0e-3,
@@ -92,6 +93,7 @@ def main(args):
             tuning_data=val_df,
             hyperparameters={
                 "env.num_gpus": args.num_gpu,
+                "env.precision": "bf16",
                 "optimization.max_epochs": args.max_epochs,
                 "model.hf_text.checkpoint_name": args.student_model,
                 "optimization.learning_rate": 2.0e-4,
@@ -121,6 +123,7 @@ def main(args):
         config=config,
         hyperparameters={
             "env.num_gpus": args.num_gpu,
+            #"env.precision": "bf16",
             "optimization.max_epochs": args.max_epochs,
             "model.hf_text.checkpoint_name": args.student_model,
             "optimization.learning_rate": 2.0e-4,

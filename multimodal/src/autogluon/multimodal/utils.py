@@ -86,7 +86,6 @@ from .constants import (
     MASKS,
     S3_PREFIX,
     LAST_CHECKPOINT,
-    SENTENCE_SIMILARITY,
 )
 from .presets import get_automm_presets, get_basic_automm_config
 
@@ -1630,7 +1629,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
 
 
 def init_pretrained(
-    problem_type: Optional[str],
+    pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -1651,7 +1650,7 @@ def init_pretrained(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    config = get_config(presets=problem_type, overrides=hyperparameters)
+    config = get_config(presets=pipeline, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
