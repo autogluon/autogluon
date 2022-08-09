@@ -49,6 +49,7 @@ def multilingual():
         "env.per_gpu_batch_size": 4,
     }
 
+
 @automm_presets.register()
 def zero_shot_classification():
     return {
@@ -56,6 +57,7 @@ def zero_shot_classification():
         "model.hf_text.checkpoint_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
         "env.eval_batch_size_ratio": 1,
     }
+
 
 @automm_presets.register()
 def zero_shot_image_classification():
