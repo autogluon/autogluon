@@ -508,12 +508,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         indexes = []
         for i in self._item_index:
             idx = pd.MultiIndex.from_product(
-                [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)],
-                names=["item_id", "timestamp"],
+                [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)]
             )
             indexes.append(idx)
 
-        new_index = pd.MultiIndex.from_tuples(np.concatenate(indexes))
+        new_index = pd.MultiIndex.from_tuples(np.concatenate(indexes), names=[ITEMID, TIMESTAMP])
         df_view.set_index(new_index, inplace=True)
         df_view._cached_freq = freq
 
