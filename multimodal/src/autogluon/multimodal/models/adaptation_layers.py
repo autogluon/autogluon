@@ -77,6 +77,7 @@ class IA3Linear(nn.Linear, LoRALayer):
     https://arxiv.org/pdf/2205.05638.pdf
     2. Code: https://github.com/r-three/t-few
     """
+
     def __init__(
         self,
         in_features: int,
@@ -85,7 +86,7 @@ class IA3Linear(nn.Linear, LoRALayer):
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         LoRALayer.__init__(self, r=8, lora_alpha=8, lora_dropout=0.0, merge_weights=True)  # Default arguments, only
-        # really a placeholder for dropout
+        # In essence the $b$ parameter of LoRA.
         self.lora_b = nn.Parameter(torch.ones(out_features, 1))
         self.weight.requires_grad = False
 
@@ -98,6 +99,7 @@ class IA3Linear(nn.Linear, LoRALayer):
         return "in_features={}, out_features={}, bias={}".format(
             self.in_features, self.out_features, self.bias is not None
         )
+
 
 class LoRALinear(nn.Linear, LoRALayer):
     """

@@ -91,7 +91,7 @@ from .models import (
     NumericalMLP,
     NumericalTransformer,
     TimmAutoModelForImagePrediction,
-    TFewModel
+    TFewModel,
 )
 from .models.utils import inject_lora_to_linear_layer, inject_ia3_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
@@ -728,9 +728,9 @@ def create_model(
                 prefix=model_name,
                 label_templates=model_config.label_templates,
                 checkpoint_name=model_config.checkpoint_name,
-                length_norm=model_config.length_norm,# Normalizes length to adjust for length bias in target template
-                unlikely_loss=model_config.unlikely_loss, # Adds loss term that lowers probability of incorrect outputs
-                mc_loss=model_config.mc_loss, # Adds multiple choice cross entropy loss
+                length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
+                unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
+                mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
                 num_classes=num_classes,
                 gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             )
@@ -1943,6 +1943,7 @@ def download(
 
     return fname
 
+
 def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold: int = 50):
     """
     Infer based on the number of training sample the data scarsity. Select mode accordingly from [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT].
@@ -1961,7 +1962,7 @@ def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold:
     row_num = len(df_train)
     if row_num == 0:
         return ZERO_SHOT
-    elif row_num  < scarcity_threshold:
+    elif row_num < scarcity_threshold:
         return FEW_SHOT
     else:
         return DEFAULT_SHOT

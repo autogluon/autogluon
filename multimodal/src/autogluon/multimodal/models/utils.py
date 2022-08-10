@@ -392,9 +392,7 @@ def get_column_features(
     return column_features, feature_masks
 
 
-def inject_ia3_to_linear_layer(
-    model: nn.Module, filter: Optional[List[str]] = None
-) -> nn.Module:
+def inject_ia3_to_linear_layer(model: nn.Module, filter: Optional[List[str]] = None) -> nn.Module:
     """
     Injects trainable adapters that inihibit and amplify activations, called (IA)^3.
     Used for efficient fine-tuning of large pre-trained models.
@@ -415,12 +413,11 @@ def inject_ia3_to_linear_layer(
             inject_ia3_to_linear_layer(module, filter)  # algorithm is in-place
 
         if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
-            lora_layer = IA3Linear(
-                module.in_features, module.out_features)
+            lora_layer = IA3Linear(module.in_features, module.out_features)
             lora_layer.weight = module.weight
             lora_layer.bias = module.bias
             setattr(model, n, lora_layer)
-            
+
     return model  # return model to enable method chaining
 
 

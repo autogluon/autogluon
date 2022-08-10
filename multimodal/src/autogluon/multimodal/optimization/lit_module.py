@@ -134,9 +134,7 @@ class LitModule(pl.LightningModule):
         bs = int(lm_target.size(0) / num_choices)
 
         lm_loss = F.cross_entropy(
-            logits.view(bs, num_choices, *logits.size()[1:])[range(bs), label].flatten(
-                0, 1
-            ),
+            logits.view(bs, num_choices, *logits.size()[1:])[range(bs), label].flatten(0, 1),
             lm_target.view(bs, num_choices, -1)[range(bs), label].flatten(0, 1),
         )
         if self.model.mc_loss > 0:
@@ -145,9 +143,9 @@ class LitModule(pl.LightningModule):
             mc_loss = 0.0
 
         if self.model.unlikely_loss > 0:
-            cand_loglikely = -F.cross_entropy(
-                logits.flatten(0, 1), lm_target.flatten(0, 1), reduction="none"
-            ).view(bs, num_choices, -1)
+            cand_loglikely = -F.cross_entropy(logits.flatten(0, 1), lm_target.flatten(0, 1), reduction="none").view(
+                bs, num_choices, -1
+            )
             cand_loglikely += (lm_target < 0).view(bs, num_choices, -1) * -100
             cand_loglikely[range(bs), label] = -100
             unlikely_loss = -torch.log(1 - torch.exp(cand_loglikely) + 1e-2).sum() / (cand_loglikely != -100).sum()
