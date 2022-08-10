@@ -224,13 +224,9 @@ class MultiModalPredictor:
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
         if pipeline is not None:
-            try:
-                self._config, self._model, self._data_processors = init_pretrained(
-                    pipeline=pipeline, hyperparameters=hyperparameters
-                )
-            except Exception as e:
-                print(e)
-                print(f"No pretrain model loaded for {pipeline}")
+            self._config, self._model, self._data_processors = init_pretrained(
+                pipeline=pipeline, hyperparameters=hyperparameters
+            )
 
     @property
     def path(self):
@@ -1144,7 +1140,6 @@ class MultiModalPredictor:
             trainer = pl.Trainer(
                 gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
                 auto_select_gpus=config.env.auto_select_gpus if num_gpus != 0 else False,
-                auto_scale_batch_size="binsearch",  # TODO
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
