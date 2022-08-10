@@ -223,7 +223,6 @@ class MultiModalPredictor:
         if problem_type is not None and problem_type.lower() == ZERO_SHOT:
             self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
 
-
     @property
     def path(self):
         return self._save_path
@@ -442,9 +441,13 @@ class MultiModalPredictor:
         )
 
         # Determine data scarcity mode, i.e. a few-shot scenario
-        scarcity_mode = infer_scarcity_mode_by_data_size(df_train=train_data, scarcity_threshold=50) #Add as seperate hyperparameter somewhere?
-        if scarcity_mode == FEW_SHOT and presets != FEW_SHOT: #TODO: check for data  type
-            logger.info(f"Detected data scarcity. Consider running using the preset {FEW_SHOT} for better performance.")
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=train_data, scarcity_threshold=50
+        )  # Add as seperate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and presets != FEW_SHOT:  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset {FEW_SHOT} for better performance."
+            )
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")

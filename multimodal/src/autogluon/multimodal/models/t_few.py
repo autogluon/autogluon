@@ -25,6 +25,7 @@ from ..constants import (
 from .utils import assign_layer_ids, get_column_features
 
 import json
+
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
@@ -51,9 +52,9 @@ class TFewModel(nn.Module):
         label_templates: dict = {},
         checkpoint_name: str = "bigscience/T0_3B",
         num_classes: Optional[int] = 0,
-        length_norm: float = 1.0, # Normalizes length to adjust for length bias in target template
-        unlikely_loss: float = 1.0, # Adds loss term that lowers probability of incorrect outputs
-        mc_loss: float = 1.0, # Adds multiple choice cross entropy loss
+        length_norm: float = 1.0,  # Normalizes length to adjust for length bias in target template
+        unlikely_loss: float = 1.0,  # Adds loss term that lowers probability of incorrect outputs
+        mc_loss: float = 1.0,  # Adds multiple choice cross entropy loss
         gradient_checkpointing: Optional[bool] = False,
     ):
         """
@@ -104,10 +105,14 @@ class TFewModel(nn.Module):
 
         if len(label_templates) == 0:
             label_templates = {"{}".format(x): x for x in range(self.num_classes)}
-            logger.info(f"Prompts for classes not specified. Fallback to default prompts (not recommended): {label_templates}")
+            logger.info(
+                f"Prompts for classes not specified. Fallback to default prompts (not recommended): {label_templates}"
+            )
 
         self.label_templates = label_templates
-        self.label_templates_inverse = {y : [q for q, p in self.label_templates.items() if p == y] for x, y in self.label_templates.items()}
+        self.label_templates_inverse = {
+            y: [q for q, p in self.label_templates.items() if p == y] for x, y in self.label_templates.items()
+        }
 
         self.mc_loss = mc_loss
         self.unlikely_loss = unlikely_loss
@@ -166,8 +171,12 @@ class TFewModel(nn.Module):
         bs = text_token_ids.size(0)
         # Sample uniformly target template descriptions from collection of descriptions
         # TODO: Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
-        selected_label_templates = [random.choice(y) for x, y in self.label_templates_inverse.items()][:self.num_classes]
-        choices_ids = torch.tensor(self.tokenizer(selected_label_templates, padding=True)['input_ids']).type_as(text_token_ids)
+        selected_label_templates = [random.choice(y) for x, y in self.label_templates_inverse.items()][
+            : self.num_classes
+        ]
+        choices_ids = torch.tensor(self.tokenizer(selected_label_templates, padding=True)["input_ids"]).type_as(
+            text_token_ids
+        )
         choices_ids = choices_ids.unsqueeze(0).repeat(text_token_ids.size(0), 1, 1)
         flat_choices_ids = choices_ids.flatten(0, 1)
         num_choices = len(selected_label_templates)
@@ -175,7 +184,6 @@ class TFewModel(nn.Module):
         # print(selected_label_templates)
         # print(batch[self.label_key])
         # print(self.tokenizer.batch_decode(text_token_ids))
-
 
         if self.disable_seg_ids:
             text_segment_ids = None
@@ -195,7 +203,7 @@ class TFewModel(nn.Module):
 
         # Foward input through the encoder
         encoder_hidden_states = self.model.encoder(inputs_embeds=inputs_embeds, attention_mask=text_masks)[0]
-        encoder_hidden_states = encoder_hidden_states.unsqueeze(dim=1).repeat(1, num_choices , 1, 1).flatten(0, 1)
+        encoder_hidden_states = encoder_hidden_states.unsqueeze(dim=1).repeat(1, num_choices, 1, 1).flatten(0, 1)
 
         attention_mask = text_masks.unsqueeze(dim=1).repeat(1, num_choices, 1).flatten(0, 1)
         decoder_input_ids = torch.cat([torch.zeros_like(flat_choices_ids[:, :1]), flat_choices_ids[:, :-1]], dim=1)

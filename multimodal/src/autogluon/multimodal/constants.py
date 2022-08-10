@@ -120,9 +120,9 @@ BIT_FIT = "bit_fit"
 LORA = "lora"
 LORA_BIAS = "lora_bias"
 LORA_NORM = "lora_norm"
-IA3="ia3"
-IA3_BIAS="ia3_bias"
-IA3_NORM="ia3_norm"
+IA3 = "ia3"
+IA3_BIAS = "ia3_bias"
+IA3_NORM = "ia3_norm"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"

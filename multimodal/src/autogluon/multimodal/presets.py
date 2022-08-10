@@ -53,11 +53,11 @@ def multilingual():
 @automm_presets.register()
 def few_shot():
     return {
-        "model.names": ['t_few'],
+        "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "bigscience/T0_3B",
-        "model.t_few.gradient_checkpointing" : True,
+        "model.t_few.gradient_checkpointing": True,
         "optimization.efficient_finetune": "lora_bias",
-        "optimization.max_steps":1000, # Find better solution to train for long
+        "optimization.max_steps": 1000,  # Find better solution to train for long
         "optimization.patience": 1000,
         "env.batch_size": 8,
         "env.precision": "bf16",
@@ -65,6 +65,7 @@ def few_shot():
         "env.val_check_interval": 1.0,
         "env.check_val_every_n_epoch": 10, # Might need adjustment
     }
+
 
 @automm_presets.register()
 def zero_shot():
