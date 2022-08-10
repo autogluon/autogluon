@@ -72,7 +72,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
         ),
         (
             "hateful_memes",
-            ["timm_image", "hf_text", "clip", "fusion_mlp"],
+            ["timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
             UNIFORM_SOUP,
@@ -81,7 +81,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
         ),
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
+            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp", "t_few"],
             None,
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
