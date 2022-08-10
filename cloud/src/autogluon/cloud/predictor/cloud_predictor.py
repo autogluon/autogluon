@@ -774,6 +774,8 @@ class CloudPredictor(ABC):
             job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor-batch-transform")
 
         if test_data_image_column is not None:
+            logger.warning('Batch inference with image modality could be slow because of some technical details.')
+            logger.warning('You can always retrieve the model trained with CloudPredictor and do batch inference using your custom solution.')
             test_data = load_pd.load(test_data)
             test_data = convert_image_path_to_encoded_bytes_in_dataframe(test_data, test_data_image_column)
         test_input = self._upload_batch_predict_data(test_data, cloud_bucket, cloud_key_prefix)
