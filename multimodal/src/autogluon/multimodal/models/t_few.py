@@ -66,7 +66,7 @@ class TFewModel(nn.Module):
         label_templates
             Dictionary of textual templates to numerical class, as representations of these classes.
         checkpoint_name
-            Name of the checkpoint. We support loading T5 checkpoints from
+            Name of the checkpoint. We support loading T5ForConditionalGeneration checkpoints from
             Huggingface Models list: https://huggingface.co/models.
             We recommend using T0 backbones. For example, you may use
                 - 'bigscience/T0_3B'
@@ -87,6 +87,7 @@ class TFewModel(nn.Module):
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
+
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
@@ -100,6 +101,10 @@ class TFewModel(nn.Module):
 
         self.dummy_layer = DummyLayer()
         self.prefix = prefix
+
+        if len(label_templates) == 0:
+            label_templates = {"{}".format(x): x for x in range(self.num_classes)}
+            logger.info(f"Prompts for classes not specified. Fallback to default prompts (not recommended): {label_templates}")
 
         self.label_templates = label_templates
         self.label_templates_inverse = {y : [q for q, p in self.label_templates.items() if p == y] for x, y in self.label_templates.items()}
@@ -161,11 +166,16 @@ class TFewModel(nn.Module):
         bs = text_token_ids.size(0)
         # Sample uniformly target template descriptions from collection of descriptions
         # TODO: Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
-        selected_label_templates = [random.choice(y) for x, y in self.label_templates_inverse.items()]
+        selected_label_templates = [random.choice(y) for x, y in self.label_templates_inverse.items()][:self.num_classes]
         choices_ids = torch.tensor(self.tokenizer(selected_label_templates, padding=True)['input_ids']).type_as(text_token_ids)
         choices_ids = choices_ids.unsqueeze(0).repeat(text_token_ids.size(0), 1, 1)
         flat_choices_ids = choices_ids.flatten(0, 1)
         num_choices = len(selected_label_templates)
+
+        # print(selected_label_templates)
+        # print(batch[self.label_key])
+        # print(self.tokenizer.batch_decode(text_token_ids))
+
 
         if self.disable_seg_ids:
             text_segment_ids = None

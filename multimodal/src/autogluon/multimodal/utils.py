@@ -726,11 +726,11 @@ def create_model(
         elif model_name.lower().startswith(T_FEW):
             model = TFewModel(
                 prefix=model_name,
-                label_templates = model_config.label_templates,
+                label_templates=model_config.label_templates,
                 checkpoint_name=model_config.checkpoint_name,
-                length_norm = model_config.length_norm,# Normalizes length to adjust for length bias in target template
-                unlikely_loss = model_config.unlikely_loss, # Adds loss term that lowers probability of incorrect outputs
-                mc_loss = model_config.mc_loss, # Adds multiple choice cross entropy loss
+                length_norm=model_config.length_norm,# Normalizes length to adjust for length bias in target template
+                unlikely_loss=model_config.unlikely_loss, # Adds loss term that lowers probability of incorrect outputs
+                mc_loss=model_config.mc_loss, # Adds multiple choice cross entropy loss
                 num_classes=num_classes,
                 gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             )
@@ -841,9 +841,6 @@ def create_model(
         all_models.append(model)
 
     if len(all_models) > 1:
-        assert (
-            T_FEW not in [x.prefix for x in all_models]
-        ), f"{T_FEW} only supported standalone, but detects multiple models {config.model.names}"
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=all_models)
     elif len(all_models) == 1:

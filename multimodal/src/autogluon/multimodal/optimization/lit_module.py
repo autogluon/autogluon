@@ -130,7 +130,7 @@ class LitModule(pl.LightningModule):
         choices_scores = per_output[LOGITS]
         lm_target = per_output[LM_TARGET]
 
-        num_choices = len(list(self.model.label_templates_inverse.keys()))
+        num_choices = self.model.num_classes
         bs = int(lm_target.size(0) / num_choices)
 
         lm_loss = F.cross_entropy(

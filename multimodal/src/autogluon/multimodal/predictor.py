@@ -70,7 +70,6 @@ from .data.infer_types import (
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
-from .optimization.lit_module_tfew import LitModuleTFew
 from .optimization.rkd_loss import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
 from .utils import (
@@ -960,15 +959,6 @@ class MultiModalPredictor:
         is_distill = teacher_model is not None
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
-        # if self._model.prefix in [T_FEW]: # Bad style, maybe find better workaround?
-        #     task = LitModuleTFew(
-        #         model=model,
-        #         efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-        #         mixup_fn=mixup_fn,
-        #         mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-        #         **metrics_kwargs,
-        #         **optimization_kwargs,
-        #     )
         if is_distill:
             output_feature_loss_weight = OmegaConf.select(
                 self._config, "distiller.output_feature_loss_weight", default=0.01
@@ -1360,11 +1350,7 @@ class MultiModalPredictor:
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-        if self._model.prefix in [T_FEW]: # Bad style. Better workaround?
-            task = LitModuleTFew(
-                model=self._model,
-        )
-        elif hasattr(self._config, MATCHER):
+        if hasattr(self._config, MATCHER):
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
             task = MatcherLitModule(
                 model=self._model,

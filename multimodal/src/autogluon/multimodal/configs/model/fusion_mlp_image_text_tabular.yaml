@@ -77,7 +77,7 @@ model:
   t_few:
     checkpoint_name: "bigscience/T0_3B"
     gradient_checkpointing: True
-    label_templates: {}
+    label_templates: {} # Dictionary mapping target prompts to class
     data_types:
       - "text"
     tokenizer_name: "hf_auto"

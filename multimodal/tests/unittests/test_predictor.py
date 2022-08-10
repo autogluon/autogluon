@@ -63,7 +63,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
     [
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
@@ -240,7 +240,7 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
 
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
@@ -440,6 +440,21 @@ def test_model_configs():
                 "embedding_arch": ["linear", "relu"],
                 "merge": "concat",
             },
+            "t_few": {
+                "checkpoint_name" : "t5-small",
+                "gradient_checkpointing" : True,
+                "label_templates" : {"test{}".format(x): x for x in range(40)},
+                "data_types" :["text"],
+                "tokenizer_name" : "hf_auto",
+                "length_norm" : 1.0,
+                "unlikely_loss" : 1.0,
+                "mc_loss" : 1.0,
+                "max_text_len" : 512,
+                "insert_sep" : True,
+                "text_segment_num" : 2,
+                "stochastic_chunk" : False,
+                "text_aug_detect_length" : 10,
+            },
             "hf_text": {
                 "checkpoint_name": "google/electra-small-discriminator",
                 "data_types": ["text"],
@@ -545,7 +560,7 @@ def test_modifying_duplicate_model_names():
 
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
         "env.num_workers": 0,
