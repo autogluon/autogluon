@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 from torch import nn
 
-from .lora_layers import LoRALinear
+from .adaptation_layers import LoRALinear, IA3Linear
 
 
 def init_weights(module: nn.Module):
@@ -390,6 +390,38 @@ def get_column_features(
 
     # print(f"column_features: {column_features}")
     return column_features, feature_masks
+
+
+def inject_ia3_to_linear_layer(
+    model: nn.Module, filter: Optional[List[str]] = None
+) -> nn.Module:
+    """
+    Injects trainable adapters that inihibit and amplify activations, called (IA)^3.
+    Used for efficient fine-tuning of large pre-trained models.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    filter
+        Apply (IA)^3 only to linear layers filtered by name.
+        If None, (IA)^3 is applied to all linear Layers in Model.
+    Returns
+    -------
+    Model with injected LoRA modules.
+    """
+    for n, module in model.named_children():
+        if len(list(module.children())) > 0:
+            inject_ia3_to_linear_layer(module, filter)  # algorithm is in-place
+
+        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
+            lora_layer = IA3Linear(
+                module.in_features, module.out_features)
+            lora_layer.weight = module.weight
+            lora_layer.bias = module.bias
+            setattr(model, n, lora_layer)
+            
+    return model  # return model to enable method chaining
 
 
 def inject_lora_to_linear_layer(

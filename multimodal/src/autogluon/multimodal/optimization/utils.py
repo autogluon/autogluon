@@ -29,6 +29,9 @@ from ..constants import (
     LORA,
     LORA_BIAS,
     LORA_NORM,
+    IA3,
+    IA3_BIAS,
+    IA3_NORM,
     MULTICLASS,
     NORM_FIT,
     PAIR_MARGIN_MINER,
@@ -528,15 +531,15 @@ def apply_layerwise_lr_decay(
                 # For norm-fit, we finetune all the normalization layers and bias layers
                 if name not in norm_param_names and "bias" not in name:
                     param.requires_grad = False
-            elif efficient_finetune == LORA:
+            elif efficient_finetune in [LORA, IA3]:
                 # For LoRA adaptation we only fine-tune LoRA weights
                 if "lora_" not in name:
                     param.requires_grad = False
-            elif efficient_finetune == LORA_BIAS:
+            elif efficient_finetune in [LORA_BIAS, IA3_BIAS]:
                 # For LoRA adapation we fine-tune LoRA and all bias weights
                 if "lora_" not in name and "bias" not in name:
                     param.requires_grad = False
-            elif efficient_finetune == LORA_NORM:
+            elif efficient_finetune in [LORA_NORM, IA3_NORM]:
                 # For LoRA adapation we fine-tune LoRA and normalization and bias layers
                 if "lora_" not in name and name not in norm_param_names and "bias" not in name:
                     param.requires_grad = False
@@ -544,7 +547,7 @@ def apply_layerwise_lr_decay(
                 raise NotImplementedError(
                     f"The efficient finetuning strategy '{efficient_finetune}'"
                     f" is not supported. We only support"
-                    f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}'."
+                    f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}', '{IA3}', '{IA3_BIAS}', '{IA3_NORM}'."
                 )
 
         if not param.requires_grad:

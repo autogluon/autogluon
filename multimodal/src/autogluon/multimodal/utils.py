@@ -38,6 +38,7 @@ from .constants import (
     CATEGORICAL,
     CATEGORICAL_MLP,
     CATEGORICAL_TRANSFORMER,
+    T_FEW,
     CLIP,
     COLUMN_FEATURES,
     F1,
@@ -67,6 +68,9 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    ZERO_SHOT,
+    FEW_SHOT,
+    DEFAULT_SHOT,
 )
 from .data import (
     CategoricalProcessor,
@@ -87,8 +91,9 @@ from .models import (
     NumericalMLP,
     NumericalTransformer,
     TimmAutoModelForImagePrediction,
+    TFewModel
 )
-from .models.utils import inject_lora_to_linear_layer
+from .models.utils import inject_lora_to_linear_layer, inject_ia3_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -718,6 +723,17 @@ def create_model(
                 pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
                 gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             )
+        elif model_name.lower().startswith(T_FEW):
+            model = TFewModel(
+                prefix=model_name,
+                label_templates = model_config.label_templates,
+                checkpoint_name=model_config.checkpoint_name,
+                length_norm = model_config.length_norm,# Normalizes length to adjust for length bias in target template
+                unlikely_loss = model_config.unlikely_loss, # Adds loss term that lowers probability of incorrect outputs
+                mc_loss = model_config.mc_loss, # Adds multiple choice cross entropy loss
+                num_classes=num_classes,
+                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
                 prefix=model_name,
@@ -825,6 +841,9 @@ def create_model(
         all_models.append(model)
 
     if len(all_models) > 1:
+        assert (
+            T_FEW not in [x.prefix for x in all_models]
+        ), f"{T_FEW} only supported standalone, but detects multiple models {config.model.names}"
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=all_models)
     elif len(all_models) == 1:
@@ -853,6 +872,11 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
             model=model,
             lora_r=config.optimization.lora.r,
             lora_alpha=config.optimization.lora.alpha,
+            filter=config.optimization.lora.filter,
+        )
+    elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
+        model = inject_ia3_to_linear_layer(
+            model=model,
             filter=config.optimization.lora.filter,
         )
 
@@ -1921,6 +1945,29 @@ def download(
                 )
 
     return fname
+
+def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold: int = 50):
+    """
+    Infer based on the number of training sample the data scarsity. Select mode accordingly from [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT].
+
+    Parameters
+    ---------------
+    df_train
+        Training dataframe
+    scarcity_threshold
+        Threshold number of samples when to select FEW_SHOT mode
+
+    Returns
+    --------
+    Mode in  [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT]
+    """
+    row_num = len(df_train)
+    if row_num == 0:
+        return ZERO_SHOT
+    elif row_num  < scarcity_threshold:
+        return FEW_SHOT
+    else:
+        return DEFAULT_SHOT
 
 
 def infer_dtypes_by_model_names(model_config: DictConfig):

@@ -9,17 +9,16 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, LOGITS, WEIGHT, TEMPLATE_LOGITS, LM_TARGET
+from ..constants import AUTOMM, LOGITS, TEMPLATE_LOGITS, LM_TARGET
 from ..data.mixup import MixupModule, multimodel_mixup
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)
 
 
-class LitModule(pl.LightningModule):
+class LitModuleTFew(pl.LightningModule):
     """
-    Control the loops for training, evaluation, and prediction. This module is independent of
-    the model definition. This class inherits from the Pytorch Lightning's LightningModule:
+    Control the loops for training, evaluation, and prediction for T-Few (https://arxiv.org/abs/2205.05638). This class inherits from the Pytorch Lightning's LightningModule:
     https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
     """
 
@@ -35,7 +34,6 @@ class LitModule(pl.LightningModule):
         lr_mult: Optional[Union[float, int]] = None,
         weight_decay: Optional[float] = None,
         warmup_steps: Optional[int] = None,
-        loss_func: Optional[_Loss] = None,
         validation_metric: Optional[torchmetrics.Metric] = None,
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
@@ -83,8 +81,6 @@ class LitModule(pl.LightningModule):
             How many steps to warmup learning rate. If a float (0, 1), it would represent the
             percentage of steps over all the training steps. The actual number is calculated as
             "int(warmup_steps * max_steps)". If an integer, it would be the exact step number.
-        loss_func
-            A Pytorch loss module, e.g., nn.CrossEntropyLoss().
         validation_metric
             A torchmetrics module used in the validation stage, e.g., torchmetrics.Accuracy().
         validation_metric_name
@@ -112,7 +108,6 @@ class LitModule(pl.LightningModule):
         self.model = model
         self.validation_metric = validation_metric
         self.validation_metric_name = f"val_{validation_metric_name}"
-        self.loss_func = loss_func
         self.mixup_fn = mixup_fn
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
@@ -121,59 +116,43 @@ class LitModule(pl.LightningModule):
             )
         self.custom_metric_func = custom_metric_func
 
-    def _compute_template_loss(
-        self,
-        per_output: Dict,
-        label: torch.Tensor,
-    ):
-        logits = per_output[TEMPLATE_LOGITS]
-        choices_scores = per_output[LOGITS]
-        lm_target = per_output[LM_TARGET]
-
-        num_choices = len(list(self.model.label_templates_inverse.keys()))
-        bs = int(lm_target.size(0) / num_choices)
-
-        lm_loss = F.cross_entropy(
-            logits.view(bs, num_choices, *logits.size()[1:])[range(bs), label].flatten(
-                0, 1
-            ),
-            lm_target.view(bs, num_choices, -1)[range(bs), label].flatten(0, 1),
-        )
-        if self.model.mc_loss > 0:
-            mc_loss = F.cross_entropy(choices_scores, label)
-        else:
-            mc_loss = 0.0
-
-        if self.model.unlikely_loss > 0:
-            cand_loglikely = -F.cross_entropy(
-                logits.flatten(0, 1), lm_target.flatten(0, 1), reduction="none"
-            ).view(bs, num_choices, -1)
-            cand_loglikely += (lm_target < 0).view(bs, num_choices, -1) * -100
-            cand_loglikely[range(bs), label] = -100
-            unlikely_loss = -torch.log(1 - torch.exp(cand_loglikely) + 1e-2).sum() / (cand_loglikely != -100).sum()
-        else:
-            unlikely_loss = 0.0
-
-        return lm_loss + mc_loss * self.model.mc_loss + unlikely_loss * self.model.unlikely_loss
-
     def _compute_loss(
         self,
         output: Dict,
         label: torch.Tensor,
     ):
-        loss = 0
+        loss = 0.0
         for _, per_output in output.items():
-            weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            if TEMPLATE_LOGITS in per_output:  # Not sure the condition creates too much overhead?
-                loss += self._compute_template_loss(per_output, label) * weight
+            logits = per_output[TEMPLATE_LOGITS]
+            choices_scores = per_output[LOGITS]
+            lm_target = per_output[LM_TARGET]
+
+            num_choices = len(list(self.model.label_templates_inverse.keys()))
+            bs = int(lm_target.size(0) / num_choices)
+
+            lm_loss = F.cross_entropy(
+                logits.view(bs, num_choices, *logits.size()[1:])[range(bs), label].flatten(
+                    0, 1
+                ),
+                lm_target.view(bs, num_choices, -1)[range(bs), label].flatten(0, 1),
+            )
+            if self.model.mc_loss > 0:
+                mc_loss = F.cross_entropy(choices_scores, label)
             else:
-                loss += (
-                    self.loss_func(
-                        input=per_output[LOGITS].squeeze(dim=1),
-                        target=label,
-                    )
-                    * weight
-                )
+                mc_loss = 0.0
+
+            if self.model.unlikely_loss > 0:
+                cand_loglikely = -F.cross_entropy(
+                    logits.flatten(0, 1), lm_target.flatten(0, 1), reduction="none"
+                ).view(bs, num_choices, -1)
+                cand_loglikely += (lm_target < 0).view(bs, num_choices, -1) * -100
+                cand_loglikely[range(bs), label] = -100
+                unlikely_loss = -torch.log(1 - torch.exp(cand_loglikely) + 1e-2).sum() / (cand_loglikely != -100).sum()
+            else:
+                unlikely_loss = 0.0
+
+            loss += lm_loss + mc_loss * self.model.mc_loss + unlikely_loss * self.model.unlikely_loss
+
         return loss
 
     def _compute_metric_score(
@@ -200,6 +179,7 @@ class LitModule(pl.LightningModule):
             self.mixup_fn.mixup_enabled = self.training & (self.current_epoch < self.hparams.mixup_off_epoch)
             batch, label = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
         output = self.model(batch)
+
         loss = self._compute_loss(output=output, label=label)
         return output, loss
 
@@ -243,8 +223,6 @@ class LitModule(pl.LightningModule):
             Index of mini-batch.
         """
         output, loss = self._shared_step(batch)
-        if isinstance(self.loss_func, nn.BCEWithLogitsLoss):
-            output[self.model.prefix][LOGITS] = torch.sigmoid(output[self.model.prefix][LOGITS].float())
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
         self._compute_metric_score(

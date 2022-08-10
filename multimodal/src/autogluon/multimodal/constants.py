@@ -11,6 +11,8 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 ZERO_SHOT = "zero_shot"
+FEW_SHOT = "few_shot"
+DEFAULT_SHOT = "default_shot"
 
 # Input keys
 IMAGE = "image"
@@ -23,6 +25,8 @@ COLUMN = "column"
 
 # Output keys
 LOGITS = "logits"
+TEMPLATE_LOGITS = "template_logits"
+LM_TARGET = "lm_target"
 LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
@@ -116,11 +120,15 @@ BIT_FIT = "bit_fit"
 LORA = "lora"
 LORA_BIAS = "lora_bias"
 LORA_NORM = "lora_norm"
+IA3="ia3"
+IA3_BIAS="ia3_bias"
+IA3_NORM="ia3_norm"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
 TIMM_IMAGE = "timm_image"
 HF_TEXT = "hf_text"
+T_FEW = "t_few"
 NUMERICAL_MLP = "numerical_mlp"
 CATEGORICAL_MLP = "categorical_mlp"
 NUMERICAL_TRANSFORMER = "numerical_transformer"

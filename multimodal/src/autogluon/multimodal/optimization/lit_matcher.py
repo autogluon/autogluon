@@ -117,6 +117,8 @@ class MatcherLitModule(pl.LightningModule):
 
             - bit_fit (only finetune the bias terms)
             - norm_fit (only finetune the weights in norm layers / bias layer)
+            - lora, lora_bias, lora_norm (only finetunes decomposition matrices inserted into model, in combination with either bit_fit or norm_fit)
+            - ia3, ia3_bias, ia3_norm (adds vector that scales activations by learned vectors, in combination with either bit_fit or norm_fit)
             - None (do not use efficient finetuning strategies)
         """
         super().__init__()

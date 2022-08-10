@@ -58,6 +58,8 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT,
+    FEW_SHOT,
+    T_FEW,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -68,6 +70,7 @@ from .data.infer_types import (
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
+from .optimization.lit_module_tfew import LitModuleTFew
 from .optimization.rkd_loss import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
 from .utils import (
@@ -103,6 +106,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    infer_scarcity_mode_by_data_size,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -219,6 +223,7 @@ class MultiModalPredictor:
 
         if problem_type is not None and problem_type.lower() == ZERO_SHOT:
             self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
+
 
     @property
     def path(self):
@@ -436,6 +441,11 @@ class MultiModalPredictor:
             data=train_data,
             provided_problem_type=self._problem_type,
         )
+
+        # Determine data scarcity mode, i.e. a few-shot scenario
+        scarcity_mode = infer_scarcity_mode_by_data_size(df_train=train_data, scarcity_threshold=50) #Add as seperate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and presets != FEW_SHOT: #TODO: check for data  type
+            logger.info(f"Detected data scarcity. Consider running using the preset {FEW_SHOT} for better performance.")
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
@@ -950,6 +960,15 @@ class MultiModalPredictor:
         is_distill = teacher_model is not None
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
+        # if self._model.prefix in [T_FEW]: # Bad style, maybe find better workaround?
+        #     task = LitModuleTFew(
+        #         model=model,
+        #         efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+        #         mixup_fn=mixup_fn,
+        #         mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+        #         **metrics_kwargs,
+        #         **optimization_kwargs,
+        #     )
         if is_distill:
             output_feature_loss_weight = OmegaConf.select(
                 self._config, "distiller.output_feature_loss_weight", default=0.01
@@ -1341,7 +1360,11 @@ class MultiModalPredictor:
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-        if hasattr(self._config, MATCHER):
+        if self._model.prefix in [T_FEW]: # Bad style. Better workaround?
+            task = LitModuleTFew(
+                model=self._model,
+        )
+        elif hasattr(self._config, MATCHER):
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
             task = MatcherLitModule(
                 model=self._model,
