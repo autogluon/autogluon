@@ -1,5 +1,6 @@
 import base64
 import copy
+import os
 import pandas as pd
 import numpy as np
 
@@ -28,8 +29,16 @@ def _save_image_and_update_dataframe_column(bytes):
     im = Image.open(BytesIO(base64.b64decode(bytes, validate=True)))
     im_name = f'multimodal_image_{image_index}.png'
     im.save(im_name)
+    image_index += 1
 
     return im_name
+
+
+def _cleanup_images():
+    files = os.listdir('.')
+    for file in files:
+        if file.endswith('.png'):
+            os.remove(file)
 
 
 def model_fn(model_dir):
@@ -135,5 +144,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         output = prediction.to_csv(index=None)
     else:
         raise ValueError(f"{output_content_type} content type not supported")
+
+    _cleanup_images()
 
     return output, output_content_type
