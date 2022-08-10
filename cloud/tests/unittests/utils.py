@@ -66,7 +66,7 @@ def _test_functionality(
     # Test deploy with already trained predictor
     trained_predictor_path = cloud_predictor._fit_job.get_output_path()
     cloud_predictor_no_train.deploy(predictor_path=trained_predictor_path)
-    _test_endpoint(cloud_predictor_no_train, test_data)
+    _test_endpoint(cloud_predictor_no_train, test_data, **predict_real_time_kwargs)
     cloud_predictor_no_train.cleanup_deployment()
     cloud_predictor_no_train.predict(test_data, predictor_path=trained_predictor_path, **predict_kwargs)
     info = cloud_predictor_no_train.info()

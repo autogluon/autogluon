@@ -21,9 +21,6 @@ class MultiModalCloudPredictor(CloudPredictor):
     def predictor_type(self):
         return 'multimodal'
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     @property
     def _realtime_predictor_cls(self):
         return AutoGluonMultiModalRealtimePredictor
