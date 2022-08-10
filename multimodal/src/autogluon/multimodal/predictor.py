@@ -1464,8 +1464,6 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        label: Optional[str] = None,
-        eval_metric: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1485,21 +1483,6 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        if label is not None:
-            for metric in metrics:
-                if metric is not None and not isinstance(metric, str):
-                    metric = metric.name
-                if metric is not None and metric.lower() in [
-                    "rmse",
-                    "r2",
-                    "pearsonr",
-                    "spearmanr",
-                ]:
-                    self._problem_type = REGRESSION
-            self._label_column = label
-            self._eval_metric_name = eval_metric
-            self.fit(data, data, init_only=True)
-
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
         else:
