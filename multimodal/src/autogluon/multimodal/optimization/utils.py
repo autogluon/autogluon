@@ -507,7 +507,7 @@ def apply_layerwise_lr_decay(
     norm_param_names = get_norm_layer_param_names(model)
     # Patterns that detect if the layer is a custom layer (not loaded from a pretraining network)
     # TODO(?) Currently it is a workaround. We need to fix it in the future, i.e., supporting tabular encoders
-    automm_custom_layer_patterns = ["fusion_mlp", "adapter"]
+    automm_custom_layer_patterns = ["head", "fusion_mlp", "adapter"]
 
     for name, param in model.named_parameters():
         within_automm_custom_layer = False
