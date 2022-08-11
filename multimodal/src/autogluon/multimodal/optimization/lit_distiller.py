@@ -267,8 +267,8 @@ class DistillerLitModule(pl.LightningModule):
         student_logits = self.teacher_model.head(student_feature)
         soft_labels = teacher_output[self.teacher_model.prefix][LOGITS].squeeze(dim=1)
 
-        student_logits = student_logits / self.temperature
-        soft_labels = soft_labels / self.temperature
+        student_logits = student_logits
+        soft_labels = soft_labels
 
         if isinstance(self.softmax_regression_loss_func, nn.CrossEntropyLoss):
             soft_labels = F.softmax(soft_labels, dim=-1)
