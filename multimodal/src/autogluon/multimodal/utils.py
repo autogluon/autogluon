@@ -87,6 +87,7 @@ from .models import (
     NumericalMLP,
     NumericalTransformer,
     TimmAutoModelForImagePrediction,
+    MMdetAutoModelForObjectDetection,
 )
 from .models.utils import inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
@@ -781,6 +782,11 @@ def create_model(
                 head_activation=model_config.head_activation,
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
+            )
+        elif model_name.lower().startswith("mmdet_image"):
+            model = MMdetAutoModelForObjectDetection(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
             )
         elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
@@ -1618,6 +1624,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         feature_masks = [ele[COLUMN_FEATURES][MASKS] for ele in outputs]  # a list of dicts
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
+    elif ret_type == "bbx":
+        return [ele["bbx"] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
@@ -1632,6 +1640,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
 
 
 def init_zero_shot(
+    pipeline: str,
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -1652,7 +1661,7 @@ def init_zero_shot(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    config = get_config(presets="zero_shot", overrides=hyperparameters)
+    config = get_config(presets=pipeline, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"

@@ -92,7 +92,6 @@ from .utils import (
     init_data_processors,
     init_df_preprocessor,
     init_zero_shot,
-    init_object_detection,
     is_interactive,
     load_text_tokenizers,
     logits_to_prob,
@@ -219,11 +218,8 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if problem_type is not None and problem_type.lower() == ZERO_SHOT:
-            self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
-
-        if problem_type is not None and problem_type.lower() == OBJECT_DETECTION:
-            self._config, self._model, self._data_processors = init_object_detection(hyperparameters=hyperparameters)
+        if problem_type is not None:
+            self._config, self._model, self._data_processors = init_zero_shot(pipeline=problem_type, hyperparameters=hyperparameters)
 
     @property
     def path(self):
@@ -1569,6 +1565,9 @@ class MultiModalPredictor:
             ret_type = PROBABILITY
         else:
             ret_type = LOGITS
+        
+        if self._problem_type == "object_detection":
+            ret_type = "bbx"
 
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -1588,7 +1587,7 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                if logits_or_prob.ndim == 2:
+                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
                     pred = logits_or_prob.argmax(axis=1)
                 else:
                     pred = logits_or_prob

@@ -5,10 +5,13 @@ import torch
 from torch import nn
 from mmdet.models import build_detector
 import mmcv
+from mmcv.runner import load_checkpoint
+import warnings
+from mmdet.core import get_classes
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_model_head
-from ..utils import download
+# from ..utils import download
 
 logger = logging.getLogger(AUTOMM)
 
@@ -46,11 +49,24 @@ class MMdetAutoModelForObjectDetection(nn.Module):
         self.pretrained = pretrained
         # TODO: model name to config
         # config = get_mmdet_model_config(checkpoint_name)
-        config_url = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/master/configs/yolo/yolov3_mobilenetv2_320_300e_coco.py'
-        config_file = download(config_url)
+        # config_url = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/master/configs/yolo/yolov3_mobilenetv2_320_300e_coco.py'
+        # config_file = download(config_url)
+        config_file = "yolov3_mobilenetv2_320_300e_coco.py"
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
         self.model = build_detector(self.config.model, test_cfg=self.config.get('test_cfg'))
+        checkpoint = 'yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth'
+        if checkpoint is not None:
+            checkpoint = load_checkpoint(self.model, checkpoint, map_location='cpu')
+        if 'CLASSES' in checkpoint.get('meta', {}):
+            self.model.CLASSES = checkpoint['meta']['CLASSES']
+        else:
+            warnings.simplefilter('once')
+            warnings.warn('Class names are not saved in the checkpoint\'s '
+                          'meta data, use COCO classes by default.')
+            self.model.CLASSES = get_classes('coco')
+        self.model.cfg = self.config  # save the config in the model for convenience
+
         self.prefix = prefix
 
     @property
@@ -94,6 +110,7 @@ class MMdetAutoModelForObjectDetection(nn.Module):
         with torch.no_grad():
             results = self.model(return_loss=False, rescale=True, **data)
 
+        ret = {"bbx": results}
         return {self.prefix: ret}
 
     def get_layer_ids(

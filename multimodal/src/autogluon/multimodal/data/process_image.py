@@ -18,6 +18,7 @@ from transformers import AutoConfig
 import mmcv
 from mmcv.parallel import collate
 from mmdet.datasets.pipelines import Compose
+from mmdet.datasets import replace_ImageToTensor
 
 from .randaug import RandAugment
 
@@ -140,6 +141,7 @@ class ImageProcessor:
                 cfg = mmcv.Config.fromfile(cfg)
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
             self.val_processor = Compose(cfg.data.test.pipeline)
+            self.train_processor = Compose(cfg.data.test.pipeline)
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)

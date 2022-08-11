@@ -59,6 +59,15 @@ def zero_shot():
     }
 
 
+@automm_presets.register()
+def object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "env.eval_batch_size_ratio": 1,
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
