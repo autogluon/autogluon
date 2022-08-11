@@ -78,7 +78,7 @@ def get_default_hps(key, prediction_length):
             "ARIMA": {
                 "maxiter": 50,
                 "order": (1, 1, 1),
-                "seasonal_order": (1, 0, 0),
+                "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
             },
             "SimpleFeedForward": {
@@ -116,9 +116,9 @@ def get_default_hps(key, prediction_length):
                 "fail_if_misconfigured": True,
             },
             "ARIMA": {
-                "maxiter": 50,
-                "order": ag.Categorical((1, 1, 1), (2, 0, 1)),
-                "seasonal_order": ag.Categorical((1, 0, 0), (1, 0, 1), (1, 1, 1)),
+                "maxiter": ag.Categorical(50),
+                "order": (1, 1, 1),
+                "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
                 "fail_if_misconfigured": True,
             },
