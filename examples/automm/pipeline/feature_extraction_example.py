@@ -36,7 +36,7 @@ def main():
 
     eval(predictor, test_df)
 
-    # TODO
+    # TODO: support fit after predict for two tower models
     predictor.fit(
         train_df,
         val_df,
