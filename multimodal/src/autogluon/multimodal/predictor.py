@@ -267,7 +267,6 @@ class MultiModalPredictor:
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
         hyperparameter_tune_kwargs: Optional[dict] = None,
-        init_only: Optional[bool] = False,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -521,7 +520,6 @@ class MultiModalPredictor:
             )
             return predictor
 
-        _fit_args["init_only"] = init_only
         self._fit(**_fit_args)
         return self
 
@@ -804,7 +802,6 @@ class MultiModalPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
-        init_only: bool = False,
         **hpo_kwargs,
     ):
         if self._config is not None:  # continuous training
@@ -1133,9 +1130,6 @@ class MultiModalPredictor:
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
-        if init_only:
-            # finish all inits
-            return
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 gpus=num_gpus if not use_ray_lightning else None,  # ray lightning requires not specifying gpus
