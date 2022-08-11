@@ -1139,7 +1139,7 @@ class MultiModalPredictor:
                 fast_dev_run=config.env.fast_dev_run,
                 track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.env.check_val_every_n_epoch,
+                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch,
             )
 
         with warnings.catch_warnings():

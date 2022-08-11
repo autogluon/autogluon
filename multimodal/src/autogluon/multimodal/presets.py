@@ -58,12 +58,11 @@ def few_shot():
         "model.t_few.gradient_checkpointing": True,
         "optimization.efficient_finetune": "lora_bias",
         "optimization.max_steps": 1000,  # Find better solution to train for long
-        "optimization.patience": 1000,
+        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
+        "optimization.val_check_interval": 1.0,
+        "optimization.top_k": 1,
         "env.batch_size": 8,
         "env.precision": "bf16",
-        "optimization.tok_k": 1,
-        "env.val_check_interval": 1.0,
-        "env.check_val_every_n_epoch": 10, # Might need adjustment
     }
 
 
