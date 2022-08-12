@@ -70,11 +70,11 @@ def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> 
 class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     """Slide window from the end of each series to generate validation series.
 
-    The first valdation series contains the entire series (i.e. the last `prediction_length` elements are used for
-    computing the validation score). The end of each following validation series is moved `prediction_length - overlap`
-    steps to the left.
+    The first valdation series contains the entire series (i.e. the last ``prediction_length`` elements are used for
+    computing the validation score). The end of each following validation series is moved
+    ``prediction_length - overlap`` steps to the left.
 
-    The validation set has up to `self.num_windows` as many items as the input dataset (can have fewer items if some
+    The validation set has up to ``self.num_windows`` as many items as the input dataset (can have fewer items if some
     training series are too short to split into `self.num_windows` many windows).
 
     Example: input_series = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], prediction_length = 3, overlap = 1, num_windows = 2
