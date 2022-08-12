@@ -37,6 +37,7 @@ from .constants import (
     CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
+    DEPRECATED_ZERO_SHOT,
     FEATURE_EXTRACTION,
     FEATURES,
     GREEDY_SOUP,
@@ -223,9 +224,18 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if pipeline is not None:
+        if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
+            warnings.warn(
+                f'problem_type="{problem_type}" is deprecated. For inference with CLIP model, '
+                f'use pipeline="zero_shot_image_classification" instead.',
+                DeprecationWarning,
+            )
+            self._problem_type = None
+            self._pipeline = ZERO_SHOT_IMAGE_CLASSIFICATION
+
+        if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
-                pipeline=pipeline, hyperparameters=hyperparameters
+                pipeline=self._pipeline, hyperparameters=hyperparameters
             )
 
     @property
