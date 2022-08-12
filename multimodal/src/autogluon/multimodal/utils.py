@@ -38,11 +38,12 @@ from .constants import (
     CATEGORICAL,
     CATEGORICAL_MLP,
     CATEGORICAL_TRANSFORMER,
-    T_FEW,
     CLIP,
     COLUMN_FEATURES,
+    DEFAULT_SHOT,
     F1,
     FEATURES,
+    FEW_SHOT,
     FUSION_MLP,
     FUSION_TRANSFORMER,
     HF_TEXT,
@@ -61,6 +62,7 @@ from .constants import (
     RMSE,
     ROC_AUC,
     S3_PREFIX,
+    T_FEW,
     TEXT,
     TIMM_IMAGE,
     VALID_CONFIG_KEYS,
@@ -69,8 +71,6 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT,
-    FEW_SHOT,
-    DEFAULT_SHOT,
 )
 from .data import (
     CategoricalProcessor,
@@ -90,10 +90,10 @@ from .models import (
     MultimodalFusionTransformer,
     NumericalMLP,
     NumericalTransformer,
-    TimmAutoModelForImagePrediction,
     TFewModel,
+    TimmAutoModelForImagePrediction,
 )
-from .models.utils import inject_lora_to_linear_layer, inject_ia3_to_linear_layer
+from .models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)

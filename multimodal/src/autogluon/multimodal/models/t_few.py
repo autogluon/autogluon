@@ -1,12 +1,12 @@
 import logging
+import random
 from typing import List, Optional, Tuple
 
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 from transformers import AutoModel, AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers import logging as hf_logging
-import random
 
 from ..constants import (
     AUTOMM,
@@ -14,17 +14,15 @@ from ..constants import (
     COLUMN_FEATURES,
     FEATURES,
     LABEL,
-    TEMPLATE_LOGITS,
+    LM_TARGET,
+    LOGITS,
     MASKS,
+    TEMPLATE_LOGITS,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
-    LM_TARGET,
-    LOGITS,
 )
 from .utils import assign_layer_ids, get_column_features
-
-import json
 
 hf_logging.set_verbosity_error()
 
@@ -170,7 +168,7 @@ class TFewModel(nn.Module):
 
         bs = text_token_ids.size(0)
         # Sample uniformly target template descriptions from collection of descriptions
-        # TODO: Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
+        # FIXME(?) Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
         selected_label_templates = [random.choice(y) for x, y in self.label_templates_inverse.items()][
             : self.num_classes
         ]
@@ -180,10 +178,6 @@ class TFewModel(nn.Module):
         choices_ids = choices_ids.unsqueeze(0).repeat(text_token_ids.size(0), 1, 1)
         flat_choices_ids = choices_ids.flatten(0, 1)
         num_choices = len(selected_label_templates)
-
-        # print(selected_label_templates)
-        # print(batch[self.label_key])
-        # print(self.tokenizer.batch_decode(text_token_ids))
 
         if self.disable_seg_ids:
             text_segment_ids = None
@@ -235,7 +229,7 @@ class TFewModel(nn.Module):
         choices_scores = -choices_scores
 
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
-        #  Not sure having column features with the decoder vocabulary logits in T-Few makes sense
+        #  FIXME(?) Not sure having column features with the decoder vocabulary logits in T-Few makes sense
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,

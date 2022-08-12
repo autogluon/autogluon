@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 from torch import nn
 
-from .adaptation_layers import LoRALinear, IA3Linear
+from .adaptation_layers import IA3Linear, LoRALinear
 
 
 def init_weights(module: nn.Module):

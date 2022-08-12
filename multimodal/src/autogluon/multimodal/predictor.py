@@ -38,6 +38,7 @@ from .constants import (
     COLUMN_FEATURES,
     DATA,
     FEATURES,
+    FEW_SHOT,
     GREEDY_SOUP,
     LABEL,
     LAST_CHECKPOINT,
@@ -58,8 +59,6 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT,
-    FEW_SHOT,
-    T_FEW,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -90,6 +89,7 @@ from .utils import (
     get_mixup,
     infer_dtypes_by_model_names,
     infer_metrics,
+    infer_scarcity_mode_by_data_size,
     init_data_processors,
     init_df_preprocessor,
     init_zero_shot,
@@ -105,7 +105,6 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
-    infer_scarcity_mode_by_data_size,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1140,8 +1139,9 @@ class MultiModalPredictor:
                 fast_dev_run=config.env.fast_dev_run,
                 track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch,
-                num_sanity_val_steps=-1,
+                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
+                if hasattr(config.optimization, "check_val_every_n_epoch")
+                else 1,
             )
 
         with warnings.catch_warnings():
