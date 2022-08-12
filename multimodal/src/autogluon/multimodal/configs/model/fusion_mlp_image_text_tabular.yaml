@@ -76,7 +76,7 @@ model:
       # - "insert_punc(0.05)"
   t_few:
     checkpoint_name: "bigscience/T0_3B"
-    gradient_checkpointing: True
+    gradient_checkpointing: False
     label_templates: {} # Dictionary mapping target prompts to class
     data_types:
       - "text"
