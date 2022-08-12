@@ -313,9 +313,9 @@ class TimeSeriesPredictor:
         if tuning_data is None:
             logger.warning(
                 "Validation data is None. "
-                + self._splitter.describe_validation_strategy(prediction_length=self.prediction_length)
+                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
             )
-            train_data, tuning_data = self._splitter.split(
+            train_data, tuning_data = self.validation_splitter.split(
                 ts_dataframe=train_data, prediction_length=self.prediction_length
             )
 
