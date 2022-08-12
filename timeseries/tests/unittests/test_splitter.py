@@ -8,7 +8,7 @@ import pytest
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
+from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter, append_suffix_to_item_id
 
 SPLITTERS = [
     LastWindowSplitter(),
@@ -46,7 +46,7 @@ def get_original_item_id_and_slice(tuning_item_id: str):
 
 @pytest.mark.parametrize("item_id_to_length", ({"A": 22, "B": 50, "C": 10}, {"A": 23}))
 @pytest.mark.parametrize("prediction_length, num_windows, overlap", [(5, 2, 0), (2, 5, 1), (8, 1, 0)])
-def test_when_sliding_window_splitter_splits_then_lengths_and_val_index_are_correct(
+def test_when_sliding_window_splitter_splits_then_train_lengths_are_correct(
     item_id_to_length, prediction_length, num_windows, overlap
 ):
     splitter = MultiWindowSplitter(num_windows=num_windows, overlap=overlap)
@@ -56,13 +56,22 @@ def test_when_sliding_window_splitter_splits_then_lengths_and_val_index_are_corr
     train_data, val_data = splitter.split(ts_dataframe=ts_dataframe, prediction_length=prediction_length)
     num_total_validation_steps = num_windows * (prediction_length - overlap) + overlap
 
-    # Training series are as long as expected
     for item_id in train_data.iter_items():
         new_length = len(train_data.loc[item_id])
         expected_length = original_lengths.loc[item_id] - num_total_validation_steps
         assert expected_length == new_length
 
-    # Validation series are as long as implied by their item_id
+
+@pytest.mark.parametrize("item_id_to_length", ({"A": 22, "B": 50, "C": 10}, {"A": 23}))
+@pytest.mark.parametrize("prediction_length, num_windows, overlap", [(5, 2, 0), (2, 5, 1), (8, 1, 0)])
+def test_when_sliding_window_splitter_splits_then_val_index_and_lengths_are_correct(
+    item_id_to_length, prediction_length, num_windows, overlap
+):
+    splitter = MultiWindowSplitter(num_windows=num_windows, overlap=overlap)
+    ts_dataframe = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
+
+    train_data, val_data = splitter.split(ts_dataframe=ts_dataframe, prediction_length=prediction_length)
+
     for new_item_id in val_data.iter_items():
         old_item_id, start, end = get_original_item_id_and_slice(new_item_id)
         new_length = len(val_data.loc[new_item_id])
@@ -102,3 +111,9 @@ def test_when_all_series_too_short_then_sliding_window_splitter_raises_exception
     with pytest.raises(ValueError):
         splitter.split(ts_dataframe=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, prediction_length=10)
         pytest.fail(f"{splitter.name} should raise ValueError since the training set is empty")
+
+
+def test_when_splitter_adds_suffix_to_index_then_data_is_not_copied():
+    ts_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
+    ts_df_with_suffix = append_suffix_to_item_id(ts_dataframe=ts_df, suffix="_[None:None]")
+    assert ts_df.values.base is ts_df_with_suffix.values.base

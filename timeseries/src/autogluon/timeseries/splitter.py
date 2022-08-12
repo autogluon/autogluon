@@ -16,12 +16,12 @@ class AbstractTimeSeriesSplitter:
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
         """Split each series in the input dataset into one train and potentially multiple validation series.
 
-        The `item_id` of each validation series is a string of format `f"{idx}_[{start}:{end}]". Here `idx` is
-        the `item_id` of the input series, and `start` and `end` correspond to the slice parameters used to generate
+        The ``item_id`` of each validation series is a string of format ``f"{idx}_[{start}:{end}]"``. Here ``idx`` is
+        the ``item_id`` of the input series, and ``start`` and ``end`` correspond to the slice parameters used to generate
         the validation series.
 
-        For example, the series `val_data.loc["0_[None:-10]"]` in the validation dataset can equivalently be
-        obtained as `ts_dataframe.loc[0][None:-10]`.
+        For example, the series ``val_data.loc["0_[None:-10]"]`` in the validation dataset can equivalently be
+        obtained as ``ts_dataframe.loc[0][None:-10]``.
 
         Parameters
         ----------
@@ -75,7 +75,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     ``prediction_length - overlap`` steps to the left.
 
     The validation set has up to ``self.num_windows`` as many items as the input dataset (can have fewer items if some
-    training series are too short to split into `self.num_windows` many windows).
+    training series are too short to split into ``self.num_windows`` many windows).
 
     Example: input_series = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], prediction_length = 3, overlap = 1, num_windows = 2
 
@@ -89,7 +89,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
 
     Parameters
     ----------
-    num_windows: int
+    num_windows: int, default = 3
         Number of windows to generate from each time series in the dataset.
     overlap: int, default = 0
         Number of steps shared between two consecutive validation windows. Can be used to increase the # of validation
@@ -145,7 +145,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
                       1970-01-08       8
     """
 
-    def __init__(self, num_windows: int, overlap: int = 0):
+    def __init__(self, num_windows: int = 3, overlap: int = 0):
         self.num_windows = num_windows
         self.overlap = overlap
 
