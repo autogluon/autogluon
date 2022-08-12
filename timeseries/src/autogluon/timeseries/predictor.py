@@ -41,12 +41,12 @@ class TimeSeriesPredictor:
 
     Parameters
     ----------
-    target: str, default = "target"
+    target : str, default = "target"
         Name of column that contains the target values to forecast (i.e., numeric observations of the
         time series). This column must contain numeric values, and missing target values
         should be in a pandas compatible format:
         https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html
-    eval_metric: str, default = None
+    eval_metric : str, default = None
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options include: "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss".
@@ -54,7 +54,7 @@ class TimeSeriesPredictor:
         If ``eval_metric is None``, it is set by default to "mean_wQuantileLoss".
         For more information about these options, see ``autogluon.timeseries.TimeSeriesEvaluator`` and GluonTS
         docs at https://ts.gluon.ai/api/gluonts/gluonts.evaluation.metrics.html
-    path: str, default = None
+    path : str, default = None
         Path to directory where models and intermediate outputs should be saved. If unspecified, a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` will be created in the working directory to store all models.
     verbosity : int, default = 2
@@ -63,11 +63,11 @@ class TimeSeriesPredictor:
         If using ``logging``, you can alternatively control amount of information printed via ``logger.setLevel(L)``,
         where ``L`` ranges from 0 to 50 (Note: higher values of ``L`` correspond to fewer print statements,
         opposite of verbosity levels).
-    prediction_length: int, default = 1
+    prediction_length : int, default = 1
         The forecast horizon, i.e., How many time points into the future forecasters should be trained to predict.
         For example, if time series contain daily observations, setting ``prediction_length=3`` will train
         models that predict up to 3 days in the future from the most recent observation.
-    quantile_levels: List[float], default = None
+    quantile_levels : List[float], default = None
         List of increasing decimals that specifies which quantiles should be estimated
         when making distributional forecasts. Can alternatively be provided with the keyword
         argument ``quantiles``. If ``None``, defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
@@ -77,34 +77,32 @@ class TimeSeriesPredictor:
     learner_type : AbstractLearner, default = TimeSeriesLearner
         A class which inherits from ``AbstractLearner``. The learner specifies the inner logic of the
         ``TimeSeriesPredictor``.
-    label: str
+    label : str
         Alias for :attr:`target`.
     learner_kwargs : dict, default = None
         Keyword arguments to send to the learner (for advanced users only). Options include ``trainer_type``, a
         class inheriting from ``AbstractTrainer`` which controls training of multiple models.
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
-    quantiles: List[float]
+    quantiles : List[float]
         Alias for :attr:`quantile_levels`.
-    ignore_time_index: bool, default = False
+    ignore_time_index : bool, default = False
         If True, AutoGluon-TimeSeries will ignore any date time indexes given in any dataset in train and test time,
         and replace any input data indexes with dummy timestamps in second frequency. In this case, sktime models
         will not activate any seasonality inference if not specified explicitly in ``hyperparameters``, and the
         forecast output time indexes will be arbitrary values.
-    validation_splitter: Union[str, AbstractTimeSeriesSplitter], default = "last_window"
+    validation_splitter : Union[str, AbstractTimeSeriesSplitter], default = "last_window"
         Strategy for splitting ``train_data`` into trainining and validation parts during
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`. If ``tuning_data`` is passed to
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
 
         - ``"last_window"`` - use last ``prediction_length`` time steps of each time series for validation.
-        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series
-            for validation.
-        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom
-            splitting strategy (for advanced users only).
+        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
+        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
 
 
     Attributes
     ----------
-    target: str
+    target : str
         Name of column in training/validation data that contains the target time-series value to be predicted. If
         not specified explicitly during :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, this will default to
         ``"target"``.
@@ -203,9 +201,9 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        train_data: TimeSeriesDataFrame
+        train_data : TimeSeriesDataFrame
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
-        tuning_data: TimeSeriesDataFrame, default = None
+        tuning_data : TimeSeriesDataFrame, default = None
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -214,11 +212,11 @@ class TimeSeriesPredictor:
             ``self.validation_splitter``. If ``tuning_data`` is provided, ``self.validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
-        time_limit: int, default = None
+        time_limit : int, default = None
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run for (wall-clock
             time in seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             run until all models have completed training.
-        presets: str, default = None
+        presets : str, default = None
             Optional preset configurations for various arguments in
             :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
 
@@ -236,7 +234,7 @@ class TimeSeriesPredictor:
             ``autogluon/timeseries/configs/presets_configs.py``. If not provided, user-provided values for other
             arguments (specifically, ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used (defaulting
             to their default values specified below).
-        hyperparameters: str or dict, default = "default"
+        hyperparameters : str or dict, default = "default"
             Determines the hyperparameters used by each model.
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
             "toy", or "toy_hpo", where "toy" settings correspond to models only intended for prototyping.
@@ -250,7 +248,7 @@ class TimeSeriesPredictor:
             hyperparameter-tuning is utilized). Any omitted hyperparameters not specified here will be set to default
             values which are given in``autogluon/timeseries/trainer/models/presets.py``. Specific hyperparameter
             choices for each of the recommended models can be found in the references.
-        hyperparameter_tune_kwargs: str or dict, default = None
+        hyperparameter_tune_kwargs : str or dict, default = None
             # TODO
 
         References
@@ -391,9 +389,9 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
+        data : TimeSeriesDataFrame
             Time series data to forecast with.
-        model: str, default=None
+        model : str, default=None
             Name of the model that you would like to use for forecasting. If None, it will by default use the
             best model from trainer.
         """
@@ -406,22 +404,22 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
+        data : TimeSeriesDataFrame
             The data to evaluate the best model on. The last ``prediction_length`` time steps of the
             data set, for each item, will be held out for prediction and forecast accuracy will be calculated
             on these time steps.
 
         Other Parameters
         ----------------
-        model: str, default=None
+        model : str, default=None
             Name of the model to predict with. If None, the best model during training (according to validation
             score) will be used for evaluation.
-        metric: str, default=None
+        metric : str, default=None
             Name of the evaluation metric to compute scores with. If None, defaults to ``self.eval_metric``
 
         Returns
         -------
-        score: float
+        score : float
             A forecast accuracy score, where higher values indicate better quality. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
         """
@@ -438,13 +436,13 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        path: str
+        path : str
             Path where the predictor was saved via
             :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
 
         Returns
         -------
-        predictor: TimeSeriesPredictor
+        predictor : TimeSeriesPredictor
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
@@ -494,7 +492,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
+        data : TimeSeriesDataFrame
             dataset used for additional evaluation. If None, the validation set used during training will
             be used.
         silent : bool, default = False
@@ -502,7 +500,7 @@ class TimeSeriesPredictor:
 
         Returns
         -------
-        leaderboard: pandas.DataFrame
+        leaderboard : pandas.DataFrame
             The leaderboard containing information on all models and in order of best model to worst in terms of
             validation performance.
         """
@@ -524,7 +522,7 @@ class TimeSeriesPredictor:
 
         Returns
         -------
-        summary_dict: Dict[str, Any]
+        summary_dict : Dict[str, Any]
             Dict containing various detailed information. We do not recommend directly printing this dict as it may
             be very large.
         """
