@@ -1633,7 +1633,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     return ret
 
 
-def init_zero_shot(
+def init_pretrained(
+    pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -1654,7 +1655,7 @@ def init_zero_shot(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    config = get_config(presets="zero_shot", overrides=hyperparameters)
+    config = get_config(presets=pipeline, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
