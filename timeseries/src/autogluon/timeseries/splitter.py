@@ -51,6 +51,9 @@ class AbstractTimeSeriesSplitter:
     def name(self):
         return self.__class__.__name__
 
+    def __repr__(self):
+        return f"{self.name}()"
+
 
 def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> TimeSeriesDataFrame:
     """Append a suffix to each item_id in a TimeSeriesDataFrame."""
@@ -64,7 +67,7 @@ def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> 
     return result
 
 
-class SlidingWindowSplitter(AbstractTimeSeriesSplitter):
+class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     """Slide window from the end of each series to generate validation series.
 
     The first valdation series contains the entire series (i.e. the last `prediction_length` elements are used for
@@ -182,7 +185,7 @@ class SlidingWindowSplitter(AbstractTimeSeriesSplitter):
         return train_data, pd.concat(validation_dataframes)
 
 
-class LastWindowSplitter(SlidingWindowSplitter):
+class LastWindowSplitter(MultiWindowSplitter):
     """Reserves the last prediction_length steps of each time series for validation."""
 
     def __init__(self):

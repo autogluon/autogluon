@@ -16,7 +16,7 @@ from autogluon.core.utils.savers import save_pkl
 from .configs import TIMESERIES_PRESETS_CONFIGS
 from .dataset import TimeSeriesDataFrame
 from .learner import AbstractLearner, TimeSeriesLearner
-from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
+from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindowSplitter
 from .trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
@@ -90,8 +90,16 @@ class TimeSeriesPredictor:
         and replace any input data indexes with dummy timestamps in second frequency. In this case, sktime models
         will not activate any seasonality inference if not specified explicitly in ``hyperparameters``, and the
         forecast output time indexes will be arbitrary values.
-    splitter: AbstractTimeSeriesSplitter, default = ``autogluon.timeseries.splitter.LastWindowSplitter()``
-        An object that splits the training TimeSeriesDataFrame into train and validation parts.
+    validation_splitter: Union[str, AbstractTimeSeriesSplitter], default = "last_window"
+        Strategy for splitting ``train_data`` into trainining and validation parts during
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`. If ``tuning_data`` is passed to
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
+
+        - ``"last_window"`` - use last ``prediction_length`` time steps of each time series for validation.
+        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series
+            for validation.
+        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom
+            splitting strategy (for advanced users only).
 
 
     Attributes
@@ -120,9 +128,7 @@ class TimeSeriesPredictor:
 
         self.ignore_time_index = kwargs.get("ignore_time_index", False)
         if target is not None and kwargs.get("label") is not None:
-            raise ValueError(
-                "Both `label` and `target` are specified. Please specify at most one of these. " "arguments."
-            )
+            raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
         self.target = target or kwargs.get("label", "target")
 
         self.prediction_length = prediction_length
@@ -145,7 +151,20 @@ class TimeSeriesPredictor:
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
         self._learner_type = type(self._learner)
-        self._splitter: AbstractTimeSeriesSplitter = kwargs.pop("splitter", LastWindowSplitter())
+        validation_splitter = kwargs.pop("validation_splitter", "last_window")
+        if validation_splitter == "last_window":
+            splitter = LastWindowSplitter()
+        elif validation_splitter == "multi_window":
+            splitter = MultiWindowSplitter()
+        elif isinstance(validation_splitter, AbstractTimeSeriesSplitter):
+            splitter = validation_splitter
+        else:
+            raise ValueError(
+                f"`validation_splitter` must be one of 'last_window', 'multi_window', or an object of type "
+                f"`autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` "
+                f"(received {validation_splitter} of type {type(validation_splitter)})."
+            )
+        self.validation_splitter: AbstractTimeSeriesSplitter = splitter
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
@@ -185,11 +204,16 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         train_data: TimeSeriesDataFrame
-            Training data in the :class:``~autogluon.timeseries.TimeSeriesDataFrame`` format.
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
         tuning_data: TimeSeriesDataFrame, default = None
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
-            used to compute the validation scores. If ``None``, AutoGluon will use a ``TimeSeriesSplitter`` to split
-            ``train_data`` into training and tuning subsets.
+            used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
+            time series are used for computing the validation score.
+
+            If ``None``, AutoGluon will split :attr:`train_data` into training and tuning subsets using
+            ``self.validation_splitter``. If ``tuning_data`` is provided, ``self.validation_splitter`` will be ignored.
+            See the description of ``validation_splitter`` in the docstring for
+            :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
         time_limit: int, default = None
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run for (wall-clock
             time in seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will

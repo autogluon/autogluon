@@ -8,12 +8,12 @@ import pytest
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.splitter import LastWindowSplitter, SlidingWindowSplitter
+from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
 SPLITTERS = [
     LastWindowSplitter(),
-    SlidingWindowSplitter(num_windows=2, overlap=0),
-    SlidingWindowSplitter(num_windows=5, overlap=2),
+    MultiWindowSplitter(num_windows=2, overlap=0),
+    MultiWindowSplitter(num_windows=5, overlap=2),
 ]
 
 
@@ -49,7 +49,7 @@ def get_original_item_id_and_slice(tuning_item_id: str):
 def test_when_sliding_window_splitter_splits_then_lengths_and_val_index_are_correct(
     item_id_to_length, prediction_length, num_windows, overlap
 ):
-    splitter = SlidingWindowSplitter(num_windows=num_windows, overlap=overlap)
+    splitter = MultiWindowSplitter(num_windows=num_windows, overlap=overlap)
     ts_dataframe = get_data_frame_with_variable_lengths(item_id_to_length=item_id_to_length)
     original_lengths = ts_dataframe.index.get_level_values(0).value_counts(sort=False)
 
@@ -98,7 +98,7 @@ def test_when_some_series_too_short_then_warning_is_raised(splitter, caplog):
 
 
 def test_when_all_series_too_short_then_sliding_window_splitter_raises_exception():
-    splitter = SlidingWindowSplitter(num_windows=5, overlap=0)
+    splitter = MultiWindowSplitter(num_windows=5, overlap=0)
     with pytest.raises(ValueError):
         splitter.split(ts_dataframe=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, prediction_length=10)
         pytest.fail(f"{splitter.name} should raise ValueError since the training set is empty")

@@ -676,3 +676,25 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
     view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
     assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
+
+
+SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
+    [
+        {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
+        {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-02"), "target": 3.5},
+        {ITEMID: "a", TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
+        {ITEMID: "a", TIMESTAMP: pd.Timestamp("2020-01-02"), "target": 3.5},
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "input_df",
+    [
+        SAMPLE_DATAFRAME_WITH_MIXED_INDEX,
+        SAMPLE_DATAFRAME_WITH_MIXED_INDEX.set_index([ITEMID, TIMESTAMP]),
+    ],
+)
+def test_when_item_id_index_has_mixed_dtype_then_value_error_is_raied(input_df):
+    with pytest.raises(ValueError, match="must be of integer or string dtype"):
+        TimeSeriesDataFrame(input_df)
