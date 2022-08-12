@@ -392,7 +392,11 @@ def get_column_features(
     return column_features, feature_masks
 
 
-def inject_ia3_to_linear_layer(model: nn.Module, filter: Optional[List[str]] = None) -> nn.Module:
+def inject_ia3_to_linear_layer(
+    model: nn.Module,
+    adaptation_to_modules: Optional[List[str]] = None,
+    adaptation_to_layers: Optional[List[str]] = None,
+) -> nn.Module:
     """
     Injects trainable adapters that inihibit and amplify activations, called (IA)^3.
     Used for efficient fine-tuning of large pre-trained models.
@@ -401,28 +405,41 @@ def inject_ia3_to_linear_layer(model: nn.Module, filter: Optional[List[str]] = N
     ----------
     model
         A PyTorch model.
-    filter
+    adaptation_to_modules
+        Apply (IA)^3 only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
+        If None, (IA)^3 is considered for all modules
+    adaptation_to_layers
         Apply (IA)^3 only to linear layers filtered by name.
-        If None, (IA)^3 is applied to all linear Layers in Model.
+        If None, (IA)^3 is applied to all linear Layers in module.
     Returns
     -------
-    Model with injected LoRA modules.
+    Model with injected (IA)3 modules.
     """
-    for n, module in model.named_children():
-        if len(list(module.children())) > 0:
-            inject_ia3_to_linear_layer(module, filter)  # algorithm is in-place
-
-        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
-            lora_layer = IA3Linear(module.in_features, module.out_features)
-            lora_layer.weight = module.weight
-            lora_layer.bias = module.bias
-            setattr(model, n, lora_layer)
+    for m_name, module in dict(model.named_modules()).items():
+        if not adaptation_to_modules or any(
+            re.match(filter_module, m_name) for filter_module in adaptation_to_modules
+        ):
+            for c_name, layer in dict(module.named_children()).items():
+                if not adaptation_to_layers or any(
+                    re.match(filter_layer, c_name) for filter_layer in adaptation_to_layers
+                ):
+                    assert isinstance(
+                        layer, nn.Linear
+                    ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    lora_layer = IA3Linear(layer.in_features, layer.out_features)
+                    lora_layer.weight = layer.weight
+                    lora_layer.bias = layer.bias
+                    setattr(module, c_name, lora_layer)
 
     return model  # return model to enable method chaining
 
 
 def inject_lora_to_linear_layer(
-    model: nn.Module, lora_r: int, lora_alpha: int, filter: Optional[List[str]] = None
+    model: nn.Module,
+    lora_r: int,
+    lora_alpha: int,
+    adaptation_to_modules: Optional[List[str]] = None,
+    adaptation_to_layers: Optional[List[str]] = None,
 ) -> nn.Module:
     """
     Injects trainable Low-Rank decomposition matrices (LoRA) into linear
@@ -438,24 +455,33 @@ def inject_lora_to_linear_layer(
     lora_alpha
         The scaling factor. Can be set to same value as r in
         most cases, as initialization is scaled already.
-    filter
-        Apply LoRa only to linear layers filtered by name.
-        If None, LoRA is applied to all linear Layers in Model.
+    adaptation_to_modules
+        Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
+        If None, loRA is considered for all modules
+    adaptation_to_layers
+        Apply loRA only to linear layers filtered by name (e.g. "query.").
+        If None, loRA is applied to all linear Layers in module.
     Returns
     -------
     Model with injected LoRA modules.
     """
-    for n, module in model.named_children():
-        if len(list(module.children())) > 0:
-            inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
-
-        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
-            lora_layer = LoRALinear(
-                module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
-            )
-            lora_layer.weight = module.weight
-            lora_layer.bias = module.bias
-            setattr(model, n, lora_layer)
+    for m_name, module in dict(model.named_modules()).items():
+        if not adaptation_to_modules or any(
+            re.match(filter_module, m_name) for filter_module in adaptation_to_modules
+        ):
+            for c_name, layer in dict(module.named_children()).items():
+                if not adaptation_to_layers or any(
+                    re.match(filter_layer, c_name) for filter_layer in adaptation_to_layers
+                ):
+                    assert isinstance(
+                        layer, nn.Linear
+                    ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    lora_layer = LoRALinear(
+                        module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
+                    )
+                    lora_layer.weight = module.weight
+                    lora_layer.bias = module.bias
+                    setattr(module, c_name, lora_layer)
 
     return model  # return model to enable method chaining
 

@@ -390,6 +390,7 @@ class MatcherLitModule(pl.LightningModule):
             grouped_parameters = apply_layerwise_lr_decay(
                 lr_decay=self.hparams.lr_decay,
                 efficient_finetune=self.hparams.efficient_finetune,
+                trainable_param_names=self.hparams.trainable_param_names,
                 **kwargs,
             )
         else:

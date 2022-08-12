@@ -99,8 +99,8 @@ class TFewModel(nn.Module):
         self.gradient_checkpointing = gradient_checkpointing
         if gradient_checkpointing:
             self.model.gradient_checkpointing_enable()
+            self.dummy_layer = DummyLayer()
 
-        self.dummy_layer = DummyLayer()
         self.prefix = prefix
 
         if len(label_templates) == 0:

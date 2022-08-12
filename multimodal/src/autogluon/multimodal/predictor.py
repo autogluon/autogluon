@@ -999,6 +999,7 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                trainable_param_names=config.optimization.trainable_param_names,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1140,6 +1141,7 @@ class MultiModalPredictor:
                 track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
                 check_val_every_n_epoch=config.optimization.check_val_every_n_epoch,
+                num_sanity_val_steps=-1,
             )
 
         with warnings.catch_warnings():

@@ -869,12 +869,14 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
             model=model,
             lora_r=config.optimization.lora.r,
             lora_alpha=config.optimization.lora.alpha,
-            filter=config.optimization.lora.filter,
+            adaptation_to_modules=config.optimization.lora.adaptation_to_modules,
+            adaptation_to_layers=config.optimization.lora.adaptation_to_layers,
         )
     elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
         model = inject_ia3_to_linear_layer(
             model=model,
-            filter=config.optimization.lora.filter,
+            adaptation_to_modules=config.optimization.lora.adaptation_to_modules,
+            adaptation_to_layers=config.optimization.lora.adaptation_to_layers,
         )
 
     model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.

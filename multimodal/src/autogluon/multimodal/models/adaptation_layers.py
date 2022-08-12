@@ -85,7 +85,7 @@ class IA3Linear(nn.Linear, LoRALayer):
         **kwargs,
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
-        LoRALayer.__init__(self, r=8, lora_alpha=8, lora_dropout=0.0, merge_weights=True)  # Default arguments, only
+        LoRALayer.__init__(self, r=4, lora_alpha=4, lora_dropout=0.0, merge_weights=True)  # Default arguments, only
         # In essence the $b$ parameter of LoRA.
         self.lora_b = nn.Parameter(torch.ones(out_features, 1))
         self.weight.requires_grad = False
