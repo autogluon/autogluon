@@ -10,6 +10,7 @@ CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
+DEPRECATED_ZERO_SHOT = "zero_shot"
 
 # Pipelines
 FEATURE_EXTRACTION = "feature_extraction"
