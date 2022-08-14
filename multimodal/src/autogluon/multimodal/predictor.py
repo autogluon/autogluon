@@ -1603,8 +1603,8 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
         
-        if self._problem_type == "object_detection":
-            ret_type = "bbx"
+        if self._pipeline == OBJECT_DETECTION:
+            ret_type = "bbox"
 
         if candidate_data:
             pred = self._match_queries_and_candidates(

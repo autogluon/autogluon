@@ -11,7 +11,6 @@ from mmdet.core import get_classes
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_model_head
-# from ..utils import download
 
 logger = logging.getLogger(AUTOMM)
 
@@ -102,7 +101,7 @@ class MMdetAutoModelForObjectDetection(nn.Module):
 
         Returns
         -------
-            A dictionary with logits and features.
+            A dictionary with bounding boxes.
         """
         data = batch[self.image_key]
         data['img_metas'] = [img_metas.data[0] for img_metas in data['img_metas']]
@@ -110,7 +109,7 @@ class MMdetAutoModelForObjectDetection(nn.Module):
         with torch.no_grad():
             results = self.model(return_loss=False, rescale=True, **data)
 
-        ret = {"bbx": results}
+        ret = {"bbox": results}
         return {self.prefix: ret}
 
     def get_layer_ids(
