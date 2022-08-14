@@ -33,7 +33,6 @@ from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, 
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
-# from ..utils import download
 
 logger = logging.getLogger(AUTOMM)
 
@@ -107,8 +106,14 @@ class ImageProcessor:
         self.mean = None
         self.std = None
 
+        if self.prefix == "mmdet_image":
+            # TODO: can we pass the config information here when we build the model?
+            cfg = self.checkpoint_name + '.py'
+            if isinstance(cfg, str):
+                cfg = mmcv.Config.fromfile(cfg)    
+
         if checkpoint_name is not None:
-            self.size, self.mean, self.std = self.extract_default(checkpoint_name)
+            self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -133,12 +138,7 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.task_type = "detection"
-        if self.task_type == "detection":
-            # TODO: change after fix in mmdet_image
-            cfg = 'yolov3_mobilenetv2_320_300e_coco.py'
-            if isinstance(cfg, str):
-                cfg = mmcv.Config.fromfile(cfg)
+        if self.prefix == "mmdet_image":
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
             self.val_processor = Compose(cfg.data.test.pipeline)
             self.train_processor = Compose(cfg.data.test.pipeline)
@@ -175,7 +175,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.task_type == "detection":
+        if self.prefix == "mmdet_image":
             fn.update(
             {
                 self.image_key: collate,
@@ -215,7 +215,7 @@ class ImageProcessor:
             raise ValueError(f"unknown image normalization: {norm_type}")
 
     @staticmethod
-    def extract_default(checkpoint_name):
+    def extract_default(checkpoint_name, cfg=None):
         """
         Extract some default hyper-parameters, e.g., image size, mean, and std,
         from a pre-trained (timm or huggingface) checkpoint.
@@ -261,16 +261,10 @@ class ImageProcessor:
                 mean = None
                 std = None
             except Exception as exp2:
-                try:
-                    # config_url = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/master/configs/yolo/yolov3_mobilenetv2_320_300e_coco.py'
-                    # config = download(config_url)
-                    # TODO: change after fix in mmdet_image
-                    config = 'yolov3_mobilenetv2_320_300e_coco.py'
-                    if isinstance(config, str):
-                        config = mmcv.Config.fromfile(config)
-                    image_size = config.test_pipeline[1]['img_scale'][0]
-                    mean = config.test_pipeline[1]['transforms'][2]['mean']
-                    std = config.test_pipeline[1]['transforms'][2]['std']
+                try:  # mmdetection checkpoint
+                    image_size = cfg.test_pipeline[1]['img_scale'][0]
+                    mean = cfg.test_pipeline[1]['transforms'][2]['mean']
+                    std = cfg.test_pipeline[1]['transforms'][2]['std']
                 except Exception as exp3:
                     raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp3
 
@@ -372,7 +366,7 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.task_type == "detection":
+                if self.prefix == "mmdet_image":
                     data = dict(img_info=dict(filename=img_path), img_prefix=None)
                     images.append(self.val_processor(data))
                 else:
@@ -410,7 +404,7 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-        if self.task_type == "detection":
+        if self.prefix == "mmdet_image":
             ret.update(
             {
                 self.image_key: images[0]

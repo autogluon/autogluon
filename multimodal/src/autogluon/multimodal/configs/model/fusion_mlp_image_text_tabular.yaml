@@ -93,7 +93,7 @@ model:
     max_img_num_per_col: 2
 
   mmdet_image:
-    checkpoint_name: "faster_rcnn_r50_fpn_1x_coco"
+    checkpoint_name: "yolov3_mobilenetv2_320_300e_coco"
     data_types:
       - "image"
     train_transform_types:

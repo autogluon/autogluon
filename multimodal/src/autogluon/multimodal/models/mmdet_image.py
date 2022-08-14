@@ -8,6 +8,7 @@ import mmcv
 from mmcv.runner import load_checkpoint
 import warnings
 from mmdet.core import get_classes
+from mim.commands.download import download
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_model_head
@@ -46,15 +47,18 @@ class MMdetAutoModelForObjectDetection(nn.Module):
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
-        # TODO: model name to config
-        # config = get_mmdet_model_config(checkpoint_name)
-        # config_url = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/master/configs/yolo/yolov3_mobilenetv2_320_300e_coco.py'
-        # config_file = download(config_url)
-        config_file = "yolov3_mobilenetv2_320_300e_coco.py"
+
+        # download config and checkpoint files using openmim
+        checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
+        
+        # read config files
+        config_file = checkpoint_name + '.py'
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
+
+        # build model and load pretrained weights
         self.model = build_detector(self.config.model, test_cfg=self.config.get('test_cfg'))
-        checkpoint = 'yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth'
+        checkpoint = checkpoints[0]
         if checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location='cpu')
         if 'CLASSES' in checkpoint.get('meta', {}):
