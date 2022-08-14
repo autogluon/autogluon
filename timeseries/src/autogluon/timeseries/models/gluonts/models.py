@@ -8,6 +8,7 @@ from autogluon.core.utils import warning_filter
 from ..abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
+    import gluonts.model.deepar
     from gluonts.model.deepar import DeepAREstimator
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
     from gluonts.model.prophet import ProphetPredictor
@@ -18,6 +19,35 @@ with warning_filter():
     from gluonts.nursery.autogluon_tabular import TabularEstimator
 
 from .abstract_gluonts import AbstractGluonTSModel
+
+
+# HACK: DeepAR currently raises an exception when it finds a frequency it doesn't like.
+#  we monkey-patch the get_lags and features functions here to return a default
+#  instead of failing. We can remove this after porting to pytorch + patching GluonTS
+def get_lags_for_frequency_safe(*args, **kwargs):
+    from gluonts.time_feature import get_lags_for_frequency
+
+    try:
+        return get_lags_for_frequency(*args, **kwargs)
+    except Exception as e:
+        if "invalid frequency" not in str(e):
+            raise
+        return get_lags_for_frequency(freq_str="A")
+
+
+def time_features_from_frequency_str_safe(*args, **kwargs):
+    from gluonts.time_feature import time_features_from_frequency_str
+
+    try:
+        return time_features_from_frequency_str(*args, **kwargs)
+    except Exception as e:
+        if "Unsupported frequency" not in str(e):
+            raise
+        return []
+
+
+gluonts.model.deepar._estimator.get_lags_for_frequency = get_lags_for_frequency_safe
+gluonts.model.deepar._estimator.time_features_from_frequency_str = time_features_from_frequency_str_safe
 
 
 class DeepARModel(AbstractGluonTSModel):

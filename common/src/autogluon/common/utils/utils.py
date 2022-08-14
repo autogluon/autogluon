@@ -1,3 +1,4 @@
+from pathlib import Path
 from datetime import datetime
 
 import logging
@@ -7,6 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
+    if path:
+        assert isinstance(path, (str, Path)), \
+            f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
     if path_suffix is None:
         path_suffix = ''
     if path_suffix and path_suffix[-1] == os.path.sep:

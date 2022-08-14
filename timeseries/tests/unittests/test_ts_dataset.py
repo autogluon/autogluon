@@ -10,7 +10,12 @@ import pandas as pd
 import pytest
 from gluonts.dataset.common import ListDataset
 
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import (
+    IRREGULAR_TIME_INDEX_FREQSTR,
+    ITEMID,
+    TIMESTAMP,
+    TimeSeriesDataFrame,
+)
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")  # type: ignore
@@ -268,40 +273,77 @@ def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferre
     assert ts_df.freq == freq
 
 
-@pytest.mark.skip("Skipped until re-enabling regularity check.")
-@pytest.mark.parametrize(
-    "list_of_timestamps",
+@pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
+def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_cached_freq_is_persisted(
+    start_time, freq
+):
+    item_list = ListDataset(
+        [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        freq=freq,
+    )
+
+    ts_df = TimeSeriesDataFrame(item_list)
+
+    assert ts_df.freq == freq  # call freq once to cache
+
+    with tempfile.TemporaryDirectory() as td:
+        pkl_filename = Path(td) / "temp_pickle.pkl"
+        ts_df.to_pickle(str(pkl_filename))
+
+        read_df = TimeSeriesDataFrame.from_pickle(pkl_filename)
+
+    assert ts_df._cached_freq == freq == read_df._cached_freq
+
+
+IRREGULAR_TIME_INDEXES = [
     [
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
-        ],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
     ],
-)
-def test_when_dataset_constructed_with_irregular_timestamps_then_constructor_raises(
-    list_of_timestamps,
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:01"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
+    ],
+]
+
+
+@pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)
+def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_returns_none(
+    irregular_index,
 ):
     df_tuples = []
-    for i, ts in enumerate(list_of_timestamps):
+    for i, ts in enumerate(irregular_index):
         for t in ts:
             df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
 
     df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
 
-    with pytest.raises(ValueError, match="uniformly sampled"):
-        TimeSeriesDataFrame.from_data_frame(df)
+    tsdf = TimeSeriesDataFrame.from_data_frame(df)
+    assert tsdf.freq is None
+
+
+@pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)
+def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_caches_irreg_freqstr(
+    irregular_index,
+):
+    df_tuples = []
+    for i, ts in enumerate(irregular_index):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+
+    df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
+
+    tsdf = TimeSeriesDataFrame.from_data_frame(df)
+    _ = tsdf.freq
+    assert tsdf._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR
 
 
 SAMPLE_ITERABLE_2 = [
@@ -393,6 +435,25 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
     assert isinstance(dfv, TimeSeriesDataFrame)
 
     assert all(ixval[1] == pd.Timestamp(expected_times[i]) for i, ixval in enumerate(dfv.index.values))  # type: ignore
+
+
+@pytest.mark.parametrize(
+    "input_iterable, input_slice",
+    [
+        (SAMPLE_ITERABLE, slice(None, 2)),
+        (SAMPLE_ITERABLE, slice(1, 2)),
+        (SAMPLE_ITERABLE_2, slice(None, 2)),
+        (SAMPLE_ITERABLE_2, slice(-2, None)),
+        (SAMPLE_ITERABLE_2, slice(-1000, 2)),
+    ],
+)
+def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input_iterable, input_slice):
+    df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
+    new_idx = df._item_index[::-1]
+    df.index = df.index.set_levels(new_idx, level=ITEMID)
+    dfv = df.slice_by_timestep(input_slice)
+
+    assert dfv._item_index.equals(new_idx)
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -610,3 +671,30 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 
     assert set(left.static_features.index) == set(left_index)
     assert set(right.static_features.index) == set(right_index)
+
+
+def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
+    view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
+    assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
+
+
+SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
+    [
+        {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
+        {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-02"), "target": 3.5},
+        {ITEMID: "a", TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
+        {ITEMID: "a", TIMESTAMP: pd.Timestamp("2020-01-02"), "target": 3.5},
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "input_df",
+    [
+        SAMPLE_DATAFRAME_WITH_MIXED_INDEX,
+        SAMPLE_DATAFRAME_WITH_MIXED_INDEX.set_index([ITEMID, TIMESTAMP]),
+    ],
+)
+def test_when_item_id_index_has_mixed_dtype_then_value_error_is_raied(input_df):
+    with pytest.raises(ValueError, match="must be of integer or string dtype"):
+        TimeSeriesDataFrame(input_df)

@@ -10,7 +10,11 @@ CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
-ZERO_SHOT = "zero_shot"
+DEPRECATED_ZERO_SHOT = "zero_shot"
+
+# Pipelines
+FEATURE_EXTRACTION = "feature_extraction"
+ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
 
 # Input keys

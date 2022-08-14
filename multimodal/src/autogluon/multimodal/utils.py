@@ -752,6 +752,7 @@ def create_model(
                 cls_token=True if len(names) == 1 else False,
                 embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
@@ -780,6 +781,7 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )
@@ -1639,8 +1641,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     return ret
 
 
-def init_zero_shot(
-    pipeline: str,
+def init_pretrained(
+    pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -1662,40 +1664,6 @@ def init_zero_shot(
         The data processors associated with the pre-trained model.
     """
     config = get_config(presets=pipeline, overrides=hyperparameters)
-    assert (
-        len(config.model.names) == 1
-    ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
-    model = create_model(config=config, pretrained=True)
-
-    data_processors = init_data_processors(
-        config=config,
-    )
-
-    return config, model, data_processors
-
-
-def init_object_detectin(
-    hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-):
-    """
-    Object detection initialization.
-
-    Parameters
-    ----------
-    hyperparameters
-        The customized hyperparameters used to override the default.
-        Users need to use it to choose one model, e.g., {"model.names": ["yolov3_mobilenetv2_320_300e_coco"]}.
-
-    Returns
-    -------
-    config
-        A DictConfig object containing the configurations for object detection.
-    model
-        The model with pre-trained weights.
-    data_processors
-        The data processors associated with the pre-trained model.
-    """
-    config = get_config(presets="zero_shot", overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"

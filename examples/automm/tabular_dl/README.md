@@ -1,28 +1,29 @@
 # Advanced Tabular DL models in AutoMM
 
-## 1. Tabular Data
 
-
-### 1.1 Example
+### 1. Run Example
 [`example_tabular.py`](./example_tabular.py) : This example provides a use case for the pure *tabular* data, including pure numerical features and numerical + categorical feartures, with FT_Transformer [1].
 
 To run the example: 
 
 ```python example_tabular.py --dataset_name ad --dataset_dir ./dataset --exp_dir ./result```
-   - `dataset_name` determines which dataset to run the experinments, refers to [Dataset Section](###1.2-Datasets).
+   - `dataset_name` determines which dataset to run the experinments, refers to [Dataset Section](###2.-Datasets).
    - `dataset_dir` is the path to the dataset(s). If the datasets do not present in this path, it will be automatically downloaded.
    - `exp_dir` is the output path to store the weights and loggings. 
-   - `seed` determines the random seed. Default is 0.
+   - `gpu_id` specifies the GPU to use (optional).
+   - `seed` determines the random seed (optional). Default is 0.
+   - `lr` specifies the inital learning rate (optional). Default is `1e-04`.
+   - `end_lr` specifies the end learning rate (optional). Default is `1e-04`.
 
 
-### 1.2 Datasets
+### 2. Datasets
 We borrowed 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in the original paper [1] to name each datasets. 
 The datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in  `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1). 
 These Data in `Numpy.ndarray` was first pre-processedin into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `MultiModalPredictor`. 
 All Data can be automatically downloaded from s3 (online connection is necessary) if it does not exisit with the given dataset path `dataset_dir`. 
 
 
-### 1.3 FT-Transformer
+### 3. FT-Transformer
 We categorize the original FT_Transformer to two models in `MultiModalPredictor`, namely `numerical_transformer` and `categorical transformer`, which depends on the modaility of input tabular data (i.e., numerical v.s. categorical). The two models share most of the common features:
    - `out_features` is the output feature size.
    - `d_token` is the dimension of the embedding tokens.
@@ -44,7 +45,7 @@ hyperparameters = {
 ```
 
 
-### 1.4 Results
+### 4. Results
 
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi 
 ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  
@@ -96,7 +97,7 @@ unzip tabular_example_result.zip
 to download the our results.
 
 
-### 1.5 Ablations on Numerical Embedding Architectures
+### 5. Ablations on Numerical Embedding Architectures
 
 We present ablations on `AutoMM FT-Transformer` with variours embedding architectures [2].
 
@@ -107,13 +108,43 @@ We can reproduce the following results by tuning `--embedding_arch` in `example_
 Datasets | ca | ad | he | ja | hi | al | ep | ye | co | ya | mi | Results
 ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----  | ----
 metrics | rmse | acc | acc | acc | acc | acc | acc | rmse | acc | rmse | rmse
-["linear" ] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip)
+["linear"] | 0.482 | 0.859 | 0.379 | 0.721 | 0.726 | 0.949 | RuntimeError | 8.891 | 0.963 | 0.769 | 0.761 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result.zip)
 ["linear", "relu"] | 0.477 | 0.859 | 0.370 | 0.721 | 0.726 | 0.951 | RuntimeError | 8.953 | 0.967 | 0.772 | 0.757 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result2.zip)
 ["linear", "leaky_relu"] | 0.473 | 0.858 | 0.370 | 0.722 | 0.725 | 0.947 | RuntimeError | 8.915 | 0.965 | 0.771 | 0.776 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result3.zip)
 ["linear", "relu", "linear"] | 0.468 | 0.858 | 0.374 | 0.721 | 0.723 | 0.951 | RuntimeError | 8.941 | 0.965 | 0.769\* | 0.770 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result4.zip)
 ["positional", "linear"] | 0.467 | 0.864 | 0.347 | 0.694 | 0.709 | 0.951 | RuntimeError | 9.120 | 0.967 | 0.773\* | 0.761 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result5.zip)
+["positional", "linear", "relu"] | 0.465 | 0.866 | 0.343 | 0.688 | 0.704 | 0.947 | RuntimeError | 9.131 | 0.967 | 0.774\* | 0.760 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result6.zip)
+["positional"] | 0.480 | 0.861 | 0.334 | 0.684 | 0.696 | 0.951 | RuntimeError | 9.189 | 0.967 | 0.774 | 0.765 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/tabular_example_result7.zip)
 
 \* denotes adjusting `env.per_gpu_batch_size` from `128` to `64` to support runing a larger model on our device.
+
+### 6. Hyper-parameter optimization for FT_Transformer
+Set `--mode` in [`example_tabular.py`](./example_tabular.py) to `single_hpo` to run the HPO for FTTransformer. 
+The search spaces for FT_transformer are as follws:
+- "model.fusion_transformer.ffn_dropout": tune.uniform(0.0, 0.5), 
+- "model.fusion_transformer.attention_dropout": tune.uniform(0.0, 0.5),
+- "model.fusion_transformer.residual_dropout": tune.uniform(0.0, 0.2),
+- "model.fusion_transformer.ffn_d_hidden": tune.randint(150, 300),
+- "model.numerical_transformer.ffn_d_hidden": tune.randint(150, 300)
+- "optimization.learning_rate": tune.uniform(0.00001, 0.001),
+
+with the tuning kwargs as follows:
+```python
+hyperparameter_tune_kwargs = {
+        "searcher": 'random',
+        "scheduler": 'FIFO',
+        "num_trials": 50,
+}
+```
+
+The results are as follws:
+Dataset (metric) | w/o HPO | w/ HPO | model_configs | results 
+----  | ----  | ----  | ----  | ----  
+ca (rmse) | 0.482 | 0.577 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ca_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ca_hpo_result.zip)
+he (acc) | 0.379 | 0.385 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/he_hpo_result.zip)
+ja (acc) | 0.721 | 0.729 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ja_hpo_result.zip)
+hi (acc) | 0.726 | 0.732 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/hi_hpo_result.zip)
+ad (acc) | 0.859 | 0.857 | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ad_hpo_config.yaml) | [link](https://autogluon.s3.us-west-2.amazonaws.com/results/tabular/hpo/ad_hpo_result.zip)
 
 ---
 
