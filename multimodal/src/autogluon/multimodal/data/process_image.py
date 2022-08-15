@@ -123,10 +123,13 @@ class ImageProcessor:
             except:
                 raise RuntimeError(
                     "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
-                )
+                )  
 
         if checkpoint_name is not None:
-            self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
+            if self.prefix == MMDET_IMAGE:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
+            else:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name)
         if self.size is None:
             if size is not None:
                 self.size = size
