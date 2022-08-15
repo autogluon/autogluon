@@ -569,6 +569,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
 
         if self.enable_ensemble:
+            models_available_for_ensemble = self.get_model_names()
             if time_limit is not None:
                 time_left_for_ensemble = time_limit - (time.time() - time_start)
                 if time_left_for_ensemble <= 0:
@@ -576,9 +577,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                         "Not fitting ensemble due to lack of time remaining. "
                         "Time left: {time_left_for_ensemble:.2f} seconds"
                     )
+            elif len(models_available_for_ensemble) <= 1:
+                logger.info(f"Not fitting ensemble as only {len(models_available_for_ensemble)} models were trained.")
             else:
                 try:
-                    model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=model_names_trained))
+                    model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=models_available_for_ensemble))
                 except Exception as e:  # noqa
                     logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
 

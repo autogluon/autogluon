@@ -71,7 +71,8 @@ def test_given_hyperparameters_when_learner_called_then_leaderboard_is_correct(
     learner = trained_learners[repr(hyperparameters)]
     leaderboard = learner.leaderboard()
 
-    expected_board_length += int(learner.load_trainer().enable_ensemble)
+    if learner.load_trainer().enable_ensemble and len(hyperparameters) > 1:
+        expected_board_length += 1
 
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
@@ -148,7 +149,8 @@ def test_given_hyperparameters_and_custom_models_when_learner_called_then_leader
     )
     leaderboard = learner.leaderboard()
 
-    expected_board_length += int(learner.load_trainer().enable_ensemble)
+    if learner.load_trainer().enable_ensemble and len(hyperparameters) > 1:
+        expected_board_length += 1
 
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative

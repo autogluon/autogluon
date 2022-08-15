@@ -8,6 +8,8 @@ import autogluon.core as ag
 from autogluon.core.models.greedy_ensemble.ensemble_selection import AbstractWeightedEnsemble, EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
     def __init__(
         self,
         ensemble_size: int,
-        metric,
+        metric: TimeSeriesEvaluator,
         problem_type: str = ag.constants.QUANTILE,
         sorted_initialization: bool = False,
         bagging: bool = False,
