@@ -49,7 +49,7 @@ install_requires = [
     "nlpaug>=1.1.10,<=1.1.10",
     "nltk>=3.4.5,<4.0.0",
     "openmim",
-    "mmcv-full",
+    "mmcv",
     "mmdet",
 ]
 
