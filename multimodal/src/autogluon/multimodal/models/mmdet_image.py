@@ -2,13 +2,21 @@ import logging
 import warnings
 from typing import Optional
 
-import mmcv
 import torch
 from mim.commands.download import download
-from mmcv.runner import load_checkpoint
-from mmdet.core import get_classes
-from mmdet.models import build_detector
 from torch import nn
+
+try:
+    import mmcv
+    from mmcv.runner import load_checkpoint
+except ImportError:
+    mmcv = None
+
+try:
+    from mmdet.core import get_classes
+    from mmdet.models import build_detector
+except ImportError:
+    mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_model_head
@@ -52,12 +60,19 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
 
         # read config files
-        config_file = checkpoint_name + ".py"
-        if isinstance(config_file, str):
-            self.config = mmcv.Config.fromfile(config_file)
+        try:
+            config_file = checkpoint_name + ".py"
+            if isinstance(config_file, str):
+                self.config = mmcv.Config.fromfile(config_file)
+        except:
+            raise RuntimeError("MMDetection requires MMCV dependency, please install mmcv-full by: mim install mmcv-full.")
 
         # build model and load pretrained weights
-        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+        try:
+            self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+        except:
+            raise RuntimeError("Please install MMDetection by: pip install mmdet.")
+
         checkpoint = checkpoints[0]
         if checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")

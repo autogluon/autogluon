@@ -49,8 +49,6 @@ install_requires = [
     "nlpaug>=1.1.10,<=1.1.10",
     "nltk>=3.4.5,<4.0.0",
     "openmim",
-    "mmcv",
-    "mmdet",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

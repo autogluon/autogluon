@@ -3,13 +3,9 @@ import logging
 import warnings
 from typing import Dict, List, Optional
 
-import mmcv
 import numpy as np
 import PIL
 import torch
-from mmcv.parallel import collate
-from mmdet.datasets import replace_ImageToTensor
-from mmdet.datasets.pipelines import Compose
 from timm import create_model
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -19,8 +15,19 @@ from timm.data.constants import (
 )
 from torchvision import transforms
 from transformers import AutoConfig
-
 from .randaug import RandAugment
+
+try:
+    import mmcv
+    from mmcv.parallel import collate
+except ImportError:
+    mmcv = None
+
+try:
+    from mmdet.datasets import replace_ImageToTensor
+    from mmdet.datasets.pipelines import Compose
+except ImportError:
+    mmdet = None
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -108,9 +115,12 @@ class ImageProcessor:
 
         if self.prefix == MMDET_IMAGE:
             # TODO: can we pass the config information here when we build the model?
-            cfg = self.checkpoint_name + ".py"
-            if isinstance(cfg, str):
-                cfg = mmcv.Config.fromfile(cfg)
+            try:
+                cfg = checkpoint_name + ".py"
+                if isinstance(cfg, str):
+                    cfg = mmcv.Config.fromfile(cfg)
+            except:
+                raise RuntimeError("MMDetection requires MMCV dependency, please install mmcv-full by: mim install mmcv-full.")
 
         if checkpoint_name is not None:
             self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
@@ -139,9 +149,12 @@ class ImageProcessor:
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         if self.prefix == MMDET_IMAGE:
-            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
-            self.val_processor = Compose(cfg.data.test.pipeline)
-            self.train_processor = Compose(cfg.data.test.pipeline)
+            try:
+                cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
+                self.val_processor = Compose(cfg.data.test.pipeline)
+                self.train_processor = Compose(cfg.data.test.pipeline)
+            except:
+                raise RuntimeError("Please install MMDetection by: pip install mmdet.")
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
@@ -176,11 +189,14 @@ class ImageProcessor:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
         if self.prefix == MMDET_IMAGE:
-            fn.update(
-                {
-                    self.image_key: collate,
-                }
-            )
+            try:
+                fn.update(
+                    {
+                        self.image_key: collate,
+                    }
+                )
+            except:
+                raise RuntimeError("MMDetection requires MMCV dependency, please install mmcv-full by: mim install mmcv-full.")
         else:
             fn.update(
                 {

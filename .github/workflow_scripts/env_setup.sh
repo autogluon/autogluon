@@ -56,6 +56,9 @@ function install_tabular_all {
 
 function install_multimodal {
     # launch different process for each test to make sure memory is released
+    python3 -m pip install --upgrade openmim
+    mim install mmcv-full
+    python3 -m pip install --upgrade mmdet
     python3 -m pip install --upgrade pytest-xdist
     python3 -m pip install --upgrade -e multimodal/[tests]
 }
