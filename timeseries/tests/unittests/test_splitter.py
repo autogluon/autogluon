@@ -23,13 +23,15 @@ def get_data_frame_with_variable_lengths(item_id_to_length: Dict[str, int]):
         for ts in pd.date_range(pd.Timestamp("2022-01-01"), periods=length):
             tuples.append((item_id, ts))
     index = pd.MultiIndex.from_tuples(tuples, names=[ITEMID, TIMESTAMP])
-    return TimeSeriesDataFrame(
+    df = TimeSeriesDataFrame(
         pd.DataFrame(
             index=index,
             data=[random.random() for _ in index],
             columns=["target"],
         )
     )
+    df.freq  # compute _cached_freq
+    return df
 
 
 DUMMY_VARIABLE_LENGTH_TS_DATAFRAME = get_data_frame_with_variable_lengths(
@@ -46,7 +48,7 @@ def get_original_item_id_and_slice(tuning_item_id: str):
 
 @pytest.mark.parametrize("item_id_to_length", ({"A": 22, "B": 50, "C": 10}, {"A": 23}))
 @pytest.mark.parametrize("prediction_length, num_windows, overlap", [(5, 2, 0), (2, 5, 1), (8, 1, 0)])
-def test_when_sliding_window_splitter_splits_then_train_lengths_are_correct(
+def test_when_multi_window_splitter_splits_then_train_lengths_are_correct(
     item_id_to_length, prediction_length, num_windows, overlap
 ):
     splitter = MultiWindowSplitter(num_windows=num_windows, overlap=overlap)
@@ -64,7 +66,7 @@ def test_when_sliding_window_splitter_splits_then_train_lengths_are_correct(
 
 @pytest.mark.parametrize("item_id_to_length", ({"A": 22, "B": 50, "C": 10}, {"A": 23}))
 @pytest.mark.parametrize("prediction_length, num_windows, overlap", [(5, 2, 0), (2, 5, 1), (8, 1, 0)])
-def test_when_sliding_window_splitter_splits_then_val_index_and_lengths_are_correct(
+def test_when_multi_window_splitter_splits_then_val_index_and_lengths_are_correct(
     item_id_to_length, prediction_length, num_windows, overlap
 ):
     splitter = MultiWindowSplitter(num_windows=num_windows, overlap=overlap)
@@ -97,6 +99,15 @@ def test_when_some_series_too_short_then_they_disappear_from_train_data(splitter
     should_be_present = original_lengths.index[original_lengths > num_total_validation_steps]
     for item_id in should_be_present:
         assert item_id in remaining_items
+
+
+@pytest.mark.parametrize("splitter", SPLITTERS)
+def test_when_multi_window_splitter_splits_then_cached_freq_is_preserved(splitter):
+    prediction_length = 10
+    train_data, val_data = splitter.split(
+        ts_dataframe=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, prediction_length=prediction_length
+    )
+    assert DUMMY_VARIABLE_LENGTH_TS_DATAFRAME._cached_freq == train_data._cached_freq == val_data._cached_freq
 
 
 @pytest.mark.parametrize("splitter", SPLITTERS)
