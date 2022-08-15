@@ -34,6 +34,7 @@ from .constants import (
     ALL_MODALITIES,
     AUTOMM,
     AVERAGE_PRECISION,
+    BBOX,
     BINARY,
     CATEGORICAL,
     CATEGORICAL_MLP,
@@ -51,6 +52,7 @@ from .constants import (
     LOGITS,
     MASKS,
     METRIC_MODE_MAP,
+    MMDET_IMAGE,
     MULTICLASS,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -67,8 +69,6 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    MMDET_IMAGE,
-    BBOX,
 )
 from .data import (
     CategoricalProcessor,
@@ -84,12 +84,12 @@ from .models import (
     CategoricalTransformer,
     CLIPForImageText,
     HFAutoModelForTextPrediction,
+    MMDetAutoModelForObjectDetection,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
     NumericalTransformer,
     TimmAutoModelForImagePrediction,
-    MMDetAutoModelForObjectDetection,
 )
 from .models.utils import inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config

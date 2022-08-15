@@ -3,9 +3,13 @@ import logging
 import warnings
 from typing import Dict, List, Optional
 
+import mmcv
 import numpy as np
 import PIL
 import torch
+from mmcv.parallel import collate
+from mmdet.datasets.pipelines import Compose
+from mmdet.datasets import replace_ImageToTensor
 from timm import create_model
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -15,10 +19,6 @@ from timm.data.constants import (
 )
 from torchvision import transforms
 from transformers import AutoConfig
-import mmcv
-from mmcv.parallel import collate
-from mmdet.datasets.pipelines import Compose
-from mmdet.datasets import replace_ImageToTensor
 
 from .randaug import RandAugment
 

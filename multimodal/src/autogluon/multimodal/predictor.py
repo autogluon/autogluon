@@ -31,6 +31,7 @@ from . import version as ag_version
 from .constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
+    BBOX,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
@@ -51,6 +52,7 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    OBJECT_DETECTION,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -59,9 +61,7 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    OBJECT_DETECTION,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
-    BBOX,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (

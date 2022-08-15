@@ -1,14 +1,14 @@
 import logging
+import warnings
 from typing import Optional
 
+import mmcv
 import torch
+from mim.commands.download import download
+from mmcv.runner import load_checkpoint
+from mmdet.core import get_classes
 from torch import nn
 from mmdet.models import build_detector
-import mmcv
-from mmcv.runner import load_checkpoint
-import warnings
-from mmdet.core import get_classes
-from mim.commands.download import download
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS, BBOX
 from .utils import assign_layer_ids, get_column_features, get_model_head
