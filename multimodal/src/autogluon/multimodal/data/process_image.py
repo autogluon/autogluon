@@ -120,7 +120,9 @@ class ImageProcessor:
                 if isinstance(cfg, str):
                     cfg = mmcv.Config.fromfile(cfg)
             except:
-                raise RuntimeError("MMDetection requires MMCV dependency, please install mmcv-full by: mim install mmcv-full.")
+                raise RuntimeError(
+                    "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
+                )
 
         if checkpoint_name is not None:
             self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
@@ -154,7 +156,9 @@ class ImageProcessor:
                 self.val_processor = Compose(cfg.data.test.pipeline)
                 self.train_processor = Compose(cfg.data.test.pipeline)
             except:
-                raise RuntimeError("Please install MMDetection by: pip install mmdet.")
+                raise RuntimeError(
+                    "If encounterd mmdet related error, please install MMDetection by: pip install mmdet."
+                )
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
@@ -196,7 +200,9 @@ class ImageProcessor:
                     }
                 )
             except:
-                raise RuntimeError("MMDetection requires MMCV dependency, please install mmcv-full by: mim install mmcv-full.")
+                raise RuntimeError(
+                    "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
+                )
         else:
             fn.update(
                 {
