@@ -122,7 +122,7 @@ class TimeSeriesEvaluator:
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
 
     @property
-    def coefficient(self) -> bool:
+    def coefficient(self) -> int:
         return self.METRIC_COEFFICIENTS[self.eval_metric]
 
     @property
