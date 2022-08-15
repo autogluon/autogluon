@@ -65,17 +65,13 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             if isinstance(config_file, str):
                 self.config = mmcv.Config.fromfile(config_file)
         except:
-            raise RuntimeError(
-                "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
-            )
+            raise RuntimeError("If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full.")
 
         # build model and load pretrained weights
         try:
             self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
         except:
-            raise RuntimeError(
-                "If encounterd mmdet related error, please install MMDetection by: pip install mmdet."
-            )
+            raise RuntimeError("If encounterd mmdet related error, please install MMDetection by: pip install mmdet.")
 
         checkpoint = checkpoints[0]
         if checkpoint is not None:
