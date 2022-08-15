@@ -181,8 +181,10 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
             validation_dataframes.append(next_val_dataframe)
 
         train_data = ts_dataframe.slice_by_timestep(slice(None, -prediction_length))
+        val_data = pd.concat(validation_dataframes)
+        val_data._cached_freq = train_data._cached_freq
 
-        return train_data, pd.concat(validation_dataframes)
+        return train_data, val_data
 
 
 class LastWindowSplitter(MultiWindowSplitter):
