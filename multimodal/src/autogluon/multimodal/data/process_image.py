@@ -405,12 +405,7 @@ class ImageProcessor:
                 )
                 column_start = len(images)
         if self.prefix == MMDET_IMAGE:
-            ret.update(
-                {
-                    self.image_key: images[0]
-        
-                }
-            )
+            ret.update({self.image_key: images[0]})
         else:
             ret.update(
                 {
