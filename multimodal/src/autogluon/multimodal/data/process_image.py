@@ -123,7 +123,7 @@ class ImageProcessor:
             except:
                 raise RuntimeError(
                     "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
-                )  
+                )
 
         if checkpoint_name is not None:
             if self.prefix == MMDET_IMAGE:
