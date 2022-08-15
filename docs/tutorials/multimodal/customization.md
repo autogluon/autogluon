@@ -313,6 +313,95 @@ predictor.fit(hyperparameters={"model.hf_text.checkpoint_name": "google/electra-
 predictor.fit(hyperparameters={"model.hf_text.checkpoint_name": "roberta-base"})
 ```
 
+### model.hf_text.pooling_mode
+The feature pooling mode for transformer architectures.
+
+- `cls`: uses the cls feature vector to represent a sentence.
+- `mean`: averages all the token feature vectors to represent a sentence.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.pooling_mode": "cls"})
+# using the mean pooling
+predictor.fit(hyperparameters={"model.hf_text.pooling_mode": "mean"})
+```
+
+### model.hf_text.tokenizer_name
+Choose the text tokenizer. It is recommended to use the default auto tokenizer. 
+
+- `hf_auto`: the [Huggingface auto tokenizer](https://huggingface.co/docs/transformers/model_doc/auto#transformers.AutoTokenizer).
+- `bert`: the [BERT tokenizer](https://huggingface.co/docs/transformers/v4.21.1/en/model_doc/bert#transformers.BertTokenizer).
+- `electra`: the [ELECTRA tokenizer](https://huggingface.co/docs/transformers/v4.21.1/en/model_doc/electra#transformers.ElectraTokenizer).
+- `clip`: the [CLIP tokenizer](https://huggingface.co/docs/transformers/v4.21.1/en/model_doc/clip#transformers.CLIPTokenizer).
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.tokenizer_name": "hf_auto"})
+# using the tokenizer of the ELECTRA model
+predictor.fit(hyperparameters={"model.hf_text.tokenizer_name": "electra"})
+```
+
+### model.hf_text.max_text_len
+Set the maximum text length. Different models may allow different maximum lengths. If `model.hf_text.max_text_len` > 0, we choose the minimum between `model.hf_text.max_text_len` and the maximum length allowed by the model. Setting `model.hf_text.max_text_len` <= 0 would use the model's maximum length.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.max_text_len": 512})
+# set to use the length allowed by the tokenizer.
+predictor.fit(hyperparameters={"model.hf_text.max_text_len": -1})
+```
+
+### model.hf_text.insert_sep
+Whether to insert the SEP token between texts from different columns of a dataframe.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.insert_sep": True})
+# use no SEP token.
+predictor.fit(hyperparameters={"model.hf_text.insert_sep": False})
+```
+
+### model.hf_text.text_segment_num
+How many text segments are used in a token sequence. Each text segment has one [token type ID](https://huggingface.co/transformers/v2.11.0/glossary.html#token-type-ids). We choose the minimum between `model.hf_text.text_segment_num` and the default used by the model.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.text_segment_num": 2})
+# use 1 text segment
+predictor.fit(hyperparameters={"model.hf_text.text_segment_num": 1})
+```
+
+### model.hf_text.stochastic_chunk
+Whether to randomly cut a text chunk if a sample's text token number is larger than `model.hf_text.max_text_len`. If False, cut a token sequence from index 0 to the maximum allowed length. Otherwise, randomly sample a start index to cut a text chunk.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.stochastic_chunk": False})
+# select a stochastic text chunk if a text sequence is over-long
+predictor.fit(hyperparameters={"model.hf_text.stochastic_chunk": True})
+```
+
+### model.hf_text.text_aug_detect_length
+Perform text augmentation only when the text token number is no less than `model.hf_text.text_aug_detect_length`.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.text_aug_detect_length": 10})
+# Allow text augmentation for texts whose token number is no less than 5
+predictor.fit(hyperparameters={"model.hf_text.text_aug_detect_length": 5})
+```
+
+### model.hf_text.text_trivial_aug_maxscale
+Set the maximum percentage of text tokens to conduct data augmentation. For each text token sequence, we randomly sample a percentage in [0, `model.hf_text.text_trivial_aug_maxscale`] and one operation from four trivial augmentations, including synonym replacement, random word swap, random word deletion, and random punctuation insertion, to do text augmentation.
+
+```
+# by default, AutoMM doesn't do text augmentation
+predictor.fit(hyperparameters={"model.hf_text.text_trivial_aug_maxscale": 0})
+# Enable trivial augmentation by setting the max scale to 0.1
+predictor.fit(hyperparameters={"model.hf_text.text_trivial_aug_maxscale": 0.1})
+```
+
+
 ### model.timm_image.checkpoint_name
 Select an image backbone from [TIMM](https://github.com/rwightman/pytorch-image-models/tree/master/timm/models).
 ```
@@ -421,7 +510,7 @@ predictor.fit(hyperparameters={"data.mixup.mixup_alpha": 1.0})
 ```
 
 ### data.mixup.cutmix_alpha
-Cutomix alpha value. Cutomix is active if `data.mixup.cutmix_alpha` > 0. 
+Cutmix alpha value. Cutmix is active if `data.mixup.cutmix_alpha` > 0. 
 
 ```
 # by default, Cutmix is turned off by using alpha 1.0
