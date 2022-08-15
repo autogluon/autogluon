@@ -8,8 +8,8 @@ import numpy as np
 import PIL
 import torch
 from mmcv.parallel import collate
-from mmdet.datasets.pipelines import Compose
 from mmdet.datasets import replace_ImageToTensor
+from mmdet.datasets.pipelines import Compose
 from timm import create_model
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,

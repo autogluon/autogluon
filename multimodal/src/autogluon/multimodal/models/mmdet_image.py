@@ -7,10 +7,10 @@ import torch
 from mim.commands.download import download
 from mmcv.runner import load_checkpoint
 from mmdet.core import get_classes
-from torch import nn
 from mmdet.models import build_detector
+from torch import nn
 
-from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS, BBOX
+from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_model_head
 
 logger = logging.getLogger(AUTOMM)
