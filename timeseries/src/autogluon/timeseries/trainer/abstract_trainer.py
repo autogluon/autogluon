@@ -586,7 +586,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             else:
                 try:
                     model_names_trained.append(
-                        self.fit_ensemble(val_data=val_data, model_names=models_available_for_ensemble)
+                        self.fit_ensemble(
+                            val_data=val_data, model_names=models_available_for_ensemble, time_limit=time_limit
+                        )
                     )
                 except Exception as e:  # noqa
                     logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
@@ -658,9 +660,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         simple_ensemble.fit_time = time_end - time_start
 
         forecasts = simple_ensemble.predict({n: model_preds[n] for n in simple_ensemble.model_names})
-        simple_ensemble.val_score = (
-            evaluator(val_data, forecasts) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
-        )
+        simple_ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
 
         predict_time = 0
         # FIXME: This is a hack, should instead leverage `predict_time_marginal` as in Tabular.
@@ -766,14 +766,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> float:
         model = self._get_model_for_prediction(model)
         eval_metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=eval_metric,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
 
         if isinstance(model, TimeSeriesEnsembleWrapper):
-            # FIXME: This section is hacky
+            evaluator = TimeSeriesEvaluator(
+                eval_metric=eval_metric,
+                prediction_length=self.prediction_length,
+                target_column=self.target,
+            )
             model_preds = {}
             base_models = self.get_minimum_model_set(model, include_self=False)
             for base_model in base_models:
@@ -781,10 +780,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 model_preds[base_model] = base_model_loaded.predict_for_scoring(
                     data, quantile_levels=self.quantile_levels
                 )
-            # FIXME: dict doesn't guarantee order!
             forecasts = model.predict(model_preds)
 
-            model_score = evaluator(data, forecasts) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[eval_metric]
+            model_score = evaluator(data, forecasts) * evaluator.coefficient
             return model_score
 
         return model.score(data, metric=eval_metric)

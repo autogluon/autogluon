@@ -315,7 +315,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         predictions = self.predict_for_scoring(data)
         metric_value = evaluator(data, predictions)
 
-        return metric_value * TimeSeriesEvaluator.METRIC_COEFFICIENTS[metric]
+        return metric_value * evaluator.coefficient
 
     def _hyperparameter_tune(
         self,
