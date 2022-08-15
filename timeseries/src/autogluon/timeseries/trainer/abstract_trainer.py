@@ -192,9 +192,9 @@ class SimpleAbstractTrainer:
             return X
 
     # FIXME: Copy pasted from Tabular
-    # Gets the minimum set of models that the provided model depends on, including itself
-    # Returns a list of model names
     def get_minimum_model_set(self, model, include_self=True) -> list:
+        """Gets the minimum set of models that the provided model depends on, including itself.
+        Returns a list of model names"""
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
@@ -333,7 +333,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     def _add_model(
         self,
-        model: Union[AbstractTimeSeriesModel, TimeSeriesEnsembleWrapper],
+        model: AbstractTimeSeriesModel,
         base_models=None,
     ):
         node_attrs = dict(
@@ -352,6 +352,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.model_graph.add_node(model.name, **node_attrs)
 
         if base_models:
+            assert isinstance(model, TimeSeriesEnsembleWrapper)
             for base_model in base_models:
                 self.model_graph.add_edge(base_model, model.name)
 
@@ -570,18 +571,23 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         if self.enable_ensemble:
             models_available_for_ensemble = self.get_model_names()
+
+            time_left_for_ensemble = None
             if time_limit is not None:
                 time_left_for_ensemble = time_limit - (time.time() - time_start)
-                if time_left_for_ensemble <= 0:
-                    logger.info(
-                        "Not fitting ensemble due to lack of time remaining. "
-                        "Time left: {time_left_for_ensemble:.2f} seconds"
-                    )
+
+            if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
+                logger.info(
+                    "Not fitting ensemble due to lack of time remaining. "
+                    "Time left: {time_left_for_ensemble:.2f} seconds"
+                )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(f"Not fitting ensemble as only {len(models_available_for_ensemble)} models were trained.")
             else:
                 try:
-                    model_names_trained.append(self.fit_ensemble(val_data=val_data, model_names=models_available_for_ensemble))
+                    model_names_trained.append(
+                        self.fit_ensemble(val_data=val_data, model_names=models_available_for_ensemble)
+                    )
                 except Exception as e:  # noqa
                     logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
 
@@ -596,7 +602,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return model_names_trained
 
-    def fit_ensemble(self, val_data, model_names):
+    def fit_ensemble(
+        self, val_data: TimeSeriesDataFrame, model_names: List[str], time_limit: Optional[float] = None
+    ) -> str:
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
             prediction_length=self.prediction_length,
@@ -617,55 +625,56 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         ensemble = TimeSeriesEnsembleSelection(
             ensemble_size=100,
-            problem_type="regression",
             metric=evaluator,
         )
         predictions = [model_preds[p] for p in model_names]
-        ensemble.fit(predictions=predictions, labels=val_data)
-        ensemble_weights = ensemble.weights_
-        final_models_ensemble = []
-        final_weights_ensemble = []
-        for i, w in enumerate(ensemble_weights):
-            if w != 0:
-                final_models_ensemble.append(model_names[i])
-                final_weights_ensemble.append(w)
 
-        # FIXME: Ensure we don't have name collisions
+        ensemble.fit(
+            predictions=predictions,
+            labels=val_data,
+            time_limit=time_limit,
+        )
+
+        # Ensure we don't have name collisions
+        ensemble_name = "WeightedEnsemble"
+        increment = 1
+        while ensemble_name in self._get_banned_model_names():
+            increment += 1
+            ensemble_name = f"WeightedEnsemble_{increment}"
+
         # FIXME: This is currently **extremely** hacky to simply get it working.
         #  Align on design / API of ensembles after v0.5.
         simple_ensemble = TimeSeriesEnsembleWrapper(
-            weights=final_weights_ensemble,
-            name="WeightedEnsemble",
+            weights={model_names[i]: w for i, w in enumerate(ensemble.weights_) if w != 0},
+            name=ensemble_name,
             freq=val_data.freq,
             prediction_length=self.prediction_length,
             eval_metric=self.eval_metric,
             path=self.path,
-            invalid_model_names=self._get_banned_model_names(),
             target=self.target,
             quantiles=self.quantile_levels,
         )
         time_end = time.time()
         simple_ensemble.fit_time = time_end - time_start
 
-        predictions: List[TimeSeriesDataFrame] = [model_preds[p] for p in final_models_ensemble]
-        forecasts = simple_ensemble.predict(predictions)
-        model_score = evaluator(val_data, forecasts) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
-
-        simple_ensemble.val_score = model_score
+        forecasts = simple_ensemble.predict({n: model_preds[n] for n in simple_ensemble.model_names})
+        simple_ensemble.val_score = (
+            evaluator(val_data, forecasts) * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
+        )
 
         predict_time = 0
         # FIXME: This is a hack, should instead leverage `predict_time_marginal` as in Tabular.
-        for m in final_models_ensemble:
+        for m in simple_ensemble.model_names:
             predict_time += self.get_model_attribute(model=m, attribute="predict_time")
         simple_ensemble.predict_time = predict_time
 
         self._log_scores_and_times(
-            val_score=model_score,
+            val_score=simple_ensemble.val_score,
             fit_time=simple_ensemble.fit_time,
             predict_time=simple_ensemble.predict_time,
         )
 
-        self._add_model(model=simple_ensemble, base_models=final_models_ensemble)
+        self._add_model(model=simple_ensemble, base_models=simple_ensemble.model_names)
         return simple_ensemble.name
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:

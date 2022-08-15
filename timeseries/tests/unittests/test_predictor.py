@@ -9,8 +9,7 @@ import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import MQRNNEstimator
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory, MQRNNEstimator
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
@@ -398,9 +397,7 @@ def test_when_passing_magic_string_as_validation_splitter_then_correct_splitter_
     assert isinstance(predictor.validation_splitter, expected_splitter_class)
 
 
-def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_fitted(
-    temp_model_path
-):
+def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
@@ -413,11 +410,11 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_fitt
             "DeepAR": {"epochs": 1},
         },
     )
-    assert any("ensemble" in n.lower() for n in predictor.get_model_names()) 
+    assert any("ensemble" in n.lower() for n in predictor.get_model_names())
 
 
 def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_then_ensemble_is_not_fitted(
-    temp_model_path
+    temp_model_path,
 ):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
@@ -428,12 +425,10 @@ def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_the
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
     )
-    assert not any("ensemble" in n.lower() for n in predictor.get_model_names()) 
+    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
 
 
-def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_fitted(
-    temp_model_path
-):
+def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_fitted(temp_model_path):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
@@ -443,4 +438,4 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
     )
-    assert not any("ensemble" in n.lower() for n in predictor.get_model_names()) 
+    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())

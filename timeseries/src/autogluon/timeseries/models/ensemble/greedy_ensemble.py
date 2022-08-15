@@ -1,15 +1,14 @@
 import copy
 import logging
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 
 import autogluon.core as ag
 from autogluon.core.models.greedy_ensemble.ensemble_selection import AbstractWeightedEnsemble, EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
-
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
 
@@ -56,18 +55,13 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 class SimpleTimeSeriesWeightedEnsemble(AbstractWeightedEnsemble):
     """Predefined user-weights ensemble"""
 
-    def __init__(self, weights, **kwargs):
+    def __init__(self, weights: List[float], **kwargs):
         self.weights_ = weights
+        self.problem_type = ag.constants.QUANTILE
 
     @property
     def ensemble_size(self):
         return len(self.weights_)
-
-    def predict(self, X):
-        return self.predict_proba(X)
-
-    def predict_proba(self, X):
-        return self.weight_pred_probas(X, weights=self.weights_)
 
     def weight_pred_probas(
         self,
@@ -81,23 +75,34 @@ class SimpleTimeSeriesWeightedEnsemble(AbstractWeightedEnsemble):
 
 
 class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):
-    """Predefined user-weights ensemble"""
+    """AbstractTimeSeriesModel wrapper for simple weighted ensemble selection
+    models.
 
-    def __init__(self, weights, name, **kwargs):
+    Parameters
+    ----------
+    weights : Dict[str, float]
+        Dictionary mapping model names to weights in the ensemble
+    name : str
+        Name of the model. Usually like ``"WeightedEnsemble"``.
+    """
+
+    def __init__(self, weights: Dict[str, float], name: str, **kwargs):
         super().__init__(name=name, **kwargs)
-        self.model = SimpleTimeSeriesWeightedEnsemble(weights=weights)
-        self.name = name
-        self.fit_time = None
-        self.val_score = None
+        self.model_names, model_weights = zip(*weights.items())
+        self.weighted_ensemble = SimpleTimeSeriesWeightedEnsemble(weights=model_weights)
 
     def _fit(self, *args, **kwargs) -> None:
         raise NotImplementedError
 
     @property
     def weights(self):
-        return self.model.weights_
+        return self.weighted_ensemble.weights_
 
-    def predict(self, data: List[TimeSeriesDataFrame], **kwargs):
-        if isinstance(data, dict):  # FIXME: HACK, unclear what the input to predict should be for weighted ensemble
-            data = [data[m] for m in data.keys()]
-        return self.model.predict(data)
+    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs):
+        if set(data.keys()) != set(self.model_names):
+            raise ValueError(
+                "Set of models given for prediction in the weighted ensemble differ from those "
+                "provided during initialization."
+            )
+
+        return self.weighted_ensemble.predict([data[k] for k in self.model_names])

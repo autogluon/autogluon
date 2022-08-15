@@ -98,7 +98,7 @@ def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
     test_data = get_data_frame_with_item_index(["A", "B", "C"])
 
     leaderboard = trainer.leaderboard(test_data)
-    
+
     if len(hyperparameters) > 1:
         expected_board_length += int(trainer.enable_ensemble)
 
@@ -416,7 +416,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
         )
 
     model_names = trainer.get_model_names()
-  
+
     # account for the ensemble if it should be fitted
     if trainer.enable_ensemble and sum(len(hp) for hp in hyperparameter_list) > 1:
         expected_number_of_unique_names += 1
