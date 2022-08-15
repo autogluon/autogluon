@@ -73,11 +73,11 @@ def get_default_hps(key, prediction_length):
                 "trend": "add",
                 "seasonal": "add",
                 "auto": False,
-                "initialization_method": "heuristic",
+                "initialization_method": "estimated",
             },
             "ARIMA": {
                 "maxiter": 50,
-                "order": (1, 1, 1),
+                "order": (1, 0, 0),
                 "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
             },
@@ -117,7 +117,7 @@ def get_default_hps(key, prediction_length):
             },
             "ARIMA": {
                 "maxiter": ag.Categorical(50),
-                "order": (1, 1, 1),
+                "order": (1, 0, 0),
                 "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
                 "fail_if_misconfigured": True,
