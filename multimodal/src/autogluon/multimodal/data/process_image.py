@@ -29,7 +29,7 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM
+from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
@@ -106,11 +106,11 @@ class ImageProcessor:
         self.mean = None
         self.std = None
 
-        if self.prefix == "mmdet_image":
+        if self.prefix == MMDET_IMAGE:
             # TODO: can we pass the config information here when we build the model?
-            cfg = self.checkpoint_name + '.py'
+            cfg = self.checkpoint_name + ".py"
             if isinstance(cfg, str):
-                cfg = mmcv.Config.fromfile(cfg)    
+                cfg = mmcv.Config.fromfile(cfg)
 
         if checkpoint_name is not None:
             self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
@@ -138,14 +138,14 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == "mmdet_image":
+        if self.prefix == MMDET_IMAGE:
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
             self.val_processor = Compose(cfg.data.test.pipeline)
             self.train_processor = Compose(cfg.data.test.pipeline)
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
-        
+
     @property
     def image_key(self):
         return f"{self.prefix}_{IMAGE}"
@@ -175,12 +175,12 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix == "mmdet_image":
+        if self.prefix == MMDET_IMAGE:
             fn.update(
-            {
-                self.image_key: collate,
-            }
-        )
+                {
+                    self.image_key: collate,
+                }
+            )
         else:
             fn.update(
                 {
@@ -262,9 +262,9 @@ class ImageProcessor:
                 std = None
             except Exception as exp2:
                 try:  # mmdetection checkpoint
-                    image_size = cfg.test_pipeline[1]['img_scale'][0]
-                    mean = cfg.test_pipeline[1]['transforms'][2]['mean']
-                    std = cfg.test_pipeline[1]['transforms'][2]['std']
+                    image_size = cfg.test_pipeline[1]["img_scale"][0]
+                    mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
+                    std = cfg.test_pipeline[1]["transforms"][2]["std"]
                 except Exception as exp3:
                     raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp3
 
@@ -366,7 +366,7 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == "mmdet_image":
+                if self.prefix == MMDET_IMAGE:
                     data = dict(img_info=dict(filename=img_path), img_prefix=None)
                     images.append(self.val_processor(data))
                 else:
@@ -404,13 +404,13 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-        if self.prefix == "mmdet_image":
+        if self.prefix == MMDET_IMAGE:
             ret.update(
-            {
-                self.image_key: images[0]
-    
-            }
-        )
+                {
+                    self.image_key: images[0]
+        
+                }
+            )
         else:
             ret.update(
                 {

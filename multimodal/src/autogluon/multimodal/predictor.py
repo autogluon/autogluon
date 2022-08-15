@@ -61,6 +61,7 @@ from .constants import (
     Y_TRUE,
     OBJECT_DETECTION,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
+    BBOX,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -1602,9 +1603,9 @@ class MultiModalPredictor:
             ret_type = PROBABILITY
         else:
             ret_type = LOGITS
-        
+
         if self._pipeline == OBJECT_DETECTION:
-            ret_type = "bbox"
+            ret_type = BBOX
 
         if candidate_data:
             pred = self._match_queries_and_candidates(

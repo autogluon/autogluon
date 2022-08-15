@@ -67,6 +67,8 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    MMDET_IMAGE,
+    BBOX,
 )
 from .data import (
     CategoricalProcessor,
@@ -87,7 +89,7 @@ from .models import (
     NumericalMLP,
     NumericalTransformer,
     TimmAutoModelForImagePrediction,
-    MMdetAutoModelForObjectDetection,
+    MMDetAutoModelForObjectDetection,
 )
 from .models.utils import inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
@@ -785,8 +787,8 @@ def create_model(
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
             )
-        elif model_name.lower().startswith("mmdet_image"):
-            model = MMdetAutoModelForObjectDetection(
+        elif model_name.lower().startswith(MMDET_IMAGE):
+            model = MMDetAutoModelForObjectDetection(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
             )
@@ -1626,8 +1628,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         feature_masks = [ele[COLUMN_FEATURES][MASKS] for ele in outputs]  # a list of dicts
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
-    elif ret_type == "bbox":
-        return [ele["bbox"] for ele in outputs]
+    elif ret_type == BBOX:
+        return [ele[BBOX] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

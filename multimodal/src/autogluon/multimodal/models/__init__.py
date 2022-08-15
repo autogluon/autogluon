@@ -7,4 +7,4 @@ from .huggingface_text import HFAutoModelForTextPrediction
 from .numerical_mlp import NumericalMLP
 from .numerical_transformer import NumericalTransformer
 from .timm_image import TimmAutoModelForImagePrediction
-from .mmdet_image import MMdetAutoModelForObjectDetection
+from .mmdet_image import MMDetAutoModelForObjectDetection

@@ -1,5 +1,5 @@
 env:
-  num_gpus: 0
+  num_gpus: -1
   num_nodes: 1
   batch_size: 128  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
   per_gpu_batch_size: 8  # training per gpu batch size
