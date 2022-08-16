@@ -29,7 +29,6 @@ def test_mmdet_object_detection_inference(checkpoint_name):
 
     predictor = MultiModalPredictor(
         hyperparameters={
-            "model.names": ["mmdet_image"],
             "model.mmdet_image.checkpoint_name": checkpoint_name,
         },
         pipeline="object_detection",

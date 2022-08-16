@@ -121,8 +121,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         data = batch[self.image_key]
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
-        with torch.no_grad():
-            results = self.model(return_loss=False, rescale=True, **data)
+        results = self.model(return_loss=False, rescale=True, **data)
 
         ret = {BBOX: results}
         return {self.prefix: ret}
