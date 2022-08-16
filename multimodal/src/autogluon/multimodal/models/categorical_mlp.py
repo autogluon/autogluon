@@ -56,7 +56,7 @@ class CategoricalMLP(nn.Module):
 
         for num_categories_per_col in num_categories:
             embedding_dim_per_col = int(
-                size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col**embed_exponent))
+                size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col ** embed_exponent))
             )
             self.column_embeddings.append(
                 nn.Embedding(

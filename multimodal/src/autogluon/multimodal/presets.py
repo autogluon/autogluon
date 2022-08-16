@@ -62,17 +62,17 @@ def few_shot_text_classification():
         "optimization.max_steps": 1000,  # Find better solution to train for long
         "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
         "optimization.val_check_interval": 1.0,
-        "optimization.top_k_average_method" : "best",
+        "optimization.top_k_average_method": "best",
         "optimization.trainable_param_names": [],
-        "optimization.warmup_steps" : 0.06,
+        "optimization.warmup_steps": 0.06,
         "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
         "optimization.lora.filter": ["k|v|wi_1.*"],
         "optimization.top_k": 1,
-        "optimization.max_epochs":  -1,
+        "optimization.max_epochs": -1,
         "env.batch_size": 8,
         "env.per_gpu_batch_size": 1,
         "env.precision": "bf16",
-        "data.templates.turn_on" : True,
+        "data.templates.turn_on": True,
     }
 
 

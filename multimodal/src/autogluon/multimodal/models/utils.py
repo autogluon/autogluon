@@ -12,6 +12,7 @@ class DummyLayer(nn.Module):
     DummyLayer to ensure that the gradient checkpointing will assign output layer as require_grad=True.
     Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
     """
+
     def __init__(self):
         super().__init__()
         self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
@@ -429,13 +430,9 @@ def inject_ia3_to_linear_layer(
     Model with injected (IA)3 modules.
     """
     for m_name, module in dict(model.named_modules()).items():
-        if not module_filter or any(
-            re.match(filter_module, m_name) for filter_module in module_filter
-        ):
+        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
             for c_name, layer in dict(module.named_children()).items():
-                if not filter or any(
-                    re.match(filter_layer, c_name) for filter_layer in filter
-                ):
+                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
                     assert isinstance(
                         layer, nn.Linear
                     ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
@@ -479,13 +476,9 @@ def inject_lora_to_linear_layer(
     Model with injected LoRA modules.
     """
     for m_name, module in dict(model.named_modules()).items():
-        if not module_filter or any(
-            re.match(filter_module, m_name) for filter_module in module_filter
-        ):
+        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
             for c_name, layer in dict(module.named_children()).items():
-                if not filter or any(
-                    re.match(filter_layer, c_name) for filter_layer in filter
-                ):
+                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
                     assert isinstance(
                         layer, nn.Linear
                     ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."

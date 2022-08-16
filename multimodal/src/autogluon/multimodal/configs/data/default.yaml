@@ -29,8 +29,11 @@ data:
     preset_templates: ["super_glue", "rte"] # Select templates from a dataset template collection in the form (Dataset, Subset). For full list see data/templates. 
     custom_templates: # Specify your own template in jinja format as well as answer choices for the model to select from.
       # 1:
+      #   template: "{{premise}} {{hypothesis}}. Yes, or no? ||| {{answer_choices[label]}}"
+      #   answer_choices: "Yes ||| No"
+      # 2:
       #   template: "{{premise}} \n\nQuestion: Does this imply that '{{hypothesis}}'? Yes, no, or maybe? ||| {{answer_choices[label]}}"
       #   answer_choices: "Yes ||| Maybe ||| No"
-      # 2:
+      # 3:
       #   template: "{{premise}} \n\nQuestion: Are we justified in saying that '{{hypothesis}}'? Yes, no, or maybe? ||| {{answer_choices[label]}}"
       #   answer_choices: "Yes ||| Maybe ||| No"

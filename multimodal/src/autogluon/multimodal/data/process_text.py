@@ -267,7 +267,7 @@ class TextProcessor:
         choices_ids = []
         segment_ids = [seg]
         ret = {}
-        
+
         for (col_name, txt_token), trim_length in zip(text_tokens.items(), trimmed_lengths):
             if col_name == CHOICES_IDS:
                 choices_ids = txt_token
@@ -349,7 +349,9 @@ class TextProcessor:
                         col_text = self.train_augmenter(col_text)
             if col_name == CHOICES_IDS:
                 answer_ids = self.tokenizer(
-                col_text, return_tensors="pt", padding=True,
+                    col_text,
+                    return_tensors="pt",
+                    padding=True,
                 )["input_ids"]
                 tokens[col_name] = answer_ids
                 continue

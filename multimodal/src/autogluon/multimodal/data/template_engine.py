@@ -4,8 +4,7 @@ from autogluon.multimodal.data.templates import Template, DatasetTemplates, Temp
 from omegaconf import OmegaConf
 
 
-
-class TemplateEngine():
+class TemplateEngine:
     """
     Class to manage the selection and use of templates.
     """
@@ -27,18 +26,19 @@ class TemplateEngine():
         self.custom_templates = OmegaConf.select(self.template_config, "custom_templates")
 
         if self.preset_templates:
-            assert len(self.preset_templates) == 2, f"Preset templates has the wrong format. Needs to be [DATASET, SUBSET]."
+            assert (
+                len(self.preset_templates) == 2
+            ), f"Preset templates has the wrong format. Needs to be [DATASET, SUBSET]."
             dataset_templates = DatasetTemplates(self.preset_templates[0], self.preset_templates[1])
             self.templates += dataset_templates.templates.values()
 
         if self.custom_templates:
             for key, value in self.custom_templates.items():
-                template = Template(key, value.template, 'custom', answer_choices=value.answer_choices)
+                template = Template(key, value.template, "custom", answer_choices=value.answer_choices)
                 self.templates.append(template)
 
-
     def has_templates(self):
-        return len(self.templates)  > 0
+        return len(self.templates) > 0
 
     def get_templates(self):
         return self.templates
@@ -52,7 +52,7 @@ class TemplateEngine():
         ---------------
         example
             A data sample, i.e. a dictionary of text columns.
-        
+
         Returns
         ------------------
         A tuple consisting of the selected tuple and the sample after the template has been applied to it.

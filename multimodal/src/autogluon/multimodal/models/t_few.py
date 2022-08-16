@@ -96,7 +96,6 @@ class TFewModel(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-
     @property
     def text_token_ids_key(self):
         return f"{self.prefix}_{TEXT_TOKEN_IDS}"
@@ -140,10 +139,14 @@ class TFewModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        #TODO: Bad style, asserts should be put somewhere in data.
-        assert batch[self.choices_key].numel(), f"No target choices found in batch. Ensure that 'data.templates_turn_on=True'. and that a valid preset or custom templates are provided."
-        assert batch[self.choices_key].size(1) == self.num_classes, f"Number of target choices is different from number of classes, but they must be the same. Please check template."
-        
+        # TODO: Bad style, asserts should be put somewhere in data.
+        assert batch[
+            self.choices_key
+        ].numel(), f"No target choices found in batch. Ensure that 'data.templates_turn_on=True'. and that a valid preset or custom templates are provided."
+        assert (
+            batch[self.choices_key].size(1) == self.num_classes
+        ), f"Number of target choices is different from number of classes, but they must be the same. Please check template."
+
         text_token_ids = batch[self.text_token_ids_key]
 
         bs = text_token_ids.size(0)

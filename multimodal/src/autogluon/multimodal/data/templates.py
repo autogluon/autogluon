@@ -579,7 +579,11 @@ class DatasetTemplates:
         """
         Returns all template fields.
         """
-        return self.templates[self.name_to_id_mapping[self.all_template_names[0]]].get_template_fields() if len(self.all_template_names) > 0 else []
+        return (
+            self.templates[self.name_to_id_mapping[self.all_template_names[0]]].get_template_fields()
+            if len(self.all_template_names) > 0
+            else []
+        )
 
     @property
     def folder_path(self) -> str:
