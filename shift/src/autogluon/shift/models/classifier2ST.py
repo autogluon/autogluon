@@ -4,7 +4,7 @@
 from sklearn.metrics import balanced_accuracy_score
 import numpy as np
 import pandas as pd
-
+from ..utils import post_fit
 
 class Classifier2ST:
     """A classifier 2 sample test, which tests for a difference between a source and target dataset.  It fits a
@@ -25,13 +25,6 @@ class Classifier2ST:
                  classifier):
         self._classifier = classifier
         self._is_fit = False
-
-    def _post_fit(func):
-        """decorator for post-fit methods"""
-        def pff_wrapper(self, *args, **kwargs):
-            assert self._is_fit, f'.fit needs to be called prior to .{func.__name__}'
-            return func(self, *args, **kwargs)
-        return pff_wrapper
 
     @staticmethod
     def _make_source_target_label(data, sample_label):
@@ -80,25 +73,23 @@ class Classifier2ST:
         self.has_fi = getattr(self._classifier, "feature_importance", None)
         self._is_fit = True
 
-    @_post_fit
+    @post_fit
     def _pvalue_half_permutation(self,
                                  num_permutations=1000):
         """The half permutation method for computing p-values.
         See Section 9.1 of https://arxiv.org/pdf/1602.02210.pdf"""
         perm_stats = [self.test_stat]
+        yhat = self._classifier.predict(self._test)
         for i in range(num_permutations):
-            perm_data = self._test.copy()
-            perm_data[self._sample_label] = \
-                np.random.permutation(perm_data[self._sample_label])
-            yhat = self._classifier.predict(perm_data)
+            perm_yhat = np.random.permutation(yhat)
             perm_test_stat = self._accuracy_metric(
-                perm_data[self._sample_label],
-                yhat)
+                self._test[self._sample_label],
+                perm_yhat)
             perm_stats.append(perm_test_stat)
         p_val = (self.test_stat <= np.array(perm_stats)).mean()
         return p_val
 
-    @_post_fit
+    @post_fit
     def pvalue(self,
                method='half permutation',
                num_permutations=1000):
@@ -125,7 +116,7 @@ class Classifier2ST:
                 num_permutations=num_permutations)
         return pval
 
-    @_post_fit
+    @post_fit
     def sample_anomaly_scores(self,
                               sample_size=100,
                               how='rand'):
@@ -158,7 +149,7 @@ class Classifier2ST:
             phat_samp = phat.iloc[:sample_size,:]
         return phat_samp
 
-    @_post_fit
+    @post_fit
     def feature_importance(self):
         """Returns the feature importances for the trained classifier for source v. target
         """

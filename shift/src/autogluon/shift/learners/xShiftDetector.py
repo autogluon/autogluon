@@ -1,8 +1,9 @@
 ## This is the public API that should be exposed to the general user
 
-import autogluon.shift as sft
 from sklearn.metrics import balanced_accuracy_score
 import warnings
+from ..utils import post_fit
+from ..models.classifier2ST import Classifier2ST
 
 class XShiftDetector:
     """Detect a change in covariate (X) distribution between training and test, which we call XShift.  This should be
@@ -11,7 +12,7 @@ class XShiftDetector:
 
     Parameters
     ----------
-    PredictorClass: an AutoGluon predictor, such as instance of autogluon.tabular.Predictor
+    predictor_class: an AutoGluon predictor, such as instance of autogluon.tabular.Predictor
         The predictor that will be fit on training set and predict the test set
 
     label: str
@@ -42,7 +43,7 @@ class XShiftDetector:
     """
 
     def __init__(self,
-                 PredictorClass,
+                 predictor_class,
                  label=None,
                  classification_metric = 'balanced accuracy'):
         named_metrics = {
@@ -50,8 +51,8 @@ class XShiftDetector:
         }
         assert classification_metric in named_metrics.keys(), \
             'classification_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
-        pred = PredictorClass(label='xshift_label')
-        self.C2ST = sft.Classifier2ST(pred)
+        pred = predictor_class(label='xshift_label')
+        self.C2ST = Classifier2ST(pred)
         self.cmetric = named_metrics[classification_metric]
         self.cmetric_name = classification_metric
         if not label:
@@ -59,13 +60,6 @@ class XShiftDetector:
                           'variable')
         self.label = label
         self._is_fit = False
-
-    def _post_fit(func):
-        """decorator for post-fit methods"""
-        def pff_wrapper(self, *args, **kwargs):
-            assert self._is_fit, f'.fit needs to be called prior to .{func.__name__}'
-            return func(self, *args, **kwargs)
-        return pff_wrapper
 
     def fit(self, Xtrain, Xtest):
         """Fit the XShift detector.
@@ -96,7 +90,7 @@ class XShiftDetector:
 
         self._is_fit = True
 
-    @_post_fit
+    @post_fit
     def decision(self, teststat_thresh = 0.55):
         """Decision function for testing XShift.  Uncertainty quantification is currently not supported.
 
@@ -116,7 +110,7 @@ class XShiftDetector:
         else:
             return 'not detected'
 
-    @_post_fit
+    @post_fit
     def json(self):
         """output the results in json format
         """
@@ -127,7 +121,7 @@ class XShiftDetector:
             'sample anomalies': self.anomalies
         }
 
-    @_post_fit
+    @post_fit
     def summary(self, format = "markdown"):
         """print the results to screen
         """
