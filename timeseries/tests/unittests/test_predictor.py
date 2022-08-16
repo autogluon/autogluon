@@ -12,6 +12,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 from autogluon.timeseries.predictor import TimeSeriesPredictor
+from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
 from .common import DUMMY_TS_DATAFRAME
 
@@ -384,3 +385,14 @@ def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(t
 
     loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
     assert loaded_predictor.ignore_time_index == ignore_time_index
+
+
+@pytest.mark.parametrize(
+    "splitter_string, expected_splitter_class",
+    [("last_window", LastWindowSplitter), ("multi_window", MultiWindowSplitter)],
+)
+def test_when_passing_magic_string_as_validation_splitter_then_correct_splitter_object_is_created(
+    splitter_string, expected_splitter_class
+):
+    predictor = TimeSeriesPredictor(validation_splitter=splitter_string)
+    assert isinstance(predictor.validation_splitter, expected_splitter_class)
