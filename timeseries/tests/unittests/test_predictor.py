@@ -397,7 +397,7 @@ def test_when_passing_magic_string_as_validation_splitter_then_correct_splitter_
     assert isinstance(predictor.validation_splitter, expected_splitter_class)
 
 
-def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
+def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",

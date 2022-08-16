@@ -582,7 +582,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     "Time left: {time_left_for_ensemble:.2f} seconds"
                 )
             elif len(models_available_for_ensemble) <= 1:
-                logger.info(f"Not fitting ensemble as only {len(models_available_for_ensemble)} models were trained.")
+                logger.info(
+                    f"Not fitting ensemble as "
+                    + (
+                        "no models were successfully trained."
+                        if not models_available_for_ensemble
+                        else "only 1 model was trained."
+                    )
+                )
             else:
                 try:
                     model_names_trained.append(
