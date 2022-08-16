@@ -36,5 +36,5 @@ def test_mmdet_object_detection_inference(checkpoint_name):
     )
 
     pred = predictor.predict({"image": [mmdet_image_name]})
-    assert len(pred[0][0]) == 80    # COCO has 80 classes
-    assert pred[0][0][0].ndim == 2    # two dimensions, (# of proposals, 5)
+    assert len(pred[0][0]) == 80  # COCO has 80 classes
+    assert pred[0][0][0].ndim == 2  # two dimensions, (# of proposals, 5)
