@@ -25,6 +25,7 @@ except ImportError:
     mmcv = None
 
 try:
+    import mmdet
     from mmdet.datasets import replace_ImageToTensor
     from mmdet.datasets.pipelines import Compose
 except ImportError:
@@ -116,14 +117,10 @@ class ImageProcessor:
 
         if self.prefix == MMDET_IMAGE:
             # TODO: can we pass the config information here when we build the model?
-            try:
-                cfg = checkpoint_name + ".py"
-                if isinstance(cfg, str):
-                    cfg = mmcv.Config.fromfile(cfg)
-            except:
-                raise RuntimeError(
-                    "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
-                )
+            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            cfg = checkpoint_name + ".py"
+            if isinstance(cfg, str):
+                cfg = mmcv.Config.fromfile(cfg)
 
         if checkpoint_name is not None:
             if self.prefix == MMDET_IMAGE:
@@ -155,14 +152,10 @@ class ImageProcessor:
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
         if self.prefix == MMDET_IMAGE:
-            try:
-                cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
-                self.val_processor = Compose(cfg.data.test.pipeline)
-                self.train_processor = Compose(cfg.data.test.pipeline)
-            except:
-                raise RuntimeError(
-                    "If encounterd mmdet related error, please install MMDetection by: pip install mmdet."
-                )
+            assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
+            self.val_processor = Compose(cfg.data.test.pipeline)
+            self.train_processor = Compose(cfg.data.test.pipeline)
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
@@ -197,16 +190,12 @@ class ImageProcessor:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
         if self.prefix == MMDET_IMAGE:
-            try:
-                fn.update(
-                    {
-                        self.image_key: collate,
-                    }
-                )
-            except:
-                raise RuntimeError(
-                    "If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full."
-                )
+            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            fn.update(
+                {
+                    self.image_key: collate,
+                }
+            )
         else:
             fn.update(
                 {

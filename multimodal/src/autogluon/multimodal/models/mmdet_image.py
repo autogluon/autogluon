@@ -13,6 +13,7 @@ except ImportError:
     mmcv = None
 
 try:
+    import mmdet
     from mmdet.core import get_classes
     from mmdet.models import build_detector
 except ImportError:
@@ -60,18 +61,14 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
 
         # read config files
-        try:
-            config_file = checkpoint_name + ".py"
-            if isinstance(config_file, str):
-                self.config = mmcv.Config.fromfile(config_file)
-        except:
-            raise RuntimeError("If encounterd mmcv related error, please install mmcv-full by: mim install mmcv-full.")
+        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+        config_file = checkpoint_name + ".py"
+        if isinstance(config_file, str):
+            self.config = mmcv.Config.fromfile(config_file)
 
         # build model and load pretrained weights
-        try:
-            self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
-        except:
-            raise RuntimeError("If encounterd mmdet related error, please install MMDetection by: pip install mmdet.")
+        assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
         checkpoint = checkpoints[0]
         if checkpoint is not None:
