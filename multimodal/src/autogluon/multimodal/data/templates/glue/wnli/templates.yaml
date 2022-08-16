@@ -1,0 +1,110 @@
+dataset: glue
+subset: wnli
+templates:
+  10c354ee-6f4e-4b04-91e1-29e999a8f3e7: !Template
+    answer_choices: not confident ||| very confident
+    id: 10c354ee-6f4e-4b04-91e1-29e999a8f3e7
+    jinja: 'If it''s true that
+
+      {{sentence1}}
+
+      how {{"confident"}} should I be that
+
+      {{sentence2}}
+
+      {{"very confident or not confident?"}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: confident
+    reference: ''
+  3a0e46cb-0b96-4972-83f6-29a6c6a09ba9: !Template
+    answer_choices: no ||| yes
+    id: 3a0e46cb-0b96-4972-83f6-29a6c6a09ba9
+    jinja: '{{"Entailment"}} means that the second sentence follows from the first
+      sentence. Are the following two sentences an example of entailment?
+
+      {{sentence1}}
+
+      {{sentence2}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: entailment explained
+    reference: ''
+  75f89b05-5a81-401b-8a04-8239211a9a95: !Template
+    answer_choices: no ||| yes
+    id: 75f89b05-5a81-401b-8a04-8239211a9a95
+    jinja: 'Assume that the following is true:
+
+      {{sentence1}}
+
+      Does this mean that "{{sentence2}}"?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: mean
+    reference: ''
+  a244158a-a248-4e34-bef7-66e269dd0815: !Template
+    answer_choices: no ||| yes
+    id: a244158a-a248-4e34-bef7-66e269dd0815
+    jinja: 'Someone told me "{{sentence1}}" Now, I think that "{{sentence2}}" Am I
+      justified in thinking this?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: justified
+    reference: ''
+  a2ce492b-dfd0-4f04-bc44-70c7867ba231: !Template
+    answer_choices: no ||| yes
+    id: a2ce492b-dfd0-4f04-bc44-70c7867ba231
+    jinja: '{{sentence1}}
+
+      {{sentence2}}
+
+      Does the first sentence imply the second sentence?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: imply
+    reference: ''

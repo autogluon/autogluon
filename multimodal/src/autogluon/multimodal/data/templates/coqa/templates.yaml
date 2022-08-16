@@ -1,0 +1,117 @@
+dataset: coqa
+templates:
+  530616d3-1cc8-4faa-a855-4b21e0da9ec9: !Template
+    answer_choices: null
+    id: 530616d3-1cc8-4faa-a855-4b21e0da9ec9
+    jinja: "Answer the question based on the information contained in the passage.\n\
+      Q: {{questions[0]}} \n\nPassage: {{story}}\n\nA: ||| {{answers[\"input_text\"\
+      ][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: first_qa_turn
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  7c0e2256-961c-48e9-bc08-6c270cc68b4a: !Template
+    answer_choices: null
+    id: 7c0e2256-961c-48e9-bc08-6c270cc68b4a
+    jinja: 'Answer the last question based on the hint.
+
+      {% for question, answer in zip(questions[:-1], answers["input_text"][:-1]) %}
+
+      Q: {{question}}
+
+
+      A:{{answer}}
+
+      {%endfor %}
+
+
+      Q: {{questions[-1]}}
+
+
+      Hint: {{story}}
+
+
+      A:|||
+
+      {{answers["input_text"][-1]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: last_qa_turn
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  a22e8bf1-f5af-43eb-b38c-002462261da2: !Template
+    answer_choices: null
+    id: a22e8bf1-f5af-43eb-b38c-002462261da2
+    jinja: 'Can you form a set of {{questions | length}} question-answer pairs about
+      the passage below?
+
+
+      Passage: {{story}}|||
+
+      {% for question, answer in zip(questions, answers["input_text"]) %}
+
+      Q: {{question}}
+
+
+      A: {{answer}}
+
+
+      {% endfor %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_dialogue
+    reference: ''
+  cb53f12f-e781-4a92-bbb0-fbef19bd2d29: !Template
+    answer_choices: null
+    id: cb53f12f-e781-4a92-bbb0-fbef19bd2d29
+    jinja: 'In the passage below, extract the part which answers the question:
+
+
+      Q: {{questions[0]}}
+
+      Passage: {{story}} |||
+
+      {{story[answers["answer_start"][0] : answers["answer_end"][0] ]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: extract_answer_first_qa_turn
+    reference: ''
+  dc05f09a-0b2b-4448-9226-45dcc4cf52e6: !Template
+    answer_choices: null
+    id: dc05f09a-0b2b-4448-9226-45dcc4cf52e6
+    jinja: "{% set missing_idx = range(questions|length)|choice %}\n\n{% for i in\
+      \ range(questions|length) %}\nQ: {{questions[i] }}\n\nA:  {% if i !=missing_idx\
+      \ %}\n{{answers[\"input_text\"][i]}}\n{%endif%}\n{%endfor%}\n\nGiven the above\
+      \ conversation, give a suitable response to the missing answer\n\nHint: {{story}}\n\
+      ||| \n{{answers[\"input_text\"][missing_idx]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: missing_answer
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'

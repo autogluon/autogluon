@@ -1,0 +1,126 @@
+dataset: hotpot_qa
+subset: distractor
+templates:
+  0eff7d44-d78a-47b5-9526-8c38f74be939: !Template
+    answer_choices: null
+    id: 0eff7d44-d78a-47b5-9526-8c38f74be939
+    jinja: "In the paragraphs below, what sentence(s) support the answer of \"{{answer}}\"\
+      \ to the question \"{{question}}\"?\n\nInformation:\n{% for sents in context.sentences\
+      \ %}\n  - {{sents | join(\"\")}}\n{% endfor %}\n\n|||\n{%- for paragraph in\
+      \ supporting_facts.title -%}\n{% set outer_loop = loop %}\n{%- for title in\
+      \ context.title -%}\n{%- if title==paragraph %}\n{{ context.sentences[loop.index0][supporting_facts.sent_id[outer_loop.index0]]\
+      \ }}\n{%- endif -%}\n{%- endfor -%}\n{%- endfor -%}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - COQA F1
+      - Other
+      original_task: true
+    name: generate_explanations_interrogative
+    reference: ''
+  20242fae-2b56-43db-ae50-734c5ca10c5c: !Template
+    answer_choices: null
+    id: 20242fae-2b56-43db-ae50-734c5ca10c5c
+    jinja: "Select sentences from the paragraphs below that explain the question-answer\
+      \ pair. \"{{question}} {{answer}}\"\n\nInformation:\n{% for sents in context.sentences\
+      \ %}\n  - {{sents | join(\"\")}}\n{% endfor %}\n\n|||\n{%- for paragraph in\
+      \ supporting_facts.title -%}\n{% set outer_loop = loop %}\n{%- for title in\
+      \ context.title -%}\n{%- if title==paragraph %}\n{{ context.sentences[loop.index0][supporting_facts.sent_id[outer_loop.index0]]\
+      \ }}\n{%- endif -%}\n{%- endfor -%}\n{%- endfor -%}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - Other
+      - ROUGE
+      original_task: true
+    name: generate_explanations_affirmative
+    reference: 'Given information, question, and its answer, list the sentences from
+      information that explain the answer '
+  690f571f-5113-426c-8aec-bdbbf21f99ae: !Template
+    answer_choices: null
+    id: 690f571f-5113-426c-8aec-bdbbf21f99ae
+    jinja: "{{question}} \n\nHint: use the information from the paragraphs below to\
+      \ answer the question.\n\n{% for sents in context.sentences %}\n  - {{sents\
+      \ | join(\"\")}}\n{% endfor %}\n||| \n{{answer}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: generate_answer_interrogative
+    reference: ''
+  6e33c684-725d-49a2-8da3-f9d0b2bb60a0: !Template
+    answer_choices: null
+    id: 6e33c684-725d-49a2-8da3-f9d0b2bb60a0
+    jinja: "What is the question that begets the answer of \"{{answer}}\"?\n\nInformation:\n\
+      {% for sents in context.sentences %}\n  - {{sents | join(\"\")}}\n{% endfor\
+      \ %}\n||| \n{{question}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: Given information and answer, generate question.
+  9aab7543-e491-403f-a77b-63a57ef3316f: !Template
+    answer_choices: null
+    id: 9aab7543-e491-403f-a77b-63a57ef3316f
+    jinja: "{{question}} Answer the question and give supporting facts from the paragraphs\
+      \ below.  Give your response in the following format:\nAnswer: ... \nExplanations:\n\
+      - ...\n- ...\n\nParagraphs:\n{% for sents in context.sentences %}\n  - {{sents\
+      \ | join(\"\")}}\n{% endfor %}\n\n|||\n{{answer}}\n\nExplanations:\n{%- for\
+      \ paragraph in supporting_facts.title -%}\n{% set outer_loop = loop %}\n{%-\
+      \ for title in context.title -%}\n{%- if title==paragraph %}\n- {{ context.sentences[loop.index0][supporting_facts.sent_id[outer_loop.index0]]\
+      \ }}\n{%- endif -%}\n{%- endfor -%}\n{%- endfor -%}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: generate_answer_and_explanations
+    reference: Given information and question, answer it and list the sentences from
+      information that explain the answer.
+  ea62fe03-8871-4322-8b5c-c060f8d41923: !Template
+    answer_choices: null
+    id: ea62fe03-8871-4322-8b5c-c060f8d41923
+    jinja: "Generate titles (separated by semi-colons) for each of the paragraphs\
+      \ below:\n{% for sents in context.sentences %}\n  - {{sents | join(\"\")}}\n\
+      {% endfor %}\n||| \n{{context.title | join(\"; \")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_title_affirmative
+    reference: Given a list of paragraphs, generate a string of titles (separated
+      by semi-colons) for each of them.
+  f14adb21-34ba-4641-b9ce-dfbd0ae9744c: !Template
+    answer_choices: null
+    id: f14adb21-34ba-4641-b9ce-dfbd0ae9744c
+    jinja: "Answer the following question, \"{{question}}\", using the information\
+      \ provided below.\n\n{% for sents in context.sentences %}\n  - {{sents | join(\"\
+      \")}}\n{% endfor %}\n||| \n{{answer}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: generate_answer_affirmative
+    reference: Given information and question, generate answer.

@@ -1,0 +1,289 @@
+dataset: limit
+templates:
+  0898caf1-f3e4-493f-a838-84a678176c14: !Template
+    answer_choices: null
+    id: 0898caf1-f3e4-493f-a838-84a678176c14
+    jinja: '{{sentence}}
+
+
+      What is the last entity in motion mentioned in the sentence if any? Otherwise,
+      respond with "No entity in motion".
+
+      |||
+
+      {% if (motion_entities  | length) > 0 %}
+
+      {{ (motion_entities | sort(attribute="start_index") | last)["entity"] }}
+
+      {% else %}
+
+      {{"No entity in motion"}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: last_moving_entity
+    reference: ''
+  3b88c578-db77-4fd0-ad50-c78a39197ce5: !Template
+    answer_choices: Yes ||| No
+    id: 3b88c578-db77-4fd0-ad50-c78a39197ce5
+    jinja: '{{sentence}}
+
+
+      Are there any entities in motion in the sentence?
+
+
+      |||
+
+
+      {% if motion == "yes" %}
+
+      {{ answer_choices[0] }}
+
+      {% else %}
+
+      {{ answer_choices[1] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: any_entity
+    reference: Asking if there is any entity in motion in the text
+  3f1689a9-b255-4d8d-b780-062ca2f83596: !Template
+    answer_choices: null
+    id: 3f1689a9-b255-4d8d-b780-062ca2f83596
+    jinja: '{{sentence}}
+
+
+      What are the entities in motion in the previous sentence? Return {{"''No entity''"}}
+      if you can''t find any. If there are multiple entities, use a comma to join
+      them.
+
+
+      |||
+
+      {% if (motion_entities  | length) == 0 %}
+
+      {{ "No entity" }}
+
+      {% else %}
+
+      {{motion_entities | map(attribute="entity") | join(", ")}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: find_entities_question
+    reference: ''
+  74c9962e-3ec2-4f06-ace4-fcac6f506076: !Template
+    answer_choices: Yes ||| No
+    id: 74c9962e-3ec2-4f06-ace4-fcac6f506076
+    jinja: "Extract: {{sentence}}\n\nIs there more than one mention of a moving entity\
+      \ in the extract? \n\n|||\n{% if (motion_entities  | length) > 1 %}\n{{ answer_choices[0]\
+      \ }}\n{% else %}\n{{ answer_choices[1] }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: more_than_one
+    reference: ''
+  766ab346-6fa6-4496-915f-65e7b06ab8ac: !Template
+    answer_choices: null
+    id: 766ab346-6fa6-4496-915f-65e7b06ab8ac
+    jinja: '{{sentence}}
+
+      How many moving entities are mentioned in the sentence above?
+
+      |||
+
+      {{motion_entities | length}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: count_entities
+    reference: ''
+  957deab1-7570-4cbf-a31f-55bfad5212a7: !Template
+    answer_choices: null
+    id: 957deab1-7570-4cbf-a31f-55bfad5212a7
+    jinja: "List out the entities in motion in the following sentence (if there are\
+      \ multiple entities, use a comma to join them). Respond {{\"'No entity'\"}}\
+      \ if you can't find any. \n\n{{sentence}}\n\n|||\n\n{% if (motion_entities |\
+      \ length) == 0 %}\n{{\"No entity\"}}\n{% else %}\n{{motion_entities | map(attribute=\"\
+      entity\") | join(\", \")}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: find_entities_list_out
+    reference: ''
+  9cbb6dce-6463-4785-8130-fbe21216eb69: !Template
+    answer_choices: null
+    id: 9cbb6dce-6463-4785-8130-fbe21216eb69
+    jinja: "Sam has watched a video described as \"{{sentence}}\". What are the entities\
+      \ moving in the video? \n\nList the entities separated by commas. Return {{\"\
+      'No entity'\"}} if there isn't any.\n\n|||\n{% if (motion_entities  | length)\
+      \ == 0 %}\n{{ \"No entity\" }}\n{% else %}\n{{motion_entities | map(attribute=\"\
+      entity\") | join(\", \")}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: find_entities_moving_in_video
+    reference: ''
+  af2203ba-d176-4981-82bd-088ef0c39214: !Template
+    answer_choices: null
+    id: af2203ba-d176-4981-82bd-088ef0c39214
+    jinja: '{{sentence}}
+
+
+      Name the first entity in motion mentioned in the sentence if any. Otherwise,
+      respond with "No entity in motion".
+
+
+      |||
+
+
+      {% if (motion_entities  | length) > 0 %}
+
+      {{ (motion_entities | sort(attribute="start_index") | first)["entity"] }}
+
+      {% else %}
+
+      {{"No entity in motion"}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: first_moving_entity
+    reference: ''
+  b847d63c-0b52-4b6e-a62f-12e47439ce54: !Template
+    answer_choices: null
+    id: b847d63c-0b52-4b6e-a62f-12e47439ce54
+    jinja: 'Count the number of moving entities in the following sentence.
+
+      {{sentence}}
+
+      |||
+
+      {{motion_entities | length}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: count_entities_affirm
+    reference: ''
+  e5482b0d-ed6e-44de-a6e9-b64cdd1e2013: !Template
+    answer_choices: Yes ||| No
+    id: e5482b0d-ed6e-44de-a6e9-b64cdd1e2013
+    jinja: 'Is there any reference to movement in the following sentence?
+
+
+      {{sentence}}
+
+
+      |||
+
+
+      {% if motion == "yes" %}
+
+      {{ answer_choices[0] }}
+
+      {% else %}
+
+      {{ answer_choices[1] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: any_entity_reference
+    reference: Indirectly asking whether there are moving entities
+  e8fca13b-7063-4ebc-9a4d-c124398cacf4: !Template
+    answer_choices: null
+    id: e8fca13b-7063-4ebc-9a4d-c124398cacf4
+    jinja: 'Extract: {{sentence}}
+
+
+      Can you find all mentions of moving entities in the extract? Return {{"''No
+      entity''"}} if you can''t find any.  If there are multiple entities, use a comma
+      to join them.
+
+
+      |||
+
+      {% if (motion_entities  | length) == 0 %}
+
+      {{ "No entity" }}
+
+      {% else %}
+
+      {{motion_entities | map(attribute="entity") | join(", ")}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: find_entities_extract
+    reference: ''
+  ebfec558-fce8-4935-8f28-648c184a3f1a: !Template
+    answer_choices: null
+    id: ebfec558-fce8-4935-8f28-648c184a3f1a
+    jinja: "What are the dynamic entities in the following sentence (if there are\
+      \ multiple entities, use a comma to join them)? Dynamic entities refer to objects\
+      \ in motion. Respond {{\"'No entity'\"}} if you can't find any. \n\n{{sentence}}\n\
+      \n|||\n\n{% if (motion_entities | length) == 0 %}\n{{\"No entity\"}}\n{% else\
+      \ %}\n{{motion_entities | map(attribute=\"entity\") | join(\", \")}}\n{% endif\
+      \ %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: find_entities_dynamic
+    reference: ''

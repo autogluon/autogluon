@@ -1,0 +1,165 @@
+dataset: narrativeqa
+templates:
+  3b53c95c-022b-4a51-946a-6c88b962892a: !Template
+    answer_choices: null
+    id: 3b53c95c-022b-4a51-946a-6c88b962892a
+    jinja: 'Synopsis: {{ document.summary.text }}
+
+
+      Answer the question.
+
+
+      {{ question.text }}
+
+
+      Full text: {{ document.text }} |||
+
+      {{answers | map(attribute="text") | list | choice }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: answer_using_summary_full_text
+    reference: Text + Summary
+  62df1726-be83-4403-9483-732da1174cf7: !Template
+    answer_choices: null
+    id: 62df1726-be83-4403-9483-732da1174cf7
+    jinja: '{{ document.text }}
+
+
+      Using the above text, answer the following question.
+
+
+      {{ question.text }} |||
+
+      {{answers | map(attribute=''text'') | list | choice }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: given_text_answer_question
+    reference: Text only
+  87cb2e86-0764-412a-ba2d-fe3172997a25: !Template
+    answer_choices: null
+    id: 87cb2e86-0764-412a-ba2d-fe3172997a25
+    jinja: '{{ document.text }}
+
+
+      Summarize the given document. |||
+
+      {{ document.summary.text }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: summarize_text
+    reference: Text summarization
+  adfa9f6d-5268-472f-b435-c4558f199961: !Template
+    answer_choices: null
+    id: adfa9f6d-5268-472f-b435-c4558f199961
+    jinja: "Full text: {{ document.text }}\n\nQuestion: {{ question.text }} \n\nAnswer\
+      \ the question using the full text. \n|||\n{{answers | map(attribute=\"text\"\
+      ) | list | choice }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: full_text_question_answer
+    reference: Text only
+  c1170dbc-8b83-4797-aa32-ccafcfddad9e: !Template
+    answer_choices: null
+    id: c1170dbc-8b83-4797-aa32-ccafcfddad9e
+    jinja: 'Answer the question using the information given in the synopsis below.
+
+
+      {{ document.summary.text }}
+
+
+      Question: {{ question.text }} |||
+
+      {{answers | map(attribute="text") | list | choice }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: given_summary_answer_text
+    reference: Summary only
+  ce20a6d2-df6b-4279-bde9-6543ef23ecff: !Template
+    answer_choices: null
+    id: ce20a6d2-df6b-4279-bde9-6543ef23ecff
+    jinja: 'Below is the summary of a document.
+
+
+      {{ document.summary.text }}
+
+
+      What is the answer to the following query?
+
+
+      {{ question.text }} |||
+
+      {{answers | map(attribute="text") | list | choice }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: summary_answer_query
+    reference: Summary only
+  e750f922-2e1b-45c8-98de-3ada1fbde16b: !Template
+    answer_choices: null
+    id: e750f922-2e1b-45c8-98de-3ada1fbde16b
+    jinja: '{{ document.text }}
+
+
+      Can you briefly recapitulate the above document? |||
+
+      {{ document.summary.text }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: recapitulate_given_text
+    reference: Text Summarization
+  f6bedb53-fc87-47f3-94b2-07adb0de2e42: !Template
+    answer_choices: null
+    id: f6bedb53-fc87-47f3-94b2-07adb0de2e42
+    jinja: "State the main points mentioned in the below text.\n\n{{ document.text\
+      \ }}\n |||\n{{ document.summary.text }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: state_main_points
+    reference: Text Summarization

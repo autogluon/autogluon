@@ -638,6 +638,7 @@ def init_data_processors(
                         text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
                         text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
+                        template_config=getattr(config.data, "templates")
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -726,7 +727,6 @@ def create_model(
         elif model_name.lower().startswith(T_FEW):
             model = TFewModel(
                 prefix=model_name,
-                label_templates=model_config.label_templates,
                 checkpoint_name=model_config.checkpoint_name,
                 length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
                 unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
@@ -869,14 +869,14 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
             model=model,
             lora_r=config.optimization.lora.r,
             lora_alpha=config.optimization.lora.alpha,
-            adaptation_to_modules=config.optimization.lora.adaptation_to_modules,
-            adaptation_to_layers=config.optimization.lora.adaptation_to_layers,
+            module_filter= config.optimization.lora.module_filter,
+            filter=config.optimization.lora.filter,
         )
     elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
         model = inject_ia3_to_linear_layer(
             model=model,
-            adaptation_to_modules=config.optimization.lora.adaptation_to_modules,
-            adaptation_to_layers=config.optimization.lora.adaptation_to_layers,
+            module_filter=config.optimization.lora.module_filter,
+            filter=config.optimization.lora.filter,
         )
 
     model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.

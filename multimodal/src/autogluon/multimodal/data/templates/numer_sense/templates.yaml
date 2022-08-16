@@ -1,0 +1,112 @@
+dataset: numer_sense
+templates:
+  1f959d92-dca8-4647-9840-69391dfbd000: !Template
+    answer_choices: nine ||| three ||| four ||| zero ||| two ||| six ||| eight |||
+      one ||| five ||| ten ||| no ||| seven
+    id: 1f959d92-dca8-4647-9840-69391dfbd000
+    jinja: "Fill in the blank in the following sentence using world knowledge:\n\n\
+      {{sentence | replace(\"<mask>\", \"__________\")}}\n\nChose from the following\
+      \ options:\n\n{{ ', '.join(answer_choices) }}\n\n||| \n\n{{target}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill_in_the_blank_with_choices_after
+    reference: ''
+  4e9da2b8-2502-44a7-a7da-ae62f2d554c9: !Template
+    answer_choices: null
+    id: 4e9da2b8-2502-44a7-a7da-ae62f2d554c9
+    jinja: 'The following sentence needs to be filled with a word which is a number
+      word or "no". Using common sense and world knowledge fill in the blanks.
+
+
+      {{sentence | replace("<mask>", "__________")}}
+
+
+      Which is it?
+
+
+      |||
+
+
+      {{target}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill_in_the_blank_with_instruction
+    reference: ''
+  5d8e8d21-8059-4373-bbf2-a25cbe1e6960: !Template
+    answer_choices: nine ||| three ||| four ||| zero ||| two ||| six ||| eight |||
+      one ||| five ||| ten ||| no ||| seven
+    id: 5d8e8d21-8059-4373-bbf2-a25cbe1e6960
+    jinja: 'Using common sense reasoning of the world and only the following options,
+      how would you fill in the blank?:
+
+
+      {{ '', ''.join(answer_choices) }}
+
+
+      {{sentence | replace("<mask>", "__________")}}
+
+
+      |||
+
+
+      {{target}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill_in_the_blank_with_choices_before
+    reference: with all the given options
+  cacee36c-e2b7-458e-9d51-6fcfd83842b4: !Template
+    answer_choices: null
+    id: cacee36c-e2b7-458e-9d51-6fcfd83842b4
+    jinja: 'Fill in the blanks:
+
+
+      {{sentence | replace("<mask>", "__________")}}
+
+
+      The correct answer is:
+
+
+      |||
+
+
+      {{target}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill_in_the_blank_before_sentence
+    reference: replace mask with fill in the blank
+  fc76beb7-c258-412f-a623-42fc8d2331b6: !Template
+    answer_choices: nine ||| three ||| four ||| zero ||| two ||| six ||| eight |||
+      one ||| five ||| ten ||| no ||| seven
+    id: fc76beb7-c258-412f-a623-42fc8d2331b6
+    jinja: "{{sentence | replace(\"<mask>\", \"__________\")}}\n\nUsing only the following\
+      \ options, what answer would make the most sense in the blank above?\n\n{{ ',\
+      \ '.join(answer_choices) }}\n\n||| \n\n{{target}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill_in_the_blank_with_instruction_and_choices
+    reference: missing word simple

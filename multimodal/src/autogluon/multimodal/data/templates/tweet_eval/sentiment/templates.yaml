@@ -1,0 +1,84 @@
+dataset: tweet_eval
+subset: sentiment
+templates:
+  1fef2b36-3a19-4179-9b43-d67887cff299: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: 1fef2b36-3a19-4179-9b43-d67887cff299
+    jinja: 'In this exam, you need to pick the correct sentiment for the tweet:
+
+
+      {{text}}
+
+
+      Possible choices: {{answer_choices | join(", ")}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_exam
+    reference: ''
+  6702e8cd-9764-4c88-86a9-046f84c98ef2: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: 6702e8cd-9764-4c88-86a9-046f84c98ef2
+    jinja: "What is the sentiment of the tweet?\n\n{{text}} \n\nPossible choices:\
+      \ {{answer_choices | join(\", \")}}\n|||\n{{answer_choices[label]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_question
+    reference: ''
+  6c6c797c-9912-4778-906b-16f465941d16: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: 6c6c797c-9912-4778-906b-16f465941d16
+    jinja: "Task: Identify the sentiment of the tweet.\n\nTweet: {{text}}\n\nOptions:\
+      \ {{answer_choices | join(\", \")}} \n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_task
+    reference: ''
+  b70647cf-22a0-49b2-b45e-23432c635cc2: !Template
+    answer_choices: negative|||neutral|||positive
+    id: b70647cf-22a0-49b2-b45e-23432c635cc2
+    jinja: "Suppose you are the moderator of Twitter, what would be the sentiment\
+      \ of the following tweet: \n\n{{text}}\n\nOptions: {{answer_choices | join(\"\
+      , \")}}\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_moderator
+    reference: ''
+  ec68fd8e-92a3-4010-b0df-b14af95421a3: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: ec68fd8e-92a3-4010-b0df-b14af95421a3
+    jinja: "{{text}}\n\nCategorize the tweet into one of the following options: \n\
+      (a) {{answer_choices[0]}} \n(b) {{answer_choices[1]}} \n(c) {{answer_choices[2]}}\n\
+      |||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_options
+    reference: ''

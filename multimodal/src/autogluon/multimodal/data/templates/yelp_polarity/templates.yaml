@@ -1,0 +1,149 @@
+dataset: yelp_polarity
+templates:
+  01dc166f-0774-4be0-b606-2beb2252d9b5: !Template
+    answer_choices: bad ||| good
+    id: 01dc166f-0774-4be0-b606-2beb2252d9b5
+    jinja: '{{ text }}
+
+      Overall, the experience is ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: experience_good_bad
+    reference: ''
+  13f829c1-ca58-4efd-b1f0-14446b176871: !Template
+    answer_choices: low ||| high
+    id: 13f829c1-ca58-4efd-b1f0-14446b176871
+    jinja: '{{ text }}
+
+      Based on that, my rating for this place is ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: rating_high_low
+    reference: ''
+  19e426b1-26e6-462e-a556-0ec3b9402e13: !Template
+    answer_choices: Yes ||| No
+    id: 19e426b1-26e6-462e-a556-0ec3b9402e13
+    jinja: '{{ text }}
+
+      Did I regret it? ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: regret_yes_or_no
+    reference: ''
+  363d31a1-6706-47fd-ad7e-d648cf23bbaa: !Template
+    answer_choices: no ||| yes
+    id: 363d31a1-6706-47fd-ad7e-d648cf23bbaa
+    jinja: '{{ text }}
+
+      If you ask me whether I will come again, my answer is ||| {{ answer_choices[label]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: come_again
+    reference: ''
+  a5ec86fb-046d-482b-a552-8499b8b59b8f: !Template
+    answer_choices: No ||| Yes
+    id: a5ec86fb-046d-482b-a552-8499b8b59b8f
+    jinja: 'Review:
+
+      {{ text }}
+
+
+      Will you come here again? |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: format_come_again
+    reference: Simulating website
+  e0cc8573-5eda-413a-a20f-1da3e7077736: !Template
+    answer_choices: dislike this place. ||| like this place.
+    id: e0cc8573-5eda-413a-a20f-1da3e7077736
+    jinja: '{{ text }}
+
+      That being said, I ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: like_dislike
+    reference: ''
+  e14da8aa-2995-4aed-a90b-adf2bec2b90e: !Template
+    answer_choices: Bad ||| Good
+    id: e14da8aa-2995-4aed-a90b-adf2bec2b90e
+    jinja: 'Review:
+
+      {{ text }}
+
+
+      Overall rating: |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: format_good_bad
+    reference: Simulating the website.
+  e7bb6ec7-921a-4889-93e9-84d957c6035b: !Template
+    answer_choices: bad ||| good
+    id: e7bb6ec7-921a-4889-93e9-84d957c6035b
+    jinja: '{{ text }}
+
+      In a nutshell, this place is ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: place_good_bad
+    reference: ''
+  fb412829-d8a3-4faa-8443-a2ebe6545f6c: !Template
+    answer_choices: no ||| yes
+    id: fb412829-d8a3-4faa-8443-a2ebe6545f6c
+    jinja: '{{ text }}
+
+      If you ask me whether I like this place? The answer is ||| {{ answer_choices[label]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: like_dislike_2
+    reference: ''

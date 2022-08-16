@@ -1,0 +1,131 @@
+dataset: aqua_rat
+subset: raw
+templates:
+  13bd5099-33fa-4383-a441-33a7d2e1746f: !Template
+    answer_choices: A ||| B ||| C ||| D ||| E
+    id: 13bd5099-33fa-4383-a441-33a7d2e1746f
+    jinja: "Given the problem:\n{{question}}\n\nand the options:\n{% for i in range(options|length)\
+      \ %}\n{{options[i].replace(')', ') ')}}\n{% endfor %}\n\nThe correct answer\
+      \ is\n |||\n{{correct}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: select_the_best_option
+    reference: ''
+  58a6aa2b-ca26-473d-9bf8-385dd1a743cd: !Template
+    answer_choices: A ||| B ||| C ||| D ||| E
+    id: 58a6aa2b-ca26-473d-9bf8-385dd1a743cd
+    jinja: 'You will now be given a question and a set of options. Choose the correct
+      option and provide a rationale for the same.
+
+
+      Question:
+
+      {{question}}
+
+
+      Options:
+
+      {% for i in range(options|length) %}
+
+      - {{options[i].replace('')'', '') '')}}
+
+      {% endfor %}
+
+
+      |||
+
+      {{correct}}
+
+
+      {{rationale}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: generate_rational_and_correct_choice
+    reference: ''
+  5acfaa48-e1b6-44df-8e92-c58b94bff595: !Template
+    answer_choices: null
+    id: 5acfaa48-e1b6-44df-8e92-c58b94bff595
+    jinja: "Answer the given question by providing the correct rationale:\n\n{{question}}\n\
+      {% for i in range(options|length) %}\n   {{options[i].replace(')', ') ')}}\n\
+      {%endfor%}\n|||\n{{rationale}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_rationale
+    reference: ''
+  815acaf5-2e59-4f81-8190-ae75dc237cf1: !Template
+    answer_choices: A ||| B ||| C ||| D ||| E
+    id: 815acaf5-2e59-4f81-8190-ae75dc237cf1
+    jinja: '{{question}}
+
+
+      The above question was asked in a Math test. Given the following options, can
+      you choose the correct one?
+
+
+      {% for i in range(options|length) %}
+
+      - {{options[i].replace('')'', '') '')}}
+
+      {% endfor %}
+
+      |||
+
+      {{correct}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: answer_quiz
+    reference: ''
+  c0403841-68b0-4c08-8c3b-a00a81272d05: !Template
+    answer_choices: A ||| B ||| C ||| D ||| E
+    id: c0403841-68b0-4c08-8c3b-a00a81272d05
+    jinja: "Solve the following question and choose the correct option.\n\n{{question}}\
+      \ \n{% for i in range(options|length) %}\n- {{options[i].replace(')', ') ')}}\n\
+      {%endfor%}\n||| \n{{correct}}\n\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Answer questions from options
+    reference: ''
+  c9352c6c-074b-4beb-8489-c151adeeedcb: !Template
+    answer_choices: null
+    id: c9352c6c-074b-4beb-8489-c151adeeedcb
+    jinja: "Question: \n{{question}}\n\nOptions: \n{% for i in range(options|length)\
+      \ %}\n- {{options[i].replace(')', ') ')}}\n{% endfor %}\n\nThis is how I solved\
+      \ the above question:\n|||\n{{rationale}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answer_question_with_rationale
+    reference: ''

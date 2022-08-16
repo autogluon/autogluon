@@ -1,0 +1,148 @@
+dataset: humicroedit
+subset: subtask-1
+templates:
+  692750f4-b4a2-4344-bc4d-e05daef47c25: !Template
+    answer_choices: null
+    id: 692750f4-b4a2-4344-bc4d-e05daef47c25
+    jinja: 'I need to know how funny it is to replace "{{ original[original.index("<")+1:original.index("/>")]
+      }}" with "{{ edit }}" in the sentence "{{ original.replace(original[original.index("<"):original.index(">")+1],
+      original[original.index("<")+1:original.index("/>")]) }} ".
+
+
+      Question: Can you give me a number from {{"0.0 to 3.0"}} that denotes how funny
+      it is, where {{"0.0"}} means not funny and {{"3.0"}} means funny?
+
+
+      |||
+
+      {{ (((5 * meanGrade) | round) / 5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: know_funniness_original_sent_edit_word
+    reference: ''
+  6c6c7354-fcd5-4b0d-8672-671c639c25f5: !Template
+    answer_choices: null
+    id: 6c6c7354-fcd5-4b0d-8672-671c639c25f5
+    jinja: 'I need to know how funny the edited sentence is compared to the original
+      sentence:
+
+      Original: {{ original.replace(original[original.index("<"):original.index(">")+1],
+      original[original.index("<")+1:original.index("/>")]) }}
+
+      Edited: {{ original.replace(original[original.index("<"):original.index(">")+1],
+      edit) }}
+
+      Question: Can you give me a number from {{"0.0 to 3.0"}} that denotes how funny
+      it is, where {{"0.0"}} means not funny and {{"3.0"}} means funny?
+
+      |||
+
+      {{ (((5 * meanGrade) | round) / 5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: know_funniness_original_sent_edited_sent
+    reference: ''
+  759a11e7-5933-41a1-b803-f352eb385d28: !Template
+    answer_choices: null
+    id: 759a11e7-5933-41a1-b803-f352eb385d28
+    jinja: 'Please give a score between 0 (not funny) and 3 (very funny) denoting
+      the funniness of replacing "{{ original[original.index("<")+1:original.index("/>")]
+      }}" with "{{ edit }}" in the sentence "{{ original.replace(original[original.index("<"):original.index(">")+1],
+      original[original.index("<")+1:original.index("/>")]) }} ".
+
+
+      |||
+
+
+      {{ (((5 * meanGrade) | round) / 5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: score_original_sent_edit_word
+    reference: ''
+  90ac629a-f670-4c43-bbf8-a9ef9021c0b3: !Template
+    answer_choices: null
+    id: 90ac629a-f670-4c43-bbf8-a9ef9021c0b3
+    jinja: "I need to assign a score from {{\"0.0 to 3.0\"}} that denotes how funny\
+      \ it is to replace \"{{ original[original.index(\"<\")+1:original.index(\"/>\"\
+      )] }}\" with \"{{ edit }}\" in the sentence \"{{ original.replace(original[original.index(\"\
+      <\"):original.index(\">\")+1], original[original.index(\"<\")+1:original.index(\"\
+      />\")]) }} \". \nWhat score should I assign? A low score means not funny whereas\
+      \ a high score means very funny.\n||| \n{{ (((5 * meanGrade) | round) / 5) }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: score_original_sent_edit_word_low_high
+    reference: ''
+  a08cab27-06fb-4c96-b6b1-eb0533fe9b25: !Template
+    answer_choices: null
+    id: a08cab27-06fb-4c96-b6b1-eb0533fe9b25
+    jinja: 'How funny is the following edited sentence compared to the original sentence?
+
+      Original: {{ original.replace(original[original.index("<"):original.index(">")+1],
+      original[original.index("<")+1:original.index("/>")]) }}
+
+      Edited: {{ original.replace(original[original.index("<"):original.index(">")+1],
+      edit) }}
+
+      Your answer should be something like {{"1.5"}}, where {{"0.0 means not funny
+      and 3.0 means funny"}}.
+
+      |||
+
+      {{ (((5 * meanGrade) | round) / 5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: example_score_original_sent_edited_sent_interrogative
+    reference: ''
+  ac6a9fa1-0f23-4ee9-9bec-c6f9f8daf7a9: !Template
+    answer_choices: null
+    id: ac6a9fa1-0f23-4ee9-9bec-c6f9f8daf7a9
+    jinja: 'Give your best shot to rate how funny the following edited sentence is
+      compared to the original sentence:
+
+      Original: {{ original.replace(original[original.index("<"):original.index(">")+1],
+      original[original.index("<")+1:original.index("/>")]) }}
+
+      Edited: {{ original.replace(original[original.index("<"):original.index(">")+1],
+      edit) }}
+
+      Use a scale of {{"0.0"}}, which denotes not funny, to {{"3.0"}}, which means
+      really hilarious.
+
+
+      |||
+
+      {{ (((5 * meanGrade) | round) / 5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: best_shot_rate_original_sent_edited_sent
+    reference: ''

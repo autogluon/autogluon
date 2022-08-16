@@ -1,0 +1,258 @@
+dataset: hellaswag
+templates:
+  00caa8cb-7f67-43bc-9e90-fc1d5d329432: !Template
+    answer_choices: '{{endings | join(" ||| ")}}'
+    id: 00caa8cb-7f67-43bc-9e90-fc1d5d329432
+    jinja: 'Complete the description with an appropriate ending:
+
+      First, {{ ctx_a.lower() }} Then, {{ ctx_b.lower() }} ...
+
+
+      (a) {{ answer_choices[0] }}
+
+
+      (b) {{ answer_choices[1] }}
+
+
+      (c) {{ answer_choices[2] }}
+
+
+      (d) {{ answer_choices[3] }}
+
+      |||
+
+      {{ answer_choices[label | int()] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: complete_first_then
+    reference: ''
+  196a016d-bd25-4387-90b9-53197fd43b1e: !Template
+    answer_choices: null
+    id: 196a016d-bd25-4387-90b9-53197fd43b1e
+    jinja: "What is the topic of the sentence: {{ctx}} \n|||\n{{activity_label}} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Topic without the ending answer
+    reference: Generate the topic sentence with only the starting sentence
+  1fd44f45-d0e6-41ad-a01f-737f4c53645b: !Template
+    answer_choices: '{{endings | join(" ||| ")}}'
+    id: 1fd44f45-d0e6-41ad-a01f-737f4c53645b
+    jinja: 'Complete the sentence: {{ctx}}
+
+      |||
+
+      {{answer_choices[label | int()]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Open-ended completion
+    reference: Template for open-ended common sense completion
+  4ebf22a1-2d23-426c-a083-b43fc8567687: !Template
+    answer_choices: null
+    id: 4ebf22a1-2d23-426c-a083-b43fc8567687
+    jinja: "{{ctx}} {{endings[label | int()]}}\nCan you identify the topic of the\
+      \ paragraph? \n|||\n{{activity_label}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Topic of the context
+    reference: List the activity label as the topic from the sentence
+  52fbd075-46cb-49fb-a41b-00a0f4a60285: !Template
+    answer_choices: '{{endings | join(" ||| ") }}'
+    id: 52fbd075-46cb-49fb-a41b-00a0f4a60285
+    jinja: '{% set prompts = [
+
+      ''Can you pick the correct ending for the sentence: '',
+
+      ''The task is to generate the ending for the sentence: '',
+
+      ''How does this sentence end? '',
+
+      ''From the list of endings described below, what ending makes the most sense
+      for the sentence '',]
+
+      %}
+
+      {{prompts | choice}}
+
+      {{ctx}}
+
+
+      (a)  {{answer_choices[0]}}
+
+
+      (b)  {{answer_choices[1]}}
+
+
+      (c)  {{answer_choices[2]}}
+
+
+      (d)  {{answer_choices[3]}}
+
+      |||
+
+      {{answer_choices [label | int()]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Randomized prompts template
+    reference: Original task template with randomized prompt template
+  663470b8-3fab-449c-84ab-6c4738da51b3: !Template
+    answer_choices: Yes ||| No
+    id: 663470b8-3fab-449c-84ab-6c4738da51b3
+    jinja: "{% set instance = [0, 1, 2, 3] | choice %}\nConsider the following description:\
+      \ {{ ctx_a }}\nIs the following an appropriate continuation?\n{{ ctx_b }} {{\
+      \ endings[instance] }}\nYes or No?\n||| \n{% if label  == instance | string()\
+      \ %}\n{{answer_choices[0]}}\n{% else %} \n{{answer_choices[1]}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Appropriate continuation - Yes or No
+    reference: 'The template checks if the two contexts are valid continuations. '
+  6e9f8d7d-9016-45bc-b997-c42aeb2dc944: !Template
+    answer_choices: '{{endings | join("|||")}}'
+    id: 6e9f8d7d-9016-45bc-b997-c42aeb2dc944
+    jinja: 'How does this sentence end?
+
+      {{ctx}}
+
+
+      (a)  {{answer_choices[0]}}
+
+
+      (b)  {{answer_choices[1]}}
+
+
+      (c)  {{answer_choices[2]}}
+
+
+      (d)  {{answer_choices[3]}}
+
+
+      Hint: the topic of the sentence is {{activity_label}}
+
+      |||
+
+      {{answer_choices [label | int()]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Predict ending with hint
+    reference: Predict the ending with the activity label as the hint
+  a8ab00ee-78ad-465b-bbf0-9cd3d242dd7e: !Template
+    answer_choices: null
+    id: a8ab00ee-78ad-465b-bbf0-9cd3d242dd7e
+    jinja: 'How would you start the sentence:
+
+      {{endings[label | int()]}}
+
+      |||
+
+      {{ctx}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Open-ended start
+    reference: Template asks the model to generate a premise or start for the ending
+  d95b81c4-5db7-44c1-926e-c7222c896a32: !Template
+    answer_choices: Yes ||| No
+    id: d95b81c4-5db7-44c1-926e-c7222c896a32
+    jinja: "{% set instance = [0, 1, 2, 3] | choice %}\nConsider the following text:\
+      \ {{ ctx_b }} {{ endings[instance] }}\nIs it an appropriate continuation of\
+      \ the following text: \n{{ ctx_a }} ?\nYes or No?\n||| \n{% if label  == instance\
+      \ | string() %}\n{{answer_choices[0]}}\n{% else %} \n{{answer_choices[1]}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Reversed appropriate continuation - Yes or No
+    reference: The template randomly selects a continuation and checks if the continuation
+      is appropriate for the given premise.
+  db8b1c25-f2db-4604-b8fc-f93d69d6fae7: !Template
+    answer_choices: Ending 1 ||| Ending 2 ||| Ending 3 ||| Ending 4
+    id: db8b1c25-f2db-4604-b8fc-f93d69d6fae7
+    jinja: '{{ ctx }}...
+
+      How does the description likely end?
+
+
+      Ending 1: {{ endings[0] }}
+
+
+      Ending 2: {{ endings[1] }}
+
+
+      Ending 3: {{ endings[2] }}
+
+
+      Ending 4: {{ endings[3] }}
+
+      ||| {{ answer_choices[label | int()] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: how_ends
+    reference: ''
+  def77598-682f-48de-b187-55db4d390f07: !Template
+    answer_choices: Ending 1 ||| Ending 2 ||| Ending 3 ||| Ending 4
+    id: def77598-682f-48de-b187-55db4d390f07
+    jinja: "If a description of a situation begins like this: {{ ctx }}... Then how\n\
+      does it continue? \n\nEnding 1: {{ endings[0] }}\n\nEnding 2: {{ endings[1]\
+      \ }}\n\nEnding 3: {{ endings[2] }}\n\nEnding 4: {{ endings[3] }}\n|||{{answer_choices[label\
+      \ | int()] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: if_begins_how_continues
+    reference: Returns a Ending <int> string in the template (similar to how ends
+      paraphrased)

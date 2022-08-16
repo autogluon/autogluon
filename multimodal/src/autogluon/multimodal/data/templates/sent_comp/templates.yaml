@@ -1,0 +1,124 @@
+dataset: sent_comp
+templates:
+  185b5001-19e3-47d3-afd3-40f74346f4bb: !Template
+    answer_choices: null
+    id: 185b5001-19e3-47d3-afd3-40f74346f4bb
+    jinja: '{{graph.sentence}}
+
+
+      ===
+
+
+      Given the above sentence, generate a compressed sentence: ||| {{compression.text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: <premise>-given_the_above-generate_compressed-<entailment>
+    reference: ''
+  336ba469-f315-49ff-8c02-baf6d059972b: !Template
+    answer_choices: null
+    id: 336ba469-f315-49ff-8c02-baf6d059972b
+    jinja: '{{graph.sentence}}
+
+
+      ===
+
+
+      Given the above sentence, write a headline: ||| {{compression.text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: <premise>-given_the_above-write_headline-<entailment>
+    reference: ''
+  6493cbf3-bce9-4556-92ab-ec815f768eb6: !Template
+    answer_choices: null
+    id: 6493cbf3-bce9-4556-92ab-ec815f768eb6
+    jinja: 'Sentence: {{graph.sentence}}
+
+
+      Compressed sentence: ||| {{compression.text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: sentence-<premise>-compressed-<entailment>
+    reference: ''
+  9391497d-4fd1-4977-aba8-dc20f9e9445a: !Template
+    answer_choices: null
+    id: 9391497d-4fd1-4977-aba8-dc20f9e9445a
+    jinja: '{{graph.sentence}}
+
+
+      Extreme TL;DR: ||| {{compression.text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: <premise>-extreme_TLDR-<entailment>
+    reference: ''
+  b7b2934c-cf3e-42b9-b7be-d6f1af679bce: !Template
+    answer_choices: null
+    id: b7b2934c-cf3e-42b9-b7be-d6f1af679bce
+    jinja: 'Write a headline for the sentence below:
+
+      {{graph.sentence}}
+
+
+      headline:
+
+      |||
+
+      {{headline}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: write_headline-<premise>-headline-<entailment>
+    reference: ''
+  ca70c220-b9d8-46fa-8d83-3b9ba9e177c0: !Template
+    answer_choices: null
+    id: ca70c220-b9d8-46fa-8d83-3b9ba9e177c0
+    jinja: '{{graph.sentence}}
+
+      ===
+
+      Given the above sentence, write one compressed sentence to summarize: ||| {{compression.text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: <premise>-given_the_above-write_compressed_to_summarize-<entailment>
+    reference: ''
+  f797c3f9-2a93-46a6-8c84-ba4871eba79b: !Template
+    answer_choices: null
+    id: f797c3f9-2a93-46a6-8c84-ba4871eba79b
+    jinja: 'Compress: {{graph.sentence}} ||| {{compression.text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: compress-<premise>-<entailment>
+    reference: ''

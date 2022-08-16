@@ -1,0 +1,125 @@
+dataset: ade_corpus_v2
+subset: Ade_corpus_v2_drug_ade_relation
+templates:
+  0ec35408-652d-4ebc-9478-5a0d330c24c8: !Template
+    answer_choices: null
+    id: 0ec35408-652d-4ebc-9478-5a0d330c24c8
+    jinja: 'Read the below text and answer the question.
+
+
+      Text: {{text}}
+
+
+      Question: What drug has an effect of {{effect}}?
+
+      |||
+
+      {{drug}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-drug
+    reference: ''
+  2682a789-a435-4976-b34f-f376991c842a: !Template
+    answer_choices: null
+    id: 2682a789-a435-4976-b34f-f376991c842a
+    jinja: '{{drug}} has an effect of {{effect}}. Please write a short medical report
+      about this.
+
+      |||
+
+      {{text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: drug-and-effect-to-text
+    reference: ''
+  61ba3622-72bc-4fd8-acfc-826bc2a93aa5: !Template
+    answer_choices: null
+    id: 61ba3622-72bc-4fd8-acfc-826bc2a93aa5
+    jinja: 'Read the below text and answer the question.
+
+
+      Text: {{text}}
+
+
+      Question: What effect does {{drug}} have?
+
+      |||
+
+      {{effect}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-effect
+    reference: ''
+  6acf3588-baa1-4ff6-87c4-4c2356855464: !Template
+    answer_choices: null
+    id: 6acf3588-baa1-4ff6-87c4-4c2356855464
+    jinja: 'Read the below text and answer the question.
+
+
+      Text: {{text}}
+
+
+      Question: What are the drug and its effect of the above text?
+
+
+      You should answer in the "drug" and "effect" format (e.g., alcohol and high
+      blood pressure)
+
+      |||
+
+      {{drug}} and {{effect}}.'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-drug-and-effect
+    reference: ''
+  db68e609-ba92-40ae-b161-8b7710124142: !Template
+    answer_choices: null
+    id: db68e609-ba92-40ae-b161-8b7710124142
+    jinja: 'Read the below text and answer the two following questions.
+
+
+      Text: {{text}}
+
+
+      Question 1: What is the drug in the above text?
+
+
+      Question 2: What is the effect of it?
+
+
+      You should answer in the "drug" and "effect" format (e.g., alcohol and high
+      blood pressure)
+
+      |||
+
+      {{drug}} and {{effect}}.'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-drug-and-effect-two-questions
+    reference: ''

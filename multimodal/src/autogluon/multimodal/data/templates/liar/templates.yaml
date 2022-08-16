@@ -1,0 +1,152 @@
+dataset: liar
+templates:
+  25af7532-2351-4883-843c-fd5e28ab8668: !Template
+    answer_choices: Moderate ||| activist ||| business-leader ||| columnist ||| constitution-party
+      ||| county-commissioner ||| democrat ||| democratic-farmer-labor ||| education-official
+      ||| government-body ||| green ||| independent ||| journalist ||| labor-leader
+      ||| liberal-party-canada ||| libertarian ||| newsmaker ||| ocean-state-tea-party-action
+      ||| organization ||| republican ||| state-official ||| talk-show-host ||| tea-party-member
+    id: 25af7532-2351-4883-843c-fd5e28ab8668
+    jinja: '{% if party_affiliation != "none" %}
+
+      What is the party affiliation of the speaker of the following statement?
+
+      Choose between: {{answer_choices|join(", ")}}
+
+
+      Statement: {{statement}} |||
+
+
+      {{party_affiliation}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: 'Guess affiliation '
+    reference: ''
+  a22bff2e-ddb8-4c2c-b7a7-fa6847648fd5: !Template
+    answer_choices: null
+    id: a22bff2e-ddb8-4c2c-b7a7-fa6847648fd5
+    jinja: '{% if job_title != "" %}
+
+      Given the following statement:
+
+
+      {{statement}}
+
+
+      and the following speaker: {{speaker.replace("-", " ")}}, predict the speaker''s
+      job title. |||
+
+      {{job_title}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: 'Given statement and speaker guess job title '
+    reference: ''
+  b3618fb1-ad56-47bc-b6ff-393b9c24992b: !Template
+    answer_choices: null
+    id: b3618fb1-ad56-47bc-b6ff-393b9c24992b
+    jinja: '{% if job_title != "" %}
+
+      Guess the context in which the statement below was stated by speaker: {{speaker
+      | replace(''-'', '' '')}}, who is a {{job_title}}
+
+
+      {{statement}} |||
+
+      {{context}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Given statement, speaker and job title guess the context '
+    reference: ''
+  d153b4d3-d0a2-4768-854a-582440943c64: !Template
+    answer_choices: False ||| Half true ||| Mostly true ||| True ||| Barely true |||
+      Pants on fire
+    id: d153b4d3-d0a2-4768-854a-582440943c64
+    jinja: 'Here''s a statement:
+
+
+      {{statement}}
+
+
+      In which of the following categories {{answer_choices | join(", ")}} would you
+      label it based on its truthfulness? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Given statement guess category
+    reference: ''
+  f61239e3-06fc-4397-93ce-f3fca7340428: !Template
+    answer_choices: marriage ||| census ||| job-accomplishments ||| public-health
+      ||| retirement ||| homeland-security ||| population ||| death-penalty ||| government-efficiency
+      ||| hunger ||| obama-birth-certificate ||| disability ||| message-machine-2012
+      ||| baseball ||| welfare ||| education ||| deficit ||| sexuality ||| congressional-rules
+      ||| campaign-advertising ||| city-budget ||| space ||| corporations ||| corrections-and-updates
+      ||| legal-issues ||| islam ||| bush-administration ||| occupy-wall-street |||
+      gas-prices ||| small-business ||| fires ||| after-the-fact ||| pensions |||
+      recreation ||| cap-and-trade ||| children ||| wealth ||| fake-news ||| science
+      ||| federal-budget ||| sotomayor-nomination ||| afghanistan ||| supreme-court
+      ||| nuclear ||| gambling ||| nightlife ||| technology ||| civil-rights ||| patriotism
+      ||| taxes ||| financial-regulation ||| terrorism ||| families ||| consumer-safety
+      ||| message-machine-2014 ||| food-safety ||| weather ||| tourism ||| states
+      ||| jobs ||| redistricting ||| human-rights ||| ebola ||| drugs ||| social-security
+      ||| climate-change ||| message-machine ||| economy ||| israel ||| transportation
+      ||| religion ||| oil-spill ||| gays-and-lesbians ||| transparency ||| county-budget
+      ||| market-regulation ||| animals ||| candidates-biography ||| autism ||| china
+      ||| workers ||| medicaid ||| immigration ||| florida ||| state-finances |||
+      new-hampshire-2012 ||| abortion ||| abc-news-week ||| military ||| history |||
+      crime ||| food ||| criminal-justice ||| stimulus ||| privacy ||| urban ||| state-budget
+      ||| sports ||| polls ||| Alcohol ||| women ||| infrastructure ||| bipartisanship
+      ||| diversity ||| housing ||| elections ||| city-government ||| congress |||
+      ethics ||| campaign-finance ||| iraq ||| labor ||| guns ||| kagan-nomination
+      ||| homeless ||| health-care ||| veterans ||| county-government ||| poverty
+      ||| government-regulation ||| natural-disasters ||| agriculture ||| medicare
+      ||| pop-culture ||| environment ||| lottery ||| income ||| trade ||| debt |||
+      energy ||| pundits ||| voting-record ||| water ||| florida-amendments ||| unions
+      ||| public-service ||| marijuana ||| foreign-policy ||| public-safety ||| bankruptcy
+      ||| debates
+    id: f61239e3-06fc-4397-93ce-f3fca7340428
+    jinja: 'Given the following statement:
+
+
+      {{statement}}
+
+
+      To what subject would you categorize it? |||
+
+      {{subject.split(",")[0]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: 'Given statement guess subject '
+    reference: ''

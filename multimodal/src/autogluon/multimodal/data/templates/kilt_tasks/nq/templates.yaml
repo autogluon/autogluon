@@ -1,0 +1,177 @@
+dataset: kilt_tasks
+subset: nq
+templates:
+  294fd8f3-c7e0-4b3c-abd3-64527f8f71b1: !Template
+    answer_choices: null
+    id: 294fd8f3-c7e0-4b3c-abd3-64527f8f71b1
+    jinja: '{% if output %}
+
+      The goal is to predict an English answer string for an input English question.
+      All questions can be answered using the contents of English Wikipedia.
+
+      Question: {{input}}
+
+      Answer:
+
+      |||
+
+      {{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto", "")|list|choice
+      }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: formal_description
+    reference: Copied from the nq_open dataset description.
+  44f247e1-9d7e-43b9-af4b-6202fd16d0c0: !Template
+    answer_choices: null
+    id: 44f247e1-9d7e-43b9-af4b-6202fd16d0c0
+    jinja: '{% if output %}
+
+      Search query: {{input}}
+
+      Response:
+
+      |||
+
+      {{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto", "")|list|choice
+      }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: search query
+    reference: ''
+  485046dc-0835-4b42-b330-e0ca2ee7f7a1: !Template
+    answer_choices: null
+    id: 485046dc-0835-4b42-b330-e0ca2ee7f7a1
+    jinja: '{% if output %}
+
+      Question : {{input}}
+
+      Answer :
+
+      |||
+
+      {{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto", "")|list|join('',
+      '') }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: false
+    name: question_with_multiple_answer
+    reference: Plain question with multiple answers
+  a5e73119-b3d5-408f-a954-56951ea070f3: !Template
+    answer_choices: null
+    id: a5e73119-b3d5-408f-a954-56951ea070f3
+    jinja: '{% if output %}
+
+      Guess a question that has the answer "{{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto",
+      "")|list|choice }}"
+
+      |||
+
+      {{input}}?
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: guess_question
+    reference: Guess a question. It will show if model can evaluate entity in question.
+  d5fabd3e-4d2e-45bc-888a-0f3a7ea48c85: !Template
+    answer_choices: null
+    id: d5fabd3e-4d2e-45bc-888a-0f3a7ea48c85
+    jinja: '{% if output %}
+
+      Question : {{input}}
+
+      Answer :
+
+      |||
+
+      {{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto", "")|list|choice
+      }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question_answer
+    reference: Plain Question
+  e1ae7863-b30e-4a1a-8c4f-74b8baee5ba9: !Template
+    answer_choices: null
+    id: e1ae7863-b30e-4a1a-8c4f-74b8baee5ba9
+    jinja: '{% if output %}
+
+      I''ve always wondered: {{input}}
+
+      |||
+
+      {{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto", "")|list|choice
+      }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: first_person_context
+    reference: Ask a question in first person
+  f63f6b1e-ef1f-4cd8-bb6e-aaf24fed8936: !Template
+    answer_choices: null
+    id: f63f6b1e-ef1f-4cd8-bb6e-aaf24fed8936
+    jinja: '{% if output %}
+
+      Answer the following question.
+
+      {{input}}
+
+      |||
+
+      {{output|selectattr("answer")|map(attribute=''answer'')|reject("equalto", "")|list|choice
+      }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question_with_instruction
+    reference: Instruction before question.

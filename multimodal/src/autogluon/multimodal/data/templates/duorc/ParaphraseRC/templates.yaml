@@ -1,0 +1,241 @@
+dataset: duorc
+subset: ParaphraseRC
+templates:
+  09adcadd-fa7b-4154-91cb-fe822bf8e00e: !Template
+    answer_choices: null
+    id: 09adcadd-fa7b-4154-91cb-fe822bf8e00e
+    jinja: '{% if no_answer == false%}
+
+      Build a movie plot around this: {{ question }} {{answers|choice}}
+
+      |||
+
+      {{ plot }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: build_story_around_qa
+    reference: Given the question-answer pair, generate a relevant plot.
+  0c7049c0-750a-46b7-af38-dd1e9fcb5217: !Template
+    answer_choices: null
+    id: 0c7049c0-750a-46b7-af38-dd1e9fcb5217
+    jinja: 'I am trying to decide whether it''s worth it to invest in this film proposal.
+      Can you help me answer a few questions? If you can''t, please say "{{"No I can''t"}}".
+
+
+      Question: {{question}}
+
+      Movie title: {{title}}
+
+      Movie plot: {{plot}}
+
+      |||
+
+      {% if no_answer %}
+
+      No I can''t
+
+      {% else %}
+
+      {{answers|choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: decide_worth_it
+    reference: ''
+  594d0551-d737-4680-a7a5-8393acc6dbb7: !Template
+    answer_choices: null
+    id: 594d0551-d737-4680-a7a5-8393acc6dbb7
+    jinja: 'Question: {{question}}
+
+      If there is no answer, please output "{{"Insufficient information to provide
+      an answer."}}".
+
+      Movie title: {{title}}
+
+      Context: {{plot}}
+
+      |||
+
+      {% if no_answer %}
+
+      Insufficient information to provide an answer.
+
+      {% else %}
+
+      {{answers|choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: question_answering
+    reference: Given a passage and a question, generate an answer.
+  805f121a-6bd4-4803-9428-ea733f385add: !Template
+    answer_choices: null
+    id: 805f121a-6bd4-4803-9428-ea733f385add
+    jinja: 'I am a movie director and I just received the following movie plot. Could
+      you help me answer this question? If not, let me know by writing "{{"Not answerable"}}".
+
+
+      Plot title: {{title}}
+
+      Movie plot: {{plot}}
+
+      My question: {{question}}
+
+      |||
+
+      {% if no_answer %}
+
+      Not answerable
+
+      {% else %}
+
+      {{answers|choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: movie_director
+    reference: ''
+  842e346b-2d26-43a2-9a3a-9154f04eb76a: !Template
+    answer_choices: null
+    id: 842e346b-2d26-43a2-9a3a-9154f04eb76a
+    jinja: 'Generate a question about the following movie plot: {{ plot }}
+
+      |||
+
+      {{ question }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: Given the plot, generate a question.
+  945053f7-6ad3-4c08-b7dd-5413564f7467: !Template
+    answer_choices: null
+    id: 945053f7-6ad3-4c08-b7dd-5413564f7467
+    jinja: 'Extract the answer to the following question from the movie plot. If the
+      question isn''t answerable, please output "{{"Can''t answer"}}".
+
+      Question: {{question}}
+
+      Title: {{title}}
+
+      Movie plot: {{plot}}
+
+      |||
+
+      {% if no_answer %}
+
+      Can''t answer
+
+      {% else %}
+
+      {{answers | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: extract_answer
+    reference: ''
+  a8597645-cfed-4f54-ba0d-c23eaafaa131: !Template
+    answer_choices: null
+    id: a8597645-cfed-4f54-ba0d-c23eaafaa131
+    jinja: 'Suggest a movie title for the following movie plot: {{plot}}
+
+      |||
+
+      {{title}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: title_generation
+    reference: Given the plot for the movie, suggest a title.
+  c6f75398-a993-44d6-a494-78961a7dc1b7: !Template
+    answer_choices: null
+    id: c6f75398-a993-44d6-a494-78961a7dc1b7
+    jinja: 'Please answer the following question about this movie plot. If it''s un-answerable,
+      please output "{{"No answer"}}".
+
+
+      Question: {{question}}
+
+      Movie plot title: {{title}}
+
+      Movie plot: {{plot}}
+
+      |||
+
+      {% if no_answer %}
+
+      No answer
+
+      {% else %}
+
+      {{answers | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: answer_question
+    reference: ''
+  ce3649d8-fd90-4a77-8819-4eb20b1c83a9: !Template
+    answer_choices: null
+    id: ce3649d8-fd90-4a77-8819-4eb20b1c83a9
+    jinja: "{% if no_answer == false%}\nGenerate a question that has the following\
+      \ answer: \n{{answers|choice}} \nfor the following movie plot: \n{{plot}}\n\
+      |||\n{{question}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question_by_answer
+    reference: Given the passage and the answer, generate a question which has that
+      answer.

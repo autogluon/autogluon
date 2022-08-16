@@ -1,0 +1,164 @@
+dataset: tmu_gfm_dataset
+templates:
+  2b6a9c53-7cbc-4574-b5bd-448cf7960693: !Template
+    answer_choices: null
+    id: 2b6a9c53-7cbc-4574-b5bd-448cf7960693
+    jinja: 'Supposedly Sentence B is more natural than Sentence A. How much better
+      is it on a scale from 1 to 4?
+
+
+      Sentence A: {{source}}
+
+
+      Sentence B: {{output}}
+
+      |||
+
+      {{ (((10*ave_f) | round )/10) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: fluency
+    reference: The metric is a regression task metric.
+  2b712291-0629-4499-86cc-566ee7376271: !Template
+    answer_choices: null
+    id: 2b712291-0629-4499-86cc-566ee7376271
+    jinja: 'Sentence B is grammatically better than Sentence A. How much better is
+      it on a scale from 0 to 4?
+
+
+      Sentence A: {{source}}
+
+
+      Sentence B: {{output}}
+
+      |||
+
+      {{ (((10*ave_g) | round )/10) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: grammar
+    reference: The metric is a regression task metric.
+  30a17c4d-2bee-450c-b921-9b748ae87c93: !Template
+    answer_choices: null
+    id: 30a17c4d-2bee-450c-b921-9b748ae87c93
+    jinja: 'Grammatically improve the below text. Note that the original meaning has
+      to be preserved and also it should sound natural.
+
+
+      Text: {{source}}
+
+      |||
+
+      {{output}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: correct-sentence
+    reference: ''
+  9854074f-422e-47e4-bb49-e472dff76311: !Template
+    answer_choices: null
+    id: 9854074f-422e-47e4-bb49-e472dff76311
+    jinja: 'Sentence A was rewritten into Sentence B. Would you say that the original
+      meaning is well preserved? Please rate it on a scale from 0 to 4.
+
+
+      Sentence A: {{source}}
+
+
+      Sentence B: {{output}}
+
+      |||
+
+      {{ (((10*ave_m) | round )/10) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: meaning
+    reference: The metric is a regression task metric.
+  c8347303-bfcd-4fe5-b085-dee46045850c: !Template
+    answer_choices: null
+    id: c8347303-bfcd-4fe5-b085-dee46045850c
+    jinja: 'Read the below two sentences and answer the question.
+
+
+      Sentence A: {{source}}
+
+
+      Sentence B: {{output}}
+
+
+      Question: Sentence B is an improved version of Sentence A. How would you rate
+      the improvement on a scale from 0 to 4, with respect to grammaticality,  fluency,
+      and meaning preservation, respectively? Please give an answer with three numbers
+      separated by commas.
+
+      |||
+
+      {{ (((10*ave_g) | round )/10) }}, {{ (((10*ave_f) | round )/10) }}, and {{ (((10*ave_m)
+      | round )/10) }}.'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: grammar-fluency-meaning
+    reference: The metric is a regression task metric.
+  ebb2956b-25eb-4a66-ba23-569ccf9b8675: !Template
+    answer_choices: Sentence A ||| Sentence B
+    id: ebb2956b-25eb-4a66-ba23-569ccf9b8675
+    jinja: 'Which one of the following two sentences is written better? Your answer
+      should be either "Sentence A" or "Sentence B".
+
+      {% if range(0,2) | choice %}
+
+      Sentence A: {{source}}
+
+
+      Sentence B: {{output}}
+
+      |||
+
+      Sentence B
+
+      {% else %}
+
+      Sentence A: {{output}}
+
+
+      Sentence B: {{source}}
+
+      |||
+
+      Sentence A
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: choose-better
+    reference: ''

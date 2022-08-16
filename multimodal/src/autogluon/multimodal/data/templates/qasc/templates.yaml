@@ -1,0 +1,141 @@
+dataset: qasc
+templates:
+  3e1e6ca0-b95e-4e68-bb6a-cd47c8429658: !Template
+    answer_choices: Yes ||| No
+    id: 3e1e6ca0-b95e-4e68-bb6a-cd47c8429658
+    jinja: "If I tell you that {{combinedfact[0]|capitalize}}{{ combinedfact[1:]|trim('.')\
+      \ }}, and ask you the question \"{{ question[0]|lower }}{{ question[1:] }}\"\
+      , is the correct answer \"{{ choices.text[0][0]|lower}}{{ choices.text[0][1:]|trim('.')\
+      \ }}\"? \n\n||| \n\n{% if answerKey == choices.label[0] %} Yes {% else %} No\
+      \ {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: is_correct_1
+    reference: ''
+  40ef67db-dff3-4e7b-b167-f7e54b400c74: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 40ef67db-dff3-4e7b-b167-f7e54b400c74
+    jinja: "{{ fact1[0]|capitalize }}{{ fact1[1:]|trim|trim('.') }}, and {{fact2[0]|lower\
+      \ }}{{ fact2[1:]|trim|trim('.') }}. Given these facts, {{ question[0]|lower\
+      \ }}{{question[1:]|trim('?') }} among the following options:\n- {{answer_choices\
+      \ | join(\"\\n - \") }}\n\n||| \n\n{% for choice in choices.label %} {% if choice\
+      \ == answerKey %}{{ answer_choices[loop.index - 1] }}{% endif %}{% endfor %} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_with_separated_facts_1
+    reference: Question Answering with separated facts.
+  5d63c186-e047-49dd-b5fd-c4a574f6f0e2: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 5d63c186-e047-49dd-b5fd-c4a574f6f0e2
+    jinja: "Fact 1: {{ fact1[0]|capitalize }}{{ fact1[1:]|trim|trim('.') }}.\n\nFact\
+      \ 2: {{fact2[0]|capitalize }}{{ fact2[1:]|trim|trim('.') }}.\n\nGiven the two\
+      \ facts above, {{ question[0]|lower }}{{question[1:]|trim('?') }}?\n\n||| \n\
+      \n{% for choice in choices.label %} {% if choice == answerKey %}{{ answer_choices[loop.index\
+      \ - 1] }}{% endif %}{% endfor %}  "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_with_separated_facts_3
+    reference: Question Answering with separated facts.
+  604dd379-21f1-4d30-af2f-22f9a8a97ceb: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 604dd379-21f1-4d30-af2f-22f9a8a97ceb
+    jinja: "You are presented with the question \"{{ question }}\" and the following\
+      \ answer choices: \n- {{answer_choices | join(\"\\n - \") }}\n\nNow knowing\
+      \ that {{ fact1[0]|lower }}{{ fact1[1:]|trim|trim('.') }} and {{fact2[0]|lower\
+      \ }}{{ fact2[1:]|trim|trim('.') }}, choose the best answer.\n\n||| \n\n{% for\
+      \ choice in choices.label %} {% if choice == answerKey %}{{ answer_choices[loop.index\
+      \ - 1] }}{% endif %}{% endfor %} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_with_separated_facts_4
+    reference: Question Answering with separated facts.
+  67cb1b35-e5d4-490b-beb8-dc9c0be9c298: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 67cb1b35-e5d4-490b-beb8-dc9c0be9c298
+    jinja: "You are presented with the quiz \"{{ question }}\" \n\nBut you don't know\
+      \ the answer, so you turn to your teacher to ask for hints. He says that \"\
+      {{ fact1[0]|lower }}{{ fact1[1:]|trim|trim('.') }}\" and \"{{fact2[0]|lower\
+      \ }}{{ fact2[1:]|trim|trim('.') }}\". \n\nSo, what's the best answer to the\
+      \ question?\n\n||| \n\n{% for choice in choices.label %} {% if choice == answerKey\
+      \ %}{{ answer_choices[loop.index - 1] }}{% endif %}{% endfor %}   "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_with_separated_facts_5
+    reference: Question Answering with separated facts.
+  b5b61423-8655-408d-a8e6-81a5eaaac2aa: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: b5b61423-8655-408d-a8e6-81a5eaaac2aa
+    jinja: "If {{ combinedfact[0]|lower }}{{ combinedfact[1:]|trim|trim('.') }}, then\
+      \ {{ question[0]|lower }}{{question[1:]|trim|trim('?') }}?\n\nAnswer choices:\n\
+      - {{answer_choices | join(\"\\n - \") }}\n||| \n\n{% for choice in choices.label\
+      \ %} {% if choice == answerKey %}{{ answer_choices[loop.index - 1] }}{% endif\
+      \ %}{% endfor %}  "
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: qa_with_combined_facts_1
+    reference: ''
+  c251edaf-a063-40fe-bd49-038843fcdb23: !Template
+    answer_choices: Yes ||| No
+    id: c251edaf-a063-40fe-bd49-038843fcdb23
+    jinja: "Do you think the right answer to the question \"{{ question[0]|lower }}{{\
+      \ question[1:] }}\" is \"{{ choices.text[1][0]|lower}}{{ choices.text[1][1:]|trim('.')\
+      \ }}\", given that\n {{combinedfact[0]|lower}}{{ combinedfact[1:]|trim('.')\
+      \ }}?\n ||| \n{% if answerKey == choices.label[0] %} Yes {% else %} No {% endif\
+      \ %}   "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: is_correct_2
+    reference: ''
+  c7cd51f1-ea49-4d6a-a422-46624333b7b1: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: c7cd51f1-ea49-4d6a-a422-46624333b7b1
+    jinja: "Fact 1: {{ fact1[0]|capitalize }}{{ fact1[1:]|trim|trim('.') }}.\n\nFact\
+      \ 2: {{fact2[0]|capitalize }}{{ fact2[1:]|trim|trim('.') }}.\n\nGiven the two\
+      \ facts above, answer the question \"{{ question }}\" with the following options:\
+      \ \n- {{answer_choices | join(\"\\n - \") }}\n\n||| \n\n{% for choice in choices.label\
+      \ %} {% if choice == answerKey %}{{ answer_choices[loop.index - 1] }}{% endif\
+      \ %}{% endfor %} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_with_separated_facts_2
+    reference: Question Answering with separated facts.

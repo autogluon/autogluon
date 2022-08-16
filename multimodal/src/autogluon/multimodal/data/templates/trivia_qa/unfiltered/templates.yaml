@@ -1,0 +1,79 @@
+dataset: trivia_qa
+subset: unfiltered
+templates:
+  5946db1a-a068-4a31-a06f-74a7d976cb6d: !Template
+    answer_choices: null
+    id: 5946db1a-a068-4a31-a06f-74a7d976cb6d
+    jinja: "{% if answer.aliases %} \n    Guess a question that has the answer \"\
+      {{answer.aliases|choice}}\" \n    |||  \n    {{question}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: guess_question
+    reference: Guess a question.
+  7ada9605-6fd1-49a9-a56e-6d778d4a0eb6: !Template
+    answer_choices: null
+    id: 7ada9605-6fd1-49a9-a56e-6d778d4a0eb6
+    jinja: "The goal is to predict an English answer string for an input English question.\
+      \ \nQuestion : {{question}}\nAnswer : \n||| \n{% if answer.aliases %} \n{{answer.aliases|choice}}\
+      \ \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: formal_description
+    reference: ''
+  91d9f950-a25a-4557-a16f-952d74629584: !Template
+    answer_choices: null
+    id: 91d9f950-a25a-4557-a16f-952d74629584
+    jinja: "Answer the following question.\n{{question}} \n|||\n{% if answer.aliases\
+      \ %} \n{{answer.aliases|choice}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question_with_instruction
+    reference: Instruction before question.
+  bfec3d73-c024-492f-8878-64fdb6639a29: !Template
+    answer_choices: null
+    id: bfec3d73-c024-492f-8878-64fdb6639a29
+    jinja: "I've always wondered: {{question}} \n||| \n{% if answer.aliases %} \n\
+      {{answer.aliases|choice}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: first_person_context
+    reference: Ask a question in first person
+  c29c7072-0535-4e38-ba0c-b7ac0acdacf8: !Template
+    answer_choices: null
+    id: c29c7072-0535-4e38-ba0c-b7ac0acdacf8
+    jinja: "Question : {{question}}\nAnswer : \n||| \n{% if answer.aliases %} \n{{answer.aliases|choice}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question_answer
+    reference: Plain Question

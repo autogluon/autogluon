@@ -1,0 +1,50 @@
+dataset: ade_corpus_v2
+subset: Ade_corpus_v2_classification
+templates:
+  56bd12a8-b8ee-464e-98cc-5f586ba9f74d: !Template
+    answer_choices: No ||| Yes
+    id: 56bd12a8-b8ee-464e-98cc-5f586ba9f74d
+    jinja: 'Please answer the below Yes / No question.
+
+
+      Is "{{text}}" related to adverse drug effect (ADE)? ||| {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: binary-classification
+    reference: ''
+  78c4ce65-dd66-46ed-878d-11f4eca5e544: !Template
+    answer_choices: No ||| Yes
+    id: 78c4ce65-dd66-46ed-878d-11f4eca5e544
+    jinja: "Read the below text and answer the question.\n\nText: {{text}} \n\nQuestion:\
+      \ Is the above text related to adverse drug effect (ADE)? Your answer should\
+      \ be either \"Yes\" or \"No\".\n\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: verbose-binary-classification
+    reference: ''
+  dabc0337-5bd3-4150-98b3-794a15ce1a3a: !Template
+    answer_choices: null
+    id: dabc0337-5bd3-4150-98b3-794a15ce1a3a
+    jinja: "{% if label==1 %}\nPlease write a short medical report that is related\
+      \ to adverse drug effect (ADE). \n{% else %}\nWrite a medical report that is\
+      \ not related to adverse drug effect (ADE). \n{% endif %}\n|||\n{{text}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: label-to-text
+    reference: ''

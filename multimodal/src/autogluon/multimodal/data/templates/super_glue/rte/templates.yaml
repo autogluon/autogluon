@@ -1,0 +1,146 @@
+dataset: super_glue
+subset: rte
+templates:
+  2b52a83c-0021-41fe-b44c-5aaa076d71a2: !Template
+    answer_choices: Yes ||| No
+    id: 2b52a83c-0021-41fe-b44c-5aaa076d71a2
+    jinja: '{{premise}} Using only the above description and what you know about the
+      world, is "{{hypothesis}}" definitely correct? Yes or no? ||| {% if label !=
+      -1 %}{{ answer_choices[label] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: MNLI crowdsource
+    reference: Adapted from Williams et al. 2018's instructions to crowdsourcing workers.
+  2d0d63da-ffcf-4f6e-941a-b8da922be43e: !Template
+    answer_choices: Yes ||| No
+    id: 2d0d63da-ffcf-4f6e-941a-b8da922be43e
+    jinja: Given {{premise}} Is it guaranteed true that "{{hypothesis}}"? Yes or no?
+      ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: guaranteed true
+    reference: Webson & Pavlick 2021
+  4163e6f1-1a83-4c73-b867-02eb7ac80316: !Template
+    answer_choices: Yes ||| No
+    id: 4163e6f1-1a83-4c73-b867-02eb7ac80316
+    jinja: Suppose {{premise}} Can we infer that "{{hypothesis}}"? Yes or no? |||
+      {% if label != -1 %}{{ answer_choices[label] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: can we infer
+    reference: Webson & Pavlick 2021
+  8fb1c6aa-20e9-438c-bece-c6af1c746449: !Template
+    answer_choices: True ||| False
+    id: 8fb1c6aa-20e9-438c-bece-c6af1c746449
+    jinja: '{{premise}}
+
+      Question: {{hypothesis}} True or False? ||| {% if label != -1 %}{{ answer_choices[label]
+      }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style
+    reference: Same as reported in Figure G31 of the GPT-3 paper.
+  9e078fb4-505b-413c-bb5e-3cd16ddcf5d7: !Template
+    answer_choices: Yes ||| No
+    id: 9e078fb4-505b-413c-bb5e-3cd16ddcf5d7
+    jinja: "{{premise}} \n\nQuestion: Does this imply that \"{{hypothesis}}\"? Yes\
+      \ or no? ||| {% if label != -1 %}{{answer_choices[label]}}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does this imply
+    reference: Sanh et al. 2021
+  b8dc85c6-28b6-4340-979a-8e77c2a0dde8: !Template
+    answer_choices: Yes ||| No
+    id: b8dc85c6-28b6-4340-979a-8e77c2a0dde8
+    jinja: Given {{premise}} Should we assume that "{{hypothesis}}" is true? Yes or
+      no? ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: should assume
+    reference: Webson & Pavlick 2021
+  e2fb58f2-b1f2-4aef-b74b-c4ee1c571fff: !Template
+    answer_choices: Yes ||| No
+    id: e2fb58f2-b1f2-4aef-b74b-c4ee1c571fff
+    jinja: Given that {{premise}} Does it follow that {{hypothesis}} Yes or no? |||
+      {% if label != -1 %}{{ answer_choices[label] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does it follow that
+    reference: Sanh et al. 2021
+  ed1f4b75-8826-4852-9bd6-aedf368678f5: !Template
+    answer_choices: Yes ||| No
+    id: ed1f4b75-8826-4852-9bd6-aedf368678f5
+    jinja: '{{premise}} Based on the previous passage, is it true that "{{hypothesis}}"?
+      Yes or no? ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: based on the previous passage
+    reference: "Adapted from the BoolQ prompts in Schick & Sch\xFCtze 2021."
+  ee0ce095-122a-4509-bf0b-33d1495295f7: !Template
+    answer_choices: Yes ||| No
+    id: ee0ce095-122a-4509-bf0b-33d1495295f7
+    jinja: '{{premise}} Are we justified in saying that "{{hypothesis}}"? Yes or no?
+      ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: justified in saying
+    reference: Webson & Pavlick 2021
+  fb4f8144-37f5-4977-88da-37a5d0bfd0e8: !Template
+    answer_choices: Yes ||| No
+    id: fb4f8144-37f5-4977-88da-37a5d0bfd0e8
+    jinja: Given that {{premise}} Therefore, it must be true that "{{hypothesis}}"?
+      Yes or no? ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: must be true
+    reference: Sanh et al. 2021

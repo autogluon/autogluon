@@ -1,0 +1,147 @@
+dataset: hyperpartisan_news_detection
+subset: byarticle
+templates:
+  06fbb182-0077-4355-b7cc-b4d0d2e98c08: !Template
+    answer_choices: 'True ||| False '
+    id: 06fbb182-0077-4355-b7cc-b4d0d2e98c08
+    jinja: 'Consider this news article text:
+
+
+      "{{text}}"
+
+
+      Does it follow a hyperpartisan argumentation? "{{answer_choices[0]}}" or "{{answer_choices[1]}}"?
+
+
+      |||
+
+
+      {{answer_choices[0] if hyperpartisan else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: consider_does_it_follow_a_hyperpartisan_argumentation
+    reference: Does this text exhibit prejudice towards a group or cause?
+  0e988588-f3f1-4c70-80ce-dc5660cde6dc: !Template
+    answer_choices: True ||| False
+    id: 0e988588-f3f1-4c70-80ce-dc5660cde6dc
+    jinja: '"{{text}}"
+
+
+      The news article text above follows a hyperpartisan argumentation. {{answer_choices[0]}}"
+      or "{{answer_choices[1]}}"?
+
+
+      |||
+
+
+      {{answer_choices[0] if hyperpartisan else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: follows_hyperpartisan_argumentation
+    reference: Does this text exhibit prejudice towards a group or cause?
+  545567e7-97cf-4600-bf1e-94f213d2f0a4: !Template
+    answer_choices: 'True ||| False '
+    id: 545567e7-97cf-4600-bf1e-94f213d2f0a4
+    jinja: '"{{text}}"
+
+
+      We must consume the news article above with caution as it exhibits prejudiced
+      allegiance towards one group or cause. "{{answer_choices[0]}}" or "{{answer_choices[1]}}"?
+
+
+      |||
+
+
+      {{answer_choices[0] if hyperpartisan else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: consume_with_caution
+    reference: Does this text exhibit prejudice towards a group or cause?
+  5a612b28-923b-4302-b959-290bf8453166: !Template
+    answer_choices: 'True ||| False '
+    id: 5a612b28-923b-4302-b959-290bf8453166
+    jinja: '"{{text}}"
+
+
+      The news article above takes an extreme left-wing or right-wing standpoint.
+      "{{answer_choices[0]}}" or "{{answer_choices[1]}}"?
+
+
+      |||
+
+
+      {{answer_choices[0] if hyperpartisan else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: extreme_left_wing_or_right_wing
+    reference: Does this text exhibit prejudice towards a group or cause?
+  8ab54a01-2728-4ac2-8ee9-79016434454f: !Template
+    answer_choices: 'True ||| False '
+    id: 8ab54a01-2728-4ac2-8ee9-79016434454f
+    jinja: '"{{text}}"
+
+
+      The publisher of the news piece above has reported strongly in favor of one
+      political side and seems to have ignored the other side. "{{answer_choices[0]}}"
+      or "{{answer_choices[1]}}"?
+
+
+      |||
+
+
+      {{answer_choices[0] if hyperpartisan else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: publisher_has_reported_strongly
+    reference: Does this text exhibit prejudice towards a group or cause?
+  d4f7f589-995a-473e-b87b-68b9a0fea0d8: !Template
+    answer_choices: 'True ||| False '
+    id: d4f7f589-995a-473e-b87b-68b9a0fea0d8
+    jinja: 'Consider this news piece:
+
+
+      "{{text}}"
+
+
+      It exhibits extreme one-sidedness to a single group of individuals or cause.
+      "{{answer_choices[0]}}" or "{{answer_choices[1]}}"?
+
+
+      |||
+
+
+      {{answer_choices[0] if hyperpartisan else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: consider_it_exhibits_extreme_one_sidedness
+    reference: Does this text exhibit prejudice towards a group or cause?

@@ -1,0 +1,119 @@
+dataset: glue
+subset: stsb
+templates:
+  50e3a541-108c-4b26-a423-956562d9b3af: !Template
+    answer_choices: null
+    id: 50e3a541-108c-4b26-a423-956562d9b3af
+    jinja: Rate on a scale from {{"0.0"}} to {{"5.0"}} how similar the sentences "{{sentence1}}"
+      and "{{sentence2}}" are. ||| {{ (((5*label) | round )/5) }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      - Spearman Correlation
+      original_task: true
+    name: rank
+    reference: ''
+  88dcb716-d19c-45bc-9d3a-cdf8fff5500b: !Template
+    answer_choices: null
+    id: 88dcb716-d19c-45bc-9d3a-cdf8fff5500b
+    jinja: 'Please rate how similar these two sentences are from {{"0.0"}} to {{"5.0"}}.
+
+      Sentence A: {{sentence1}}
+
+      Sentence B: {{sentence2}}
+
+      |||
+
+      {{ (((5*label) | round )/5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      - Spearman Correlation
+      original_task: true
+    name: rate
+    reference: ''
+  a552635f-3a9a-497f-ac04-ef414b24eb16: !Template
+    answer_choices: null
+    id: a552635f-3a9a-497f-ac04-ef414b24eb16
+    jinja: 'Please give me a score denoting the similarity of the following two sentences:
+
+      Sentence 1: {{sentence1}}
+
+      Sentence 2: {{sentence2}}
+
+      Your score should be something like {{"3.4"}}, where {{"0.0 means very dissimilar,
+      2.5 means kind of similar, and 5.0 means very similar"}}.
+
+      |||
+
+      {{ (((5*label) | round )/5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      - Spearman Correlation
+      original_task: true
+    name: examples
+    reference: ''
+  ca75788d-4974-440a-a7b7-c42bae814d59: !Template
+    answer_choices: null
+    id: ca75788d-4974-440a-a7b7-c42bae814d59
+    jinja: 'I need to know how similar these two passages are:
+
+      - {{sentence1}}
+
+      - {{sentence2}}
+
+
+      Question: Can you give me a number from {{"0.0 to 5.0"}} that denotes how similar
+      they are, where {{"0.0"}} means totally dissimilar and {{"5.0"}} means extremely
+      similar?
+
+      Answer:
+
+      |||
+
+      {{ (((5*label) | round )/5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      - Spearman Correlation
+      original_task: true
+    name: similarity
+    reference: ''
+  d7315518-cfb9-4840-93ab-c52f1bb5e74d: !Template
+    answer_choices: null
+    id: d7315518-cfb9-4840-93ab-c52f1bb5e74d
+    jinja: 'I need to assign a score from {{"0.0 to 5.0"}} that denotes how similar
+      the following two sentences are:
+
+      A: {{sentence1}}
+
+      B: {{sentence2}}
+
+      What score should I assign?
+
+      |||
+
+      {{ (((5*label) | round )/5) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      - Spearman Correlation
+      original_task: true
+    name: score
+    reference: ''

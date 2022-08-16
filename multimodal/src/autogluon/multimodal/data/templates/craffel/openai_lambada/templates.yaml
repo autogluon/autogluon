@@ -1,0 +1,82 @@
+dataset: craffel/openai_lambada
+templates:
+  1ee5ddef-fffb-4b73-a2f7-f600ffac63cb: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 1ee5ddef-fffb-4b73-a2f7-f600ffac63cb
+    jinja: '{{ text.split()[:-1] | join('' '') }}...
+
+
+      What comes after the ellipses? ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: ellipses
+    reference: ''
+  4f08e9d4-bcff-4bc0-9902-87c497625d17: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 4f08e9d4-bcff-4bc0-9902-87c497625d17
+    jinja: 'Fill in the blank:
+
+
+      {{ text.split()[:-1] | join('' '') }} ____. ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style
+    reference: Brown et al.
+  507de732-8298-4971-bac3-7d768d511a31: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 507de732-8298-4971-bac3-7d768d511a31
+    jinja: '{{ text.split()[:-1] | join('' '') }} ____.
+
+
+      Fill in the ____: ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill in the ____
+    reference: ''
+  774b4349-0524-4a34-881b-b344f8f5c34e: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 774b4349-0524-4a34-881b-b344f8f5c34e
+    jinja: 'This story got cut short. What comes next?
+
+
+      {{ text.split()[:-1] | join('' '') }} ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what comes next
+    reference: ''
+  ef072a60-252e-4c52-aa8a-4152bb4dd83c: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: ef072a60-252e-4c52-aa8a-4152bb4dd83c
+    jinja: 'Please predict the next word after the following chunk of text.
+
+
+      {{ text.split()[:-1] | join('' '') }} ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: please next word
+    reference: ''

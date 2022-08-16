@@ -1,0 +1,69 @@
+dataset: enriched_web_nlg
+subset: en
+templates:
+  3860d7fb-0b50-4275-a7ab-782ae86756e5: !Template
+    answer_choices: null
+    id: 3860d7fb-0b50-4275-a7ab-782ae86756e5
+    jinja: 'Take the following triple set as part of a Data-to-Text task: {{modified_triple_sets.mtriple_set[0]
+      | join(", ")}}. Make a lexicalization of the triple set into plain text. |||
+      {{lex.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: Non-explicit Description
+    reference: 'Triple set: lexicalization'
+  5c203187-70e4-4913-86af-8b00b5ca9e16: !Template
+    answer_choices: null
+    id: 5c203187-70e4-4913-86af-8b00b5ca9e16
+    jinja: 'Verbalize the following triples separated by a comma: {{modified_triple_sets.mtriple_set[0]
+      | join(", ")}} ||| {{lex.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: Verbalize + Specify Commas
+    reference: 'Instruction: verbalization'
+  715a885b-1022-43b0-bcfe-20fa432314da: !Template
+    answer_choices: null
+    id: 715a885b-1022-43b0-bcfe-20fa432314da
+    jinja: 'Take the following graph comprising triple sets, where each element of
+      a triple is separated  by "|" and each triple set by ",": {{modified_triple_sets.mtriple_set[0]
+      | join(", ")}}. Make a verbalization of the triple set into plain text. |||
+      {{lex.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: Explicit Graph Description
+    reference: 'Explicit Graph Description: verbalization.'
+  e80f68dd-ebd0-4cbc-960d-bb28aff2d2d4: !Template
+    answer_choices: null
+    id: e80f68dd-ebd0-4cbc-960d-bb28aff2d2d4
+    jinja: 'Take the following Table to text task comprising semantic triples (RDF
+      triples), where each element of a triple is separated  by "|" and each triple
+      set by ",": {{modified_triple_sets.mtriple_set[0] | join(", ")}}. Make a verbalization
+      of the triple set into plain text, which fully and accurately describes the
+      Table. ||| {{lex.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: Explicit Table-to-Text Description
+    reference: 'Explicit Table description: verbalization.'

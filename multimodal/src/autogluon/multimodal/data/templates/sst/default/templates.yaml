@@ -1,0 +1,105 @@
+dataset: sst
+subset: default
+templates:
+  23c231c1-672d-4420-a8ab-41ab930de317: !Template
+    answer_choices: no ||| yes
+    id: 23c231c1-672d-4420-a8ab-41ab930de317
+    jinja: 'Does the movie review below make someone want to watch it?
+
+
+      {{sentence}} |||
+
+      {{answer_choices
+
+      [0 if label < 0.5 else 1]
+
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_watch_movie
+    reference: ''
+  5119a0b5-5d82-4401-900a-7fafc1d48ff6: !Template
+    answer_choices: null
+    id: 5119a0b5-5d82-4401-900a-7fafc1d48ff6
+    jinja: 'How positive is the movie review below?
+
+      Give a score on a scale from 0 to 1.
+
+
+      {{sentence}} |||
+
+      {{''%0.1f''| format(label|float)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: sentiment scoring scale
+    reference: ''
+  647585d3-dac6-40c3-b6d0-f02d835ae4c4: !Template
+    answer_choices: null
+    id: 647585d3-dac6-40c3-b6d0-f02d835ae4c4
+    jinja: 'How much does the movie review below make you want to watch it?
+
+      Give a score on a scale from 0 to 1.
+
+
+      {{sentence}} |||
+
+      {{''%0.1f''| format(label|float)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: sentiment_watch_scale
+    reference: ''
+  9453d08b-6144-4f36-a53d-232ed1dfcff4: !Template
+    answer_choices: no ||| yes
+    id: 9453d08b-6144-4f36-a53d-232ed1dfcff4
+    jinja: 'Does it seem like the reviewer who wrote this review liked the movie?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[0 if label < 0.5 else 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: did_reviewer_like
+    reference: ''
+  b15994be-ca57-4924-9af7-fbaa6ee0124b: !Template
+    answer_choices: no ||| yes
+    id: b15994be-ca57-4924-9af7-fbaa6ee0124b
+    jinja: 'Is the movie review below positive?
+
+
+      {{sentence}} |||
+
+      {{answer_choices
+
+      [0 if label < 0.5 else 1]
+
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: sentiment_classification
+    reference: ''

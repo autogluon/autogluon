@@ -1,0 +1,236 @@
+dataset: tydiqa
+subset: secondary_task
+templates:
+  047ed162-f58b-42d5-81aa-0a17a9750230: !Template
+    answer_choices: null
+    id: 047ed162-f58b-42d5-81aa-0a17a9750230
+    jinja: "{% set lang = id.split('-')[0] %}\n{% if lang == \"english\" %}\nSnippet:\
+      \ {{context}}\nI know that the answer to \"{{question}}\" appears somewhere\
+      \ in the text snippet about {{title}}. Can you answer the question?\n|||\n{{answers.text\
+      \ | choice}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: can_you_answer_the_question
+    reference: Ask question with Context
+  05c99237-0e03-4ec9-95f3-dfde8ae25605: !Template
+    answer_choices: null
+    id: 05c99237-0e03-4ec9-95f3-dfde8ae25605
+    jinja: '{% set _blank2 = ["title", "context", "topic" ] %}
+
+      {% set _blank1 = ["guess", "generate", "determine"] %}
+
+      {% set _blank=["passage", "text", "text snippet", "info"]|random %}
+
+      {% set _position = ["above", "following"] |random %}
+
+      {% set lang = id.split(''-'')[0] %}
+
+      {% if lang == "english" %}
+
+      {% if  _position == "above" %}
+
+      {{context}}{{"\n"}}
+
+      {% endif %}
+
+      Can you {{_blank1|random}} the {{_blank2|random}} of the {{_position}} passage.
+
+      {% if  _position == "following" %}
+
+      {{"\n"}}{{context}}
+
+      {% endif %}
+
+      |||
+
+      {{title}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: title_generation
+    reference: Generate title from a passage
+  1f4728ba-b25e-450e-975f-6dc8c0cb4bb1: !Template
+    answer_choices: null
+    id: 1f4728ba-b25e-450e-975f-6dc8c0cb4bb1
+    jinja: '{% set lang = id.split(''-'')[0] %}
+
+      {% if lang == "english" %}
+
+      Could you generate a question whose answer is {{answers.text | choice}} based
+      on the following context: {{context}}
+
+      |||
+
+      {{question}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: end_to_end_question_generation
+    reference: generate end-to-end question from a passage.
+  3d7ee9fe-ac53-4cf3-9913-431425225a5c: !Template
+    answer_choices: null
+    id: 3d7ee9fe-ac53-4cf3-9913-431425225a5c
+    jinja: '{% set lang = id.split(''-'')[0] %}
+
+      {% if lang == "english" %}
+
+      I am trying to figure out the answer to the question "{{question}}"
+
+      I found this text about {{title}} on Wikipedia and I think it contains the answer.
+      Can you tell me the answer?
+
+      Text: {{context}}
+
+      |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: can_you_tell_me_the_answer
+    reference: Ask question with Context
+  696c888c-3419-4e4c-b559-1d9772fa60ab: !Template
+    answer_choices: null
+    id: 696c888c-3419-4e4c-b559-1d9772fa60ab
+    jinja: "{% set lang = id.split('-')[0] %}\n{% if lang == \"english\" %}\nExtract\
+      \ in the passage the answer to the question: {{question}}\nPassage about {{title}}:\
+      \ {{context}}\n|||\n{{answers.text | choice}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: extract_answer
+    reference: Ask question with Context
+  c2356ac6-7761-43b8-9fb9-38ed25c0db9b: !Template
+    answer_choices: null
+    id: c2356ac6-7761-43b8-9fb9-38ed25c0db9b
+    jinja: '{% set lang = id.split("-")[0] %}
+
+      {% if lang == "english" %}
+
+      I am testing my students'' knowledge about {{title}}.
+
+      Based on the context ({{context}}), here''s the question to answer: {{question}}.
+      The answer is in the context.
+
+      |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: testing_students
+    reference: ''
+  d0966d12-6d15-4138-b273-5fe2e1619ff9: !Template
+    answer_choices: null
+    id: d0966d12-6d15-4138-b273-5fe2e1619ff9
+    jinja: '{% set lang = id.split(''-'')[0] %}
+
+      {% if lang == "english" %}
+
+      Could you generate a question about {{title}} and whose answer is {{answers.text
+      | choice}} based on the following context: {{context}}
+
+      |||
+
+      {{question}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: end_to_end_question_generation_with_title
+    reference: generate end-to-end question from a passage with a title
+  f276815f-f7c0-4dab-b12e-08e76da6d760: !Template
+    answer_choices: null
+    id: f276815f-f7c0-4dab-b12e-08e76da6d760
+    jinja: '{% set lang = id.split(''-'')[0] %}
+
+      {% if lang == "english" %}
+
+      {{question}}
+
+      Answer the question above.
+
+      |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: simple_question_odqa
+    reference: Ask question without Context
+  fcf0920f-5599-44a6-bf2a-9ef6bbbe1e64: !Template
+    answer_choices: null
+    id: fcf0920f-5599-44a6-bf2a-9ef6bbbe1e64
+    jinja: '{% set lang = id.split(''-'')[0] %}
+
+      {% if lang == "english" %}
+
+      I''ve always wondered: {{question}}
+
+      I searched Wikipedia and I found the following text snippet about {{title}}.
+
+      Snippet: {{context}}
+
+      What''s the answer?
+
+      |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: whats_the_answer
+    reference: Ask question with Context

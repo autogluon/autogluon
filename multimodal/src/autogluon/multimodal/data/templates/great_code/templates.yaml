@@ -1,0 +1,163 @@
+dataset: great_code
+templates:
+  027215bb-1055-4584-b3ce-3267a8043d3a: !Template
+    answer_choices: null
+    id: 027215bb-1055-4584-b3ce-3267a8043d3a
+    jinja: "{% set mask = 'def <FUNC_NAME> (' %}\n{% set indent = '    ' %}\n{% set\
+      \ ns = namespace(indent_size=0, result=[], masked=false, target='') %}\n{% for\
+      \ token in source_tokens  %}\n    {% if ns.masked is false and token.startswith('def')\
+      \ %}\n            {% set ns.target = token.split('def ')[1][:-1] %}\n      \
+      \      {% set token = mask %}\n            {% set ns.masked = true %}\n    {%\
+      \ endif%}\n    {% if token== '#INDENT#' %}\n       {% set ns.indent_size = ns.indent_size\
+      \ + 1 %}\n       {% set ns.result = ns.result + [indent * ns.indent_size] %}\n\
+      \    {% elif token == '#NEWLINE#' %}\n          {% set ns.result = ns.result\
+      \ + [\"\\n\"] %}\n    {% elif token == '#UNINDENT#' %}\n        {% set ns.indent_size\
+      \ = ns.indent_size - 1 %}\n    {% else %}\n          {% if not loop.first and\
+      \ loop.previtem == '#NEWLINE#' %}\n               {% set ns.result = ns.result\
+      \ + [indent * ns.indent_size] %}\n          {% endif %}\n          {% set ns.result\
+      \ = ns.result + [token | replace('\\\\n', '\\n'), \" \"] %}\n    {% endif %}\n\
+      {% endfor %}\n{{ns.result | join(\"\") | replace(\" . \", \".\") | replace(\"\
+      \ , \", \", \")  | replace(\"( \", \"(\") | replace(\" )\", \")\") | replace(\"\
+      [ \", \"[\") | replace(\" ]\", \"]\")}}\n\nWhat is the function name?\n|||\n\
+      {{ ns.target }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: function name generation
+    reference: ''
+  24fa908d-daa2-4fd2-bb22-374021c1fc23: !Template
+    answer_choices: null
+    id: 24fa908d-daa2-4fd2-bb22-374021c1fc23
+    jinja: "{% set result = \"\" %}\n{% set indent = '    ' %}\n{% set ns = namespace(indent_size=0,\
+      \ line_number=0, buggy_line=0, bug_location=0, bug_len=0, result=[], result_lines=[])\
+      \ %}\n{% set fixed_token = source_tokens[repair_targets[0]] %}\n{% set buggy_line_content\
+      \ = \"\" %}\n{% set fixed_buggy_line_content = \"\" %}\n\n{% if has_bug and\
+      \ (repair_targets | length > 0) %}\n    {% for token in source_tokens  %}\n\
+      \        {% if loop.index0 == error_location %}\n                {% set ns.buggy_line\
+      \ = ns.line_number %}\n                {% set ns.bug_location = (ns.result |\
+      \ join(\"\") | length) %}\n                {% set ns.bug_len = (token | length)\
+      \ %}\n        {% endif%}\n        {% if token== '#INDENT#' %}\n           {%\
+      \ set ns.indent_size = ns.indent_size + 1 %}\n           {% set ns.result =\
+      \ ns.result + [indent * ns.indent_size] %}\n        {% elif token == '#NEWLINE#'\
+      \ %}\n              {% set ns.result_lines = ns.result_lines + [ns.result |\
+      \ join(\"\")] %}\n              {% set ns.result = [] %}\n              {% set\
+      \ ns.line_number = ns.line_number + 1 %}\n        {% elif token == '#UNINDENT#'\
+      \ %}\n            {% set ns.indent_size = ns.indent_size - 1 %}\n        {%\
+      \ else %}\n              {% if not loop.first and loop.previtem == '#NEWLINE#'\
+      \ %}\n                   {% set ns.result = ns.result + [indent * ns.indent_size]\
+      \ %}\n              {% endif %}\n              {% set ns.result = ns.result\
+      \ + [token | replace('\\\\n', '\\n'), \" \"] %}\n        {% endif %}\n    {%\
+      \ endfor %}\n    {% set ns.result_lines = ns.result_lines + [ns.result | join(\"\
+      \")] %}\n    {% set result = ns.result_lines | join(\"\\n\") %}\n    {{result\
+      \ | replace(\" . \", \".\") | replace(\" , \", \", \")  | replace(\"( \", \"\
+      (\") | replace(\" )\", \")\") | replace(\"[ \", \"[\") | replace(\" ]\", \"\
+      ]\")}}\n\n    {% set buggy_line_content = ns.result_lines[ns.buggy_line] | trim\
+      \ | replace(\" . \", \".\") | replace(\" , \", \", \")  | replace(\"( \", \"\
+      (\") | replace(\" )\", \")\") | replace(\"[ \", \"[\") | replace(\" ]\", \"\
+      ]\") %}\n    {% set fixed_buggy_line_content = (ns.result_lines[ns.buggy_line][:ns.bug_location]\
+      \ + fixed_token +  ns.result_lines[ns.buggy_line][ns.bug_location + ns.bug_len:])\
+      \ | trim | replace(\" . \", \".\") | replace(\" , \", \", \")  | replace(\"\
+      ( \", \"(\") | replace(\" )\", \")\") | replace(\"[ \", \"[\") | replace(\"\
+      \ ]\", \"]\")%}\n\n    Fix the buggy line: {{buggy_line_content}}\n    |||\n\
+      \    {{fixed_buggy_line_content}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: fix buggy line
+    reference: ''
+  3c0f36da-834a-4814-86f6-6e55414fbd32: !Template
+    answer_choices: null
+    id: 3c0f36da-834a-4814-86f6-6e55414fbd32
+    jinja: "{% set mask = '<MASK>' %}\n{% set indent = '    ' %}\n{% set ns = namespace(indent_size=0,\
+      \ result=[]) %}\n\n{% if has_bug %}\n    {% for token in source_tokens  %}\n\
+      \        {% if loop.index0 == error_location %}\n                {% set token\
+      \ = mask %}\n        {% endif%}\n        {% if token== '#INDENT#' %}\n     \
+      \      {% set ns.indent_size = ns.indent_size + 1 %}\n           {% set ns.result\
+      \ = ns.result + [indent * ns.indent_size] %}\n        {% elif token == '#NEWLINE#'\
+      \ %}\n              {% set ns.result = ns.result + [\"\\n\"] %}\n        {%\
+      \ elif token == '#UNINDENT#' %}\n            {% set ns.indent_size = ns.indent_size\
+      \ - 1 %}\n        {% else %}\n              {% if not loop.first and loop.previtem\
+      \ == '#NEWLINE#' %}\n                   {% set ns.result = ns.result + [indent\
+      \ * ns.indent_size] %}\n              {% endif %}\n              {% set ns.result\
+      \ = ns.result + [token | replace('\\\\n', '\\n'), \" \"] %}\n        {% endif\
+      \ %}\n    {% endfor %}\n    {{ns.result | join(\"\") | replace(\" . \", \".\"\
+      ) | replace(\" , \", \", \")  | replace(\"( \", \"(\") | replace(\" )\", \"\
+      )\") | replace(\"[ \", \"[\") | replace(\" ]\", \"]\")}}\n    \n    Given the\
+      \ code above, what is a proper replacement for {{mask}}?\n    |||\n    {{source_tokens[repair_targets[0]]}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: identifier prediction no choices
+    reference: ''
+  57f93ca1-1e27-40ff-8fa4-ba11a499baef: !Template
+    answer_choices: Yes ||| No
+    id: 57f93ca1-1e27-40ff-8fa4-ba11a499baef
+    jinja: "{% set indent = '    ' %}\n{% set ns = namespace(indent_size=0, result=[])\
+      \ %}\n{% for token in source_tokens  %}\n    {% if token== '#INDENT#' %}\n \
+      \      {% set ns.indent_size = ns.indent_size + 1 %}\n       {% set ns.result\
+      \ = ns.result + [indent * ns.indent_size] %}\n    {% elif token == '#NEWLINE#'\
+      \ %}\n          {% set ns.result = ns.result + [\"\\n\"] %}\n    {% elif token\
+      \ == '#UNINDENT#' %}\n        {% set ns.indent_size = ns.indent_size - 1 %}\n\
+      \    {% else %}\n          {% if not loop.first and loop.previtem == '#NEWLINE#'\
+      \ %}\n               {% set ns.result = ns.result + [indent * ns.indent_size]\
+      \ %}\n          {% endif %}\n          {% set ns.result = ns.result + [token\
+      \ | replace('\\\\n', '\\n'), \" \"] %}\n    {% endif %}\n{% endfor %}\n{{ns.result\
+      \ | join(\"\") | replace(\" . \", \".\") | replace(\" , \", \", \")  | replace(\"\
+      ( \", \"(\") | replace(\" )\", \")\") | replace(\"[ \", \"[\") | replace(\"\
+      \ ]\", \"]\")}}\n\nIs there a bug in the code above?\n|||\n{{ {True: \"Yes\"\
+      , False: \"No\"}[has_bug] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: bug detection
+    reference: ''
+  6b154f4f-50a5-4890-b0fc-a0118061ce0c: !Template
+    answer_choices: '{% if has_bug %}     {% set nss = namespace(choices=[]) %}     {%
+      for i in repair_candidates  %}         {% set nss.choices = nss.choices + [source_tokens[(i
+      | int)]] %}     {% endfor %}     {{nss.choices | unique | join(" ||| ")}} {%
+      endif %}'
+    id: 6b154f4f-50a5-4890-b0fc-a0118061ce0c
+    jinja: "{% set mask = '<MASK>' %}\n{% set indent = '    ' %}\n{% set ns = namespace(indent_size=0,\
+      \ result=[]) %}\n\n{% if has_bug %}\n    {% for token in source_tokens  %}\n\
+      \        {% if loop.index0 == error_location %}\n                {% set token\
+      \ = mask %}\n        {% endif%}\n        {% if token== '#INDENT#' %}\n     \
+      \      {% set ns.indent_size = ns.indent_size + 1 %}\n           {% set ns.result\
+      \ = ns.result + [indent * ns.indent_size] %}\n        {% elif token == '#NEWLINE#'\
+      \ %}\n              {% set ns.result = ns.result + [\"\\n\"] %}\n        {%\
+      \ elif token == '#UNINDENT#' %}\n            {% set ns.indent_size = ns.indent_size\
+      \ - 1 %}\n        {% else %}\n              {% if not loop.first and loop.previtem\
+      \ == '#NEWLINE#' %}\n                   {% set ns.result = ns.result + [indent\
+      \ * ns.indent_size] %}\n              {% endif %}\n              {% set ns.result\
+      \ = ns.result + [token | replace('\\\\n', '\\n'), \" \"] %}\n        {% endif\
+      \ %}\n    {% endfor %}\n    {{ns.result | join(\"\") | replace(\" . \", \".\"\
+      ) | replace(\" , \", \", \")  | replace(\"( \", \"(\") | replace(\" )\", \"\
+      )\") | replace(\"[ \", \"[\") | replace(\" ]\", \"]\")}}\n    \n    Given the\
+      \ code above, what is a proper replacement for {{mask}}? Choose among: {{answer_choices\
+      \ | join(\", \")}}\n    |||\n    {{source_tokens[repair_targets[0]]}}\n{% endif\
+      \ %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: identifier prediction with choices
+    reference: ''

@@ -1,0 +1,138 @@
+dataset: quartz
+templates:
+  005b9776-2170-47f8-a5d2-03e83d0e55ae: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 005b9776-2170-47f8-a5d2-03e83d0e55ae
+    jinja: "Use information from the paragraph to answer the question.\n\nQuestion:\n\
+      \n{% if '_____' in question %}\n{{ question | trim(\".?!\") | replace(\"_____\"\
+      , answer_choices | join(\" or \")) }}{{ \"?\" }} \n{% else %}\n{{ question |\
+      \ trim(\".?!\") }} {{ answer_choices | join(\" or \") }}{{ \"?\" }} \n{% endif\
+      \ %}\n\nParagraph :\n\n{{ para }}\n|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: use_info_from_question_paragraph
+    reference: ''
+  01d6ae3e-87bb-456c-9722-92a214f6ff19: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 01d6ae3e-87bb-456c-9722-92a214f6ff19
+    jinja: "{{ para }}\n{% if '_____' in question %}\n{{ question | trim(\".?!\")\
+      \ | replace(\"_____\", answer_choices | join(\" or \")) }}{{ \"?\" }} \n{% else\
+      \ %}\n{{ question | trim(\".?!\")}} {{ answer_choices | join(\" or \") }}{{\
+      \ \"?\" }} \n{% endif %}\n|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: paragraph_question_plain_concat
+    reference: ''
+  22e29cab-f57f-4af7-92fc-72b131a96878: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 22e29cab-f57f-4af7-92fc-72b131a96878
+    jinja: "Use information from the paragraph to answer the question.\n\nParagraph\
+      \ :\n\n{{ para }}\n\nQuestion:\n\n{% if '_____' in question %}\n{{ question\
+      \ | trim(\".?!\") | replace(\"_____\", answer_choices | join(\" or \")) }}{{\
+      \ \"?\" }} \n{% else %}\n{{ question | trim(\".?!\") }} {{ answer_choices |\
+      \ join(\" or \") }}{{ \"?\" }} \n{% endif %}\n|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: use_info_from_paragraph_question
+    reference: ''
+  2f6baa0c-3b69-48be-b195-cc00cb5c96fa: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 2f6baa0c-3b69-48be-b195-cc00cb5c96fa
+    jinja: "Answer the question based on the following text.\n\nQuestion:\n\n{% if\
+      \ '_____' in question %}\n{{ question | trim(\".?!\") | replace(\"_____\", answer_choices\
+      \ | join(\" or \")) }}{{ \"?\" }} \n{% else %}\n{{ question | trim(\".?!\")\
+      \ }} {{ answer_choices | join(\" or \") }}{{ \"?\" }} \n{% endif %}\n\nText:\n\
+      \n{{ para }}|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: answer_question_based_on
+    reference: ''
+  397bdb29-03e8-478b-9840-1bfe9d57d6fb: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 397bdb29-03e8-478b-9840-1bfe9d57d6fb
+    jinja: "Answer the question below:\n\n{% if '_____' in question %}\n{{ question\
+      \ | trim(\".?!\") | replace(\"_____\", answer_choices | join(\" or \")) }}{{\
+      \ \"?\" }} \n{% else %}\n{{ question | trim(\".?!\") }} {{  answer_choices |\
+      \ join(\" or \") }}{{ \"?\" }} \n{% endif %}\n\nAssuming that:\n\n{{ para }}|||\n\
+      {{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: answer_question_below
+    reference: ''
+  39a67851-fdf5-4f0d-bda2-4902be3a6bff: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 39a67851-fdf5-4f0d-bda2-4902be3a6bff
+    jinja: "Read the passage below and choose the right answer to the following question\
+      \ (choices are {{ answer_choices | join(\" or \") }} ):\n\n{{ para }}\n\n{%\
+      \ if '_____' in question %}\n{{ question | trim(\".?!\") | replace(\"_____\"\
+      , answer_choices | join(\" or \")) }}{{ \"?\" }} \n{% else %}\n{{ question |\
+      \ trim(\".?!\") }} {{ answer_choices | join(\" or \") }}{{ \"?\" }} \n{% endif\
+      \ %}\n|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: read_passage_below_choose
+    reference: ''
+  5c794ff0-32b9-43d4-b496-1a4d246ecfc0: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 5c794ff0-32b9-43d4-b496-1a4d246ecfc0
+    jinja: "{{ para }}\n\nHaving read the above passage, choose the right answer to\
+      \ the following question (choices are {{ answer_choices | join(\" or \") }}\
+      \ ):\n\n{% if '_____' in question %}\n{{ question | trim(\".?!\") | replace(\"\
+      _____\", answer_choices | join(\" or \")) }}{{ \"?\" }} \n{% else %}\n{{ question\
+      \ | trim(\".?!\") }} {{ answer_choices | join(\" or \") }}{{ \"?\" }} \n{% endif\
+      \ %}\n|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: having_read_above_passage
+    reference: ''
+  a8c6ae4c-4874-47d1-93ea-801b6e080a58: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: a8c6ae4c-4874-47d1-93ea-801b6e080a58
+    jinja: "Given the fact that:\n\n{{ para }}\n\nAnswer the question:\n\n{% if '_____'\
+      \ in question %}\n{{ question | trim(\".?!\") | replace(\"_____\", answer_choices\
+      \ | join(\" or \")) }}{{ \"?\" }} \n{% else %}\n{{ question | trim(\".?!\")\
+      \ }} {{ answer_choices | join(\" or \") }}{{ \"?\" }} \n{% endif %}\n|||\n{{answer_choices[choices.label.index(answerKey)]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: given_the_fact_answer_the_q
+    reference: ''

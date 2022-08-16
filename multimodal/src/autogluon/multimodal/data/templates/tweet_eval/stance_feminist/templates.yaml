@@ -1,0 +1,108 @@
+dataset: tweet_eval
+subset: stance_feminist
+templates:
+  2f6bfe8f-c45e-4f1d-a623-91a9cfd0ea8b: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 2f6bfe8f-c45e-4f1d-a623-91a9cfd0ea8b
+    jinja: '{{text}} Where does the above sentence stand on feminism? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: feminism_guess_passive
+    reference: ''
+  4309e10d-c9a9-4a17-8561-15270b99890b: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 4309e10d-c9a9-4a17-8561-15270b99890b
+    jinja: 'How would you describe the stance used in this tweet? {{answer_choices|join(",
+      ")}}
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: feminism_how_describe
+    reference: ''
+  7e47c6b8-2923-4580-a275-a2b8867a3d9b: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 7e47c6b8-2923-4580-a275-a2b8867a3d9b
+    jinja: 'What option among, {{"neutral"}}, {{"against"}}, {{"in favor"}}, best
+      describes the stance of this tweet regarding feminism?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: feminism_option
+    reference: ''
+  89aa258e-3c3b-4d1c-8ac4-fe2c838b76eb: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 89aa258e-3c3b-4d1c-8ac4-fe2c838b76eb
+    jinja: 'Does the author express any stance about feminism in the following text?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: feminism_predict_stance
+    reference: ''
+  97ef9418-7c92-455d-a4c5-d7b91668278b: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 97ef9418-7c92-455d-a4c5-d7b91668278b
+    jinja: 'Is this tweet neutral, in favor of, or against feminism?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: feminism
+    reference: ''
+  f28307ab-563e-4189-99b5-e0d858e9ab4b: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: f28307ab-563e-4189-99b5-e0d858e9ab4b
+    jinja: '{{text}} Where does the author of the above sentence stand on feminism?
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: feminism_guess_passive_author
+    reference: ''

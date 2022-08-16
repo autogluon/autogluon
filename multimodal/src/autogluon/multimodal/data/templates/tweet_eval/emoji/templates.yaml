@@ -1,0 +1,68 @@
+dataset: tweet_eval
+subset: emoji
+templates:
+  8c794abe-5364-430f-aa1e-eb3501443cec: !Template
+    answer_choices: "\u2764|||\U0001F60D|||\U0001F602|||\U0001F495|||\U0001F525|||\U0001F60A\
+      |||\U0001F60E|||\u2728|||\U0001F499|||\U0001F618|||\U0001F4F7|||\U0001F1FA\U0001F1F8\
+      |||\u2600|||\U0001F49C|||\U0001F609|||\U0001F4AF|||\U0001F601|||\U0001F384|||\U0001F4F8\
+      |||\U0001F61C"
+    id: 8c794abe-5364-430f-aa1e-eb3501443cec
+    jinja: 'Which emoji among {{answer_choices | join(", ")}} best describes the sentiment
+      of the following tweet?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: emoji_option
+    reference: 'official metric:  macroaveraged F1'
+  c05f50e0-f708-44bc-98e7-ff7b3f9f5d93: !Template
+    answer_choices: "\u2764|||\U0001F60D|||\U0001F602|||\U0001F495|||\U0001F525|||\U0001F60A\
+      |||\U0001F60E|||\u2728|||\U0001F499|||\U0001F618|||\U0001F4F7|||\U0001F1FA\U0001F1F8\
+      |||\u2600|||\U0001F49C|||\U0001F609|||\U0001F4AF|||\U0001F601|||\U0001F384|||\U0001F4F8\
+      |||\U0001F61C"
+    id: c05f50e0-f708-44bc-98e7-ff7b3f9f5d93
+    jinja: 'Which emoji among {{answer_choices | join(", ")}} would be the best comment
+      to the following tweet?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: emoji_reply
+    reference: 'Metric: macroaveraged F1'
+  d5c771d3-28e7-420e-af47-c077cfe0e7e5: !Template
+    answer_choices: "\u2764|||\U0001F60D|||\U0001F602|||\U0001F495|||\U0001F525|||\U0001F60A\
+      |||\U0001F60E|||\u2728|||\U0001F499|||\U0001F618|||\U0001F4F7|||\U0001F1FA\U0001F1F8\
+      |||\u2600|||\U0001F49C|||\U0001F609|||\U0001F4AF|||\U0001F601|||\U0001F384|||\U0001F4F8\
+      |||\U0001F61C"
+    id: d5c771d3-28e7-420e-af47-c077cfe0e7e5
+    jinja: 'Which emoji best describes the sentiment of the following tweet?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: emoji
+    reference: 'official metric:  macroaveraged F1'

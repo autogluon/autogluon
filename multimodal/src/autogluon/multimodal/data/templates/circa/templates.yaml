@@ -1,0 +1,101 @@
+dataset: circa
+templates:
+  053260a8-1bcc-4805-81d2-bb528fc56ca2: !Template
+    answer_choices: null
+    id: 053260a8-1bcc-4805-81d2-bb528fc56ca2
+    jinja: 'Convert this question to a sentence declarative sentence asserting an
+      affirmative answer:
+
+
+      {{question_X}} |||
+
+      {{canquestion_X}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - BLEU
+      - Edit Distance
+      - ROUGE
+      original_task: false
+    name: question_declarative
+    reference: ''
+  70b7a94a-6a39-4a81-9a6e-0709a0acdb28: !Template
+    answer_choices: "Yes ||| No ||| In the middle, neither yes nor no ||| Probably\
+      \ yes / sometimes yes ||| Probably no ||| Yes, subject to some conditions |||\
+      \ Other ||| I am not sure how X will interpret Y\u2019s answer"
+    id: 70b7a94a-6a39-4a81-9a6e-0709a0acdb28
+    jinja: "{% if goldstandard2 != -1 %}\n\nGiven the question-answer pair of X and\
+      \ Y in the context of {{context}}, which of the following answers is Y implying:\
+      \ \"{{\"Yes\"}}\", \"{{\"No\"}}\", \"{{\"In the middle, neither yes nor no\"\
+      }}\", \"{{\"Probably yes / sometimes yes\"}}\", \"{{\"Probably no\"}}\", \"\
+      {{\"Yes, subject to some conditions\"}}\", \"{{\"Other\"}}\" or \"{{\"I am not\
+      \ sure how X will interpret Y\u2019s answer\"}}\" ?\n\nX: {{question_X}} \n\n\
+      Y: {{answer_Y}} |||\n\n{{   answer_choices[goldstandard2]}}\n\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: goldstandard2_judgement
+    reference: ''
+  73466d0f-b1b1-4c61-8f03-346e121ae06c: !Template
+    answer_choices: null
+    id: 73466d0f-b1b1-4c61-8f03-346e121ae06c
+    jinja: 'What is a possible question X could ask Y given the context of {{context}}
+      that would cause Y to answer "{{answer_Y}}"? |||
+
+      {{question_X}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: possible_qn
+    reference: ''
+  997f7f96-d420-48c1-85f7-ecade54adbd7: !Template
+    answer_choices: "Yes ||| No ||| In the middle, neither yes nor no ||| Probably\
+      \ yes / sometimes yes ||| Probably no ||| Yes, subject to some conditions |||\
+      \ Other ||| I am not sure how X will interpret Y\u2019s answer"
+    id: 997f7f96-d420-48c1-85f7-ecade54adbd7
+    jinja: "{% if goldstandard1 != -1 %}\n\nGiven the question-answer pair of X and\
+      \ Y in the context of {{context}}, what answer is Y implying?\n\nX: {{question_X}}\
+      \ \n\nY: {{answer_Y}} |||\n\n{{   answer_choices[goldstandard1]}}\n\n{% endif\
+      \ %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: judgement
+    reference: ''
+  a15c1a30-5ef0-451f-b202-987a16752a0a: !Template
+    answer_choices: "Yes ||| No ||| In the middle, neither yes nor no ||| Probably\
+      \ yes / sometimes yes ||| Probably no ||| Yes, subject to some conditions |||\
+      \ Other ||| I am not sure how X will interpret Y\u2019s answer"
+    id: a15c1a30-5ef0-451f-b202-987a16752a0a
+    jinja: "{% if goldstandard1 != -1 %}\n\nGiven the question-answer pair of X and\
+      \ Y in the context of {{context}}, which of the following answers is Y implying:\
+      \ \"{{\"Yes\"}}\", \"{{\"No\"}}\", \"{{\"In the middle, neither yes nor no\"\
+      }}\", \"{{\"Probably yes / sometimes yes\"}}\", \"{{\"Probably no\"}}\", \"\
+      {{\"Yes, subject to some conditions\"}}\", \"{{\"Other\"}}\" or \"{{\"I am not\
+      \ sure how X will interpret Y\u2019s answer\"}}\" ?\n\nX: {{question_X}} \n\n\
+      Y: {{answer_Y}} |||\n\n{{   answer_choices[goldstandard1]}}\n\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: goldstandard1_judgement
+    reference: ''

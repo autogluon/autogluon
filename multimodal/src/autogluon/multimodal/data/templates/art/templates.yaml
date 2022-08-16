@@ -1,0 +1,133 @@
+dataset: art
+templates:
+  151d0e97-d7d2-47f2-86b4-6777587b16f2: !Template
+    answer_choices: '{{hypothesis_1 | trim(''.?!'') }} ||| {{hypothesis_2 | trim(''.?!'')
+      }}'
+    id: 151d0e97-d7d2-47f2-86b4-6777587b16f2
+    jinja: "We know that:\n\n{{ observation_1 }},\n\nand:\n\n{{ observation_2 }} \n\
+      \nWhich one is more likely?\n\nThe first option: \n\n{{ answer_choices[0] }},\
+      \ \n\nor the second option:\n\n{{ answer_choices[1] }}?\n|||\n{{ answer_choices[label-1]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_hypothesis_options
+    reference: ''
+  a090e019-1b98-4863-ab5d-ff9772f682d6: !Template
+    answer_choices: '{{hypothesis_1| trim(''.?!'') }} ||| {{hypothesis_2| trim(''.?!'')
+      }}'
+    id: a090e019-1b98-4863-ab5d-ff9772f682d6
+    jinja: 'You know the following:
+
+
+      {{ observation_1 }} {{ observation_2 }}
+
+
+      Which one is more believable?
+
+
+      - {{ answer_choices[0] }}
+
+      - {{ answer_choices[1] }}
+
+
+      |||
+
+
+      {{ answer_choices[label-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_hypothesis_believable
+    reference: ''
+  bf8a5b8a-70cb-4b27-82db-8ca4fbd2318d: !Template
+    answer_choices: '{{hypothesis_1| trim(''.?!'') }} ||| {{hypothesis_2| trim(''.?!'')
+      }}'
+    id: bf8a5b8a-70cb-4b27-82db-8ca4fbd2318d
+    jinja: '{{ observation_1 }} {{ observation_2 }}
+
+
+      Would you rather believe that:
+
+
+      {{ answer_choices[0] }},
+
+
+      or:
+
+
+      {{ answer_choices[1] }}?
+
+      |||
+
+      {{ answer_choices[label-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_hypothesis
+    reference: ''
+  d418b574-9d0a-4d29-a518-7d9a5f5a4a3d: !Template
+    answer_choices: '{{hypothesis_1| trim(''.?!'') }} ||| {{hypothesis_2| trim(''.?!'')
+      }}'
+    id: d418b574-9d0a-4d29-a518-7d9a5f5a4a3d
+    jinja: "Which of the following better fits the description?\n\nIs it that: \n\n\
+      {{ answer_choices[0] }},\n\nor rather: \n\n{{ answer_choices[1] }}?\n\nDescription:\
+      \ \n\n{{ observation_1 }} {{ observation_2 }}\n|||\n{{ answer_choices[label-1]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_hypothesis_desc
+    reference: ''
+  eb0baa43-3c79-4d1d-973a-37e0055bbfec: !Template
+    answer_choices: '{{hypothesis_1| trim(''.?!'') }} ||| {{hypothesis_2| trim(''.?!'')
+      }}'
+    id: eb0baa43-3c79-4d1d-973a-37e0055bbfec
+    jinja: 'Which version is more likely?
+
+
+      The first one:
+
+
+      {{ answer_choices[0] }},
+
+
+      or the second one:
+
+
+      {{ answer_choices[1] }}?
+
+
+      Assuming that:
+
+
+      {{ observation_1 }} {{ observation_2 }}
+
+      |||
+
+      {{ answer_choices[label-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_hypothesis_likely
+    reference: ''

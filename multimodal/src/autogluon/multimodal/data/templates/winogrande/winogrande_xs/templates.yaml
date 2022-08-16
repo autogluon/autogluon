@@ -1,0 +1,110 @@
+dataset: winogrande
+subset: winogrande_xs
+templates:
+  52b40d2b-7547-44e2-8cc6-eb127ecbb2fe: !Template
+    answer_choices: '{{ option1 }} ||| {{ option2 }}'
+    id: 52b40d2b-7547-44e2-8cc6-eb127ecbb2fe
+    jinja: '{{ sentence }} In the previous sentence, does _ refer to {{ option1 }}
+      or  {{ option2 }}? ||| {% if answer == ''1'' %} {{option1}} {% else %} {{ option2
+      }} {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does underscore refer to
+    reference: ''
+  75072f4d-843b-4ba4-96a5-cd0ea3e7855d: !Template
+    answer_choices: True ||| False
+    id: 75072f4d-843b-4ba4-96a5-cd0ea3e7855d
+    jinja: 'The _ in the sentence below refers to {{option1}}. True or False?
+
+      {{sentence}}|||
+
+      {{answer_choices[answer|int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: True or False
+    reference: ''
+  8a976d84-efbc-47c0-8e3d-8e3cf89c3e2c: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: 8a976d84-efbc-47c0-8e3d-8e3cf89c3e2c
+    jinja: '{{sentence}}
+
+      What does the _ in the above sentence refer to? {{ option1 }} or {{ option2
+      }}? ||| {% if answer == ''1'' %} {{option1}} {% else %} {{ option2 }} {% endif
+      %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: underscore refer to
+    reference: ''
+  9ee3a3b0-d84f-4d66-bb79-de82ac5040b2: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: 9ee3a3b0-d84f-4d66-bb79-de82ac5040b2
+    jinja: 'In the sentence below, does the _ stand for {{answer_choices[0]}} or {{answer_choices[1]}}?
+
+      {{sentence}}|||
+
+      {{answer_choices[answer | int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: stand for
+    reference: ''
+  eb63f6df-99d9-4a00-a165-976e93c7271f: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: eb63f6df-99d9-4a00-a165-976e93c7271f
+    jinja: "{{sentence}}\nReplace the _ in the above sentence with the correct option:\
+      \ \n- {{option1}}\n- {{option2}}\n|||\n{% if answer == '1' %} {{option1}} {%\
+      \ else %} {{ option2 }} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Replace
+    reference: ''
+  f87367de-59ca-4859-abe0-26521a77fc67: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: f87367de-59ca-4859-abe0-26521a77fc67
+    jinja: 'Fill in the _ in the below sentence:
+
+      {{sentence}}
+
+
+      Choices:
+
+      - {{ option1 }}
+
+      - {{ option2 }}
+
+
+      Answer: ||| {% if answer == ''1'' %} {{option1}} {% else %} {{ option2 }} {%
+      endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill in the blank
+    reference: ''

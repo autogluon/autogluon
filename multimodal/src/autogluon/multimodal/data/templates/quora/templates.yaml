@@ -1,0 +1,89 @@
+dataset: quora
+templates:
+  2c780ebe-f8e6-44f0-a804-0a3e53eb8cce: !Template
+    answer_choices: No ||| Yes
+    id: 2c780ebe-f8e6-44f0-a804-0a3e53eb8cce
+    jinja: Given the question "{{questions.text.0}}" would you consider "{{questions.text.1}}"
+      as a duplicate?||| {{ answer_choices [is_duplicate] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: are_two_questions_duplicate
+    reference: ''
+  3331355a-4d69-4060-ae9e-cdb951335ed2: !Template
+    answer_choices: No ||| Yes
+    id: 3331355a-4d69-4060-ae9e-cdb951335ed2
+    jinja: Is the following question "{{questions.text.0}}" the same as "{{questions.text.1}}"?
+      ||| {{ answer_choices [is_duplicate] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: are_two_questions_same
+    reference: ''
+  397b1fb9-0cf1-455b-aaf2-efdb750014c5: !Template
+    answer_choices: null
+    id: 397b1fb9-0cf1-455b-aaf2-efdb750014c5
+    jinja: '{% if is_duplicate == true%} Paraphrase the the following question: {%
+      if questions.text.0|length < questions.text.1|length %}  {{questions.text.0}}
+      |||  {{questions.text.1}} {% else %}  {{questions.text.1}} ||| {{questions.text.0}}
+      {% endif %}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: rephrase_given_question
+    reference: ''
+  6de61945-992b-4191-9b3a-930e266769c9: !Template
+    answer_choices: True ||| False
+    id: 6de61945-992b-4191-9b3a-930e266769c9
+    jinja: The question "{{questions.text.0}}" is different from "{{questions.text.1}}".
+      {{"True"}} or {{"false"}}? ||| {{ answer_choices [is_duplicate] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: are_two_questions_different
+    reference: ''
+  7c367d58-e34f-4899-9c09-64a6a00a04b1: !Template
+    answer_choices: false ||| true
+    id: 7c367d58-e34f-4899-9c09-64a6a00a04b1
+    jinja: The question "{{questions.text.0}}" is the same as "{{questions.text.1}}".
+      {{"True"}} or {{"false"}} ? ||| {{ answer_choices [is_duplicate] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: true_or_false
+    reference: ''
+  7cc5ba2c-215d-4834-b41e-3ef717f6ac8c: !Template
+    answer_choices: No, they are different questions ||| Yes, they are the same question
+    id: 7cc5ba2c-215d-4834-b41e-3ef717f6ac8c
+    jinja: Two new posts asked on Quora are "{{questions.text.0}}" and "{{questions.text.1}}".
+      I feel like they have asked the same question. Am I correct? ||| {{answer_choices[is_duplicate]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: yes_or_no
+    reference: ''

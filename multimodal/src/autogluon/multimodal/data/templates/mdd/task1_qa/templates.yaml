@@ -1,0 +1,103 @@
+dataset: mdd
+subset: task1_qa
+templates:
+  0523ad87-64ab-4a9c-8772-56deda832ab4: !Template
+    answer_choices: null
+    id: 0523ad87-64ab-4a9c-8772-56deda832ab4
+    jinja: "Using the internet, answer the following question:\n\n{{ dialogue_turns.utterance[0][0]\
+      \ | capitalize }}{{ dialogue_turns.utterance[0][1:] }} \n|||\n{{dialogue_turns.utterance[1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: using_internet_answer
+    reference: Template asks the model to answer the question with a prefix "using
+      the internet"
+  1aa44534-ddbf-4478-9682-50192183ab82: !Template
+    answer_choices: null
+    id: 1aa44534-ddbf-4478-9682-50192183ab82
+    jinja: 'Given the best answer(s), "{{ dialogue_turns.utterance[1] }}", generate
+      a movie-trivia question:
+
+      |||
+
+      {{ dialogue_turns.utterance[0][0] | capitalize }}{{ dialogue_turns.utterance[0][1:]
+      }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: prompt_generate_question
+    reference: Given the answer with prompt, generate a question related to it.
+  59b9d82e-b778-429c-a45c-a27d6abdf13a: !Template
+    answer_choices: null
+    id: 59b9d82e-b778-429c-a45c-a27d6abdf13a
+    jinja: "{{ dialogue_turns.utterance[0][0] | capitalize }}{{ dialogue_turns.utterance[0][1:]\
+      \ }} \n|||\n{{dialogue_turns.utterance[1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: question_answering
+    reference: Given a question, return the answer.
+  a0b665ab-001f-44f6-9094-d2d5ef60926c: !Template
+    answer_choices: null
+    id: a0b665ab-001f-44f6-9094-d2d5ef60926c
+    jinja: "Complete this movie-trivia-related dialogue between Speaker {{ dialogue_turns.speaker[0]\
+      \ }} and Speaker {{ dialogue_turns.speaker[1] }} by answering Speaker {{ dialogue_turns.speaker[0]\
+      \ }}'s question as Speaker {{ dialogue_turns.speaker[1] }}.\n\nSpeaker {{ dialogue_turns.speaker[0]\
+      \ }}: {{ dialogue_turns.utterance[0][0] | capitalize }}{{ dialogue_turns.utterance[0][1:]\
+      \ }} \n\nSpeaker {{ dialogue_turns.speaker[1] }}:\n|||\n{{dialogue_turns.utterance[1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: question_answering_speaker
+    reference: Given a question, return the answer with speaker information.
+  bedf40a1-630a-4aae-ad2f-cfc90f77fb9f: !Template
+    answer_choices: null
+    id: bedf40a1-630a-4aae-ad2f-cfc90f77fb9f
+    jinja: 'Generate a movie-trivia question for the answer(s): {{ dialogue_turns.utterance[1]
+      }}
+
+      |||
+
+      {{ dialogue_turns.utterance[0][0] | capitalize }}{{ dialogue_turns.utterance[0][1:]
+      }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: Given the answer, generate a question related to it.
+  cba3d029-993d-4a95-a213-0e70efde6009: !Template
+    answer_choices: null
+    id: cba3d029-993d-4a95-a213-0e70efde6009
+    jinja: "Answer the following question:\n\n{{ dialogue_turns.utterance[0][0] |\
+      \ capitalize }}{{ dialogue_turns.utterance[0][1:] }} \n|||\n{{dialogue_turns.utterance[1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: prompt_question_answering
+    reference: Given a question with prompt, return the answer.

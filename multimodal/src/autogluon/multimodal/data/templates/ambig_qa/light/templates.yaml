@@ -1,0 +1,128 @@
+dataset: ambig_qa
+subset: light
+templates:
+  050b1534-b53f-4341-b42c-6e689ef8911b: !Template
+    answer_choices: null
+    id: 050b1534-b53f-4341-b42c-6e689ef8911b
+    jinja: "{# Assignement in if clause breaks test, we need to declare variables\
+      \ in global scope first: https://github.com/pallets/jinja/issues/1314 #}\n{%\
+      \ set selected_question = \"\" %}\n{% set selected_answer = \"\" %}\n{% set\
+      \ random_question_id = -1 %}\n{% if annotations.type[0] == \"multipleQAs\" %}\n\
+      \   {% set random_question_id = range(0, annotations.qaPairs[0].question | length)\
+      \ | choice%}\n   {% set selected_question = annotations.qaPairs[0].question[random_question_id]%}\n\
+      \   {% set selected_answer = annotations.qaPairs[0].answer[random_question_id]\
+      \ | choice%}\n{% else %}\n   {% set selected_question = question %}\n   {% set\
+      \ selected_answer = annotations.answer[0] | choice %}\n{% endif %}\n\nHere's\
+      \ a question-answer pair: {{question}} {{selected_answer}}.\nIs the question\
+      \ ambiguous? If so, generate a better question suitable for the answer. Otherwise,\
+      \ output the same question.\n|||\n{{selected_question}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - Edit Distance
+      original_task: false
+    name: is_question_ambiguous
+    reference: ''
+  09880e1a-0fcc-49dc-8462-b6603e15d691: !Template
+    answer_choices: null
+    id: 09880e1a-0fcc-49dc-8462-b6603e15d691
+    jinja: "What are the possible answers to the question \"{{question}}\"? Use semi-colons\
+      \ to separate your answers if you have multiple answers.\n\n|||\n\n{# Assignement\
+      \ in if clause breaks test, we need to declare variables in global scope first:\
+      \ https://github.com/pallets/jinja/issues/1314 #}\n{% set random_answer = \"\
+      \" %}\n{% set random_answer_form = \"\" %}\n{% if annotations.type[0] == \"\
+      singleAnswer\" %}\n    {% set random_answer_form = [] %}\n    {% for possible_answer\
+      \ in annotations.answer[0] %}\n    {{ random_answer_form.append(possible_answer\
+      \ ) or \"\"}}\n    {% endfor %}\n{% else %}\n    {% set random_answer_form =\
+      \ [] %}\n    {% for possible_answers in annotations.qaPairs[0].answer %}\n \
+      \   {% for possible_answer in possible_answers %}\n    {{ random_answer_form.append(possible_answer\
+      \ ) or \"\"}}\n    {% endfor %}\n    {% endfor %}\n{% endif %}\n\n{{random_answer_form\
+      \ | join(\"; \")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: answer_prediction_all_answers_interrogative
+    reference: ''
+  45b20de4-a3c1-4e76-ad79-06d7c8c66009: !Template
+    answer_choices: null
+    id: 45b20de4-a3c1-4e76-ad79-06d7c8c66009
+    jinja: "Given the question \"{{question}}\", generate all the possible answers,\
+      \ separated by semi-colon.\n\n|||\n\n{# Assignement in if clause breaks test,\
+      \ we need to declare variables in global scope first: https://github.com/pallets/jinja/issues/1314\
+      \ #}\n{% set random_answer = \"\" %}\n{% set random_answer_form = \"\" %}\n\
+      {% if annotations.type[0] == \"singleAnswer\" %}\n    {% set random_answer_form\
+      \ = [] %}\n    {% for possible_answer in annotations.answer[0] %}\n    {{ random_answer_form.append(possible_answer\
+      \ ) or \"\"}}\n    {% endfor %}\n{% else %}\n    {% set random_answer_form =\
+      \ [] %}\n    {% for possible_answers in annotations.qaPairs[0].answer %}\n \
+      \   {% for possible_answer in possible_answers %}\n    {{ random_answer_form.append(possible_answer\
+      \ ) or \"\"}}\n    {% endfor %}\n    {% endfor %}\n{% endif %}\n\n{{random_answer_form\
+      \ | join(\"; \")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: answer_prediction_all_answers_affirmative
+    reference: ''
+  72bf511b-44ce-4b9f-a2d0-5ed6334f0e07: !Template
+    answer_choices: Yes ||| No
+    id: 72bf511b-44ce-4b9f-a2d0-5ed6334f0e07
+    jinja: "{# Assignement in if clause breaks test, we need to declare variables\
+      \ in global scope first: https://github.com/pallets/jinja/issues/1314 #}\n{%\
+      \ set random_question_id = -1 %}\n{% set random_answer_id = -1 %}\n{% set selected_question\
+      \ = \"\" %}\n{% set selected_answer = \"\" %}\n{% if annotations.type[0] ==\
+      \ \"multipleQAs\" %}\n   {% set random_question_id = range(0, annotations.qaPairs[0].question\
+      \ | length) | choice%}\n   {% set random_answer_id = range(0, annotations.qaPairs[0].answer\
+      \ | length) | choice%}\n   {% set selected_question = annotations.qaPairs[0].question[random_question_id]\
+      \ %}\n   {% set selected_answer = annotations.qaPairs[0].answer[random_answer_id]\
+      \ | choice%}\n{% else %}\n   {% set random_question_id = 0 %}\n   {% set random_answer_id\
+      \ = 0 %}\n   {% set selected_question = question %}\n   {% set selected_answer\
+      \ = annotations.answer[0] | choice %}\n{% endif %}\n\nIs \"{{selected_answer}}\"\
+      \ an acceptable answer to \"{{selected_question}}\"? {{answer_choices[0]}} or\
+      \ {{answer_choices[1].lower()}}?\n\n|||\n\n{% if random_answer_id == random_question_id\
+      \ %} {{answer_choices[0]}} {% else %} {{answer_choices[1]}} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: answer_prediction_yes_or_no
+    reference: Classify if the given answer if correct compared to the chosen question
+  bb089312-23cb-475d-93b5-952781bc6be4: !Template
+    answer_choices: null
+    id: bb089312-23cb-475d-93b5-952781bc6be4
+    jinja: "{# Assignement in if clause breaks test, we need to declare variables\
+      \ in global scope first: https://github.com/pallets/jinja/issues/1314 #}\n{%\
+      \ set selected_question = \"\" %}\n{% set selected_answer = \"\" %}\n{% set\
+      \ random_question_id = -1 %}\n{% if annotations.type[0] == \"multipleQAs\" %}\n\
+      \   {% set random_question_id = range(0, annotations.qaPairs[0].question | length)\
+      \ | choice%}\n   {% set selected_question = annotations.qaPairs[0].question[random_question_id]%}\n\
+      \   {% set selected_answer = annotations.qaPairs[0].answer[random_question_id]\
+      \ | choice%}\n{% else %}\n   {% set selected_question = question %}\n   {% set\
+      \ selected_answer = annotations.answer[0] | choice %}\n{% endif %}\n\nQuestion:\
+      \ {{question}}\nAnswer: {{selected_answer}}\n\nKnowing that the question can\
+      \ be ambiguous, can you perform question disambiguation by generating a question\
+      \ such that \"{{selected_answer}}\" is a more suitable answer? If you deem that\
+      \ the question is not ambiguous, generate the same question given above.\n|||\n\
+      {{selected_question}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: perform_question_disambiguation
+    reference: ''

@@ -1,0 +1,129 @@
+dataset: commonsense_qa
+templates:
+  1e1d0ce1-b0ea-4ad8-9971-b2b44948123b: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 1e1d0ce1-b0ea-4ad8-9971-b2b44948123b
+    jinja: '{% if answerKey != "" %}
+
+      Answer the following question:
+
+      {{question}} |||
+
+      {{ answer_choices[choices[''label''].index(answerKey)] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: answer_given_question_without_options
+    reference: ''
+  41188da5-c16a-4c6b-89af-6ce6815aedc6: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 41188da5-c16a-4c6b-89af-6ce6815aedc6
+    jinja: '{% if answerKey != "" %}
+
+      {{question}}
+
+
+      - {{answer_choices | join("\n- ")}} |||
+
+      {{answer_choices[choices[''label''].index(answerKey)] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: question_answering
+    reference: ''
+  42fca80b-b614-4288-aad2-2525360543cb: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 42fca80b-b614-4288-aad2-2525360543cb
+    jinja: '{% if answerKey != "" %}
+
+      Given the following options, what do you think is the correct answer to the
+      question below:
+
+
+      {{question}}
+
+
+      Options:
+
+      {% for letter, t in zip(answer_choices, choices.text) %}
+
+      - {{letter}}: {{t}}
+
+      {% endfor %} |||
+
+      {{answerKey}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: question_to_answer_index
+    reference: ''
+  8e3f63fa-9ae6-4105-bd51-874b5e1d6b8e: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 8e3f63fa-9ae6-4105-bd51-874b5e1d6b8e
+    jinja: '{% if answerKey != "" %}
+
+      Given the options below, select the most suitable answer for the following question:
+
+      {{question}}
+
+      Options:
+
+      - {{answer_choices | join("\n- ")}}|||
+
+      {{answer_choices[choices["label"].index(answerKey)]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: most_suitable_answer
+    reference: ''
+  bc718994-1d3e-4ae4-b65b-be307154b0a6: !Template
+    answer_choices: null
+    id: bc718994-1d3e-4ae4-b65b-be307154b0a6
+    jinja: '{% if answerKey != "" %}
+
+      Use the following options to predict a possible question for them:
+
+
+      {% for i in range(choices[''text'']|length) %}
+
+      - {{choices[''text''][i]}}
+
+      {% endfor %} |||
+
+      {{question}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answer_to_question
+    reference: ''

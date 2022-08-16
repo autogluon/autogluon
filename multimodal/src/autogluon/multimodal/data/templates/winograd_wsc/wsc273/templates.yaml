@@ -1,0 +1,125 @@
+dataset: winograd_wsc
+subset: wsc273
+templates:
+  18233597-fcd3-415d-a184-a971e98119d9: !Template
+    answer_choices: '{{ options | join("|||") }}'
+    id: 18233597-fcd3-415d-a184-a971e98119d9
+    jinja: '{{ text }} Here, does "{{ pronoun }}" stand for {{ answer_choices[0] }}
+      or {{ answer_choices[1] }}? ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does p stand for
+    reference: ''
+  3f04226a-fb68-4d82-bda1-658f1a316365: !Template
+    answer_choices: '{{ options | join("|||") }}'
+    id: 3f04226a-fb68-4d82-bda1-658f1a316365
+    jinja: "{{ text }} \n{% if pronoun.lower()  == \"they\" or pronoun.lower() ==\
+      \ \"them\" %}\nQuestion: Who or what are \"{{ pronoun }}\"? {{ answer_choices[0]\
+      \ }} or {{ answer_choices[1] }}?\n{% else %}\nQuestion: Who or what is \"{{\
+      \ pronoun }}\"? Is it {{ answer_choices[0] }} or {{ answer_choices[1] }}?\n\
+      {% endif %}\nAnswer: ||| {{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Who or what is/are
+    reference: ''
+  53603685-806f-4332-ae9a-e393b6ad2d89: !Template
+    answer_choices: '{{options | join("|||")}}'
+    id: 53603685-806f-4332-ae9a-e393b6ad2d89
+    jinja: '{{ text }} In the previous sentence, can the pronoun "{{pronoun }}" be
+      replaced with "{{ answer_choices[0] }}" or "{{ answer_choices[1] }}"? ||| {{
+      answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: replaced with
+    reference: ''
+  62aa8a33-2f62-43ec-aa7e-20d2052e2a8c: !Template
+    answer_choices: '{{ options | join("|||") }}'
+    id: 62aa8a33-2f62-43ec-aa7e-20d2052e2a8c
+    jinja: "{{ text }} \nIn the passage above, the pronoun \"{{ pronoun }}\" refers\
+      \ to {{ answer_choices[0] }} or {{ answer_choices[1] }}? ||| {{ answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: the pronoun refers to
+    reference: "Adapted from Perez et al. 2021 and Schick & Sch\xFCtz 2021."
+  6e8a2985-ecc1-4184-86b9-929d2d25746e: !Template
+    answer_choices: '{{options | join("|||")}}'
+    id: 6e8a2985-ecc1-4184-86b9-929d2d25746e
+    jinja: "Context: {{ text }} \n\n{% if pronoun.lower()  == \"they\" or pronoun.lower()\
+      \ == \"them\" %}\nQuestion: \"{{ pronoun }}\" are {{ answer_choices[0] }} or\
+      \ {{ answer_choices[1] }}?\n{% else %}\nQuestion: \"{{ pronoun }}\" is {{ answer_choices[0]\
+      \ }} or {{ answer_choices[1] }}?\n{% endif %}\n\nAnswer: ||| {{ answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: p is/are r
+    reference: ''
+  7ee12960-5512-431a-b1eb-b3a975761f6c: !Template
+    answer_choices: '{{options | join("|||")}}'
+    id: 7ee12960-5512-431a-b1eb-b3a975761f6c
+    jinja: "Passage: {{ text }} \n\nQuestion: In the passage above, does the pronoun\
+      \ \"{{ pronoun }}\" refer to {{ answer_choices[0] }} or {{answer_choices[1]\
+      \ }}?\n\nAnswer: ||| {{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 Style
+    reference: Adapted from Figure G33, p. 59, Brown et al. 2020
+  a0e4b805-e0bc-4b20-81bd-2b265ace8644: !Template
+    answer_choices: '{{options | join("|||")}}'
+    id: a0e4b805-e0bc-4b20-81bd-2b265ace8644
+    jinja: '{{ text }} In the previous sentence, does the pronoun "{{ pronoun }}"
+      refer to {{ answer_choices[0] }} or {{ answer_choices[1] }}? ||| {{ answer_choices[label]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does the pronoun refer to
+    reference: "Adapted from Perez et al. 2021 and Schick & Sch\xFCtz 2021."
+  e617cc59-9eca-4b17-ba2e-a87b79fe8c89: !Template
+    answer_choices: '{{options | join("|||")}}'
+    id: e617cc59-9eca-4b17-ba2e-a87b79fe8c89
+    jinja: '{{ text }} Here, by "{{ pronoun }}" do they mean "{{ answer_choices[0]
+      }}" or "{{ answer_choices[1]}}"? ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: by p they mean
+    reference: ''

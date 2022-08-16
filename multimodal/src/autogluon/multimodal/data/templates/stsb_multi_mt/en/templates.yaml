@@ -1,0 +1,74 @@
+dataset: stsb_multi_mt
+subset: en
+templates:
+  6c0bdf61-9baa-415a-bf03-fdb8789d1740: !Template
+    answer_choices: null
+    id: 6c0bdf61-9baa-415a-bf03-fdb8789d1740
+    jinja: How similar are "{{sentence1}}" and "{{sentence2}}"? Give a score between
+      {{"0.0"}} and {{"5.0"}}. ||| {{(((5*similarity_score)|round)/5)}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: Similarity_how
+    reference: ''
+  6df357b5-f8ea-49d2-b304-3541acb5271a: !Template
+    answer_choices: no ||| yes
+    id: 6df357b5-f8ea-49d2-b304-3541acb5271a
+    jinja: Do you think "{{sentence1}}" and "{{sentence2}}" express the same thing?
+      ||| {{answer_choices[0 if similarity_score < 2.5 else 1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Similarity_express_binary
+    reference: sst2
+  775af665-d8a5-46b2-bfcf-2a21abc7e99c: !Template
+    answer_choices: no ||| yes
+    id: 775af665-d8a5-46b2-bfcf-2a21abc7e99c
+    jinja: Do "{{sentence1}}" and "{{sentence2}}" seem similar to you ? ||| {{answer_choices[0
+      if similarity_score < 2.5 else 1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Similarity_seem_binary
+    reference: ''
+  9cab340c-32ce-465d-be89-049e4a63af11: !Template
+    answer_choices: null
+    id: 9cab340c-32ce-465d-be89-049e4a63af11
+    jinja: On a scale from {{"0.0"}} to {{"5.0"}}, how similar are "{{sentence1}}"
+      and "{{sentence2}}"? ||| {{(((5*similarity_score)|round)/5)}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: Similarity_scale
+    reference: ''
+  e0551bee-61f0-4c1e-9c3f-18c8b54439f8: !Template
+    answer_choices: null
+    id: e0551bee-61f0-4c1e-9c3f-18c8b54439f8
+    jinja: "Rate the similarity of these two sentences: ({{\"0.0\"}} being the lowest\
+      \ and {{\"5.0\"}} the highest)\n\"{{sentence1}}\" and \"{{sentence2}}\" \n|||\n\
+      {{(((5*similarity_score)|round)/5)}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: Similarity_rate
+    reference: ''

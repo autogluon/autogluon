@@ -1,0 +1,110 @@
+dataset: winogrande
+subset: winogrande_m
+templates:
+  5170abad-7046-4538-8216-68cc508d3d23: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: 5170abad-7046-4538-8216-68cc508d3d23
+    jinja: "{{sentence}}\nReplace the _ in the above sentence with the correct option:\
+      \ \n- {{option1}}\n- {{option2}}\n|||\n{% if answer == '1' %} {{option1}} {%\
+      \ else %} {{ option2 }} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Replace
+    reference: ''
+  5c801298-c08f-4165-8c25-38592e341a1c: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: 5c801298-c08f-4165-8c25-38592e341a1c
+    jinja: 'Fill in the _ in the below sentence:
+
+      {{sentence}}
+
+
+      Choices:
+
+      - {{ option1 }}
+
+      - {{ option2 }}
+
+
+      Answer: ||| {% if answer == ''1'' %} {{option1}} {% else %} {{ option2 }} {%
+      endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill in the blank
+    reference: ''
+  894b5a5b-6685-462b-ad00-ea82f4fb80e2: !Template
+    answer_choices: True ||| False
+    id: 894b5a5b-6685-462b-ad00-ea82f4fb80e2
+    jinja: 'The _ in the sentence below refers to {{option1}}. True or False?
+
+      {{sentence}}|||
+
+      {{answer_choices[answer|int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: True or False
+    reference: ''
+  a394fafe-260c-4473-8b67-a4ecfc7fe1fd: !Template
+    answer_choices: '{{ option1 }} ||| {{ option2 }}'
+    id: a394fafe-260c-4473-8b67-a4ecfc7fe1fd
+    jinja: '{{ sentence }} In the previous sentence, does _ refer to {{ option1 }}
+      or  {{ option2 }}? ||| {% if answer == ''1'' %} {{option1}} {% else %} {{ option2
+      }} {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does underscore refer to
+    reference: ''
+  ad345e36-5dc7-4a0b-a9f4-654f253e3c20: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: ad345e36-5dc7-4a0b-a9f4-654f253e3c20
+    jinja: '{{sentence}}
+
+      What does the _ in the above sentence refer to? {{ option1 }} or {{ option2
+      }}? ||| {% if answer == ''1'' %} {{option1}} {% else %} {{ option2 }} {% endif
+      %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: underscore refer to
+    reference: ''
+  ead1b8bf-7c42-4320-86ec-3a7c7aef14cb: !Template
+    answer_choices: '{{option1}} ||| {{option2}}'
+    id: ead1b8bf-7c42-4320-86ec-3a7c7aef14cb
+    jinja: 'In the sentence below, does the _ stand for {{answer_choices[0]}} or {{answer_choices[1]}}?
+
+      {{sentence}}|||
+
+      {{answer_choices[answer | int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: stand for
+    reference: ''

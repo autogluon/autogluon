@@ -1,0 +1,207 @@
+dataset: qa_zre
+templates:
+  2d6b6ec6-4cba-4a07-a0d1-f6b7cb103281: !Template
+    answer_choices: null
+    id: 2d6b6ec6-4cba-4a07-a0d1-f6b7cb103281
+    jinja: 'The following question is asking about a specific relation. What is this
+      relation?
+
+      Question: {{question}} |||
+
+      {{relation}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: extract_relation
+    reference: https://www.aclweb.org/anthology/K17-1034.pdf
+  5a970b88-53a0-4148-b45e-7ac410df263f: !Template
+    answer_choices: null
+    id: 5a970b88-53a0-4148-b45e-7ac410df263f
+    jinja: 'Based on the context below, please answer the question: "{{question.replace("XXX",subject)}}".
+      If the context is not sufficient to answer, please write "unanswerable" instead.
+
+      Context: {{context}}
+
+      |||
+
+      {% if answers|length > 0 %}
+
+      {{answers|choice}}
+
+      {% else %}
+
+      unanswerable
+
+      {% endif %} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: based_on_context
+    reference: ''
+  6368de04-070a-4f67-a8bf-fd6d2c07d401: !Template
+    answer_choices: null
+    id: 6368de04-070a-4f67-a8bf-fd6d2c07d401
+    jinja: 'What does "XXX" represent in the following context-question pair?
+
+
+      {{context}}
+
+      {{question}} |||
+
+      {{subject}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: subject
+    reference: ''
+  8f76743d-6486-4ae1-8bc8-ae644e3c54aa: !Template
+    answer_choices: null
+    id: 8f76743d-6486-4ae1-8bc8-ae644e3c54aa
+    jinja: 'Extract the appropriate relation from the following question about {{subject}}
+
+
+      {{question|replace("XXX",subject)}} |||
+
+      {{relation}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: relation2
+    reference: ''
+  b2195890-a3c5-4e33-be4a-5e53af75e6dd: !Template
+    answer_choices: null
+    id: b2195890-a3c5-4e33-be4a-5e53af75e6dd
+    jinja: '
+
+      You will find below a context and a question. Please answer the question or
+      write "unanswerable" if the question cannot be answered using the context.
+
+      Context: {{context}}
+
+      Question: {{question.replace("XXX",subject)}} |||
+
+      {% if answers|length > 0 %}
+
+      {{answers|choice}}
+
+      {% else %}
+
+      unanswerable
+
+      {% endif %} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: qa_including_unanswerable
+    reference: ''
+  b2195890-a3c5-4e33-be4a-5e53af75e7dd: !Template
+    answer_choices: null
+    id: b2195890-a3c5-4e33-be4a-5e53af75e7dd
+    jinja: ' Question: {{question.replace("XXX",subject)}}
+
+      Context: {{context}}
+
+      Please answer the question above using a passage present in the context. If
+      no passage is a good answer for the question, please write "unanswerable" instead.
+
+      |||
+
+      {% if answers|length > 0 %}
+
+      {{answers|choice}}
+
+      {% else %}
+
+      unanswerable
+
+      {% endif %} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: using_a_passage
+    reference: ''
+  b2195890-a3c5-4e33-be4a-5e53af75e8dd: !Template
+    answer_choices: null
+    id: b2195890-a3c5-4e33-be4a-5e53af75e8dd
+    jinja: ' Question: {{question.replace("XXX",subject)}}
+
+      Context: {{context}}
+
+      Please copy the span in the context that best answers the question. If there
+      is no such span, please output "unanswerable" instead.
+
+      |||
+
+      {% if answers|length > 0 %}
+
+      {{answers|choice}}
+
+      {% else %}
+
+      unanswerable
+
+      {% endif %} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: copy_the_span
+    reference: ''
+  b2195890-a3c5-4e33-be4a-5e53af75e9dd: !Template
+    answer_choices: null
+    id: b2195890-a3c5-4e33-be4a-5e53af75e9dd
+    jinja: ' Question: {{question.replace("XXX",subject)}}
+
+      Context: {{context}}
+
+      The following context may contain an answer to the question. If it does, please
+      copy the span that best answers it. If it does not, mention that the question
+      is "unanswerable" using the context.
+
+      |||
+
+      {% if answers|length > 0 %}
+
+      {{answers|choice}}
+
+      {% else %}
+
+      unanswerable
+
+      {% endif %} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: may_contain
+    reference: ''

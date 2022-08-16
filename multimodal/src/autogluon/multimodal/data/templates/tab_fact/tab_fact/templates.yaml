@@ -1,0 +1,109 @@
+dataset: tab_fact
+subset: tab_fact
+templates:
+  137a6f5d-fdcd-4849-ba3c-7ae572285ef9: !Template
+    answer_choices: null
+    id: 137a6f5d-fdcd-4849-ba3c-7ae572285ef9
+    jinja: '{% if label %}
+
+      Passage: "{{statement}}"
+
+
+      Table: "{{table_text}}"
+
+
+      Note: {{"#"}} is the delimiter between columns; {{"\\n"}} is the delimiter between
+      rows.
+
+
+      Give a suitable caption for the table.|||
+
+      {{table_caption}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Edit Distance
+      original_task: false
+    name: tab_fact_table_caption
+    reference: Generate Table Caption
+  33e3dbc2-3b1b-4891-8c78-2b575dd3ec35: !Template
+    answer_choices: refuted ||| entailed
+    id: 33e3dbc2-3b1b-4891-8c78-2b575dd3ec35
+    jinja: "Parse the following table:\n\nTable Caption: \"{{table_caption}}\"\n\n\
+      Table:\n\n{{table_text}}\n\nNote: {{\"#\"}} is the delimiter between columns;\
+      \ {{\"\\n\"}} is the delimiter between rows.\n\nFrom the above table, the statement\
+      \ \"{{statement}}\" can either be {{\"entailed\"}} or {{\"refuted\"}}. Which\
+      \ one is it? |||  \n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: parse_table
+    reference: 'Input: Table Caption, Table; Label: Refuted/Entailed -- Affirmative
+      Form'
+  5bf642b0-4d75-40b7-9c0a-80b38a170d0f: !Template
+    answer_choices: null
+    id: 5bf642b0-4d75-40b7-9c0a-80b38a170d0f
+    jinja: "{% if label %}\nDescribe a piece of information or conclusion obtained\
+      \ from the following table in plain English:\n\n\"{{table_caption}}\"\n\n\"\
+      {{table_text}}\" \n\nNote: {{\"#\"}} is the delimiter between columns; {{\"\\\
+      n\"}} is the delimiter between rows.\n|||\n{{statement}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Edit Distance
+      original_task: false
+    name: tab_fact_express
+    reference: Generate Natural Text from the table
+  6e4d3fe8-1d31-4685-8ef6-419ab8554741: !Template
+    answer_choices: No ||| Yes
+    id: 6e4d3fe8-1d31-4685-8ef6-419ab8554741
+    jinja: "Is \"{{statement}}\" corroborated by \"{{table_caption}}\"\nwith the following\
+      \ table:\n{{table_text}}\"? \n\nNote: {{\"#\"}} is the delimiter between columns;\
+      \ {{\"\\n\"}} is the delimiter between rows.\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: 'tab_fact_corroborated '
+    reference: 'Input: Table Caption, Table; Label: Yes/No -- Interrogative Form (corroboration)'
+  becf68bd-726d-40c1-afb1-80afd461126c: !Template
+    answer_choices: No ||| Yes
+    id: becf68bd-726d-40c1-afb1-80afd461126c
+    jinja: 'I have the following paragraph: "{{statement}}". Is there any evidence
+      of this passage in the data below?
+
+
+      Topic: "{{table_caption}}"
+
+
+      {{table_text}}
+
+
+      Note: {{"#"}} is the delimiter between columns; {{"\\n"}} is the delimiter between
+      rows.
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: 'tab_fact_evidence '
+    reference: 'Input: Table Caption, Table; Label: Yes/No -- Interrogative Form'

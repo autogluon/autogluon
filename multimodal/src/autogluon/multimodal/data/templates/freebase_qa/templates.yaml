@@ -1,0 +1,95 @@
+dataset: freebase_qa
+templates:
+  02b12d5c-a481-494d-84ea-a210eefa66d2: !Template
+    answer_choices: null
+    id: 02b12d5c-a481-494d-84ea-a210eefa66d2
+    jinja: "{% set question_context = Parses.TopicEntityName | choice %}\n{% set inference_context\
+      \ = Parses.InferentialChain | first %}\n\nThe topic of this question is: {{question_context.split(\"\
+      \ \") | map(\"capitalize\") | join(\" \")}}.\n\nThe answer to this question\
+      \ should be in the following category: {{ inference_context.split(\".\") | last\
+      \ | capitalize | replace(\"_\", \" \")}}\n\nUsing this, answer the following\
+      \ question:\n\n{{RawQuestion}}\n||| \n{% set answer = Parses.Answers | choice\
+      \ %}\n{{answer.AnswersName[0][0].split(\" \") | map(\"capitalize\") | join(\"\
+      \ \") }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_context_2
+    reference: qa prompt with topic and inference chain provided
+  1d583b71-7ef1-49df-b252-e8e1d6910129: !Template
+    answer_choices: null
+    id: 1d583b71-7ef1-49df-b252-e8e1d6910129
+    jinja: 'What category best describes the answer to the following question?
+
+
+      Question: {{RawQuestion}}
+
+      |||
+
+      {% set answer = Parses.InferentialChain | first %}
+
+      {{ answer.split(".") | last | capitalize | replace("_", " ")}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: inference_chain_prompt
+    reference: predicting the inference chain given just the question
+  1fd7e73c-92ac-4e33-be33-80775cbb14df: !Template
+    answer_choices: null
+    id: 1fd7e73c-92ac-4e33-be33-80775cbb14df
+    jinja: "Answer the following question:\n\n{{RawQuestion}}\n||| \n{% set answer\
+      \ = Parses.Answers | choice %}\n{{answer.AnswersName[0][0].split(\" \") | map(\"\
+      capitalize\") | join(\" \") }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_template_basic
+    reference: basic question/answer format
+  30ff02f4-3673-4ea6-a3e0-0df0cf19b021: !Template
+    answer_choices: null
+    id: 30ff02f4-3673-4ea6-a3e0-0df0cf19b021
+    jinja: "{% set context = Parses.TopicEntityName | choice %}\nThe topic of this\
+      \ question is: {{context.split(\" \") | map(\"capitalize\") | join(\" \")}}.\n\
+      \nWith that context, answer the following question:\n\n{{RawQuestion}}\n|||\
+      \ \n{% set answer = Parses.Answers | choice %}\n{{answer.AnswersName[0][0].split(\"\
+      \ \") | map(\"capitalize\") | join(\" \") }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_context_1
+    reference: qa question with simple entity context
+  dbf762f0-2daa-4cc4-af67-ba72aa2c1991: !Template
+    answer_choices: null
+    id: dbf762f0-2daa-4cc4-af67-ba72aa2c1991
+    jinja: "{% set answer = Parses.Answers | choice %}\nFor the following question:\n\
+      \n\"{{RawQuestion}}\" \n\nWhat word or phrase best describes its answer, \"\
+      {{answer.AnswersName[0][0].split(\" \") | map(\"capitalize\") | join(\" \")\
+      \ }}\"? \n||| \n{% set a = Parses.InferentialChain | first %}\n{{ a.split(\"\
+      .\") | last | capitalize | replace(\"_\", \" \")}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: inference_chain_prompt_context
+    reference: determine the inference chain between question and answer

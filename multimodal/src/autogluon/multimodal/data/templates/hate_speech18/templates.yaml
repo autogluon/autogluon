@@ -1,0 +1,20 @@
+dataset: hate_speech18
+templates:
+  3266f9d4-9c80-4e17-a8a6-1fe44ca8f3bf: !Template
+    answer_choices: noHate ||| hate
+    id: 3266f9d4-9c80-4e17-a8a6-1fe44ca8f3bf
+    jinja: '{% if label in [0, 1] %}
+
+      {{text}} Is the sentiment the sentence expresses is a {{answer_choices[1]}}
+      speech or {{answer_choices[0]}} speech? ||| {{answer_choices[label]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: hate_or_noHate_sentiment_analysis
+    reference: ''

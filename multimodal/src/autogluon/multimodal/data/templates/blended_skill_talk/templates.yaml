@@ -1,0 +1,57 @@
+dataset: blended_skill_talk
+templates:
+  54f785e9-453a-4ffe-8181-28095e3f2b80: !Template
+    answer_choices: null
+    id: 54f785e9-453a-4ffe-8181-28095e3f2b80
+    jinja: "Given the below conversation between two people, what would the listener\
+      \ say?\n\nA: {{previous_utterance[0]}}\n\nB: {{previous_utterance[1]}}\n{% for\
+      \ message_f, message_g in zip(free_messages[:-1], guided_messages[:-1]) %}\n\
+      A: {{message_f}}\n\nB: {{message_g}}\n{% endfor %} \nA: {{free_messages[-1]}}\n\
+      \nB: \n|||\n{{guided_messages[-1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: guess-last-utterance
+    reference: ''
+  58f4e068-26fa-4843-a1d6-54bde324e780: !Template
+    answer_choices: Yes ||| No
+    id: 58f4e068-26fa-4843-a1d6-54bde324e780
+    jinja: "Two people are having a conversation. Are the utterances in the correct\
+      \ order? \n\nYour answer should be either \"Yes\" or \"No\".\n{% if range(0,\
+      \ 2) | choice %}\nA: {{previous_utterance[0]}}\n\nB: {{previous_utterance[1]}}\n\
+      {% for message_f, message_g in zip(free_messages, guided_messages) %}\nA: {{message_f}}\n\
+      \nB: {{message_g}}\n{% endfor %} \n\n|||\nYes.\n{% else %}\nA: {{previous_utterance[1]}}\n\
+      \nB: {{previous_utterance[0]}}\n{% for message_f, message_g in zip(guided_messages,\
+      \ free_messages) %}\nA: {{message_f}}\n\nB: {{message_g}}\n{% endfor %} \n\n\
+      |||\nNo.\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: guess-correct-order
+    reference: ''
+  8792b63e-7217-40fe-8130-7392baca3519: !Template
+    answer_choices: null
+    id: 8792b63e-7217-40fe-8130-7392baca3519
+    jinja: "Two people are talking to each other.  What do you think Person A said\
+      \ in the beginning?\n\nPerson B: {{previous_utterance[1]}}\n{% for message_f,\
+      \ message_g in zip(free_messages, guided_messages) %}\nPerson A: {{message_f}}\n\
+      \nPerson B: {{message_g}}\n{% endfor %} \n|||\n{{previous_utterance[0]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: guess-first-utterance
+    reference: ''

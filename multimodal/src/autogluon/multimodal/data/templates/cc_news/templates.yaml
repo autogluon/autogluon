@@ -1,0 +1,264 @@
+dataset: cc_news
+templates:
+  0c630a0d-5eeb-46ea-ba15-f76f5d05a57d: !Template
+    answer_choices: null
+    id: 0c630a0d-5eeb-46ea-ba15-f76f5d05a57d
+    jinja: 'What could be the content of a news article with the following title and
+      summary?
+
+
+      Title: {{title}}
+
+
+      Summary: {{description}}
+
+      |||
+
+      {{text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Use title and summary to generate news
+    reference: ''
+  0c651168-8729-4a35-8c7c-5d812d4be790: !Template
+    answer_choices: null
+    id: 0c651168-8729-4a35-8c7c-5d812d4be790
+    jinja: "{{ text }} \n\nGive a brief description of the above text.\n|||\n{{ description\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate description using text
+    reference: ''
+  11a681c3-8450-4064-aa08-ad3700b8b1bd: !Template
+    answer_choices: null
+    id: 11a681c3-8450-4064-aa08-ad3700b8b1bd
+    jinja: '{{ text }}
+
+
+      What title would you choose for the text above?
+
+      |||
+
+      {{ title }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Generate title using text
+    reference: ''
+  14aca5f0-89ae-4ae1-9746-7a68f6a0664f: !Template
+    answer_choices: null
+    id: 14aca5f0-89ae-4ae1-9746-7a68f6a0664f
+    jinja: 'Suggest the content of a news article entitled:
+
+
+      {{ title }},
+
+
+      regarding:
+
+
+      {{ description }}
+
+      |||
+
+      {{ text }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Use title and description to generate text
+    reference: ''
+  319a6d41-d6bb-4f8f-ba1b-085a45b3eddd: !Template
+    answer_choices: null
+    id: 319a6d41-d6bb-4f8f-ba1b-085a45b3eddd
+    jinja: "Write a brief summary of the text below: \n\n{{ text }}\n|||\n{{ description\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Write brief summary
+    reference: ''
+  5ca5100e-7aa6-48c0-9e78-48914739dc90: !Template
+    answer_choices: null
+    id: 5ca5100e-7aa6-48c0-9e78-48914739dc90
+    jinja: 'Use the description below to write a news article entitled:
+
+      {{ title }}.
+
+
+      Description: {{ description }}
+
+      |||
+
+      {{ text }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Use title and description to generate news article
+    reference: ''
+  7fd214bd-2403-42aa-850f-5255771e5609: !Template
+    answer_choices: null
+    id: 7fd214bd-2403-42aa-850f-5255771e5609
+    jinja: "Choose a title for the text below: \n\n{{ text }}\n|||\n{{ title }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Choose a title for text
+    reference: ''
+  858a02bf-10c0-4284-886e-26a8859b2cc3: !Template
+    answer_choices: null
+    id: 858a02bf-10c0-4284-886e-26a8859b2cc3
+    jinja: '{{ text }}
+
+
+      Summarize the essential ideas of the above piece of news.
+
+      |||
+
+      {{ description }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Summarize text using description
+    reference: ''
+  a993713f-fd0e-4d62-99c0-e1313ab5c1c8: !Template
+    answer_choices: null
+    id: a993713f-fd0e-4d62-99c0-e1313ab5c1c8
+    jinja: "{{ text }} \n\nWhat title suits best the above piece of news?\n|||\n{{\
+      \ title }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Generate title using news text
+    reference: ''
+  ae553815-f631-4e67-a6bc-6d8a21dedb25: !Template
+    answer_choices: null
+    id: ae553815-f631-4e67-a6bc-6d8a21dedb25
+    jinja: "Summarize the essential ideas of the following piece of news: \n\n{{ text\
+      \ }}\n|||\n{{ description }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Summarize ideas from news
+    reference: ''
+  b637cfd7-d4b8-420a-b60b-4fe0aa891000: !Template
+    answer_choices: null
+    id: b637cfd7-d4b8-420a-b60b-4fe0aa891000
+    jinja: 'Write a piece of news expanding the following ideas:
+
+
+      {{ description }},
+
+
+      entitled:
+
+
+      {{ title }}
+
+      |||
+
+      {{ text }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Use title and description to generate news
+    reference: ''
+  cc13d9b7-041a-4b29-b6c4-a6851a21fb46: !Template
+    answer_choices: null
+    id: cc13d9b7-041a-4b29-b6c4-a6851a21fb46
+    jinja: "Give this text a title: \n\n{{ text }}\n|||\n{{ title }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Give text a title
+    reference: ''
+  e4d40d0e-8c38-45ef-97dd-15ebab0b4078: !Template
+    answer_choices: null
+    id: e4d40d0e-8c38-45ef-97dd-15ebab0b4078
+    jinja: "Give a brief description of the following text: \n\n{{ text }}\n|||\n\
+      {{ description }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Given brief description of text
+    reference: ''
+  f4a0b21c-fcf1-4e3d-aa59-7cf3b9ae8780: !Template
+    answer_choices: null
+    id: f4a0b21c-fcf1-4e3d-aa59-7cf3b9ae8780
+    jinja: "{{ text }} \n\nThe above text can be summarized as follows:\n|||\n{{ description\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Text summarized using description '
+    reference: ''

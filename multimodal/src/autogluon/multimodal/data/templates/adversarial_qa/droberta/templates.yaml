@@ -1,0 +1,120 @@
+dataset: adversarial_qa
+subset: droberta
+templates:
+  00755780-f3c0-44b4-b159-8f3873cdb163: !Template
+    answer_choices: null
+    id: 00755780-f3c0-44b4-b159-8f3873cdb163
+    jinja: 'I want to test the ability of students to read a passage and answer questions
+      about it. Could you please come up with a good question for the passage "{{context}}"?
+      |||
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: 'Input: Context, Output: Question (generate a question)'
+  3b2459cc-6600-443c-abf8-8f60c34cd993: !Template
+    answer_choices: null
+    id: 3b2459cc-6600-443c-abf8-8f60c34cd993
+    jinja: '{% if metadata.split != "test" %}
+
+      I know that the answer to the question "{{question}}" is in "{{context}}". Can
+      you tell me what it is? |||
+
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: tell_what_it_is
+    reference: 'Input: QC, Output: A (rephrase)'
+  5bdb1815-5c6f-49a3-ad1d-367344420703: !Template
+    answer_choices: null
+    id: 5bdb1815-5c6f-49a3-ad1d-367344420703
+    jinja: '{% if metadata.split != "test" %}
+
+      Question: "{{question}}"
+
+
+      Context: "{{context}}"
+
+
+      Answer:
+
+      |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: question_context_answer
+    reference: 'Input: QC, Output: Answer (short form)'
+  a0872cde-2f19-4ae6-919a-868da47bfbc3: !Template
+    answer_choices: null
+    id: a0872cde-2f19-4ae6-919a-868da47bfbc3
+    jinja: '{% if metadata.split != "test" %}
+
+      Extract the answer to the question from the following context.
+
+      Question: {{question}}
+
+      Context: {{context}}|||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: based_on
+    reference: ''
+  a64d5a15-68e2-4d1c-b30a-ca8250c860f3: !Template
+    answer_choices: null
+    id: a64d5a15-68e2-4d1c-b30a-ca8250c860f3
+    jinja: '{% if metadata.split != "test" %}
+
+      Given the following passage
+
+
+      "{{context}}",
+
+
+      answer the following question. Note that the answer is present within the text.
+
+
+      Question: {{question}} |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: answer_the_following_q
+    reference: 'Input: QC, Output: Answer'

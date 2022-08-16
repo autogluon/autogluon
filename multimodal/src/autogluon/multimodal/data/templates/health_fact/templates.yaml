@@ -1,0 +1,105 @@
+dataset: health_fact
+templates:
+  041ffdd5-88b0-41df-9e22-8c7a7bc0ce24: !Template
+    answer_choices: null
+    id: 041ffdd5-88b0-41df-9e22-8c7a7bc0ce24
+    jinja: "After reading:\n\n {{main_text }}\n\nI  {{[\"do not believe\", \"do not\
+      \ think it is completely true that\", \"believe\", \"do not think it has been\
+      \ proven yet that\"][label]}}:\n\n{{claim}}\n\nis true because of: |||\n\n{{explanation}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      original_task: true
+    name: claim_explanation_generation_after_reading
+    reference: Given a claim and a belief on its veracity, generate an explanation
+      of that belief
+  23a2ef7f-2032-4771-bf39-94b840aee763: !Template
+    answer_choices: definitely false ||| likely false ||| definitely true ||| not
+      proven
+    id: 23a2ef7f-2032-4771-bf39-94b840aee763
+    jinja: "After reading:\n\n {{main_text }}\n\nI believe :\n\n{{claim}}\n\nis \n\
+      |||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: claim_veracity_classification_after_reading_I_believe
+    reference: ''
+  277f3961-5e9b-4cd5-a13c-f822f6541c76: !Template
+    answer_choices: False ||| A mixture of true and false ||| True ||| Unproven
+    id: 277f3961-5e9b-4cd5-a13c-f822f6541c76
+    jinja: "The claim is: \n{{claim}}\n\nand the explanation is: \n{{explanation}}.\
+      \ \n\nGiven the above, this claim is: |||\n {{answer_choices[label]}} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: claim_explanation_classification
+    reference: Read the claim and rely on explanation and main text
+  5000d89e-a93e-4b96-9ad4-b93924e1066b: !Template
+    answer_choices: null
+    id: 5000d89e-a93e-4b96-9ad4-b93924e1066b
+    jinja: 'I  {{["could not conclude", "could not say for sure", "could conclude",
+      "do not think it has been proven yet"][label]}}:
+
+
+      {{claim}}
+
+
+      from:
+
+
+      {{main_text}}
+
+
+      because of: |||
+
+
+      {{explanation}}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      original_task: true
+    name: claim_explanation_generation_I_because
+    reference: Given a claim and a belief on its veracity, generate an explanation
+      of that belief
+  ce294c51-275a-47f0-9106-2dc3104f1083: !Template
+    answer_choices: definitely false ||| likely false ||| definitely true ||| not
+      proven
+    id: ce294c51-275a-47f0-9106-2dc3104f1083
+    jinja: 'Tell me whether the following claim is {{answer_choices[0]}}, {{answer_choices[1]}},
+      {{answer_choices[2]}}, or {{answer_choices[3]}} after reading the passage.
+
+
+      Claim: {{claim}}
+
+
+      Passage: {{main_text }}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: claim_veracity_classification_tell_me
+    reference: ''

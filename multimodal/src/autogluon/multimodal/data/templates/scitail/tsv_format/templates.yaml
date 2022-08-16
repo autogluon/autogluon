@@ -1,0 +1,77 @@
+dataset: scitail
+subset: tsv_format
+templates:
+  189ed384-c077-49ad-b606-ed08b66f8376: !Template
+    answer_choices: true ||| false
+    id: 189ed384-c077-49ad-b606-ed08b66f8376
+    jinja: "{{premise}} Therefore, we are licensed to say that {{hypothesis}}  {{\
+      \ answer_choices | join(' or ') }}|||\n{% if label == \"entails\" %} \n{{answer_choices[0]}}\n\
+      {% else %}\n{{answer_choices[1]}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: "\u2026 Therefore, we're licensed to say that\u2026"
+    reference: ''
+  1ff92b02-fefc-49e0-b676-9391fab8f193: !Template
+    answer_choices: neutral ||| entails
+    id: 1ff92b02-fefc-49e0-b676-9391fab8f193
+    jinja: Suppose {{premise}} Can we infer that {{hypothesis}}? ||| {{label}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: "Suppose\u2026 Can we infer that\u2026"
+    reference: ''
+  5aa53544-73a6-4486-b8c8-623345353fa7: !Template
+    answer_choices: yes ||| no
+    id: 5aa53544-73a6-4486-b8c8-623345353fa7
+    jinja: "{{premise}} Does the previous passage support the claim that {{hypothesis}}?\
+      \ |||{% if label == \"entails\" %} \n{{answer_choices[0]}}\n{% else %}\n{{answer_choices[1]}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: "\u2026does the previous passage support the claim that"
+    reference: ''
+  705fa099-0650-4de5-b72f-881aea0fa208: !Template
+    answer_choices: yes ||| no
+    id: 705fa099-0650-4de5-b72f-881aea0fa208
+    jinja: "Given that {{premise}} Does it follow that {{hypothesis}}  {{ answer_choices\
+      \ | join(' or ') }} |||\n{% if label == \"entails\" %} \n{{answer_choices[0]}}\n\
+      {% else %}\n{{answer_choices[1]}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: "given\u2026 does it follow that\u2026 "
+    reference: Another yes/no entailment framing
+  9aa89dee-6cef-43bc-bdf4-e38cdf0796a6: !Template
+    answer_choices: yes ||| no
+    id: 9aa89dee-6cef-43bc-bdf4-e38cdf0796a6
+    jinja: "Sentence 1: {{premise}}\n\nSentence 2: {{hypothesis}}\n\nQuestion: Does\
+      \ Sentence 1 entail Sentence 2?  {{ answer_choices | join(' or ') }} |||\n{%\
+      \ if label == \"entails\" %} \n{{answer_choices[0]}}\n{% else %}\n{{answer_choices[1]}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does S1 entail S2?
+    reference: Adapted from Victor's prompts for XNLI.

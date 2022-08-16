@@ -1,0 +1,158 @@
+dataset: gigaword
+templates:
+  0a45ae54-4585-4d13-9540-890125d614e0: !Template
+    answer_choices: null
+    id: 0a45ae54-4585-4d13-9540-890125d614e0
+    jinja: '{{document}}
+
+
+      ===
+
+
+      Generate a title for this article: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: generate_summary_for_this
+    reference: ''
+  2558932f-894a-41ef-be34-32a5afb1f5d8: !Template
+    answer_choices: null
+    id: 2558932f-894a-41ef-be34-32a5afb1f5d8
+    jinja: 'Title: {{summary}}
+
+
+      ||| {{document}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: reverse_writing
+    reference: ''
+  696e561e-1311-4a3e-9ca1-51d1fd77392b: !Template
+    answer_choices: null
+    id: 696e561e-1311-4a3e-9ca1-51d1fd77392b
+    jinja: 'Make a title for this article: {{document}} |||
+
+
+      {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: make_a_title
+    reference: ''
+  7ad1a48a-195d-4c0c-aea5-df0689589f27: !Template
+    answer_choices: null
+    id: 7ad1a48a-195d-4c0c-aea5-df0689589f27
+    jinja: 'First sentence of the article: {{document}}
+
+
+      Title: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: first_sentence_title
+    reference: ''
+  90c34acf-2f42-4e66-98dc-7453f7e60e60: !Template
+    answer_choices: null
+    id: 90c34acf-2f42-4e66-98dc-7453f7e60e60
+    jinja: '{{document}}
+
+
+      TL;DR: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: TLDR
+    reference: GPT-2 TLDR
+  93f0c400-501f-43ad-861b-4f67564f2e8f: !Template
+    answer_choices: null
+    id: 93f0c400-501f-43ad-861b-4f67564f2e8f
+    jinja: '{{document}}
+
+
+      ===
+
+
+      Given the above sentence, write its title: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: write_its_sentence
+    reference: ''
+  a0e699bf-1268-4929-ad13-438c08644118: !Template
+    answer_choices: null
+    id: a0e699bf-1268-4929-ad13-438c08644118
+    jinja: "Write a title for this sentence: {{document}} \n\nTitle: ||| {{summary}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: write_a_title_for_this_sentence
+    reference: ''
+  ac53a797-4d59-455a-b0e6-0e4d7d85f029: !Template
+    answer_choices: null
+    id: ac53a797-4d59-455a-b0e6-0e4d7d85f029
+    jinja: '{{document}} In a nutshell, ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: in_a_nutshell
+    reference: ''
+  d1d4a115-65fd-49eb-bd75-179a46b67ec0: !Template
+    answer_choices: null
+    id: d1d4a115-65fd-49eb-bd75-179a46b67ec0
+    jinja: 'Title: {{summary}}
+
+
+      ===
+
+
+      Write an article with the given title: ||| {{document}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: write_an_article
+    reference: ''

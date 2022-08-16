@@ -1,0 +1,119 @@
+dataset: swag
+subset: regular
+templates:
+  111e2684-cd6c-4808-97c1-e452941d7550: !Template
+    answer_choices: Yes ||| No
+    id: 111e2684-cd6c-4808-97c1-e452941d7550
+    jinja: "{% set instance = [0, 1, 2, 3] | choice %}\nConsider the sentence: {{\
+      \ sent2 }} {{ [ending0, ending1, ending2, ending3][instance] }} \nIs it an appropriate\
+      \ continuation of the following situation:\n{{ sent1 }} ?\nYes or No?\n||| \n\
+      {% if label  == instance %}\n{{answer_choices[0]}}\n{% else %}\n{{answer_choices[1]}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: reversed_appropriate_continuation
+    reference: The template randomly selects a continuation and checks if the continuation
+      is appropriate for the given premise.
+  124f20bc-fea8-415f-8f09-5c2f8d077232: !Template
+    answer_choices: Yes ||| No
+    id: 124f20bc-fea8-415f-8f09-5c2f8d077232
+    jinja: "{% set instance = [0, 1, 2, 3] | choice %}\nConsider the sentence: {{\
+      \ sent1 }}\nIs the following an appropriate continuation?\n{{ sent2 }} {{ [ending0,\
+      \ ending1, ending2, ending3][instance] }}\nYes or No?\n||| \n{% if label  ==\
+      \ instance %}\n{{answer_choices[0]}}\n{% else %}\n{{answer_choices[1]}}\n{%\
+      \ endif %}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: appropriate_continuation
+    reference: The template checks if the two sentences are valid continuations.
+  25b7abe7-e357-4e93-8c31-5f7be319b705: !Template
+    answer_choices: (a) ||| (b) ||| (c) ||| (d)
+    id: 25b7abe7-e357-4e93-8c31-5f7be319b705
+    jinja: "{{ startphrase }}...\nHow does the description likely end? \n(a): {{ ending0\
+      \ }}\n(b): {{ ending1 }}\n(c): {{ ending2 }}\n(d): {{ ending3 }}\n||| \n{{ answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: how_ends
+    reference: 'Predict the ending key based on the startphrase. Not original task
+      because sent1 is not included. '
+  66366555-f989-4e82-beca-2aaa92960a50: !Template
+    answer_choices: (a) ||| (b) ||| (c) ||| (d)
+    id: 66366555-f989-4e82-beca-2aaa92960a50
+    jinja: "First, {{ sent1.lower() }} Then, {{ sent2.lower() }}... \nComplete with\
+      \ an appropriate ending:\n(a) {{ ending0 }}\n(b) {{ ending1 }}\n(c) {{ ending2\
+      \ }}\n(d) {{ ending3 }}\n||| \n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: first_then
+    reference: Generate the ending
+  d61be86a-242e-48ad-871c-f8be5133c4df: !Template
+    answer_choices: (a) ||| (b) ||| (c) ||| (d)
+    id: d61be86a-242e-48ad-871c-f8be5133c4df
+    jinja: "First, {{ sent1.lower() }} Then, {{ sent2.lower() }}... \nChoose the key\
+      \ with an appropriate ending:\n(a) {{ ending0 }}\n(b) {{ ending1 }}\n(c) {{\
+      \ ending2 }}\n(d) {{ ending3 }}\n||| \n{{answer_choices[label]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: first_then_key
+    reference: Predict the key of the ending
+  dae2999a-843e-445f-819e-9a3255cca049: !Template
+    answer_choices: null
+    id: dae2999a-843e-445f-819e-9a3255cca049
+    jinja: "{% set endings = [ending0, ending1, ending2, ending3] %}\nGenerate the\
+      \ starting sentence with the ending: {{endings[label]}}\n||| \n{{sent1}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_start
+    reference: Template generates the start of the sentence
+  ecb7eddb-5836-4b31-89d6-e2d4ebfcc779: !Template
+    answer_choices: null
+    id: ecb7eddb-5836-4b31-89d6-e2d4ebfcc779
+    jinja: 'Complete the sentence: {{ sent1 }} {{sent2}}
+
+      |||
+
+      {% set endings = [ending0, ending1, ending2, ending3] %}
+
+      {{ endings[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: open_completion
+    reference: Template for open-ended common sense completion

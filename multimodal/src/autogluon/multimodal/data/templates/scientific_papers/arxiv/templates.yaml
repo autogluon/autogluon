@@ -1,0 +1,121 @@
+dataset: scientific_papers
+subset: arxiv
+templates:
+  3dfaa906-d430-491f-945b-8d419e335e16: !Template
+    answer_choices: null
+    id: 3dfaa906-d430-491f-945b-8d419e335e16
+    jinja: "Suppose that you have an abstract for a scientific paper:   {{abstract}}.\n\
+      And you have already written the first three sentences of the full article:\
+      \ {{article.strip().split('\\n')[:3]|join('\\n')}}. \nPlease generate the next\
+      \ two sentences of the article\n|||\n{{article.strip().split('\\n')[3:5]|join(\"\
+      \\n\")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: write_sentences_4_and_5_from_sentences_1_2_3_and_abstract
+    reference: Given the first three sentences, and generate the next two sentence.
+  6f268cad-7bdd-4ca2-a647-18ac04d0d422: !Template
+    answer_choices: null
+    id: 6f268cad-7bdd-4ca2-a647-18ac04d0d422
+    jinja: 'Write the first line of an abstract of a paper.
+
+      This paper starts with: {{ article.strip().split(''\n'')[:3]|join(''\n'') }}
+
+      |||
+
+      {{ abstract.strip().split(''\n'')[0]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_first_line_abstract_from_first_three_lines_article
+    reference: Given the first three lines of an article, write the first line of
+      abstract.
+  a13472ad-df38-469a-85a8-a4e1ed58bc87: !Template
+    answer_choices: null
+    id: a13472ad-df38-469a-85a8-a4e1ed58bc87
+    jinja: 'What would be the first line of a scientific article for the following
+      abstract: {{ abstract }}
+
+      |||
+
+      {{ article.strip().split(''\n'')[0] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_first_line_from_abstract
+    reference: Given the abstract, generate the first line of the article.
+  ab3e65ab-0935-497c-a6d0-61ad31e5a1a7: !Template
+    answer_choices: null
+    id: ab3e65ab-0935-497c-a6d0-61ad31e5a1a7
+    jinja: 'Write the first 100 words for a scientific article with the following
+      abstract: {{ abstract }}
+
+      |||
+
+      {{ article.strip().split('' '')[:100] |join('' '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_first_100_words_for_article
+    reference: Given the abstract, generate the first 100 words of the article.
+  ed38e74f-2a5f-4b27-a1f9-0331c6ee8b29: !Template
+    answer_choices: null
+    id: ed38e74f-2a5f-4b27-a1f9-0331c6ee8b29
+    jinja: 'Write the section names for a scientific article with the abstract: {{
+      abstract }}
+
+      |||
+
+      {{ section_names.strip().split(''\n'')|join('', '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: get_section_names_from_abstract
+    reference: Given the abstract, get the section names.
+  fb501d80-9e93-4a7f-b66c-69b98ac0347f: !Template
+    answer_choices: null
+    id: fb501d80-9e93-4a7f-b66c-69b98ac0347f
+    jinja: 'Write the first three sentences of a scientific article for the following
+      abstract:
+
+      {{abstract}}
+
+      |||
+
+      {{article.strip().split(''\n'')[:3]|join("\n")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_first_three_sentences_of_an_article_from_abstract
+    reference: Given the abstract, generate first three sentences of the article.

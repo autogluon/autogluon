@@ -1,0 +1,189 @@
+dataset: multi_news
+templates:
+  12269bd1-1c3a-4865-9702-892782b593d9: !Template
+    answer_choices: null
+    id: 12269bd1-1c3a-4865-9702-892782b593d9
+    jinja: '{% set docs = document.split("3ed2dface8203c4c9dfb1a5dc58e41e0||") | reject("equalto",
+      "") | list %}
+
+      {% if document != "" %}
+
+      What are the key points across these news articles:
+
+      {% for doc in docs %}
+
+
+      Article: {{doc}}
+
+      {% endfor %}
+
+      |||
+
+      {{summary[2:]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: what are the key points
+    reference: ''
+  940d0ce4-c1ef-4453-a47b-1abaaf811160: !Template
+    answer_choices: null
+    id: 940d0ce4-c1ef-4453-a47b-1abaaf811160
+    jinja: '{% set docs = document.split("3ed2dface8203c4c9dfb1a5dc58e41e0||") | reject("equalto",
+      "") | list %}
+
+      {% if document != "" %}
+
+      Synthesize these documents into a single one:
+
+      {% for doc in docs %}
+
+
+      - {{doc}}
+
+      {% endfor %}
+
+      |||
+
+      {{summary[2:]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: synthesize
+    reference: ''
+  9ab370ad-2b89-4d2a-bb40-ccc31accefad: !Template
+    answer_choices: null
+    id: 9ab370ad-2b89-4d2a-bb40-ccc31accefad
+    jinja: '{% set docs = document.split("3ed2dface8203c4c9dfb1a5dc58e41e0||") | reject("equalto",
+      "") | list %}
+
+      {% if document != "" %}
+
+      I want to edit the following articles into a more concise summary:
+
+      {% for doc in docs %}
+
+
+      Article: {{doc}}
+
+      {% endfor %}
+
+      |||
+
+      {{summary[2:]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: summary scenario
+    reference: ''
+  b15485f5-2bd9-4ed4-98ce-4b241a341f99: !Template
+    answer_choices: null
+    id: b15485f5-2bd9-4ed4-98ce-4b241a341f99
+    jinja: '{% set docs = document.split("3ed2dface8203c4c9dfb1a5dc58e41e0||") | reject("equalto",
+      "") | list %}
+
+      {% if document != "" %}
+
+      Write a summary of the following articles:
+
+      {% for doc in docs %}
+
+
+      Document: {{doc}}
+
+      {% endfor %}
+
+      |||
+
+      {{summary[2:]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: summarize
+    reference: ''
+  bc910e51-c0a9-473c-aa85-adcab21b9ba9: !Template
+    answer_choices: null
+    id: bc910e51-c0a9-473c-aa85-adcab21b9ba9
+    jinja: '{% set docs = document.split("3ed2dface8203c4c9dfb1a5dc58e41e0||") | reject("equalto",
+      "") | list%}
+
+      {% if document != "" %}
+
+      Write an expanded news article with plausible details from the following summary:
+
+      {{summary[2:]}}
+
+      |||
+
+      {{docs | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: expand (reverse task)
+    reference: ''
+  d5a4bb2a-634a-4e9a-9f1f-b0803894ca0f: !Template
+    answer_choices: null
+    id: d5a4bb2a-634a-4e9a-9f1f-b0803894ca0f
+    jinja: '{% set docs = document.split("3ed2dface8203c4c9dfb1a5dc58e41e0||") | reject("equalto",
+      "") | list %}
+
+      {% if document != "" %}
+
+      I''m trying to distill these articles down into one:
+
+      {% for doc in docs %}
+
+
+      Article: {{doc}}
+
+      {% endfor %}
+
+      |||
+
+      {{summary[2:]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: distill
+    reference: ''

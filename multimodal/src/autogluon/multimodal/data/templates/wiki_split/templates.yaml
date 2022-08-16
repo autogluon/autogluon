@@ -1,0 +1,125 @@
+dataset: wiki_split
+templates:
+  50e32867-042a-480c-a55d-99f0d9d9bca6: !Template
+    answer_choices: null
+    id: 50e32867-042a-480c-a55d-99f0d9d9bca6
+    jinja: 'The following sentence is pretty complex to understand.
+
+
+      "{{complex_sentence|replace("'' '''' ","")}}"
+
+
+      Simplify the sentence above into two simpler sentences.|||
+
+      {{simple_sentence_1|replace("'' '''' ","")}}  {{simple_sentence_2|replace("''
+      '''' ","")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: true
+    name: split_complex_to_simple_affirmative_simplify
+    reference: ''
+  51bdeba1-d23c-427e-9def-9099e7b5f803: !Template
+    answer_choices: null
+    id: 51bdeba1-d23c-427e-9def-9099e7b5f803
+    jinja: "Given the sentence below, how would you use two simple sentences to represent\
+      \ its meaning?\n\nSentence: {{complex_sentence|replace(\"' '' \",\"\")}} \n\
+      |||\n{{simple_sentence_1|replace(\"' '' \",\"\")}} {{simple_sentence_2|replace(\"\
+      ' '' \",\"\")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: true
+    name: split_complex_to_simple_interrogative_represent
+    reference: ''
+  96a38f85-90d4-438a-b4e9-ccb61310d5a8: !Template
+    answer_choices: null
+    id: 96a38f85-90d4-438a-b4e9-ccb61310d5a8
+    jinja: 'Break down "{{complex_sentence|replace("'' '''' ","")}}" into two simpler
+      sentences. |||
+
+      {{simple_sentence_1|replace("'' '''' ","")}} {{simple_sentence_2|replace("''
+      '''' ","")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: true
+    name: split_complex_to_simple_affirmative_break_down
+    reference: ''
+  9e1192cc-6828-4e1c-949c-b86af4999145: !Template
+    answer_choices: null
+    id: 9e1192cc-6828-4e1c-949c-b86af4999145
+    jinja: "You are trying to teach sixth-grade students with complex sentences. You\
+      \ ask them to break down the following sentence into two simpler sentences.\
+      \ What are those sentences? \n\nSentence: {{complex_sentence|replace(\"' ''\
+      \ \",\"\")}} \n|||\n{{simple_sentence_1|replace(\"' '' \",\"\")}} {{simple_sentence_2|replace(\"\
+      ' '' \",\"\")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: true
+    name: split_complex_to_simple_interrogative_textbook
+    reference: ''
+  a8285013-e3cf-4f43-86dc-3754ead3f90c: !Template
+    answer_choices: null
+    id: a8285013-e3cf-4f43-86dc-3754ead3f90c
+    jinja: "You are talking to your friend on Zoom, but the internet is choppy. Your\
+      \ friend asks you to repeat the sentence \"{{complex_sentence|replace(\"' ''\
+      \ \",\"\")}}\". You want to repeat it with two shorter sentences. What would\
+      \ you say? \n|||\n{{simple_sentence_1|replace(\"' '' \",\"\")}} {{simple_sentence_2|replace(\"\
+      ' '' \",\"\")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: true
+    name: split_complex_to_simple_interrogative_repeat
+    reference: ''
+  c5da1785-e4e3-4788-ad41-bc9255e137fa: !Template
+    answer_choices: null
+    id: c5da1785-e4e3-4788-ad41-bc9255e137fa
+    jinja: 'The sentence "{{complex_sentence|replace("'' '''' ","")}}" can be broken
+      down into two simpler sentences. One of it is "{{simple_sentence_1|replace("''
+      '''' ","")}}". What is the other sentence?|||
+
+      {{simple_sentence_2|replace("'' '''' ","")}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: false
+    name: find_A_given_B_and_C
+    reference: ''
+  da51aebf-e4c1-495b-b69e-0ed4eb646d37: !Template
+    answer_choices: null
+    id: da51aebf-e4c1-495b-b69e-0ed4eb646d37
+    jinja: "Combine these two sentences \"{{simple_sentence_1|replace(\"' '' \",\"\
+      \")}}\" and \"{{simple_sentence_2|replace(\"' '' \",\"\")}}\" into a complex\
+      \ sentence. \n|||\n{{complex_sentence|replace(\"' '' \",\"\")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: false
+    name: combine
+    reference: ''

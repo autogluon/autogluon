@@ -1,0 +1,120 @@
+dataset: adversarial_qa
+subset: dbidaf
+templates:
+  41f28b31-d0fc-4f20-a0a2-ff21813e298e: !Template
+    answer_choices: null
+    id: 41f28b31-d0fc-4f20-a0a2-ff21813e298e
+    jinja: '{% if metadata.split != "test" %}
+
+      Extract the answer to the question from the following context.
+
+      Question: {{question}}
+
+      Context: {{context}}|||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: based_on
+    reference: ''
+  a64d5a15-68e2-4d1c-b30a-ca8250c860d9: !Template
+    answer_choices: null
+    id: a64d5a15-68e2-4d1c-b30a-ca8250c860d9
+    jinja: '{% if metadata.split != "test" %}
+
+      Given the following passage
+
+
+      "{{context}}",
+
+
+      answer the following question. Note that the answer is present within the text.
+
+
+      Question: {{question}} |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: answer_the_following_q
+    reference: 'Input: QC, Output: Answer'
+  c7a80603-d610-4999-98a7-815b2f84592d: !Template
+    answer_choices: null
+    id: c7a80603-d610-4999-98a7-815b2f84592d
+    jinja: 'I want to test the ability of students to read a passage and answer questions
+      about it. Could you please come up with a good question for the passage "{{context}}"?
+      |||
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: 'Input: Context, Output: Question (generate a question)'
+  ce9bc00a-567b-4c4e-aad7-df6f5d5d57bb: !Template
+    answer_choices: null
+    id: ce9bc00a-567b-4c4e-aad7-df6f5d5d57bb
+    jinja: '{% if metadata.split != "test" %}
+
+      I know that the answer to the question "{{question}}" is in "{{context}}". Can
+      you tell me what it is? |||
+
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: tell_what_it_is
+    reference: 'Input: QC, Output: A (rephrase)'
+  fa185424-6ebe-49b8-b4ed-7632ca33c361: !Template
+    answer_choices: null
+    id: fa185424-6ebe-49b8-b4ed-7632ca33c361
+    jinja: '{% if metadata.split != "test" %}
+
+      Question: "{{question}}"
+
+
+      Context: "{{context}}"
+
+
+      Answer:
+
+      |||
+
+      {{answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: question_context_answer
+    reference: 'Input: QC, Output: Answer (short form)'

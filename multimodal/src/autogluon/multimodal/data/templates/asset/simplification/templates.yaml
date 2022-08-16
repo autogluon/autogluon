@@ -1,0 +1,168 @@
+dataset: asset
+subset: simplification
+templates:
+  0f0e55f9-28b4-4844-b65d-b9544a0918eb: !Template
+    answer_choices: null
+    id: 0f0e55f9-28b4-4844-b65d-b9544a0918eb
+    jinja: "{% set real_simplifications = [] %}{% for text in simplifications %}{%\
+      \ if text|length < original|length %}{{real_simplifications.append(text) | default(\"\
+      \", True)}}{% endif %}{% endfor %}\n{% if real_simplifications %}\nText: {{original}}\n\
+      \nHow would I simplify this? \n\n|||\n\n{{real_simplifications | choice}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: verbose-to-simplification
+    reference: Rewrite text using one random simplification
+  3cbfbc1c-6876-4dd7-b7db-45fb3233a667: !Template
+    answer_choices: null
+    id: 3cbfbc1c-6876-4dd7-b7db-45fb3233a667
+    jinja: '{% set real_simplifications = [] %}{% for text in simplifications %}{%
+      if text|length < original|length %}{{real_simplifications.append(text) | default("",
+      True)}}{% endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      Make the below sentence more verbose:
+
+
+      {{real_simplifications | choice}}
+
+
+      |||
+
+
+      {{original}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: simplification-to-verbose
+    reference: Make the simplified text more verbose
+  41d32553-433c-44fb-9eda-0fce51bf9e14: !Template
+    answer_choices: A ||| B
+    id: 41d32553-433c-44fb-9eda-0fce51bf9e14
+    jinja: '{% set rand_num = range(0,2) | choice  %}
+
+      {% set real_simplifications = [] %}{% for text in simplifications %}{% if text|length
+      < original|length %}{{real_simplifications.append(text) | default("", True)}}{%
+      endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      One of the following two sentences is more verbose than the other. Which one
+      is it?
+
+      {% if rand_num %}
+
+      A: {{real_simplifications | choice}}
+
+
+      B: {{original}}
+
+      {% else %}
+
+      A: {{original}}
+
+
+      B: {{real_simplifications | choice}}
+
+      {% endif %}
+
+      |||
+
+      {{ answer_choices[rand_num] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: choose-verbose
+    reference: ''
+  5c2f56b9-5bd4-4455-9d68-0729bfdb9c84: !Template
+    answer_choices: A ||| B
+    id: 5c2f56b9-5bd4-4455-9d68-0729bfdb9c84
+    jinja: '{% set rand_num = range(0,2) | choice %}
+
+      {% set real_simplifications = [] %}{% for text in simplifications %}{% if text|length
+      < original|length %}{{real_simplifications.append(text) | default("", True)}}{%
+      endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      One of the following two sentences is more simple than the other. Which one
+      is it?
+
+      {% if rand_num %}
+
+      A: {{real_simplifications | choice}}
+
+
+      B: {{original}}
+
+      {% else %}
+
+      A: {{original}}
+
+
+      B: {{real_simplifications | choice}}
+
+      {% endif %}
+
+      |||
+
+      {{ answer_choices[1-rand_num] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose-simplification
+    reference: ''
+  d528d74b-bbc2-4888-ae21-db0ab37304df: !Template
+    answer_choices: null
+    id: d528d74b-bbc2-4888-ae21-db0ab37304df
+    jinja: '{% set real_simplifications = [] %}{% for text in simplifications %}{%
+      if text|length < original|length %}{{real_simplifications.append(text) | default("",
+      True)}}{% endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      I''d like to explain to my child "{{original}}". How would I do so?
+
+
+      |||
+
+
+      {{real_simplifications | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: verbose-to-simplification-implicit
+    reference: Implicit simplification request

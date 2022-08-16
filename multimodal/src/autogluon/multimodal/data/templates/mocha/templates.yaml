@@ -1,0 +1,170 @@
+dataset: mocha
+templates:
+  1c390ee6-fab9-4b16-8028-2649fca56866: !Template
+    answer_choices: null
+    id: 1c390ee6-fab9-4b16-8028-2649fca56866
+    jinja: "On a scale of 1.0 (completely different) to 5 (identical), how similar\
+      \ are these two sentences \"{{candidate}}\" and \"{{reference}}\"? \nThese sentences\
+      \ answer the question \"{{ question }}\" with the context of \"{{ context }}\"\
+      \n|||\n{{ score }}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: score_candidate_with_question_context_interrogative
+    reference: Similarity measure between candidate and reference answers (in a regression
+      manner)
+  2816084e-0193-4284-9a4f-9de4ae03e9d6: !Template
+    answer_choices: null
+    id: 2816084e-0193-4284-9a4f-9de4ae03e9d6
+    jinja: "Given the passage and the answers given below, generate a relevant question.\n\
+      \nPassage: {{ context }}\n\nAnswer 1 (Correct): {{ reference }}\n\nAnswer 2:\
+      \ {{ candidate }}\n{% if candidate2 %}\nAnswer 3: {{ candidate2 }}\n{% endif\
+      \ %} \n|||\n{{ question }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: Given passage and the answers, generate a question for the gold answer.
+  31e49d18-800f-4d16-8d84-86509db30499: !Template
+    answer_choices: Similar ||| Not similar
+    id: 31e49d18-800f-4d16-8d84-86509db30499
+    jinja: "Person A: {{ question }}\n\nPerson B: {{ reference }}\n\nPerson C: {{\
+      \ candidate }}\n\nDoes Person B give a similar answer as Person C? Answer \"\
+      {{ answer_choices[0] }}\" or \"{{ answer_choices[1] }}\".\n\n|||\n{% if score\
+      \ != 3 %}\n{{ [answer_choices[1], answer_choices[0]][score > 3] }} \n{% endif\
+      \ %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: classifiy_similarity_candidate_with_ques
+    reference: Similarity measure between candidate and reference answers (in a classification
+      manner)
+  46e52ca4-7203-4e92-a0ac-c412494903c9: !Template
+    answer_choices: null
+    id: 46e52ca4-7203-4e92-a0ac-c412494903c9
+    jinja: 'Given these two sentences "{{candidate}}" and "{{reference}}", return
+      a value on a scale of 1.0 (completely different) to 5 (identical) indicating
+      their similarity.
+
+      These sentences answer the following question about the given context.
+
+      Question: {{ question }}
+
+      Context: {{ context }}
+
+      |||
+
+      {{ score }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: score_candidate_with_question_context_affirmative
+    reference: ''
+  5098f807-5558-4d19-af12-7bb87cbc59f0: !Template
+    answer_choices: null
+    id: 5098f807-5558-4d19-af12-7bb87cbc59f0
+    jinja: 'Give the similarity measure (on a scale of 1.0 to 5.0) for answers A and
+      B. A value of 1.0 means completely different, whereas a value of 5.0 means identical.
+
+
+      Question: {{ question }}
+
+
+      Answer A: "{{reference}}"
+
+
+      Answer B: "{{candidate}}"
+
+      |||
+
+      {{ score }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: score_candidate_with_question
+    reference: Similarity measure between candidate and reference answers (in a regression
+      manner)
+  6570aa7f-de3d-489e-8565-72fb535b1f10: !Template
+    answer_choices: null
+    id: 6570aa7f-de3d-489e-8565-72fb535b1f10
+    jinja: "How similar are Sentence A and B? Output the result value between 1.0\
+      \ (completely different) and 5.0 (identical).\n\nA: \"{{candidate}}\"\n\nB:\
+      \ \"{{reference}}\" \n|||\n{{ score }}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: score_candidate_no_ques_no_context_interrogative
+    reference: Similarity measure between candidate and reference answers (in a regression
+      manner)
+  7ebdd3bc-4896-425b-b8c2-3e4ea3944de8: !Template
+    answer_choices: null
+    id: 7ebdd3bc-4896-425b-b8c2-3e4ea3944de8
+    jinja: '{{ context }}
+
+
+      Given the passage above, what is the answer to the question "{{ question }}"
+
+      |||
+
+      {{ reference }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_correct_answer_with_noisy_candidates
+    reference: Given the passage and the question, generate the correct answer.
+  d64dec9f-94c3-4cd5-9900-2a6ea8f03416: !Template
+    answer_choices: null
+    id: d64dec9f-94c3-4cd5-9900-2a6ea8f03416
+    jinja: 'Output the similarity value between 1.0 (completely different) and 5.0
+      (identical) for Sentence A and B.
+
+
+      A: "{{candidate}}"
+
+
+      B: "{{reference}}"
+
+      |||
+
+      {{ score }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: score_candidate_no_ques_no_context_affirmative
+    reference: ''

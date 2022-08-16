@@ -1,0 +1,51 @@
+dataset: neural_code_search
+subset: evaluation_dataset
+templates:
+  30858249-c732-46a6-85b5-466fe964c4d4: !Template
+    answer_choices: null
+    id: 30858249-c732-46a6-85b5-466fe964c4d4
+    jinja: 'Description:
+
+      {{ question }}
+
+
+      Implementation:
+
+      |||
+
+      {{ answer }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: generate code given a description
+    reference: ''
+  34f4095d-0ce0-42d5-8070-1626dd51b987: !Template
+    answer_choices: null
+    id: 34f4095d-0ce0-42d5-8070-1626dd51b987
+    jinja: 'Given the following code:
+
+      {{ answer }}
+
+      Describe it:
+
+      |||
+
+      {{ question }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate a description given code
+    reference: ''

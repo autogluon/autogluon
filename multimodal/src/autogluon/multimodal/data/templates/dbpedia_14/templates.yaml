@@ -1,0 +1,80 @@
+dataset: dbpedia_14
+templates:
+  824ecb55-ecad-40c2-8033-f2fa0add2ddf: !Template
+    answer_choices: Company ||| Educational Institution ||| Artist ||| Athlete |||
+      Office Holder ||| Mean Of Transportation ||| Building ||| Natural Place |||
+      Village ||| Animal ||| Plant ||| Album ||| Film ||| Written Work
+    id: 824ecb55-ecad-40c2-8033-f2fa0add2ddf
+    jinja: '{{content}} Given a list of categories: {{"company, educational institution,
+      artist, athlete, office holder, mean of transportation, building, natural place,
+      village, animal, plant, album, film or written work"}}, what category does the
+      paragraph belong to? ||| {{ answer_choices[label] }}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: given_list_what_category_does_the_paragraph_belong_to
+    reference: ''
+  8eda7e71-6734-486f-b883-e99d3f14c0bf: !Template
+    answer_choices: Company ||| Educational Institution ||| Artist ||| Athlete |||
+      Office Holder ||| Mean Of Transportation ||| Building ||| Natural Place |||
+      Village ||| Animal ||| Plant ||| Album ||| Film ||| Written Work
+    id: 8eda7e71-6734-486f-b883-e99d3f14c0bf
+    jinja: Pick one category for the following text. The options are - {{"company,
+      educational institution, artist, athlete, office holder, mean of transportation,
+      building, natural place, village, animal, plant, album, film or written work"}}.
+      {{title}} - {{content}} ||| {{ answer_choices[label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_one_category_for_the_following_text
+    reference: ''
+  9dfa5d15-96bc-41ee-ad89-4f8df5c4ff67: !Template
+    answer_choices: Company ||| Educational Institution ||| Artist ||| Athlete |||
+      Office Holder ||| Mean Of Transportation ||| Building ||| Natural Place |||
+      Village ||| Animal ||| Plant ||| Album ||| Film ||| Written Work
+    id: 9dfa5d15-96bc-41ee-ad89-4f8df5c4ff67
+    jinja: '{{title}} - {{content}} Given a choice of categories {{"company, educational
+      institution, artist, athlete, office holder, mean of transportation, building,
+      natural place, village, animal, plant, album, film or written work"}}, the text
+      refers to which one? ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: 'given_a_choice_of_categories '
+    reference: ''
+  f72fa410-3278-4f62-91f0-f9edf4a4e792: !Template
+    answer_choices: Company ||| Educational Institution ||| Artist ||| Athlete |||
+      Office Holder ||| Mean Of Transportation ||| Building ||| Natural Place |||
+      Village ||| Animal ||| Plant ||| Album ||| Film ||| Written Work
+    id: f72fa410-3278-4f62-91f0-f9edf4a4e792
+    jinja: '"{{title}}", given a list of categories: {{"company, educational institution,
+      artist, athlete, office holder, mean of transportation, building, natural place,
+      village, animal, plant, album, film or written work"}}, what category does the
+      title belong to? ||| {{ answer_choices[label] }}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: given_a_list_of_category_what_does_the_title_belong_to
+    reference: ''

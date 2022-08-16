@@ -77,7 +77,6 @@ model:
   t_few:
     checkpoint_name: "bigscience/T0_3B"
     gradient_checkpointing: False
-    label_templates: {} # Dictionary mapping target prompts to class
     data_types:
       - "text"
     tokenizer_name: "hf_auto"
@@ -85,8 +84,8 @@ model:
     unlikely_loss: 1.0 # Adds loss term that lowers probability of incorrect outputs
     mc_loss: 1.0 # Adds multiple choice cross entropy loss
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
-    insert_sep: True
     text_segment_num: 2
+    insert_sep: True
     stochastic_chunk: False
     text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_trivial_aug_maxscale: 0.0            # augmentation magnititude randomly drawn from [0, text_trivial_aug_maxscale]

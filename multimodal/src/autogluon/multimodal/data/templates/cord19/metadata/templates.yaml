@@ -1,0 +1,89 @@
+dataset: cord19
+subset: metadata
+templates:
+  10d78ae0-635d-4cf3-8e24-61c879fd6ae7: !Template
+    answer_choices: null
+    id: 10d78ae0-635d-4cf3-8e24-61c879fd6ae7
+    jinja: 'Write a scientific title for the following abstract: {{abstract}}
+
+      Title:|||
+
+      {{ title }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: title_generation_from_following_abstract
+    reference: ''
+  1821279d-37a7-42f0-ab0c-2a5589a2a7c3: !Template
+    answer_choices: null
+    id: 1821279d-37a7-42f0-ab0c-2a5589a2a7c3
+    jinja: "Title: {{title}}\nGenerate a plausible scientific abstract for a scientific\
+      \ paper on Covid-19 with the previous title |||\n {{ abstract }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: abstract_generation_from_previous_title
+    reference: ''
+  21fc3c51-5168-4abb-b969-81a115f2f568: !Template
+    answer_choices: null
+    id: 21fc3c51-5168-4abb-b969-81a115f2f568
+    jinja: 'Write a scientific abstract for a paper on Covid-19 with the following
+      title: {{title}}
+
+      Abstract:|||
+
+      {{ abstract }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: abstract_generation_from_following_title
+    reference: ''
+  6a2ebf64-9db7-41f0-85a5-379270c54fa6: !Template
+    answer_choices: null
+    id: 6a2ebf64-9db7-41f0-85a5-379270c54fa6
+    jinja: "Abstract: \n{{abstract}}\nWhat could a scientific title be for this abstract\
+      \ on Covid-19?\nTitle:|||\n{{ title }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: title_generation_from_previous_abstract
+    reference: ''
+  c895c4f1-d5e1-4a07-9ae9-0268c218e526: !Template
+    answer_choices: null
+    id: c895c4f1-d5e1-4a07-9ae9-0268c218e526
+    jinja: 'Write a scientific abstract for a research paper on Coronavirus disease
+      with the following title: {{title}}
+
+      Abstract:|||
+
+      {{ abstract }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: abstract_generation_on_coronavirus
+    reference: ''

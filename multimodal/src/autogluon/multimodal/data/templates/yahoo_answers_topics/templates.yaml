@@ -1,0 +1,131 @@
+dataset: yahoo_answers_topics
+templates:
+  21e4d34e-0f80-4056-8870-bb303ba12dca: !Template
+    answer_choices: null
+    id: 21e4d34e-0f80-4056-8870-bb303ba12dca
+    jinja: 'Given the answer below suggest a possible question title:
+
+
+      Answer: {{ best_answer}} |||
+
+      {{ question_title}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question_from_answer
+    reference: Prompt template generates the question from the answer
+  2b5a86e3-51a8-4b74-bf2c-15dca37ac98a: !Template
+    answer_choices: Society & Culture ||| Science & Mathematics ||| Health ||| Education
+      & Reference ||| Computers & Internet ||| Sports ||| Business & Finance ||| Entertainment
+      & Music ||| Family & Relationships ||| Politics & Government
+    id: 2b5a86e3-51a8-4b74-bf2c-15dca37ac98a
+    jinja: "Question: {{ question_title }}; {{ question_content }} \n\nAnswer: {{best_answer}}\n\
+      \nFrom the list of topics, choose the correct topic that relates to the question\
+      \ and passage: \n- {{answer_choices|join('\\n- ')}}\n|||\n{{ answer_choices[topic]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: options_for_topic
+    reference: The template asks the model to choose from a list of topics
+  32ca4b76-fbb1-4846-94c9-9e968c627ed9: !Template
+    answer_choices: null
+    id: 32ca4b76-fbb1-4846-94c9-9e968c627ed9
+    jinja: 'Given the question and additional details, answer the question:
+
+
+      Question: {{ question_title }}
+
+
+      Additional details: {{ question_content }} |||
+
+      {{ best_answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: question_answer
+    reference: The prompt asks to answer the question
+  568a5d5e-ec5c-4ceb-9620-df5e86280143: !Template
+    answer_choices: Society & Culture ||| Science & Mathematics ||| Health ||| Education
+      & Reference ||| Computers & Internet ||| Sports ||| Business & Finance ||| Entertainment
+      & Music ||| Family & Relationships ||| Politics & Government
+    id: 568a5d5e-ec5c-4ceb-9620-df5e86280143
+    jinja: "Given the question title, question content, and the answer, classify the\
+      \ question into one of these topics, {{answer_choices|join(', ')}}:\n\nQuestion\
+      \ Title: {{ question_title }}\n\nQuestion content: {{ question_content }} \n\
+      \nAnswer: {{best_answer}}\n|||\n{{ answer_choices[topic]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: question_content_answer_classification
+    reference: Prompt classifies question, content, and answer into a topic
+  846d9711-0389-4a2a-8545-0d021f858cd1: !Template
+    answer_choices: Society & Culture ||| Science & Mathematics ||| Health ||| Education
+      & Reference ||| Computers & Internet ||| Sports ||| Business & Finance ||| Entertainment
+      & Music ||| Family & Relationships ||| Politics & Government
+    id: 846d9711-0389-4a2a-8545-0d021f858cd1
+    jinja: "Question: {{ question_title }}\n\nAdditional details: {{question_content}}\
+      \  \n\nBest answer: {{best_answer}} \n\nIn this test, you need to classify the\
+      \ document into one of the following categories: {{answer_choices |join(', ')}}.\
+      \ \n||| \n{{ answer_choices[topic]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: classify_document_exam_style
+    reference: Prompt asks to classify documents with an exam style prompt
+  b3ca202f-11ba-4c96-92eb-2e766749e7a2: !Template
+    answer_choices: Society & Culture ||| Science & Mathematics ||| Health ||| Education
+      & Reference ||| Computers & Internet ||| Sports ||| Business & Finance ||| Entertainment
+      & Music ||| Family & Relationships ||| Politics & Government
+    id: b3ca202f-11ba-4c96-92eb-2e766749e7a2
+    jinja: "Question: {{ question_title }}; {{ question_content }} \n\nAnswer: {{best_answer}}\n\
+      \nTo win the prize in the game, pick the right topic for the question-answer\
+      \ pair from the list of topics:  {{answer_choices|join(', ')}}.\n|||\n{{ answer_choices[topic]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: gameshow_topic_classification
+    reference: This template asks the model to choose the correct topic in a gameshow
+      style format
+  b56d1289-d3df-4e66-88b5-737dce09b467: !Template
+    answer_choices: Society & Culture ||| Science & Mathematics ||| Health ||| Education
+      & Reference ||| Computers & Internet ||| Sports ||| Business & Finance ||| Entertainment
+      & Music ||| Family & Relationships ||| Politics & Government
+    id: b56d1289-d3df-4e66-88b5-737dce09b467
+    jinja: "Given the question title below, classify the document into one of these\
+      \ topics: {{answer_choices |join(', ')}}.\n\nQuestion: {{ question_title }}\
+      \ \n\n|||\n{{ answer_choices[topic]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: classify_document
+    reference: classify the topic of the document

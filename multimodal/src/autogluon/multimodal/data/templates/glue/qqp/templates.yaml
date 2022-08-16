@@ -1,0 +1,100 @@
+dataset: glue
+subset: qqp
+templates:
+  8e711799-a57c-4941-833b-466bedfb80ad: !Template
+    answer_choices: no ||| yes
+    id: 8e711799-a57c-4941-833b-466bedfb80ad
+    jinja: I'm an administrator on the website Quora. There are two posts, one that
+      asks "{{question1}}" and another that asks "{{question2}}". I can merge questions
+      if they are asking the same thing. Can I merge these two questions? ||| {{ answer_choices[label]
+      }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: quora
+    reference: ''
+  94972071-a726-42a3-a726-13f414b65e67: !Template
+    answer_choices: not duplicates ||| duplicates
+    id: 94972071-a726-42a3-a726-13f414b65e67
+    jinja: '{{question1}}
+
+      {{question2}}
+
+      Pick one: These questions are "{{"duplicates"}}" or "{{"not duplicates"}}".
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: duplicate or not
+    reference: ''
+  a45ad5cd-a3ba-4ab2-a728-a9ea0f27102b: !Template
+    answer_choices: no ||| yes
+    id: a45ad5cd-a3ba-4ab2-a728-a9ea0f27102b
+    jinja: Are the questions "{{question1}}" and "{{question2}}" asking the same thing?
+      ||| {{ answer_choices[label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: same thing
+    reference: ''
+  c0182cd1-c7ac-4abe-829f-4651536af951: !Template
+    answer_choices: no ||| yes
+    id: c0182cd1-c7ac-4abe-829f-4651536af951
+    jinja: Can an answer to "{{question1}}" also be used to answer "{{question2}}"?
+      ||| {{ answer_choices[label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: answer
+    reference: ''
+  c0724198-97e7-44a1-89d8-c51e97ce0b04: !Template
+    answer_choices: No ||| Yes
+    id: c0724198-97e7-44a1-89d8-c51e97ce0b04
+    jinja: 'Question 1: {{question1}}
+
+      Question 2: {{question2}}
+
+
+      Do these two questions convey the same meaning? Yes or no? ||| {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: meaning
+    reference: ''
+  fd244bd3-ca3b-4e4f-9722-fd006c50e157: !Template
+    answer_choices: no ||| yes
+    id: fd244bd3-ca3b-4e4f-9722-fd006c50e157
+    jinja: I received the questions "{{question1}}" and "{{question2}}". Are they
+      duplicates? ||| {{ answer_choices[label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: duplicate
+    reference: ''

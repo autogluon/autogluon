@@ -1,0 +1,130 @@
+dataset: scicite
+templates:
+  113a4e9e-7f59-4963-89a3-c1c647acaf2b: !Template
+    answer_choices: A ||| C ||| B
+    id: 113a4e9e-7f59-4963-89a3-c1c647acaf2b
+    jinja: 'Consider the following citation from a scientific paper:
+
+      {{ string }}
+
+      {% if sectionName %} It came from a section titled: {{sectionName}}.
+
+      {% endif %}
+
+      Is this citation describing
+
+
+      A: a {{"method"}}
+
+
+      B: a {{"result"}}
+
+
+      C: {{"background"}}
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Classify intent w/section (select choice)
+    reference: ''
+  359418b3-2425-4968-b428-ecb5d60b3b4e: !Template
+    answer_choices: method ||| background ||| result
+    id: 359418b3-2425-4968-b428-ecb5d60b3b4e
+    jinja: 'Is the following citation from a scientific paper describing a {{answer_choices[0]}},
+      a {{answer_choices[2]}}, or {{answer_choices[1]}}?
+
+      Citation: {{ string }}
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Classify intent (choices first)
+    reference: ''
+  36a77a57-31e5-48d3-a9b8-e8b8db5fe334: !Template
+    answer_choices: A ||| C ||| B
+    id: 36a77a57-31e5-48d3-a9b8-e8b8db5fe334
+    jinja: 'A scientific paper contained the following citation:
+
+      "{{ string }}"
+
+      Is this citation describing
+
+
+      A: a {{"method"}}
+
+
+      B: a {{"result"}}
+
+
+      C: {{"background"}}
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Classify intent (select choice)
+    reference: ''
+  b917ab5b-3e33-48ee-a319-ccca6af58cd5: !Template
+    answer_choices: method ||| background ||| result
+    id: b917ab5b-3e33-48ee-a319-ccca6af58cd5
+    jinja: 'The following is a citation taken from a scientific paper.
+
+      "{{ string }}"
+
+      Is this citation describing a {{answer_choices[0]}}, a {{answer_choices[2]}},
+      or {{answer_choices[1]}}?
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Classify intent
+    reference: ''
+  f63606d8-7168-4201-a2bc-e48a442540ac: !Template
+    answer_choices: method ||| background ||| result
+    id: f63606d8-7168-4201-a2bc-e48a442540ac
+    jinja: 'Citations can describe a {{answer_choices[0]}}, a {{answer_choices[2]}},
+      or {{answer_choices[1]}}.
+
+      What is the citation below describing?
+
+      "{{ string }}"
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: can_describe
+    reference: ''

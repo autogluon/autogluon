@@ -1,0 +1,147 @@
+dataset: snips_built_in_intents
+templates:
+  05b95953-c659-4b51-8abc-6a170db93658: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: 05b95953-c659-4b51-8abc-6a170db93658
+    jinja: "Here is a voice command by a user of a voice assistant: \n\n{{text}}.\n\
+      \nIt can be summarized by one of the following options: \n\n{{answer_choices\
+      \ | join(\", \")}}. \n\nWhich one would that be?\n\n|||\n\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: voice_intent
+    reference: ''
+  069cc4e0-b76e-46be-a592-68a2323e41ea: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: 069cc4e0-b76e-46be-a592-68a2323e41ea
+    jinja: 'Humans can ask questions or make requests related to one of the following
+      categories: {{answer_choices | join(", ")}}
+
+
+      What is the best category for the following request? - "{{text}}"
+
+
+      |||
+
+
+      {{answer_choices[label]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: categorize_query
+    reference: ''
+  0952c001-39fe-4d02-9c3f-54d44bac7694: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: 0952c001-39fe-4d02-9c3f-54d44bac7694
+    jinja: "{{answer_choices | join(\", \")}} are possible user intents.\n\nWhich\
+      \ of the above options best captures the intent of the following user message?\
+      \ \n\n{{text}}\n\n|||\n\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: intent_query
+    reference: ''
+  2a1037cc-a807-493d-bffe-5493c73a425b: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: 2a1037cc-a807-493d-bffe-5493c73a425b
+    jinja: 'Map this query "{{text}}" to one of these categories - {{answer_choices
+      | join(", ")}}
+
+      |||
+
+
+      {{answer_choices[label]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: categorize_query_brief
+    reference: ''
+  7dea1614-2d7f-4fee-a7a8-35f9ea12c411: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: 7dea1614-2d7f-4fee-a7a8-35f9ea12c411
+    jinja: "\"{{text}}\" is a message from a user.\n\nWhich of the following options\
+      \ best captures the intent of the user message written above? \n\n{{answer_choices\
+      \ | join(\", \")}}\n\n|||\n\n{{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: query_intent
+    reference: ''
+  9e262c90-a8b7-40d3-896f-74dee67516a7: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: 9e262c90-a8b7-40d3-896f-74dee67516a7
+    jinja: "\"{{text}}\"\n\nThis message from a user can be summarized by one of these\
+      \ options - {{answer_choices | join(\", \")}}. \n\nWhat would be the best option?\n\
+      \n|||\n\n\n{{answer_choices[label]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: query_summarize
+    reference: ''
+  b987cb60-6b37-454e-a07e-dfe8b06a70c3: !Template
+    answer_choices: Compare Places ||| Request Ride ||| Get Weather ||| Search Place
+      ||| Get Place Details ||| Share Current Location ||| Get Traffic Information
+      ||| Book Restaurant ||| Get Directions ||| Share ETA
+    id: b987cb60-6b37-454e-a07e-dfe8b06a70c3
+    jinja: '"{{text}}"
+
+
+      Is the best category for the query above answer_choices[0]? Or is it answer_choices[1]?
+      Other category options include {{answer_choices[2]}}, {{answer_choices[3]}},
+      {{answer_choices[4]}}, {{answer_choices[5]}}, {{answer_choices[6]}}, {{answer_choices[7]}},
+      {{answer_choices[8]}} and {{answer_choices[9]}}. What is the best answer?
+
+
+      |||
+
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: query_options_or
+    reference: ''

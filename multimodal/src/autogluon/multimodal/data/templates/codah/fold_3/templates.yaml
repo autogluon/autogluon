@@ -1,0 +1,205 @@
+dataset: codah
+subset: fold_3
+templates:
+  15861c29-a2f1-4165-8849-83b88320fc3d: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 15861c29-a2f1-4165-8849-83b88320fc3d
+    jinja: 'Sentence: {{question_propmt}}
+
+
+      Candidate Answer Choices:
+
+      {% for candidate in candidate_answers -%}
+
+      {{ answer_choices[loop.index - 1] }}. {{candidate}}
+
+      {% endfor %}
+
+      What''s the best ending to finish the incomplete sentence above?
+
+      |||
+
+      {{ answer_choices[correct_answer_idx] }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: interrogative_instruction_after_sentence_and_choices
+    reference: ''
+  9ab1a3e6-6c03-4c37-9a85-d8128dc92545: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 9ab1a3e6-6c03-4c37-9a85-d8128dc92545
+    jinja: 'Complete the sentence below by choosing the best answer from a list of
+      candidates.
+
+
+      Sentence: {{question_propmt}}
+
+
+      Candidate Answer Choices:
+
+      {% for candidate in candidate_answers -%}
+
+      {{ answer_choices[loop.index - 1] }}. {{candidate}}
+
+      {% endfor %}
+
+      |||
+
+      {{ answer_choices[correct_answer_idx] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: affirmative_instruction_before_sentence_and_choices
+    reference: ''
+  9efbda8e-19f8-47fb-907a-d19c660b0ab8: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 9efbda8e-19f8-47fb-907a-d19c660b0ab8
+    jinja: 'Sentence: {{question_propmt}}
+
+
+      Candidate Answer Choices:
+
+      {% for candidate in candidate_answers -%}
+
+      {{ answer_choices[loop.index - 1] }}. {{candidate}}
+
+      {% endfor %}
+
+      Complete the sentence by choosing the best answer from the candidates above.
+
+      |||
+
+      {{ answer_choices[correct_answer_idx] }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: affirmative_instruction_after_sentence_and_choices
+    reference: ''
+  9fecf40b-f96f-4124-80b0-038d5e58784c: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 9fecf40b-f96f-4124-80b0-038d5e58784c
+    jinja: 'Sentence: {{question_propmt}}
+
+
+      Complete the sentence above by choosing the best answer from the candidates
+      below.
+
+
+      Candidate Answer Choices:
+
+      {% for candidate in candidate_answers -%}
+
+      {{ answer_choices[loop.index - 1] }}. {{candidate}}
+
+      {% endfor %}
+
+      |||
+
+      {{ answer_choices[correct_answer_idx] }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: affirmative_instruction_between_sentence_and_choices
+    reference: ''
+  a53e444c-da0d-4159-8488-35858b239d3d: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: a53e444c-da0d-4159-8488-35858b239d3d
+    jinja: 'Here we have an incomplete sentence "{{question_propmt}}".
+
+
+      What would be the best answer choice to finish it?
+
+
+      Candidate Answer Choices:
+
+      {% for candidate in candidate_answers -%}
+
+      {{ answer_choices[loop.index - 1] }}. {{candidate}}
+
+      {% endfor %}
+
+      |||
+
+      {{ answer_choices[correct_answer_idx] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: interrogative_instruction_between_sentence_and_choices
+    reference: ''
+  ce98e4d9-7eca-4101-8299-fb074b52d279: !Template
+    answer_choices: Idioms ||| Reference ||| Polysemy ||| Negation ||| Quantitative
+      ||| Others
+    id: ce98e4d9-7eca-4101-8299-fb074b52d279
+    jinja: 'Sentence: {{question_propmt}}
+
+      Completion: {{ candidate_answers[correct_answer_idx] }}
+
+
+      Which of  {{'', ''.join(["Idioms", "Reference", "Polysemy", "Negation", "Quantitative",
+      " or Others"])}} best describes the completed sentence?
+
+
+      |||
+
+      {{answer_choices[question_category]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: question_category
+    reference: ''
+  dd7a60fc-bec9-473b-b00d-f52c31c30b1c: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: dd7a60fc-bec9-473b-b00d-f52c31c30b1c
+    jinja: 'What''s the best ending to finish this incomplete sentence "{{question_propmt}}"?
+
+
+      Candidate Answer Choices:
+
+      {% for candidate in candidate_answers -%}
+
+      {{ answer_choices[loop.index - 1] }}. {{candidate}}
+
+      {% endfor %}
+
+      |||
+
+      {{ answer_choices[correct_answer_idx] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: interrogative_instruction_before_sentence_and_choices
+    reference: ''

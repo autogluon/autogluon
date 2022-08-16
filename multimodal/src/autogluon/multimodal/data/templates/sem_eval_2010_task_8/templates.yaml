@@ -1,0 +1,123 @@
+dataset: sem_eval_2010_task_8
+templates:
+  202246b0-3f82-42b9-bc8d-d36997b5f2cb: !Template
+    answer_choices: Cause Effect e1,e2 ||| Cause Effect e2,e1 ||| Component Whole
+      e1,e2 ||| Component Whole e2,e1 ||| Content Container e1,e2 ||| Content Container
+      e2,e1 ||| Entity Destination e1,e2 ||| Entity Destination e2,e1 ||| Entity Origin
+      e1,e2 ||| Entity Origin e2,e1 ||| Instrument Agency e1,e2 ||| Instrument Agency
+      e2,e1 ||| Member Collection e1,e2 ||| Member Collection e2,e1 ||| Message Topic
+      e1,e2 ||| Message Topic e2,e1 ||| Product Producer e1,e2 ||| Product Producer
+      e2,e1 ||| Other
+    id: 202246b0-3f82-42b9-bc8d-d36997b5f2cb
+    jinja: "Given the sentence, {{sentence}}\n\nOut of the options {{answer_choices\
+      \ | join(\", \")}}, \n\nWhat is the semantic relations between the two nominals\
+      \ (nouns or noun phrases) e1 and e2 in the sentence: ||| {{ answer_choices[relation]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: semantic relations with options
+    reference: out of options; macro-averaged F1-score official metric
+  5d7123a8-4ed4-42ce-bcfb-4af415962efc: !Template
+    answer_choices: Cause Effect e1,e2 ||| Cause Effect e2,e1 ||| Component Whole
+      e1,e2 ||| Component Whole e2,e1 ||| Content Container e1,e2 ||| Content Container
+      e2,e1 ||| Entity Destination e1,e2 ||| Entity Destination e2,e1 ||| Entity Origin
+      e1,e2 ||| Entity Origin e2,e1 ||| Instrument Agency e1,e2 ||| Instrument Agency
+      e2,e1 ||| Member Collection e1,e2 ||| Member Collection e2,e1 ||| Message Topic
+      e1,e2 ||| Message Topic e2,e1 ||| Product Producer e1,e2 ||| Product Producer
+      e2,e1 ||| Other
+    id: 5d7123a8-4ed4-42ce-bcfb-4af415962efc
+    jinja: 'How semantically related are the two nominals in the sentence, {{sentence}}
+
+
+      Please answer {{answer_choices[:-1]|join(", ")}} or {{answer_choices[-1]}}:
+      ||| {{ answer_choices[relation] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: semantically related nominials with options
+    reference: 'please answer; official metric:  macro-averaged F1-score'
+  87ca690e-87a7-44d5-b001-a4181482f5c9: !Template
+    answer_choices: Cause Effect e1,e2 ||| Cause Effect e2,e1 ||| Component Whole
+      e1,e2 ||| Component Whole e2,e1 ||| Content Container e1,e2 ||| Content Container
+      e2,e1 ||| Entity Destination e1,e2 ||| Entity Destination e2,e1 ||| Entity Origin
+      e1,e2 ||| Entity Origin e2,e1 ||| Instrument Agency e1,e2 ||| Instrument Agency
+      e2,e1 ||| Member Collection e1,e2 ||| Member Collection e2,e1 ||| Message Topic
+      e1,e2 ||| Message Topic e2,e1 ||| Product Producer e1,e2 ||| Product Producer
+      e2,e1 ||| Other
+    id: 87ca690e-87a7-44d5-b001-a4181482f5c9
+    jinja: 'Given the two nominals (nouns or noun phrases) e1 and e2 in {{sentence}}
+
+
+      ===
+
+
+      What is the semantic relations between e1 and e2 : ||| {{ answer_choices[relation]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: semantic relations without options
+    reference: 'relationship between two nomimals; official metric: macro-averaged
+      F1-score'
+  c97e7bbf-b7f0-4cee-ada5-431ce7d606cc: !Template
+    answer_choices: Cause Effect e1,e2 ||| Cause Effect e2,e1 ||| Component Whole
+      e1,e2 ||| Component Whole e2,e1 ||| Content Container e1,e2 ||| Content Container
+      e2,e1 ||| Entity Destination e1,e2 ||| Entity Destination e2,e1 ||| Entity Origin
+      e1,e2 ||| Entity Origin e2,e1 ||| Instrument Agency e1,e2 ||| Instrument Agency
+      e2,e1 ||| Member Collection e1,e2 ||| Member Collection e2,e1 ||| Message Topic
+      e1,e2 ||| Message Topic e2,e1 ||| Product Producer e1,e2 ||| Product Producer
+      e2,e1 ||| Other
+    id: c97e7bbf-b7f0-4cee-ada5-431ce7d606cc
+    jinja: 'Given the sentence, {{sentence}}
+
+
+      ===
+
+
+      What is the semantic relations between the two nominals (nouns or noun phrases)
+      e1 and e2 in the sentence: ||| {{ answer_choices[relation] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: semantic relations nominials without options
+    reference: mention e1,e2 after; macro-averaged F1-score official metric
+  d7e88599-da89-4cfd-94e2-65e68c7ef141: !Template
+    answer_choices: Cause Effect e1,e2 ||| Cause Effect e2,e1 ||| Component Whole
+      e1,e2 ||| Component Whole e2,e1 ||| Content Container e1,e2 ||| Content Container
+      e2,e1 ||| Entity Destination e1,e2 ||| Entity Destination e2,e1 ||| Entity Origin
+      e1,e2 ||| Entity Origin e2,e1 ||| Instrument Agency e1,e2 ||| Instrument Agency
+      e2,e1 ||| Member Collection e1,e2 ||| Member Collection e2,e1 ||| Message Topic
+      e1,e2 ||| Message Topic e2,e1 ||| Product Producer e1,e2 ||| Product Producer
+      e2,e1 ||| Other
+    id: d7e88599-da89-4cfd-94e2-65e68c7ef141
+    jinja: 'Sentence: {{sentence}}
+
+
+      Are the two nominals (nouns or noun phrases) in the sentence semantically related
+      as {{answer_choices[:-1]|join(", ")}} or {{answer_choices[-1]}}? ||| {{answer_choices[relation]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: semantically nominals with options
+    reference: 'given nomials; official metric: macro-averaged F1-score'

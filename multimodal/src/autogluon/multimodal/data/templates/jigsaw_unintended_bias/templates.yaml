@@ -1,0 +1,211 @@
+dataset: jigsaw_unintended_bias
+templates:
+  17f730bd-fc7e-419c-84cc-e5c795268d02: !Template
+    answer_choices: null
+    id: 17f730bd-fc7e-419c-84cc-e5c795268d02
+    jinja: 'Online comments can sometimes be toxic. For instance, they might be insulting,
+      threatening, racist or many other issues. If 0 corresponds to a very civil comment,
+      and 100 to a highly toxic one, how would you grade the following comment?
+
+      "{{comment_text}}"
+
+      |||
+
+      {{(target * 100.0) | round(0) }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: online_comment
+    reference: ''
+  1add6d25-346e-4bf5-aa58-8dc184018f9e: !Template
+    answer_choices: keep ||| remove
+    id: 1add6d25-346e-4bf5-aa58-8dc184018f9e
+    jinja: 'You are the moderator of the comments section on a website. You want to
+      remove uncivil comments. Would you {{answer_choices[1]}} or {{answer_choices[0]}}
+      the following comment?
+
+      "{{comment_text}}"
+
+      |||
+
+      {{answer_choices[target | round | int]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: moderator
+    reference: ''
+  355aa574-61c2-4b94-9f1a-9347fd7c6444: !Template
+    answer_choices: null
+    id: 355aa574-61c2-4b94-9f1a-9347fd7c6444
+    jinja: "{{toxicity_annotator_count}} annotators where tasked with assessing the\
+      \ toxicity of the following comment:\n\n\"{{comment_text}}\"\n\nOn a scale of\
+      \ 0 to 1, what do you think their average prediction was?\n\n||| \n\n{{ target\
+      \ | round(1) }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: annotators_rated
+    reference: ''
+  3f5fe7e8-0808-4792-94e5-f5d8fff7c89d: !Template
+    answer_choices: null
+    id: 3f5fe7e8-0808-4792-94e5-f5d8fff7c89d
+    jinja: How toxic is this comment is on a scale from 0 to 5? "{{comment_text}}"
+      ||| {{(target * 5.0) | round(1) }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: modified_scale
+    reference: ''
+  48ef9835-a99b-45f5-8ff4-96b3b2422855: !Template
+    answer_choices: null
+    id: 48ef9835-a99b-45f5-8ff4-96b3b2422855
+    jinja: 'You were hired to evaluate the toxicity of online comments. You find the
+      following comment:
+
+      "{{comment_text}}"
+
+      How would you grade its toxicity from 0 to 1?
+
+      |||
+
+      {{target | round(1) }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: hired_to_review
+    reference: ''
+  5e06b59c-9888-47b1-a982-b90bced2d6a2: !Template
+    answer_choices: civil ||| toxic
+    id: 5e06b59c-9888-47b1-a982-b90bced2d6a2
+    jinja: 'You are browsing the comment section of a website. You read the following
+      comment:
+
+      "{{comment_text}}"
+
+      Would you classify that comment as {{answer_choices[0]}} or {{answer_choices[1]}}?
+
+      |||
+
+      {{answer_choices[target | round | int]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: browsing
+    reference: ''
+  68962b6a-2ed3-48d5-ba7c-9f023e314592: !Template
+    answer_choices: civil ||| toxic
+    id: 68962b6a-2ed3-48d5-ba7c-9f023e314592
+    jinja: "Someone posted the following comment online:\n\n\"{{comment_text}}\"\n\
+      \nWould you classify it as {{answer_choices[0]}} or {{answer_choices[1]}}?\n\
+      \n||| \n\n{{answer_choices[target | round | int]}}\n\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: binary_pred
+    reference: ''
+  71508d0b-7fd9-4810-933c-c3c59f0c5328: !Template
+    answer_choices: null
+    id: 71508d0b-7fd9-4810-933c-c3c59f0c5328
+    jinja: 'On a scale of 0 to 1, how threatening is the below comment?
+
+      {{comment_text}}
+
+      |||
+
+      {{threat | round(1)}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: threatening
+    reference: ''
+  71508d0b-7fd9-4810-933c-c3c59f0c5329: !Template
+    answer_choices: no ||| yes
+    id: 71508d0b-7fd9-4810-933c-c3c59f0c5329
+    jinja: '"{{comment_text}}" Someone posted this comment online. Do you find it
+      toxic?
+
+      |||
+
+      {{answer_choices[target | round | int]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: yes_or_no
+    reference: ''
+  71508d1b-7fd9-4810-933c-c3c59f0c5329: !Template
+    answer_choices: no ||| yes
+    id: 71508d1b-7fd9-4810-933c-c3c59f0c5329
+    jinja: '"{{comment_text}}"
+
+      Should this online comment be removed for its toxicity? {{answer_choices[1]}}
+      or {{answer_choices[0]}}?
+
+      |||
+
+      {{answer_choices[target | round | int]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: yes_or_no_remove
+    reference: ''
+  a9cf1274-4167-4647-8058-986b4eeff1a0: !Template
+    answer_choices: null
+    id: a9cf1274-4167-4647-8058-986b4eeff1a0
+    jinja: 'How toxic is the below comment on a scale of 0 to 1?
+
+
+      "{{comment_text}}"
+
+
+      |||
+
+      {{target | round(1)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: how_toxic
+    reference: ''

@@ -1,0 +1,387 @@
+dataset: squad_v2
+templates:
+  17b83a3f-f748-42e6-9cdf-b2951dd8299d: !Template
+    answer_choices: null
+    id: 17b83a3f-f748-42e6-9cdf-b2951dd8299d
+    jinja: '{% set seq = [
+
+      ''Answer the question depending on the context.'',
+
+      ''What is the answer?'',
+
+      ] %}
+
+
+      {{ seq | choice }}
+
+      Context: {{context}};
+
+      Question: {{question}};
+
+      Answer: |||
+
+      {% if answers.text == [] %}
+
+      Answer not in context
+
+      {% else %}
+
+      {{answers.text[0]}}
+
+      {% endif %}'
+    metadata: &id001 !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Questions with Context
+    reference: Given context and question, give answer
+  189dcc58-fd13-4771-ad03-7879a61c7ab7: !Template
+    answer_choices: null
+    id: 189dcc58-fd13-4771-ad03-7879a61c7ab7
+    jinja: '{% if answers.text != [] %}
+
+      Determine the question that you might have asked to get back the following answer
+      for the given context
+
+      Context: {{context}};
+
+      Answer: {{answers.text[0]}};
+
+      Question: |||
+
+      {{question}}
+
+      {% endif %}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Jeopardy with Context
+    reference: Given context and an answer, guess the question.
+  20064b80-e4d0-41b7-9135-92c0077d5044: !Template
+    answer_choices: null
+    id: 20064b80-e4d0-41b7-9135-92c0077d5044
+    jinja: '{% set seq = [
+
+      ''What is this about? '',
+
+      ''What is the paragraph about? '',
+
+      ''Get the topic from: '',
+
+      ''From the passage,  get the topic'',
+
+      ''I want to know the topic. '',
+
+      ''Topic from the passage: '',
+
+      ''Topic from the paragraph: '',
+
+      ] %}
+
+      {{ seq | choice }}
+
+      {{context}} |||
+
+      {{title | replace("_", " ")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: Topic Prediction - Context with randomized prompt options
+    reference: Asks to predict the topic given the context with additional input as
+      if a person is asking another person.
+  338cc143-361e-4796-b035-31fb2201c49f: !Template
+    answer_choices: null
+    id: 338cc143-361e-4796-b035-31fb2201c49f
+    jinja: '{% set seq = [
+
+      ''This is about '',
+
+      ''What is this about? '',
+
+      ''The paragraph is about '',
+
+      ''What is the paragraph about? '',
+
+      ''Get the topic: '',
+
+      ''From the passage, the topic is'',
+
+      ''I want to know the topic. '',
+
+      ''Topic from the passage: '',
+
+      ''Topic from the paragraph: '',
+
+      ] %}
+
+      {{context}}
+
+      {{ seq | choice }}|||
+
+      {{title | replace("_", " ")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: Topic Prediction - Context with randomized prompt options placed in the
+      end
+    reference: The prompt is placed at the end of Context
+  7a44cd99-7420-4456-aaaa-34e2c81d1679: !Template
+    answer_choices: null
+    id: 7a44cd99-7420-4456-aaaa-34e2c81d1679
+    jinja: '{% if answers.text != [] %}
+
+      What is a question that would give the following answer?
+
+      Answer: {{answers.text[0]}};
+
+      Question: |||
+
+      {{question}}
+
+      {% endif %}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Jeopardy without Context
+    reference: Given an answer, output a viable question. Context is omitted.
+  8bea1123-fd8d-4bac-96bf-b8a289ee74b3: !Template
+    answer_choices: null
+    id: 8bea1123-fd8d-4bac-96bf-b8a289ee74b3
+    jinja: '{% set seq = [
+
+      ''Can you tell me '',
+
+      ''Please tell me '',
+
+      ''Tell me '',
+
+      ''From the passage, '',
+
+      ''I want to know '',
+
+      ''I want to ask '',
+
+      ''What is the answer to: '',
+
+      ''Find the answer to: '',
+
+      ''Answer: '',
+
+      '''',
+
+      ] %}
+
+      {{context}} {{ seq | choice }}{{question}}|||
+
+      {% if answers.text == [] %}
+
+      Answer not in context
+
+      {% else %}
+
+      {{answers.text[0]}}
+
+      {% endif %}'
+    metadata: &id002 !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Questions with Context - Without Prompt Keywords
+    reference: Given context and question, give answer. No keywords to delineate context
+      and question is given.
+  b14c9843-fd56-42ff-817d-39e41963c847: !Template
+    answer_choices: null
+    id: b14c9843-fd56-42ff-817d-39e41963c847
+    jinja: '{% set seq = [
+
+      ''Answer the question depending on the context.'',
+
+      ''What is the answer?'',
+
+      ] %}
+
+
+      {{ seq | choice }}
+
+      Context: {{context}};
+
+      Question: {{question}};
+
+      If you can''t find the answer, please respond "unanswerable".
+
+      Answer: |||
+
+      {% if answers.text == [] %}
+
+      unanswerable
+
+      {% else %}
+
+      {{answers.text[0]}}
+
+      {% endif %}'
+    metadata: *id001
+    name: Questions with Context +unanswerable
+    reference: Given context and question, give answer
+  d768c181-1c9b-40c3-aa01-fc78c3b29875: !Template
+    answer_choices: null
+    id: d768c181-1c9b-40c3-aa01-fc78c3b29875
+    jinja: '{% if answers.text != [] %}
+
+      {{question}}|||
+
+      {{answers.text[0]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Trivia
+    reference: Given input and directly outputs answer.
+  e1630107-8f5d-44ce-8ccd-6fa80da80328: !Template
+    answer_choices: null
+    id: e1630107-8f5d-44ce-8ccd-6fa80da80328
+    jinja: '{% set seq = [
+
+      ''Can you tell me '',
+
+      ''Please tell me '',
+
+      ''Tell me '',
+
+      ''From the passage, '',
+
+      ''I want to know '',
+
+      ''I want to ask '',
+
+      ''What is the answer to: '',
+
+      ''Find the answer to: '',
+
+      ''Answer: '',
+
+      '''',
+
+      ] %}
+
+      {{context}} {{ seq | choice }}{{question}} If you can''t find the answer, please
+      respond "unanswerable". |||
+
+      {% if answers.text == [] %}
+
+      unanswerable
+
+      {% else %}
+
+      {{answers.text[0]}}
+
+      {% endif %}'
+    metadata: *id002
+    name: Questions with Context - Without Prompt Keywords +unanswerable
+    reference: Given context and question, give answer. No keywords to delineate context
+      and question is given.
+  e2e41877-4794-4ff9-9f92-a2a85105e2a7: !Template
+    answer_choices: yes ||| no
+    id: e2e41877-4794-4ff9-9f92-a2a85105e2a7
+    jinja: "Context: {{context}}; \n\nQuestion: {{question}} \n\nIs this question\
+      \ answerable? ||| \n{% if answers.text != [] %}\n{{answer_choices[0]}}\n{% else\
+      \ %}\n{{answer_choices[1]}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Unanwerable question
+    reference: The template checks if the question is answerable or not
+  e51c23b9-5b10-4db3-a0d1-ba546830173d: !Template
+    answer_choices: null
+    id: e51c23b9-5b10-4db3-a0d1-ba546830173d
+    jinja: '{% set seq = [
+
+      ''Determine the topic of the question-answer pair. '',
+
+      ''Find the topic. '',
+
+      ''What is the topic from this? '',
+
+      ] %}
+
+      {% if answers.text != [] %}
+
+      {{ seq | choice }}
+
+      Question: {{question}};  Answer: {{answers.text[0]}}; Topic: |||
+
+      {{title}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: Topic Prediction - Question and Answer Pair
+    reference: Given a Question-Answer pair, generate the topic.
+  fdcf132e-6c70-4188-999e-93601ee8e089: !Template
+    answer_choices: null
+    id: fdcf132e-6c70-4188-999e-93601ee8e089
+    jinja: 'What is the following passage about?
+
+      {{context}} |||
+
+      {{title | replace("_", " ")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: Topic Prediction - Context
+    reference: Predict the topic from the passage

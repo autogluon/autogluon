@@ -1,0 +1,162 @@
+dataset: climate_fever
+templates:
+  38632cd9-7c4c-4e1d-85b3-20e7a78d4580: !Template
+    answer_choices: support ||| refute ||| not provide enough information for
+    id: 38632cd9-7c4c-4e1d-85b3-20e7a78d4580
+    jinja: 'Here''s a statement and accompanying evidence. Does the evidence {{answer_choices[0]}},
+      {{answer_choices[1]}}, or {{answer_choices[2]}} the statement?
+
+
+      Statement: {{claim}}
+
+
+      Evidence: {{evidences[0]["evidence"].strip(".").strip(''"'')}}.
+
+      |||
+
+      {{ answer_choices[evidences[0]["evidence_label"]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: first_evidence_and_claim_itemization
+    reference: First evidence and claim with simple itemization
+  3970f474-a9e3-4264-aefa-dd4cfadd279c: !Template
+    answer_choices: support ||| refute ||| not enough information ||| disputed
+    id: 3970f474-a9e3-4264-aefa-dd4cfadd279c
+    jinja: 'For the given claim, do the accompanying statements {{answer_choices[0]}}
+      or {{answer_choices[1]}} it? If there are some of each, say "{{answer_choices[3]}}".
+      If there is not enough information to conclude, say "{{answer_choices[2]}}".
+
+
+      Claim: {{claim}}
+
+
+      Statements:
+
+      - {{ evidences | map(attribute="evidence") | map("trim", "\".")  | join(".\n-
+      ") }}.
+
+      |||
+
+      {{ answer_choices[claim_label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: claim_and_all_supporting_evidences
+    reference: A claim and all supporting evidences provided with the associated claim
+      label
+  5d5062c1-d28f-4b1c-a7da-9b53796ed39f: !Template
+    answer_choices: support ||| refute ||| not provide enough information for
+    id: 5d5062c1-d28f-4b1c-a7da-9b53796ed39f
+    jinja: 'Following is a statement made on climate change.
+
+      Statement: {{claim}}
+
+
+      If I provide the evidence "{{evidences[4]["evidence"].strip(".").strip(''"'')}}",  will
+      it {{answer_choices[0]}}, {{answer_choices[1]}}, or {{answer_choices[2]}} the
+      claim?
+
+      |||
+
+      {{ answer_choices[evidences[4]["evidence_label"]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fifth_evidence_and_claim_itemization
+    reference: Fifth evidence and claim with simple itemization
+  9ba074a2-fbcf-4f69-bf03-bd16dbdec9cd: !Template
+    answer_choices: support ||| refute ||| not provide enough information for
+    id: 9ba074a2-fbcf-4f69-bf03-bd16dbdec9cd
+    jinja: 'Does the statement "{{evidences[3]["evidence"].strip(".").strip(''"'')}}"
+      {{answer_choices[0]}}, {{answer_choices[1]}}, or {{answer_choices[2]}} the claim
+      that "{{claim}}'' |||
+
+      {{ answer_choices[evidences[3]["evidence_label"]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fourth_evidence_and_claim_itemization
+    reference: Fourth evidence and claim with simple itemization
+  9f68b883-d6a3-4e95-af2a-b7755bc46ba9: !Template
+    answer_choices: support ||| refute ||| not enough information
+    id: 9f68b883-d6a3-4e95-af2a-b7755bc46ba9
+    jinja: 'While searching about climate change, I came across a claim that says
+      "{{claim}}". Should I use the following evidence to {{answer_choices[0]}} or
+      {{answer_choices[1]}} the claim? If there is not enough information, say "not
+      enough information".
+
+      Evidence: {{evidences[2]["evidence"].strip(".").strip(''"'')}}.
+
+      |||
+
+      {{ answer_choices[evidences[2]["evidence_label"]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: third_evidence_and_claim_itemization
+    reference: Third evidence and claim with simple itemization
+  e3e01825-e256-4098-b7bb-aa07c399e8f6: !Template
+    answer_choices: support ||| refute ||| not provide enough information for
+    id: e3e01825-e256-4098-b7bb-aa07c399e8f6
+    jinja: 'If I argue that "{{claim}}" would the following evidence {{answer_choices[0]}},
+      {{answer_choices[1]}}, or {{answer_choices[2]}} the claim?
+
+      Evidence: {{evidences[1]["evidence"].strip(".").strip(''"'')}}.
+
+      |||
+
+      {{ answer_choices[evidences[1]["evidence_label"]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: second_evidence_and_claim_itemization
+    reference: Second evidence and claim with simple itemization
+  ff9c9c11-92f1-4cb2-a73c-d786d58b00e1: !Template
+    answer_choices: support ||| refute ||| not provide enough information for
+    id: ff9c9c11-92f1-4cb2-a73c-d786d58b00e1
+    jinja: 'Considering the following claim:
+
+      {{claim}}.
+
+      Does the following statement {{answer_choices[0]}}, {{answer_choices[1]}}, or
+      {{answer_choices[2]}} the claim?
+
+      {{evidences[2]["evidence"].strip(".").strip(''"'')}}.
+
+      |||
+
+      {{ answer_choices[evidences[2]["evidence_label"]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: third_evidence_claim_pair
+    reference: Relation between the claim and third evidence pair.

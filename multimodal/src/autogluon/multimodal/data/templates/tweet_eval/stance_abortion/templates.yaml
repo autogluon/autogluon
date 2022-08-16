@@ -1,0 +1,108 @@
+dataset: tweet_eval
+subset: stance_abortion
+templates:
+  0d1dc279-e50c-4706-bc3d-84ea01cb59a1: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 0d1dc279-e50c-4706-bc3d-84ea01cb59a1
+    jinja: 'Does the author express any stance about abortion in the following text?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: abortion_predict_stance
+    reference: ''
+  22758062-db86-4009-81a4-1e2a2e1052f2: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 22758062-db86-4009-81a4-1e2a2e1052f2
+    jinja: '{{text}} Where does the author of the above sentence stand on abortion?
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: abortion_guess_passive_author
+    reference: ''
+  615151f8-ac5b-4c0e-a234-9e9b6296a2f2: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 615151f8-ac5b-4c0e-a234-9e9b6296a2f2
+    jinja: 'What option among, {{"neutral"}}, {{"against"}}, {{"in favor"}}, best
+      describes the stance of this tweet regarding abortion?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: abortion_option
+    reference: ''
+  687ffa1e-a772-48b1-9291-ba4e530a909e: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 687ffa1e-a772-48b1-9291-ba4e530a909e
+    jinja: 'Is this tweet neutral, in favor of, or against abortion?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: abortion
+    reference: ''
+  c5507588-1d20-42f9-935f-0c767294f5a9: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: c5507588-1d20-42f9-935f-0c767294f5a9
+    jinja: 'How would you describe the stance used in this tweet? {{answer_choices|join(",
+      ")}}
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: abortion_how_describe
+    reference: ''
+  ee12d37b-5667-4b0e-9831-f952d08152b5: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: ee12d37b-5667-4b0e-9831-f952d08152b5
+    jinja: '{{text}} Where does the above sentence stand on abortion? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: abortion_guess_passive
+    reference: ''

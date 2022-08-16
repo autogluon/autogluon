@@ -1,0 +1,84 @@
+dataset: tweet_eval
+subset: hate
+templates:
+  3266f9d4-9c80-4e17-a8a6-1fe44ce8f3bf: !Template
+    answer_choices: no ||| yes
+    id: 3266f9d4-9c80-4e17-a8a6-1fe44ce8f3bf
+    jinja: 'Does this tweet convey the author''s hatred towards something or someone?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: author_hate
+    reference: ''
+  34a5128b-6fc8-453b-94d4-4ebaa87172c1: !Template
+    answer_choices: no ||| yes
+    id: 34a5128b-6fc8-453b-94d4-4ebaa87172c1
+    jinja: 'Does this tweet convey hate: yes or no?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: hate_no_yes
+    reference: ''
+  5b15dc68-05a2-42dd-b0bf-fa15d4f40320: !Template
+    answer_choices: no|||yes
+    id: 5b15dc68-05a2-42dd-b0bf-fa15d4f40320
+    jinja: "Is this a hateful tweet? \n{{text}}\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: hate_question
+    reference: ''
+  971ad470-85bf-484e-aab7-b942f817bf2c: !Template
+    answer_choices: non-hate ||| hate
+    id: 971ad470-85bf-484e-aab7-b942f817bf2c
+    jinja: 'Does this tweet convey {{"hate"}} or {{"non-hate"}}?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: hate_options
+    reference: ''
+  b0cdecc2-78a2-47e7-a74e-38d509c01214: !Template
+    answer_choices: 'no ||| yes '
+    id: b0cdecc2-78a2-47e7-a74e-38d509c01214
+    jinja: "In this test, you need to answer with either yes or no. \n\nQ: Is this\
+      \ a hateful tweet? \n{{text}}\n\nA: \n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: hate_exam
+    reference: ''

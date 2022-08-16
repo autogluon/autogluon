@@ -1,0 +1,108 @@
+dataset: glue
+subset: ax
+templates:
+  074de970-f1fd-4793-923e-88299502e2f0: !Template
+    answer_choices: entailment ||| neutral ||| contradiction
+    id: 074de970-f1fd-4793-923e-88299502e2f0
+    jinja: 'The relationship between the following sentences can be characterized
+      as {{answer_choices[0]}} (one sentence implies the other), {{answer_choices[1]}}
+      (the sentences don''t necessarily imply or contradict one another), or {{answer_choices[2]}}
+      (the sentences contract each other).
+
+      Sentence 1: {{hypothesis}}
+
+      Sentence 2: {{premise}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: relationship_between_hypothesis_premise
+    reference: ''
+  32ae8811-2a1f-4027-96e8-725ecd08bba1: !Template
+    answer_choices: yes ||| maybe ||| no
+    id: 32ae8811-2a1f-4027-96e8-725ecd08bba1
+    jinja: '{{premise}}
+
+      Given the above, is it necessarily true that "{{hypothesis}}"? {{answer_choices[0]}},
+      {{answer_choices[2]}}, or {{answer_choices[1]}}? ||| {{ answer_choices[label]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: based_on_prem_is_hypothesis
+    reference: ''
+  3f6b9de8-616b-4a43-a077-e205a4c33a28: !Template
+    answer_choices: yes ||| maybe ||| no
+    id: 3f6b9de8-616b-4a43-a077-e205a4c33a28
+    jinja: 'Consider the hypothesis that "{{hypothesis}}"
+
+      Does this follow from the knowledge that "{{premise}}"
+
+      {{answer_choices[0]}}, {{answer_choices[2]}}, or {{answer_choices[1]}}?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does_hyp_follow_from_prem
+    reference: ''
+  76803347-b0fd-4dd6-8a04-ab1a6ab314d5: !Template
+    answer_choices: imply ||| neither ||| contradict
+    id: 76803347-b0fd-4dd6-8a04-ab1a6ab314d5
+    jinja: '{{premise}}
+
+      Does the above sentence imply or contradict that "{{hypothesis}}"? Please answer
+      as "{{answer_choices[0]}}", "{{answer_choices[2]}}", or "{{answer_choices[1]}}".
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does_this_imply
+    reference: ''
+  8ff27ccf-21d3-45c2-afe4-4531309dfb9f: !Template
+    answer_choices: supports ||| neither ||| contradicts
+    id: 8ff27ccf-21d3-45c2-afe4-4531309dfb9f
+    jinja: 'Consider the {{"premise"}}:
+
+      Premise: {{premise}}
+
+      Does the above premise support the following hypothesis?
+
+      Hypothesis: {{hypothesis}}
+
+      Please answer as "{{answer_choices[0]}}", "{{answer_choices[2]}}", or "{{answer_choices[1]}}".
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does_this_support
+    reference: ''

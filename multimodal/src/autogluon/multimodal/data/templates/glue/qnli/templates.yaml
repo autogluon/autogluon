@@ -1,0 +1,106 @@
+dataset: glue
+subset: qnli
+templates:
+  50c3108c-b23c-4691-97be-72438606c840: !Template
+    answer_choices: yes ||| no
+    id: 50c3108c-b23c-4691-97be-72438606c840
+    jinja: '{{sentence}}
+
+      Does that sentence have all you need to answer the question "{{question}}"?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: have all you need
+    reference: ''
+  5f0f24d9-14a7-4588-8dc2-494b4c693b81: !Template
+    answer_choices: yes ||| no
+    id: 5f0f24d9-14a7-4588-8dc2-494b4c693b81
+    jinja: 'Can you answer the question "{{question}}" based only on the following:
+
+      {{sentence}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: based only on
+    reference: ''
+  c626350d-6c0e-47be-b09e-c9ba1446b027: !Template
+    answer_choices: yes ||| no
+    id: c626350d-6c0e-47be-b09e-c9ba1446b027
+    jinja: 'Does knowing that "{{sentence}}" imply that I know the answer to "{{question}}"
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: imply
+    reference: ''
+  f2403d55-21a7-44bc-8b4c-6921fd7b01f5: !Template
+    answer_choices: yes ||| no
+    id: f2403d55-21a7-44bc-8b4c-6921fd7b01f5
+    jinja: 'I want to know the answer to the following question:
+
+      {{question}}
+
+      All the background I''m provided with is that "{{sentence}}". Is that enough
+      to answer the question?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: want to know
+    reference: ''
+  f44715c4-d787-484e-a912-5456cc2b6741: !Template
+    answer_choices: yes ||| no
+    id: f44715c4-d787-484e-a912-5456cc2b6741
+    jinja: 'Consider the passage:
+
+      {{sentence}}
+
+      and the question:
+
+      {{question}}
+
+      Is it possible to answer this question based only on the information in the
+      passage? {{"A) yes"}} or {{"B) no"}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: possible to answer
+    reference: ''

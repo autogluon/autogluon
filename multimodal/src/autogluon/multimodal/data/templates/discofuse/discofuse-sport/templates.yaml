@@ -1,0 +1,210 @@
+dataset: discofuse
+subset: discofuse-sport
+templates:
+  03f85406-df19-4bba-9ff7-53e050db6c84: !Template
+    answer_choices: null
+    id: 03f85406-df19-4bba-9ff7-53e050db6c84
+    jinja: "{% if coherent_second_sentence==\"\" %}\n\nDecompose the following sentence\
+      \ into two separate sentences:\n\n{{coherent_first_sentence}}\n\n|||\n\n{{incoherent_first_sentence}}\
+      \ {{incoherent_second_sentence}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: decompose_top
+    reference: ''
+  0e00ea8a-dc1b-4b3d-9f6f-13378e6e739d: !Template
+    answer_choices: Apposition ||| Relative Clauses ||| Cataphora ||| Verb Phrase
+      Coordination ||| Anaphora ||| Inner Connectives ||| Both Inner Connectives and
+      Anaphora ||| Sentence Coordination ||| Both Sentence Coordination and Anaphora
+      ||| Forward Connectives ||| Discourse Connectives ||| Both Discourse Connectives
+      and Anaphora
+    id: 0e00ea8a-dc1b-4b3d-9f6f-13378e6e739d
+    jinja: "{% set poss_ans_list = [\"SINGLE_APPOSITION\", \"SINGLE_RELATIVE\", \"\
+      SINGLE_CATAPHORA\", \"SINGLE_VP_COORD\", \"PAIR_ANAPHORA\", \"SINGLE_CONN_INNER\"\
+      , \"SINGLE_CONN_INNER_ANAPHORA\", \"SINGLE_S_COORD\", \"SINGLE_S_COORD_ANAPHORA\"\
+      , \"SINGLE_CONN_START\", \"PAIR_CONN\", \"PAIR_CONN_ANAPHORA\"] %}\n\n{% if\
+      \ discourse_type != \"PAIR_NONE\" %}\nPassage 1: {{incoherent_first_sentence}}\
+      \ {{incoherent_second_sentence}}\n\nPassage 2: {{coherent_first_sentence}} {{coherent_second_sentence}}\n\
+      \nWhich of the following discourse phenomena have been used to turn Passage\
+      \ 1 into Passage 2?\n\n{% for lab in answer_choices %}\n{{ loop.index }}: {{\
+      \ lab }}\n{% endfor %}\n  \n |||\n\n{{ answer_choices[poss_ans_list.index(discourse_type)]\
+      \ }}\n\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: false
+    name: grammar_detection_bottom
+    reference: ''
+  26c4cd24-45db-4d40-a04b-7c6f0e1e27d0: !Template
+    answer_choices: null
+    id: 26c4cd24-45db-4d40-a04b-7c6f0e1e27d0
+    jinja: "{% if coherent_second_sentence==\"\" %}\n\nRead this sentence:\n\n{{coherent_first_sentence}}\n\
+      \nNow, read this second sentence, that covers some of the information from the\
+      \ first:\n\n{{incoherent_first_sentence}}\n\nWrite a sentence that covers the\
+      \ information from the first sentence that is missing from the second\n|||\n\
+      \n {{incoherent_second_sentence}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: decompose_remainder_2
+    reference: ''
+  2f4a3f45-2367-495c-84ca-fee5833527b4: !Template
+    answer_choices: null
+    id: 2f4a3f45-2367-495c-84ca-fee5833527b4
+    jinja: 'Rewrite the following two sentences so that they flow better:
+
+
+      first sentence: {{incoherent_first_sentence}}
+
+
+      Second Sentence: {{incoherent_second_sentence}}
+
+
+      |||
+
+
+      {{coherent_first_sentence}} {{coherent_second_sentence}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: fuse_instruction_top
+    reference: ''
+  3af62454-2938-4fff-ab0c-8083ba09b92b: !Template
+    answer_choices: null
+    id: 3af62454-2938-4fff-ab0c-8083ba09b92b
+    jinja: 'Here are two sentences:
+
+
+
+      1: {{incoherent_first_sentence}}
+
+
+      2: {{incoherent_second_sentence}}
+
+
+      Please edit them so that they sound more connected to each other, perhaps by
+      fusing the sentences together.
+
+      |||
+
+
+      {{coherent_first_sentence}} {{coherent_second_sentence}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: fuse_instruction_bottom
+    reference: ''
+  6f1920ac-6b78-4892-8932-ccf92de5270d: !Template
+    answer_choices: null
+    id: 6f1920ac-6b78-4892-8932-ccf92de5270d
+    jinja: "{% if coherent_second_sentence==\"\" %}\n\nSentence 1: {{incoherent_first_sentence}}\n\
+      Sentence 2: {{incoherent_second_sentence}}\n \nCould you find a way to fuse\
+      \ the two sentences above?\n\n|||\n\n{{coherent_first_sentence}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: fuse_interrogative_bottom
+    reference: ''
+  73d198a5-9532-4894-9f26-3dccd60640ab: !Template
+    answer_choices: null
+    id: 73d198a5-9532-4894-9f26-3dccd60640ab
+    jinja: "{% if coherent_second_sentence==\"\" %}\n\nRewrite these two sentences\
+      \ as one sentence:\n\nFirst sentence: {{incoherent_first_sentence}} \n\nSecond\
+      \ sentence: {{incoherent_second_sentence}} \n\n|||\n\n{{coherent_first_sentence}}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: fuse_top
+    reference: ''
+  d63d8a90-c92c-42af-a09c-25014eac7005: !Template
+    answer_choices: Apposition ||| Relative Clauses ||| Cataphora ||| Verb Phrase
+      Coordination ||| Anaphora ||| Inner Connectives ||| Both Inner Connectives and
+      Anaphora ||| Sentence Coordination ||| Both Sentence Coordination and Anaphora
+      ||| Forward Connectives ||| Discourse Connectives ||| Both Discourse Connectives
+      and Anaphora
+    id: d63d8a90-c92c-42af-a09c-25014eac7005
+    jinja: "{% set poss_ans_list = [\"SINGLE_APPOSITION\", \"SINGLE_RELATIVE\", \"\
+      SINGLE_CATAPHORA\", \"SINGLE_VP_COORD\", \"PAIR_ANAPHORA\", \"SINGLE_CONN_INNER\"\
+      , \"SINGLE_CONN_INNER_ANAPHORA\", \"SINGLE_S_COORD\", \"SINGLE_S_COORD_ANAPHORA\"\
+      , \"SINGLE_CONN_START\", \"PAIR_CONN\", \"PAIR_CONN_ANAPHORA\"] %}\n{% if discourse_type\
+      \ != \"PAIR_NONE\" %}\nPeruse the following two passages and identify the discourse\
+      \ phenomenon which can be used to turn Passage 1 into Passage 2.\n\nPassage\
+      \ 1: {{incoherent_first_sentence}} {{incoherent_second_sentence}}\n\nPassage\
+      \ 2: {{coherent_first_sentence}} {{coherent_second_sentence}}\n\n{% for lab\
+      \ in answer_choices %}\n{{ loop.index }}: {{ lab }}\n{% endfor %}\n  \n |||\n\
+      \n{{ answer_choices[poss_ans_list.index(discourse_type)] }}\n\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: false
+    name: grammar_detection_top
+    reference: ''
+  ee884693-a941-46a1-a9d4-4f3af95dfd93: !Template
+    answer_choices: null
+    id: ee884693-a941-46a1-a9d4-4f3af95dfd93
+    jinja: "{% if coherent_second_sentence==\"\" %}\n{{coherent_first_sentence}}\n\
+      \nDecompose this sentence into two sentences\n|||\n\n{{incoherent_first_sentence}}\
+      \ {{incoherent_second_sentence}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: decompose_bottom
+    reference: ''
+  f9b1102b-5545-4fe4-9782-f50a80c62e56: !Template
+    answer_choices: null
+    id: f9b1102b-5545-4fe4-9782-f50a80c62e56
+    jinja: "{% if coherent_second_sentence==\"\" %}\n\nRead this sentence:\n\n{{coherent_first_sentence}}\n\
+      \nNow, read this second sentence, that covers some of the information from the\
+      \ first:\n\n{{incoherent_second_sentence}}\n\nWrite a sentence that covers the\
+      \ information from the first sentence that is missing from the second\n|||\n\
+      \n {{incoherent_first_sentence}} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: decompose_remainder_1
+    reference: ''

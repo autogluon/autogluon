@@ -1,0 +1,234 @@
+dataset: discovery
+subset: discovery
+templates:
+  63cb3007-dc47-41c5-bdc0-a4b3ffcc1c9a: !Template
+    answer_choices: no connection ||| absolutely ||| accordingly ||| actually |||
+      additionally ||| admittedly ||| afterward ||| again ||| already ||| also |||
+      alternately ||| alternatively ||| although ||| altogether ||| amazingly |||
+      and ||| anyway ||| apparently ||| arguably ||| as a result ||| basically |||
+      because of that ||| because of this ||| besides ||| but ||| by comparison |||
+      by contrast ||| by doing this ||| by then ||| certainly ||| clearly ||| coincidentally
+      ||| collectively ||| consequently ||| conversely ||| curiously ||| currently
+      ||| elsewhere ||| especially ||| essentially ||| eventually ||| evidently |||
+      finally ||| first ||| firstly ||| for example ||| for instance ||| fortunately
+      ||| frankly ||| frequently ||| further ||| furthermore ||| generally ||| gradually
+      ||| happily ||| hence ||| here ||| historically ||| honestly ||| hopefully |||
+      however ||| ideally ||| immediately ||| importantly ||| in contrast ||| in fact
+      ||| in other words ||| in particular ||| in short ||| in sum ||| in the end
+      ||| in the meantime ||| in turn ||| incidentally ||| increasingly ||| indeed
+      ||| inevitably ||| initially ||| instead ||| interestingly ||| ironically |||
+      lastly ||| lately ||| later ||| likewise ||| locally ||| luckily ||| maybe |||
+      meaning ||| meantime ||| meanwhile ||| moreover ||| mostly ||| namely ||| nationally
+      ||| naturally ||| nevertheless ||| next ||| nonetheless ||| normally ||| notably
+      ||| now ||| obviously ||| occasionally ||| oddly ||| often ||| on the contrary
+      ||| on the other hand ||| once ||| only ||| optionally ||| or ||| originally
+      ||| otherwise ||| overall ||| particularly ||| perhaps ||| personally ||| plus
+      ||| preferably ||| presently ||| presumably ||| previously ||| probably |||
+      rather ||| realistically ||| really ||| recently ||| regardless ||| remarkably
+      ||| sadly ||| second ||| secondly ||| separately ||| seriously ||| significantly
+      ||| similarly ||| simultaneously ||| slowly ||| so ||| sometimes ||| soon |||
+      specifically ||| still ||| strangely ||| subsequently ||| suddenly ||| supposedly
+      ||| surely ||| surprisingly ||| technically ||| thankfully ||| then ||| theoretically
+      ||| thereafter ||| thereby ||| therefore ||| third ||| thirdly ||| this |||
+      though ||| thus ||| together ||| traditionally ||| truly ||| truthfully |||
+      typically ||| ultimately ||| undoubtedly ||| unfortunately ||| unsurprisingly
+      ||| usually ||| well ||| yet
+    id: 63cb3007-dc47-41c5-bdc0-a4b3ffcc1c9a
+    jinja: "Which word gives a smooth transition from the first sentence to the second\
+      \ sentence?\n\n{{sentence1}}\n\n{{sentence2}} \n\n|||\n{{ answer_choices[label]\
+      \ }}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: smooth_transition
+    reference: ''
+  a4a7dad2-18b0-45b4-bd93-537e13e435cc: !Template
+    answer_choices: no connection ||| absolutely ||| accordingly ||| actually |||
+      additionally ||| admittedly ||| afterward ||| again ||| already ||| also |||
+      alternately ||| alternatively ||| although ||| altogether ||| amazingly |||
+      and ||| anyway ||| apparently ||| arguably ||| as a result ||| basically |||
+      because of that ||| because of this ||| besides ||| but ||| by comparison |||
+      by contrast ||| by doing this ||| by then ||| certainly ||| clearly ||| coincidentally
+      ||| collectively ||| consequently ||| conversely ||| curiously ||| currently
+      ||| elsewhere ||| especially ||| essentially ||| eventually ||| evidently |||
+      finally ||| first ||| firstly ||| for example ||| for instance ||| fortunately
+      ||| frankly ||| frequently ||| further ||| furthermore ||| generally ||| gradually
+      ||| happily ||| hence ||| here ||| historically ||| honestly ||| hopefully |||
+      however ||| ideally ||| immediately ||| importantly ||| in contrast ||| in fact
+      ||| in other words ||| in particular ||| in short ||| in sum ||| in the end
+      ||| in the meantime ||| in turn ||| incidentally ||| increasingly ||| indeed
+      ||| inevitably ||| initially ||| instead ||| interestingly ||| ironically |||
+      lastly ||| lately ||| later ||| likewise ||| locally ||| luckily ||| maybe |||
+      meaning ||| meantime ||| meanwhile ||| moreover ||| mostly ||| namely ||| nationally
+      ||| naturally ||| nevertheless ||| next ||| nonetheless ||| normally ||| notably
+      ||| now ||| obviously ||| occasionally ||| oddly ||| often ||| on the contrary
+      ||| on the other hand ||| once ||| only ||| optionally ||| or ||| originally
+      ||| otherwise ||| overall ||| particularly ||| perhaps ||| personally ||| plus
+      ||| preferably ||| presently ||| presumably ||| previously ||| probably |||
+      rather ||| realistically ||| really ||| recently ||| regardless ||| remarkably
+      ||| sadly ||| second ||| secondly ||| separately ||| seriously ||| significantly
+      ||| similarly ||| simultaneously ||| slowly ||| so ||| sometimes ||| soon |||
+      specifically ||| still ||| strangely ||| subsequently ||| suddenly ||| supposedly
+      ||| surely ||| surprisingly ||| technically ||| thankfully ||| then ||| theoretically
+      ||| thereafter ||| thereby ||| therefore ||| third ||| thirdly ||| this |||
+      though ||| thus ||| together ||| traditionally ||| truly ||| truthfully |||
+      typically ||| ultimately ||| undoubtedly ||| unfortunately ||| unsurprisingly
+      ||| usually ||| well ||| yet
+    id: a4a7dad2-18b0-45b4-bd93-537e13e435cc
+    jinja: "What connector could be added to the second sentence such that both sentences\
+      \ together convey a clear argument? If none, answer with \"no connection\".\n\
+      \n{{sentence1}}\n\n{{sentence2}} \n\nAnswer Choices: \n- {{ answer_choices |\
+      \ join(\"\\n- \") }}\n\n|||\n{{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: add_connector
+    reference: ''
+  cf87d7ad-9b78-4ead-9e0e-ae4dc12b91d0: !Template
+    answer_choices: no connection ||| absolutely ||| accordingly ||| actually |||
+      additionally ||| admittedly ||| afterward ||| again ||| already ||| also |||
+      alternately ||| alternatively ||| although ||| altogether ||| amazingly |||
+      and ||| anyway ||| apparently ||| arguably ||| as a result ||| basically |||
+      because of that ||| because of this ||| besides ||| but ||| by comparison |||
+      by contrast ||| by doing this ||| by then ||| certainly ||| clearly ||| coincidentally
+      ||| collectively ||| consequently ||| conversely ||| curiously ||| currently
+      ||| elsewhere ||| especially ||| essentially ||| eventually ||| evidently |||
+      finally ||| first ||| firstly ||| for example ||| for instance ||| fortunately
+      ||| frankly ||| frequently ||| further ||| furthermore ||| generally ||| gradually
+      ||| happily ||| hence ||| here ||| historically ||| honestly ||| hopefully |||
+      however ||| ideally ||| immediately ||| importantly ||| in contrast ||| in fact
+      ||| in other words ||| in particular ||| in short ||| in sum ||| in the end
+      ||| in the meantime ||| in turn ||| incidentally ||| increasingly ||| indeed
+      ||| inevitably ||| initially ||| instead ||| interestingly ||| ironically |||
+      lastly ||| lately ||| later ||| likewise ||| locally ||| luckily ||| maybe |||
+      meaning ||| meantime ||| meanwhile ||| moreover ||| mostly ||| namely ||| nationally
+      ||| naturally ||| nevertheless ||| next ||| nonetheless ||| normally ||| notably
+      ||| now ||| obviously ||| occasionally ||| oddly ||| often ||| on the contrary
+      ||| on the other hand ||| once ||| only ||| optionally ||| or ||| originally
+      ||| otherwise ||| overall ||| particularly ||| perhaps ||| personally ||| plus
+      ||| preferably ||| presently ||| presumably ||| previously ||| probably |||
+      rather ||| realistically ||| really ||| recently ||| regardless ||| remarkably
+      ||| sadly ||| second ||| secondly ||| separately ||| seriously ||| significantly
+      ||| similarly ||| simultaneously ||| slowly ||| so ||| sometimes ||| soon |||
+      specifically ||| still ||| strangely ||| subsequently ||| suddenly ||| supposedly
+      ||| surely ||| surprisingly ||| technically ||| thankfully ||| then ||| theoretically
+      ||| thereafter ||| thereby ||| therefore ||| third ||| thirdly ||| this |||
+      though ||| thus ||| together ||| traditionally ||| truly ||| truthfully |||
+      typically ||| ultimately ||| undoubtedly ||| unfortunately ||| unsurprisingly
+      ||| usually ||| well ||| yet
+    id: cf87d7ad-9b78-4ead-9e0e-ae4dc12b91d0
+    jinja: "In essay writing, it is important to avoid abrupt sentences. Choose a\
+      \ word to connect the following two sentences so they read more smoothly. If\
+      \ they cannot be connected, answer with \"no connection\".\n\n{{sentence1}}\n\
+      \n{{sentence2}} \n\nAnswer Choices: \n- {{ answer_choices | join(\"\\n- \")\
+      \ }}\n\n|||\n{{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: context_essay_writing_affirmative_instruction
+    reference: ''
+  e5a06323-697a-43e2-953d-f264dd4c2f84: !Template
+    answer_choices: no connection ||| absolutely ||| accordingly ||| actually |||
+      additionally ||| admittedly ||| afterward ||| again ||| already ||| also |||
+      alternately ||| alternatively ||| although ||| altogether ||| amazingly |||
+      and ||| anyway ||| apparently ||| arguably ||| as a result ||| basically |||
+      because of that ||| because of this ||| besides ||| but ||| by comparison |||
+      by contrast ||| by doing this ||| by then ||| certainly ||| clearly ||| coincidentally
+      ||| collectively ||| consequently ||| conversely ||| curiously ||| currently
+      ||| elsewhere ||| especially ||| essentially ||| eventually ||| evidently |||
+      finally ||| first ||| firstly ||| for example ||| for instance ||| fortunately
+      ||| frankly ||| frequently ||| further ||| furthermore ||| generally ||| gradually
+      ||| happily ||| hence ||| here ||| historically ||| honestly ||| hopefully |||
+      however ||| ideally ||| immediately ||| importantly ||| in contrast ||| in fact
+      ||| in other words ||| in particular ||| in short ||| in sum ||| in the end
+      ||| in the meantime ||| in turn ||| incidentally ||| increasingly ||| indeed
+      ||| inevitably ||| initially ||| instead ||| interestingly ||| ironically |||
+      lastly ||| lately ||| later ||| likewise ||| locally ||| luckily ||| maybe |||
+      meaning ||| meantime ||| meanwhile ||| moreover ||| mostly ||| namely ||| nationally
+      ||| naturally ||| nevertheless ||| next ||| nonetheless ||| normally ||| notably
+      ||| now ||| obviously ||| occasionally ||| oddly ||| often ||| on the contrary
+      ||| on the other hand ||| once ||| only ||| optionally ||| or ||| originally
+      ||| otherwise ||| overall ||| particularly ||| perhaps ||| personally ||| plus
+      ||| preferably ||| presently ||| presumably ||| previously ||| probably |||
+      rather ||| realistically ||| really ||| recently ||| regardless ||| remarkably
+      ||| sadly ||| second ||| secondly ||| separately ||| seriously ||| significantly
+      ||| similarly ||| simultaneously ||| slowly ||| so ||| sometimes ||| soon |||
+      specifically ||| still ||| strangely ||| subsequently ||| suddenly ||| supposedly
+      ||| surely ||| surprisingly ||| technically ||| thankfully ||| then ||| theoretically
+      ||| thereafter ||| thereby ||| therefore ||| third ||| thirdly ||| this |||
+      though ||| thus ||| together ||| traditionally ||| truly ||| truthfully |||
+      typically ||| ultimately ||| undoubtedly ||| unfortunately ||| unsurprisingly
+      ||| usually ||| well ||| yet
+    id: e5a06323-697a-43e2-953d-f264dd4c2f84
+    jinja: "{{sentence1}} [X] {{sentence2}} \n\nWhat should the [X], which is the\
+      \ discourse marker that connects the two sentences, be? If they cannot be connected,\
+      \ answer with \"no connection\". Otherwise, choose from the following options:\n\
+      - {{ answer_choices[1:] | join(\"\\n- \") }}\n\n|||\n{{ answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: discourse_marker_X
+    reference: ''
+  f57ab7ab-bf87-43c7-8eb9-48ea840345f6: !Template
+    answer_choices: no connection ||| absolutely ||| accordingly ||| actually |||
+      additionally ||| admittedly ||| afterward ||| again ||| already ||| also |||
+      alternately ||| alternatively ||| although ||| altogether ||| amazingly |||
+      and ||| anyway ||| apparently ||| arguably ||| as a result ||| basically |||
+      because of that ||| because of this ||| besides ||| but ||| by comparison |||
+      by contrast ||| by doing this ||| by then ||| certainly ||| clearly ||| coincidentally
+      ||| collectively ||| consequently ||| conversely ||| curiously ||| currently
+      ||| elsewhere ||| especially ||| essentially ||| eventually ||| evidently |||
+      finally ||| first ||| firstly ||| for example ||| for instance ||| fortunately
+      ||| frankly ||| frequently ||| further ||| furthermore ||| generally ||| gradually
+      ||| happily ||| hence ||| here ||| historically ||| honestly ||| hopefully |||
+      however ||| ideally ||| immediately ||| importantly ||| in contrast ||| in fact
+      ||| in other words ||| in particular ||| in short ||| in sum ||| in the end
+      ||| in the meantime ||| in turn ||| incidentally ||| increasingly ||| indeed
+      ||| inevitably ||| initially ||| instead ||| interestingly ||| ironically |||
+      lastly ||| lately ||| later ||| likewise ||| locally ||| luckily ||| maybe |||
+      meaning ||| meantime ||| meanwhile ||| moreover ||| mostly ||| namely ||| nationally
+      ||| naturally ||| nevertheless ||| next ||| nonetheless ||| normally ||| notably
+      ||| now ||| obviously ||| occasionally ||| oddly ||| often ||| on the contrary
+      ||| on the other hand ||| once ||| only ||| optionally ||| or ||| originally
+      ||| otherwise ||| overall ||| particularly ||| perhaps ||| personally ||| plus
+      ||| preferably ||| presently ||| presumably ||| previously ||| probably |||
+      rather ||| realistically ||| really ||| recently ||| regardless ||| remarkably
+      ||| sadly ||| second ||| secondly ||| separately ||| seriously ||| significantly
+      ||| similarly ||| simultaneously ||| slowly ||| so ||| sometimes ||| soon |||
+      specifically ||| still ||| strangely ||| subsequently ||| suddenly ||| supposedly
+      ||| surely ||| surprisingly ||| technically ||| thankfully ||| then ||| theoretically
+      ||| thereafter ||| thereby ||| therefore ||| third ||| thirdly ||| this |||
+      though ||| thus ||| together ||| traditionally ||| truly ||| truthfully |||
+      typically ||| ultimately ||| undoubtedly ||| unfortunately ||| unsurprisingly
+      ||| usually ||| well ||| yet
+    id: f57ab7ab-bf87-43c7-8eb9-48ea840345f6
+    jinja: "Sentence 1: {{sentence1}}\n\nSentence 2: {{sentence2}} \n\nWhat word signifies\
+      \ the shift or extension in meaning from the first to the second sentence? Choose\
+      \ from the following 174 answer choices: {{ answer_choices | join(\", \") }}.\n\
+      |||\n{{ answer_choices [label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: shift_in_meaning
+    reference: ''

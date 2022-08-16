@@ -1,0 +1,84 @@
+dataset: tweet_eval
+subset: irony
+templates:
+  c45095f1-9be1-4e83-8daa-68805b6ece39: !Template
+    answer_choices: no ||| yes
+    id: c45095f1-9be1-4e83-8daa-68805b6ece39
+    jinja: "Is this tweet is ironic? \n\n{{text}} |||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: irony_question
+    reference: ''
+  cd2ed852-c6fa-431a-b0f1-06f0240d74a0: !Template
+    answer_choices: no ||| yes
+    id: cd2ed852-c6fa-431a-b0f1-06f0240d74a0
+    jinja: "Is this tweet ironic? Answer with either yes or no. \n\n{{text}} |||\n\
+      {{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: irony_yes_no
+    reference: ''
+  cef39e97-09f2-430c-ad1f-5fd9d05c876b: !Template
+    answer_choices: no ||| yes
+    id: cef39e97-09f2-430c-ad1f-5fd9d05c876b
+    jinja: "In this test, you need to answer with either yes or no. \n\nQ: Is this\
+      \ an ironic tweet? \n{{text}}\n\nA: \n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: irony_exam
+    reference: exam style prompt
+  e7cff075-9388-48de-af51-fe185b654217: !Template
+    answer_choices: non-irony ||| irony
+    id: e7cff075-9388-48de-af51-fe185b654217
+    jinja: 'Does this tweet contain {{"irony"}} or {{"non-irony"}}?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: irony_option
+    reference: ''
+  f8361684-dad1-4c2c-9f22-1128f3096c20: !Template
+    answer_choices: no|||yes
+    id: f8361684-dad1-4c2c-9f22-1128f3096c20
+    jinja: 'Does this tweet convey the author''s irony towards something or someone?
+
+
+      {{text}}
+
+      |||
+
+      {{answer_choices[label]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: irony_author
+    reference: ''

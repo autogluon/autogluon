@@ -1,0 +1,147 @@
+dataset: cbt
+subset: V
+templates:
+  08820238-5bb3-4c7c-98bb-ec3d81e432cc: !Template
+    answer_choices: null
+    id: 08820238-5bb3-4c7c-98bb-ec3d81e432cc
+    jinja: '{{sentences | join('' '')}}
+
+
+      Write the next sentence of this story.
+
+      |||
+
+      {{ question.replace("XXXXX", answer) }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate Next Sentence
+    reference: Generate the next sentence given the story.
+  1f8cad96-4c0f-435a-9a6f-653fcf158dcc: !Template
+    answer_choices: '{{options|join("|||")}}'
+    id: 1f8cad96-4c0f-435a-9a6f-653fcf158dcc
+    jinja: '{{sentences | join ('' '')}} {{question}}
+
+
+      Replace {{"XXXXX"}} with the correct option from:
+
+      {{answer_choices|join(", ")}}
+
+      |||
+
+      {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Fill Blank with Options - Replace
+    reference: Fill the blank given the options.
+  556ee207-18c9-4c6c-860a-8ea09b9350cc: !Template
+    answer_choices: '{{options|join(''|||'')}}'
+    id: 556ee207-18c9-4c6c-860a-8ea09b9350cc
+    jinja: "{{sentences | join (' ')}}\n\nIn this following sentence: \n\"{{question}}\"\
+      , \naptly substitute the {{\"XXXXX\"}} with one of the following options:\n\
+      {{answer_choices|join(\", \")}}\n|||\n{{ answer }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Fill Blank with Options - In the following
+    reference: Fill in the blanks given options.
+  63bfa7b6-b566-4693-848c-e05cd7a12acc: !Template
+    answer_choices: '{{options|join("|||")}}'
+    id: 63bfa7b6-b566-4693-848c-e05cd7a12acc
+    jinja: '{{ sentences | join('' '') }} {{question}}
+
+
+      Fill in the {{"XXXXX"}}.
+
+      |||
+
+      {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Fill Blank without Options
+    reference: Fill in the blank without options.
+  a2e38459-90d9-4292-9d96-491ad7d4e3cc: !Template
+    answer_choices: '{{options|join("|||")}}'
+    id: a2e38459-90d9-4292-9d96-491ad7d4e3cc
+    jinja: '{{sentences | join ('' '')}} {{question}}
+
+
+      Which of the following options replaces {{"XXXXX"}} the best in the above story?
+
+      {{answer_choices|join(", ")}}
+
+      |||
+
+      {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Fill Blanks with Options - above story
+    reference: Given the sentences, fill the blanks using the options.
+  a6fa37d5-899c-4ad0-b888-fab04cc8e4cc: !Template
+    answer_choices: '{{options|join("|||")}}'
+    id: a6fa37d5-899c-4ad0-b888-fab04cc8e4cc
+    jinja: '{{sentences | join ('' '')}}
+
+
+      Which of the following options replaces {{"XXXXX"}} in "{{question}}"?
+
+      {{answer_choices|join(", ")}}
+
+      |||
+
+      {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Fill Blank with Options - Which
+    reference: Fill Blank given options.
+  a8b67815-1927-4ef3-8d04-8d3f95525ecc: !Template
+    answer_choices: '{{options|join("|||")}}'
+    id: a8b67815-1927-4ef3-8d04-8d3f95525ecc
+    jinja: '{{sentences | join ('' '')}} {{question}}
+
+
+      Fill in the {{"XXXXX"}} from the following choices:
+
+      {{answer_choices|join(", ")}}
+
+      |||
+
+      {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Fill Blank with Options - Fill in
+    reference: Fill in the blank given options

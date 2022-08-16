@@ -1,0 +1,93 @@
+dataset: selqa
+subset: answer_selection_analysis
+templates:
+  39f5f57c-50b9-40b3-bb4f-3f0e4fec7776: !Template
+    answer_choices: No ||| Yes
+    id: 39f5f57c-50b9-40b3-bb4f-3f0e4fec7776
+    jinja: '{% set rand_index = range(0,10)|choice %} He asked me "{{ question }}"
+      Is he talking about the topic "{{ ["MUSIC", "TV","TRAVEL","ART","SPORT","COUNTRY","MOVIES","HISTORICAL
+      EVENTS","SCIENCE","FOOD"][rand_index]|lower}}"? ||| {% if topic == rand_index
+      %}{{answer_choices[1]}}{% else %}{{answer_choices[0]}}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: is-he-talking-about
+    reference: ''
+  5354e98d-8aa2-49d0-a50b-fc72a503d7d4: !Template
+    answer_choices: No ||| Yes
+    id: 5354e98d-8aa2-49d0-a50b-fc72a503d7d4
+    jinja: '{% set possible_indexes = [] %}{% for c in candidates %}{% if c|trim %}{{
+      possible_indexes.append(loop.index0) | default("", True) }}{% endif %}{% endfor
+      %}{% set rand_index = possible_indexes | choice %} Would it make sense to reply
+      "{{ candidates[rand_index]|trim|trim(''.'') }}" to the question "{{ question
+      }}"? ||| {% if rand_index in answers %}{{answer_choices[1]}}{%else %}{{answer_choices[0]}}{%endif%}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: would-make-sense-qu-rand
+    reference: ''
+  721463cf-bae4-4a22-bd19-7bdbb0777856: !Template
+    answer_choices: null
+    id: 721463cf-bae4-4a22-bd19-7bdbb0777856
+    jinja: '{% set rand_index = range(0,10)|choice %}{% set rand_index = rand_index
+      - 1 if rand_index == topic else rand_index %}{% set topics = ["MUSIC", "TV","TRAVEL","ART","SPORT","COUNTRY","MOVIES","HISTORICAL
+      EVENTS","SCIENCE","FOOD"]%} What is the topic of the question "{{ question }}"?
+      Is it {{ topics[rand_index]|lower}} or {{ topics[topic]|lower}}? ||| {{ topics[topic]|lower
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: about-topic-vs-random
+    reference: ''
+  9de0a553-63e7-4b67-a6c5-1a15ac0d5483: !Template
+    answer_choices: No ||| Yes
+    id: 9de0a553-63e7-4b67-a6c5-1a15ac0d5483
+    jinja: '{% set possible_indexes = [] %}{% for c in candidates %}{% if c|trim %}{{
+      possible_indexes.append(loop.index0) | default("", True) }}{% endif %}{% endfor
+      %}{% set rand_index = possible_indexes | choice %}Someone asked me "{{ question
+      }}" I replied "{{ candidates[rand_index] }}" Does my answer make sense? |||
+      {% if rand_index in answers %}{{answer_choices[1]}}{%else %}{{answer_choices[0]}}{%endif%}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: make-sense-rand
+    reference: ''
+  c2be1297-cfce-48bd-9ef0-9f46fc898e84: !Template
+    answer_choices: 1 ||| 2
+    id: c2be1297-cfce-48bd-9ef0-9f46fc898e84
+    jinja: "{% set rand_val = range(0,candidates|length)|choice %}{% set rand_index\
+      \ = namespace(value=rand_val)%}\n{% for answer in answers|sort(reverse=True)%}\n\
+      \  {% if rand_index.value == answer %}\n  {% set rand_index.value = rand_index.value\
+      \ - 1 %}\n{% endif %}\n{% endfor %}\n{% set response=\"2\" %}{% set real_fake_answers\
+      \ = [candidates[rand_index.value], candidates[answers[0]]] %}\n{% if range(0,2)|choice\
+      \ %}{% set response=\"1\" %}{% set real_fake_answers = [candidates[answers[0]],\
+      \ candidates[rand_index.value]] %}{% endif %}\nThe next question was \"{{ question\
+      \ }}\" Which is the correct answer? 1: \"{{ real_fake_answers|join('\" or 2:\
+      \ \"') }} ||| {{ response }}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: which-answer-1st-vs-random
+    reference: ''

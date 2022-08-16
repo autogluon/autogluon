@@ -1,0 +1,240 @@
+dataset: wiqa
+templates:
+  1bc8d95b-0a50-49f4-a46b-bd752929926d: !Template
+    answer_choices: null
+    id: 1bc8d95b-0a50-49f4-a46b-bd752929926d
+    jinja: '-  {{ question_para_step[1:] | join("\n- ") }}
+
+
+      What might be the first step of the process?
+
+
+      |||
+
+
+      {{ question_para_step | first }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: what_might_be_the_first_step_of_the_process
+    reference: ''
+  360cd99a-2f83-469a-a505-d80808159dd2: !Template
+    answer_choices: null
+    id: 360cd99a-2f83-469a-a505-d80808159dd2
+    jinja: '
+
+      {% set process_list = question_para_step[:-1] if question_para_step[-1] == ""
+      else question_para_step %}
+
+      -  {{ process_list[:-1] | join("\n- ") }}
+
+
+      What might be the last step of the process?
+
+
+      |||
+
+
+      {{ process_list | last }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: what_might_be_the_last_step_of_the_process
+    reference: ''
+  4191b162-9220-46e5-a2f0-0a763eef55a0: !Template
+    answer_choices: null
+    id: 4191b162-9220-46e5-a2f0-0a763eef55a0
+    jinja: 'What is the missing first step of the following process:
+
+
+      -  {{ question_para_step[1:] | join("\n- ") }}
+
+
+      |||
+
+
+      {{ question_para_step | first }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: what_is_the_missing_first_step
+    reference: ''
+  52d69c02-5ff3-4fe7-bcaf-a6b995a15020: !Template
+    answer_choices: null
+    id: 52d69c02-5ff3-4fe7-bcaf-a6b995a15020
+    jinja: ' {% set process_list = question_para_step[:-1] if question_para_step[-1]
+      == "" else question_para_step %}
+
+      What is the final step of the following process:
+
+      -  {{ process_list[:-1] | join("\n- ") }}
+
+
+      |||
+
+
+      {{ process_list | last }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: what_is_the_final_step_of_the_following_process
+    reference: ''
+  5dfee2c2-9742-4003-8ab6-dfe0ce5a745b: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 5dfee2c2-9742-4003-8ab6-dfe0ce5a745b
+    jinja: 'Process:
+
+      - {{ question_para_step | join("\n- ")}}
+
+
+      Question:
+
+      {{question_stem}}
+
+
+      How does the supposed perturbation influence the second effect mentioned. Answer
+      by {{"more, less or no effect"}}
+
+
+      |||
+
+
+      {{answer_label|replace("_", " ")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: effect_with_string_answer
+    reference: ''
+  667c291f-6a36-4334-aa49-804c9e72500b: !Template
+    answer_choices: indirectly impacting a step of the process ||| not impacting any
+      step of the process
+    id: 667c291f-6a36-4334-aa49-804c9e72500b
+    jinja: 'Process:
+
+
+      - {{ question_para_step | join("\n- ") }}
+
+
+      {{question_stem}}
+
+
+      Which of the following is the supposed perturbation?
+
+
+      - {{"directly impacting a step of the process"}}
+
+      - {{"indirectly impacting a step of the process"}}
+
+      - {{"not impacting any step of the process"}}
+
+
+
+      |||
+
+
+      {{{"EXOGENOUS_EFFECT": "indirectly impacting a step of the process", "OUTOFPARA_DISTRACTOR":
+      "not impacting any step of the process", "INPARA_EFFECT": "directly impacting
+      a step of the process"}[metadata_question_type]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: which_of_the_following_is_the_supposed_perturbation
+    reference: ''
+  6cf2b300-6790-4120-9592-9db63bec221b: !Template
+    answer_choices: A ||| B ||| C
+    id: 6cf2b300-6790-4120-9592-9db63bec221b
+    jinja: 'Process:
+
+      - {{ question_para_step | join("\n- ")}}
+
+
+      Question:
+
+      {{question_stem}}
+
+
+      - {{"A: more"}}
+
+      - {{"B: less"}}
+
+      - {{"C: no effect"}}
+
+
+      |||
+
+
+      {{answer_label_as_choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: effect_with_label_answer
+    reference: ''
+  a17313bd-94bb-47ab-82bf-538df1b1ad5f: !Template
+    answer_choices: yes ||| no
+    id: a17313bd-94bb-47ab-82bf-538df1b1ad5f
+    jinja: 'Process:
+
+
+      - {{ question_para_step | join("\n- ") }}
+
+
+      Perturbation hypothesis:
+
+      {{question_stem}}
+
+
+      Does the supposed perturbation have an effect (direct or indirect) on the process?
+
+
+      |||
+
+
+      {{{"EXOGENOUS_EFFECT": "yes", "OUTOFPARA_DISTRACTOR": "no", "INPARA_EFFECT":
+      "yes"}[metadata_question_type]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: does_the_supposed_perturbation_have_an_effect
+    reference: ''

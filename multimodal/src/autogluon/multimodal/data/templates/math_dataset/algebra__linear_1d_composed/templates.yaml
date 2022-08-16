@@ -1,0 +1,204 @@
+dataset: math_dataset
+subset: algebra__linear_1d_composed
+templates:
+  0cb3708a-0004-431b-88fa-2a66b284acd5: !Template
+    answer_choices: null
+    id: 0cb3708a-0004-431b-88fa-2a66b284acd5
+    jinja: '{{question.split(''Solve'')[0]}}If {{question.split(''Solve'')[1][1:-7]}},
+      what is the value of {{question[-2]}}?
+
+
+      {{question[-2]}}=
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_one_sentence_extract_variable_name_v2
+    reference: Variant of simple_template_question_one_sentence_extract_variable_name
+  10a6ab6c-51f1-45cf-9176-54764bb6b613: !Template
+    answer_choices: null
+    id: 10a6ab6c-51f1-45cf-9176-54764bb6b613
+    jinja: '{{question}}
+
+      What is the solution to the previous algebraic expression?
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_after
+    reference: Simple question after expression
+  1e769483-a2e1-4829-8bf4-72a160477094: !Template
+    answer_choices: null
+    id: 1e769483-a2e1-4829-8bf4-72a160477094
+    jinja: '{{question}}
+
+      {% set variable_name = question[-2] %}
+
+      {{variable_name}}=
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: no_question_extracting_variable_name
+    reference: Provide solution with no question extracting the variable name
+  49a55302-2696-4b74-8d99-8310b14504ed: !Template
+    answer_choices: null
+    id: 49a55302-2696-4b74-8d99-8310b14504ed
+    jinja: '{{question.split(''Solve'')[0]}}How do I solve the following algebraic
+      equation: {{question.split(''Solve'')[1][1:-1]}}?
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_one_sentence
+    reference: Put the question with algebra equation in one sentence.
+  5b77efd0-4207-4390-826e-6119292393fa: !Template
+    answer_choices: null
+    id: 5b77efd0-4207-4390-826e-6119292393fa
+    jinja: '{{question.split(''Solve'')[0]}}If {{question.split(''Solve'')[1][1:-7]}},
+      what is the value of {{question[-2]}}?
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_one_sentence_extracting_variable_name
+    reference: Put the question with algebra equation in one setence and extract the
+      variable name
+  67e864ae-191e-424d-b056-a027d4eb8feb: !Template
+    answer_choices: null
+    id: 67e864ae-191e-424d-b056-a027d4eb8feb
+    jinja: '{{question.split(''Solve'')[0]}}How do I solve the following algebraic
+      equation: {{question.split(''Solve'')[1][1:-1]}}?
+
+
+      {{question[-2]}}=
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_one_sentence_v2
+    reference: Variant of simple_template_question_one_sentence
+  77893b3c-d16e-4a6d-a171-aa21697b8bb8: !Template
+    answer_choices: null
+    id: 77893b3c-d16e-4a6d-a171-aa21697b8bb8
+    jinja: 'What is the solution to the following algebraic expression?
+
+      {{question}}
+
+      {% set variable_name = question[-2] %}
+
+      {{variable_name}}=
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_before_extracting_variable_name
+    reference: Simple question before expression extracting variable name
+  7ac3e795-8b2e-4391-984f-e57ed2d1e3fc: !Template
+    answer_choices: null
+    id: 7ac3e795-8b2e-4391-984f-e57ed2d1e3fc
+    jinja: '{{question}}
+
+      What is the solution to the previous algebraic expression?
+
+      {% set variable_name = question[-2] %}
+
+      {{variable_name}}=
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_after_extracting_variable_name
+    reference: Simple question after expression extracting variable name
+  99f9f0d5-7a36-4b14-b80c-2540e7c8d3f5: !Template
+    answer_choices: null
+    id: 99f9f0d5-7a36-4b14-b80c-2540e7c8d3f5
+    jinja: 'What is the solution to the following algebraic expression?
+
+      {{question}}
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: simple_template_question_before
+    reference: Simple question before expression
+  e4f26ee0-c02c-4355-a242-c2b213b8761c: !Template
+    answer_choices: null
+    id: e4f26ee0-c02c-4355-a242-c2b213b8761c
+    jinja: '{{question}}
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: no_question
+    reference: Provide solution with no question

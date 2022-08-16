@@ -1,0 +1,101 @@
+dataset: math_qa
+templates:
+  091ba88e-d208-4a3a-ada7-d9698aeb5568: !Template
+    answer_choices: a ||| b ||| c ||| d  ||| e
+    id: 091ba88e-d208-4a3a-ada7-d9698aeb5568
+    jinja: 'You will receive full credit if you solve the following word problem:
+
+      {{Problem}}
+
+
+      {{options}}|||
+
+      {{correct}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_correct_variant
+    reference: 'Variant of choose_correct. '
+  6312d599-8ca4-4bc8-a76f-81f2e36727bd: !Template
+    answer_choices: 'a ||| b ||| c ||| d ||| e '
+    id: 6312d599-8ca4-4bc8-a76f-81f2e36727bd
+    jinja: 'Given the following problem:
+
+      {{Problem}}
+
+      ===
+
+      and the following options, select the correct option
+
+      {{options}}|||
+
+      {{correct}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_correct_og
+    reference: The template asks the model to choose the correct answer.
+  8c4c81cc-ca54-45fc-a69a-4b97a5f2b465: !Template
+    answer_choices: a ||| b ||| c ||| d ||| e
+    id: 8c4c81cc-ca54-45fc-a69a-4b97a5f2b465
+    jinja: "Solve the problem by choosing the correct answer: \n{{Problem}}\n\n{{options}}|||\n\
+      {{correct}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_the_correct
+    reference: The template picks the correct the answer choice
+  a313a5f8-53cd-4b76-abb6-fea2ac4e9ef4: !Template
+    answer_choices: a ||| b ||| c ||| d ||| e
+    id: a313a5f8-53cd-4b76-abb6-fea2ac4e9ef4
+    jinja: "One of the five choices are correctly answers the math problem. Can you\
+      \ choose the right one? \n\n{{options}}\n\nProblem: {{Problem}}\n|||\n{{correct}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: first_choice_then_problem
+    reference: First give the list of choices and then describe the problem
+  a3c2ec72-4af5-42aa-9e8e-ef475fa7c039: !Template
+    answer_choices: general ||| physics ||| gain ||| geometry ||| probability |||
+      other
+    id: a3c2ec72-4af5-42aa-9e8e-ef475fa7c039
+    jinja: "Given the problem below, in what category would you classify it?\n===\n\
+      {{Problem}} \n\nCategories:\n{{answer_choices | join(\"\\n\")}}\n|||\n{{category}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: problem_set_type
+    reference: The template asks to generate the category of the problem set
+  eb89c860-5849-461a-9081-3bd466f5642c: !Template
+    answer_choices: a ||| b ||| c ||| d ||| e
+    id: eb89c860-5849-461a-9081-3bd466f5642c
+    jinja: "Solve this advanced GRE problem: \n{{Problem}}\n\n{{options}}|||\n{{correct}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: gre_problem
+    reference: 'Template uses "GRE" as a prefix/template. '

@@ -1,0 +1,138 @@
+dataset: gutenberg_time
+templates:
+  06dce7dd-ae32-4acb-a1c8-6a01303b577b: !Template
+    answer_choices: null
+    id: 06dce7dd-ae32-4acb-a1c8-6a01303b577b
+    jinja: 'Given the following text, what time reference is reported in the text?
+
+
+      {{tok_context}}
+
+      |||
+
+      {{time_phrase}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: asking_the_time_reference
+    reference: Asking the time reference before the text
+  197f6f12-d2d8-483c-a250-17082d3ce831: !Template
+    answer_choices: 0 ||| 1 ||| 2 ||| 3 ||| 4 ||| 5 ||| 6 ||| 7 ||| 8 ||| 9 ||| 10
+      ||| 11 ||| 12 ||| 13 ||| 14 ||| 15 ||| 16 ||| 17 ||| 18 ||| 19 ||| 20 ||| 21
+      ||| 22 ||| 23
+    id: 197f6f12-d2d8-483c-a250-17082d3ce831
+    jinja: 'Answer the following question using the passage below: what hour is the
+      phrase "{{time_phrase}}"? Give the integer answer using 24 hour format.
+
+
+      {{tok_context}}
+
+      |||
+
+      {% set idx = hour_reference | int %}
+
+      {{answer_choices[idx]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: asking_the_hour_affirmative
+    reference: ''
+  3446ae6a-67a0-4bb0-8148-506648097843: !Template
+    answer_choices: A.M. ||| P.M.
+    id: 3446ae6a-67a0-4bb0-8148-506648097843
+    jinja: 'Given the passage below, is the phrase "{{time_phrase}}" {{answer_choices[0]}}
+      or {{answer_choices[1]}}?
+
+
+      {{tok_context}}
+
+      |||
+
+      {% set hour = hour_reference | int %}
+
+      {{answer_choices[0] if hour < 12 else answer_choices[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: asking_AM_PM_interrogative
+    reference: ''
+  4618dd9b-d11b-48f3-a359-f51d8593c80d: !Template
+    answer_choices: A.M. ||| P.M.
+    id: 4618dd9b-d11b-48f3-a359-f51d8593c80d
+    jinja: "There's a time phrase of \"{{time_phrase}}\" in the passage below. Determine\
+      \ whether the time the phrase is referring to is \u201C{{answer_choices[0]}}\u201D\
+      \ or \u201C{{answer_choices[1]}}\u201D.\n\n{{tok_context}}\n|||\n{% set hour\
+      \ = hour_reference | int %}\n{{answer_choices[0] if hour < 12 else answer_choices[1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: asking_AM_PM_affirmative
+    reference: ''
+  4efa58a3-a38b-4bcd-8597-687a7b7f56f8: !Template
+    answer_choices: 0 ||| 1 ||| 2 ||| 3 ||| 4 ||| 5 ||| 6 ||| 7 ||| 8 ||| 9 ||| 10
+      ||| 11 ||| 12 ||| 13 ||| 14 ||| 15 ||| 16 ||| 17 ||| 18 ||| 19 ||| 20 ||| 21
+      ||| 22 ||| 23
+    id: 4efa58a3-a38b-4bcd-8597-687a7b7f56f8
+    jinja: 'Given the following text. What hour (between 0 and 23) does the phrase
+      "{{time_phrase}}" indicate?
+
+
+      {{tok_context}}
+
+      |||
+
+      {% set idx = hour_reference | int %}
+
+      {{answer_choices[idx]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: asking_the_hour_interrogative
+    reference: Ask for the time reported in the text, explicitly mentioning the phrase,
+      asking the question before the text
+  8e86db06-1ef6-4120-9cbf-1d083eb8af7f: !Template
+    answer_choices: 0 ||| 1 ||| 2 ||| 3 ||| 4 ||| 5 ||| 6 ||| 7 ||| 8 ||| 9 ||| 10
+      ||| 11 ||| 12 ||| 13 ||| 14 ||| 15 ||| 16 ||| 17 ||| 18 ||| 19 ||| 20 ||| 21
+      ||| 22 ||| 23
+    id: 8e86db06-1ef6-4120-9cbf-1d083eb8af7f
+    jinja: 'There''s a time phrase of "{{time_phrase}}" in the passage below. What
+      hour does it refer to? Give the integer value between 0 and 23.
+
+
+      {{tok_context}}
+
+      |||
+
+      {% set idx = hour_reference | int %}
+
+      {{answer_choices[idx]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: asking_the_hour_refer
+    reference: ''

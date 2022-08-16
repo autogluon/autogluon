@@ -1,0 +1,116 @@
+dataset: yahoo_answers_qa
+templates:
+  1a6eda86-debc-4681-b643-f1f16fedd713: !Template
+    answer_choices: null
+    id: 1a6eda86-debc-4681-b643-f1f16fedd713
+    jinja: "Answer the following question: \n\n{{question}} |||\n{{nbestanswers|choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: n_best_answer
+    reference: Template chooses a random answer for the given question
+  2c214261-f32b-42ab-ac90-b22f4f2f465f: !Template
+    answer_choices: Society & Culture ||| Science & Mathematics ||| Health ||| Education
+      & Reference ||| Computers & Internet ||| Sports ||| Business & Finance ||| Entertainment
+      & Music ||| Family & Relationships ||| Politics & Government
+    id: 2c214261-f32b-42ab-ac90-b22f4f2f465f
+    jinja: "What is the category of the following question? \nPossible topics: {{answer_choices\
+      \ |join(', ')}}.\n\n{{question}} |||\n{{main_category}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: category
+    reference: Template asks the model to pick the correct category for the question
+      (topics from yahoo_answers_topics dataset)
+  7fc9307b-99ad-457a-8b60-c44bd6b2d86c: !Template
+    answer_choices: null
+    id: 7fc9307b-99ad-457a-8b60-c44bd6b2d86c
+    jinja: 'Given the best answer , "{{answer}}", generate the question: |||
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answer_to_question
+    reference: Template generates the question from the best answer
+  914f3d07-cc51-487e-8e2a-91dc92c49dda: !Template
+    answer_choices: null
+    id: 914f3d07-cc51-487e-8e2a-91dc92c49dda
+    jinja: "Using the internet, answer the following question: \n\n{{question}} |||\n\
+      {{nbestanswers|choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: using_internet_answer
+    reference: Template asks the model to answer the question with a prefix "using
+      the internet"
+  922f01b3-98e8-419c-bcb0-a854abc7f4f3: !Template
+    answer_choices: null
+    id: 922f01b3-98e8-419c-bcb0-a854abc7f4f3
+    jinja: "Answer the following question:\n{{question}} \n\nHint: The question is\
+      \ related to {{main_category}}. \n\n|||\n{{nbestanswers|choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: hint_question_answer
+    reference: 'Template asks the model to generate the answer for the question. The
+      template provides a hint. '
+  f0eeb5cb-1364-44c2-b284-de67452aef6d: !Template
+    answer_choices: null
+    id: f0eeb5cb-1364-44c2-b284-de67452aef6d
+    jinja: 'What is the best answer for the following question?
+
+
+      {{question}} |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: best_answer
+    reference: The template asks to generate the correct answer
+  fab0eea0-158a-484b-9cfe-87dfb7b0d627: !Template
+    answer_choices: null
+    id: fab0eea0-158a-484b-9cfe-87dfb7b0d627
+    jinja: "{{question}} \n\nFor full credit on the open-book test, you need to answer\
+      \ the question.  You are allowed to use any resource including the internet.\
+      \ \n\n|||\n{{nbestanswers|choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: exam_style_prompt
+    reference: Template asks the model to answer the exam style prompt

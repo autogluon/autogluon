@@ -1,0 +1,126 @@
+dataset: conv_ai_3
+templates:
+  04de512a-b097-474e-b952-3f47548ae557: !Template
+    answer_choices: yes ||| no
+    id: 04de512a-b097-474e-b952-3f47548ae557
+    jinja: Given the request "{{initial_request}}", would a search system need clarification
+      to answer it?|||{% if 3 <= clarification_need%}{{ answer_choices[0] }}{% else
+      %}{{ answer_choices[1] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: clarification_needed
+    reference: ''
+  2b94810c-515d-455f-a7d0-d1465d5f4f9d: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4
+    id: 2b94810c-515d-455f-a7d0-d1465d5f4f9d
+    jinja: 'Can you give me a number from {{ answer_choices[0] }} to {{ answer_choices[3]
+      }} that denotes how much the request "{{initial_request}}" needs clarification,
+      where {{ answer_choices[0] }} means clarification absolutely not needed and
+      {{ answer_choices[3] }} means clarification absolutely needed?
+
+      |||
+
+      {{ answer_choices[clarification_need-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: score_give_number
+    reference: ''
+  5c302d76-b34c-44e2-9f56-96901758060a: !Template
+    answer_choices: yes ||| no
+    id: 5c302d76-b34c-44e2-9f56-96901758060a
+    jinja: Would the request "{{initial_request}}" be ambiguous for an informational
+      retrieval system?|||{% if 3 <= clarification_need%}{{ answer_choices[0] }}{%
+      else %}{{ answer_choices[1] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: ambiguous
+    reference: ''
+  691d46e5-f1b0-4c7b-90b9-6da9711fd054: !Template
+    answer_choices: yes ||| no
+    id: 691d46e5-f1b0-4c7b-90b9-6da9711fd054
+    jinja: Is the request "{{initial_request}}" to a information retrieval system
+      self-contained?|||{% if 2 >= clarification_need%}{{ answer_choices[0] }}{% else
+      %}{{ answer_choices[1] }}{% endif %}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: self_contained
+    reference: ''
+  a1bad8cc-ee02-465d-a51d-a2b79a75075e: !Template
+    answer_choices: yes ||| no
+    id: a1bad8cc-ee02-465d-a51d-a2b79a75075e
+    jinja: 'Would a search system directly be able to answer this request unambiguously:
+      "{{initial_request}}"?|||{% if 2 >= clarification_need%}{{ answer_choices[0]
+      }}{% else %}{{ answer_choices[1] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: directly_answer
+    reference: ''
+  c718e88c-bedd-4b8d-98ec-5db99787a4b8: !Template
+    answer_choices: null
+    id: c718e88c-bedd-4b8d-98ec-5db99787a4b8
+    jinja: '{% if clarification_need >= 3 and question != "" %}
+
+      Here''s a request: "{{initial_request}}".
+
+      The request is ambiguous in the sense that an information retrieval system could
+      return multiple appropriate answers to the request.
+
+      Generate a clarifying question to the request.|||
+
+      {{question}}?
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: generate_clarif_question
+    reference: ''
+  d5479a4d-a57d-4005-995e-ec10bff02123: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4
+    id: d5479a4d-a57d-4005-995e-ec10bff02123
+    jinja: 'Request "{{initial_request}}", how ambiguous is this request? ({{ answer_choices[0]
+      }} means it would not need any clarification, and {{ answer_choices[3] }} means
+      it is absolutely ambiguous, making it impossible to guess the user''s right
+      intent before answering)
+
+      |||
+
+      {{ answer_choices[clarification_need-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: score_how_much
+    reference: ''

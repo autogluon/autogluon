@@ -1,0 +1,103 @@
+dataset: movie_rationales
+templates:
+  3ea71512-c48a-4898-8e29-6169a7a00752: !Template
+    answer_choices: Negative ||| Positive
+    id: 3ea71512-c48a-4898-8e29-6169a7a00752
+    jinja: "Review: {{review}} \n===\nIs this review {{answer_choices[0]}} or {{answer_choices[1]}}?\
+      \ |||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Standard binary sentiment analysis
+    reference: Standard binary sentiment analysis
+  5aaa7d8b-631a-4972-aeca-20a4e0518a60: !Template
+    answer_choices: Negative ||| Positive
+    id: 5aaa7d8b-631a-4972-aeca-20a4e0518a60
+    jinja: 'Evidences:
+
+      - {{ evidences | join("\n- ") }}
+
+      ===
+
+      Based on these review excerpts, is the review {{answer_choices[0]}} or {{answer_choices[1]}}
+      ? ||| {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Evidences sentiment classification
+    reference: Only taking the evidences as input
+  b953c90c-722a-487e-ab8d-c83ae45de139: !Template
+    answer_choices: Negative ||| Positive
+    id: b953c90c-722a-487e-ab8d-c83ae45de139
+    jinja: 'Review: {{review}}
+
+
+      Highlighted extracts:
+
+      - {{ evidences | join("\n- ") }}
+
+      ===
+
+      Based on this review and the highlighted extracts from the review, decide whether
+      this review is {{answer_choices[0]}} or {{answer_choices[1]}} . ||| {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Evidences + review
+    reference: Classification based both on evidences and review
+  e517bce9-5820-4f20-ad86-b2e3db9e6731: !Template
+    answer_choices: null
+    id: e517bce9-5820-4f20-ad86-b2e3db9e6731
+    jinja: 'Review: {{review}}
+
+      ===
+
+      This review is {% if label == 0 %}positive{% else %}negative{% endif %}. Extract
+      from it the passages that indicate it. |||
+
+      - {{ evidences | join("\n- ") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Generate evidences
+    reference: From the review, extract the spans of text that let us think that the
+      review is positive or negative.
+  f11ea73a-3a03-43d8-90d8-4da3905161c2: !Template
+    answer_choices: Negative ||| Positive
+    id: f11ea73a-3a03-43d8-90d8-4da3905161c2
+    jinja: 'Review: {{review}}
+
+      ====
+
+      Is this review {{answer_choices[0]}} or {{answer_choices[0]}}? Extract from
+      the review the passages that proves this choice. |||
+
+      {{answer_choices[label]}}
+
+      - {{ evidences | join("\n- ") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Generate evidences and sentiment
+    reference: From the review, determine whether it is negative or positive and extract
+      the passages supporting this choice

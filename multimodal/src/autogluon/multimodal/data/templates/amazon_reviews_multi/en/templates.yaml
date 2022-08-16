@@ -1,0 +1,147 @@
+dataset: amazon_reviews_multi
+subset: en
+templates:
+  073dfd34-5aef-461a-81d9-bdb8e00f12c9: !Template
+    answer_choices: null
+    id: 073dfd34-5aef-461a-81d9-bdb8e00f12c9
+    jinja: 'Write a title for the review below:
+
+      ===
+
+      {{review_body}} |||
+
+      {{review_title}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_title
+    reference: Review Title based on Review body
+  0f5b005b-c6bc-4fe0-bde4-0917cdba39e8: !Template
+    answer_choices: 1|||2|||3|||4|||5
+    id: 0f5b005b-c6bc-4fe0-bde4-0917cdba39e8
+    jinja: 'Rate the product by the number of stars based on the review title below:
+      (1 being the lowest and 5 the highest)
+
+      ===
+
+      {{review_title}} |||
+
+      {{answer_choices[stars-1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: false
+    name: prompt_title_to_star
+    reference: Rating based on review title
+  199ad6de-5bcc-421e-90e2-4b6edada6a01: !Template
+    answer_choices: 1|||2|||3|||4|||5
+    id: 199ad6de-5bcc-421e-90e2-4b6edada6a01
+    jinja: 'Rate the product by the number of stars based on the review body below:
+      (1 being the lowest and 5 the highest)
+
+      ===
+
+      {{review_body}} |||
+
+      {{answer_choices[stars-1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: prompt_review_to_star
+    reference: Rating based on review body
+  37806754-58f7-4383-961a-fe2c88109fcd: !Template
+    answer_choices: 1|||2|||3|||4|||5
+    id: 37806754-58f7-4383-961a-fe2c88109fcd
+    jinja: 'Rate the product by the number of stars based on the review below: (1
+      being the lowest and 5 the highest)
+
+      ===
+
+      {{review_title}}. {{review_body}} |||
+
+      {{answer_choices[stars-1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: prompt_body_title_to_star
+    reference: Rating based on review body,title
+  7ecaf718-c85d-47f4-83cb-f14c58f2911f: !Template
+    answer_choices: null
+    id: 7ecaf718-c85d-47f4-83cb-f14c58f2911f
+    jinja: 'Guess the product category from the following review:
+
+      ===
+
+      {{review_body}} |||
+
+      {{product_category}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: false
+    name: prompt_review_to_category
+    reference: Product category based on review body
+  8e8973f6-431f-4e78-b83a-a86c04655882: !Template
+    answer_choices: 1|||2|||3|||4|||5
+    id: 8e8973f6-431f-4e78-b83a-a86c04655882
+    jinja: 'Rate the product by the number of stars based on the review below: (1
+      being the lowest and 5 the highest)
+
+      ===
+
+      {{review_title}}. {{review_body}} Product category: {{product_category}}|||
+
+      {{answer_choices[stars-1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: prompt_body_title_category_to_star
+    reference: Rating based on review body, title, category
+  c4717e75-4d3e-4b79-9737-167155f51513: !Template
+    answer_choices: null
+    id: c4717e75-4d3e-4b79-9737-167155f51513
+    jinja: 'Guess the product category from the review title below:
+
+      ===
+
+      {{review_title}} |||
+
+      {{product_category}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: false
+    name: prompt_title_to_product_category
+    reference: Product category from review title

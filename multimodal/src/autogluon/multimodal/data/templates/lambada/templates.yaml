@@ -1,0 +1,82 @@
+dataset: lambada
+templates:
+  3747e80a-4182-44eb-944b-dee40095bb17: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 3747e80a-4182-44eb-944b-dee40095bb17
+    jinja: 'Please predict the next word after the following chunk of text.
+
+
+      {{ text.split()[:-1] | join('' '') }} ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: please next word
+    reference: ''
+  506765b8-17c0-4946-bbb0-b28288caacb3: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 506765b8-17c0-4946-bbb0-b28288caacb3
+    jinja: '{{ text.split()[:-1] | join('' '') }} ____.
+
+
+      Fill in the ____: ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: fill in the ____
+    reference: ''
+  948664d5-2ea2-4245-b656-9283948dd5cd: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: 948664d5-2ea2-4245-b656-9283948dd5cd
+    jinja: '{{ text.split()[:-1] | join('' '') }}...
+
+
+      What comes after the ellipses? ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: ellipses
+    reference: ''
+  acfe374c-60ce-4354-b285-e7b0717cffe5: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: acfe374c-60ce-4354-b285-e7b0717cffe5
+    jinja: 'This story got cut short. What comes next?
+
+
+      {{ text.split()[:-1] | join('' '') }} ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what comes next
+    reference: ''
+  d5707bd9-d3cc-4535-b4c1-5c2aee8cb8c7: !Template
+    answer_choices: '{{ text.split()[:-1] | unique | join('' ||| '') }}'
+    id: d5707bd9-d3cc-4535-b4c1-5c2aee8cb8c7
+    jinja: 'Fill in the blank:
+
+
+      {{ text.split()[:-1] | join('' '') }} ____. ||| {{ text.split()[-1] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style
+    reference: Brown et al.

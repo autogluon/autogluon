@@ -1,0 +1,91 @@
+dataset: Zaid/quac_expanded
+templates:
+  01d8c949-89a7-4a44-9a39-6cf2ac3e0a7b: !Template
+    answer_choices: null
+    id: 01d8c949-89a7-4a44-9a39-6cf2ac3e0a7b
+    jinja: "What is the answer to the last question in the dialogue below? If there\
+      \ is no answer in the passage, say \"unknown\".\n\nPassage: {{context}}\n\n\
+      Q: {{question}} \nA: ||| {{answer[\"texts\"][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: What is the answer
+    reference: 'Metric: F1'
+  1484c6e6-bf42-47ca-9ea7-c3c552a24de1: !Template
+    answer_choices: null
+    id: 1484c6e6-bf42-47ca-9ea7-c3c552a24de1
+    jinja: "{{context}}\n\nQ: {{question}} \nA: ||| {{answer[\"texts\"][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: GPT-3 Style
+    reference: 'Brown et al. NeurIPS 2020. Metric: F1'
+  2bca0532-01a3-4a64-a228-a57ae0965719: !Template
+    answer_choices: null
+    id: 2bca0532-01a3-4a64-a228-a57ae0965719
+    jinja: "Below is a passage, followed by a series of questions and answers about\
+      \ the passage. Answer the last question based on the information contained in\
+      \ the passage. If there is no answer in the passage, say \"unknown\".\n\nPassage:\
+      \ {{context}}\n\nQ: {{question}} \nA: ||| {{answer[\"texts\"][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Verbose instructions
+    reference: 'Metric: F1'
+  4abd0379-dbc0-4f71-901b-dd0af3581157: !Template
+    answer_choices: null
+    id: 4abd0379-dbc0-4f71-901b-dd0af3581157
+    jinja: "Answer the last question based on the information contained in the passage.\
+      \ If there is no answer in the passage, say \"unknown\".\n\nPassage: {{context}}\n\
+      \nQ: {{question}} \nA: ||| {{answer[\"texts\"][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Answer the last question
+    reference: 'Metric: F1'
+  8ebbd098-b40c-4e69-8cbb-0ffecf0fe2a6: !Template
+    answer_choices: null
+    id: 8ebbd098-b40c-4e69-8cbb-0ffecf0fe2a6
+    jinja: "Complete the dialogue based on the information contained in the passage.\
+      \ If there is no answer in the passage, say \"unknown\".\n\nPassage: {{context}}\n\
+      \nQ: {{question}} \nA: ||| {{answer[\"texts\"][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Complete the dialogue
+    reference: 'Metric: F1'
+  e624695b-5d26-47cc-bdb4-ac2bee4ddaea: !Template
+    answer_choices: null
+    id: e624695b-5d26-47cc-bdb4-ac2bee4ddaea
+    jinja: "Help me complete the dialogue about this passage. If there is no answer\
+      \ in the passage, say \"unknown\".\n\nPassage: {{context}}\n\nQ: {{question}}\
+      \ \nA: ||| {{answer[\"texts\"][0]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Help me
+    reference: 'Metric: F1'

@@ -1,0 +1,74 @@
+dataset: mwsc
+templates:
+  66c3e53a-2f2f-4ab4-b17b-ca42535d4ea1: !Template
+    answer_choices: '{{options | join(" ||| ")}}'
+    id: 66c3e53a-2f2f-4ab4-b17b-ca42535d4ea1
+    jinja: '{{ question|trim(''?'') }} in the sentence "{{ sentence|trim(''.'') }}"?
+      ||| {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: in-the-sentence-question-first
+    reference: ''
+  8d4f3463-d64b-43be-b0ed-2455cb99e017: !Template
+    answer_choices: '{{options | join(" ||| ")}}'
+    id: 8d4f3463-d64b-43be-b0ed-2455cb99e017
+    jinja: If I were to say "{{sentence}}" and then ask you "{{ question }}", what
+      do you think is the correct answer out of "{{ options|join('" and "')}}"? |||
+      {{ answer }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what-think
+    reference: ''
+  a37a2745-c815-4f3a-8f78-3da2fceae7fe: !Template
+    answer_choices: '{{options | join(" ||| ")}}'
+    id: a37a2745-c815-4f3a-8f78-3da2fceae7fe
+    jinja: In the sentence "{{ sentence|trim('.') }}", {{ question[0]|lower }}{{ question[1:]
+      }} ||| {{ answer }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: in-the-sentence
+    reference: ''
+  ad4b74f6-6b2f-40a8-8189-4ada58d64fd4: !Template
+    answer_choices: '{{options | join(" ||| ")}}'
+    id: ad4b74f6-6b2f-40a8-8189-4ada58d64fd4
+    jinja: '{{sentence}} {{ question }} Was it "{{options|join(''" or "'')}}"? |||
+      {{ answer }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: options-or
+    reference: ''
+  f0e01268-c83b-4785-b593-48eb4f9173cd: !Template
+    answer_choices: Yes ||| No
+    id: f0e01268-c83b-4785-b593-48eb4f9173cd
+    jinja: '{{ sentence }} Would "{{ options[0] }}" be correct if I were to ask you
+      {{question[0]|lower }}{{ question[1:] }} ||| {% if answer == options[0] %} {{answer_choices[0]}}
+      {% else %} {{answer_choices[1]}} {% endif %}   '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: is-correct
+    reference: ''

@@ -1,0 +1,153 @@
+dataset: billsum
+templates:
+  0938c6e4-dbaf-43d8-8d8f-4bc62489ae74: !Template
+    answer_choices: null
+    id: 0938c6e4-dbaf-43d8-8d8f-4bc62489ae74
+    jinja: 'Given the title: "{{title}}" and the summary of a bill: {{summary}}.
+
+      Write this bill based on the title and summary.
+
+      |||
+
+      {{text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Write a bill: (title, summary->text)'
+    reference: ''
+  3c790ac3-0557-47a9-9b71-1cb435f15629: !Template
+    answer_choices: null
+    id: 3c790ac3-0557-47a9-9b71-1cb435f15629
+    jinja: "Given a state bill: {{text}}. \nPlease write the title of this bill in\
+      \ one sentence.\n|||\n{{title}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Summarize this bill in one sentence: (text-> title)'
+    reference: ''
+  438192e5-d67a-4098-9d82-a9fe892f6be2: !Template
+    answer_choices: null
+    id: 438192e5-d67a-4098-9d82-a9fe892f6be2
+    jinja: 'Given a summary of a bill: {{summary}}.
+
+      Write this bill.
+
+      |||
+
+      {{text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Write a bill: (summary-> text)'
+    reference: ''
+  4891a8e7-258c-41e2-80d3-0c1a054acb07: !Template
+    answer_choices: null
+    id: 4891a8e7-258c-41e2-80d3-0c1a054acb07
+    jinja: 'Given a title: "{{title}}" of a bill.
+
+      Write this bill based on this title.
+
+      |||
+
+      {{text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Write a bill: (title-> text)'
+    reference: ''
+  550fa161-af4e-4430-9844-ce7dad587733: !Template
+    answer_choices: null
+    id: 550fa161-af4e-4430-9844-ce7dad587733
+    jinja: 'Given this bill: {{text}}.
+
+      Write a summary of this bill.
+
+      |||
+
+      {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: 'Summarize this bill: (text-> summary)'
+    reference: ''
+  5d2404b9-63ff-406e-977d-eda6afb5c689: !Template
+    answer_choices: null
+    id: 5d2404b9-63ff-406e-977d-eda6afb5c689
+    jinja: 'Given a summary: {{summary}}, we want to generate a title from this summary.
+
+      |||
+
+      {{title}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate title from summary
+    reference: ''
+  6a439a80-4924-49e9-b5ae-f661683b399f: !Template
+    answer_choices: null
+    id: 6a439a80-4924-49e9-b5ae-f661683b399f
+    jinja: 'Summarize this US bill: {{text}}
+
+      |||
+
+      {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: 'Summarize: (text -> summary )'
+    reference: ''
+  ea9f0376-6cec-450c-b258-89f479cb9f6d: !Template
+    answer_choices: null
+    id: ea9f0376-6cec-450c-b258-89f479cb9f6d
+    jinja: 'Given a summary of a bill: {{summary}}.
+
+      Please write the title of this summary.
+
+      |||
+
+      {{title}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Summarize: (summary -> title)'
+    reference: ''

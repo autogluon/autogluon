@@ -1,0 +1,120 @@
+dataset: qed
+templates:
+  292db39d-b9e9-4113-b59d-6c5b93133563: !Template
+    answer_choices: null
+    id: 292db39d-b9e9-4113-b59d-6c5b93133563
+    jinja: "Give a suitable title to the following passage:\n\n{{paragraph_text}}\
+      \ \n|||\n\n{{title_text}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: title-prediction
+    reference: ''
+  3578c1ee-8872-406f-be9f-b7e174aed92c: !Template
+    answer_choices: null
+    id: 3578c1ee-8872-406f-be9f-b7e174aed92c
+    jinja: '{% set chosen = original_nq_answers | choice %}
+
+      Question: {{question}} ?
+
+      |||
+
+      {{ chosen["string"]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: closed-book-qa
+    reference: ''
+  383d06fe-d562-4883-8d29-b727d4c3877b: !Template
+    answer_choices: null
+    id: 383d06fe-d562-4883-8d29-b727d4c3877b
+    jinja: "{% set chosen = original_nq_answers | choice %}\n{% if annotation['selected_sentence']['string']!=\"\
+      \" %}\nAnswer the following question given the hint.\n\nQuestion: {{question}}?\n\
+      \nHint: {{paragraph_text}}  \n\n|||\n{{ chosen[\"string\"]}}\n{% endif %}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: open-book-qa
+    reference: ''
+  5b45c11d-bbea-45a1-a799-a77a56fe8e1d: !Template
+    answer_choices: null
+    id: 5b45c11d-bbea-45a1-a799-a77a56fe8e1d
+    jinja: 'Please extract the title from the given URL (Uniform Resource Locator).
+
+
+      URL: {{ url }}
+
+      |||
+
+      {{ title_text }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: extract-title-from-url
+    reference: ''
+  7d3746b5-52e6-4ce1-b441-007f271f477b: !Template
+    answer_choices: null
+    id: 7d3746b5-52e6-4ce1-b441-007f271f477b
+    jinja: "I need to prepare for my upcoming test. Can you read the below passage\
+      \ and ask me a reasonable question? \n\n{{paragraph_text}} \n||| \n\n{{question}}?"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: question-forming
+    reference: ''
+  86cffd6d-db04-4daf-ab30-f462fd1177e3: !Template
+    answer_choices: null
+    id: 86cffd6d-db04-4daf-ab30-f462fd1177e3
+    jinja: '{% if annotation["selected_sentence"]["string"]  != "" %}
+
+      Read the following paragraph and question A, and answer question B:
+
+
+      Paragraph: {{ paragraph_text }}
+
+
+      Question A: {{ question }}?
+
+
+      Question B: What''s the most important sentence in Paragraph, in order to answer
+      question A?
+
+      |||
+
+      {{ annotation["selected_sentence"]["string"] }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: select-sentence
+    reference: ''

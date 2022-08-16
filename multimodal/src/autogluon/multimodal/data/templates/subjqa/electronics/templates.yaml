@@ -1,0 +1,257 @@
+dataset: subjqa
+subset: electronics
+templates:
+  2077a669-1574-4117-84fe-e683bead8d46: !Template
+    answer_choices: books|||electronics|||grocery|||movies|||restaurants|||tripadvisor
+    id: 2077a669-1574-4117-84fe-e683bead8d46
+    jinja: '{% set mapping = {"books": 0, "electronics": 1, "grocery": 2, "movies":
+      3, "restaurants":4 , "tripadvisor": 5} %}
+
+      Possible categories:
+
+      - {{ ["books", "electronics", "grocery", "movies", "restaurants", "tripadvisor"]  |
+      join("\n- ") }}
+
+
+      Context:
+
+      {{context}}
+
+
+      Which of the category corresponds to the context?
+
+
+      |||
+
+
+      {{answer_choices[mapping[domain]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: domain_q
+    reference: The prompt asks to pick the category for the context
+  27a56ea6-f951-4a95-a8a4-517d1ec191ef: !Template
+    answer_choices: null
+    id: 27a56ea6-f951-4a95-a8a4-517d1ec191ef
+    jinja: '{{question}}
+
+
+      Answer using extracts from the following context. If you can''t find an answer,
+      return {{"Unanswerable"}}
+
+
+      Context:
+
+      {{context}}
+
+
+      Hint: The context domain is {{domain}}
+
+
+      |||
+
+      {% if (answers["text"]  | length) == 0 %}
+
+      {{ "Unanswerable" }}
+
+      {% else %}
+
+      {{answers["text"][0]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: domain_hint_og_task
+    reference: Original task template with the domain hint
+  4a99dd61-9044-45e0-b8e1-c554d0f63e7b: !Template
+    answer_choices: null
+    id: 4a99dd61-9044-45e0-b8e1-c554d0f63e7b
+    jinja: "In today's exam on {{domain}}, answer the following question with the\
+      \ help of the context. If the question cannot be answered, say Unanswerable.\n\
+      \nQuestion: \n{{question}}\n\nContext:\n{{context}}\n\n|||\n{% if (answers[\"\
+      text\"]  | length) == 0 %}\n{{ \"Unanswerable\" }}\n{% else %}\n{{answers[\"\
+      text\"][0]}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: exam_style_prompt
+    reference: 'Exam style original task prompt '
+  68baa479-1ad6-41f4-ad48-75d06683f1d2: !Template
+    answer_choices: null
+    id: 68baa479-1ad6-41f4-ad48-75d06683f1d2
+    jinja: 'Context:
+
+      {{context}}
+
+
+      Answer the following question with extracts from the context: {{question}}
+
+
+      |||
+
+      {% if (answers["text"]  | length) == 0 %}
+
+      {{ "Unanswerable" }}
+
+      {% else %}
+
+      {{answers["text"][0]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: answer_q_with_context_first
+    reference: Original prompt with the context in the beginning.
+  6caf413a-d696-4fdc-9f85-41aa0197f180: !Template
+    answer_choices: null
+    id: 6caf413a-d696-4fdc-9f85-41aa0197f180
+    jinja: '{{question}}
+
+
+      Answer using extracts from the following context. If you can''t find an answer,
+      return {{"Unanswerable"}}
+
+
+      Context:
+
+      {{context}}
+
+
+      |||
+
+      {% if (answers["text"]  | length) == 0 %}
+
+      {{ "Unanswerable" }}
+
+      {% else %}
+
+      {{answers["text"][0]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: answer_q_with_context_after
+    reference: Prompt has instructions to answer to question along with the context
+  6d03b0a7-0b1f-4165-af90-071baab36e49: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4 ||| 5
+    id: 6d03b0a7-0b1f-4165-af90-071baab36e49
+    jinja: 'Context:
+
+      {{context}}
+
+
+      Question:
+
+      {{question}}
+
+
+      How would you rate the subjectivity of the question (on a 1 to 5 scale with
+      1 being the most subjective)?
+
+
+      |||
+
+
+      {{answer_choices[question_subj_level -1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: q_subj_score_with_context
+    reference: The prompt asks to rate the subjectivity of the question
+  772db86f-9435-4ac1-bc9a-8bef389e5a80: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4 ||| 5
+    id: 772db86f-9435-4ac1-bc9a-8bef389e5a80
+    jinja: 'Question:
+
+      {{question}}
+
+
+      On a scale of 1 to 5 (1 being the most subjective), how subjective is the question?
+
+
+      |||
+
+
+      {{answer_choices[question_subj_level -1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: q_subj_score
+    reference: Prompt asks the rate the subjectivity of the question
+  b21776bb-c6b3-45c8-8898-4c502d91a4d4: !Template
+    answer_choices: null
+    id: b21776bb-c6b3-45c8-8898-4c502d91a4d4
+    jinja: "To get full credit in today's test,  answer the following question with\
+      \ the help of the context. If the question cannot be answered, say Unanswerable.\n\
+      \nQuestion: \n{{question}}\n\nContext:\n{{context}}\n\n|||\n{% if (answers[\"\
+      text\"]  | length) == 0 %}\n{{ \"Unanswerable\" }}\n{% else %}\n{{answers[\"\
+      text\"] | join(\" \\n \")}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: exam_style_without_hint
+    reference: Exam style prompt without hint
+  e35fe9f1-84db-4436-9264-e30f090052f0: !Template
+    answer_choices: books ||| electronics ||| grocery ||| movies ||| restaurants |||
+      tripadvisor
+    id: e35fe9f1-84db-4436-9264-e30f090052f0
+    jinja: '{% set mapping = {"books": 0, "electronics": 1, "grocery": 2, "movies":
+      3, "restaurants":4 , "tripadvisor": 5} %}
+
+      Context:
+
+      {{context}}
+
+
+      Which of {{"books, electronics, grocery, movies, restaurants or tripadvisor"}}
+      corresponds to the context?
+
+
+      |||
+
+
+      {{answer_choices[mapping[domain]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: domain_q_after_context
+    reference: Another prompt asking to pick the correct category

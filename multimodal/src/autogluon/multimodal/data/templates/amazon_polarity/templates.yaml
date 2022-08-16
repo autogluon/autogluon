@@ -1,0 +1,192 @@
+dataset: amazon_polarity
+templates:
+  1e90a24a-1182-43dd-9445-22f2e56e5761: !Template
+    answer_choices: Negative ||| Positive
+    id: 1e90a24a-1182-43dd-9445-22f2e56e5761
+    jinja: 'Title: {{title}}
+
+      Review: {{content}}
+
+      Is the review positive or negative? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Is_this_review
+    reference: ''
+  3a48f287-6a4b-4df0-ab2d-2eaf6cb8e53d: !Template
+    answer_choices: No ||| Yes
+    id: 3a48f287-6a4b-4df0-ab2d-2eaf6cb8e53d
+    jinja: 'Based on this review, would the user recommend this product?
+
+      ===
+
+      Review: {{content}}
+
+      Answer: |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: User_recommend_this_product
+    reference: 'Reformulation equivalent to sent analysis: would the user recommend
+      this product?'
+  592caf8f-f8ff-426a-a61b-b7e95ed510b6: !Template
+    answer_choices: No ||| Yes
+    id: 592caf8f-f8ff-426a-a61b-b7e95ed510b6
+    jinja: 'Is this product review positive?
+
+      Title: {{title}}
+
+      Review: {{content}}
+
+      Answer: |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Is_this_product_review_positive
+    reference: ''
+  745b9c05-10df-4a7e-81ad-1b88cefcb166: !Template
+    answer_choices: Yes ||| No
+    id: 745b9c05-10df-4a7e-81ad-1b88cefcb166
+    jinja: 'Title: {{title}}
+
+      Review: {{content}}
+
+      Is this product review negative?|||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Is_this_review_negative
+    reference: ''
+  8abb5377-5dd3-4402-92a5-0d81adb6a325: !Template
+    answer_choices: Negative ||| Positive
+    id: 8abb5377-5dd3-4402-92a5-0d81adb6a325
+    jinja: 'Title: {{title}}
+
+      Review: {{content}}
+
+      Does this product review convey a negative or positive sentiment?|||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: convey_negative_or_positive_sentiment
+    reference: ''
+  9df70cdf-f8ed-4e79-8e2f-b4668058d637: !Template
+    answer_choices: Negative ||| Positive
+    id: 9df70cdf-f8ed-4e79-8e2f-b4668058d637
+    jinja: 'Is there a negative or positive tone to this product review?
+
+      ===
+
+      Title: {{title}}
+
+      Review: {{content}}
+
+      Answer: |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: negative_or_positive_tone
+    reference: ''
+  b13369e8-0500-4e93-90d4-8e6814bfb97b: !Template
+    answer_choices: dissatisfied ||| satisfied
+    id: b13369e8-0500-4e93-90d4-8e6814bfb97b
+    jinja: 'Here is a review left by a customer on a product. Would you say he was
+      {{answer_choices[1]}} or {{answer_choices[0]}}?
+
+      Title: {{title}}
+
+      Review: {{content}}
+
+      |||
+
+      {{answer_choices[label]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: user_satisfied
+    reference: ''
+  b13369e8-0500-4e93-90d4-8e6814bfb98b: !Template
+    answer_choices: decrease ||| increase
+    id: b13369e8-0500-4e93-90d4-8e6814bfb98b
+    jinja: 'You are considering whether to buy a product. You look at the reviews.
+      Would the following review {{answer_choices[0]}} or {{answer_choices[1]}} the
+      chances of you buying the product?
+
+      Review title: {{title}}
+
+      Product review: {{content}}
+
+      |||
+
+      {{answer_choices[label]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: would_you_buy
+    reference: ''
+  b13369e8-0500-4e93-90d4-8e6814bfb99b: !Template
+    answer_choices: unflattering ||| flattering
+    id: b13369e8-0500-4e93-90d4-8e6814bfb99b
+    jinja: 'Title: {{title}}
+
+      Product review: {{content}}
+
+      Would you say this review depicts the product in a {{answer_choices[1]}} or
+      {{answer_choices[0]}} light?
+
+      |||
+
+      {{answer_choices[label]}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: flattering_or_not
+    reference: ''

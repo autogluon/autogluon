@@ -1,0 +1,209 @@
+dataset: humicroedit
+subset: subtask-2
+templates:
+  437942d0-f1e0-4b17-83d0-01b19e54ec51: !Template
+    answer_choices: C ||| A ||| B
+    id: 437942d0-f1e0-4b17-83d0-01b19e54ec51
+    jinja: 'Given an original sentence "{{ original1.replace(original1[original1.index("<"):original1.index(">")+1],
+      original1[original1.index("<")+1:original1.index("/>")]) }}", is it more humorous
+      to replace "{{ original1[original1.index("<")+1:original1.index("/>")] }}" with
+      "{{ edit1 }}", or to replace "{{ original2[original2.index("<")+1:original2.index("/>")]
+      }}" with "{{ edit2 }}", or are both equally hilarious?
+
+      {{ answer_choices[1] }}. replace "{{ original1[original1.index("<")+1:original1.index("/>")]
+      }}" with "{{ edit1 }}"
+
+      {{ answer_choices[2] }}. replace "{{ original2[original2.index("<")+1:original2.index("/>")]
+      }}" with "{{ edit2 }}"
+
+      {{ answer_choices[0] }}. both equally hilarious
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: original_sent_edit_words_qa_id
+    reference: ''
+  49c71a8a-97af-465c-af04-36f08884e568: !Template
+    answer_choices: C ||| A ||| B
+    id: 49c71a8a-97af-465c-af04-36f08884e568
+    jinja: "Original sentence: {{ original1.replace(original1[original1.index(\"<\"\
+      ):original1.index(\">\")+1], original1[original1.index(\"<\")+1:original1.index(\"\
+      />\")]) }}.\nEdited sentence A: {{ original1.replace(original1[original1.index(\"\
+      <\"):original1.index(\">\")+1], edit1) }}.\nEdited sentence B: {{ original2.replace(original2[original2.index(\"\
+      <\"):original2.index(\">\")+1], edit2) }}.\nThere are two edited sentences based\
+      \ on the original sentence, which is more humorous ({{answer_choices[1]}} or\
+      \ {{answer_choices[2]}}) or are they equally humorous? \n{{answer_choices[1]}}.\
+      \ Edited sentence A\n{{answer_choices[2]}}. Edited sentence B\n{{answer_choices[0]}}.\
+      \ Equal\n|||\n{{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: original_sent_edited_sentences_qa_id
+    reference: ''
+  6d576e77-df98-47cd-b92e-c87a56190be4: !Template
+    answer_choices: C ||| A ||| B
+    id: 6d576e77-df98-47cd-b92e-c87a56190be4
+    jinja: 'Given an original sentence "{{ original1.replace(original1[original1.index("<"):original1.index(">")+1],
+      original1[original1.index("<")+1:original1.index("/>")]) }}", we have two replacement
+      strategies. The first is to replace "{{ original1[original1.index("<")+1:original1.index("/>")]
+      }}" with "{{ edit1 }}", and the second is to replace "{{ original2[original2.index("<")+1:original2.index("/>")]
+      }}" with "{{ edit2 }}".
+
+      Is the first strategy more humorous or the second, or are they equally funny?
+
+      {{ answer_choices[1] }}. The first strategy
+
+      {{ answer_choices[2] }}. The second strategy
+
+      {{ answer_choices[0] }}. Both are equally funny
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: original_sent_edit_words_qa_strategy_id
+    reference: ''
+  794ee65f-df0a-4448-8eac-20f757a8918d: !Template
+    answer_choices: C ||| A ||| B
+    id: 794ee65f-df0a-4448-8eac-20f757a8918d
+    jinja: 'There are two sentences:
+
+      Sentence1: {{ original1.replace(original1[original1.index("<"):original1.index(">")+1],
+      edit1) }}
+
+      Sentence2: {{ original2.replace(original2[original2.index("<"):original2.index(">")+1],
+      edit2) }}
+
+      Which sentence is more humorous?
+
+      {{ answer_choices[1] }}. Sentence 1
+
+      {{ answer_choices[2] }}. Sentence 2
+
+      {{ answer_choices[0] }}. Equal
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: only_edited_sentences_QA_id
+    reference: ''
+  88054771-74d2-481f-91f1-c078a2bda5b9: !Template
+    answer_choices: equal ||| A ||| B
+    id: 88054771-74d2-481f-91f1-c078a2bda5b9
+    jinja: 'Which of the following sentences is more humorous? If they are equally
+      funny, please answer "{{ answer_choices[0] }}".
+
+      {{ answer_choices[1] }}. {{ original1.replace(original1[original1.index("<"):original1.index(">")+1],
+      edit1) }}
+
+      {{ answer_choices[2] }}. {{ original2.replace(original2[original2.index("<"):original2.index(">")+1],
+      edit2) }}
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: only_edited_sentences_id
+    reference: ''
+  8e5f09ae-27bc-4b34-b20e-6bc6672a2c1a: !Template
+    answer_choices: Equal ||| Sentence 1 ||| Sentence 2
+    id: 8e5f09ae-27bc-4b34-b20e-6bc6672a2c1a
+    jinja: 'There are two sentences:
+
+      Sentence1: {{ original1.replace(original1[original1.index("<"):original1.index(">")+1],
+      edit1) }}
+
+      Sentence2: {{ original2.replace(original2[original2.index("<"):original2.index(">")+1],
+      edit2) }}
+
+      Which sentence is more humorous?
+
+      - {{ answer_choices[1] }}
+
+      - {{ answer_choices[2] }}
+
+      - {{ answer_choices[0] }}
+
+      |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: only_edited_sentences_QA_text
+    reference: ''
+  b9e3fe90-d328-44a8-bb6e-212f600a2050: !Template
+    answer_choices: Equal ||| First ||| Second
+    id: b9e3fe90-d328-44a8-bb6e-212f600a2050
+    jinja: "Given an original sentence \"{{ original1.replace(original1[original1.index(\"\
+      <\"):original1.index(\">\")+1], original1[original1.index(\"<\")+1:original1.index(\"\
+      />\")]) }}\", we have two replacement strategies:\nThe first is to replace \"\
+      {{ original1[original1.index(\"<\")+1:original1.index(\"/>\")] }}\" with \"\
+      {{ edit1 }}\".\nThe second is to replace \"{{ original2[original2.index(\"<\"\
+      )+1:original2.index(\"/>\")] }}\" with \"{{ edit2 }}\".\nWhich strategy is more\
+      \ humorous (respond with \"{{answer_choices[1]}}\" or \"{{answer_choices[2]}}\"\
+      ) or equally funny (if so, respond with \"{{answer_choices[0]}}\")? \n|||\n\
+      {{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: original_sent_edit_words_qa_strategy
+    reference: ''
+  ec92a63f-7d82-48f0-a9e4-8e99dd5a0bb0: !Template
+    answer_choices: Equally funny ||| First ||| Second
+    id: ec92a63f-7d82-48f0-a9e4-8e99dd5a0bb0
+    jinja: "Given an original sentence \"{{ original1.replace(original1[original1.index(\"\
+      <\"):original1.index(\">\")+1], original1[original1.index(\"<\")+1:original1.index(\"\
+      />\")]) }}\", we have two edited sentences. The first is \"{{ original1.replace(original1[original1.index(\"\
+      <\"):original1.index(\">\")+1], edit1) }}\", and the second is \"{{ original2.replace(original2[original2.index(\"\
+      <\"):original2.index(\">\")+1], edit2) }}\". \n\nWhich edited sentence is more\
+      \ humorous (answer with \"{{answer_choices[1]}}\" or \"{{answer_choices[2]}}\"\
+      ) or equally humorous (if so, answer 'Equally funny')?\n|||\n{{ answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: original_sent_edited_sentences_qa
+    reference: ''

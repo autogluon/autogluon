@@ -1,0 +1,97 @@
+dataset: cbt
+subset: raw
+templates:
+  4906fc72-c879-4f0a-b7ae-c6379a63e32c: !Template
+    answer_choices: null
+    id: 4906fc72-c879-4f0a-b7ae-c6379a63e32c
+    jinja: 'Guess the author for the book: "{{title.split(''___'')[1].split(''.'')[:-2]|join(''.'')|replace(''_'',''
+      '')}}"
+
+      |||
+
+      {{title.split(''___'')[0]|replace(''_'','' '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Given Title Guess Author
+    reference: Given the title, guess the author of the book.
+  5172f015-f022-4c3b-89e9-607467e29012: !Template
+    answer_choices: null
+    id: 5172f015-f022-4c3b-89e9-607467e29012
+    jinja: 'Suggest a book written by {{title.split(''___'')[0]|replace(''_'','' '')}}.
+
+      |||
+
+      {{title.split(''___'')[1].split(''.'')[:-2]|join(''.'')|replace(''_'','' '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Given Author Recommend Book
+    reference: Given the author name, recommend one of his books.
+  82c63934-1f33-4e6f-af59-af570b3e2e4c: !Template
+    answer_choices: null
+    id: 82c63934-1f33-4e6f-af59-af570b3e2e4c
+    jinja: 'Who wrote "{{title.split(''___'')[1].split(''.'')[:-2]|join(''.'')|replace(''_'',''
+      '')}}"?
+
+      |||
+
+      {{title.split(''___'')[0]|replace(''_'','' '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Who wrote
+    reference: Given the title, guess the author of the title.
+  d407406e-ed5c-4f1f-bca8-b1f511e5fa53: !Template
+    answer_choices: null
+    id: d407406e-ed5c-4f1f-bca8-b1f511e5fa53
+    jinja: '{{ content }}
+
+
+      Guess the author for the above story.
+
+      |||
+
+      {{title.split(''___'')[0]|replace(''_'','' '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Given Story Guess Author
+    reference: Given the story, guess the author.
+  f4e1d9bb-a43e-4c75-aa5d-4711090dd628: !Template
+    answer_choices: null
+    id: f4e1d9bb-a43e-4c75-aa5d-4711090dd628
+    jinja: '{{ content }}
+
+
+      Write a title for the above story.
+
+      |||
+
+      {{title.split(''___'')[1].split(''.'')[:-2]|join(''.'')|replace(''_'','' '')}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Given Story Write Title
+    reference: Given the story, write a title.

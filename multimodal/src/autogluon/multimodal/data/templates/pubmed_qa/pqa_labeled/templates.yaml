@@ -1,0 +1,130 @@
+dataset: pubmed_qa
+subset: pqa_labeled
+templates:
+  00584766-2415-4d10-ab76-bf86058faa07: !Template
+    answer_choices: null
+    id: 00584766-2415-4d10-ab76-bf86058faa07
+    jinja: "Given a research abstract: {{ context.contexts | join(\", \") }}\nAnd\
+      \ given keywords: {{context.meshes | join(\", \")}}.\n \nWhat is the question\
+      \ answered by the above research abstract? \n|||\n{{question}} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate Question Title with meshes
+    reference: ''
+  00f58886-e04a-4efb-bf41-cfcbd00a5e7d: !Template
+    answer_choices: null
+    id: 00f58886-e04a-4efb-bf41-cfcbd00a5e7d
+    jinja: "Given a PubMed abstract: {{ context.contexts | join(\", \") }}\n\nAnswer\
+      \ this question: \"{{question}}\" \n||| \n{{long_answer}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: Question Answering (Long)
+    reference: Provide a long/verbose answer to the provided question
+  0b630e04-02a8-46d6-b164-a41cd34042ff: !Template
+    answer_choices: null
+    id: 0b630e04-02a8-46d6-b164-a41cd34042ff
+    jinja: "Given a research abstract: {{ context.contexts | join(\", \") }}\n\nWhat\
+      \ is the question answered by the above research abstract? \n|||\n{{question}} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Generate Question Title '
+    reference: Given abstract, generate title (which is in the form of a question)
+  1e0a77f8-0eb4-40a1-814d-8a111df66e5e: !Template
+    answer_choices: Yes ||| No ||| Maybe
+    id: 1e0a77f8-0eb4-40a1-814d-8a111df66e5e
+    jinja: "Question: \"{{ question }}\" \n\nAnswer: \"{{ long_answer }}\"\n\nSummarize\
+      \ the above answer as YES, NO, or MAYBE? \n|||\n{{final_decision}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Long Answer to Final Decision
+    reference: Given a question, the full text of the relevant answer, summarize a
+      yes/no/maybe answer
+  21240f74-530a-47b7-a5d9-a6a13083b72e: !Template
+    answer_choices: '{{context.labels | join("|||")}}'
+    id: 21240f74-530a-47b7-a5d9-a6a13083b72e
+    jinja: "{% set n_sections = context.contexts | length %}\n{% set choice = range(0,\
+      \ n_sections) | random %}\n\n\"{{ context.contexts[choice] }}\"\n\nThe above\
+      \ text would most likely be found in which section of a biomedical paper:  {{\
+      \ context.labels[:-1] | join(\", \") }} or {{ context.labels[-1] }} ? \n|||\n\
+      {{ context.labels[choice] }}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Context Section Type
+    reference: Assign text in an abstract to specific paper section headers
+  45cb344c-bb36-492a-ace0-7cfc897e127a: !Template
+    answer_choices: null
+    id: 45cb344c-bb36-492a-ace0-7cfc897e127a
+    jinja: "Given a PubMed abstract:{{ context.contexts | join(\", \") }}\n\nWhat\
+      \ are the MeSH (Medical Subject Headings) terms for this? \n|||\n{{ context.meshes\
+      \ | join(\", \") }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      - Other
+      original_task: false
+    name: Medical Subject Headings
+    reference: 'Predict the set of MeSH terms for a given PubMed abstract '
+  48ee58bb-6a4a-4667-9d9c-69618408c6ce: !Template
+    answer_choices: null
+    id: 48ee58bb-6a4a-4667-9d9c-69618408c6ce
+    jinja: "Given a research abstract: {{ context.contexts | join(\", \") }}\nAnd\
+      \ given long answer of a question: {{long_answer}}.\n \nWhat is the question\
+      \ asked by this research paper? \n|||\n{{question}} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate Question Title with long answer
+    reference: ''
+  91d481e5-fac6-4532-b013-5ac1235b6e1a: !Template
+    answer_choices: Yes ||| No ||| Maybe
+    id: 91d481e5-fac6-4532-b013-5ac1235b6e1a
+    jinja: "Given a PubMed abstract: {{ context.contexts | join(\", \") }}\n\nAnswer\
+      \ the question: \"{{question}}\" as YES, NO, MAYBE.\n||| \n{{final_decision}}\n\
+      \n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Question Answering (Short)
+    reference: Answer the following question using the provided abstract text

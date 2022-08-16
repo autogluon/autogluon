@@ -1,0 +1,197 @@
+dataset: guardian_authorship
+subset: cross_genre_1
+templates:
+  026e1ef2-c765-4262-b7b3-a087f38907db: !Template
+    answer_choices: Catherine Bennett ||| George Monbiot ||| Hugo Young ||| Jonathan
+      Freedland ||| Martin Kettle ||| Mary Riddell ||| Nick Cohen ||| Peter Preston
+      ||| Polly Toynbee ||| Roy Hattersley ||| Simon Hoggart ||| Will Hutton ||| Zoe
+      Williams
+    id: 026e1ef2-c765-4262-b7b3-a087f38907db
+    jinja: 'Who could have authored this article based on the writing style? The answer
+      options are {{ answer_choices | join(", ") }}.
+
+
+      {{article}} |||
+
+      {{ answer_choices[author] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: writing_style
+    reference: ''
+  12982397-c0c3-49a9-b3ac-38735908428b: !Template
+    answer_choices: null
+    id: 12982397-c0c3-49a9-b3ac-38735908428b
+    jinja: "Generate an article based on the writing style of {{\n[\n  \"Catherine\
+      \ Bennett\",\n  \"George Monbiot\",\n  \"Hugo Young\",\n  \"Jonathan Freedland\"\
+      ,\n  \"Martin Kettle\",\n  \"Mary Riddell\",\n  \"Nick Cohen\",\n  \"Peter Preston\"\
+      ,\n  \"Polly Toynbee\",\n  \"Roy Hattersley\",\n  \"Simon Hoggart\",\n  \"Will\
+      \ Hutton\",\n  \"Zoe Williams\"\n] [author]\n}} on the topic of {{\n[\n  \"\
+      Politics\",\n  \"Society\",\n  \"UK\",\n  \"World\",\n  \"Books\"\n] [topic]\n\
+      }}. |||\n{{article}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: article_from_author_topic
+    reference: ''
+  1b9fb5f9-6d2a-45ad-8ad4-dc199ee181b6: !Template
+    answer_choices: null
+    id: 1b9fb5f9-6d2a-45ad-8ad4-dc199ee181b6
+    jinja: "Generate an article on the topic of {{[\n  \"Politics\",\n  \"Society\"\
+      ,\n  \"UK\",\n  \"World\",\n  \"Books\"\n][topic] }}. |||\n{{article}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: article_from_topic
+    reference: ''
+  45e1aa31-6e76-4072-a6ee-ba99785999fc: !Template
+    answer_choices: Catherine Bennett ||| George Monbiot ||| Hugo Young ||| Jonathan
+      Freedland ||| Martin Kettle ||| Mary Riddell ||| Nick Cohen ||| Peter Preston
+      ||| Polly Toynbee ||| Roy Hattersley ||| Simon Hoggart ||| Will Hutton ||| Zoe
+      Williams
+    id: 45e1aa31-6e76-4072-a6ee-ba99785999fc
+    jinja: 'Given the answer options of {{answer_choices[:-1] | join(", ")}} and {{answer_choices[-1]}},
+      identify the author of the passage, which is related to {{ ["Politics", "Society",
+      "UK", "World", "Books"][topic] }}, below.
+
+
+      {{article}}
+
+      |||
+
+      {{ answer_choices[author] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: who_wrote_article_with_topic_affirmative
+    reference: ''
+  68bfa6a4-a89c-4be2-aa0b-cce1103e3ecf: !Template
+    answer_choices: Politics ||| Society ||| UK ||| World ||| Books
+    id: 68bfa6a4-a89c-4be2-aa0b-cce1103e3ecf
+    jinja: "What is the topic of this article? The answer options are {{answer_choices|join(\"\
+      , \")}}.\n\n{{article}} \n|||\n{{answer_choices[topic]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: topic
+    reference: ''
+  8d8e432e-8594-4e89-8b03-e11f0cebcf7b: !Template
+    answer_choices: Catherine Bennett ||| George Monbiot ||| Hugo Young ||| Jonathan
+      Freedland ||| Martin Kettle ||| Mary Riddell ||| Nick Cohen ||| Peter Preston
+      ||| Polly Toynbee ||| Roy Hattersley ||| Simon Hoggart ||| Will Hutton ||| Zoe
+      Williams
+    id: 8d8e432e-8594-4e89-8b03-e11f0cebcf7b
+    jinja: 'Identify the author of the passage below by choosing from the author list
+      of {{answer_choices|join(", ")}}.
+
+
+      {{article}}
+
+      |||
+
+      {{ answer_choices[author] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: who_wrote_article_affirmative
+    reference: ''
+  8e852323-3aba-4c57-a428-004bbef4185e: !Template
+    answer_choices: Catherine Bennett ||| George Monbiot ||| Hugo Young ||| Jonathan
+      Freedland ||| Martin Kettle ||| Mary Riddell ||| Nick Cohen ||| Peter Preston
+      ||| Polly Toynbee ||| Roy Hattersley ||| Simon Hoggart ||| Will Hutton ||| Zoe
+      Williams
+    id: 8e852323-3aba-4c57-a428-004bbef4185e
+    jinja: "You are in an examination, which requires you to associate the passage\
+      \ below to the author. The topic is about {{ [\"Politics\", \"Society\", \"\
+      UK\", \"World\", \"Books\"][topic] }}, and the possible authors are one of the\
+      \ following: {{answer_choices | join(\", \")}}. What is the answer?\n\nPassage:\
+      \ {{ article }} \n|||\n{{ answer_choices[author] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: who_wrote_article_with_topic_exam
+    reference: ''
+  dc46136b-69d1-484e-9b5f-accfb4ba22df: !Template
+    answer_choices: null
+    id: dc46136b-69d1-484e-9b5f-accfb4ba22df
+    jinja: "Generate an article based on the writing style of {{\n[\n  \"Catherine\
+      \ Bennett\",\n  \"George Monbiot\",\n  \"Hugo Young\",\n  \"Jonathan Freedland\"\
+      ,\n  \"Martin Kettle\",\n  \"Mary Riddell\",\n  \"Nick Cohen\",\n  \"Peter Preston\"\
+      ,\n  \"Polly Toynbee\",\n  \"Roy Hattersley\",\n  \"Simon Hoggart\",\n  \"Will\
+      \ Hutton\",\n  \"Zoe Williams\"\n] [author]\n}} .\n|||\n{{article}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: article_from_author
+    reference: ''
+  e885498a-04f9-4db9-bc01-d1324803315a: !Template
+    answer_choices: Catherine Bennett ||| George Monbiot ||| Hugo Young ||| Jonathan
+      Freedland ||| Martin Kettle ||| Mary Riddell ||| Nick Cohen ||| Peter Preston
+      ||| Polly Toynbee ||| Roy Hattersley ||| Simon Hoggart ||| Will Hutton ||| Zoe
+      Williams
+    id: e885498a-04f9-4db9-bc01-d1324803315a
+    jinja: "Who wrote this article? The answer options are {{answer_choices|join(\"\
+      , \")}}.\n\n{{article}} \n\n|||\n\n{{ answer_choices[author] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: who_wrote_article
+    reference: ''
+  f6ff1e76-4148-450c-ba0c-157a5b4c2383: !Template
+    answer_choices: Catherine Bennett ||| George Monbiot ||| Hugo Young ||| Jonathan
+      Freedland ||| Martin Kettle ||| Mary Riddell ||| Nick Cohen ||| Peter Preston
+      ||| Polly Toynbee ||| Roy Hattersley ||| Simon Hoggart ||| Will Hutton ||| Zoe
+      Williams
+    id: f6ff1e76-4148-450c-ba0c-157a5b4c2383
+    jinja: "Who is the author of the passage below? Choose from the following list:\
+      \ {{ answer_choices | join(\", \")}}. \n\nHint: The topic is related to {{ [\"\
+      Politics\", \"Society\", \"UK\", \"World\", \"Books\"][topic] }}.\n\n{{article}}\n\
+      |||\n{{ answer_choices[author] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: who_wrote_article_with_topic_hint
+    reference: ''

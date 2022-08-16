@@ -1,3 +1,4 @@
+import collections
 import logging
 import random
 from typing import List, Optional, Tuple
@@ -10,6 +11,7 @@ from transformers import logging as hf_logging
 
 from ..constants import (
     AUTOMM,
+    CHOICES_IDS,
     COLUMN,
     COLUMN_FEATURES,
     FEATURES,
@@ -22,20 +24,11 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import assign_layer_ids, get_column_features
+from .utils import assign_layer_ids, DummyLayer, get_column_features
 
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
-
-
-class DummyLayer(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
-
-    def forward(self, x):
-        return x + self.dummy_bias - self.dummy_bias
 
 
 class TFewModel(nn.Module):
@@ -47,7 +40,6 @@ class TFewModel(nn.Module):
     def __init__(
         self,
         prefix: str,
-        label_templates: dict = {},
         checkpoint_name: str = "bigscience/T0_3B",
         num_classes: Optional[int] = 0,
         length_norm: float = 1.0,  # Normalizes length to adjust for length bias in target template
@@ -62,8 +54,6 @@ class TFewModel(nn.Module):
         ----------
         prefix
             The model prefix.
-        label_templates
-            Dictionary of textual templates to numerical class, as representations of these classes.
         checkpoint_name
             Name of the checkpoint. We support loading T5ForConditionalGeneration checkpoints from
             Huggingface Models list: https://huggingface.co/models.
@@ -75,8 +65,6 @@ class TFewModel(nn.Module):
             The number of classes. 1 for a regression task.
         gradient_checkpointing
             Whether to enable gradient checkpointing
-        label_templates
-            A dictionary mapping the label ids to textual templates
         length_norm
              Normalizes length to adjust for length bias in target template
         unlikely_loss
@@ -92,7 +80,7 @@ class TFewModel(nn.Module):
 
         self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name)
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
-        self.eos_token = self.tokenizer.eos_token  # TODO: Do not hardcode
+        self.eos_token = self.tokenizer.eos_token
 
         self.gradient_checkpointing = gradient_checkpointing
         if gradient_checkpointing:
@@ -101,17 +89,6 @@ class TFewModel(nn.Module):
 
         self.prefix = prefix
 
-        if len(label_templates) == 0:
-            label_templates = {"{}".format(x): x for x in range(self.num_classes)}
-            logger.info(
-                f"Prompts for classes not specified. Fallback to default prompts (not recommended): {label_templates}"
-            )
-
-        self.label_templates = label_templates
-        self.label_templates_inverse = {
-            y: [q for q, p in self.label_templates.items() if p == y] for x, y in self.label_templates.items()
-        }
-
         self.mc_loss = mc_loss
         self.unlikely_loss = unlikely_loss
         self.length_norm = length_norm
@@ -119,11 +96,6 @@ class TFewModel(nn.Module):
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
 
-        if hasattr(self.model.config, "type_vocab_size") and self.model.config.type_vocab_size <= 1:
-            # Disable segment ids for models like RoBERTa
-            self.disable_seg_ids = True
-        else:
-            self.disable_seg_ids = False
 
     @property
     def text_token_ids_key(self):
@@ -140,6 +112,10 @@ class TFewModel(nn.Module):
     @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
+
+    @property
+    def choices_key(self):
+        return f"{self.prefix}_{CHOICES_IDS}"
 
     @property
     def text_column_prefix(self):
@@ -164,25 +140,18 @@ class TFewModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
+        #TODO: Bad style, asserts should be put somewhere in data.
+        assert batch[self.choices_key].numel(), f"No target choices found in batch. Ensure that 'data.templates_turn_on=True'. and that a valid preset or custom templates are provided."
+        assert batch[self.choices_key].size(1) == self.num_classes, f"Number of target choices is different from number of classes, but they must be the same. Please check template."
+        
         text_token_ids = batch[self.text_token_ids_key]
 
         bs = text_token_ids.size(0)
-        # Sample uniformly target template descriptions from collection of descriptions
-        # FIXME(?) Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
-        selected_label_templates = [random.choice(y) for x, y in self.label_templates_inverse.items()][
-            : self.num_classes
-        ]
-        choices_ids = torch.tensor(self.tokenizer(selected_label_templates, padding=True)["input_ids"]).type_as(
-            text_token_ids
-        )
-        choices_ids = choices_ids.unsqueeze(0).repeat(text_token_ids.size(0), 1, 1)
-        flat_choices_ids = choices_ids.flatten(0, 1)
-        num_choices = len(selected_label_templates)
+        # TODO(?) Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
+        choices_ids = batch[self.choices_key]
 
-        if self.disable_seg_ids:
-            text_segment_ids = None
-        else:
-            text_segment_ids = batch[self.text_segment_ids_key]
+        bs, num_choices = choices_ids.size()[:2]
+        flat_choices_ids = choices_ids.flatten(0, 1)
 
         text_valid_length = batch[self.text_valid_length_key]
         text_masks = (text_token_ids != self.tokenizer.pad_token_id).float()
@@ -212,7 +181,7 @@ class TFewModel(nn.Module):
 
         target_template_logits = model_output.logits  # Decoder Logits over the vocabulary for target template sequence
         lm_target = flat_choices_ids - 100 * (flat_choices_ids == self.tokenizer.pad_token_id).long()
-        # Calculate entropy of target templates' logits to target template, i.e. how close it target template to what
+        # Calculate entropy of target templates' logits to target template, i.e. how close the target template is to what
         # the model would predict, going from sentence start token (target_template_logits) to sentence end token (
         # lm_target)
         choices_scores = (

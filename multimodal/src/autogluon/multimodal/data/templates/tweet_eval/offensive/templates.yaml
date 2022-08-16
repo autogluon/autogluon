@@ -1,0 +1,87 @@
+dataset: tweet_eval
+subset: offensive
+templates:
+  10850707-80f3-4a75-b9f4-1e2d12be04c0: !Template
+    answer_choices: no ||| yes
+    id: 10850707-80f3-4a75-b9f4-1e2d12be04c0
+    jinja: "Is this tweet {{\"offensive\"}}? \n\n{{text}} |||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: offensive_question
+    reference: ''
+  22ecf073-2932-4b0a-b305-1f92b696d0b4: !Template
+    answer_choices: no ||| yes
+    id: 22ecf073-2932-4b0a-b305-1f92b696d0b4
+    jinja: "Can the tweet be removed for being offensive? Answer with a yes or a no.\
+      \ \n\n{{text}}\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: offensive_tweet_removed
+    reference: ''
+  90a80d37-922d-40c0-b036-87eac64ce4c5: !Template
+    answer_choices: no ||| yes
+    id: 90a80d37-922d-40c0-b036-87eac64ce4c5
+    jinja: 'Is the author''s tweet offensive? Answer with either yes or no.
+
+
+      {{text}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: offensive_author
+    reference: ''
+  a12bd98b-facc-4b17-bb16-80c98a20aa64: !Template
+    answer_choices: no ||| yes
+    id: a12bd98b-facc-4b17-bb16-80c98a20aa64
+    jinja: 'Task: Identify if the tweet or text is offensive.
+
+
+      Tweet: {{text}}
+
+
+      Possible answers: yes, no
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: offensive_task
+    reference: ''
+  bf2cea43-0666-4eb5-814d-00956afd1900: !Template
+    answer_choices: no ||| yes
+    id: bf2cea43-0666-4eb5-814d-00956afd1900
+    jinja: "In this test, you need to answer with either yes or no.\n\nQ: Is this\
+      \ an offensive tweet?\n\n{{text}}\n\nA: \n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: offensive_exam
+    reference: ''

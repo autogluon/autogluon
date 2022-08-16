@@ -1,0 +1,155 @@
+dataset: imdb
+templates:
+  02ff2949-0f45-4d97-941e-6fa4c0afbc2d: !Template
+    answer_choices: negative ||| positive
+    id: 02ff2949-0f45-4d97-941e-6fa4c0afbc2d
+    jinja: The following movie review expresses what sentiment? {{text}} ||| {{ answer_choices
+      [label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Movie Expressed Sentiment 2
+    reference: ''
+  2351d12a-e630-4d19-8b41-e199266e38f7: !Template
+    answer_choices: bad ||| good
+    id: 2351d12a-e630-4d19-8b41-e199266e38f7
+    jinja: '{{text}} Did the reviewer find this movie {{"good or bad"}}? ||| {{ answer_choices
+      [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Reviewer Opinion bad good choices
+    reference: ''
+  5f372fb1-795a-47b6-8ddf-c4fd1579e76a: !Template
+    answer_choices: negative ||| positive
+    id: 5f372fb1-795a-47b6-8ddf-c4fd1579e76a
+    jinja: "{{text}} \nIs this review {{\"positive or negative\"}}? ||| \n{{answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: 'Sentiment with choices '
+    reference: ''
+  866474a5-1498-46b7-bfee-ac0c5160707f: !Template
+    answer_choices: negative ||| positive
+    id: 866474a5-1498-46b7-bfee-ac0c5160707f
+    jinja: '{{text}} How does the viewer feel about the movie? ||| {{ answer_choices
+      [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Reviewer Sentiment Feeling
+    reference: ''
+  96538f30-f2c1-430e-8fc6-936a16966d9c: !Template
+    answer_choices: negative ||| positive
+    id: 96538f30-f2c1-430e-8fc6-936a16966d9c
+    jinja: '{{text}} What sentiment does the writer express for the movie? ||| {{
+      answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Writer Expressed Sentiment
+    reference: ''
+  af51297c-38a3-4d6c-a8b5-04b1243d7443: !Template
+    answer_choices: negative ||| positive
+    id: af51297c-38a3-4d6c-a8b5-04b1243d7443
+    jinja: '{{text}} The sentiment expressed for the movie is ||| {{ answer_choices
+      [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Movie Expressed Sentiment
+    reference: ''
+  b93b74ac-fe95-40b4-9610-318b46ab820f: !Template
+    answer_choices: negative ||| positive
+    id: b93b74ac-fe95-40b4-9610-318b46ab820f
+    jinja: '{{text}} What is the sentiment expressed in this text? ||| {{ answer_choices
+      [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Text Expressed Sentiment
+    reference: ''
+  b9b5d79d-f0b3-4bec-a724-f585db3e93ff: !Template
+    answer_choices: negative ||| positive
+    id: b9b5d79d-f0b3-4bec-a724-f585db3e93ff
+    jinja: '{{text}} This is definitely not a ||| {{ answer_choices [1-label]}} review.'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Negation template for positive and negative
+    reference: ''
+  bd82ba0f-01d4-4fa1-bf8d-07e392c00cd9: !Template
+    answer_choices: No ||| Yes
+    id: bd82ba0f-01d4-4fa1-bf8d-07e392c00cd9
+    jinja: '{{text}} Did the reviewer enjoy the movie? ||| {{ answer_choices [label]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Reviewer Enjoyment Yes No
+    reference: ''
+  c70d1687-2421-49a2-9553-91b8bac4cfbe: !Template
+    answer_choices: negative ||| positive
+    id: c70d1687-2421-49a2-9553-91b8bac4cfbe
+    jinja: '{{text}} What is the sentiment expressed by the reviewer for the movie?
+      ||| {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Reviewer Expressed Sentiment
+    reference: ''
+  e01970ab-42c0-4e6e-a08f-4940d889ef37: !Template
+    answer_choices: They didn't like it! ||| They loved it
+    id: e01970ab-42c0-4e6e-a08f-4940d889ef37
+    jinja: '{{text}} How does the reviewer feel about the movie? ||| {{ answer_choices
+      [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Reviewer Enjoyment
+    reference: ''

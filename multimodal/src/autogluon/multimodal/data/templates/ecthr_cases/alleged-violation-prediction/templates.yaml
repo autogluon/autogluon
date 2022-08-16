@@ -1,0 +1,159 @@
+dataset: ecthr_cases
+subset: alleged-violation-prediction
+templates:
+  32404ed1-2276-401f-bb93-2937d9919585: !Template
+    answer_choices: one ||| two ||| three ||| four or more
+    id: 32404ed1-2276-401f-bb93-2937d9919585
+    jinja: '{{facts | join("\n")}}
+
+
+      These facts show potential violation of European Convention on Human Rights
+      articles. The number of violated articles is
+
+      |||
+
+      {{ answer_choices[{1:0,2:1,3:2,4:3}[[4,labels | length] | min]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: implicit_advice_number
+    reference: 'implicitly ask for number of violated articles (rather than quantity).
+      Metrics: micro-F1, refer to the paper https://arxiv.org/abs/2103.13084'
+  3e5ba238-98ad-4d25-b84f-f226158ef8d6: !Template
+    answer_choices: one ||| two ||| three ||| several
+    id: 3e5ba238-98ad-4d25-b84f-f226158ef8d6
+    jinja: "The following facts relate to a claim brought before the European Court\
+      \ of Human Rights (ECtHR). \nQuestion: How many substantive articles in the\
+      \ European Convention on Human Rights could have been breached on these facts?\
+      \ If more than three substantive articles are breached, answer \"{{'several'}}\"\
+      .\n\n{{facts | join(\"\\n\")}}\n\nAnswer:\n|||\n{{ answer_choices[{1:0,2:1,3:2,4:3}[[4,labels\
+      \ | length] | min]]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: ecthr_alleged_articles_declaration_at_end
+    reference: 'Explicitly ask question at end. Metrics: micro-F1, refer to the paper
+      https://arxiv.org/abs/2103.13084'
+  7a56f5cc-20b5-4543-bb20-9c616d3f36dc: !Template
+    answer_choices: one ||| two ||| three ||| several
+    id: 7a56f5cc-20b5-4543-bb20-9c616d3f36dc
+    jinja: 'Question: Have {{"one"}}, {{"two"}}, {{"three"}}, or {{"several"}} articles
+      of the European Convention on Human Rights (ECHR) been violated on the facts
+      above?
+
+
+      {{facts | join("\n")}}
+
+
+      Answer:
+
+      |||
+
+      {{ answer_choices[{1:0,2:1,3:2,4:3}[[4,labels | length] | min]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: ecthr_alleged_articles_question_at_start
+    reference: 'Explicitly ask question at start of prompt. Metrics: micro-F1, refer
+      to the paper https://arxiv.org/abs/2103.13084'
+  96fb3903-c1e4-4752-8b05-5e8c1c12370a: !Template
+    answer_choices: one ||| two ||| three ||| more than three
+    id: 96fb3903-c1e4-4752-8b05-5e8c1c12370a
+    jinja: '{{facts | join("\n")}}
+
+
+      In ruling on this case I have needed to carefully consider the submissions of
+      the parties. The plaintiffs allege breaches at the European Court of Human Rights
+      - the number of sections allegedly breached is
+
+      |||
+
+      {{ answer_choices[{1:0,2:1,3:2,4:3}[[4,labels | length] | min]]}}.'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: implicit_judgment_paragraph
+    reference: 'implicitly asking for quantity as part of a judgment. Metrics: micro-F1,
+      refer to the paper https://arxiv.org/abs/2103.13084'
+  b4fb5e6e-5e91-4f39-82ba-45dba7b71aad: !Template
+    answer_choices: yes ||| no
+    id: b4fb5e6e-5e91-4f39-82ba-45dba7b71aad
+    jinja: 'Question: Is it true that the facts in this case indicate more than two
+      sections of the European Human Rights Convention were allegedly violated? Answer
+      "{{"yes"}}" or "{{"no"}}"
+
+
+      {{facts | join("\n")}}
+
+
+      Answer:
+
+      |||
+
+      {{ answer_choices[{1:1 ,2:1 ,3:0 ,4:0}[[4,labels | length] | min]] }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: confirm number of violated articles
+    reference: 'ask for yes/no confirmation of the number of violated articles. Metrics:
+      micro-F1, refer to the paper https://arxiv.org/abs/2103.13084'
+  e3e9046e-c631-4cf3-b1d3-98c08d88e62e: !Template
+    answer_choices: one ||| two ||| three ||| several
+    id: e3e9046e-c631-4cf3-b1d3-98c08d88e62e
+    jinja: 'The following is an extract of facts from a judgment handed down by the
+      European Court of Human Rights.
+
+      Question: Have {{"one"}}, {{"two"}}, {{"three"}}, or {{"several"}} articles
+      of the European Court of Human Rights (ECHR) been violated on these facts?
+
+
+      {{facts[:10] | join("\n")}}
+
+
+      {% if silver_rationales | length > 0 %}
+
+      Additionally, the court cited the following facts elsewhere in the decision
+
+      {% for loc in silver_rationales[:10] %}
+
+      {{facts[loc]}}
+
+      {% endfor %}
+
+      {% endif %}
+
+
+      Answer:
+
+      |||
+
+      {{ answer_choices[{1:0,2:1,3:2,4:3}[[4,labels | length] | min]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: silver_rationales
+    reference: 'Metrics: micro-F1, refer to the paper https://arxiv.org/abs/2103.13084'

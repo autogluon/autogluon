@@ -1,0 +1,163 @@
+dataset: aeslc
+templates:
+  0bef38b8-6d0b-440b-8a3d-db034aaf5a15: !Template
+    answer_choices: null
+    id: 0bef38b8-6d0b-440b-8a3d-db034aaf5a15
+    jinja: '{{ email_body }}
+
+
+      What is this email about? |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: what_is_this_email_about
+    reference: Ask a question from a context
+  11de8b2c-8016-4b98-b5f2-c1a7e5c0e433: !Template
+    answer_choices: null
+    id: 11de8b2c-8016-4b98-b5f2-c1a7e5c0e433
+    jinja: 'What is the subject of this email:
+
+
+      {{ email_body }} |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: what_is_the_subject_of_this_email
+    reference: Ask a question from a context
+  12616e45-1d61-4924-8ce4-fe3efd061e7a: !Template
+    answer_choices: null
+    id: 12616e45-1d61-4924-8ce4-fe3efd061e7a
+    jinja: 'The text below is the content of an email. What is the topic of this email?
+
+
+      {{ email_body }} |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: the_text_below
+    reference: ''
+  25179c66-5638-4de5-bdce-d6dccec64c65: !Template
+    answer_choices: null
+    id: 25179c66-5638-4de5-bdce-d6dccec64c65
+    jinja: 'Generate a subject line for the email body below:
+
+
+      {{ email_body }} |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: generate_subject_line
+    reference: Instruct to generate
+  8917d7f0-5f72-418f-a2d9-98d4a8da13b0: !Template
+    answer_choices: null
+    id: 8917d7f0-5f72-418f-a2d9-98d4a8da13b0
+    jinja: 'What is this email about:
+
+
+      {{ email_body }} |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: what_about
+    reference: Ask a question from a context
+  d1c5da3f-f1e4-4891-abcb-79463b30a616: !Template
+    answer_choices: null
+    id: d1c5da3f-f1e4-4891-abcb-79463b30a616
+    jinja: '{{ email_body }}
+
+
+      What is the subject of this email? |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: what_subject_of_email
+    reference: Ask a question from a context
+  d9dd8e72-acb4-4aad-aeb7-a877bacbb402: !Template
+    answer_choices: null
+    id: d9dd8e72-acb4-4aad-aeb7-a877bacbb402
+    jinja: '{{ email_body }}
+
+
+      Generate a subject line for the email body above. |||
+
+
+      {{ subject_line }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: generate_subject
+    reference: Instruct to generate
+  dca29ebb-2372-423f-b93c-21d99eddf455: !Template
+    answer_choices: null
+    id: dca29ebb-2372-423f-b93c-21d99eddf455
+    jinja: '{{ email_body }}
+
+
+      The above text is the content of an email. What is the topic of this email?
+      |||
+
+
+      {{ subject_line }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - Other
+      original_task: true
+    name: what_topic
+    reference: ''

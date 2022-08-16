@@ -1,0 +1,60 @@
+dataset: covid_qa_castorini
+templates:
+  481dcd72-1674-4962-b711-0dbf146ae836: !Template
+    answer_choices: null
+    id: 481dcd72-1674-4962-b711-0dbf146ae836
+    jinja: 'Generate a question whose answer could be found within the following papers
+      (only titles have been provided):
+
+
+      {{answers["title"]|join(", ")}} |||
+
+      {{question_query}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: papers_to_qn
+    reference: ''
+  56915f43-ebd6-44dc-9aac-6098ec2d1b32: !Template
+    answer_choices: null
+    id: 56915f43-ebd6-44dc-9aac-6098ec2d1b32
+    jinja: 'Provide the keyword form of the following query:
+
+
+      {{question_query}} |||
+
+      {{keyword_query}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: keyword_form
+    reference: ''
+  665bfa4a-b83f-4431-acda-29855c89916b: !Template
+    answer_choices: null
+    id: 665bfa4a-b83f-4431-acda-29855c89916b
+    jinja: 'Generate a possible question to the following answers:
+
+
+      {{answers["exact_answer"]|join(", ")}} |||
+
+      {{question_query}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answers_to_qn
+    reference: ''

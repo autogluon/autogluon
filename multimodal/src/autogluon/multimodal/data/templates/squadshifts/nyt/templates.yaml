@@ -1,0 +1,179 @@
+dataset: squadshifts
+subset: nyt
+templates:
+  00201c79-e310-4fb0-b4c1-d0ec0f126bf1: !Template
+    answer_choices: null
+    id: 00201c79-e310-4fb0-b4c1-d0ec0f126bf1
+    jinja: 'I''ve always wondered: {{question}}
+
+
+      I searched New York Times and this is what I found. What''s the answer?
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: wondered
+    reference: 'Original task prompt '
+  2e618671-1bb3-4943-b16c-cbef60b0c3e2: !Template
+    answer_choices: null
+    id: 2e618671-1bb3-4943-b16c-cbef60b0c3e2
+    jinja: 'Use the following answers to generate a possible short passage-question
+      pair:
+
+      {{answers["text"]|join('', '')}} |||
+
+      {{context}}
+
+      {{question}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answers_question
+    reference: Generate a question-passage pair from the answer
+  6336eed0-3ecd-4007-8ad3-f6e615570fdf: !Template
+    answer_choices: null
+    id: 6336eed0-3ecd-4007-8ad3-f6e615570fdf
+    jinja: 'I''m working on the final exam for my class and am trying to figure out
+      the answer to the question "{{question}}" I found the following info on New
+      York Times and I think it has the answer. Can you tell me the answer?
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: exam
+    reference: 'Exam style prompt '
+  68ef7980-7c81-4768-a9d1-7d4fbbdb7a39: !Template
+    answer_choices: null
+    id: 68ef7980-7c81-4768-a9d1-7d4fbbdb7a39
+    jinja: "{{context}}\n\nWith the help of the passage, please answer the following\
+      \ question: \n{{question}} |||\n{{answers[\"text\"]|choice}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: pick_one_answer
+    reference: The prompt randomly picks one correct answer
+  69e4dc24-544f-410f-a821-6270d57b9da7: !Template
+    answer_choices: null
+    id: 69e4dc24-544f-410f-a821-6270d57b9da7
+    jinja: 'I''m creating a final exam for my reading class. Can you please come up
+      with a good question to quiz how well students have read the following text
+      snippet?
+
+
+      {{context}}
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: exam_creation_help
+    reference: 'Question generation '
+  6ccc816f-a773-430a-af26-c0f99a9366e0: !Template
+    answer_choices: null
+    id: 6ccc816f-a773-430a-af26-c0f99a9366e0
+    jinja: '{{["Question", "Problem"]  | choice}} {{range(1, 12) | choice}}: {{question}}
+
+
+      Hint: {{context}}
+
+
+      |||
+
+      {{answers["text"] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: question_num_hint_answer
+    reference: 'The prompt has a prefix of question or problem and chooses a random
+      number followed the actual question. '
+  711539f5-f199-4201-89a2-e4ea569726e1: !Template
+    answer_choices: null
+    id: 711539f5-f199-4201-89a2-e4ea569726e1
+    jinja: 'Please come up with a good question to test reading comprehension about
+      the following paragraph:
+
+
+      {{context}}
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: question generation task
+  ffc98700-eb7a-4099-b77f-9677e2ceb7d3: !Template
+    answer_choices: null
+    id: ffc98700-eb7a-4099-b77f-9677e2ceb7d3
+    jinja: 'After reading the following paragraph, please answer this question: {{question}}
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: after
+    reference: First question, then answer

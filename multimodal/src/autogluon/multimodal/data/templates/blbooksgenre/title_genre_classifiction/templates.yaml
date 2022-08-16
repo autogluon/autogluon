@@ -1,0 +1,63 @@
+dataset: blbooksgenre
+subset: title_genre_classifiction
+templates:
+  0c3e83f4-7f4d-4eca-8f80-6b6bdd8eeedd: !Template
+    answer_choices: Fiction ||| Non-fiction
+    id: 0c3e83f4-7f4d-4eca-8f80-6b6bdd8eeedd
+    jinja: "Given the title: {{title}}, which of the following genres is the book?\n\
+      (a) {{ answer_choices[0] }}\n(b) {{ answer_choices[1] }}\n|||\n {{  answer_choices[label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: true
+    name: multi-choice
+    reference: ''
+  5564acb9-c911-4d71-ba4d-add444aaf1e3: !Template
+    answer_choices: True ||| False
+    id: 5564acb9-c911-4d71-ba4d-add444aaf1e3
+    jinja: "{{title}} is the title of a fictional book, True or False?\nAnswer: \n\
+      |||\n{{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: true
+    name: premise_context_first
+    reference: ''
+  afc18daa-999d-495f-908a-d99477f6f5ac: !Template
+    answer_choices: True ||| False
+    id: afc18daa-999d-495f-908a-d99477f6f5ac
+    jinja: "The following is the title of a fictional book, True or False?\n{{title}}\n\
+      Answer: \n|||\n{{ answer_choices[label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: true
+    name: premise
+    reference: ''
+  cf4b6ce0-ff87-4c7a-9b9e-ec7c4cf741d8: !Template
+    answer_choices: Fiction ||| Non-fiction
+    id: cf4b6ce0-ff87-4c7a-9b9e-ec7c4cf741d8
+    jinja: The genre of the book "{{title}}" is |||  {{  answer_choices[label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: true
+    name: classify
+    reference: ''

@@ -1,0 +1,109 @@
+dataset: tweet_eval
+subset: stance_climate
+templates:
+  2ebf2eaa-ef9f-413d-b7bf-cb2037330d2a: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 2ebf2eaa-ef9f-413d-b7bf-cb2037330d2a
+    jinja: 'What option among, {{"neutral"}}, {{"against"}}, {{"in favor"}}, best
+      describes the stance of this tweet regarding climate change?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: climate_option
+    reference: ''
+  6f4205ad-6321-42a9-bf8e-a45508e67c1a: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 6f4205ad-6321-42a9-bf8e-a45508e67c1a
+    jinja: '{{text}} Where does the above sentence stand on climate change? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: climate_guess_passive
+    reference: ''
+  703f067e-5930-424e-9882-48063307ff8e: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 703f067e-5930-424e-9882-48063307ff8e
+    jinja: 'How would you describe the stance used in this tweet? {{answer_choices|join(",
+      ")}}
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: climate_how_describe
+    reference: ''
+  8ecd5059-742a-4833-95a1-bf0e25e9abfc: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 8ecd5059-742a-4833-95a1-bf0e25e9abfc
+    jinja: '{{text}} Where does the author of the above sentence stand on climate
+      change? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: climate_guess_passive_author
+    reference: ''
+  cd82620b-6d1d-42f7-af89-56980cbb69a5: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: cd82620b-6d1d-42f7-af89-56980cbb69a5
+    jinja: 'Does the author express any stance about climate change in the following
+      text?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: climate_predict_stance
+    reference: ''
+  edcdde10-b2e4-4954-82e2-f84fd57fc122: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: edcdde10-b2e4-4954-82e2-f84fd57fc122
+    jinja: 'Is this tweet neutral, in favor of, or against climate change?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: climate_change
+    reference: ''

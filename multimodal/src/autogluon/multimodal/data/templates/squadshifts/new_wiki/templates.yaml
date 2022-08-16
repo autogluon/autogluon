@@ -1,0 +1,200 @@
+dataset: squadshifts
+subset: new_wiki
+templates:
+  60995116-53af-456f-ac20-858b83fa9ba6: !Template
+    answer_choices: null
+    id: 60995116-53af-456f-ac20-858b83fa9ba6
+    jinja: 'After reading the following paragraph, please answer this question: {{question}}
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: after
+    reference: First question, then answer
+  a5691e58-f2cc-41eb-8308-c7046856f72f: !Template
+    answer_choices: null
+    id: a5691e58-f2cc-41eb-8308-c7046856f72f
+    jinja: 'Use the following answers to generate a possible short passage-question
+      pair:
+
+      {{answers["text"]|join('', '')}} |||
+
+      {{context}}
+
+      {{question}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answers_question
+    reference: Generate a question-passage pair from the answer
+  bc874f68-ce23-43cd-9683-5574c9ef01cb: !Template
+    answer_choices: null
+    id: bc874f68-ce23-43cd-9683-5574c9ef01cb
+    jinja: 'I''ve always wondered: {{question}}
+
+
+      I searched Wikipedia and this is what I found. What''s the answer?
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: wondered
+    reference: 'Original task prompt '
+  bfa571de-6076-44c2-b23b-8b2a404b180d: !Template
+    answer_choices: null
+    id: bfa571de-6076-44c2-b23b-8b2a404b180d
+    jinja: '{{["Question", "Problem"]  | choice}} {{range(1, 12) | choice}}: {{question}}
+
+
+      Hint: {{context}}
+
+
+      |||
+
+      {{answers["text"] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: question_num_hint_answer
+    reference: 'The prompt has a prefix of question or problem and chooses a random
+      number followed the actual question. '
+  caec82a4-f845-4e10-aad4-19111c9884c1: !Template
+    answer_choices: null
+    id: caec82a4-f845-4e10-aad4-19111c9884c1
+    jinja: 'I''m creating a final exam for my reading class. Can you please come up
+      with a good question to quiz how well students have read the following text
+      snippet?
+
+
+      {{context}}
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: exam_creation_help
+    reference: 'Question generation '
+  d760501f-7726-48ec-9d86-46c10ce408d3: !Template
+    answer_choices: null
+    id: d760501f-7726-48ec-9d86-46c10ce408d3
+    jinja: 'Generate a title for the following short passage:
+
+
+      {{context}} |||
+
+      {{title|replace("_"," ")}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: title
+    reference: Pormpt generates the title of the short passage
+  e5b77630-c87c-47b5-9544-5a68cd6b5a93: !Template
+    answer_choices: null
+    id: e5b77630-c87c-47b5-9544-5a68cd6b5a93
+    jinja: "{{context}}\n\nWith the help of the passage, please answer the following\
+      \ question: \n{{question}} |||\n{{answers[\"text\"]|choice}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: pick_one_answer
+    reference: The prompt randomly picks one correct answer
+  f372bda7-8ac7-4b7f-a777-37c6cdc18f34: !Template
+    answer_choices: null
+    id: f372bda7-8ac7-4b7f-a777-37c6cdc18f34
+    jinja: 'Please come up with a good question to test reading comprehension about
+      the following paragraph:
+
+
+      {{context}}
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: question generation task
+  f602988d-c3ea-4894-9fb6-7fadbb9d87c8: !Template
+    answer_choices: null
+    id: f602988d-c3ea-4894-9fb6-7fadbb9d87c8
+    jinja: 'I''m working on the final exam for my class and am trying to figure out
+      the answer to the question "{{question}}" I found the following info on Wikipedia
+      and I think it has the answer. Can you tell me the answer?
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: exam
+    reference: 'Exam style prompt '

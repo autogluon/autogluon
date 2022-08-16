@@ -1,0 +1,231 @@
+dataset: conv_ai
+templates:
+  1664cdd9-54e8-4679-821b-8013e9df197e: !Template
+    answer_choices: yes ||| no
+    id: 1664cdd9-54e8-4679-821b-8013e9df197e
+    jinja: '{% if 0 < (thread | selectattr("userId", "equalto", "Alice") | list |
+      length) %} {{context}}
+
+
+      {% for utterance in thread %}
+
+      - {{ utterance["userId"] }}: {{ utterance["text"] }}
+
+      {% endfor %}
+
+
+      Alice''s utterances in the previous conversation show that she was interested
+      in the context, {{ answer_choices[0] }} or {{ answer_choices[1] }}?
+
+      |||
+
+      {% for eval in evaluation %}
+
+      {% if "Alice" == eval["userId"] %}
+
+      {% if 3 < eval["engagement"] %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: engagement_alice_interested
+    reference: ''
+  2d3ca9f5-60f0-459d-932f-ab30e1e79b22: !Template
+    answer_choices: yes ||| no
+    id: 2d3ca9f5-60f0-459d-932f-ab30e1e79b22
+    jinja: '{% if 0 < (thread | selectattr("userId", "equalto", "Bob") | list | length)
+      %} "{{context}}"
+
+
+      Given the previous context, would you say Bob''s engagement is real in this
+      conversation:
+
+      {% for utterance in thread %}
+
+      - {{ utterance["userId"] }}: {{ utterance["text"] }}
+
+      {% endfor %}
+
+      |||
+
+      {% for eval in evaluation %}
+
+      {% if "Bob" == eval["userId"] %}
+
+      {% if 3 < eval["engagement"] %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: engagement_bob_real
+    reference: ''
+  4390549a-3bdf-43ad-9e69-6bc380f33f01: !Template
+    answer_choices: Alice ||| Bob ||| both
+    id: 4390549a-3bdf-43ad-9e69-6bc380f33f01
+    jinja: '{% set alice = (evaluation|selectattr("userId", "equalto", "Alice")|first)["engagement"]
+      %} {% set bob = (evaluation|selectattr("userId", "equalto", "Bob")|first)["engagement"]
+      %} {% if (0 < (thread | selectattr("userId", "equalto", "Bob") | list | length))
+      and (0 < (thread | selectattr("userId", "equalto", "Alice") | list | length))
+      %} {{context}}
+
+
+      Given the previous context, who do you think is more engaged in this conversation
+      ({{ answer_choices[0] }}, {{ answer_choices[1] }}, or {{ answer_choices[2] }}):
+
+      {% for utterance in thread %}
+
+      - {{ utterance["userId"] }}: {{ utterance["text"] }}
+
+      {% endfor %}
+
+      |||
+
+      {% if alice == bob %}{{ answer_choices[2] }}{% elif alice < bob %}{{ answer_choices[1]
+      }}{% else %}{{ answer_choices[0] }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: engagement_question_before
+    reference: ''
+  955dd9f5-0fe5-46c3-a217-995bd876f26f: !Template
+    answer_choices: yes ||| no
+    id: 955dd9f5-0fe5-46c3-a217-995bd876f26f
+    jinja: '{% if 0 < (thread | selectattr("userId", "equalto", "Bob") | list | length)
+      %}{{context}}
+
+
+      Given the preceding context, do Bob''s following utterances show that he was
+      interested in the context?
+
+      {% for utterance in thread %}
+
+      {% if "Bob" == utterance["userId"] %}
+
+      - "{{ utterance["text"] }}",
+
+      {% endif %}{% endfor %}
+
+      |||
+
+      {% for eval in evaluation %}
+
+      {% if "Bob" == eval["userId"] %}
+
+      {% if 3 < eval["engagement"] %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: engagement_bob_interested
+    reference: ''
+  c0840f89-e444-49ab-bab0-08f71ec89093: !Template
+    answer_choices: yes ||| no
+    id: c0840f89-e444-49ab-bab0-08f71ec89093
+    jinja: '{% if 0 < (thread | selectattr("userId", "equalto", "Alice") | list |
+      length) %} context:
+
+
+      {{context}}
+
+
+      conversation:
+
+      {% for utterance in thread %}
+
+      - {{ utterance["userId"] }}: {{ utterance["text"] }}
+
+      {% endfor %}
+
+      Was Alice really into this conversation?|||
+
+      {% for eval in evaluation %}
+
+      {% if "Alice" == eval["userId"] %}
+
+      {% if 3 < eval["engagement"] %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: engagement_alice_really
+    reference: ''
+  db94d56f-3fc8-4b6a-b3d3-2ac37e8110ff: !Template
+    answer_choices: Alice ||| Bob ||| both
+    id: db94d56f-3fc8-4b6a-b3d3-2ac37e8110ff
+    jinja: '{% set alice = (evaluation|selectattr("userId", "equalto", "Alice")|first)["engagement"]
+      %} {% set bob = (evaluation|selectattr("userId", "equalto", "Bob")|first)["engagement"]
+      %} {% if (0 < (thread | selectattr("userId", "equalto", "Bob") | list | length))
+      and (0 < (thread | selectattr("userId", "equalto", "Alice") | list | length))
+      %} Context: {{context}}
+
+      Conversation: {% for utterance in thread %}
+
+      {{ utterance["userId"] }}: {{ utterance["text"] }}
+
+      {% endfor %}
+
+      Given the previous context and conversation, who do you think is more engaged
+      in this conversation ({{ answer_choices[0] }}, {{ answer_choices[1] }}, or {{
+      answer_choices[2] }}):
+
+      |||
+
+      {% if alice == bob %}{{ answer_choices[2] }}{% elif alice < bob %}{{ answer_choices[1]
+      }}{% else %}{{ answer_choices[0] }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: engagement_question_after
+    reference: ''

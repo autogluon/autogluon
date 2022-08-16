@@ -1,0 +1,288 @@
+dataset: banking77
+templates:
+  0dba8abc-248a-44db-bb86-20492ffc17f6: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: 0dba8abc-248a-44db-bb86-20492ffc17f6
+    jinja: 'Which help page can be provided to provide information regarding this
+      query?
+
+      Query: {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: help_page_topic
+    reference: ''
+  2520f6d0-fcdf-44b6-abb3-a76e44948047: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: 2520f6d0-fcdf-44b6-abb3-a76e44948047
+    jinja: 'To which department in the bank can this query be directed?
+
+      Query: {{text}}
+
+      ||| {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: direct_to_which_department
+    reference: ''
+  9482bce0-f201-451b-9384-af588d707629: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: 9482bce0-f201-451b-9384-af588d707629
+    jinja: 'To which of the following departments in the bank can the given query
+      be directed?
+
+      Query: {{text}} Departments:
+
+      {% for intent in answer_choices %}
+
+      - {{intent}} {% endfor %}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose the correct department
+    reference: ''
+  e629d77c-46f9-4e00-b23a-c522d07a9943: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: e629d77c-46f9-4e00-b23a-c522d07a9943
+    jinja: "Summarise the following query in the form of key banking terms: \n{{text}}\n\
+      |||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: rephrase_as_banking_term
+    reference: ''
+  edd67883-0386-4496-af7f-37a44c41293f: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: edd67883-0386-4496-af7f-37a44c41293f
+    jinja: 'Which of the following intents best represents this banking query?
+
+      Text: {{text}}
+
+      Intents:
+
+      {% for intent in answer_choices %}
+
+      - {{intent}} {% endfor %}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_the_correct_intent
+    reference: ''
+  eee2366a-8f0c-4ac3-b9cc-aa038e40f8cb: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: eee2366a-8f0c-4ac3-b9cc-aa038e40f8cb
+    jinja: 'What is the intent of this banking query?
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what_is_intent
+    reference: ''
+  f4e80455-1523-4b91-aacc-249d8c6f0f2a: !Template
+    answer_choices: activate my card|||age limit|||apple pay or google pay|||atm support|||automatic
+      top up|||balance not updated after bank transfer|||balance not updated after
+      cheque or cash deposit|||beneficiary not allowed|||cancel transfer|||card about
+      to expire|||card acceptance|||card arrival|||card delivery estimate|||card linking|||card
+      not working|||card payment fee charged|||card payment not recognised|||card
+      payment wrong exchange rate|||card swallowed|||cash withdrawal charge|||cash
+      withdrawal not recognised|||change pin|||compromised card|||contactless not
+      working|||country support|||declined card payment|||declined cash withdrawal|||declined
+      transfer|||direct debit payment not recognised|||disposable card limits|||edit
+      personal details|||exchange charge|||exchange rate|||exchange via app|||extra
+      charge on statement|||failed transfer|||fiat currency support|||get disposable
+      virtual card|||get physical card|||getting spare card|||getting virtual card|||lost
+      or stolen card|||lost or stolen phone|||order physical card|||passcode forgotten|||pending
+      card payment|||pending cash withdrawal|||pending top up|||pending transfer|||pin
+      blocked|||receiving money|||Refund not showing up|||request refund|||reverted
+      card payment?|||supported cards and currencies|||terminate account|||top up
+      by bank transfer charge|||top up by card charge|||top up by cash or cheque|||top
+      up failed|||top up limits|||top up reverted|||topping up by card|||transaction
+      charged twice|||transfer fee charged|||transfer into account|||transfer not
+      received by recipient|||transfer timing|||unable to verify identity|||verify
+      my identity|||verify source of funds|||verify top up|||virtual card not working|||visa
+      or mastercard|||why verify identity|||wrong amount of cash received|||wrong
+      exchange rate for cash withdrawal
+    id: f4e80455-1523-4b91-aacc-249d8c6f0f2a
+    jinja: 'Generate the subject for an email containing the following text:
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: generate_subject_for_text
+    reference: ''

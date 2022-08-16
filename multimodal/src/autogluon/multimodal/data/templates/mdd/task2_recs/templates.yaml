@@ -1,0 +1,56 @@
+dataset: mdd
+subset: task2_recs
+templates:
+  3596d528-12c6-440b-bdc0-d61076b108c5: !Template
+    answer_choices: null
+    id: 3596d528-12c6-440b-bdc0-d61076b108c5
+    jinja: "Complete this movie-trivia-related dialogue between Speaker {{ dialogue_turns.speaker[0]\
+      \ }} and Speaker {{ dialogue_turns.speaker[1] }} by answering Speaker {{ dialogue_turns.speaker[0]\
+      \ }}'s question as Speaker {{ dialogue_turns.speaker[1] }}.\n\nSpeaker {{dialogue_turns.speaker[0]}}:\
+      \ {{dialogue_turns.utterance[0]}}\n\nSpeaker {{dialogue_turns.speaker[1]}}:\
+      \ \n|||\n{{dialogue_turns.utterance[1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: recommend_movies_speaker
+    reference: Given likes, recomend a movie with speaker information.
+  6f0eb61c-d9f9-4e52-a317-3d7b8049eb9b: !Template
+    answer_choices: null
+    id: 6f0eb61c-d9f9-4e52-a317-3d7b8049eb9b
+    jinja: '{{dialogue_turns.utterance[0]}}
+
+      |||
+
+      {{dialogue_turns.utterance[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: recommed_movies
+    reference: Given the likes,  recommend a movie.
+  8948a52c-a422-4858-bbf7-19790597d278: !Template
+    answer_choices: null
+    id: 8948a52c-a422-4858-bbf7-19790597d278
+    jinja: '{{ ["Someone said:", "He said:", "She said:", "They said:", "A friend
+      asked me:", "A colleague asked me:"] | choice  }} {{ dialogue_turns.utterance[0]
+      }}
+
+      |||
+
+      {{dialogue_turns.utterance[1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: recommend_movies_dialogue
+    reference: Given the likes, recommend a movie as a dialogue

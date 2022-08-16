@@ -1,0 +1,130 @@
+dataset: Zaid/coqa_expanded
+templates:
+  12ad4331-d063-4b56-b0f6-76f59c690717: !Template
+    answer_choices: null
+    id: 12ad4331-d063-4b56-b0f6-76f59c690717
+    jinja: "Below is a passage, followed by a series of questions and answers about\
+      \ the passage. Answer the last question based on the information contained in\
+      \ the passage. If there is no answer in the passage, say \"unknown\".\n\nPassage:\
+      \ {{story}}\n\nQ: {{question}} \nA: ||| {% if answer[\"answer_start\"] != -1\
+      \ %}\n{{answer[\"input_text\"]}}\n{% else %}\nunknown\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Verbose instructions
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  2f9fb20d-f4c9-4371-9cd4-db47607cb7a3: !Template
+    answer_choices: null
+    id: 2f9fb20d-f4c9-4371-9cd4-db47607cb7a3
+    jinja: "What is the answer to the last question in the dialogue below? If there\
+      \ is no answer in the passage, say \"unknown\".\n\nPassage: {{story}}\n\nQ:\
+      \ {{question}} \nA: ||| {% if answer[\"answer_start\"] != -1 %}\n{{answer[\"\
+      input_text\"]}}\n{% else %}\nunknown\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: What is the answer
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  9aff8967-d41c-4d79-8ef4-fc3650773735: !Template
+    answer_choices: null
+    id: 9aff8967-d41c-4d79-8ef4-fc3650773735
+    jinja: "Complete the dialogue based on the information contained in the passage.\
+      \ If there is no answer in the passage, say \"unknown\".\n\nPassage: {{story}}\n\
+      \nQ: {{question}} \nA: ||| {% if answer[\"answer_start\"] != -1 %}\n{{answer[\"\
+      input_text\"]}}\n{% else %}\nunknown\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Complete the dialogue
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  9bc32f2e-eee6-4006-bce3-74a79403d33e: !Template
+    answer_choices: null
+    id: 9bc32f2e-eee6-4006-bce3-74a79403d33e
+    jinja: "Answer the last question based on the information contained in the passage.\
+      \ If there is no answer in the passage, say \"unknown\".\n\nPassage: {{story}}\n\
+      \nQ: {{question}} \nA: ||| {% if answer[\"answer_start\"] != -1 %}\n{{answer[\"\
+      input_text\"]}}\n{% else %}\nunknown\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Answer the last question
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  bacb6534-e607-4afc-a412-ccfcd9fe38e2: !Template
+    answer_choices: null
+    id: bacb6534-e607-4afc-a412-ccfcd9fe38e2
+    jinja: 'In the passage below, extract the part which answers the last question.
+      If there is no answer in the passage, say "unknown".
+
+
+      Passage: {{story}}
+
+
+      Q: {{question}}
+
+      A: |||
+
+      {% if answer["answer_start"] != -1 %}
+
+      {{story[answer["answer_start"] : answer["answer_end"] ]}}
+
+      {% else %}
+
+      unknown
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: extract_answer
+    reference: ''
+  be39974f-aa86-4076-b444-bd3c2732b17b: !Template
+    answer_choices: null
+    id: be39974f-aa86-4076-b444-bd3c2732b17b
+    jinja: "Help me complete the dialogue about this passage. If there is no answer\
+      \ in the passage, say \"unknown\".\n\nPassage: {{story}}\n\nQ: {{question}}\
+      \ \nA: ||| {% if answer[\"answer_start\"] != -1 %}\n{{answer[\"input_text\"\
+      ]}}\n{% else %}\nunknown\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Help me
+    reference: 'Metric: variant of SQuAD (Section 6.1 of the paper)'
+  d95440ce-d538-40f8-ae09-664e05852ca8: !Template
+    answer_choices: null
+    id: d95440ce-d538-40f8-ae09-664e05852ca8
+    jinja: "{{story}}\n\nQ: {{question}} \nA: ||| {% if answer[\"answer_start\"] !=\
+      \ -1 %}\n{{answer[\"input_text\"]}}\n{% else %}\nunknown\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: GPT-3 Style
+    reference: 'Brown et al. NeurIPS 2020. Metric: variant of SQuAD (Section 6.1 of
+      the paper)'

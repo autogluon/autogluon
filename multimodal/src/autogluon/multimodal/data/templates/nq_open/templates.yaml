@@ -1,0 +1,121 @@
+dataset: nq_open
+templates:
+  05b8ac63-5aa1-4ce7-8257-ade0fca889ae: !Template
+    answer_choices: null
+    id: 05b8ac63-5aa1-4ce7-8257-ade0fca889ae
+    jinja: 'The goal is to predict an English answer string for an input English question.
+      All questions can be answered using the contents of English Wikipedia.
+
+      Question: {{question}}
+
+      Answer:
+
+      |||
+
+      {{answer|choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: formal_description
+    reference: Copied from the dataset description.
+  0b23fe26-c659-4a84-834f-f19622d11412: !Template
+    answer_choices: null
+    id: 0b23fe26-c659-4a84-834f-f19622d11412
+    jinja: 'Question : {{question}}
+
+      Answer :
+
+      |||
+
+
+      {{answer | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question_answer
+    reference: Plain Question
+  35113036-4cb4-4db5-a92e-d208e1b48b7c: !Template
+    answer_choices: null
+    id: 35113036-4cb4-4db5-a92e-d208e1b48b7c
+    jinja: 'Guess a question that has the answer "{{answer|choice}}"
+
+      |||
+
+      {{question}}?'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: guess_question
+    reference: Guess a question. It will show if model can evaluate entity in question.
+  5762f138-a3bf-4614-8dff-dcae7b5bd4a4: !Template
+    answer_choices: null
+    id: 5762f138-a3bf-4614-8dff-dcae7b5bd4a4
+    jinja: 'I''ve always wondered: {{question}}
+
+      |||
+
+      {{answer|choice}} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: first_person_context
+    reference: Ask a question in first person
+  cd157288-0211-46a8-a00c-ba0e07980e37: !Template
+    answer_choices: null
+    id: cd157288-0211-46a8-a00c-ba0e07980e37
+    jinja: 'Search query: {{question}}
+
+      Response:
+
+      |||
+
+      {{answer|choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: search query
+    reference: ''
+  cf937d15-48e0-4ae3-a4eb-9098cccc58ce: !Template
+    answer_choices: null
+    id: cf937d15-48e0-4ae3-a4eb-9098cccc58ce
+    jinja: 'Answer the following question.
+
+      {{question}}
+
+      |||
+
+      {{answer|choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question_with_instruction
+    reference: Instruction before question.

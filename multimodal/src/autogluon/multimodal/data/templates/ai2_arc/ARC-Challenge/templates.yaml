@@ -1,0 +1,142 @@
+dataset: ai2_arc
+subset: ARC-Challenge
+templates:
+  32f7eb4d-dd38-4503-b67d-a8a96ab40449: !Template
+    answer_choices: null
+    id: 32f7eb4d-dd38-4503-b67d-a8a96ab40449
+    jinja: 'Pick and copy all the incorrect options for the following question:
+
+
+      {{question}}
+
+
+      Options:
+
+      - {{choices["text"] | join("\n- ")}}|||
+
+      {% for i in range(choices["label"]|length) %}
+
+      {% if i != choices["label"].index(answerKey) %}
+
+      - {{choices["text"][i]}}
+
+      {% endif %}
+
+      {% endfor %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: false
+    name: pick_false_options
+    reference: ''
+  540ebc31-2ea6-4feb-a6fd-67b6e71cf20a: !Template
+    answer_choices: '{{choices.label | join("|||")}}'
+    id: 540ebc31-2ea6-4feb-a6fd-67b6e71cf20a
+    jinja: "Here's a problem to solve: {{question}}\n\nAmong the 4 following options,\
+      \ which is the correct answer?\n{% for letter, t in zip(answer_choices, choices.text)\
+      \ %}\n- {{letter}}: {{t}}\n {% endfor %}|||{{answerKey}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: heres_a_problem
+    reference: ''
+  5ec2b8ca-e4c0-444e-b097-89ccce811550: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 5ec2b8ca-e4c0-444e-b097-89ccce811550
+    jinja: '{{question}}
+
+
+      Options:
+
+      - {{answer_choices | join("\n- ")}}|||
+
+      {{answer_choices[choices["label"].index(answerKey)]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: qa_options
+    reference: ''
+  5ff84886-9d5f-40d1-80d7-2a39b7c16ec6: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 5ff84886-9d5f-40d1-80d7-2a39b7c16ec6
+    jinja: 'I am hesitating between 4 options to answer the following question, which
+      option should I choose?
+
+      Question: {{question}}
+
+      Possibilities:
+
+      - {{answer_choices | join("\n- ")}}|||
+
+      {{answer_choices[choices["label"].index(answerKey)]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: i_am_hesitating
+    reference: ''
+  ced2b33b-b590-4522-b041-51d7dd669561: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: ced2b33b-b590-4522-b041-51d7dd669561
+    jinja: 'I gave my students this multiple choice question: {{question}}
+
+
+      Only one answer is correct among these 4 choices:
+
+      - {{answer_choices | join("\n- ")}}
+
+
+      Could you tell me which one is correct?|||
+
+      {{answer_choices[choices["label"].index(answerKey)]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: multiple_choice
+    reference: ''
+  e371fc1a-8edb-477b-b345-9d73e97ffade: !Template
+    answer_choices: '{{choices.label | join("|||")}}'
+    id: e371fc1a-8edb-477b-b345-9d73e97ffade
+    jinja: 'Pick the most correct option to answer the following question.
+
+
+      {{question}}
+
+
+      Options:
+
+      {% for letter, t in zip(answer_choices, choices.text) %}
+
+      - {{letter}}: {{t}}
+
+      {% endfor %} |||
+
+      {{answerKey}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_the_most_correct_option
+    reference: ''

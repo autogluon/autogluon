@@ -1,0 +1,103 @@
+dataset: tweet_eval
+subset: emotion
+templates:
+  7c09c33e-31f2-414b-89a1-6b1dda92ef6f: !Template
+    answer_choices: anger ||| joy ||| optimism ||| sadness
+    id: 7c09c33e-31f2-414b-89a1-6b1dda92ef6f
+    jinja: '{{text}}
+
+
+      To get full credit in this exam, choose the correct emotion from the following
+      choices: {{answer_choices | join(", ")}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: emotion_exam
+    reference: exam style prompt
+  87db02f2-585e-4fd1-81c0-e94297607097: !Template
+    answer_choices: anger ||| joy ||| optimism ||| sadness
+    id: 87db02f2-585e-4fd1-81c0-e94297607097
+    jinja: 'Which emotion among {{answer_choices | join(", ")}} best describes the
+      feeling of the author of the following tweet?
+
+
+      {{text}}|||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: author_emotion
+    reference: ''
+  8bc3ebc5-77f1-4d55-bd96-c62429ebf093: !Template
+    answer_choices: anger ||| joy ||| optimism ||| sadness
+    id: 8bc3ebc5-77f1-4d55-bd96-c62429ebf093
+    jinja: 'Which emotion is best represented by the following tweet?
+
+      {{text}}
+
+
+      Possible emotions: {{answer_choices | join(", ")}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: which_emotion
+    reference: ''
+  a5992077-2e31-467b-a6ee-b75dee933d0e: !Template
+    answer_choices: anger ||| joy ||| optimism ||| sadness
+    id: a5992077-2e31-467b-a6ee-b75dee933d0e
+    jinja: "{{text}}\n\nCategorize the tweet into one of the following options: \n\
+      (a) {{answer_choices[0]}}\n(b) {{answer_choices[1]}}\n(c) {{answer_choices[2]}}\n\
+      (d) {{answer_choices[3]}}\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: emotion_with_option
+    reference: ''
+  b8f4912e-e3be-4dd5-82ec-6f110c056a86: !Template
+    answer_choices: anger ||| joy ||| optimism ||| sadness
+    id: b8f4912e-e3be-4dd5-82ec-6f110c056a86
+    jinja: '{{text}}
+
+
+      What is the emotion of the text?
+
+
+      Hint: {{answer_choices | join(", ")}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: emotion_hint
+    reference: ''

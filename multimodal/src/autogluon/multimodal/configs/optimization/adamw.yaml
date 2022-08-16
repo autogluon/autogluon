@@ -2,7 +2,7 @@ optimization:
   optim_type: "adamw"
   learning_rate: 1.0e-4
   weight_decay: 0.001
-  lr_choice: "layerwise_decay"
+  lr_choice: "layerwise_decay" #"linear_decay" #"layerwise_decay"
   lr_decay: 0.9
   lr_schedule: "cosine_decay"
   max_epochs: 10
@@ -26,8 +26,8 @@ optimization:
     - ".*fusion_mlp*."
     - ".*adapter*."
   lora:
-    adaptation_to_modules: # Specify which module (if any) to adapt(e.g. ".*EncDecAttention|.*DenseReluDense"). Default consider all modules in a model (i.e. empty filter).
-    adaptation_to_layers: # Specify which layer to adapt. Default fine-tune only query and value attention weights, recommended in https://arxiv.org/abs/2106.09685
+    module_filter: None # Specify which module (if any) to adapt(e.g. ".*EncDecAttention|.*DenseReluDense"). Default consider all modules in a model (i.e. empty filter).
+    filter: # Specify which layer in a module to adapt. Default fine-tune only query and value attention weights, recommended in https://arxiv.org/abs/2106.09685
       - "query"
       - "value"
       - "^q$"  # The filter can also be a regex. We will use re.match(filter, name) to determine if LoRA should be applied.

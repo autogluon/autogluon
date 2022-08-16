@@ -1,0 +1,106 @@
+dataset: drop
+templates:
+  350e0c24-b10c-4156-9053-a0b2d4af4214: !Template
+    answer_choices: null
+    id: 350e0c24-b10c-4156-9053-a0b2d4af4214
+    jinja: 'Question: {{question}}
+
+      Answer based on following passage.
+
+
+      {{passage}}
+
+
+      Answer:
+
+      ||| {{ answers_spans.spans | join(", ") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: question context answer
+    reference: Reading Comprehension with KB
+  79c0d600-8d49-4628-b1c1-d472fb762fa2: !Template
+    answer_choices: null
+    id: 79c0d600-8d49-4628-b1c1-d472fb762fa2
+    jinja: "I am trying to figure out the answer to the question, \"{{question}}\"\
+      \ I found the following text-snippet has the answer. Can you tell me the answer?\n\
+      \n{{passage}} \n\n||| {{ answers_spans.spans | join(\", \") }}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: can you tell me
+    reference: Reading Comprehension with KB
+  ab58cc42-a558-4709-8a73-30194fcf9fa2: !Template
+    answer_choices: null
+    id: ab58cc42-a558-4709-8a73-30194fcf9fa2
+    jinja: 'Passage: {{passage}}
+
+      Question: {{question}}
+
+      Answer: ||| {{ answers_spans.spans | join(", ") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: DROP GPT3
+    reference: Prompt format from GPT3 - Table G20
+  ad649b92-59ad-44a9-b328-7bbab49b104f: !Template
+    answer_choices: null
+    id: ad649b92-59ad-44a9-b328-7bbab49b104f
+    jinja: 'Generate a question from the following passage that has the answer, {{
+      answers_spans.spans | join(", ") }}
+
+      Passage : {{passage}}
+
+      Question :
+
+      |||
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question_with_passage_and_answer
+    reference: ''
+  e9bba528-7782-4f2b-a431-7601f8258628: !Template
+    answer_choices: null
+    id: e9bba528-7782-4f2b-a431-7601f8258628
+    jinja: 'Context: {{passage}}
+
+      I am trying to figure out the answer to the question from the above context.  Can
+      you tell me the answer?
+
+      Question: {{question}}
+
+      Answer:
+
+      ||| {{ answers_spans.spans | join(", ") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: context question answer
+    reference: Reading Comprehension with KB

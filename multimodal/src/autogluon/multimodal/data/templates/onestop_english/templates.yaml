@@ -1,0 +1,141 @@
+dataset: onestop_english
+templates:
+  2807f792-45a6-4139-8386-7cdc98651e53: !Template
+    answer_choices: Elementary ||| Intermediate ||| Advanced
+    id: 2807f792-45a6-4139-8386-7cdc98651e53
+    jinja: 'For English as Second Language (ESL) learners, would the text passage
+      below be at {{"Elementary"}}, {{"Intermediate"}} or {{"Advanced"}} level for
+      reading and simplifying?
+
+
+      "{{text}}"
+
+
+      |||
+
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: esl_context
+    reference: ''
+  553f2bbd-269c-4c4f-bc12-3825f155844d: !Template
+    answer_choices: Elementary ||| Intermediate ||| Advanced
+    id: 553f2bbd-269c-4c4f-bc12-3825f155844d
+    jinja: 'Consider the following text passage: {{text}}
+
+
+      How would you rate the difficulty level of the passage above for automatic readability
+      assessment? {{"Elementary"}},  {{"Intermediate"}} or {{"Advanced"}} level?
+
+
+      |||
+
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: ara_context
+    reference: ''
+  b0b076b8-b72b-4b71-8dd0-0b20877e001c: !Template
+    answer_choices: Elementary ||| Intermediate ||| Advanced
+    id: b0b076b8-b72b-4b71-8dd0-0b20877e001c
+    jinja: 'Look at the first three sentences of a story shown here: {{text.strip().split(''\n'')[:3]|join("\n")}}
+
+
+
+      Based on these three sentences alone, can you predict whether the entire story
+      is on the {{"Elementary"}}, {{"Intermediate"}} or {{"Advanced"}} level?
+
+
+
+
+
+      |||
+
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: determine_reading_level_from_the_first_three_sentences
+    reference: ''
+  de75ccb8-c0ba-4510-abf8-649b42019cd5: !Template
+    answer_choices: Elementary ||| Intermediate ||| Advanced
+    id: de75ccb8-c0ba-4510-abf8-649b42019cd5
+    jinja: 'If the text passage below was to be presented to someone learning English
+      as their second language, how are they likely going to rate the difficulty level
+      of the text in terms of reading and simplifying? {{"Elementary"}}, {{"Intermediate"}}
+      or {{"Advanced"}} level?
+
+
+      "{{text}}"
+
+
+
+      |||
+
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: esl_variation
+    reference: ''
+  e1289be8-7e81-4a85-bfb3-225fd31749a7: !Template
+    answer_choices: Elementary ||| Intermediate ||| Advanced
+    id: e1289be8-7e81-4a85-bfb3-225fd31749a7
+    jinja: 'How would you assess the reading difficulty of the text passage below?
+      Choose from one of {{"Elementary"}}, {{"Intermediate"}} or {{"Advanced"}} levels.
+
+
+      "{{text}}"
+
+
+      |||
+
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: assess
+    reference: ''
+  fdc96a76-6415-437b-bf61-ef6d1d1b8645: !Template
+    answer_choices: Elementary ||| Intermediate ||| Advanced
+    id: fdc96a76-6415-437b-bf61-ef6d1d1b8645
+    jinja: "Consider the following text passage: \n\n\"{{text}}\"\n\nHow would you\
+      \ assess the difficulty level for the task of simplifying the text passage above?\
+      \ Would it be at the {{\"Elementary\"}}, {{\"Intermediate\"}} or {{\"Advanced\"\
+      }} level?\n\n|||\n\n{{ answer_choices [label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: ats
+    reference: ''

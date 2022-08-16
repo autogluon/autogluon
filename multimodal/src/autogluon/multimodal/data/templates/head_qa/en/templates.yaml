@@ -1,0 +1,203 @@
+dataset: head_qa
+subset: en
+templates:
+  375b86a3-a869-4473-920c-c00ea789e943: !Template
+    answer_choices: '{{ answers | map(attribute="aid") | join("|||") }}'
+    id: 375b86a3-a869-4473-920c-c00ea789e943
+    jinja: 'Answer/complete the following paragraph about {{category}}:
+
+
+      {{qtext}}
+
+
+      Which one is the correct answer?
+
+
+      {% for answer in answers %}
+
+      {{answer["aid"] | string}}. {{answer["atext"]}}
+
+      {% endfor %}
+
+
+      |||
+
+
+      {{ra | string}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: multiple_choice_q_and_a_index_with_context_en
+    reference: Pose a multi-choice question using the index as an answer and the category
+      as context
+    task_template: true
+  749a5c3f-c10e-4a4a-aa35-d31698bb1104: !Template
+    answer_choices: '{{ answers | map(attribute="atext") | join("|||") }}'
+    id: 749a5c3f-c10e-4a4a-aa35-d31698bb1104
+    jinja: 'Answer/complete the following paragraph:
+
+
+      {{qtext}}
+
+
+      What is the correct answer?
+
+      - {{ answers | map(attribute="atext")| join("\n- ") }}
+
+
+      |||
+
+
+      {% for answer in answers if answer["aid"]==ra -%}
+
+      {{answer["atext"]}}
+
+      {%- endfor %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: multiple_choice_q_and_a_en
+    reference: Pose a multi-choice question
+    task_template: true
+  c830f4cc-128c-4644-9e19-4c99782f70bb: !Template
+    answer_choices: '{{ answers | map(attribute="aid") | join("|||") }}'
+    id: c830f4cc-128c-4644-9e19-4c99782f70bb
+    jinja: 'Answer/complete the following paragraph:
+
+
+      {{qtext}}
+
+
+      Which one is the correct answer?
+
+
+      {% for answer in answers %}
+
+      {{answer["aid"] | string}}. {{answer["atext"]}}
+
+      {% endfor %}
+
+
+      |||
+
+
+      {{ra | string}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: multiple_choice_q_and_a_index_en
+    reference: Pose a multi-choice question using as anwer the index
+    task_template: true
+  df12d7e1-2168-46e0-9400-c3a7ca27b42c: !Template
+    answer_choices: '{{ answers | map(attribute="atext") | join("|||") }}'
+    id: df12d7e1-2168-46e0-9400-c3a7ca27b42c
+    jinja: 'Answer/complete the following paragraph about {{category}}:
+
+
+      {{qtext}}
+
+
+      What is the correct answer?
+
+      - {{ answers | map(attribute="atext")| join("\n- ") }}
+
+
+      |||
+
+
+      {% for answer in answers if answer["aid"]==ra -%}
+
+      {{answer["atext"]}}
+
+      {%- endfor %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: multiple_choice_q_and_a_with_context_en
+    reference: Pose a multi-choice question using category information as context
+    task_template: true
+  e0cb8056-22b4-4878-8164-a79cfc5d3a62: !Template
+    answer_choices: '{{ answers | map(attribute="atext") | join("|||") }}'
+    id: e0cb8056-22b4-4878-8164-a79cfc5d3a62
+    jinja: 'Given this list of statements about {{category}}: {{ answers | map(attribute="atext")
+      | map("lower") | map("trim", ".") | join(", ") }}.
+
+
+      Which one is the most appropriate answer/completion for the paragraph that follows?
+
+
+      {{qtext}}
+
+
+      |||
+
+
+      {% for answer in answers if answer["aid"]==ra -%}
+
+      {{answer["atext"]}}
+
+      {%- endfor %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: multiple_choice_a_and_q_with_context_en
+    reference: Pose a multi-choice question presenting the answers first using category
+      as context
+    task_template: true
+  e4f4e194-a78b-433b-ac48-dabf6244be35: !Template
+    answer_choices: '{{ answers | map(attribute="atext") | join("|||") }}'
+    id: e4f4e194-a78b-433b-ac48-dabf6244be35
+    jinja: 'Given this list of statements: {{ answers | map(attribute="atext") | map("lower")
+      | map("trim", ".") | join(", ") }}.
+
+
+      Which one is the most appropriate answer/completion for the paragraph that follows?
+
+
+      {{qtext}}
+
+
+      |||
+
+
+      {% for answer in answers if answer["aid"]==ra -%}
+
+      {{answer["atext"]}}
+
+      {%- endfor %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: multiple_choice_a_and_q_en
+    reference: Pose a multi-choice question presenting the answers first
+    task_template: true

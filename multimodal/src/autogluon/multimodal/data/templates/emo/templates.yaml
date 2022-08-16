@@ -1,0 +1,218 @@
+dataset: emo
+templates:
+  2603600f-2d49-40f5-a8c6-05c9b38eab0c: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: 2603600f-2d49-40f5-a8c6-05c9b38eab0c
+    jinja: "Person A says something, Person B responds, and then Person A says something.\
+      \ Here's their conversation: \n\n\"{{text}}\"\n\nGiven the context and the last\
+      \ message, how would you best describe Person A's emotion - {{\"happy\"}}, {{\"\
+      sad\"}}, {{\"angry\"}}, or {{\"something else\"}}?\n\n|||\n\n{{ answer_choices\
+      \ [label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: persons_describe
+    reference: ''
+  4b078a4e-1a04-4401-a65e-a3d30c7d16ad: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: 4b078a4e-1a04-4401-a65e-a3d30c7d16ad
+    jinja: "Consider this textual dialogue of 3 messages between 2 participants who\
+      \ took turns to talk: \n\n\"{{text}}\"\"\n\nWhat would you say is the underlying\
+      \ emotion of the final message in this dialogue? {{\"happy\"}}, {{\"sad\"}},\
+      \ {{\"angry\"}}, or {{\"something else\"}}?\n\n|||\n\n{{ answer_choices [label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: final_message
+    reference: ''
+  6699f3ed-cb6b-4b85-a266-cb5311bb6018: !Template
+    answer_choices: another emotion ||| happiness ||| sadness ||| angriness
+    id: 6699f3ed-cb6b-4b85-a266-cb5311bb6018
+    jinja: '"{{text}}"
+
+
+      What emotion do you think was felt by the speaker of the last utterance of this
+      dialogue? {{answer_choices[1]}}, {{answer_choices[2]}}, {{answer_choices[3]}}
+      or {{answer_choices[0]}}
+
+
+      |||
+
+
+      {{answer_choices[label]}}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: what_emotion_do_you_think
+    reference: ''
+  70f652fe-8c2b-42f4-ac1b-2026d040d80e: !Template
+    answer_choices: another state ||| happy ||| sad ||| angry
+    id: 70f652fe-8c2b-42f4-ac1b-2026d040d80e
+    jinja: "Consider this short dialogue:\n\n{{text}}\n\nHow would you describe the\
+      \ emotional state of the last person to speak? {{answer_choices[1]}}, {{answer_choices[2]}},\
+      \ {{answer_choices[3]}} or {{answer_choices[0]}} \n\n|||\n\n{{answer_choices[label]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: emotional_state
+    reference: ''
+  8cd68ed9-60d6-4e01-a961-e1af07263646: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: 8cd68ed9-60d6-4e01-a961-e1af07263646
+    jinja: 'Dialogue between speaker A and B:
+
+
+      {{text}}
+
+
+      How would you say A feels in the last message? Is it {{answer_choices[1]}},
+      {{answer_choices[2]}}, {{answer_choices[3]}} or {{answer_choices[0]}}? ||| {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: dialogue_between
+    reference: ''
+  99f6f2b9-ed9f-42f7-b0bc-249cead1a82f: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: 99f6f2b9-ed9f-42f7-b0bc-249cead1a82f
+    jinja: "Person A says something, Person B responds, and then Person A says something.\
+      \ Here's their conversation: \n\n\"{{text}}\"\n\nWhat emotion can be inferred\
+      \ from the context and Person A's last message? {{\"happy\"}}, {{\"sad\"}},\
+      \ {{\"angry\"}}, or  {{\"something else\"}}?\n\n|||\n\n{{ answer_choices [label]\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: persons_infer
+    reference: ''
+  9a87023c-176a-4031-9ef5-92a775ca9d83: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: 9a87023c-176a-4031-9ef5-92a775ca9d83
+    jinja: "Consider this textual dialogue of 3 messages between 2 participants who\
+      \ took turns to talk: \n\n\"{{text}}\"\n\nGiven the context, what emotion can\
+      \ you detect in the message from the person who spoke last? {{\"happy\"}}, {{\"\
+      sad\"}}, {{\"angry\"}}, or {{\"something else\"}}?\n\n|||\n\n{{ answer_choices\
+      \ [label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: spoke_last
+    reference: ''
+  f5c9ceea-40c8-4837-a631-b40b1d30f015: !Template
+    answer_choices: another feeling ||| happiness ||| sadness ||| angriness
+    id: f5c9ceea-40c8-4837-a631-b40b1d30f015
+    jinja: '"{{text}}"
+
+
+      In this dialogue, what emotion was felt by the first speaker in the final answer?
+      {{answer_choices[1]}}, {{answer_choices[2]}}, {{answer_choices[3]}} or {{answer_choices[0]}}
+
+
+      |||
+
+
+      {{answer_choices[label]}}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: feel_when_last_answer
+    reference: ''
+  f686cef0-6174-466d-b87d-672aaf5f9caa: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: f686cef0-6174-466d-b87d-672aaf5f9caa
+    jinja: '"{{text}}"
+
+      This was a dialogue exchange between 2 people who took turns to talk. Given
+      the context, which of the following options best describes the emotion that
+      the last speaker is feeling? {{"happy"}}, {{"sad"}}. {{"angry"}}, or {{"something
+      else"}}?
+
+
+      |||
+
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: feeling
+    reference: ''
+  fcb82da7-3d47-4763-a8e5-84e559afeddf: !Template
+    answer_choices: something else ||| happy ||| sad ||| angry
+    id: fcb82da7-3d47-4763-a8e5-84e559afeddf
+    jinja: 'In the dialogue below, would you say the first speaker feels {{answer_choices[1]}},
+      {{answer_choices[2]}}, {{answer_choices[3]}} or {{answer_choices[0]}} when the
+      last sentence is uttered?
+
+      {{text}}
+
+
+      |||
+
+
+      {{answer_choices[label]}}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: in_this_dialogue
+    reference: ''

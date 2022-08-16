@@ -1,0 +1,202 @@
+dataset: race
+subset: all
+templates:
+  00ede994-778f-4d25-82dc-bae7ba9e115f: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 00ede994-778f-4d25-82dc-bae7ba9e115f
+    jinja: 'I''m taking a test and have to guess the right answer to the question
+      after the article.
+
+      Article: {{article}}
+
+      Question: {{question}}
+
+      Options: {{"A"}}: {{options.0}}
+
+      {{"B"}}: {{options.1}}
+
+      {{"C"}}: {{options.2}}
+
+      {{"D"}}: {{options.3}}
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Taking a test
+    reference: ''
+  02ed2a0c-b3a4-4b86-8524-e8961f042ae9: !Template
+    answer_choices: null
+    id: 02ed2a0c-b3a4-4b86-8524-e8961f042ae9
+    jinja: "Write a multi-choice question for the following article:\nArticle: {{article}}\n\
+      |||\nQuestion: \n{{question}}\nOptions:\n{{\"A\"}} {{options.0}}\n{{\"B\"}}\
+      \ {{options.1}}\n{{\"C\"}} {{options.2}}\n{{\"D\"}} {{options.3}}\nAnswer:\n\
+      {{answer}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Write a multi-choice question for the following article
+    reference: ''
+  59b5c4e3-9539-449f-ac60-04e681c705b5: !Template
+    answer_choices: '{{ options | join("|||") }}'
+    id: 59b5c4e3-9539-449f-ac60-04e681c705b5
+    jinja: 'Read the following article and answer the question.
+
+      Article: {{article}}
+
+      Question: {{question}}
+
+      Answer:
+
+      |||
+
+      {{ answer_choices[{"A":0,"B":1,"C":2,"D":3}[answer]] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Read the article and answer the question (no option)
+    reference: ''
+  81368f4b-817f-4c81-9db5-b86905bb975e: !Template
+    answer_choices: '{{ options | join("|||") }}'
+    id: 81368f4b-817f-4c81-9db5-b86905bb975e
+    jinja: 'Read the following article and select the best answer.
+
+      Article: {{article}}
+
+      Question: {{question}}
+
+      - {{answer_choices | join("\n- ")}}
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answer]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Select the best answer (generate span)
+    reference: ''
+  b808b05e-0d2a-459e-b345-2d83cdb20216: !Template
+    answer_choices: Yes ||| No
+    id: b808b05e-0d2a-459e-b345-2d83cdb20216
+    jinja: '{% set candidate = ["A", "B", "C", "D"] | choice %}
+
+      Article: {{article}}
+
+      Question: {{question}}
+
+      Yes or no, is the answer "{{ [options.0,options.1,options.2,options.3][{"A":0,"B":1,"C":2,"D":3}[answer]]
+      }}"?
+
+      |||
+
+      {% if candidate == answer %}
+
+      Yes
+
+      {% else %}
+
+      No
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Is this the right answer
+    reference: ''
+  cce2b02b-6c47-4941-83d6-5ecb2dfedadc: !Template
+    answer_choices: null
+    id: cce2b02b-6c47-4941-83d6-5ecb2dfedadc
+    jinja: "Write a multi-choice question for the following article, with the given\
+      \ choices and answer:\nArticle: {{article}}\nOptions:\n{{\"A\"}} {{options.0}}\n\
+      {{\"B\"}} {{options.1}}\n{{\"C\"}} {{options.2}}\n{{\"D\"}} {{options.3}}\n\
+      Answer:\n{{answer}} {{ [options.0,options.1,options.2,options.3][{\"A\":0,\"\
+      B\":1,\"C\":2,\"D\":3}[answer]] }}\nQuestion: \n|||\n{{question}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Write a multi-choice question (options given)
+    reference: ''
+  e5c4d6a3-ff68-4243-93aa-2629e72d0d70: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: e5c4d6a3-ff68-4243-93aa-2629e72d0d70
+    jinja: 'Read the article and select the best answer.
+
+      Article: {{article}}
+
+      Question: {{question}}
+
+      Options: {{"A"}}: {{options.0}}
+
+      {{"B"}}: {{options.1}}
+
+      {{"C"}}: {{options.2}}
+
+      {{"D"}}: {{options.3}}
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Select the best answer
+    reference: ''
+  f79ba457-3c44-455f-a6ed-9c5f50d0e886: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: f79ba457-3c44-455f-a6ed-9c5f50d0e886
+    jinja: '{{article}}
+
+      {{question}}
+
+      {{"A)"}} {{options.0}}
+
+      {{"B)"}} {{options.1}}
+
+      {{"C)"}} {{options.2}}
+
+      {{"D)"}} {{options.3}}
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Select the best answer (no instructions)
+    reference: ''

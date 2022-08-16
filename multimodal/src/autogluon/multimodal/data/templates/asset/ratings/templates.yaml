@@ -1,0 +1,119 @@
+dataset: asset
+subset: ratings
+templates:
+  09b2a13b-cba6-4473-8a46-3fa24be71ce2: !Template
+    answer_choices: No ||| Yes
+    id: 09b2a13b-cba6-4473-8a46-3fa24be71ce2
+    jinja: "{% set label = None %}\n{% set questions = None %}\n{% if rating > 50\
+      \ %}\n{% set label = 1 %}\n{% else %}\n{% set label = 0 %}\n{% endif %}\n{%\
+      \ set questions= [ \"Does the second sentence better convey the information?\"\
+      ,  \"Is the second sentence more fluent?\", \"Is the second sentence simpler?\"\
+      ] %}\n\nFirst sentence: {{original}}\n\nSecond sentence: {{simplification}}\n\
+      \n{{questions[aspect]}}. Please answer Yes or No. \n|||\n{{answer_choices[label]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: rate-binary
+    reference: Taking questions from the original paper, we use rating to establish
+      a binary classification problem
+  47142040-4121-4144-98b9-61cb5cbb1313: !Template
+    answer_choices: null
+    id: 47142040-4121-4144-98b9-61cb5cbb1313
+    jinja: 'First sentence: {{original}}
+
+
+      Second sentence: {{simplification}}
+
+
+      I am scoring these simplification exercises. How easier to read is the second
+      sentence on a scale from 0 (harder to read) to 100 (easier to read)?
+
+
+      |||
+
+
+      {{rating}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: rate-regression-simplicity
+    reference: Prompt model to rate how simplified the sentence is in the general
+      sense, instead of an particular aspect. This is a regression task whose range
+      is from 0 to 100.
+  7dd6e8b6-eae0-40c5-aa5e-1cc24357d85d: !Template
+    answer_choices: null
+    id: 7dd6e8b6-eae0-40c5-aa5e-1cc24357d85d
+    jinja: '{% set label = None %}
+
+      {% set questions = None %}
+
+      {% if rating > 50 %}
+
+      {% set label = 1 %}
+
+      {% else %}
+
+      {% set label = 0 %}
+
+      {% endif %}
+
+      {% if label == 1 %}
+
+      {% set questions= [ "Rewrite the following sentence so that it conveys the information
+      better.",  "Rewrite the following sentence so that it is more fluent.", "Rewrite
+      the following sentence so that it is simpler."] %}
+
+      {% else %}
+
+      {% set questions= [ "Rewrite the following sentence so that it conveys the information
+      more poorly.",  "Rewrite the following sentence so that it is less fluent.",
+      "Rewrite the following sentence so that it is more complicated."] %}
+
+      {% endif %}
+
+      {{questions[aspect]}}
+
+
+      {{original}}
+
+      |||
+
+      {{simplification}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate-text-based-on-rating
+    reference: ''
+  d2bed959-29ab-4962-a106-dc91c00f3f03: !Template
+    answer_choices: null
+    id: d2bed959-29ab-4962-a106-dc91c00f3f03
+    jinja: "{% set statements= [ \"the second sentence expresses the underlying meaning\
+      \ the best.\",  \"the second sentence is more fluent.\", \"the second sentence\
+      \ is simpler.\"] %}\n\nFirst sentence: {{original}}\n\nSecond sentence: {{simplification}}\n\
+      \nRate the following statement from 0 (strongly disagree) to 100 (strongly agree):\
+      \ {{statements[aspect]}} \n\n|||\n{{rating}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: rate-regression
+    reference: Require the model to output the rating. This is a regression task whose
+      range is from 0 to 100.

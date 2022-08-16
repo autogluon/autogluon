@@ -1,0 +1,186 @@
+dataset: biosses
+templates:
+  084e20ea-689d-4813-9db0-04735016aa0b: !Template
+    answer_choices: null
+    id: 084e20ea-689d-4813-9db0-04735016aa0b
+    jinja: 'How similar are the following two sentences? {{sentence1}} {{sentence2}}
+
+
+      Give the answer on a scale from 0 - 4, where 0 is "not similar at all" and 4
+      is "means the same thing". |||
+
+
+      {{(((5*score)|round)/5)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: similarity with question first
+    reference: stsb template from FLAN
+  2aa62df9-5905-4f50-baff-c11986670122: !Template
+    answer_choices: null
+    id: 2aa62df9-5905-4f50-baff-c11986670122
+    jinja: On a scale from 0 to 4, where 0 is "not similar" and 4 is "very similar",
+      how similar is the sentence "{{sentence1}}" to the sentence {{sentence2}}"?
+      ||| {{(((5*score)|round)/5)}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: compare one sentence to another
+    reference: stsb template from FLAN
+  2ec48b7b-c2c8-4253-9c0f-b57814ba0027: !Template
+    answer_choices: null
+    id: 2ec48b7b-c2c8-4253-9c0f-b57814ba0027
+    jinja: "Sentence 1: {{sentence1}} \nSentence 2: {{sentence2}}\n\nFrom 0 to 4 (0\
+      \ = \"no meaning overlap\" and 4 = \"means the same thing\"), how similar are\
+      \ the two sentences? |||\n\n{{(((5*score)|round)/5)}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: similarity with sentences first
+    reference: stsb template from FLAN
+  400dcb4c-8654-44aa-acec-4dbe108e34a6: !Template
+    answer_choices: null
+    id: 400dcb4c-8654-44aa-acec-4dbe108e34a6
+    jinja: '{{sentence1}} {{sentence2}}
+
+
+      On a scale from 0 to 4, where 0 is "no meaning overlap" and 4 is "means the
+      same thing", how closely does the first sentence resemble the second one? |||
+
+
+      {{(((5*score)|round)/5)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: resemblance
+    reference: stsb template from FLAN
+  5a6bc1a2-8d73-4c57-baa1-cc4b5c4dfacc: !Template
+    answer_choices: null
+    id: 5a6bc1a2-8d73-4c57-baa1-cc4b5c4dfacc
+    jinja: 'Do the following sentences say the same thing? {{sentence1}} {{sentence2}}
+
+
+      Return your answer on a scale from 0 to 4, where 0 is "not similar" and 5 is
+      "very similar". |||
+
+
+      {{(((5*score)|round)/5)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: same thing scoring
+    reference: stsb template from FLAN
+  5c53ce9b-45f6-41ab-9da7-9c24f0f6f56d: !Template
+    answer_choices: no ||| yes
+    id: 5c53ce9b-45f6-41ab-9da7-9c24f0f6f56d
+    jinja: "(1) {{sentence1}} \n(2) {{sentence2}}\n\nDo these two sentences convey\
+      \ the same information? |||\n\n{{answer_choices[0 if score < 2.5 else 1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: same info binary
+    reference: paws_wiki from FLAN
+  c1b48040-b083-4501-a7ef-a21b65800eb6: !Template
+    answer_choices: null
+    id: c1b48040-b083-4501-a7ef-a21b65800eb6
+    jinja: '{{sentence1}} {{sentence2}}
+
+
+      Rate the textual similarity of these two sentences on a scale of {{"0.0"}} and
+      {{"4.0"}}, where 0 is "no relation" and 4 is "equivalent". |||
+
+
+      {{(((5*score)|round)/5)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: rate with sentences first
+    reference: stsb template from FLAN
+  d52895b8-71bb-4b87-a20f-e8eae53ede92: !Template
+    answer_choices: no ||| yes
+    id: d52895b8-71bb-4b87-a20f-e8eae53ede92
+    jinja: Please check if these have the same meaning. Answer "yes" if they do, otherwise
+      "no". {{sentence1}} {{sentence2}} ||| {{answer_choices[0 if score < 2.5 else
+      1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: same meaning binary
+    reference: paws_wiki from FLAN
+  e22d8c63-3184-40df-84c2-6800960496a7: !Template
+    answer_choices: no ||| yes
+    id: e22d8c63-3184-40df-84c2-6800960496a7
+    jinja: Do "{{sentence1}}" and "{{sentence2}}" seem similar to you ? ||| {{answer_choices[0
+      if score < 2.5 else 1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: similarity binary
+    reference: stsb_multi_mt
+  f2b20779-4ac9-41d9-9660-b9c5223fe9c1: !Template
+    answer_choices: null
+    id: f2b20779-4ac9-41d9-9660-b9c5223fe9c1
+    jinja: 'Rate the similarity of these two sentences: ({{"0.0"}} being the lowest
+      and {{"4.0"}} the highest) "{{sentence1}}" and "{{sentence2}}" |||
+
+
+      {{(((5*score)|round)/5)}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      original_task: true
+    name: rate with question first
+    reference: stsb_multi_mt
+  fc22748c-72c0-4727-bc4e-53aae4449bef: !Template
+    answer_choices: no ||| yes
+    id: fc22748c-72c0-4727-bc4e-53aae4449bef
+    jinja: Do you think "{{sentence1}}" and "{{sentence2}}" express the same thing?
+      ||| {{answer_choices[0 if score < 2.5 else 1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: same thing binary
+    reference: stsb_multi_mt

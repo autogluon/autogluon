@@ -1,0 +1,178 @@
+dataset: meta_woz
+subset: dialogues
+templates:
+  4b64c6e9-0aa0-431f-85b5-8367daa4773a: !Template
+    answer_choices: null
+    id: 4b64c6e9-0aa0-431f-85b5-8367daa4773a
+    jinja: "What does this conversation between a Chatbot and a client talk about\
+      \ ? \n{% for utterance in turns %}\n{{[\"Client\", \"Chatbot\"][loop.index %\
+      \ 2]}}: {{utterance}}\n{% endfor %}\n|||\n{{domain.replace('_', ' ') | lower\
+      \ }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: predict_domain_chatbot_human_chat
+    reference: ''
+  56151136-82a4-455b-98ed-aea6ee1c273d: !Template
+    answer_choices: null
+    id: 56151136-82a4-455b-98ed-aea6ee1c273d
+    jinja: '{% set count = namespace(value=0) %}
+
+      {% for i in range(range(2, turns|length) | random() - 1) %}
+
+      {{["AI Assistant", "Client"][i% 2]}}: {{turns[i]}}
+
+      {% set count.value= i + 1 %}
+
+      {% endfor %}
+
+      {{["AI Assistant", "Client"][ count.value % 2]}}:
+
+      |||
+
+      {{turns[count.value] }}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: predict_random_stop
+    reference: ''
+  5e90f705-9d63-4917-acc9-3baabc6ee5e9: !Template
+    answer_choices: null
+    id: 5e90f705-9d63-4917-acc9-3baabc6ee5e9
+    jinja: "{% set rand_index= namespace(value=range(turns|length)|random()) %}\n\
+      {% for utterance in turns %}\n{% if loop.index0 == rand_index.value %}\n{{[\"\
+      Chatbot\", \"Human\"][loop.index0 % 2]}}: (blank)\n{% else %}\n{{[\"Chatbot\"\
+      , \"Human\"][loop.index0 % 2]}}: {{utterance}}\n{% endif %}\n{% endfor %}\n\
+      Fill in the blank \n|||\n{{turns[rand_index.value] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: predict_blank_response_random
+    reference: ''
+  77a9e854-08ef-4f2d-86f9-ed077f18b39d: !Template
+    answer_choices: null
+    id: 77a9e854-08ef-4f2d-86f9-ed077f18b39d
+    jinja: "This conversation is between an AI assistant and a human. What is the\
+      \ human inquiring about ? \n{% for utterance in turns %}\n{{[\"Human\", \" AI\
+      \ assistant\"][loop.index % 2]}}: {{utterance}}\n{% endfor %}\n|||\n{{domain.replace('_',\
+      \ ' ') | lower }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: predict_domain_ai_human_question
+    reference: ''
+  9150f1e0-8b9e-4f24-bc58-1cbb230cb8d9: !Template
+    answer_choices: null
+    id: 9150f1e0-8b9e-4f24-bc58-1cbb230cb8d9
+    jinja: "This conversation is between an AI assistant and a human. what does it\
+      \ talk about ? \n{% for utterance in turns %}\n{{[\"Human\", \" AI assistant\"\
+      ][loop.index % 2]}}: {{utterance}}\n{% endfor %}\n|||\n{{domain.replace('_',\
+      \ ' ') | lower }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: predict_domain_ai_human_chat
+    reference: ''
+  a02a980d-630f-4845-8b4d-b0eb072110e9: !Template
+    answer_choices: null
+    id: a02a980d-630f-4845-8b4d-b0eb072110e9
+    jinja: '{% for utterance in turns[:-1] %}
+
+      {{["User", "Bot"][loop.index % 2]}}: {{utterance}}
+
+      {% endfor %}
+
+      {{["User", "Bot"][ turns | length % 2]}}:
+
+      |||
+
+      {{turns[-1]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: predict_last_statement_user_bot
+    reference: ''
+  a4a8c7a1-1747-4560-8365-e998b1d2cfdf: !Template
+    answer_choices: null
+    id: a4a8c7a1-1747-4560-8365-e998b1d2cfdf
+    jinja: '{% for utterance in turns[:-1] %}
+
+      {{["Human", "Chatbot"][loop.index % 2]}}: {{utterance}}
+
+      {% endfor %}
+
+      {{["Human", "Chatbot"][ turns | length % 2]}}:
+
+      |||
+
+      {{turns[-1]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: predict_last_statement_human_chatbot
+    reference: ''
+  eba8d3ba-88f8-4257-a252-b02eafcfc463: !Template
+    answer_choices: null
+    id: eba8d3ba-88f8-4257-a252-b02eafcfc463
+    jinja: '{% for utterance in turns[:-1] %}
+
+      {{["Client", "AI Assistant"][loop.index % 2]}}: {{utterance}}
+
+      {% endfor %}
+
+      {{["Client", "AI Assistant"][ turns | length % 2]}}:
+
+      |||
+
+      {{turns[-1]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: predict_last_statement_client_ai
+    reference: ''

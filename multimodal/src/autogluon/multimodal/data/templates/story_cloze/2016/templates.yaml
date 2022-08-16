@@ -1,0 +1,99 @@
+dataset: story_cloze
+subset: '2016'
+templates:
+  1a4946f9-a0e2-4fbb-aee8-b26ead2cf6b8: !Template
+    answer_choices: '{{sentence_quiz1}} ||| {{sentence_quiz2}}'
+    id: 1a4946f9-a0e2-4fbb-aee8-b26ead2cf6b8
+    jinja: '{{input_sentence_1}} {{input_sentence_2}} {{input_sentence_3}} {{input_sentence_4}}
+      What is a possible continuation for the story given the following options ?
+      - {{answer_choices | join("\n- ")}} ||| {{answer_choices[answer_right_ending
+      -1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Answer Given options
+    reference: ''
+  1a9d53bc-eb77-4e7c-af6e-3d15b79d6cf1: !Template
+    answer_choices: '{{sentence_quiz1}} ||| {{sentence_quiz2}}'
+    id: 1a9d53bc-eb77-4e7c-af6e-3d15b79d6cf1
+    jinja: "Read the following story :\n\n{{input_sentence_1}}\n{{input_sentence_2}}\n\
+      {{input_sentence_3}}\n{{input_sentence_4}}\n\nChoose a possible ending for the\
+      \ previous story from the following options: \n- {{answer_choices | join(\"\\\
+      n- \")}}\n|||\n\n{{answer_choices[answer_right_ending -1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Choose Story Ending
+    reference: ''
+  9dab69d1-cad0-4d2f-a7cc-120df233571c: !Template
+    answer_choices: '{{sentence_quiz1}} ||| {{sentence_quiz2}}'
+    id: 9dab69d1-cad0-4d2f-a7cc-120df233571c
+    jinja: 'Yesterday, I watched a movie. Here''s what happened: {{input_sentence_1}}
+      {{input_sentence_2}} {{input_sentence_3}} {{input_sentence_4}} What happens
+      next? - {{answer_choices | join("\n- ")}} ||| {{answer_choices[answer_right_ending
+      -1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Movie What Happens Next
+    reference: ''
+  b5c8445f-2d3a-4691-bdd5-58956816702f: !Template
+    answer_choices: '{{sentence_quiz1}} ||| {{sentence_quiz2}}'
+    id: b5c8445f-2d3a-4691-bdd5-58956816702f
+    jinja: "What is a possible continuation for the following story ? \n\n{{input_sentence_1}}\n\
+      {{input_sentence_2}}\n{{input_sentence_3}}\n{{input_sentence_4}}\n\nChoose from\
+      \ the following options:\n- {{answer_choices | join(\"\\n- \")}}\n|||\n\n{{answer_choices[answer_right_ending\
+      \ -1]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Story Continuation and Options
+    reference: ''
+  baffa716-43cf-4954-a35c-655d775321e6: !Template
+    answer_choices: '{{sentence_quiz1}} ||| {{sentence_quiz2}}'
+    id: baffa716-43cf-4954-a35c-655d775321e6
+    jinja: 'Generate a possible ending for the following story: {{input_sentence_1}}
+      {{input_sentence_2}} {{input_sentence_3}} {{input_sentence_4}} ||| {{answer_choices[answer_right_ending
+      -1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate Ending
+    reference: ''
+  c6f3d802-4f97-449f-a911-03470d418f7d: !Template
+    answer_choices: '{{sentence_quiz1}} ||| {{sentence_quiz2}}'
+    id: c6f3d802-4f97-449f-a911-03470d418f7d
+    jinja: 'I read the following novel: {{input_sentence_1}} {{input_sentence_2}}
+      {{input_sentence_3}} {{input_sentence_4}} What do you think is the most probable
+      ending? You can choose from the following options: - {{answer_choices | join("\n-
+      ")}} ||| {{answer_choices[answer_right_ending -1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Novel Correct Ending
+    reference: ''

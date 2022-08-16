@@ -1,0 +1,369 @@
+dataset: super_glue
+subset: record
+templates:
+  014b669e-2e3b-40ce-bdde-418966c7d666: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: 014b669e-2e3b-40ce-bdde-418966c7d666
+    jinja: "{{ passage }} \n{{ query }} \nWhich one is the \"{{\"@placeholder\"}}\"\
+      ? {{ entities | join(\", \") }}? ||| {% if ( answers | length ) > 0 %} {{ answers\
+      \ | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Which one is the placeholder?
+    reference: ''
+  11e27d59-b1f5-43a1-9ccc-17f1c3249173: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: 11e27d59-b1f5-43a1-9ccc-17f1c3249173
+    jinja: "The following document has been corrupted. Tell me what \"{{\"@placeholder\"\
+      }}\" is referring to.\n\nDocument: {{ passage }} \n{{ query }} \n||| {% if (\
+      \ answers | length ) > 0 %}{{ answers | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: corrupted
+    reference: ''
+  147656b2-2dad-4028-96c4-f19d57cd1344: !Template
+    answer_choices: '{% for entity in entities[:-1] %} {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: 147656b2-2dad-4028-96c4-f19d57cd1344
+    jinja: "Summary:\n\n- {{ passage.split(\"@highlight\")[1:] | join(\"\\n- \") }}\
+      \ \n\nArticle:\n\n{{ passage.split(\"@highlight\")[0] }}\n ||| {% if ( answers\
+      \ | length ) > 0 %}{{ query | replace(\"@placeholder\", answers | choice) }}\
+      \ {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Summary first (continuation choices)
+    reference: ''
+  24c267d4-359e-40a9-83d2-bff904d63b09: !Template
+    answer_choices: '{% for entity in entities[:-1] %} {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: 24c267d4-359e-40a9-83d2-bff904d63b09
+    jinja: "Summary:\n\n- {{ passage.split(\"@highlight\")[1:] | join(\"\\n- \") }}\
+      \ \n\nArticle:\n\n{{ passage.split(\"@highlight\")[0] }}\n\nNow that you've\
+      \ read the article, please write a new sentence to add to it.\n\n||| {% if (\
+      \ answers | length ) > 0 %}{{ query | replace(\"@placeholder\", answers | choice)\
+      \ }} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Add sentence after after (continuation choices)
+    reference: ''
+  441c70e3-095a-44a1-8163-bc3b666b7ea1: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: 441c70e3-095a-44a1-8163-bc3b666b7ea1
+    jinja: "{{ passage }} \n{{ query }} \n\nYou should decide what \"{{\"@placeholder\"\
+      }}\" is referring to. Choose between:\n- {{answer_choices | join(\"\\n- \")}}\n\
+      ||| {% if ( answers | length ) > 0 %}{{ answers | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: choose_between
+    reference: ''
+  64013fb3-1afd-4e5a-8777-b164ca3b8e18: !Template
+    answer_choices: '{% for entity in entities[:-1] %} - {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} - {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: 64013fb3-1afd-4e5a-8777-b164ca3b8e18
+    jinja: "{{ passage.split(\"@highlight\")[0] }}\n\nSummary:\n\n- {{ passage.split(\"\
+      @highlight\")[1:] | join(\"\\n- \") }} \n\n ||| {% if ( answers | length ) >\
+      \ 0 %}- {{ query | replace(\"@placeholder\", answers | choice) }} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style summary only (continuation choices)
+    reference: Brown et al. 2020
+  90fc9ecb-c706-4c03-bb7e-4fe9fcd777f6: !Template
+    answer_choices: '{% for entity in entities[:-1] %} {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: 90fc9ecb-c706-4c03-bb7e-4fe9fcd777f6
+    jinja: "Article:\n\n{{ passage.split(\"@highlight\")[0] }}\n\nHighlights:\n\n\
+      {{ passage.split(\"@highlight\")[1:] | join(\"\\n\") }} \n\n ||| {% if ( answers\
+      \ | length ) > 0 %}{{ query | replace(\"@placeholder\", answers | choice) }}\
+      \ {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: GPT-3 style with labels without hyphens (continuation choices)
+    reference: ''
+  91555c1c-c1e4-469b-a2a4-fc952ce1a145: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: 91555c1c-c1e4-469b-a2a4-fc952ce1a145
+    jinja: "{{ passage }} \n{{ query }} \nIn the question above, the \"{{\"@placeholder\"\
+      }}\" stands for ||| {% if ( answers | length ) > 0 %}{{ answers | choice }}{%\
+      \ endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: In the question above, the placeholder stands for
+    reference: ''
+  94577b75-2eac-4eae-b367-3b413c4188c6: !Template
+    answer_choices: '{% for entity in entities[:-1] %} {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: 94577b75-2eac-4eae-b367-3b413c4188c6
+    jinja: 'After reading the article, write another sentence to add to it.
+
+      {{ passage | replace("@highlight", "\n- ") }}
+
+
+      ||| {% if ( answers | length ) > 0 %}{{ query | replace("@placeholder", answers
+      | choice) }}{% endif %}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Add sentence after (continuation choices)
+    reference: ''
+  9579b54e-4f0f-4e43-8907-af57112cc857: !Template
+    answer_choices: '{% for entity in entities[:-1] %} {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: 9579b54e-4f0f-4e43-8907-af57112cc857
+    jinja: "Please read the following news article and write another sentence to add\
+      \ to it.\n\n{{ passage | replace(\"@highlight\", \"\\n- \") }} \n ||| {% if\
+      \ ( answers | length ) > 0 %}{{ query | replace(\"@placeholder\", answers |\
+      \ choice) }} {% endif %}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: News article (continuation choices)
+    reference: ''
+  99dd38ce-32f3-4d58-93c5-59821002b9cc: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: 99dd38ce-32f3-4d58-93c5-59821002b9cc
+    jinja: "{{ passage }} \n{{ query }} \nWhat could the \"{{\"@placeholder\"}}\"\
+      \ be? {{ entities | join(\", \") }}? ||| {% if ( answers | length ) > 0 %}{{\
+      \ answers | choice }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: What could the placeholder be?
+    reference: ''
+  9b688cf3-28bf-4f33-94cf-e73e4fa8c608: !Template
+    answer_choices: '{{entities | join("|||")}}'
+    id: 9b688cf3-28bf-4f33-94cf-e73e4fa8c608
+    jinja: '{{ passage }}
+
+      {{ query }}
+
+
+      I am trying to decide what "{{"@placeholder"}}" means in the previous text.
+
+      Help by choosing an option between:
+
+      - {{ entities | join("\n- ") }}
+
+      ||| {% if ( answers | length ) > 0 %}
+
+      {{ answers | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: trying_to_decide
+    reference: ''
+  a5ed27ed-162b-4ac1-9c7a-85059d5214be: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: a5ed27ed-162b-4ac1-9c7a-85059d5214be
+    jinja: "{{ passage }} \n{{ query }} \nHere, the placeholder refers to ||| {% if\
+      \ ( answers | length ) > 0 %}{{ answers | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: "the placeholder refers to\u2026"
+    reference: ''
+  a99a92e0-e1ee-4ec3-a38a-3be4303ba017: !Template
+    answer_choices: '{% for entity in entities[:-1] %} - {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} - {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: a99a92e0-e1ee-4ec3-a38a-3be4303ba017
+    jinja: "{{ passage.split(\"@highlight\")[0] }}\n\nHighlights:\n\n- {{ passage.split(\"\
+      @highlight\")[1:] | join(\"\\n- \") }} \n\nPlease write an additional highlight.\n\
+      \ ||| {% if ( answers | length ) > 0 %}- {{ query | replace(\"@placeholder\"\
+      , answers | choice) }} {% endif %}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: New highlight (continuation choices)
+    reference: ''
+  d3fce74e-0d9d-404a-a009-9ebbf5794c2c: !Template
+    answer_choices: '{{entities | join("|||")}}'
+    id: d3fce74e-0d9d-404a-a009-9ebbf5794c2c
+    jinja: 'Exercise: Extract from the text the correct entity that "{{"@placeholder"}}"
+      is referring to.
+
+
+      {{ passage }}
+
+      {{ query }}
+
+      ||| {% if ( answers | length ) > 0 %}
+
+      {{ answers | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: exercise
+    reference: ''
+  de5b635e-c2f4-40bb-81ac-650f1b45564b: !Template
+    answer_choices: '{{entities | join("|||")}}'
+    id: de5b635e-c2f4-40bb-81ac-650f1b45564b
+    jinja: '{{ passage }}
+
+      {{ query }}
+
+
+      Pick one option, "{{"@placeholder"}}" refers to:
+
+      - {{answer_choices | join("\n- ")}}
+
+      ||| {% if ( answers | length ) > 0 %}
+
+      {{ answers | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: pick_one_option
+    reference: ''
+  df8d0822-2cad-42de-8191-687ae47f6098: !Template
+    answer_choices: '{% for entity in entities[:-1] %} - {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} - {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: df8d0822-2cad-42de-8191-687ae47f6098
+    jinja: "{{ passage | replace(\"@highlight\", \"\\n- \") }} \n\n ||| {% if ( answers\
+      \ | length ) > 0 %}- {{ query | replace(\"@placeholder\", answers | choice)\
+      \ }} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style (continuation choices)
+    reference: Brown et al. 2020
+  dfa3052f-ede8-42c2-b99a-bc5762c4fdc6: !Template
+    answer_choices: '{% for entity in entities[:-1] %} - {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} - {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: dfa3052f-ede8-42c2-b99a-bc5762c4fdc6
+    jinja: "Article:\n\n{{ passage.split(\"@highlight\")[0] }}\n\nHighlights:\n\n\
+      - {{ passage.split(\"@highlight\")[1:] | join(\"\\n- \") }} \n\n ||| {% if (\
+      \ answers | length ) > 0 %}- {{ query | replace(\"@placeholder\", answers |\
+      \ choice) }} {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: GPT-3 style with labels (continuation choices)
+    reference: Brown et al. 2020
+  e68d13c5-df75-4de0-b59e-f2eaf4af6ce7: !Template
+    answer_choices: '{{ entities | join("|||") }}'
+    id: e68d13c5-df75-4de0-b59e-f2eaf4af6ce7
+    jinja: "{{ passage }} \n{{ query }} \nCan you figure out what does the \"{{\"\
+      @placeholder\"}}\" mean? It means ||| {% if ( answers | length ) > 0 %}{{ answers\
+      \ | choice }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: "Can you figure out\u2026"
+    reference: ''
+  f7a92707-c531-42cb-81b4-063976e013cb: !Template
+    answer_choices: '{% for entity in entities[:-1] %} {{ query | replace("@placeholder",
+      entity) }} ||| {% endfor %} {{ query | replace("@placeholder", entities[-1])
+      }}'
+    id: f7a92707-c531-42cb-81b4-063976e013cb
+    jinja: "{{ passage | replace(\"@highlight\", \"\\n\") }} \n ||| {% if ( answers\
+      \ | length ) > 0 %}{{ query | replace(\"@placeholder\", answers | choice) }}\
+      \ {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style without hyphens (continuation choices)
+    reference: Brown et al. 2020

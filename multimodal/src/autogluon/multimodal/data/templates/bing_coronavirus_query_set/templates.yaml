@@ -1,0 +1,77 @@
+dataset: bing_coronavirus_query_set
+templates:
+  43332782-9e92-4bb2-94bf-28759f3fe181: !Template
+    answer_choices: null
+    id: 43332782-9e92-4bb2-94bf-28759f3fe181
+    jinja: "This search query talks about the coronavirus and was published on {{Date}}.\
+      \ In what country was it issued? \n{{Query}}\n|||\n{{Country}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: 'what_country '
+    reference: ''
+  68f9c063-1907-4866-ab1b-756cc57e5695: !Template
+    answer_choices: implicit ||| explicit
+    id: 68f9c063-1907-4866-ab1b-756cc57e5695
+    jinja: "The user is searching for coronavirus results on Bing.com. Is the intent\
+      \ implicit or explicit? \n{{Query}}\n|||\n{% if IsImplicitIntent == \"True\"\
+      \ %}\n{{answer_choices[0] }}\n{% else %}\n{{answer_choices[1] }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: 'is_implicit_or_explicit '
+    reference: ''
+  992d541f-9e0c-466d-b4c4-92e9e236f863: !Template
+    answer_choices: implicit ||| explicit
+    id: 992d541f-9e0c-466d-b4c4-92e9e236f863
+    jinja: "This search query about coronavirus was issued in {{Country}} on {{Date}}.\
+      \ Is the intent implicit or explicit? \n{{Query}}\n|||\n{% if IsImplicitIntent\
+      \ == \"True\" %}\n{{answer_choices[0] }}\n{% else %}\n{{answer_choices[1] }}\n\
+      {% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: 'is_explicit_country_date '
+    reference: ''
+  df53652c-36dc-45fe-a015-d0781e32cd33: !Template
+    answer_choices: Yes ||| No
+    id: df53652c-36dc-45fe-a015-d0781e32cd33
+    jinja: "Does this search engine query have an indirect relation to Covid-19? \n\
+      {{Query}}\n|||\n{% if IsImplicitIntent == \"True\" %}\n{{answer_choices[0] }}\n\
+      {% else %}\n{{answer_choices[1] }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: is_implicit_query
+    reference: ''
+  df7bc2ee-686c-4826-ad84-3a056a2da4d4: !Template
+    answer_choices: No ||| Yes
+    id: df7bc2ee-686c-4826-ad84-3a056a2da4d4
+    jinja: "Does this search query on Bing.com talk about the coronavirus explicitly?\
+      \ \n{{Query}}\n|||\n{% if IsImplicitIntent == \"True\" %}\n{{answer_choices[0]\
+      \ }}\n{% else %}\n{{answer_choices[1] }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: is_explicit_query
+    reference: ''

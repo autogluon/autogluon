@@ -1,0 +1,182 @@
+dataset: financial_phrasebank
+subset: sentences_allagree
+templates:
+  06719321-62e7-4f6e-8f95-464cd2b5ca5c: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: 06719321-62e7-4f6e-8f95-464cd2b5ca5c
+    jinja: 'Which word between "{{"negative"}}", "{{"neutral"}}", "{{"positive"}}"
+      would you use to describe the effect of the following news on the related share
+      prices?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: share_price_option
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  0beba048-f949-4034-83b6-a3e0e7363f46: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: 0beba048-f949-4034-83b6-a3e0e7363f46
+    jinja: 'What is the sentiment of the sentence?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: sentiment
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  1af36463-8ed9-4574-9157-f029960e1d5e: !Template
+    answer_choices: growth ||| neutral ||| decline
+    id: 1af36463-8ed9-4574-9157-f029960e1d5e
+    jinja: 'What word among "{{"growth"}}", "{{"neutral"}}", "{{"decline"}}", comes
+      to your mind when reading the following argument?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: word_comes_to_mind
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  461efe04-6883-41e8-80f0-e722a75260fe: !Template
+    answer_choices: growth ||| neutral ||| decline
+    id: 461efe04-6883-41e8-80f0-e722a75260fe
+    jinja: 'What does the following argument mean for the complementary industries?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: complementary_industries
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  5fa16d31-b513-480d-bd1b-1fa8c182fb76: !Template
+    answer_choices: bearish ||| neutral ||| bullish
+    id: 5fa16d31-b513-480d-bd1b-1fa8c182fb76
+    jinja: 'Should an investor be "{{"bullish"}}", "{{"neutral"}}", or "{{"bearish"}}"
+      given the following news?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: bullish_neutral_bearish
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  612be728-b6c8-4636-80b6-8aaa7593a2e1: !Template
+    answer_choices: negative ||| neutral ||| positive
+    id: 612be728-b6c8-4636-80b6-8aaa7593a2e1
+    jinja: 'Is the sentiment of the sentence "{{"negative"}}", "{{"neutral"}}", or
+      "{{"positive"}}"?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: sentiment_option
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  b7364738-258d-4b81-b322-b9876b6fd93d: !Template
+    answer_choices: growth ||| neutral ||| decline
+    id: b7364738-258d-4b81-b322-b9876b6fd93d
+    jinja: 'What word among "{{"growth"}}", "{{"neutral"}}", "{{"decline"}}", would
+      you use to describe the effect of the following argument on complementary industries?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: complementary_industries_option
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  b85d62c9-a34a-4da2-836e-a0aadbe48291: !Template
+    answer_choices: negative effect ||| neutral effect ||| positive effect
+    id: b85d62c9-a34a-4da2-836e-a0aadbe48291
+    jinja: 'What adjective would you use to describe the effect of the following news
+      on the related share prices?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: share_price
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'
+  e0650133-befc-4aeb-92e1-2f8d6a0200b3: !Template
+    answer_choices: growth ||| neutral ||| decline
+    id: e0650133-befc-4aeb-92e1-2f8d6a0200b3
+    jinja: 'What word would you use to describe the effect of the following argument
+      on the local economy?
+
+
+      {{sentence}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - Other
+      original_task: true
+    name: local_economy
+    reference: 'Metrics: Accuracy, Precision, Recall, F1 per class'

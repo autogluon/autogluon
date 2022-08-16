@@ -1,0 +1,202 @@
+dataset: conv_ai_2
+templates:
+  04f7a3d8-c40f-45d1-b9ae-5bd23ff11628: !Template
+    answer_choices: yes ||| no
+    id: 04f7a3d8-c40f-45d1-b9ae-5bd23ff11628
+    jinja: '{% set class = ["Human", "Bot"] | random %} {% if (0 < (dialog | selectattr("sender_class",
+      "equalto", "Bot") | list | length)) and (0 < (dialog | selectattr("sender_class",
+      "equalto", "Human") | list | length)) %}
+
+      Would a person self-describing with such statements:
+
+      {% for bp in user_profile %}
+
+      - "{{ bp | join('''') }}",
+
+      {% endfor %}
+
+      say things like:
+
+      {% for utterance in dialog %}
+
+      {% if class == utterance["sender_class"] %}
+
+      - "{{ utterance["text"] }}",
+
+      {% endif %}{% endfor %}
+
+      in a conversation?|||
+
+      {% if "Human" == class %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: match_profile_question
+    reference: ''
+  2dfa7a0c-46d5-4842-be2f-ae62fa80d581: !Template
+    answer_choices: yes ||| no
+    id: 2dfa7a0c-46d5-4842-be2f-ae62fa80d581
+    jinja: '{% set class = ["Human", "Bot"] | random %} {% if (0 < (dialog | selectattr("sender_class",
+      "equalto", "Bot") | list | length)) and (0 < (dialog | selectattr("sender_class",
+      "equalto", "Human") | list | length)) %}
+
+      I wonder if somebody describing herself, or himself, using these statements:
+
+      {% for bp in user_profile %}
+
+      - "{{ bp | join('''') }}",
+
+      {% endfor %}
+
+      could utter things like:
+
+      {% for utterance in dialog %}
+
+      {% if class == utterance["sender_class"] %}
+
+      - "{{ utterance["text"] }}",
+
+      {% endif %}{% endfor %}
+
+      in a conversation...
+
+      What''s your guess: {{ answer_choices[0] }} or {{ answer_choices[1] }}?|||
+
+      {% if "Human" == class %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: match_profile_guess
+    reference: ''
+  6ff0a746-5cf0-4a73-9dd9-8e08ddf0768a: !Template
+    answer_choices: yes ||| no
+    id: 6ff0a746-5cf0-4a73-9dd9-8e08ddf0768a
+    jinja: '{% set class = ["Human", "Bot"] | random %} {% if (0 < (dialog | selectattr("sender_class",
+      "equalto", "Bot") | list | length)) and (0 < (dialog | selectattr("sender_class",
+      "equalto", "Human") | list | length)) %}
+
+      Somebody using the following self-describing statements:
+
+      {% for bp in user_profile %}
+
+      - {{ bp | join('''') }}
+
+      {% endfor %}
+
+      might possibly say things like:
+
+      {% for utterance in dialog %}
+
+      {% if class == utterance["sender_class"] %}
+
+      - {{ utterance["text"] }}
+
+      {% endif %}{% endfor %}
+
+      Do you agree?|||
+
+      {% if "Human" == class %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: match_profile_agree
+    reference: ''
+  cb296bf2-5189-48af-9517-a1f802509eb1: !Template
+    answer_choices: yes ||| no
+    id: cb296bf2-5189-48af-9517-a1f802509eb1
+    jinja: '{% set class = ["Human", "Bot"] | random %} {% if (0 < (dialog | selectattr("sender_class",
+      "equalto", "Bot") | list | length)) and (0 < (dialog | selectattr("sender_class",
+      "equalto", "Human") | list | length)) %}
+
+      {% for bp in user_profile %}
+
+      - "{{ bp | join('''') }}"
+
+      {% endfor %}
+
+      This profile matches a person saying things like:
+
+      {% for utterance in dialog %}
+
+      {% if class == utterance["sender_class"] %}
+
+      - "{{ utterance["text"] }}"
+
+      {% endif %}{% endfor %}
+
+      {{ answer_choices[0] }} of {{ answer_choices[1] }}?|||
+
+      {% if "Human" == class %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: match_profile
+    reference: ''
+  eea6d2da-1c4c-460c-a1f9-f64cfd8c21c7: !Template
+    answer_choices: yes ||| no
+    id: eea6d2da-1c4c-460c-a1f9-f64cfd8c21c7
+    jinja: '{% set class = ["Human", "Bot"] | random %} {% if (0 < (dialog | selectattr("sender_class",
+      "equalto", "Bot") | list | length)) and (0 < (dialog | selectattr("sender_class",
+      "equalto", "Human") | list | length)) %}
+
+      Given the following profile:
+
+      {% for bp in user_profile %}
+
+      - "{{ bp | join('''') }}"
+
+      {% endfor %}
+
+      would these utterances be expected:
+
+      {% for utterance in dialog %}
+
+      {% if class == utterance["sender_class"] %}
+
+      - "{{ utterance["text"] }}"
+
+      {% endif %}{% endfor %}
+
+      from a person in a conversation?|||
+
+      {% if "Human" == class %}{{ answer_choices[0] }}{% else %}{{ answer_choices[1]
+      }}{% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: match_profile_expected
+    reference: ''

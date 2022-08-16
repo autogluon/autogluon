@@ -1,0 +1,157 @@
+dataset: openbookqa
+subset: main
+templates:
+  0206de6a-22da-4558-9b75-40c558ba60be: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 0206de6a-22da-4558-9b75-40c558ba60be
+    jinja: '{{question_stem}}
+
+
+      Choose an answer from this list:
+
+      - {{ answer_choices | join("\n- ") }}
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answerKey]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_an_answer_with_options
+    reference: choose an answer from a list
+  0dfe6c27-9716-455d-92a8-63ada1eb949b: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 0dfe6c27-9716-455d-92a8-63ada1eb949b
+    jinja: '{{question_stem}}
+
+
+      Which is the correct answer?
+
+      - {{ answer_choices | join("\n- ") }}
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answerKey]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: which_correct
+    reference: ''
+  90260bf9-caf1-4847-b0a7-c76bc015acbf: !Template
+    answer_choices: A ||| B ||| C ||| D
+    id: 90260bf9-caf1-4847-b0a7-c76bc015acbf
+    jinja: '{{question_stem}}
+
+      {% for k in range(choices["text"] | length) %}
+
+      {{'' -> ''.join([["A", "B", "C", "D"][k], choices["text"][k]])}}
+
+      {% endfor %}
+
+      Is the right answer {{"A, B, C or D"}} ?
+
+      |||
+
+      {{answerKey}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_using_id
+    reference: Using the index (A, B, C, D) for the answer
+  96e5065b-2876-4e4f-a33a-bb94c3505bb6: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: 96e5065b-2876-4e4f-a33a-bb94c3505bb6
+    jinja: '{{question_stem}}
+
+
+      Choices:
+
+      - {{ answer_choices | join("\n- ") }}
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answerKey]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choices
+    reference: ''
+  a4453d77-4cdd-44e5-9901-358f48631944: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: a4453d77-4cdd-44e5-9901-358f48631944
+    jinja: '{{question_stem}}
+
+      - {{ answer_choices | join("\n- ") }}
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answerKey]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: only_options
+    reference: Listing the options right after the question
+  c4814b92-9887-4b08-a4e2-1c7ca44345f7: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: c4814b92-9887-4b08-a4e2-1c7ca44345f7
+    jinja: '{{question_stem}}
+
+      - {{ answer_choices | join("\n- ") }}
+
+
+      Which is the correct answer?
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answerKey]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: which_correct_inverse
+    reference: Giving options before asking question
+  e9ca981e-0bda-4332-a101-41d5947df8f3: !Template
+    answer_choices: '{{choices.text | join("|||")}}'
+    id: e9ca981e-0bda-4332-a101-41d5947df8f3
+    jinja: '{{question_stem}}
+
+
+      Pick the right answer from the list:
+
+      - {{ answer_choices | join("\n- ") }}
+
+      |||
+
+      {{answer_choices[{"A":0,"B":1,"C":2,"D":3}[answerKey]]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_answer_with_options
+    reference: ''

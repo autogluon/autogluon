@@ -1,0 +1,145 @@
+dataset: social_i_qa
+templates:
+  605691e9-df59-415d-a622-530734c7df38: !Template
+    answer_choices: '{{answerA}} ||| {{answerB}} ||| {{answerC}}'
+    id: 605691e9-df59-415d-a622-530734c7df38
+    jinja: 'I heard that {{context}}
+
+
+      And I was wondering {{question}}
+
+
+      |||
+
+
+      {{answer_choices[label | int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: I was wondering
+    reference: ''
+  666f415b-e3ac-47bf-a79b-19024c4a4143: !Template
+    answer_choices: '{{answerA}} ||| {{answerB}} ||| {{answerC}}'
+    id: 666f415b-e3ac-47bf-a79b-19024c4a4143
+    jinja: '{{context}}
+
+
+      Given the context: {{question}}
+
+
+      Possible answers: {{answer_choices | join(", ")}}
+
+
+      |||
+
+
+      {{answer_choices[label | int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Show choices and generate answer
+    reference: ''
+  991f78cc-82d3-482f-b1de-f37a7179a316: !Template
+    answer_choices: Yes ||| No
+    id: 991f78cc-82d3-482f-b1de-f37a7179a316
+    jinja: "{% set random_answer_id = range(0,2) | choice%}\n{% set answers = [answerA,\
+      \ answerB, answerC] %}\n{{context}}\n\nGiven the question \"{{question}}\",\
+      \ is \"{{answers[random_answer_id]}}\" a valid answer?\n\n|||\n\n{% if (label\
+      \ | int) - 1 == random_answer_id %}\n    Yes\n{% else %}\n    No\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Check if a random answer is valid or not
+    reference: ''
+  b980667e-b4ca-44ce-aba9-5b47d3ccf406: !Template
+    answer_choices: null
+    id: b980667e-b4ca-44ce-aba9-5b47d3ccf406
+    jinja: '{{context}}
+
+
+      Given that the answer to a question is "{{{"1": answerA, "2": answerB, "3":
+      answerC}[label]}}", what is the question?
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Generate the question from the answer
+    reference: ''
+  cbad777f-5794-4d71-bf3d-54da6043e5f1: !Template
+    answer_choices: '{{answerA}} ||| {{answerB}} ||| {{answerC}}'
+    id: cbad777f-5794-4d71-bf3d-54da6043e5f1
+    jinja: '{{context}}
+
+
+      Given the context: {{question}}
+
+
+      |||
+
+
+      {{answer_choices[label | int - 1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Generate answer
+    reference: ''
+  e2316120-2461-4664-943d-962a85008e23: !Template
+    answer_choices: A ||| B ||| C
+    id: e2316120-2461-4664-943d-962a85008e23
+    jinja: 'Context: {{context}}
+
+
+      Question: {{question}}
+
+
+      Which one of these answers best answers the question according to the context?
+
+
+      A: {{answerA}}
+
+
+      B: {{answerB}}
+
+
+      C: {{answerC}}
+
+
+      |||
+
+
+      {{{"1": "A", "2": "B", "3": "C"}[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Show choices and generate index
+    reference: ''

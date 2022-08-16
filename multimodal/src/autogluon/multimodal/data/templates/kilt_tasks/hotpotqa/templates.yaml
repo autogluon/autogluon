@@ -1,0 +1,114 @@
+dataset: kilt_tasks
+subset: hotpotqa
+templates:
+  1a123f3a-0507-41b9-904f-b18d9ce2b79e: !Template
+    answer_choices: null
+    id: 1a123f3a-0507-41b9-904f-b18d9ce2b79e
+    jinja: '{% if output %}
+
+      Here''s a complex question that requires someone to reason about the input,
+      can you answer it?
+
+      {{input}}
+
+      |||
+
+      {{output | map(attribute="answer") | list | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: complex_question
+    reference: ''
+  5531ce47-35ff-4bce-943d-5b2b86c44352: !Template
+    answer_choices: null
+    id: 5531ce47-35ff-4bce-943d-5b2b86c44352
+    jinja: '{% if output %}
+
+      Combine facts and answer this: {{input}}
+
+      |||
+
+      {{output | map(attribute="answer") | list | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: combining_facts
+    reference: ''
+  5ce9d659-4df8-4afd-a6e1-3e542df0035a: !Template
+    answer_choices: null
+    id: 5ce9d659-4df8-4afd-a6e1-3e542df0035a
+    jinja: '{% if output %}
+
+      Formulate an answer to this elaborate question: {{input}}
+
+      |||
+
+      {{output | map(attribute="answer") | list | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: formulate
+    reference: ''
+  9211f663-51f9-428e-ba27-158480eee083: !Template
+    answer_choices: null
+    id: 9211f663-51f9-428e-ba27-158480eee083
+    jinja: '{% if output %}
+
+      FINAL EXAM
+
+
+      Question 1. {{input}}
+
+      |||
+
+      {{output | map(attribute="answer") | list | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: final_exam
+    reference: ''
+  ac0545a1-9363-4c17-aada-f0eedf5a24b2: !Template
+    answer_choices: null
+    id: ac0545a1-9363-4c17-aada-f0eedf5a24b2
+    jinja: '{% if output %}
+
+      {{input}}
+
+      |||
+
+      {{output | map(attribute="answer") | list | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: straighforward_qa
+    reference: ''

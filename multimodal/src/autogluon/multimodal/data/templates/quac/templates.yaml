@@ -1,0 +1,138 @@
+dataset: quac
+templates:
+  12c9d007-991c-49ed-82e2-13a7d3147881: !Template
+    answer_choices: null
+    id: 12c9d007-991c-49ed-82e2-13a7d3147881
+    jinja: "Given the  partial dialogue : \n\nStudent: {{questions[0]}}\n\nTeacher:\
+      \ {{(answers.texts[0] | choice).replace(\"CANNOTANSWER\",\"Cannot answer\")\
+      \ }}\n\nThe context : {{context}}\n\nAnswer the question: {{questions[1] }}\n\
+      |||\n{{(answers.texts[1] | choice).replace(\"CANNOTANSWER\",\"Cannot answer\"\
+      )  }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: Answer Given Only First Dialogue
+    reference: ''
+  1d4014c2-7cf7-45d1-8f85-a701b6a65118: !Template
+    answer_choices: null
+    id: 1d4014c2-7cf7-45d1-8f85-a701b6a65118
+    jinja: "Given the dialogue: \n{% for i in range(0, questions | length - 1)%}\n\
+      Student: {{questions[i]}}\n\nTeacher: {{(answers.texts[i] | choice).replace(\"\
+      CANNOTANSWER\",\"Cannot answer\") }}\n{% endfor %}\n\nThe context: {{context}}\n\
+      \nAnswer the question: {{questions | last }}\n|||\n{{(answers.texts | last |\
+      \ choice).replace(\"CANNOTANSWER\",\"Cannot answer\") }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Answer Given Full Dialogue
+    reference: ''
+  1f28f748-bc9e-4881-89ae-1d561abf2f2b: !Template
+    answer_choices: null
+    id: 1f28f748-bc9e-4881-89ae-1d561abf2f2b
+    jinja: 'This conversation happened between a teacher and a student:
+
+      {% for i in range(0, questions | length - 1) %}
+
+      Student: {{questions[i]}}
+
+
+      Teacher: {{(answers.texts[i] | choice).replace("CANNOTANSWER","Cannot answer")
+      }}
+
+      {% endfor %}
+
+
+      Use the article : {{context}} to answer the question: {{questions | last }}
+
+      |||
+
+      {{(answers.texts | last | choice).replace("CANNOTANSWER","Cannot answer") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: 'Answer Converation '
+    reference: ''
+  2c052ef8-adfa-497b-adb1-9e942ad998e0: !Template
+    answer_choices: null
+    id: 2c052ef8-adfa-497b-adb1-9e942ad998e0
+    jinja: "I read an article : {{context}} \n\nThen the following conversation occurred:\
+      \ \n{% for i in range(0, questions | length - 1) %}\nStudent: {{questions[i]}}\n\
+      \nTeacher: {{(answers.texts[i] | choice).replace(\"CANNOTANSWER\",\"Cannot answer\"\
+      ) }}\n{% endfor %}\nUse both to answer the question:  {{questions | last }}\n\
+      |||\n{{(answers.texts | last | choice).replace(\"CANNOTANSWER\",\"Cannot answer\"\
+      ) }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: 'Context First '
+    reference: ''
+  70c85283-44f3-4d31-866c-02294aed7a59: !Template
+    answer_choices: null
+    id: 70c85283-44f3-4d31-866c-02294aed7a59
+    jinja: "Read the article: {{context}} \n\nThen answer the question:  {{questions\
+      \ | last}}\n\nYou can use this dialogue to find the answer faster:\n{% for i\
+      \ in range(0, questions | length - 1)%}\nStudent: {{questions[i]}}\n\nTeacher:\
+      \ {{(answers.texts[i] | choice).replace(\"CANNOTANSWER\",\"Cannot answer\")\
+      \ }}\n{% endfor %}\n|||\n{{(answers.texts | last | choice).replace(\"CANNOTANSWER\"\
+      ,\"Cannot answer\")  }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Use Dialogue as Hint
+    reference: ''
+  a62e17c6-8973-43a3-863a-40bb12a1c8cf: !Template
+    answer_choices: null
+    id: a62e17c6-8973-43a3-863a-40bb12a1c8cf
+    jinja: 'A student is asking a teacher about the following article:
+
+      {{context}}
+
+
+      This is a summary of their conversation:
+
+      {% for i in range(0, questions | length - 1)%}
+
+      Student: {{questions[i]}}
+
+
+      Teacher: {{(answers.texts[i] | choice).replace("CANNOTANSWER","Cannot answer")
+      }}
+
+      {% endfor %}
+
+
+      Use their conversation and the article to answer the question :  {{questions
+      | last}}
+
+      |||
+
+      {{(answers.texts | last | choice).replace("CANNOTANSWER","Cannot answer")  }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: 'Student Asking Teacher '
+    reference: ''

@@ -1,0 +1,132 @@
+dataset: medal
+templates:
+  389edf89-c645-4502-b524-d338089a6145: !Template
+    answer_choices: null
+    id: 389edf89-c645-4502-b524-d338089a6145
+    jinja: '{% set tokenised_text = text.split('' '') %}
+
+      {% set acronym = location[0] %}
+
+      Based on the text below, how would you disambiguate the abbreviation "{{ tokenised_text[acronym]
+      }}"?
+
+
+
+      {{text}}
+
+
+      |||
+
+      {{ label[0] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: disambiguate_abbrev_text_after
+    reference: ''
+  38d3122d-45e0-46d7-b61d-77971b4366f9: !Template
+    answer_choices: null
+    id: 38d3122d-45e0-46d7-b61d-77971b4366f9
+    jinja: "{% set tokenised_text = text.split(' ') %}\n{% set acronym = location[0]\
+      \ %}\n\n{{tokenised_text[0:location[0]]|join(' ') }} {{  label[0]}} {{tokenised_text[location[0]+1:tokenised_text|length]|join('\
+      \ ') }} \n\nI am a doctor, and I need to replace the phrase \"{{ label[0] }}\"\
+      \ with its correct medical abbreviation. Can you suggest to me the acronym based\
+      \ on the PubMed abstract above?\n\n|||\n{{ tokenised_text[acronym] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: create_abbrev_doctor
+    reference: ''
+  474fc22a-f7ab-4785-8d54-1ace15e6081a: !Template
+    answer_choices: null
+    id: 474fc22a-f7ab-4785-8d54-1ace15e6081a
+    jinja: '{% set tokenised_text = text.split('' '') %}
+
+      {% set acronym = location[0] %}
+
+      As a layperson, I would like to understand the meaning of the abbreviation "{{
+      tokenised_text[acronym] }}". Could you disambiguate it for me based on the text
+      below?
+
+
+
+      {{text}}
+
+
+      |||
+
+      {{ label[0] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: disambiguate_abbrev_layperson
+    reference: ''
+  5e3772f9-4891-47ac-b5c6-5e86be17a600: !Template
+    answer_choices: null
+    id: 5e3772f9-4891-47ac-b5c6-5e86be17a600
+    jinja: "{% set tokenised_text = text.split(' ') %}\n{% set acronym = location[0]\
+      \ %}\n\n{{tokenised_text[0:location[0]]|join(' ') }} {{  label[0]}} {{tokenised_text[location[0]+1:tokenised_text|length]|join('\
+      \ ') }} \n\nGiven the PubMed abstract above, what could be the abbreviation\
+      \ for the token: \"{{ label[0] }}\"?\n\n|||\n{{ tokenised_text[acronym] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: create_abbrev_before
+    reference: ''
+  6f18eefa-660b-47d9-8093-fc628c3c38a0: !Template
+    answer_choices: null
+    id: 6f18eefa-660b-47d9-8093-fc628c3c38a0
+    jinja: "{% set tokenised_text = text.split(' ') %}\n{% set acronym = location[0]\
+      \ %}\nBased on the text below, how would you abbreviate the token: \"{{ label[0]\
+      \ }}\"?\n\n{{tokenised_text[0:location[0]]|join(' ') }} {{  label[0]}} {{tokenised_text[location[0]+1:tokenised_text|length]|join('\
+      \ ') }} \n\n|||\n{{ tokenised_text[acronym] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: create_abbrev_after
+    reference: ''
+  767d7896-e29b-4dfb-b82c-a18b356edfd5: !Template
+    answer_choices: null
+    id: 767d7896-e29b-4dfb-b82c-a18b356edfd5
+    jinja: '{% set tokenised_text = text.split('' '') %}
+
+      {% set acronym = location[0] %}
+
+
+      {{text}}
+
+
+      Please write what the abbreviation "{{ tokenised_text[acronym] }}" means in
+      the text above?
+
+      |||
+
+      {{ label[0] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: disambiguate_abbrev_text_before
+    reference: ''

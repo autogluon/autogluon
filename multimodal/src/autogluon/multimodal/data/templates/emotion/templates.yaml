@@ -1,0 +1,99 @@
+dataset: emotion
+templates:
+  2da087fe-8cca-4f92-b19c-babccb26a510: !Template
+    answer_choices: sadness ||| joy ||| love ||| anger ||| fear ||| surprise
+    id: 2da087fe-8cca-4f92-b19c-babccb26a510
+    jinja: '{{text}}. The emotion expressed for the message is
+
+      |||
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose_the_best_emotion_label
+    reference: emotion is
+  5fbc4f16-4f7f-4c82-b35d-6e68eced0c70: !Template
+    answer_choices: sadness ||| joy ||| love ||| anger ||| fear ||| surprise
+    id: 5fbc4f16-4f7f-4c82-b35d-6e68eced0c70
+    jinja: '{{text}}. What is the emotion expressed in this message?
+
+      |||
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: reply_with_emoation_label
+    reference: what is present
+  7bbb7b75-47ca-4bc6-8537-5a3be683172c: !Template
+    answer_choices: sadness ||| joy ||| love ||| anger ||| fear ||| surprise
+    id: 7bbb7b75-47ca-4bc6-8537-5a3be683172c
+    jinja: "What emotion does the following message express? {{text}}\n |||\n {{ answer_choices\
+      \ [label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: answer_with_class_label
+    reference: direct basic emotions
+  a2c026ba-2b54-451b-84a0-b302f37bbabe: !Template
+    answer_choices: sadness ||| joy ||| love ||| anger ||| fear ||| surprise
+    id: a2c026ba-2b54-451b-84a0-b302f37bbabe
+    jinja: '{{text}}. How will you feel about the message?
+
+      |||
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: answer_question_with_emotion_label
+    reference: how you feel
+  b88c0f70-0362-499b-b42e-da9bd84e553c: !Template
+    answer_choices: sadness ||| joy ||| love ||| anger ||| fear ||| surprise
+    id: b88c0f70-0362-499b-b42e-da9bd84e553c
+    jinja: "'Given the message: {{text}}. \n\nOut of the options, {{\"sadness\"}},\
+      \ {{\"joy\"}}, {{\"love\"}}, {{\"anger\"}}, {{\"fear\"}} and {{\"surprise\"\
+      }}, \n\nthe emotion in the message is \n|||\n{{ answer_choices [label] }}'"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: select_emotion_label_from_list
+    reference: out of six emotions
+  ef04c109-9b8d-4ea3-b8f5-646ec235c568: !Template
+    answer_choices: sadness ||| joy ||| love ||| anger ||| fear ||| surprise
+    id: ef04c109-9b8d-4ea3-b8f5-646ec235c568
+    jinja: '{{text}}. What emotion does the writer express for the message?
+
+      |||
+
+      {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: predict_the_best_emotion_label
+    reference: emotion of the writer

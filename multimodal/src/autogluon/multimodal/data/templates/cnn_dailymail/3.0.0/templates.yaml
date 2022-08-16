@@ -1,0 +1,174 @@
+dataset: cnn_dailymail
+subset: 3.0.0
+templates:
+  0556fd07-f7de-4daf-a0ae-4cda4fc239c8: !Template
+    answer_choices: null
+    id: 0556fd07-f7de-4daf-a0ae-4cda4fc239c8
+    jinja: 'Can you write an outline of the following article in a few points?
+
+
+      Article: {{article}}|||
+
+      {{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: write_an_outline
+    reference: ''
+  1c446bde-b3e6-4629-860f-9125681c72a1: !Template
+    answer_choices: null
+    id: 1c446bde-b3e6-4629-860f-9125681c72a1
+    jinja: 'Summarise the article:
+
+
+      {{article}} |||
+
+      {{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: news_summary
+    reference: ''
+  6e46894f-b5ff-4259-a691-63f1da8405da: !Template
+    answer_choices: null
+    id: 6e46894f-b5ff-4259-a691-63f1da8405da
+    jinja: 'In 2 or 3 sentences, what are the main points one should remember from
+      this news article?
+
+
+      Article: {{article}} |||
+
+      {{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: 2_or_3_sentences
+    reference: ''
+  892cbf90-2c19-4664-943e-a004a0c9a7fa: !Template
+    answer_choices: null
+    id: 892cbf90-2c19-4664-943e-a004a0c9a7fa
+    jinja: 'Could you please generate a TLDR (Too Long Didn''t Read) summary of the
+      following news article?
+
+
+      Article: {{article}} |||
+
+      {{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: tldr_summary
+    reference: ''
+  9b7c6abf-5110-4b31-8345-be6b2eeea580: !Template
+    answer_choices: null
+    id: 9b7c6abf-5110-4b31-8345-be6b2eeea580
+    jinja: 'Condense the article down to the essentials to present it in the form
+      of short cards in mobile news apps:
+
+
+      {{article}} |||
+
+      {{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: news_card_view
+    reference: ''
+  b4ff2f63-8539-4d9c-9858-42fa5f95ba56: !Template
+    answer_choices: null
+    id: b4ff2f63-8539-4d9c-9858-42fa5f95ba56
+    jinja: 'Generate a story from key plot points:
+
+
+      {{highlights}} |||
+
+      {{article}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_story
+    reference: ''
+  c20ac3c5-da85-408a-bba9-8b12ef2ae379: !Template
+    answer_choices: null
+    id: c20ac3c5-da85-408a-bba9-8b12ef2ae379
+    jinja: 'Sum the following article in brief: {{article}}|||{{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: sum_in_brief
+    reference: ''
+  e047b4ec-abff-4b36-896a-83f5f1ea6759: !Template
+    answer_choices: null
+    id: e047b4ec-abff-4b36-896a-83f5f1ea6759
+    jinja: 'Extract key points from the article based on which the stock market could
+      react:
+
+
+      {{article}} |||
+
+      {{highlights}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: news_stock
+    reference: ''
+  efa42de6-7a20-4e35-92fc-919a5eb0b77e: !Template
+    answer_choices: null
+    id: efa42de6-7a20-4e35-92fc-919a5eb0b77e
+    jinja: 'What details would you include in a storyline to make it more engaging
+      and informative?
+
+
+      {{highlights}} |||
+
+      {{article}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: spice_up_story
+    reference: ''

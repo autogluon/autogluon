@@ -1,0 +1,145 @@
+dataset: super_glue
+subset: axb
+templates:
+  1ae41916-7b4d-4ef3-b414-bfadd95d67e2: !Template
+    answer_choices: Yes ||| No
+    id: 1ae41916-7b4d-4ef3-b414-bfadd95d67e2
+    jinja: 'Given {{sentence1}} Should we assume that "{{sentence2}}" is true? Yes
+      or no? ||| {{ answer_choices[label] }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: should assume
+    reference: Webson & Pavlick 2021
+  1b2d6e85-a5a9-4d1b-9e3b-630b490c6a34: !Template
+    answer_choices: Yes ||| No
+    id: 1b2d6e85-a5a9-4d1b-9e3b-630b490c6a34
+    jinja: '{{sentence1}} Are we justified in saying that "{{sentence2}}"? Yes or
+      no? ||| {{ answer_choices[label] }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: justified in saying
+    reference: Webson & Pavlick 2021
+  23651f68-93cc-441f-b826-30dd2c6d6a93: !Template
+    answer_choices: Yes ||| No
+    id: 23651f68-93cc-441f-b826-30dd2c6d6a93
+    jinja: Given that {{sentence1}} Does it follow that {{sentence2}} Yes or no? |||
+      {{ answer_choices[label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does it follow that
+    reference: Sanh et al. 2021
+  552d6c20-ab5b-462f-b5fb-3c7b80c78dcc: !Template
+    answer_choices: Yes ||| No
+    id: 552d6c20-ab5b-462f-b5fb-3c7b80c78dcc
+    jinja: '{{sentence1}} Using only the above description and what you know about
+      the world, is "{{sentence2}}" definitely correct? Yes or no? ||| {{ answer_choices[label]
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: MNLI crowdsource
+    reference: Adapted from Williams et al. 2018's instructions to crowdsourcing workers.
+  908be561-caf4-4416-9fe9-9919c3998681: !Template
+    answer_choices: Yes ||| No
+    id: 908be561-caf4-4416-9fe9-9919c3998681
+    jinja: 'Given {{sentence1}} Is it guaranteed true that "{{sentence2}}"? Yes or
+      no? ||| {{ answer_choices[label] }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: guaranteed true
+    reference: Webson & Pavlick 2021
+  bae54ef5-c3be-4862-bdd4-a559ed04eb31: !Template
+    answer_choices: Yes ||| No
+    id: bae54ef5-c3be-4862-bdd4-a559ed04eb31
+    jinja: 'Suppose {{sentence1}} Can we infer that "{{sentence2}}"? Yes or no? |||
+      {{ answer_choices[label] }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: can we infer
+    reference: Webson & Pavlick 2021
+  c92d765f-83b1-4684-a0a3-580929b5e46b: !Template
+    answer_choices: Yes ||| No
+    id: c92d765f-83b1-4684-a0a3-580929b5e46b
+    jinja: "{{sentence1}} \n\nQuestion: Does this imply that \"{{sentence2}}\"? Yes\
+      \ or no? ||| {{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does this imply
+    reference: Sanh et al. 2021
+  cb68ee27-c0a3-440b-b595-e90fe89539c3: !Template
+    answer_choices: Yes ||| No
+    id: cb68ee27-c0a3-440b-b595-e90fe89539c3
+    jinja: 'Given that {{sentence1}} Therefore, it must be true that "{{sentence2}}"?
+      Yes or no? ||| {{ answer_choices[label] }} '
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: must be true
+    reference: Sanh et al. 2021
+  d57550ef-2f67-46eb-98cb-432dd135be16: !Template
+    answer_choices: Yes ||| No
+    id: d57550ef-2f67-46eb-98cb-432dd135be16
+    jinja: '{{sentence1}} Based on the previous passage, is it true that "{{sentence2}}"?
+      Yes or no? ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: based on the previous passage
+    reference: "Adapted from the BoolQ prompts in Schick & Sch\xFCtze 2021."
+  d965164b-fa96-41b5-8852-e0f6dfe5524e: !Template
+    answer_choices: True ||| False
+    id: d965164b-fa96-41b5-8852-e0f6dfe5524e
+    jinja: '{{sentence1}}
+
+      Question: {{sentence2}} True or False? ||| {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 style
+    reference: Same as reported in Figure G31 of the GPT-3 paper.

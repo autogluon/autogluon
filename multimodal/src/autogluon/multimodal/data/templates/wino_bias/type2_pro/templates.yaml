@@ -1,0 +1,162 @@
+dataset: wino_bias
+subset: type2_pro
+templates:
+  165a421e-6a90-4a7a-8ec5-06ae904ab46f: !Template
+    answer_choices: null
+    id: 165a421e-6a90-4a7a-8ec5-06ae904ab46f
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      {{tokens | join(" ")}}
+
+      {% if pronoun.lower()  == "they" or pronoun.lower() == "them" %}
+
+      Question: Who or what are "{{ pronoun }}"?
+
+      {% else %}
+
+      Question: Who or what is "{{ pronoun }}"?
+
+      {% endif %}
+
+      Answer: ||| {{ referent }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: Who or what is/are
+    reference: ''
+  25066e95-3782-44fc-949e-3620edd24a22: !Template
+    answer_choices: null
+    id: 25066e95-3782-44fc-949e-3620edd24a22
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      What does "{{ pronoun }}" refer to in the following sentence?
+
+      {{tokens | join(" ")}} ||| {{referent}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: refers_to
+    reference: ''
+  793c09af-1ec7-492a-ab65-392b0b17d807: !Template
+    answer_choices: null
+    id: 793c09af-1ec7-492a-ab65-392b0b17d807
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      In the sentence below, what does "{{pronoun}}" represent?
+
+      {{tokens | join(" ")}} ||| {{referent}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: represent
+    reference: ''
+  83446f7f-07ae-4b88-8aff-3eda1183dd7b: !Template
+    answer_choices: null
+    id: 83446f7f-07ae-4b88-8aff-3eda1183dd7b
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      {{tokens | join(" ")}}
+
+      In the previous sentence, the pronoun "{{ pronoun }}" can be replaced with |||
+      {{ referent }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: replaced with
+    reference: ''
+  85a90e9b-a6ef-4e25-9577-f26f14350099: !Template
+    answer_choices: null
+    id: 85a90e9b-a6ef-4e25-9577-f26f14350099
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      {{tokens | join(" ")}}
+
+      Here, by "{{ pronoun }}" they mean ||| {{ referent }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: by p they mean
+    reference: ''
+  ace9b776-df88-4895-b1e1-6821c5fcef72: !Template
+    answer_choices: null
+    id: ace9b776-df88-4895-b1e1-6821c5fcef72
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      {{tokens | join(" ")}}
+
+      Here, what does "{{ pronoun }}" stand for? ||| {{ referent }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: What does p stand for
+    reference: ''
+  af0b86f2-2fc6-4237-89da-d6d7dd2d9a40: !Template
+    answer_choices: null
+    id: af0b86f2-2fc6-4237-89da-d6d7dd2d9a40
+    jinja: '{% set pronoun = tokens[coreference_clusters[2] | int : coreference_clusters[3]
+      | int + 1] | join(" ") %}
+
+      {% set referent = tokens[coreference_clusters[0] | int : coreference_clusters[1]
+      | int + 1] | join(" ") %}
+
+      {{tokens | join(" ")}}
+
+      In the passage above, the pronoun "{{ pronoun }}" refers to ||| {{ referent
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: the pronoun refers to
+    reference: "Adapted from Perez et al. 2021 and Schick & Sch\xFCtz 2021."

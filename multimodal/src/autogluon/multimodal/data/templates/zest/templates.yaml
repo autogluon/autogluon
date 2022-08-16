@@ -1,0 +1,202 @@
+dataset: zest
+templates:
+  223c6226-5f2d-4dd8-9710-4657ffb54f13: !Template
+    answer_choices: null
+    id: 223c6226-5f2d-4dd8-9710-4657ffb54f13
+    jinja: '{{context}}
+
+      {{question}}|||
+
+      {% if answer != []%}
+
+      {% if answer[0] == "n/a" %}
+
+      I don''t know
+
+      {% else %}
+
+      {{answer | choice |replace("|", " or ")}}
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: concat_quest_context
+    reference: 'Concatenate question and context. Metric: F1 Score with modified precision
+      and recall, please refer to the paper https://arxiv.org/abs/2011.08115'
+  2283cebf-988e-4bff-96bf-982a09963e49: !Template
+    answer_choices: No ||| Yes
+    id: 2283cebf-988e-4bff-96bf-982a09963e49
+    jinja: 'Decide whether the question "{{question}}" is answerable solely based
+      on this passage:
+
+      {{context}}
+
+      Answer: |||
+
+      {% if answer != []%}
+
+      {% if answer[0] == "n/a" %}
+
+      {{ answer_choices[0] }}
+
+      {% else %}
+
+      {{ answer_choices[1] }}
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: answerable_or_not
+    reference: 'Decide whether this question is answerable. Metric: F1 Score with
+      modified precision and recall, please refer to the paper https://arxiv.org/abs/2011.08115'
+  6f694e45-1d17-4067-a1f6-7dae89c148db: !Template
+    answer_choices: null
+    id: 6f694e45-1d17-4067-a1f6-7dae89c148db
+    jinja: 'My daughter is asking me a question about {{domain | replace("_", " ")}}:
+      "{{question}}"
+
+      Here''s what I found on the internet: {{context}}
+
+      What''s the answer?
+
+      Answer: |||
+
+      {% if answer != []%}
+
+      {% if answer[0] == "n/a" %}
+
+      Can''t answer
+
+      {% else %}
+
+      {{answer | choice |replace("|", " or ")}}
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: ask_question_as_kid
+    reference: 'Answer the questions of a curious kid. Metric: F1 Score with modified
+      precision and recall, please refer to the paper https://arxiv.org/abs/2011.08115'
+  7425232a-9880-428c-9ddc-4070e50e22cc: !Template
+    answer_choices: null
+    id: 7425232a-9880-428c-9ddc-4070e50e22cc
+    jinja: 'Answer the question based on the context. If the question is not answerable
+      with the context alone, say "Can''t answer".
+
+      {{context}}
+
+      {{question}}|||
+
+      {% if answer != []%}
+
+      {% if answer[0] == "n/a" %}
+
+      Can''t answer
+
+      {% else %}
+
+      {{answer | choice |replace("|", " or ")}}
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: gpt3_instruct_format
+    reference: 'Template format from GPT3 instruct. Metric: F1 Score with modified
+      precision and recall, please refer to the paper https://arxiv.org/abs/2011.08115'
+  bdaf4f8a-2344-4e46-a52b-2045a080a4b2: !Template
+    answer_choices: null
+    id: bdaf4f8a-2344-4e46-a52b-2045a080a4b2
+    jinja: 'Answer the question about {{domain | replace("_", " ")}} based on the
+      context below. If the question is not answerable with the context alone, say
+      "Can''t answer".
+
+      Context:
+
+      {{context}}
+
+      Question:
+
+      {{question}}|||
+
+      {% if answer != []%}
+
+      {% if answer[0] == "n/a" %}
+
+      Can''t answer
+
+      {% else %}
+
+      {{answer | choice |replace("|", " or ")}}
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: gpt3_instruct_format_with_domain
+    reference: 'Template format from GPT3 instruct with the question''s domain. Metric:
+      F1 Score with modified precision and recall, please refer to the paper https://arxiv.org/abs/2011.08115'
+  cd563834-49ee-495d-ac46-99f0264e58d5: !Template
+    answer_choices: null
+    id: cd563834-49ee-495d-ac46-99f0264e58d5
+    jinja: 'I am giving my students the following question about {{domain | replace("_",
+      " ")}}: "{{question}}".
+
+      What should be their answer based on this context: {{context}}|||
+
+      {% if answer != []%}
+
+      {% if answer[0] == "n/a" %}
+
+      I don''t know
+
+      {% else %}
+
+      {{answer | choice |replace("|", " or ")}}
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: ask_question_as_teacher
+    reference: 'I don''t know answer. Metric: F1 Score with modified precision and
+      recall, please refer to the paper https://arxiv.org/abs/2011.08115'

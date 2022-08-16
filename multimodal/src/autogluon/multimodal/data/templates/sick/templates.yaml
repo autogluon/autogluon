@@ -1,0 +1,120 @@
+dataset: sick
+templates:
+  2b5fcfdc-8dc4-4aed-9819-8a104230d0fa: !Template
+    answer_choices: null
+    id: 2b5fcfdc-8dc4-4aed-9819-8a104230d0fa
+    jinja: 'How related are the following sentences?
+
+      Give a score on a scale of 1 to 5.
+
+
+      {{sentence_A}}
+
+
+      {{sentence_B}} |||
+
+
+      {{(((5*relatedness_score)|round)/5)}}
+
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Pearson Correlation
+      - Spearman Correlation
+      original_task: true
+    name: sentences relation score
+    reference: ''
+  566db154-818a-43c6-b66d-924a20fbbec2: !Template
+    answer_choices: entail ||| is neutral ||| contradict
+    id: 566db154-818a-43c6-b66d-924a20fbbec2
+    jinja: 'Does sentence B entail, contradict, or is neutral with respect to sentence
+      A?
+
+
+      Sentence A: {{sentence_A}}
+
+
+      Sentence B: {{sentence_B}} |||
+
+      {{ answer_choices[label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: B entails_netural_contradict A?
+    reference: ''
+  9a4d6bd4-bd67-46e4-ac70-6d46eff32b93: !Template
+    answer_choices: entail ||| is neutral ||| contradict
+    id: 9a4d6bd4-bd67-46e4-ac70-6d46eff32b93
+    jinja: 'Does sentence A entail, contradict, or is neutral with respect to sentence
+      B?
+
+
+      Sentence A: {{sentence_A}}
+
+
+      Sentence B: {{sentence_B}}|||
+
+      {{
+
+      {"A_entails_B": answer_choices[0], "A_neutral_B": answer_choices[1], "A_contradicts_B":
+      answer_choices[2]}[entailment_AB]
+
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: A entails_neutral_contradict B?
+    reference: ''
+  a502cdc1-3bf0-4019-8b4c-b293d75a95ff: !Template
+    answer_choices: Yes ||| No
+    id: a502cdc1-3bf0-4019-8b4c-b293d75a95ff
+    jinja: 'Does the sentence, "{{sentence_B}}", entail the sentence, "{{sentence_A}}"
+      ? |||
+
+      {{
+
+      [answer_choices[0], answer_choices[1], answer_choices[1]][label]
+
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: B entails A?
+    reference: ''
+  d96bfba4-3bf3-41db-84be-3d67126faf07: !Template
+    answer_choices: Yes ||| No
+    id: d96bfba4-3bf3-41db-84be-3d67126faf07
+    jinja: 'Does the sentence, "{{sentence_A}}", entail the sentence, "{{sentence_B}}"
+      ? |||
+
+      {{
+
+      {"A_entails_B": answer_choices[0], "A_neutral_B": answer_choices[1], "A_contradicts_B":
+      answer_choices[1]}[entailment_AB]
+
+      }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: A entails B?
+    reference: ''

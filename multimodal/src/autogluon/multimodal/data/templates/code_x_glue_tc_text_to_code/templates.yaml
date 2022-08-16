@@ -1,0 +1,28 @@
+dataset: code_x_glue_tc_text_to_code
+templates:
+  eb965448-691e-4506-bb61-a54771c7014b: !Template
+    answer_choices: null
+    id: eb965448-691e-4506-bb61-a54771c7014b
+    jinja: "{% set field_seperator = \"concode_field_sep\" %}\n{% set method_seperator\
+      \ = \"concode_elem_sep\" %}\n{% set ns = namespace(nl=\"\", fields=[], methods=[])\
+      \ %}\n{% if code | length > 0 %}\n\n    {% for chunk_a in nl.split(field_seperator)\
+      \  %}\n        {% set first_iter = loop.index0 == 0 %}\n        {% for chunk_b\
+      \ in chunk_a.split(method_seperator)  %}\n            {% if loop.index0 == 0\
+      \ and first_iter %}\n                {% set ns.nl = chunk_b %}\n           \
+      \ {% elif loop.index0 == 0 %}\n                {% set ns.fields = ns.fields\
+      \ + [chunk_b.strip()] %}\n            {% else %}\n                {% set ns.methods\
+      \ = ns.methods + [chunk_b.strip()] %}\n            {% endif %}\n        {% endfor\
+      \ %}\n    {% endfor %}\n    Method description:\n    {{ns.nl}}\n\n    Class\
+      \ fields:\n    {{ns.fields | unique | join(\", \")}}\n\n    Class methods:\n\
+      \    {{ns.methods | unique | join(\", \")}}\n\n    Generate the method\n   \
+      \ |||\n    {{code}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - BLEU
+      original_task: true
+    name: generate class member function given class environment
+    reference: ''

@@ -1,0 +1,96 @@
+dataset: scitldr
+subset: Abstract
+templates:
+  01fb91ab-2c95-436e-9363-3dfcdb6c5ba6: !Template
+    answer_choices: null
+    id: 01fb91ab-2c95-436e-9363-3dfcdb6c5ba6
+    jinja: "Generate a summary for the text: \n{{source | join(\" \")}}\n|||\n{{target|choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: basic_task_description_like
+    reference: Assume there is only one choice
+  08b9e913-a305-46e2-aa43-f1126d76cf55: !Template
+    answer_choices: null
+    id: 08b9e913-a305-46e2-aa43-f1126d76cf55
+    jinja: "Elaborate on the given summary: \n{{target |choice}}\n\nStart with following\
+      \ sentence: {{source[0]}}\n|||\n{{source | join(\" \")}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: reverse_generation
+    reference: This template asks the model to hallucinate the abstract.
+  16faf5c0-a0c5-488a-89dd-2989622b01dc: !Template
+    answer_choices: null
+    id: 16faf5c0-a0c5-488a-89dd-2989622b01dc
+    jinja: "Compress the abstract to one or two sentences. Make sure it captures the\
+      \ main point of the abstract. \nAbstract: {{source | join(\" \")}}\nSummary:\
+      \ \n|||\n{{target[0]}}\n\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: instructions_for_summary
+    reference: Providing instructions on what a summary should look like
+  68502ad6-cb36-4137-9359-e6826731854a: !Template
+    answer_choices: null
+    id: 68502ad6-cb36-4137-9359-e6826731854a
+    jinja: "Abstract: {{source | join(\" \")}}\nPlease summarize the abstract in one\
+      \ sentence: \n|||\n{{target|choice}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: summarize_in_sentence
+    reference: Template asks the model to summarize in one sentence
+  ab46a8f2-1e57-4ac9-b4ae-422c70689450: !Template
+    answer_choices: null
+    id: ab46a8f2-1e57-4ac9-b4ae-422c70689450
+    jinja: '{{source| join(" ")}}
+
+      TL;DR: ||| {{target[0]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: gpt_2_style
+    reference: GPT 2 style template
+  bac2ebcf-a54d-49a0-ac37-e7ad3f4878cb: !Template
+    answer_choices: null
+    id: bac2ebcf-a54d-49a0-ac37-e7ad3f4878cb
+    jinja: "{{source | join(\" \")}}\nPlease summarize the above paragraph. \n|||\n\
+      {{target|choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: basic_with_choice_output
+    reference: basic task like description with choice filter

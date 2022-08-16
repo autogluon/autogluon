@@ -1,0 +1,119 @@
+dataset: poem_sentiment
+templates:
+  2714baf0-5d19-4781-a60f-f44cd95935f7: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: 2714baf0-5d19-4781-a60f-f44cd95935f7
+    jinja: '{{verse_text}} Is the sentiment the poet express for the poem {{answer_choices[0]}},
+      {{answer_choices[1]}}, {{answer_choices[2]}} or {{answer_choices[3]}}? |||  {{
+      answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: positive_or_negative_sentiment_variation_2
+    reference: ''
+  574ab816-b0bc-4049-a5a5-dcf8f4280dc5: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: 574ab816-b0bc-4049-a5a5-dcf8f4280dc5
+    jinja: The following poem expresses what sentiment? {{verse_text}} ||| {{ answer_choices
+      [label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: guess_sentiment_without_options_variation_2
+    reference: ''
+  7801d04c-4f42-4411-a552-9614c8c3fd53: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: 7801d04c-4f42-4411-a552-9614c8c3fd53
+    jinja: '{{verse_text}} The sentiment expressed in the poem is |||  {{ answer_choices
+      [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: guess_sentiment_without_options_variation_1
+    reference: ''
+  9fa8eeb4-314b-4850-a28b-0f53bca006d8: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: 9fa8eeb4-314b-4850-a28b-0f53bca006d8
+    jinja: '{{verse_text}} What is the sentiment expressed in this poem? |||  {{ answer_choices
+      [label] }}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: positive_or_negative_sentiment_variation_1
+    reference: ''
+  aecb3d13-ff68-4e60-a382-87191940bd5b: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: aecb3d13-ff68-4e60-a382-87191940bd5b
+    jinja: '{{verse_text}} The most appropriate word out of {{"negative"}}, {{"positive"}},
+      {{"neutral"}} and {{"mixed"}}, which express the poet''s sentiment is: |||  {{
+      answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: most_appropriate_sentiment
+    reference: ''
+  ca15cecb-4ee6-4445-a0f4-6ef5cd519923: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: ca15cecb-4ee6-4445-a0f4-6ef5cd519923
+    jinja: "{{verse_text}} What sentiment does this poem express? \nOptions: {{answer_choices[0]}},\
+      \ {{answer_choices[1]}}, {{answer_choices[2]}}, {{answer_choices[3]}}.\nAnswer:\
+      \  ||| {{ answer_choices [label] }}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: question_answer_format
+    reference: ''
+  f87a7ba0-11f7-41f9-bee6-94d0ad6e597a: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: f87a7ba0-11f7-41f9-bee6-94d0ad6e597a
+    jinja: Does this poem express a {{"negative"}}, {{"positive"}}, {{"neutral"}}
+      or {{"mixed"}} sentiment? {{verse_text}} ||| {{ answer_choices [label] }}
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: guess_sentiment_from_given_options
+    reference: ''
+  fdbebd3d-6517-4be1-8771-489e2de658ef: !Template
+    answer_choices: negative ||| positive ||| neutral ||| mixed
+    id: fdbebd3d-6517-4be1-8771-489e2de658ef
+    jinja: '{{verse_text}} What is the sentiment that the poet wants the readers to
+      feel through the verse mentioned above?||| {{ answer_choices [label] }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: guess_sentiment_without_options
+    reference: ''

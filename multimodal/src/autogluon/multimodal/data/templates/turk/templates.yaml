@@ -1,0 +1,136 @@
+dataset: turk
+templates:
+  58d1370e-3fc0-4b96-9e74-950b7c3edfd9: !Template
+    answer_choices: null
+    id: 58d1370e-3fc0-4b96-9e74-950b7c3edfd9
+    jinja: '{% set real_simplifications = [] %}{% for text in simplifications %}{%
+      if text|length < original|length %}{{real_simplifications.append(text) | default("",
+      True)}}{% endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      Simplify the below sentence.
+
+
+      {{original}}
+
+      |||
+
+      {{real_simplifications | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: true
+    name: simplify
+    reference: This is not the original task, since the original task is the analysis
+      of simplification, not the simplification itself.
+  da3fb228-7383-497f-936c-9bcbcd0d057b: !Template
+    answer_choices: Text A ||| Text B
+    id: da3fb228-7383-497f-936c-9bcbcd0d057b
+    jinja: '{% set real_simplifications = [] %}{% for text in simplifications %}{%
+      if text|length < original|length %}{{real_simplifications.append(text) | default("",
+      True)}}{% endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      Read the below two texts and answer the question.
+
+      {% if range(0,2) | choice %}
+
+      Text A: {{original}}
+
+
+      Text B: {{real_simplifications | choice }}
+
+
+      One of the texts above is more verbose than the other. Which one is the verbose
+      one? Your answer should be either "Text A" or "Text B".
+
+      |||
+
+      Text A
+
+      {% else %}
+
+      Text A: {{real_simplifications | choice }}
+
+
+      Text B: {{original}}
+
+
+      One of the texts above is more verbose than the other. Which one is the verbose
+      one? Your answer should be either "Text A" or "Text B".
+
+      |||
+
+      Text B
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: choose-verbose
+    reference: ''
+  dc853532-e948-443b-bae1-3ebb968bc7c5: !Template
+    answer_choices: null
+    id: dc853532-e948-443b-bae1-3ebb968bc7c5
+    jinja: '{% set real_simplifications = [] %}{% for text in simplifications %}{%
+      if text|length < original|length %}{{real_simplifications.append(text) | default("",
+      True)}}{% endif %}{% endfor %}
+
+      {% if real_simplifications %}
+
+      Make the following sentence more verbose.
+
+
+      {{real_simplifications | choice}}
+
+      |||
+
+      {{original}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: make-verbose
+    reference: ''
+  ec70cd03-8282-4e45-957f-927c60254ad4: !Template
+    answer_choices: Text A ||| Text B
+    id: ec70cd03-8282-4e45-957f-927c60254ad4
+    jinja: "{% set real_simplifications = [] %}{% for text in simplifications %}{%\
+      \ if text|length < original|length %}{{real_simplifications.append(text) | default(\"\
+      \", True)}}{% endif %}{% endfor %}\n{% if real_simplifications %}\n{% if range(0,2)\
+      \ | choice %}\nText A: {{original}}\n\nText B: {{real_simplifications | choice\
+      \ }}\n\nOne of the texts above is a simplification of the other. Which one is\
+      \ the simplified one? Your answer should be either \"Text A\" or \"Text B\"\
+      .\n|||\nText B\n{% else %}\nText A: {{real_simplifications | choice }}\n\nText\
+      \ B: {{original}}\n\nOne of the texts above is a simplification of the other.\
+      \ Which one is the simplified one? Your answer should be either \"Text A\" or\
+      \ \"Text B\".\n|||\nText A\n{% endif %} \n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose-simplification
+    reference: ''

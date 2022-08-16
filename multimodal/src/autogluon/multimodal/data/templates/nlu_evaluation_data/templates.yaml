@@ -1,0 +1,211 @@
+dataset: nlu_evaluation_data
+templates:
+  0fed9f2f-a53f-48c7-a625-dbd39cfb809c: !Template
+    answer_choices: alarm query ||| alarm remove ||| alarm set ||| audio volume down
+      ||| audio volume mute ||| audio volume other ||| audio volume up ||| calendar
+      query ||| calendar remove ||| calendar set ||| cooking query ||| cooking recipe
+      ||| date time convert ||| date time query ||| email add contact ||| email query
+      ||| email query contact ||| email send email ||| general affirm ||| general
+      command stop ||| general confirm ||| general don't care ||| general explain
+      ||| general greet ||| general joke ||| general negate ||| general praise |||
+      general quirky ||| general repeat ||| internet of things cleaning ||| internet
+      of things coffee ||| internet of things hue light change ||| internet of things
+      hue light dim ||| internet of things hue light off ||| internet of things hue
+      light on ||| internet of things hue light up ||| internet of things wemo off
+      ||| internet of things wemo on ||| lists create or add ||| lists query ||| lists
+      remove ||| music dislikeness ||| music likeness ||| music query ||| music settings
+      ||| news query ||| play audiobook ||| play game ||| play music ||| play podcasts
+      ||| play radio ||| question answer currency ||| question answer definition |||
+      question answer factoid ||| question answer maths ||| question answer stock
+      ||| recommendation events ||| recommendation locations ||| recommendation movies
+      ||| social post ||| social query ||| takeaway order ||| takeaway query ||| transport
+      query ||| transport taxi ||| transport ticket ||| transport traffic ||| weather
+      query
+    id: 0fed9f2f-a53f-48c7-a625-dbd39cfb809c
+    jinja: 'What is the user who made this request trying to do?
+
+      Choices are {{answer_choices[0:-1]  | join('', '') }} or {{answer_choices[-1]}}.
+
+      Request: {{text}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what_does_user_want_choices
+    reference: ''
+  23659b4a-c740-46d5-adb9-1261026dc1ce: !Template
+    answer_choices: alarm ||| audio ||| calendar ||| cooking ||| datetime ||| email
+      ||| general ||| iot ||| lists ||| music ||| news ||| play ||| qa ||| recommendation
+      ||| social ||| takeaway ||| transport ||| weather
+    id: 23659b4a-c740-46d5-adb9-1261026dc1ce
+    jinja: 'What service does the following piece of text talk about?
+
+      Choices are {{ answer_choices[0:-1] | join(", ")}} or {{answer_choices[-1]}}.
+
+      {{text}}
+
+      |||
+
+      {{answer_choices[answer_choices.index(scenario)]}} {# Hack to make sure answer
+      is actually in answer_choices #}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: what_service_talk_about_choices
+    reference: ''
+  586b9200-ab35-4559-8b0d-20cb5d874fe2: !Template
+    answer_choices: alarm query ||| alarm remove ||| alarm set ||| audio volume down
+      ||| audio volume mute ||| audio volume other ||| audio volume up ||| calendar
+      query ||| calendar remove ||| calendar set ||| cooking query ||| cooking recipe
+      ||| date time convert ||| date time query ||| email add contact ||| email query
+      ||| email query contact ||| email send email ||| general affirm ||| general
+      command stop ||| general confirm ||| general don't care ||| general explain
+      ||| general greet ||| general joke ||| general negate ||| general praise |||
+      general quirky ||| general repeat ||| internet of things cleaning ||| internet
+      of things coffee ||| internet of things hue light change ||| internet of things
+      hue light dim ||| internet of things hue light off ||| internet of things hue
+      light on ||| internet of things hue light up ||| internet of things wemo off
+      ||| internet of things wemo on ||| lists create or add ||| lists query ||| lists
+      remove ||| music dislikeness ||| music likeness ||| music query ||| music settings
+      ||| news query ||| play audiobook ||| play game ||| play music ||| play podcasts
+      ||| play radio ||| question answer currency ||| question answer definition |||
+      question answer factoid ||| question answer maths ||| question answer stock
+      ||| recommendation events ||| recommendation locations ||| recommendation movies
+      ||| social post ||| social query ||| takeaway order ||| takeaway query ||| transport
+      query ||| transport taxi ||| transport ticket ||| transport traffic ||| weather
+      query
+    id: 586b9200-ab35-4559-8b0d-20cb5d874fe2
+    jinja: 'Classify this request based on the user''s intent:
+
+      {{text}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: classify_intent
+    reference: ''
+  bba54daf-a2ed-4bcb-ad63-8ad900fae3a7: !Template
+    answer_choices: null
+    id: bba54daf-a2ed-4bcb-ad63-8ad900fae3a7
+    jinja: "What would be a typical query for activating the following service ? \n\
+      {{scenario}}\n|||\n{{text}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      original_task: false
+    name: intent_to_query
+    reference: ''
+  c1a4b9b6-09fa-41ca-820c-45c088a429b5: !Template
+    answer_choices: alarm query ||| alarm remove ||| alarm set ||| audio volume down
+      ||| audio volume mute ||| audio volume other ||| audio volume up ||| calendar
+      query ||| calendar remove ||| calendar set ||| cooking query ||| cooking recipe
+      ||| date time convert ||| date time query ||| email add contact ||| email query
+      ||| email query contact ||| email send email ||| general affirm ||| general
+      command stop ||| general confirm ||| general don't care ||| general explain
+      ||| general greet ||| general joke ||| general negate ||| general praise |||
+      general quirky ||| general repeat ||| internet of things cleaning ||| internet
+      of things coffee ||| internet of things hue light change ||| internet of things
+      hue light dim ||| internet of things hue light off ||| internet of things hue
+      light on ||| internet of things hue light up ||| internet of things wemo off
+      ||| internet of things wemo on ||| lists create or add ||| lists query ||| lists
+      remove ||| music dislikeness ||| music likeness ||| music query ||| music settings
+      ||| news query ||| play audiobook ||| play game ||| play music ||| play podcasts
+      ||| play radio ||| question answer currency ||| question answer definition |||
+      question answer factoid ||| question answer maths ||| question answer stock
+      ||| recommendation events ||| recommendation locations ||| recommendation movies
+      ||| social post ||| social query ||| takeaway order ||| takeaway query ||| transport
+      query ||| transport taxi ||| transport ticket ||| transport traffic ||| weather
+      query
+    id: c1a4b9b6-09fa-41ca-820c-45c088a429b5
+    jinja: "Classify this request into one of the following intents: \n{{answer_choices[0:-1]\
+      \  | join(', ') }} or {{answer_choices[-1]}}.\n{{text}}\n|||\n{{answer_choices[label]}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: classify_intent_choices
+    reference: ''
+  cbc45b59-04c7-490e-93d4-e923f6d3c8e1: !Template
+    answer_choices: alarm query ||| alarm remove ||| alarm set ||| audio volume down
+      ||| audio volume mute ||| audio volume other ||| audio volume up ||| calendar
+      query ||| calendar remove ||| calendar set ||| cooking query ||| cooking recipe
+      ||| date time convert ||| date time query ||| email add contact ||| email query
+      ||| email query contact ||| email send email ||| general affirm ||| general
+      command stop ||| general confirm ||| general don't care ||| general explain
+      ||| general greet ||| general joke ||| general negate ||| general praise |||
+      general quirky ||| general repeat ||| internet of things cleaning ||| internet
+      of things coffee ||| internet of things hue light change ||| internet of things
+      hue light dim ||| internet of things hue light off ||| internet of things hue
+      light on ||| internet of things hue light up ||| internet of things wemo off
+      ||| internet of things wemo on ||| lists create or add ||| lists query ||| lists
+      remove ||| music dislikeness ||| music likeness ||| music query ||| music settings
+      ||| news query ||| play audiobook ||| play game ||| play music ||| play podcasts
+      ||| play radio ||| question answer currency ||| question answer definition |||
+      question answer factoid ||| question answer maths ||| question answer stock
+      ||| recommendation events ||| recommendation locations ||| recommendation movies
+      ||| social post ||| social query ||| takeaway order ||| takeaway query ||| transport
+      query ||| transport taxi ||| transport ticket ||| transport traffic ||| weather
+      query
+    id: cbc45b59-04c7-490e-93d4-e923f6d3c8e1
+    jinja: 'What is the user who made this request trying to do?
+
+      Request: {{text}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what_does_user_want
+    reference: ''
+  ce869e8f-7975-4d5c-bd91-a23624c17285: !Template
+    answer_choices: alarm ||| audio ||| calendar ||| cooking ||| datetime ||| email
+      ||| general ||| iot ||| lists ||| music ||| news ||| play ||| qa ||| recommendation
+      ||| social ||| takeaway ||| transport ||| weather
+    id: ce869e8f-7975-4d5c-bd91-a23624c17285
+    jinja: 'What service does the following piece of text talk about?
+
+      {{text}}
+
+      |||
+
+      {{answer_choices[answer_choices.index(scenario)]}} {# Hack to make sure answer
+      is actually in answer_choices #}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: what_service_talk_about
+    reference: ''

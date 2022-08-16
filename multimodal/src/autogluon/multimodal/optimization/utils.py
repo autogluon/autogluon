@@ -10,6 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_metric_learning import distances, losses, miners
 from torch import nn, optim
 from torch.nn import functional as F
+from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
 
 from ..constants import (
@@ -245,6 +246,15 @@ def get_optimizer(
             lr=lr,
             weight_decay=weight_decay,
             momentum=momentum,
+        )
+    elif optim_type == "adafactor":
+        optimizer = Adafactor(
+            optimizer_grouped_parameters,
+            lr=lr,
+            weight_decay=weight_decay,
+            scale_parameter=True, # Generally recommended to enabel scaling
+            relative_step=False,
+            warmup_init=False,
         )
     else:
         raise ValueError(f"unknown optimizer: {optim_type}")

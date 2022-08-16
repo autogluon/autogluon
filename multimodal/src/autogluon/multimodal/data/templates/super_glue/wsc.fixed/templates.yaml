@@ -1,0 +1,155 @@
+dataset: super_glue
+subset: wsc.fixed
+templates:
+  212fb8b1-8436-4f64-8f37-a9094fe029f4: !Template
+    answer_choices: No ||| Yes
+    id: 212fb8b1-8436-4f64-8f37-a9094fe029f4
+    jinja: '{{ text }} In the previous sentence, does the pronoun "{{ span2_text.lower()
+      }}" refer to {{ span1_text }}? Yes or no? ||| {% if label != -1 %}{{ answer_choices[label]
+      }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does the pronoun refer to
+    reference: "Adapted from Perez et al. 2021 and Schick & Sch\xFCtz 2021."
+  23361c5d-b67f-4c2a-9da7-16301c55d0e1: !Template
+    answer_choices: No ||| Yes
+    id: 23361c5d-b67f-4c2a-9da7-16301c55d0e1
+    jinja: '{{ text }} Here, by "{{ span2_text }}" they mean "{{ span1_text }}". Yes
+      or no? ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: by p they mean
+    reference: ''
+  2f17f18b-6daa-44ef-a2dd-dddaf04aec0e: !Template
+    answer_choices: False ||| True
+    id: 2f17f18b-6daa-44ef-a2dd-dddaf04aec0e
+    jinja: "{{ text }} \n\nIn other words, {{ text.split(\" \")[span2_index:] | join(\"\
+      \ \") | replace(span2_text, span1_text) }} True or false? ||| {% if label !=\
+      \ -1 %}{{ answer_choices[label] }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: in other words
+    reference: ''
+  4b3e29cc-ccb8-4e4c-a845-4935ca29cf34: !Template
+    answer_choices: No ||| Yes
+    id: 4b3e29cc-ccb8-4e4c-a845-4935ca29cf34
+    jinja: '{{ text }} I think they mean "{{ text.split(" ")[span2_index:] | join("
+      ") | replace(span2_text, span1_text) }}" Yes or no? ||| {% if label != -1 %}{{
+      answer_choices[label] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: I think they mean
+    reference: ''
+  7482d24f-cf45-4013-b82d-369489fc958b: !Template
+    answer_choices: No ||| Yes
+    id: 7482d24f-cf45-4013-b82d-369489fc958b
+    jinja: '{{ text }} Here, does "{{ span2_text.lower() }}" stand for {{ span1_text
+      }}? Yes or no? ||| {% if label != -1 %}{{ answer_choices[label] }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: does p stand for
+    reference: ''
+  7d377293-d043-4b6c-8ec1-d61eaf14ec67: !Template
+    answer_choices: No ||| Yes
+    id: 7d377293-d043-4b6c-8ec1-d61eaf14ec67
+    jinja: "Passage: {{ text }} \n\nQuestion: In the passage above, does the pronoun\
+      \ \"{{ span2_text }}\" refer to {{ span1_text }}?\n\nAnswer: ||| {% if label\
+      \ != -1 %}{{ answer_choices[label] }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: GPT-3 Style
+    reference: Adapted from Figure G33, p. 59, Brown et al. 2020
+  809eacd0-2f6c-4e3a-b52a-57c783879d36: !Template
+    answer_choices: No ||| Yes
+    id: 809eacd0-2f6c-4e3a-b52a-57c783879d36
+    jinja: '{{ text }} In the previous sentence, can the pronoun "{{ span2_text }}"
+      be replaced with "{{ span1_text }}"? Yes or no? ||| {% if label != -1 %}{{ answer_choices[label]
+      }}{% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: replaced with
+    reference: ''
+  87f97aa0-1fa9-4f0b-b8e6-89d3c1f19bd6: !Template
+    answer_choices: False ||| True
+    id: 87f97aa0-1fa9-4f0b-b8e6-89d3c1f19bd6
+    jinja: "Context: {{ text }} \n\n{% if span2_text.lower()  == \"they\" or span2_text.lower()\
+      \ == \"them\" %}\nQuestion: \"{{ span2_text }}\" are {{ span1_text }}. True\
+      \ or false?\n{% else %}\nQuestion: \"{{ span2_text }}\" is {{ span1_text }}.\
+      \ True or false?\n{% endif %}\n\nAnswer: ||| {% if label != -1 %}{{ answer_choices[label]\
+      \ }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: p is/are r
+    reference: ''
+  aae24b54-c3a7-4f69-8b77-f6dc115988f8: !Template
+    answer_choices: False ||| True
+    id: aae24b54-c3a7-4f69-8b77-f6dc115988f8
+    jinja: "{{ text }} \nIn the passage above, the pronoun \"{{ span2_text }}\" refers\
+      \ to {{ span1_text }}. True or false? ||| {% if label != -1 %}{{ answer_choices[label]\
+      \ }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: the pronoun refers to
+    reference: "Adapted from Perez et al. 2021 and Schick & Sch\xFCtz 2021."
+  d88f3e21-42dc-49a5-924d-69b764a14816: !Template
+    answer_choices: No ||| Yes
+    id: d88f3e21-42dc-49a5-924d-69b764a14816
+    jinja: "{{ text }} \n{% if span2_text.lower()  == \"they\" or span2_text.lower()\
+      \ == \"them\" %}\nQuestion: Who or what are \"{{ span2_text.lower() }}\"? {{\
+      \ span1_text }}?\n{% else %}\nQuestion: Who or what is \"{{ span2_text.lower()\
+      \ }}\"? Is it {{ span1_text }}?\n{% endif %}\nAnswer: ||| {% if label != -1\
+      \ %}{{ answer_choices[label] }}{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Who or what is/are
+    reference: I double checked the only plural pronouns in WSC are "they" and "them".

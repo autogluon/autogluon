@@ -1,0 +1,179 @@
+dataset: squadshifts
+subset: amazon
+templates:
+  24400f56-8d4e-4090-8b37-1861aad5bbb6: !Template
+    answer_choices: null
+    id: 24400f56-8d4e-4090-8b37-1861aad5bbb6
+    jinja: 'I''m creating a final exam for my reading class. Can you please come up
+      with a good question to quiz how well students have read the following text
+      snippet?
+
+
+      {{context}}
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: exam_creation_help
+    reference: 'Question generation '
+  32575c5c-52b4-49f6-82a8-2dd7828091d4: !Template
+    answer_choices: null
+    id: 32575c5c-52b4-49f6-82a8-2dd7828091d4
+    jinja: 'After reading the following paragraph, please answer this question: {{question}}
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: after
+    reference: First question, then answer
+  6cb1fa6d-3dfb-4eba-b962-444ed826bd23: !Template
+    answer_choices: null
+    id: 6cb1fa6d-3dfb-4eba-b962-444ed826bd23
+    jinja: 'I''m working on the final exam for my class and am trying to figure out
+      the answer to the question "{{question}}" I found the following info on Amazon
+      and I think it has the answer. Can you tell me the answer?
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: exam
+    reference: 'Exam style prompt '
+  8fa4d051-8704-48ab-9b57-981a5e2b4cd4: !Template
+    answer_choices: null
+    id: 8fa4d051-8704-48ab-9b57-981a5e2b4cd4
+    jinja: 'Please come up with a good question to test reading comprehension about
+      the following paragraph:
+
+
+      {{context}}
+
+
+      |||
+
+
+      {{question}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: generate_question
+    reference: question generation task
+  a158a9f3-4b8c-470b-8dd0-08f02554da6f: !Template
+    answer_choices: null
+    id: a158a9f3-4b8c-470b-8dd0-08f02554da6f
+    jinja: '{{["Question", "Problem"]  | choice}} {{range(1, 12) | choice}}: {{question}}
+
+
+      Hint: {{context}}
+
+
+      |||
+
+      {{answers["text"] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: question_num_hint_answer
+    reference: 'The prompt has a prefix of question or problem and chooses a random
+      number followed the actual question. '
+  ae6bf01b-a5a3-4c78-a922-f0bbf0b72653: !Template
+    answer_choices: null
+    id: ae6bf01b-a5a3-4c78-a922-f0bbf0b72653
+    jinja: 'I''ve always wondered: {{question}}
+
+
+      I searched Amazon and this is what I found. What''s the answer?
+
+
+      {{context}}
+
+
+      |||
+
+      {{answers[''text''] | most_frequent | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: wondered
+    reference: 'Original task prompt '
+  b7f7b2b5-e099-40c9-bc7c-93e957b32c8d: !Template
+    answer_choices: null
+    id: b7f7b2b5-e099-40c9-bc7c-93e957b32c8d
+    jinja: 'Use the following answers to generate a possible short passage-question
+      pair:
+
+      {{answers["text"]|join('', '')}} |||
+
+      {{context}}
+
+      {{question}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: answers_question
+    reference: Generate a question-passage pair from the answer
+  d0d3b9ba-a138-46d3-968b-679ec4fb570b: !Template
+    answer_choices: null
+    id: d0d3b9ba-a138-46d3-968b-679ec4fb570b
+    jinja: "{{context}}\n\nWith the help of the passage, please answer the following\
+      \ question: \n{{question}} |||\n{{answers[\"text\"]|choice}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: pick_one_answer
+    reference: The prompt randomly picks one correct answer

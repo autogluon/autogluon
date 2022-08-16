@@ -1,0 +1,77 @@
+dataset: generated_reviews_enth
+templates:
+  7f158fb6-bbdd-41b8-bed7-21508c9f3c80: !Template
+    answer_choices: no ||| yes
+    id: 7f158fb6-bbdd-41b8-bed7-21508c9f3c80
+    jinja: Does "{{translation.en}}" seem like a positive review to you? ||| {{answer_choices[0
+      if review_star<3 else 1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - AUC
+      - Accuracy
+      original_task: true
+    name: seem like a positive review
+    reference: stsb_multi_mt_en
+  95136948-3402-4bd4-8a69-1aa7b85461cc: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4 ||| 5
+    id: 95136948-3402-4bd4-8a69-1aa7b85461cc
+    jinja: Rate the positivity of this review ({{"1"}} being the lowest and {{"5"}}
+      the highest).\n"{{translation.en}}" ||| {{review_star}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - AUC
+      - Accuracy
+      original_task: true
+    name: rate positive review
+    reference: stsb_multi_mt
+  ad12212f-a230-4750-a199-9791628856c4: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4 ||| 5
+    id: ad12212f-a230-4750-a199-9791628856c4
+    jinja: "How positive is the review \"{{translation.en}}\"? Give a score between\n\
+      \      {{\"0\"}} and {{\"5\"}}. ||| {{review_star}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      - AUC
+      original_task: true
+    name: how positive review
+    reference: stsb_multi_mt_en
+  cf8f4dcb-f527-4944-b9ec-a1a3e476c13f: !Template
+    answer_choices: 1 ||| 2 ||| 3 ||| 4 ||| 5
+    id: cf8f4dcb-f527-4944-b9ec-a1a3e476c13f
+    jinja: On a scale from {{"1"}} to {{"5"}}, how positive is the review "{{translation.en}}"?
+      ||| {{review_star}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - AUC
+      - Accuracy
+      original_task: true
+    name: scale of positive review
+    reference: stsb_multi_mt_en
+  e6c55d56-23d4-41a4-9908-e9366cc2e167: !Template
+    answer_choices: no ||| yes
+    id: e6c55d56-23d4-41a4-9908-e9366cc2e167
+    jinja: Do you think "{{translation.en}}" is a positive review? ||| {{answer_choices[0
+      if review_star < 3 else 1]}}
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - AUC
+      - Accuracy
+      original_task: true
+    name: think positive review
+    reference: stsb_multi_mt_en

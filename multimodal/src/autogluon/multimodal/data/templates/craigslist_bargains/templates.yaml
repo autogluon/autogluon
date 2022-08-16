@@ -1,0 +1,320 @@
+dataset: craigslist_bargains
+templates:
+  145dd841-b971-4550-bc88-305ad3278d58: !Template
+    answer_choices: good ||| bad ||| incomplete
+    id: 145dd841-b971-4550-bc88-305ad3278d58
+    jinja: 'The following conversation is a negotiation on craigslist. The first speaker
+      is the buyer, and the second speaker is the seller.
+
+
+      {{utterance | join("\n\n")}}
+
+
+      From the seller''s point of view, this deal could be considered
+
+      |||
+
+      {% set nonzero_price = [] %}
+
+      {% for p in dialogue_acts["price"] %}
+
+      {% if p>-1 %}
+
+      {{nonzero_price.append(p) or ""}}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% set final_price = -1 %}
+
+      {% if nonzero_price | length != 0 %}{% set final_price = nonzero_price[-1] %}{%
+      endif %}
+
+      {% if final_price == -1 %}
+
+      {{answer_choices[2]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) == ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[0]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) < ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[1]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) > ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[0]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: good deal for seller no list price implicit
+    reference: implicit version of "good deal for seller no list price"
+  27010b55-dd5b-4ee9-9e14-a4b809aa6cdb: !Template
+    answer_choices: yes ||| no ||| unknown
+    id: 27010b55-dd5b-4ee9-9e14-a4b809aa6cdb
+    jinja: 'The following conversation is a negotiation on craigslist. The first speaker
+      is the buyer, and the second speaker is the seller.
+
+
+      {{utterance | join("\n\n")}}
+
+
+      Was this a good deal for the seller? answer "{{answer_choices[0]}}", "{{answer_choices[1]}}",
+      or "{{answer_choices[2]}}".
+
+      |||
+
+      {% set nonzero_price = [] %}
+
+      {% for p in dialogue_acts["price"] %}
+
+      {% if p>-1 %}
+
+      {{nonzero_price.append(p) or ""}}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% set final_price = -1 %}
+
+      {% if nonzero_price | length != 0 %}{% set final_price = nonzero_price[-1] %}{%
+      endif %}
+
+      {% if final_price == -1 %}
+
+      {{answer_choices[2]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) == ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[0]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) < ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[1]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) > ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[1]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: good deal for seller no list price
+    reference: same as "good deal for seller" prompt, but excludes the list price
+  3e1e2993-2b41-493b-8f27-9a7bb7fa4a0b: !Template
+    answer_choices: null
+    id: 3e1e2993-2b41-493b-8f27-9a7bb7fa4a0b
+    jinja: 'The following conversation is a negotiation on craigslist. The first speaker
+      is the buyer, and the second speaker is the seller. The listed price was ${{items["Price"][0]}}0.
+
+
+      {{utterance | join("\n\n")}}
+
+
+      How much was the gap between the target of the buyer and the seller?
+
+      |||
+
+      ${{(agent_info[''Target''][0] - agent_info[''Target''][1]) | abs}}0'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: gap between parties
+    reference: asks model explicitly what the gap was between the buyer's target and
+      the seller's target
+  78d1b487-c535-4a0d-ae49-055d321db3fd: !Template
+    answer_choices: yes ||| no ||| unknown
+    id: 78d1b487-c535-4a0d-ae49-055d321db3fd
+    jinja: 'The following conversation is a negotiation on craigslist. The first speaker
+      is the buyer, and the second speaker is the seller. The listed price was ${{items["Price"][0]}}.
+
+
+      {{utterance | join("\n\n")}}
+
+
+      Was this a good deal for the seller? Answer "{{answer_choices[0]}}" or "{{answer_choices[1]}}",
+      or "{{answer_choices[2]}}".
+
+      |||
+
+      {% set nonzero_price = [] %}
+
+      {% for p in dialogue_acts["price"] %}
+
+      {% if p>-1 %}
+
+      {{nonzero_price.append(p) or ""}}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% set final_price = -1 %}
+
+      {% if nonzero_price | length != 0 %}{% set final_price = nonzero_price[-1] %}{%
+      endif %}
+
+      {% if final_price == -1 %}
+
+      {{answer_choices[2]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) == ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[0]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) < ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[1]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) > ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[0]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: good deal for seller
+    reference: asks the model whether the deal was good for the seller or not (it's
+      good if the seller's target is closer to the final price than the buyer's, or
+      there is a tie)
+  a1dbb258-2e5c-4160-986b-46fc03546965: !Template
+    answer_choices: buyer |||  seller ||| neither ||| unknown
+    id: a1dbb258-2e5c-4160-986b-46fc03546965
+    jinja: 'The following conversation is a negotiation on craigslist. The first speaker
+      is the buyer, and the second speaker is the seller. The listed price was ${{items["Price"][0]}}.
+
+
+      {{utterance | join("\n\n")}}
+
+      Question: Which party got the better deal? Choose from:
+
+      - {{answer_choices[0]}}
+
+      - {{answer_choices[1]}}
+
+      - {{answer_choices[2]}}
+
+      - {{answer_choices[3]}}
+
+
+      Answer:
+
+      |||
+
+      {% set nonzero_price = [] %}
+
+      {% for p in dialogue_acts["price"] %}
+
+      {% if p>-1 %}
+
+      {{nonzero_price.append(p) or ""}}
+
+      {% endif %}
+
+      {% endfor %}
+
+      {% set final_price = -1 %}
+
+      {% if nonzero_price | length != 0 %}{% set final_price = nonzero_price[-1] %}{%
+      endif %}
+
+      {% if final_price == -1 %}
+
+      {{answer_choices[3]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) == ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[2]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) < ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[0]}}
+
+      {% elif ((final_price - agent_info["Target"][0]) | abs) > ((final_price - agent_info["Target"][1])
+      | abs) %}
+
+      {{answer_choices[1]}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: best deal
+    reference: explicitly asks model which party got the best deal
+  b891bbe7-b3da-4118-b54f-4faa647e36f4: !Template
+    answer_choices: null
+    id: b891bbe7-b3da-4118-b54f-4faa647e36f4
+    jinja: 'The following conversation is a negotiation on craigslist. The first speaker
+      is the buyer, and the second speaker is the seller.
+
+
+      {% set nonempty_utterance = [] %}
+
+      {% for line in utterance  %}
+
+      {% if line != ""  %}
+
+      {{ nonempty_utterance.append(line) or "" }}
+
+      {% endif %}
+
+      {% endfor %}
+
+
+      {{nonempty_utterance[:-1] | join(''\n\n'')}}
+
+
+      Question: What could be the next line in the negotiation?
+
+      Answer:
+
+      |||
+
+      {{nonempty_utterance[-1]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: true
+    name: generate line
+    reference: Generates the next line of negotiation

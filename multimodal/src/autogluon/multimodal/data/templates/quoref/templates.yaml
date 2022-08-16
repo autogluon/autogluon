@@ -1,0 +1,222 @@
+dataset: quoref
+templates:
+  4120bebc-9c8f-44af-8d1a-a65e443ce010: !Template
+    answer_choices: null
+    id: 4120bebc-9c8f-44af-8d1a-a65e443ce010
+    jinja: 'The answer to the question: {{question}} is inside the article: {{context}},
+      can you guess it ?
+
+
+      |||
+
+      {{answers.text | choice}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Guess Answer
+    reference: ''
+  6f1d5031-1377-4b8a-9475-987b2275b8da: !Template
+    answer_choices: null
+    id: 6f1d5031-1377-4b8a-9475-987b2275b8da
+    jinja: 'Given the following context:
+
+
+      {{context}}
+
+
+      answer the following question:
+
+
+      {{question}} |||
+
+      {{answers.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Answer Question Given Context
+    reference: ''
+  9493f80a-daf5-4c30-a9fc-7bc5bc61b5e9: !Template
+    answer_choices: null
+    id: 9493f80a-daf5-4c30-a9fc-7bc5bc61b5e9
+    jinja: "The following article contains an answer for the question: {{question}}\
+      \ , can you please find it? \n\n{{context}}|||\n{{answers.text | choice}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Find Answer
+    reference: ''
+  a3e5e25d-0a87-4cb8-89ab-3539fc4d23cb: !Template
+    answer_choices: null
+    id: a3e5e25d-0a87-4cb8-89ab-3539fc4d23cb
+    jinja: 'This article: {{context}} contains an answer for the question: {{question}},
+      what is it ?
+
+      |||
+
+      {{answers.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Context Contains Answer
+    reference: ''
+  aa26aab2-d2e7-4560-b7eb-0cbcff7c0f31: !Template
+    answer_choices: null
+    id: aa26aab2-d2e7-4560-b7eb-0cbcff7c0f31
+    jinja: '{{question}}
+
+
+      Answer the above question based on the context below:
+
+
+      {{context}} |||
+
+      {{answers.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Given Context Answer Question
+    reference: ''
+  abdfa570-2de5-406c-9051-caa6a1362796: !Template
+    answer_choices: null
+    id: abdfa570-2de5-406c-9051-caa6a1362796
+    jinja: 'What is the answer for the question: {{question}} from the following article
+      ?
+
+
+      {{context}}|||
+
+      {{answers.text | choice}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: What Is The Answer
+    reference: ''
+  b3ec0888-dd6f-466a-abd4-b2fbcacfdb8b: !Template
+    answer_choices: null
+    id: b3ec0888-dd6f-466a-abd4-b2fbcacfdb8b
+    jinja: 'I have a test where I am given the following article, what is an answer
+      for the question: {{question}} ?
+
+
+      {{context}}|||
+
+      {{answers.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Answer Test
+    reference: ''
+  bf525757-8cde-4839-81fb-a85be3fd1192: !Template
+    answer_choices: null
+    id: bf525757-8cde-4839-81fb-a85be3fd1192
+    jinja: 'Given the below context:
+
+
+      {{context}}
+
+
+      Guess a valid title for it! |||
+
+      {{title}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: false
+    name: Guess Title For Context
+    reference: ''
+  d055747f-7a32-4e12-aab1-fed35d42a445: !Template
+    answer_choices: null
+    id: d055747f-7a32-4e12-aab1-fed35d42a445
+    jinja: 'Found the following article online, use it to answer the question: {{question}}
+
+
+      {{context}}|||
+
+      {{answers.text | choice}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Found Context Online
+    reference: ''
+  d1abb8a0-03c4-41ef-865c-aa275278a0e4: !Template
+    answer_choices: null
+    id: d1abb8a0-03c4-41ef-865c-aa275278a0e4
+    jinja: 'A friend asked me to answer this question: {{question}}, using the article:
+      {{context}}, what would be the answer ?
+
+
+      |||
+
+      {{answers.text | choice}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: Answer Friend Question
+    reference: ''
+  fcbe0609-06ce-4cbd-91de-adc38966bcac: !Template
+    answer_choices: null
+    id: fcbe0609-06ce-4cbd-91de-adc38966bcac
+    jinja: 'Read the following paragraph and extract the answer for the question:
+      {{question}}
+
+
+      {{context}} |||
+
+      {{answers.text | choice}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: 'Read And Extract '
+    reference: ''

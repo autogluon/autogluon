@@ -1,0 +1,265 @@
+dataset: piqa
+templates:
+  16e97a16-c958-4956-bfba-279f88dafd5b: !Template
+    answer_choices: '{{sol1}} ||| {{sol2}}'
+    id: 16e97a16-c958-4956-bfba-279f88dafd5b
+    jinja: 'Goal: {{goal}}
+
+
+      Which is the correct ending?
+
+      - {{sol1}}
+
+      - {{sol2}}
+
+
+      Answer:
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: what_is_the_correct_ending
+    reference: ''
+  3f336295-c1f7-410a-8fc6-d2ed79487aa4: !Template
+    answer_choices: '{{sol1}} ||| {{sol2}}'
+    id: 3f336295-c1f7-410a-8fc6-d2ed79487aa4
+    jinja: '{{"Solution 1"}}: {{sol1}}
+
+      {{"Solution 2"}}: {{sol2}}
+
+
+      Goal: {{goal}}
+
+
+      Given the goal, what is the correct solution?
+
+
+      Answer by copying the correct solution
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_correct_choice_with_choice_given_before_goal
+    reference: ''
+  44778818-7b73-4262-a294-c00fc32b6c2c: !Template
+    answer_choices: 1 ||| 2
+    id: 44778818-7b73-4262-a294-c00fc32b6c2c
+    jinja: 'Sentence: {{goal}}
+
+
+      Choice {{answer_choices[0]}}: {{sol1}}
+
+
+      Choice {{answer_choices[1]}}: {{sol2}}
+
+
+      What is the index of the correct choice for ending for the sentence?
+
+
+      Answer:
+
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: pick_correct_choice_index
+    reference: ''
+  5f4b4645-9438-4375-9062-083130e6d04e: !Template
+    answer_choices: null
+    id: 5f4b4645-9438-4375-9062-083130e6d04e
+    jinja: "Given a goal and a wrong solution, rewrite it to give a correct solution.\n\
+      Goal: {{goal}} \nSolution: {{[sol1, sol2][1 - label]}}\nCorrected solution:\n\
+      |||\n{{[sol1, sol2][label]}}\n"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: Correct the solution
+    reference: ''
+  94c39589-7bfb-4c09-9337-672369459545: !Template
+    answer_choices: '{{sol1}} ||| {{sol2}}'
+    id: 94c39589-7bfb-4c09-9337-672369459545
+    jinja: 'Finish the following sentence with the best choice: {{goal}}
+
+
+      Choices:
+
+      - {{sol1}}
+
+      - {{sol2}}
+
+
+      Answer:
+
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: finish_sentence_with_correct_choice
+    reference: ''
+  99565244-4eaf-4004-a28b-4362ba5bcac3: !Template
+    answer_choices: No ||| Yes
+    id: 99565244-4eaf-4004-a28b-4362ba5bcac3
+    jinja: '{{goal}} {{sol2}}
+
+      Does this phrase make sense?
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Does this solution make sense? sol2
+    reference: ''
+  adfef248-f856-44fa-affd-e3223718854e: !Template
+    answer_choices: Solution 1 ||| Solution 2
+    id: adfef248-f856-44fa-affd-e3223718854e
+    jinja: 'Given a goal and 2 solutions, choose the most appropriate solution.
+
+      Goal: {{goal}}
+
+      - {{"Solution 1"}}: {{sol1}}
+
+      - {{"Solution 2"}}: {{sol2}}
+
+
+      Answer by returning either {{"Solution 1"}} or {{"Solution 2"}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: choose the most appropriate solution
+    reference: ''
+  b5c69473-eedb-4c4f-a5fa-d4e266e43535: !Template
+    answer_choices: null
+    id: b5c69473-eedb-4c4f-a5fa-d4e266e43535
+    jinja: 'Given a sentence, correct it if it doesn''t make sense. If it makes sense,
+      just return it as the answer.
+
+      Input: {{goal}} {{sol2[0].lower() + sol2[1:]}}
+
+      Output:
+
+      |||
+
+      {{goal}} {{[sol1[0].lower() + sol1[1:], sol2[0].lower() + sol2[1:]][label]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Correct the solution if false: from sol 2'
+    reference: ''
+  c8c45ef1-2ffc-43d7-8710-b98c2fc4f699: !Template
+    answer_choices: null
+    id: c8c45ef1-2ffc-43d7-8710-b98c2fc4f699
+    jinja: '{{goal}}
+
+      |||
+
+      {{[sol1[0].lower() + sol1[1:], sol2[0].lower() + sol2[1:]][label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: no prompt needed
+    reference: ''
+  f044def7-01c2-42de-b6ad-4e8c63ab2bf1: !Template
+    answer_choices: Yes ||| No
+    id: f044def7-01c2-42de-b6ad-4e8c63ab2bf1
+    jinja: 'Does this phrase make sense?
+
+      {{goal}} {{sol1[0].lower() + sol1[1:]}}
+
+      Answer with {{answer_choices[0]}} or {{answer_choices[1]}}
+
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Does this solution make sense? sol1
+    reference: ''
+  f42cd457-a14b-465a-a139-d7d2407a3bac: !Template
+    answer_choices: null
+    id: f42cd457-a14b-465a-a139-d7d2407a3bac
+    jinja: 'Sentence: {{goal}} {{sol1[0].lower() + sol1[1:]}}
+
+      If the sentence does not make sense, correct it so that it does make sense.
+      Otherwise, just copy it.
+
+      Answer:
+
+      |||
+
+      {{goal}} {{[sol1[0].lower() + sol1[1:], sol2[0].lower() + sol2[1:]][label]}}
+
+      '
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: 'Correct the solution if false: from sol 1'
+    reference: ''

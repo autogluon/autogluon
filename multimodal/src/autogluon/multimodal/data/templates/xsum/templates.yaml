@@ -1,0 +1,180 @@
+dataset: xsum
+templates:
+  13c02904-e4e2-4b4f-b115-44b437d22041: !Template
+    answer_choices: null
+    id: 13c02904-e4e2-4b4f-b115-44b437d22041
+    jinja: '{{document}}
+
+
+      ===
+
+
+      Write a summary of the text above : ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: DOC_write_summary_of_above
+    reference: ''
+  30292806-8e58-463c-8d92-ba525411c6fa: !Template
+    answer_choices: null
+    id: 30292806-8e58-463c-8d92-ba525411c6fa
+    jinja: 'Article: {{document}}
+
+
+      Summary: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: article_DOC_summary
+    reference: Prefix-Tuning
+  3d388a1e-3361-407b-baa7-61397cc58382: !Template
+    answer_choices: null
+    id: 3d388a1e-3361-407b-baa7-61397cc58382
+    jinja: '{{document}}
+
+      How would you rephrase that in a few words? ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: DOC_how_would_you_rephrase_few_words
+    reference: http://gptprompts.wikidot.com/prompt:summarization
+  4cfe4126-b9f5-44eb-8a98-973987c5f32e: !Template
+    answer_choices: null
+    id: 4cfe4126-b9f5-44eb-8a98-973987c5f32e
+    jinja: 'My college roommate asked me what this article means:
+
+
+      {{document}}
+
+
+      So I recapped it in layman''s terms: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: college_roommate_asked_DOC_so_I_recap
+    reference: http://gptprompts.wikidot.com/prompt:summarization
+  57a7a3f1-91f8-4f4b-b72d-745d7cb7b1e3: !Template
+    answer_choices: null
+    id: 57a7a3f1-91f8-4f4b-b72d-745d7cb7b1e3
+    jinja: '{{document}}
+
+      This boils down to the simple idea that ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: DOC_boils_down_to_simple_idea_that
+    reference: http://gptprompts.wikidot.com/prompt:summarization
+  65a3c419-57e9-48c2-b090-0c5d7adb23c6: !Template
+    answer_choices: null
+    id: 65a3c419-57e9-48c2-b090-0c5d7adb23c6
+    jinja: 'Summarize: {{document}}|||
+
+      {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: summarize_DOC
+    reference: ''
+  752fda48-e64c-47a7-8342-17c2c113f600: !Template
+    answer_choices: null
+    id: 752fda48-e64c-47a7-8342-17c2c113f600
+    jinja: 'Summarize this document: {{document}}
+
+      Summary: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: summarize_this_DOC_summary
+    reference: ''
+  826ffcd4-c0e6-4f4c-bd9a-fcf8ee169ede: !Template
+    answer_choices: null
+    id: 826ffcd4-c0e6-4f4c-bd9a-fcf8ee169ede
+    jinja: '{{document}}
+
+
+      ===
+
+
+      Given the above document, write one sentence to summarize: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: DOC_given_above_write_one_sentence
+    reference: ''
+  9a3f617f-628f-4fa5-9b74-47d0b166a487: !Template
+    answer_choices: null
+    id: 9a3f617f-628f-4fa5-9b74-47d0b166a487
+    jinja: 'First, please read the article below.
+
+
+      {{document}}
+
+
+      Now, can you write me an extremely short abstract for it?  ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: read_below_DOC_write_abstract
+    reference: ''
+  d878b768-9da2-4d9d-9517-1edcca3b1b26: !Template
+    answer_choices: null
+    id: d878b768-9da2-4d9d-9517-1edcca3b1b26
+    jinja: '{{document}}
+
+
+      TL;DR: ||| {{summary}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - ROUGE
+      - BLEU
+      original_task: true
+    name: DOC_tldr
+    reference: GPT-2 TLDR

@@ -1,0 +1,108 @@
+dataset: tweet_eval
+subset: stance_hillary
+templates:
+  21ba1c40-b491-43ed-96d6-7423b55c3bcf: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 21ba1c40-b491-43ed-96d6-7423b55c3bcf
+    jinja: 'Does the author express any stance about Hillary in the following text?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Hillary_predict_stance
+    reference: ''
+  41502ea8-73a4-48a4-a15e-ab2ac7700457: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 41502ea8-73a4-48a4-a15e-ab2ac7700457
+    jinja: 'What option among, {{"neutral"}}, {{"against"}}, {{"in favor"}}, best
+      describes the stance of this tweet regarding Hillary?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Hillary_option
+    reference: ''
+  498f1dec-12dc-4082-a44e-82fcae004bb8: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 498f1dec-12dc-4082-a44e-82fcae004bb8
+    jinja: 'Is this tweet neutral, in favor of, or against Hillary?
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Hillary
+    reference: ''
+  5c451846-349a-44ad-83ef-d0f8e5d2bd6b: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 5c451846-349a-44ad-83ef-d0f8e5d2bd6b
+    jinja: '{{text}} Where does the above sentence stand on Hillary? |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Hillary_guess_passive
+    reference: ''
+  83f10728-2347-46e9-b365-724f47e65877: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: 83f10728-2347-46e9-b365-724f47e65877
+    jinja: '{{text}} Where does the author of the above sentence stand on Hillary?
+      |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Hillary_guess_passive_author
+    reference: ''
+  b521857a-9d4f-4e21-848b-0baf7f4a636c: !Template
+    answer_choices: Neutral ||| Against ||| In favor
+    id: b521857a-9d4f-4e21-848b-0baf7f4a636c
+    jinja: 'How would you describe the stance used in this tweet? {{answer_choices|join(",
+      ")}}
+
+
+      {{text}} |||
+
+      {{answer_choices[label]}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Hillary_how_describe
+    reference: ''

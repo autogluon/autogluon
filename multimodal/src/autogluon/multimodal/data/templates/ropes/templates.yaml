@@ -1,0 +1,280 @@
+dataset: ropes
+templates:
+  0791ec30-6361-4e62-8dce-ca9cbf997acc: !Template
+    answer_choices: null
+    id: 0791ec30-6361-4e62-8dce-ca9cbf997acc
+    jinja: "{% if answers.text %}\nPlease answer correctly the following question\
+      \ related to the paragraph below. \n\n{{ question }}\n\n{{ situation }}\n\n\
+      Hint: {{ background }}\n|||\n{{ answers.text | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: prompt_beginning
+    reference: ''
+  0909d72d-50c7-4cbb-bec4-1f891123717c: !Template
+    answer_choices: null
+    id: 0909d72d-50c7-4cbb-bec4-1f891123717c
+    jinja: "{% if answers.text %}\n{{ situation }}\n\nGiven the paragraph above, please\
+      \ answer correctly the following question: \n\n{{ question }}\n|||\n{{ answers.text\
+      \ | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: prompt_bottom_no_hint
+    reference: ''
+  1e4944e7-4d5b-475c-8b04-4b523e96bc51: !Template
+    answer_choices: null
+    id: 1e4944e7-4d5b-475c-8b04-4b523e96bc51
+    jinja: '{% if answers.text %}
+
+      Background: {{ background }}
+
+
+      Paragraph: {{ situation }}
+
+
+      Given the paragraph above, please answer correctly the following question: {{
+      question }}
+
+      |||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: prompt_bottom_hint_beginning
+    reference: ''
+  27fb16c6-a563-46ef-af73-42e15183824e: !Template
+    answer_choices: null
+    id: 27fb16c6-a563-46ef-af73-42e15183824e
+    jinja: '{% if answers.text %}
+
+      Given the background: {{background}}
+
+
+      and the situation: {{situation}}
+
+
+      Answer the following question: {{question}}|||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: given_background_situation
+    reference: ''
+  31faf808-80ff-47af-ac49-d2cd7a7abcaf: !Template
+    answer_choices: null
+    id: 31faf808-80ff-47af-ac49-d2cd7a7abcaf
+    jinja: '{% if answers.text %}
+
+      {{ situation }}
+
+
+      {{ question }}
+
+
+      |||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: false
+    name: plain_no_background
+    reference: Task without background
+  473f2c9c-9731-443c-a641-5e43770f7df6: !Template
+    answer_choices: null
+    id: 473f2c9c-9731-443c-a641-5e43770f7df6
+    jinja: '{% if answers.text %}
+
+      {{ situation }}
+
+
+      {{ question }}
+
+
+      Hint: {{ background }}
+
+      |||
+
+      {{ answers.text | choice}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: plain_bottom_hint
+    reference: ''
+  a04f69ac-8122-4618-8426-185fc043feca: !Template
+    answer_choices: null
+    id: a04f69ac-8122-4618-8426-185fc043feca
+    jinja: '{% if answers.text %}
+
+      {{ background }}
+
+
+      {{ situation }}
+
+
+      {{ question }}
+
+      |||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: plain_background_situation
+    reference: ''
+  a17aefbb-c571-4127-8170-379e2ec83774: !Template
+    answer_choices: null
+    id: a17aefbb-c571-4127-8170-379e2ec83774
+    jinja: '{% if answers.text %}
+
+      I can use this background: {{background}}
+
+
+      Now, I have a new situation: {{situation}}
+
+
+      Answer this question please: {{question}}|||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: background_new_situation_answer
+    reference: ''
+  b6da4f12-5384-46f5-a74e-c703c19d1698: !Template
+    answer_choices: null
+    id: b6da4f12-5384-46f5-a74e-c703c19d1698
+    jinja: '{% if answers.text %}
+
+      You are given a new situation: {{situation}}
+
+
+      and a hint : {{background}}
+
+
+      Please answer this question : {{question}}|||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: background_situation_middle
+    reference: ''
+  cc747655-6472-4023-95e4-03cb85d5a1c5: !Template
+    answer_choices: null
+    id: cc747655-6472-4023-95e4-03cb85d5a1c5
+    jinja: '{% if answers.text %}
+
+      I have a new situation: {{situation}}
+
+
+      But I can use this background: {{background}}
+
+
+      What is an answer for this question: {{question}}|||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: new_situation_background_answer
+    reference: ''
+  cc8f3c6b-b800-4b47-b6ec-e8febfdaad6f: !Template
+    answer_choices: null
+    id: cc8f3c6b-b800-4b47-b6ec-e8febfdaad6f
+    jinja: "{% if answers.text %}\n{{ situation }}\n\nGiven the paragraph above, please\
+      \ answer correctly the following question: \n\n{{ question }}\n\nHint: {{ background\
+      \ }}\n|||\n{{ answers.text | choice }}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: prompt_mix
+    reference: ''
+  f62e0adb-ca74-4280-8ed3-8b53411d87ce: !Template
+    answer_choices: null
+    id: f62e0adb-ca74-4280-8ed3-8b53411d87ce
+    jinja: '{% if answers.text %}
+
+      I read this background article the other day: {{background}}
+
+
+      I am facing a new situation today: {{situation}}
+
+
+      Using the knowledge I acquired from the background article, how should I answer
+      correctly the following question regarding my new situation: {{question}}|||
+
+      {{ answers.text | choice }}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Squad
+      original_task: true
+    name: read_background_situation
+    reference: ''

@@ -1,0 +1,173 @@
+dataset: tydiqa
+subset: primary_task
+templates:
+  16f11e56-a78d-4e33-bba1-586f9947baf7: !Template
+    answer_choices: Yes ||| No ||| None
+    id: 16f11e56-a78d-4e33-bba1-586f9947baf7
+    jinja: '{% if language == "english" %}
+
+      I wonder {{question_text}}.
+
+      Help me answer this question with "{{answer_choices[0]}}" or "{{answer_choices[1]}}"
+      or "{{answer_choices[2]}}" if none of the first two answers apply.
+
+      Here''s what I found on the internet:
+
+      Topic: {{document_title}}
+
+      Article: {{document_plaintext}}
+
+      |||
+
+      {{annotations.yes_no_answer[0] | capitalize}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: heres_what_I_found
+    reference: ''
+  297fc59f-bd92-493b-ae61-3c3adcb46eb3: !Template
+    answer_choices: Yes ||| No ||| None
+    id: 297fc59f-bd92-493b-ae61-3c3adcb46eb3
+    jinja: "{% if language == \"english\" %} \nQuestion: {{question_text}}\nAnswer\
+      \ the question with {{\"Yes\"}} or {{\"No\"}}. If it is not possible then answer\
+      \ {{\"None\"}}.\nHint: {{document_plaintext}}\n|||\n{{annotations.yes_no_answer[0]\
+      \ | capitalize}}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: yes_no_none
+    reference: ''
+  4b21e3be-fba4-49b7-beb1-a61de26eb0ac: !Template
+    answer_choices: Yes ||| No
+    id: 4b21e3be-fba4-49b7-beb1-a61de26eb0ac
+    jinja: "{% if language == \"english\" %} \n    {% if annotations.yes_no_answer[0]\
+      \ == \"YES\" or annotations.yes_no_answer[0] == \"NO\" %} \nAnswer the question\
+      \ about {{document_title}}. {{question_text}}\n||| \n{{annotations.yes_no_answer[0]\
+      \ | capitalize}} \n    {% endif %} \n{% endif %} "
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: open_domain_qa_without_choices
+    reference: Answer Yes/No question
+  6835dd64-96bd-4bf8-9ba5-645d6a7b8472: !Template
+    answer_choices: Yes ||| No
+    id: 6835dd64-96bd-4bf8-9ba5-645d6a7b8472
+    jinja: '{% if language == "english" %}
+
+      {{question_text}}
+
+      Is this a "Yes/No" question?
+
+      |||
+
+      {% if annotations. yes_no_answer[0] == "NONE" %}
+
+      No
+
+      {% else %}
+
+      Yes
+
+      {% endif %}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: yes_no_question
+    reference: Ask if this is a yes no question
+  7b8b7707-dbad-40d2-a5c2-430e6ace10bb: !Template
+    answer_choices: Yes ||| No ||| None
+    id: 7b8b7707-dbad-40d2-a5c2-430e6ace10bb
+    jinja: '{% if language == "english" %}
+
+      Answer the following question with "{{answer_choices[0]}}" or "{{answer_choices[1]}}"
+      or "{{answer_choices[2]}}" if none of the first two answers apply.
+
+      Question: {{question_text}}
+
+      Topic: {{document_title}}
+
+      Article: {{document_plaintext}}
+
+      |||
+
+      {{annotations.yes_no_answer[0] | capitalize}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: read_and_answer
+    reference: ''
+  9c42e3fd-d46e-4149-bb60-4b3118104d95: !Template
+    answer_choices: Yes ||| No
+    id: 9c42e3fd-d46e-4149-bb60-4b3118104d95
+    jinja: "{% if language == \"english\" %} \n    {% if annotations.yes_no_answer[0]\
+      \ == \"YES\" or annotations.yes_no_answer[0] == \"NO\" %} \nAfter reading the\
+      \ following text snippet from Wikipedia, please answer the question: {{question_text}}\
+      \ \n{{document_plaintext}}\n||| \n{{annotations.yes_no_answer[0] | capitalize}}\n\
+      \    {% endif %}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: after_reading_the_text
+    reference: Reading Comprehension
+  b4f7c441-41b1-4665-93f9-f2e875aed92a: !Template
+    answer_choices: Yes ||| No
+    id: b4f7c441-41b1-4665-93f9-f2e875aed92a
+    jinja: "{% if language == \"english\" %} \n    {% if annotations.yes_no_answer[0]\
+      \ == \"YES\" or annotations.yes_no_answer[0] == \"NO\" %} \nAnswer the question\
+      \ about {{document_title}}.\nQuestion: {{question_text}}. Yes or No?\n||| \n\
+      {{annotations.yes_no_answer[0] | capitalize}}\n    {% endif %}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: true
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: open_domain_qa
+    reference: Ask Yes/No question
+  e593017f-9bcf-4442-944d-fcdf2edcb4f7: !Template
+    answer_choices: Yes ||| No
+    id: e593017f-9bcf-4442-944d-fcdf2edcb4f7
+    jinja: "{% if language == \"english\" %} \n    {% if annotations.yes_no_answer[0]\
+      \ == \"YES\" or annotations.yes_no_answer[0] == \"NO\" %} \nBased on the following\
+      \ text snippet, {{question_text}} \n{{document_plaintext}}\n||| \n{{annotations.yes_no_answer[0]\
+      \ | capitalize}}\n    {% endif %}\n{% endif %}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: based_on_the_text
+    reference: Binary question without mentioning KB

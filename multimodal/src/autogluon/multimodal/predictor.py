@@ -443,9 +443,9 @@ class MultiModalPredictor:
         scarcity_mode = infer_scarcity_mode_by_data_size(
             df_train=train_data, scarcity_threshold=50
         )  # Add as seperate hyperparameter somewhere?
-        if scarcity_mode == FEW_SHOT and presets != FEW_SHOT:  # TODO: check for data  type
+        if scarcity_mode == FEW_SHOT and FEW_SHOT not in presets:  # TODO: check for data  type
             logger.info(
-                f"Detected data scarcity. Consider running using the preset {FEW_SHOT} for better performance."
+                f"Detected data scarcity. Consider running using the preset 'few_shot_text_classification' for better performance."
             )
 
         logger.debug(f"column_types: {column_types}")

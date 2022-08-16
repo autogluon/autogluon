@@ -1,0 +1,182 @@
+dataset: wiki_hop
+subset: masked
+templates:
+  08f2d1cf-c026-4b65-96d0-a28ff91affb5: !Template
+    answer_choices: '{{candidates | join("|||")}}'
+    id: 08f2d1cf-c026-4b65-96d0-a28ff91affb5
+    jinja: '{% set question_split = question.split('' '') %}
+
+      {% if question_split[0]=="place_of_birth" %}
+
+      Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      Where was {{ question_split[1:] | join(" ")}} born? Choose from the following:
+
+      - {{ candidates | join("\n- ") }}
+
+      {% elif question_split[0]=="country_of_citizenship" %}
+
+      Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      What country is {{ question_split[1:] | join(" ")}} a citizen of? Choose from
+      the following:
+
+      - {{ candidates | join("\n- ") }}
+
+      {% elif question_split[0]=="place_of_death" %}
+
+      Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      Where did {{ question_split[1:] | join(" ")}} die? Choose from the following:
+
+      - {{ candidates | join("\n- ") }}
+
+      {% endif %}
+
+      |||
+
+      {% if question_split[0] in ["place_of_birth", "country_of_citizenship", "place_of_death"]
+      %}
+
+      {{answer}}
+
+      {% endif %}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Indirect Question about Birthplace / Citizenship / Place of Death
+    reference: Ask about place of birth, citizenship, or place of death for the subject
+      entity.
+  1fb4f0d9-9533-49ab-8ac9-53cd42849584: !Template
+    answer_choices: null
+    id: 1fb4f0d9-9533-49ab-8ac9-53cd42849584
+    jinja: 'Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      {% set question_split = question.split('' '') %}
+
+      What is the relationship between "{{ question_split[1:] | join(" ")}}" and "{{answer}}"?
+
+
+      |||
+
+      {{ question_split[0] | replace("_", " ") }}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Explain Relation
+    reference: Given information, explain the relation between the subject entity
+      and the object entity in a fact triple.
+  3181f711-a376-4d6e-9fca-a34e1d048585: !Template
+    answer_choices: '{{candidates | join("|||")}}'
+    id: 3181f711-a376-4d6e-9fca-a34e1d048585
+    jinja: 'Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      {% set question_split = question.split('' '') %}
+
+      Question: ({{ question_split[1:] | join(" ")}}, {{ question_split[0] | replace("_",
+      " ") }}, ?)
+
+
+      |||
+
+      {{answer}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: false
+    name: Generate Object Answer
+    reference: Given information, generate the best object entity for the fact triple.
+  639fa83f-14fd-457a-886e-a65334cb7e66: !Template
+    answer_choices: '{{candidates | join("|||")}}'
+    id: 639fa83f-14fd-457a-886e-a65334cb7e66
+    jinja: "Information:\n- {{ supports | join(\"\\n- \") }}\n\n{% set question_split\
+      \ = question.split(' ') %}\nQuestion: ({{ question_split[1:] | join(\" \")}},\
+      \ {{ question_split[0] | replace(\"_\", \" \") }}, ?)\n\nCandidate Answers:\
+      \ \n- {{ candidates | join(\"\\n- \") }}\n|||\n{{answer}}"
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: Choose Best Object Candidate
+    reference: Given information and possible object candidates, choose the best object
+      for the fact triple.
+  c543669d-d3aa-4eb2-9338-0fa7c37b6b90: !Template
+    answer_choices: null
+    id: c543669d-d3aa-4eb2-9338-0fa7c37b6b90
+    jinja: 'Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      {% set question_split = question.split('' '') %}
+
+      Generate a fact triple for the information above.
+
+
+      |||
+
+      ({{ question_split[1:] | join(" ") }}, {{ question_split[0] | replace("_", "
+      ") }}, {{answer}})'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Generate Fact Triple
+    reference: Given information, generate a fact triple.
+  dc8f1874-f6d5-4dc4-a829-0899286021a0: !Template
+    answer_choices: null
+    id: dc8f1874-f6d5-4dc4-a829-0899286021a0
+    jinja: 'Information:
+
+      - {{ supports | join("\n- ") }}
+
+
+      {% set question_split = question.split('' '') %}
+
+      Question: (?, {{ question_split[0] | replace("_", " ") }}, {{answer}})
+
+
+      |||
+
+      {{ question_split[1:] | join(" ")}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: null
+      languages:
+      - en
+      metrics:
+      - Other
+      original_task: false
+    name: Generate Subject Answer
+    reference: Given information, generate the best subject entity for the fact triple.

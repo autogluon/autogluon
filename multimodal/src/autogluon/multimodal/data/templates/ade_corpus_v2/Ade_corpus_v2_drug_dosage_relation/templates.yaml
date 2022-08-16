@@ -1,0 +1,114 @@
+dataset: ade_corpus_v2
+subset: Ade_corpus_v2_drug_dosage_relation
+templates:
+  1de6d411-ed0a-4d48-806e-cad009f07a65: !Template
+    answer_choices: null
+    id: 1de6d411-ed0a-4d48-806e-cad009f07a65
+    jinja: 'Read the below text and answer the question.
+
+
+      Text: {{text}}
+
+
+      Question: What drug has a dosage of {{dosage}}?
+
+      |||
+
+      {{drug}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-drug
+    reference: ''
+  1e719388-59c9-4b0a-9ed9-dd02b6ddd0a6: !Template
+    answer_choices: null
+    id: 1e719388-59c9-4b0a-9ed9-dd02b6ddd0a6
+    jinja: '{{dosage}} of {{drug}} was given to a patient. Please write a short medical
+      report about this.
+
+      |||
+
+      {{text}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - BLEU
+      - ROUGE
+      original_task: false
+    name: drug-and-dosage-to-text
+    reference: ''
+  2bed0f04-8249-4248-86ea-e3a1971b2e1b: !Template
+    answer_choices: null
+    id: 2bed0f04-8249-4248-86ea-e3a1971b2e1b
+    jinja: 'Read the below text and answer the two following questions.
+
+
+      Text: {{text}}
+
+
+
+      Question 1: What is the drug in the above text?
+
+
+      Question 2: What is the dosage of it?
+
+
+      You should answer in the "drug" and "dosage" format (e.g., Aspirin and 500mg)
+
+      |||
+
+      {{drug}} and {{dosage}}.'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-drug-and-dosage-two-questions
+    reference: ''
+  ca175bed-d046-40e7-9dbb-1e50fde7e603: !Template
+    answer_choices: null
+    id: ca175bed-d046-40e7-9dbb-1e50fde7e603
+    jinja: 'Read the below text and answer the question.
+
+
+      Text: {{text}}
+
+
+      Question: What is the dosage of {{drug}}?
+
+      |||
+
+      {{dosage}}'
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-dosage
+    reference: ''
+  ce5208ac-6b4c-4a35-8738-e20232df1917: !Template
+    answer_choices: null
+    id: ce5208ac-6b4c-4a35-8738-e20232df1917
+    jinja: "Read the below text and answer the question.\n\nText: {{text}}\n\nQuestion:\
+      \ What are the drug and its dosage of the above text? \n\nYou should answer\
+      \ in the \"drug\" and \"dosage\" format (e.g., Aspirin and 500mg)\n|||\n{{drug}}\
+      \ and {{dosage}}."
+    metadata: !TemplateMetadata
+      choices_in_prompt: false
+      languages:
+      - en
+      metrics:
+      - Accuracy
+      original_task: true
+    name: find-drug-and-dosage
+    reference: ''
