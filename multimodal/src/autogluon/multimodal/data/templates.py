@@ -270,6 +270,7 @@ class Template(yaml.YAMLObject):
     """
 
     yaml_tag = "!Template"
+    yaml_loader = yaml.SafeLoader
 
     def __init__(self, name, jinja, reference, metadata=None, answer_choices=None):
         """
@@ -299,7 +300,6 @@ class Template(yaml.YAMLObject):
         self.reference = reference
         self.metadata = metadata if metadata is not None else Template.Metadata()
         self.answer_choices = answer_choices
-        self.yaml_loader = yaml.SafeLoader
 
     def get_id(self):
         """
@@ -433,6 +433,7 @@ class Template(yaml.YAMLObject):
         """
 
         yaml_tag = "!TemplateMetadata"
+        yaml_loader = yaml.SafeLoader
 
         def __init__(
             self,
@@ -618,7 +619,7 @@ class DatasetTemplates:
                 "Please ignore this warning if you are creating new prompts for this dataset."
             )
             return {}
-        yaml_dict = yaml.load(open(self.yaml_path, "r"), Loader=yaml.FullLoader)
+        yaml_dict = yaml.safe_load(open(self.yaml_path, "r"))
         return yaml_dict[self.TEMPLATES_KEY]
 
     def write_to_file(self) -> None:
