@@ -20,6 +20,7 @@ from autogluon.multimodal.constants import (
     DISTILLER,
     ENVIRONMENT,
     GREEDY_SOUP,
+    IA3,
     LORA,
     LORA_BIAS,
     LORA_NORM,
@@ -63,7 +64,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
     [
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
+            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
             "prajjwal1/bert-tiny",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
@@ -71,8 +72,17 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             "auto",
         ),
         (
+            "petfinder",
+            ["t_few"],
+            "t5-small",
+            "swin_tiny_patch4_window7_224",
+            GREEDY_SOUP,
+            IA3,
+            "auto",
+        ),
+        (
             "hateful_memes",
-            ["timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
+            ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
             UNIFORM_SOUP,
@@ -81,7 +91,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
         ),
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp", "t_few"],
+            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
             None,
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,

@@ -22,8 +22,8 @@ class TemplateEngine:
         self.template_config = template_config
         collection = TemplateCollection()
         self.all_datasets = collection.keys
-        self.preset_templates = OmegaConf.select(self.template_config, "preset_templates")
-        self.custom_templates = OmegaConf.select(self.template_config, "custom_templates")
+        self.preset_templates = OmegaConf.select(self.template_config, "preset_templates", default=None)
+        self.custom_templates = OmegaConf.select(self.template_config, "custom_templates", default=None)
 
         if self.preset_templates:
             assert (

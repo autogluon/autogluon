@@ -998,7 +998,7 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                trainable_param_names=config.optimization.trainable_param_names,
+                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )

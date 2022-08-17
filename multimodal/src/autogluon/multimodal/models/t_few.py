@@ -168,7 +168,7 @@ class TFewModel(nn.Module):
             #  Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
             inputs_embeds = self.dummy_layer(inputs_embeds)
 
-        # Foward input through the encoder
+        # Forward input through the encoder
         encoder_hidden_states = self.model.encoder(inputs_embeds=inputs_embeds, attention_mask=text_masks)[0]
         encoder_hidden_states = encoder_hidden_states.unsqueeze(dim=1).repeat(1, num_choices, 1, 1).flatten(0, 1)
 

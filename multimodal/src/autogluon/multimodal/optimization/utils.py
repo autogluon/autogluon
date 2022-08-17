@@ -505,7 +505,7 @@ def get_trainable_params_efficient_finetune(
     Get list of trainable parameter names according to the provided efficient finetuning method.
     """
     if not trainable_param_names:
-        trainable_param_names = []
+        trainable_param_names = [".*head*.", ".*fusion_mlp*.", ".*adapter*."]  # backwards compatibility
 
     if efficient_finetune == BIT_FIT:
         trainable_param_names.append(".*bias*.")

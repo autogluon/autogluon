@@ -638,7 +638,7 @@ def init_data_processors(
                         text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
                         text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
-                        template_config=getattr(config.data, "templates"),
+                        template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
                     )
                 )
             elif d_type == CATEGORICAL:
