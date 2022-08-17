@@ -4,16 +4,16 @@ import os
 import warnings
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
-from .template_engine import TemplateEngine
-from omegaconf import DictConfig
 
 import numpy as np
-from nptyping import NDArray
 import torch
+from nptyping import NDArray
+from omegaconf import DictConfig
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
 from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
 from .collator import Pad, Stack
+from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
 

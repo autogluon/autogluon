@@ -1,7 +1,7 @@
 import numpy as np
-
-from autogluon.multimodal.data.templates import Template, DatasetTemplates, TemplateCollection
 from omegaconf import OmegaConf
+
+from autogluon.multimodal.data.templates import DatasetTemplates, Template, TemplateCollection
 
 
 class TemplateEngine:

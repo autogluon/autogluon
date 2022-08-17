@@ -6,9 +6,9 @@ Apache-2.0 license
 import logging
 import os
 import random
+import re
 import uuid
 from collections import Counter, defaultdict
-import re
 from shutil import rmtree
 from typing import Dict, List, Optional, Tuple
 
@@ -16,7 +16,6 @@ import pandas as pd
 import pkg_resources
 import yaml
 from jinja2 import BaseLoader, Environment, meta
-
 
 # Truncation of jinja template variables
 # 1710 = 300 words x 4.7 avg characters per word + 300 spaces

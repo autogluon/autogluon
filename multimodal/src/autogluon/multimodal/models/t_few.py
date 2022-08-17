@@ -1,5 +1,6 @@
 import collections
 import logging
+import os
 import random
 from typing import List, Optional, Tuple
 
@@ -24,7 +25,7 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import assign_layer_ids, DummyLayer, get_column_features
+from .utils import DummyLayer, assign_layer_ids, get_column_features
 
 hf_logging.set_verbosity_error()
 
