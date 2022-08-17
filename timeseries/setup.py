@@ -31,6 +31,8 @@ install_requires = [
     "gluonts~=0.11.0",
     "torch>=1.9,<1.13",
     "pytorch-lightning>=1.7.4,<1.8.0",
+    "networkx~=2.7",
+    "tqdm",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular=={version}",
