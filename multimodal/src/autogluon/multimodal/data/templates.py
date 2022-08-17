@@ -299,6 +299,7 @@ class Template(yaml.YAMLObject):
         self.reference = reference
         self.metadata = metadata if metadata is not None else Template.Metadata()
         self.answer_choices = answer_choices
+        self.yaml_loader = yaml.SafeLoader
 
     def get_id(self):
         """
@@ -605,20 +606,6 @@ class DatasetTemplates:
             formatted_dict[self.SUBSET_KEY] = self.subset_name
         return formatted_dict
 
-    def check_yaml_sanity(self, yaml):
-        for key, value in yaml.items():
-            assert type(value) in [
-                Template,
-                str,
-                int,
-                float,
-                list,
-                tuple,
-                dict,
-            ], f"Read dataset collection contains unrecognized objects of type {type(value)}."
-            if type(value) in [list, dict]:
-                self.check_yaml_sanity(value)
-
     def read_from_file(self) -> Dict:
         """
         Reads a file containing a prompt collection.
@@ -632,7 +619,6 @@ class DatasetTemplates:
             )
             return {}
         yaml_dict = yaml.load(open(self.yaml_path, "r"), Loader=yaml.FullLoader)
-        self.check_yaml_sanity(yaml_dict)
         return yaml_dict[self.TEMPLATES_KEY]
 
     def write_to_file(self) -> None:
