@@ -34,6 +34,7 @@ from .constants import (
     ALL_MODALITIES,
     AUTOMM,
     AVERAGE_PRECISION,
+    BBOX,
     BINARY,
     CATEGORICAL,
     CATEGORICAL_MLP,
@@ -51,6 +52,7 @@ from .constants import (
     LOGITS,
     MASKS,
     METRIC_MODE_MAP,
+    MMDET_IMAGE,
     MULTICLASS,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -82,6 +84,7 @@ from .models import (
     CategoricalTransformer,
     CLIPForImageText,
     HFAutoModelForTextPrediction,
+    MMDetAutoModelForObjectDetection,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
@@ -783,6 +786,11 @@ def create_model(
                 ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
+            )
+        elif model_name.lower().startswith(MMDET_IMAGE):
+            model = MMDetAutoModelForObjectDetection(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
             )
         elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
@@ -1620,6 +1628,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         feature_masks = [ele[COLUMN_FEATURES][MASKS] for ele in outputs]  # a list of dicts
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
+    elif ret_type == BBOX:
+        return [ele[BBOX] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

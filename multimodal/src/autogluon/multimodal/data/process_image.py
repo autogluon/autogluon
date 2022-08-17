@@ -19,13 +19,26 @@ from transformers import AutoConfig
 from .randaug import RandAugment
 
 try:
+    import mmcv
+    from mmcv.parallel import collate
+except ImportError:
+    mmcv = None
+
+try:
+    import mmdet
+    from mmdet.datasets import replace_ImageToTensor
+    from mmdet.datasets.pipelines import Compose
+except ImportError:
+    mmdet = None
+
+try:
     from torchvision.transforms import InterpolationMode
 
     BICUBIC = InterpolationMode.BICUBIC
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM
+from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
@@ -102,8 +115,18 @@ class ImageProcessor:
         self.mean = None
         self.std = None
 
+        if self.prefix == MMDET_IMAGE:
+            # TODO: can we pass the config information here when we build the model?
+            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            cfg = checkpoint_name + ".py"
+            if isinstance(cfg, str):
+                cfg = mmcv.Config.fromfile(cfg)
+
         if checkpoint_name is not None:
-            self.size, self.mean, self.std = self.extract_default(checkpoint_name)
+            if self.prefix == MMDET_IMAGE:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
+            else:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name)
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -128,8 +151,14 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = self.construct_processor(self.train_transform_types)
-        self.val_processor = self.construct_processor(self.val_transform_types)
+        if self.prefix == MMDET_IMAGE:
+            assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
+            self.val_processor = Compose(cfg.data.test.pipeline)
+            self.train_processor = Compose(cfg.data.test.pipeline)
+        else:
+            self.train_processor = self.construct_processor(self.train_transform_types)
+            self.val_processor = self.construct_processor(self.val_transform_types)
 
     @property
     def image_key(self):
@@ -160,12 +189,20 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        fn.update(
-            {
-                self.image_key: Pad(pad_val=0),
-                self.image_valid_num_key: Stack(),
-            }
-        )
+        if self.prefix == MMDET_IMAGE:
+            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            fn.update(
+                {
+                    self.image_key: collate,
+                }
+            )
+        else:
+            fn.update(
+                {
+                    self.image_key: Pad(pad_val=0),
+                    self.image_valid_num_key: Stack(),
+                }
+            )
 
         return fn
 
@@ -193,7 +230,7 @@ class ImageProcessor:
             raise ValueError(f"unknown image normalization: {norm_type}")
 
     @staticmethod
-    def extract_default(checkpoint_name):
+    def extract_default(checkpoint_name, cfg=None):
         """
         Extract some default hyper-parameters, e.g., image size, mean, and std,
         from a pre-trained (timm or huggingface) checkpoint.
@@ -239,7 +276,12 @@ class ImageProcessor:
                 mean = None
                 std = None
             except Exception as exp2:
-                raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp2
+                try:  # mmdetection checkpoint
+                    image_size = cfg.test_pipeline[1]["img_scale"][0]
+                    mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
+                    std = cfg.test_pipeline[1]["transforms"][2]["std"]
+                except Exception as exp3:
+                    raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp3
 
         return image_size, mean, std
 
@@ -339,33 +381,37 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message=(
-                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
-                        ),
-                    )
-                    is_zero_img = False
-                    try:
-                        img = PIL.Image.open(img_path).convert("RGB")
-                    except Exception as e:
-                        if self.missing_value_strategy.lower() == "zero":
-                            logger.debug(f"Using a zero image due to '{e}'")
-                            img = PIL.Image.new("RGB", (self.size, self.size), color=0)
-                            is_zero_img = True
-                        else:
-                            raise e
-
-                if is_training:
-                    img = self.train_processor(img)
+                if self.prefix == MMDET_IMAGE:
+                    data = dict(img_info=dict(filename=img_path), img_prefix=None)
+                    images.append(self.val_processor(data))
                 else:
-                    img = self.val_processor(img)
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            "ignore",
+                            message=(
+                                "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                            ),
+                        )
+                        is_zero_img = False
+                        try:
+                            img = PIL.Image.open(img_path).convert("RGB")
+                        except Exception as e:
+                            if self.missing_value_strategy.lower() == "zero":
+                                logger.debug(f"Using a zero image due to '{e}'")
+                                img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                                is_zero_img = True
+                            else:
+                                raise e
 
-                if is_zero_img:
-                    zero_images.append(img)
-                else:
-                    images.append(img)
+                    if is_training:
+                        img = self.train_processor(img)
+                    else:
+                        img = self.val_processor(img)
+
+                    if is_zero_img:
+                        zero_images.append(img)
+                    else:
+                        images.append(img)
 
             if self.requires_column_info:
                 # only count the valid images since they are put ahead of the zero images in the below returning
@@ -373,15 +419,17 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-
-        ret.update(
-            {
-                self.image_key: torch.tensor([])
-                if len(images + zero_images) == 0
-                else torch.stack(images + zero_images, dim=0),
-                self.image_valid_num_key: len(images),
-            }
-        )
+        if self.prefix == MMDET_IMAGE:
+            ret.update({self.image_key: images[0]})
+        else:
+            ret.update(
+                {
+                    self.image_key: torch.tensor([])
+                    if len(images + zero_images) == 0
+                    else torch.stack(images + zero_images, dim=0),
+                    self.image_valid_num_key: len(images),
+                }
+            )
         return ret
 
     def __call__(
