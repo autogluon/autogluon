@@ -25,7 +25,7 @@ TEXT_VAR_LENGTH = 2048
 # Local path to the folder containing the templates
 TEMPLATES_FOLDER_PATH = pkg_resources.resource_filename(__name__, "templates")
 
-env = Environment(loader=BaseLoader)
+env = Environment(loader=BaseLoader, autoescape=True)
 
 # Allow the python function zip()
 env.globals.update(zip=zip)
