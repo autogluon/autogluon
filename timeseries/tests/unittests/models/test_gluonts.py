@@ -10,6 +10,7 @@ from gluonts.mx.model.transformer import TransformerEstimator
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
     DeepARModel,
+    DeepARPyTorchModel,
     GenericGluonTSModel,
     MQCNNModel,
     ProphetModel,
@@ -26,6 +27,7 @@ TESTABLE_MODELS = [
     MQCNNModel,
     # MQRNNModel,
     SimpleFeedForwardModel,
+    DeepARPyTorchModel,
     # TransformerModel,
     partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
