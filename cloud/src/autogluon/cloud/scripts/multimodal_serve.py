@@ -26,7 +26,7 @@ image_index = 0
 
 def _save_image_and_update_dataframe_column(bytes):
     global image_index
-    im = Image.open(BytesIO(base64.b64decode(bytes, validate=True)))
+    im = Image.open(BytesIO(base64.b85decode(bytes)))
     im_name = f'multimodal_image_{image_index}.png'
     im.save(im_name)
     image_index += 1
@@ -75,7 +75,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         data = np.load(buf, allow_pickle=True)
         image_paths = []
         for i, bytes in enumerate(data):
-            im = Image.open(BytesIO(base64.b64decode(bytes, validate=True)))
+            im = Image.open(BytesIO(base64.b85decode(bytes)))
             im_name = f'{i}.png'
             im.save(im_name)
             image_paths.append(im_name)

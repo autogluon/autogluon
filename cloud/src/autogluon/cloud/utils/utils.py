@@ -17,7 +17,7 @@ def read_image_bytes_and_encode(image_path):
     image_obj = open(image_path, 'rb')
     image_bytes = image_obj.read()
     image_obj.close()
-    b64_image = base64.b64encode(image_bytes).decode("utf-8")
+    b64_image = base64.b85encode(image_bytes).decode("utf-8")
 
     return b64_image
 

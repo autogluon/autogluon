@@ -13,7 +13,7 @@ image_index = 0
 
 def _save_image_and_update_dataframe_column(bytes):
     global image_index
-    im = Image.open(BytesIO(base64.b64decode(bytes, validate=True)))
+    im = Image.open(BytesIO(base64.b85decode(bytes)))
     im_name = f'tabular_image_{image_index}.png'
     im.save(im_name)
 
