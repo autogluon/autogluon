@@ -1,8 +1,6 @@
 import copy
-import gc
 import logging
 import os
-import pprint
 import time
 import traceback
 from pathlib import Path
@@ -15,7 +13,6 @@ from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 

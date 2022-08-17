@@ -12,7 +12,6 @@ from flaky import flaky
 from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models import AutoETSModel, DeepARModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
