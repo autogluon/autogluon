@@ -1,11 +1,13 @@
 import base64
 import logging
 import os
-import cv2
+import PIL
 import tarfile
 import shutil
 import uuid
 import zipfile
+
+from PIL import Image
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,15 @@ def zipfolder(output_filename, dir_name):
 
 def is_compressed_file(filename):
     return tarfile.is_tarfile(filename) or zipfile.is_zipfile(filename)
+
+
+def is_image_file(filename):
+    try:
+        Image.open(filename)
+    except PIL.UnidentifiedImageError:
+        # Not an image
+        return False
+    return True
 
 
 def unzip_file(tarball_path, save_path):

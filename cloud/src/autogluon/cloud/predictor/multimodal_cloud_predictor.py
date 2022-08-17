@@ -1,15 +1,21 @@
 import copy
-import cv2
+import os
 import pandas as pd
+import PIL
 
 from autogluon.common.loaders import load_pd
+from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
+
+from PIL import Image
 
 from .cloud_predictor import CloudPredictor
 from ..utils.ag_sagemaker import AutoGluonMultiModalRealtimePredictor
 from ..utils.constants import VALID_ACCEPT
+from ..utils.s3_utils import is_s3_folder
 from ..utils.utils import (
     convert_image_path_to_encoded_bytes_in_dataframe,
     read_image_bytes_and_encode,
+    is_image_file,
 )
 
 
@@ -39,7 +45,12 @@ class MultiModalCloudPredictor(CloudPredictor):
         predictor_cls = multimodal_predictor_cls
         return predictor_cls
 
-    def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
+    def predict_real_time(
+            self,
+            test_data,
+            test_data_image_column=None,
+            accept='application/x-parquet'
+        ):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.
@@ -76,12 +87,14 @@ class MultiModalCloudPredictor(CloudPredictor):
         import numpy as np
 
         if isinstance(test_data, str):
-            image = cv2.imread(test_data)
-            if image is None:  # not an image
+            if is_s3_url(test_data):
                 test_data = load_pd.load(test_data)
             else:
-                test_data = np.array([read_image_bytes_and_encode(test_data)], dtype='object')
-                content_type = 'application/x-npy'
+                if is_image_file(test_data):
+                    test_data = np.array([read_image_bytes_and_encode(test_data)], dtype='object')
+                    content_type = 'application/x-npy'
+                else:
+                    test_data = load_pd.load(test_data)
         if isinstance(test_data, list):
             images = []
             test_data = np.array([read_image_bytes_and_encode(image) for image in images], dtype='object')
@@ -99,7 +112,6 @@ class MultiModalCloudPredictor(CloudPredictor):
         self,
         test_data,
         test_data_image_column=None,
-        image_modality_only=False,
         **kwargs,
     ):
         """
@@ -109,18 +121,29 @@ class MultiModalCloudPredictor(CloudPredictor):
             When predicting multimodality with image modality:
                 You need to specify `test_data_image_column`, and make sure the image column contains relative path to the image.
             When predicting with only images:
-                User has to specify `image_modality_only` for this mode.
                 Can be a local path or a s3 path to a directory containing the images.
+                or a local path or a s3 path to a single image.
         test_data_image_column: Optional(str)
             If test_data involves image modality, you must specify the column name corresponding to image paths.
             Images have to live in the same directory specified by the column.
-        image_modality_only: Bool
-            Whether the test_data only contains image modality.
-            If so, test data can be a local path or a s3 path to a directory containing the images.
-            Otherwise, you can only provide a pandas.DataFrame, a local path or a s3 path to a csv file, and specify `test_data_image_column`.
         kwargs:
             Refer to `CloudPredictor.predict()`
         """
+        image_modality_only = False
+        if isinstance(test_data, str):
+            if is_s3_url(test_data):
+                if is_s3_folder(test_data, session=self.sagemaker_session):
+                    image_modality_only = True
+                else:
+                    bucket, prefix = s3_path_to_bucket_prefix(test_data)
+                    utils_folder = 'utils'
+                    self.sagemaker_session.download_data(utils_folder, bucket, key_prefix=prefix)
+                    filename = prefix.rsplit('/')[-1]
+                    if is_image_file(os.path.join(utils_folder, filename)):
+                        image_modality_only = True
+            elif os.path.isdir(test_data) or is_image_file(test_data):
+                image_modality_only = True
+
         if image_modality_only:
             split_type = None
             content_type = 'application/x-image'

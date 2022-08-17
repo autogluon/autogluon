@@ -41,7 +41,12 @@ class ImageCloudPredictor(CloudPredictor):
             **kwargs
         )
 
-    def predict_real_time(self, test_data, test_data_image_column=None, accept='application/x-parquet'):
+    def predict_real_time(
+            self,
+            test_data,
+            test_data_image_column=None,
+            accept='application/x-parquet'
+        ):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.

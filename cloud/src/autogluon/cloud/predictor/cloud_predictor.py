@@ -1,17 +1,17 @@
+import boto3
 import copy
-import cv2
 import os
 import yaml
 import tarfile
 import logging
-
 import pandas as pd
-import boto3
+import PIL
 import sagemaker
 
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
+from PIL import Image
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.loaders import load_pkl
@@ -44,6 +44,7 @@ from ..utils.utils import (
     convert_image_path_to_encoded_bytes_in_dataframe,
     zipfolder,
     is_compressed_file,
+    is_image_file,
     unzip_file,
     rename_file_with_uuid
 )
@@ -642,7 +643,11 @@ class CloudPredictor(ABC):
                 logger.warning('SageMaker endpoint could only take maximum 5MB. Please consider reduce test data size or use `predict()` instead.')
             raise e
 
-    def predict_real_time(self, test_data, accept='application/x-parquet'):
+    def predict_real_time(
+            self,
+            test_data,
+            accept='application/x-parquet'
+        ):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.
@@ -677,11 +682,10 @@ class CloudPredictor(ABC):
             # If a directory of images, upload directly
             if isinstance(test_data, str) and not os.path.isdir(test_data):
                 # either a file to a dataframe, or a file to an image
-                image = cv2.imread(test_data)
-                if image is None:  # not an image
-                    test_data = load_pd.load(test_data)
-                else:
+                if is_image_file(test_data):
                     logger.warning('Are you sure you want to do batch inference on a single image? You might want to try `deploy()` and `predict_realtime()` instead')
+                else:
+                    test_data = load_pd.load(test_data)
 
             if isinstance(test_data, pd.DataFrame):
                 test_data = self._prepare_data(test_data, 'test', output_type='csv')
