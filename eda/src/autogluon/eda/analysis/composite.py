@@ -23,6 +23,10 @@ class CompositeAnalysis(AbstractAnalysis):
                  rendering_backend: Type[RenderingBackend] = SequentialCompositeRenderer,
                  **kwargs) -> None:
         super().__init__(children=children, rendering_backend=rendering_backend, **kwargs)
+        for k, v in kwargs.items():
+            for child in children:
+                if getattr(child, k) is None:
+                    setattr(child, k, v)
 
     def fit(self, **kwargs):
         component_models = []
