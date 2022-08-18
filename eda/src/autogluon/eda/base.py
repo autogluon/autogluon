@@ -41,6 +41,7 @@ class AbstractAnalysis(ABC):
         self.rendering_backend = rendering_backend
 
         self.model = None
+        self._kwargs = kwargs
 
     @abstractmethod
     def fit(self, **kwargs):
