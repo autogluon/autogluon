@@ -3,6 +3,7 @@ import datetime
 import functools
 import hashlib
 import logging
+import math
 import os
 import pickle
 import sys
@@ -2033,3 +2034,41 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
             path = None
 
     return path
+
+
+def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
+    """
+    Compute the gpu number to initialize the lightning trainer.
+
+    Parameters
+    ----------
+    config_num_gpus
+        The gpu number provided by config.
+    strategy
+        A lightning trainer's strategy such as "ddp", "ddp_spawn", and "dp".
+
+    Returns
+    -------
+    A valid gpu number for the current environment and config.
+    """
+    config_num_gpus = (
+        math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
+    )
+    detected_num_gpus = torch.cuda.device_count()
+
+    if config_num_gpus < 0:  # In case config_num_gpus is -1, meaning using all gpus.
+        num_gpus = detected_num_gpus
+    else:
+        num_gpus = min(config_num_gpus, detected_num_gpus)
+
+    if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
+        warnings.warn(
+            "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
+            "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
+            "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
+            "MultiModalPredictor in a script.",
+            UserWarning,
+        )
+        num_gpus = 1
+
+    return num_gpus

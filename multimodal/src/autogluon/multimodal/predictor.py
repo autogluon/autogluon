@@ -81,6 +81,7 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_num_gpus,
     compute_score,
     convert_checkpoint_name,
     create_model,
@@ -95,7 +96,6 @@ from .utils import (
     init_data_processors,
     init_df_preprocessor,
     init_pretrained,
-    is_interactive,
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
@@ -251,6 +251,10 @@ class MultiModalPredictor:
     @property
     def problem_type(self):
         return self._problem_type
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -893,14 +897,10 @@ class MultiModalPredictor:
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
-        self._config = config
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
         self._loss_func = loss_func
-
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
 
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
@@ -1078,23 +1078,7 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = (
-            math.floor(config.env.num_gpus)
-            if isinstance(config.env.num_gpus, (int, float))
-            else len(config.env.num_gpus)
-        )
-        if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
-            num_gpus = torch.cuda.device_count()
-
-        if is_interactive() and num_gpus > 1:
-            warnings.warn(
-                "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
-                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-                "MultiModalPredictor in a script.",
-                UserWarning,
-            )
-            num_gpus = 1
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(
@@ -1139,6 +1123,13 @@ class MultiModalPredictor:
             else:
                 strategy = None
                 num_gpus = min(num_gpus, 1)
+
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy
+        self._config = config
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
@@ -1327,13 +1318,7 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        num_gpus = (
-            math.floor(self._config.env.num_gpus)
-            if isinstance(self._config.env.num_gpus, (int, float))
-            else len(self._config.env.num_gpus)
-        )
-        if num_gpus < 0:
-            num_gpus = torch.cuda.device_count()
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
