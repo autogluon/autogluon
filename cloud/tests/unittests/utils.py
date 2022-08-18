@@ -24,14 +24,18 @@ def _test_functionality(
     test_data,
     image_path=None,
     fit_instance_type='ml.m5.2xlarge',
+    fit_kwargs=None,
     predict_real_time_kwargs=None,
     predict_kwargs=None
 ):
+    if fit_kwargs is None:
+        fit_kwargs = dict()
     cloud_predictor.fit(
         predictor_init_args=predictor_init_args,
         predictor_fit_args=predictor_fit_args,
         image_path=image_path,
-        instance_type=fit_instance_type
+        instance_type=fit_instance_type,
+        **fit_kwargs
     )
     info = cloud_predictor.info()
     assert info['local_output_path'] is not None

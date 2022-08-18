@@ -79,6 +79,7 @@ def test_tabular_tabular_text_image():
             test_data,
             image_path='tabular_text_image_images.zip',
             fit_instance_type='ml.g4dn.2xlarge',
+            fit_kwargs=dict(image_column_name='Images'),
             predict_real_time_kwargs=dict(test_data_image_column='Images'),
             predict_kwargs=dict(test_data_image_column='Images')
         )

@@ -23,28 +23,26 @@ class TabularCloudPredictor(CloudPredictor):
         predictor_cls = TabularPredictor
         return predictor_cls
 
-    def _construct_config(self, predictor_init_args, predictor_fit_args, leaderboard, **kwargs):
-        assert self.predictor_type is not None
-        if 'feature_metadata' in predictor_fit_args:
-            predictor_fit_args = copy.deepcopy(predictor_fit_args)
-            feature_metadata = predictor_fit_args.pop('feature_metadata')
-            feature_metadata = dict(
-                type_map_raw=feature_metadata.type_map_raw,
-                type_map_special=feature_metadata.get_type_map_special(),
-            )
-            assert 'feature_metadata' not in kwargs, 'feature_metadata in both `predictor_fit_args` and kwargs. This should not happen.'
-            kwargs['feature_metadata'] = feature_metadata
-        config = dict(
-            predictor_type=self.predictor_type,
+    def fit(
+        self,
+        *,
+        predictor_init_args,
+        predictor_fit_args,
+        image_path=None,
+        image_column_name=None,
+        **kwargs
+    ):
+        if image_path is not None:
+            assert image_column_name is not None, 'Please provide `image_column_name` when training multimodality with image modality'
+        if image_column_name is not None:
+            assert image_path is not None, 'Please provide `image_path` when training multimodality with image modality'
+        super().fit(
             predictor_init_args=predictor_init_args,
             predictor_fit_args=predictor_fit_args,
-            leaderboard=leaderboard,
+            image_path=image_path,
+            image_column_name=image_column_name,
             **kwargs
         )
-        path = os.path.join(self.local_output_path, 'utils', 'config.yaml')
-        with open(path, 'w') as f:
-            yaml.dump(config, f)
-        return path
 
     def predict_real_time(
             self,

@@ -86,8 +86,6 @@ if __name__ == "__main__":
     assert predictor_type in valid_predictor_types, f'predictor_type {predictor_type} not supported. Valid options are {valid_predictor_types}'
     if predictor_type == 'tabular':
         predictor_cls = TabularPredictor
-        if 'feature_meatadata' in predictor_fit_args:
-            predictor_fit_args['feature_meatadata'] = FeatureMetadata(**predictor_fit_args['feature_meatadata'])
     elif predictor_type == 'text':
         predictor_cls = TextPredictor
     elif predictor_type == 'image':
@@ -97,6 +95,10 @@ if __name__ == "__main__":
 
     train_file = get_input_path(args.training_dir)
     training_data = TabularDataset(train_file)
+    if predictor_type == 'tabular' and 'image_column_name' in config:
+        feature_metadata = FeatureMetadata.from_df(training_data)
+        feature_metadata = feature_metadata.add_special_types({config['image_column_name']: ['image_path']})
+        predictor_fit_args['feature_meatadata'] = feature_metadata
 
     tuning_data = None
     if args.tune_dir:
