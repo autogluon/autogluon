@@ -15,8 +15,8 @@ class SimpleJupyterRenderingToolsMixin:
         else:
             print(text)
 
-    def render_table(self, df):
-        display(df)
+    def display_object(self, obj):
+        display(obj)
 
     def render_histogram(self, df: DataFrame, **kwargs):
         fig_params = kwargs.pop('fig_params', {})

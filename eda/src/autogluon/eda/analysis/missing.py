@@ -15,18 +15,15 @@ ALL = '__all__'
 class MissingStatistics(AbstractAnalysis):
 
     def __init__(self,
-                 sample=1000,
                  chart_type='matrix',
                  rendering_backend: Type[RenderingBackend] = MissingStatisticsRenderer,
                  **kwargs) -> None:
         super().__init__(rendering_backend=rendering_backend, **kwargs)
-        self.sample = sample
         self.chart_type = chart_type
         self.data = None
 
     def fit(self, **kwargs):
         self.model = {
-            'datasets': {},
             'chart_type': self.chart_type,
             'kwargs': self._kwargs,
             'hint': {
@@ -39,9 +36,4 @@ class MissingStatistics(AbstractAnalysis):
             }[self.chart_type]
         }
 
-        for t, ds in self._datasets_as_map().items():
-            if ds is not None:
-                if self.sample is not None:
-                    if len(ds) > self.sample:
-                        ds = ds.sample(self.sample)
-                self.model['datasets'][t] = ds
+        self._sample_and_set_model_datasets()
