@@ -21,8 +21,8 @@ class DatasetSummaryAnalysisRenderer(RenderingBackend, SimpleJupyterRenderingToo
     def render(self, model: Dict[str, Any]):
         for t, summary in model['datasets'].items():
             self.render_text(f'Summary for dataset: {t}', text_type='h2')
-            self.render_table(summary)
+            self.display_object(summary)
 
         if len(model['types'].columns) > 2:
             self.render_text(f'Types details', text_type='h2')
-            self.render_table(model['types'])
+            self.display_object(model['types'])

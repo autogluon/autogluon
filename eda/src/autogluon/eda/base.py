@@ -22,10 +22,12 @@ class AbstractAnalysis(ABC):
                  problem_type: str = None,
                  label: str = None,
                  eval_metric=None,
+                 sample = None,
                  rendering_backend: Union[RenderingBackend, Type[RenderingBackend]] = None,
                  estimators_backend: Type[EstimatorsBackend] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
+        self.sample = sample
         self.estimators_backend = estimators_backend
         self.tuning_data = tuning_data
         self.test_data = test_data
@@ -67,3 +69,15 @@ class AbstractAnalysis(ABC):
             'test_data': self.test_data,
             'tuning_data': self.tuning_data
         }
+
+    def _get_datasets(self):
+        return self.model['datasets']
+
+    def _sample_and_set_model_datasets(self):
+        self.model['datasets'] = {}
+        for t, ds in self._datasets_as_map().items():
+            if ds is not None:
+                if self.sample is not None:
+                    if len(ds) > self.sample:
+                        ds = ds.sample(self.sample)
+                self.model['datasets'][t] = ds

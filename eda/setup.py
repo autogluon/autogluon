@@ -21,6 +21,7 @@ install_requires = [
     'numpy',
     'pandas',
     'missingno',
+    'altair',
 ]
 
 extras_require = dict()
