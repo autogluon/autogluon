@@ -8,7 +8,7 @@ from autogluon.timeseries.models.gluonts.callback import (
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from ..common import DUMMY_TS_DATAFRAME
-from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
+from .test_gluonts import TESTABLE_MX_MODELS as GLUONTS_TESTABLE_MODELS
 
 
 @pytest.mark.parametrize(

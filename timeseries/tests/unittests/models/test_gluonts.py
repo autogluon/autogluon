@@ -22,12 +22,11 @@ from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureG
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME_WITH_STATIC
 
-TESTABLE_MODELS = [
+TESTABLE_MX_MODELS = [
     DeepARModel,
     MQCNNModel,
     # MQRNNModel,
     SimpleFeedForwardModel,
-    DeepARPyTorchModel,
     # TransformerModel,
     partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
@@ -38,6 +37,7 @@ MODELS_WITH_STATIC_FEATURES = [
     DeepARModel,
     MQCNNModel,
 ]
+TESTABLE_MODELS = TESTABLE_MX_MODELS + [DeepARPyTorchModel]
 
 # if PROPHET_IS_INSTALLED:
 #     TESTABLE_MODELS += [ProphetModel]

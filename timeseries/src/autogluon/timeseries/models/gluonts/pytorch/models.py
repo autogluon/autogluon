@@ -2,11 +2,13 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
-from typing import Optional, Type
+from pathlib import Path
+from typing import Any, Dict, Optional, Type
 
 import pytorch_lightning as pl
 from gluonts.core.component import from_hyperparameters
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
+from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.deepar import DeepAREstimator
 
 # TODO: enable in GluonTS v0.10
@@ -83,6 +85,25 @@ class AbstractGluonTSPytorchModel(AbstractGluonTSModel):
                 validation_data=self._to_gluonts_dataset(val_data),
             )
 
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
+        model = super().load(path, reset_paths, verbose)
+        model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
+        return model
+
 
 class DeepARPyTorchModel(AbstractGluonTSPytorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        """Get GluonTS specific constructor arguments for estimator objects, an alias to
+        `self._get_model_params` for better readability."""
+        init_kwargs = self._get_model_params()
+        
+        # GluonTS does not handle context_length=1 well, and sets the context to only prediction_length
+        # we set it to a minimum of 10 here.
+        init_kwargs["context_length"] = max(
+            10, init_kwargs.get("context_length", self.prediction_length)
+        )
+        
+        return init_kwargs
