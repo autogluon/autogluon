@@ -417,9 +417,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 
     model_names = trainer.get_model_names()
 
-    # account for the ensemble if it should be fitted
+    # account for the ensemble if it should be fitted, and drop ensemble names
     if trainer.enable_ensemble and sum(len(hp) for hp in hyperparameter_list) > 1:
-        expected_number_of_unique_names += 1
+        model_names = [n for n in model_names if "WeightedEnsemble" not in n]
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
         assert any(name.endswith(suffix) for name in model_names)

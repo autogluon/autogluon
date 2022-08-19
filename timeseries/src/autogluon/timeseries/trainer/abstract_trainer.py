@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import traceback
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from warnings import warn
@@ -47,7 +48,7 @@ class SimpleAbstractTrainer:
 
         self._extra_banned_names = set()
 
-    def get_model_names(self) -> List[str]:
+    def get_model_names(self, **kwargs) -> List[str]:
         """Get all model names that are registered in the model graph"""
         return list(self.model_graph.nodes)
 
@@ -356,6 +357,33 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             for base_model in base_models:
                 self.model_graph.add_edge(base_model, model.name)
 
+    def _get_model_levels(self) -> Dict[str, int]:
+        """Get a dictionary mapping each model to their level in the model graph"""
+
+        # get nodes without a parent
+        rootset = set(self.model_graph.nodes)
+        for e in self.model_graph.edges():
+            rootset.discard(e[1])
+
+        # get shortest paths
+        paths_from = defaultdict(dict)
+        for source_node, paths_to in nx.shortest_path_length(self.model_graph):
+            for dest_node in paths_to:
+                paths_from[dest_node][source_node] = paths_to[dest_node]
+
+        # determine levels
+        levels = {}
+        for n in paths_from:
+            levels[n] = max(paths_from[n].get(src, 0) for src in rootset)
+
+        return levels
+
+    def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
+        """Get model names that are registered in the model graph"""
+        if level is not None:
+            return list(node for node, l in self._get_model_levels().items() if l == level)
+        return list(self.model_graph.nodes)
+
     def _train_single(
         self,
         train_data: TimeSeriesDataFrame,
@@ -570,7 +598,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
 
         if self.enable_ensemble:
-            models_available_for_ensemble = self.get_model_names()
+            models_available_for_ensemble = self.get_model_names(level=0)
 
             time_left_for_ensemble = None
             if time_limit is not None:
@@ -594,7 +622,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 try:
                     model_names_trained.append(
                         self.fit_ensemble(
-                            val_data=val_data, model_names=models_available_for_ensemble, time_limit=time_limit
+                            val_data=val_data,
+                            model_names=models_available_for_ensemble,
+                            time_limit=time_left_for_ensemble,
                         )
                     )
                 except Exception as e:  # noqa
@@ -610,6 +640,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             logger.error(str(e))
 
         return model_names_trained
+
+    def _get_ensemble_model_name(self) -> str:
+        """Ensure we don't have name collisions in the ensemble model name"""
+        ensemble_name = "WeightedEnsemble"
+        increment = 1
+        while ensemble_name in self._get_banned_model_names():
+            increment += 1
+            ensemble_name = f"WeightedEnsemble_{increment}"
+        return ensemble_name
 
     def fit_ensemble(
         self, val_data: TimeSeriesDataFrame, model_names: List[str], time_limit: Optional[float] = None
@@ -644,18 +683,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             time_limit=time_limit,
         )
 
-        # Ensure we don't have name collisions
-        ensemble_name = "WeightedEnsemble"
-        increment = 1
-        while ensemble_name in self._get_banned_model_names():
-            increment += 1
-            ensemble_name = f"WeightedEnsemble_{increment}"
-
         # FIXME: This is currently **extremely** hacky to simply get it working.
         #  Align on design / API of ensembles after v0.5.
         simple_ensemble = TimeSeriesEnsembleWrapper(
             weights={model_names[i]: w for i, w in enumerate(ensemble.weights_) if w != 0},
-            name=ensemble_name,
+            name=self._get_ensemble_model_name(),
             freq=val_data.freq,
             prediction_length=self.prediction_length,
             eval_metric=self.eval_metric,
