@@ -22,6 +22,7 @@ install_requires = [
     'pandas',
     'missingno',
     'altair',
+    'seaborn',
 ]
 
 extras_require = dict()

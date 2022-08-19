@@ -4,15 +4,15 @@ from autogluon.eda import AbstractAnalysis, RenderingBackend
 from autogluon.eda.backend.interaction import TwoFeatureInteractionBoxplotRenderer, ThreeFeatureInteractionBoxplotRenderer
 
 
-class TwoFeatureInteractionBoxplot(AbstractAnalysis):
+class TwoFeatureInteraction(AbstractAnalysis):
     def __init__(self,
-                 x,
-                 y,
+                 x=None,
+                 y=None,
                  rendering_backend: Type[RenderingBackend] = TwoFeatureInteractionBoxplotRenderer,
                  **kwargs) -> None:
         super().__init__(rendering_backend=rendering_backend, **kwargs)
-        self.y = y
         self.x = x
+        self.y = y
 
     def fit(self, **kwargs):
         self.model = {
@@ -24,7 +24,7 @@ class TwoFeatureInteractionBoxplot(AbstractAnalysis):
         self.model['datasets'] = {t: ds[[self.x, self.y]] for t, ds in self._get_datasets().items()}
 
 
-class ThreeFeatureInteractionBoxplot(TwoFeatureInteractionBoxplot):
+class ThreeFeatureInteraction(TwoFeatureInteraction):
     def __init__(self,
                  hue,
                  rendering_backend: Type[RenderingBackend] = ThreeFeatureInteractionBoxplotRenderer,

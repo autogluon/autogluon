@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
+import altair as alt
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
 from .altair_base import AltairMixin
 from ..backend.base import RenderingBackend
 from ..backend.jupyter import SimpleJupyterRenderingToolsMixin
-import pandas as pd
-import altair as alt
+
 ALL = '__all__'
 
 
@@ -76,3 +80,65 @@ class ThreeFeatureInteractionBoxplotRenderer(RenderingBackend, SimpleJupyterRend
             self.display_object(bars)
 
 
+class TwoFeatureInteractionBarchartRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
+
+    def render(self, model: Dict[str, Any]):
+        for t, source in model['datasets'].items():
+            kwargs = model['kwargs'].copy()
+
+            plot_kwargs = kwargs.pop('plot_kwargs', {})
+
+            fig, ax = plt.subplots(**plot_kwargs)
+            sns.barplot(
+                ax=ax,
+                x=model['x'],
+                y=model['y'],
+                data=source,
+                **kwargs
+            )
+
+            self.render_text(f'Interaction between {model["x"]} and {model["y"]} in {t}', text_type='h2')
+            plt.show(fig)
+
+
+class TwoFeatureInteractionCountplotRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
+
+    def render(self, model: Dict[str, Any]):
+        for t, source in model['datasets'].items():
+            kwargs = model['kwargs'].copy()
+
+            plot_kwargs = kwargs.pop('plot_kwargs', {})
+
+            fig, ax = plt.subplots(**plot_kwargs)
+            sns.countplot(
+                ax=ax,
+                x=model['x'],
+                hue=model['y'],
+                data=source,
+                **kwargs
+            )
+
+            self.render_text(f'Interaction between {model["x"]} and {model["y"]} in {t}', text_type='h2')
+            plt.show(fig)
+
+
+class TwoFeatureInteractionKDEPlotRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
+
+    def render(self, model: Dict[str, Any]):
+        for t, source in model['datasets'].items():
+            kwargs = model['kwargs'].copy()
+
+            plot_kwargs = kwargs.pop('plot_kwargs', {})
+
+            fig, ax = plt.subplots(**plot_kwargs)
+
+            sns.kdeplot(
+                ax=ax,
+                x=model['x'],
+                hue=model['y'],
+                data=source,
+                **kwargs
+            )
+
+            self.render_text(f'Interaction between {model["x"]} and {model["y"]} in {t}', text_type='h2')
+            plt.show(fig)
