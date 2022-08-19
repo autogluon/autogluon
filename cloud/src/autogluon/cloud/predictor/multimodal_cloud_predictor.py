@@ -1,11 +1,12 @@
 import copy
+import logging
 import os
 import pandas as pd
 import PIL
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.utils.s3_utils import is_s3_url, s3_path_to_bucket_prefix
-
+from botocore.exceptions import ClientError
 from PIL import Image
 
 from .cloud_predictor import CloudPredictor
@@ -17,6 +18,9 @@ from ..utils.utils import (
     read_image_bytes_and_encode,
     is_image_file,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class MultiModalCloudPredictor(CloudPredictor):
@@ -46,11 +50,11 @@ class MultiModalCloudPredictor(CloudPredictor):
         return predictor_cls
 
     def predict_real_time(
-            self,
-            test_data,
-            test_data_image_column=None,
-            accept='application/x-parquet'
-        ):
+        self,
+        test_data,
+        test_data_image_column=None,
+        accept='application/x-parquet'
+    ):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.
@@ -106,7 +110,19 @@ class MultiModalCloudPredictor(CloudPredictor):
 
         # Providing content type here because sagemaker serializer doesn't support change content type dynamically.
         # Pass to `endpoint.predict()` call as `initial_args` instead
-        return self._predict_real_time(test_data=test_data, accept=accept, ContentType=content_type)
+        try:
+            return self._predict_real_time(test_data=test_data, accept=accept, ContentType=content_type)
+        except ClientError as e:
+            # TODO: remove this after fix is out for 0.6 release
+            fail_to_load_on_cpu_error_msg = "GPUAccelerator can not run on your system since the accelerator is not available. The following accelerator(s) is available and can be passed into `accelerator` argument of `Trainer`: ['cpu']."
+            if fail_to_load_on_cpu_error_msg in e.response['Error']['Message']:
+                logger.warning(e.response['Error']['Message'])
+                logger.warning('Warning: Having trouble load gpu trained model on a cpu machine. This is a known issue of AutoGluon and will be fixed in future containers')
+                logger.warning('Warning: You can either try deploy on a gpu machine')
+                logger.warning('Warning: or download the trained artifact and modify `num_gpus` to be `-1` in the config file located at `config.yaml`')
+                logger.warning('Warning: then try to deploy with the modified artifact')
+                return None
+            raise e
 
     def predict(
         self,
@@ -164,3 +180,9 @@ class MultiModalCloudPredictor(CloudPredictor):
                 test_data_image_column=test_data_image_column,
                 **kwargs,
             )
+        # TODO: remove this after fix is out for 0.6 release
+        if self.info()['recent_transform_job']['status'] == 'Failed':
+            logger.warning("If the log shows error related to loading gpu trained model on cpu")
+            logger.warning('Warning: You can either try deploy on a gpu machine')
+            logger.warning('Warning: or download the trained artifact and modify `num_gpus` to be `-1` in the config file located at `config.yaml`')
+            logger.warning('Warning: then try to deploy with the modified artifact')
