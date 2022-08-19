@@ -25,7 +25,7 @@ class CompositeAnalysis(AbstractAnalysis):
         super().__init__(children=children, rendering_backend=rendering_backend, **kwargs)
         for k, v in kwargs.items():
             for child in children:
-                if getattr(child, k) is None:
+                if getattr(child, k, None) is None:
                     setattr(child, k, v)
 
     def fit(self, **kwargs):
