@@ -44,6 +44,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             time_limit=time_limit,
             sample_weight=sample_weight,
         )
+        self.dummy_pred = None
 
     def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred=None, sample_weight=None):  # noqa
         dummy_pred = copy.deepcopy(self.dummy_pred if dummy_pred is None else dummy_pred)
