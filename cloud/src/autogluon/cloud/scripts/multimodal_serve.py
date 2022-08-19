@@ -131,7 +131,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         pred.name = str(pred.name) + '_pred' if pred.name is not None else 'pred'
         prediction = pd.concat([pred, pred_proba], axis=1)
     else:
-        prediction = model.predict(data)
+        prediction = model.predict(data, as_pandas=True)
 
     if isinstance(prediction, pd.Series):
         prediction = prediction.to_frame()

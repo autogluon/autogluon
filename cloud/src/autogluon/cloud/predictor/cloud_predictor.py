@@ -307,7 +307,7 @@ class CloudPredictor(ABC):
         predictor_init_args,
         predictor_fit_args,
         image_path=None,
-        image_column_name=None,
+        image_column=None,
         leaderboard=True,
         framework_version='latest',
         job_name=None,
@@ -340,7 +340,7 @@ class CloudPredictor(ABC):
             If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
             And you want to make sure in your training/tuning file, the column corresponding to the images is a relative path prefix with the root directory.
             For example, `example_images/train/image1.png`. An absolute path will NOT work as the file will be moved to a remote system.
-        image_column_name: str, default = None
+        image_column: str, default = None
             The column name in the training/tuning data that contains the image paths.
         leaderboard: bool, default = True
             Whether to include the leaderboard in the output artifact
@@ -404,8 +404,8 @@ class CloudPredictor(ABC):
             predictor_fit_args=predictor_fit_args,
             leaderboard=leaderboard,
         )
-        if image_column_name is not None:
-            config_args['image_column_name'] = image_column_name
+        if image_column is not None:
+            config_args['image_column'] = image_column
         config = self._construct_config(**config_args)
         inputs = self._upload_fit_artifact(
             train_data=train_data,

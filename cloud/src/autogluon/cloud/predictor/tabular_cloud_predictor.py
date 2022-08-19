@@ -57,7 +57,7 @@ class TabularCloudPredictor(CloudPredictor):
         predictor_init_args,
         predictor_fit_args,
         image_path=None,
-        image_column_name=None,
+        image_column=None,
         **kwargs
     ):
         """
@@ -76,7 +76,7 @@ class TabularCloudPredictor(CloudPredictor):
             If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
             And you want to make sure in your training/tuning file, the column corresponding to the images is a relative path prefix with the root directory.
             For example, `example_images/train/image1.png`. An absolute path will NOT work as the file will be moved to a remote system.
-        image_column_name: str, default = None
+        image_column: str, default = None
             The column name in the training/tuning data that contains the image paths.
             This is REQUIRED if you want to train multimodality with image modality with one exception:
             If you pass in an `autogluon.tabular.FeatureMetadata` object that contains `image_path` special type to `predictor_fit_args`.
@@ -84,15 +84,15 @@ class TabularCloudPredictor(CloudPredictor):
             Refer to `CloudPredictor`
         """
         if image_path is not None:
-            assert image_column_name is not None or 'feature_metadata' in predictor_fit_args,\
-                'Please provide `image_column_name` when training multimodality with image modality'
-        if image_column_name is not None:
+            assert image_column is not None or 'feature_metadata' in predictor_fit_args,\
+                'Please provide `image_column` when training multimodality with image modality'
+        if image_column is not None:
             assert image_path is not None, 'Please provide `image_path` when training multimodality with image modality'
         super().fit(
             predictor_init_args=predictor_init_args,
             predictor_fit_args=predictor_fit_args,
             image_path=image_path,
-            image_column_name=image_column_name,
+            image_column=image_column,
             **kwargs
         )
 

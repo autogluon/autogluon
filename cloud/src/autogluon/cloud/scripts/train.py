@@ -99,11 +99,11 @@ if __name__ == "__main__":
 
     train_file = get_input_path(args.training_dir)
     training_data = TabularDataset(train_file)
-    if predictor_type == 'tabular' and 'image_column_name' in config:
+    if predictor_type == 'tabular' and 'image_column' in config:
         feature_metadata = predictor_fit_args.get('feature_metadata', None)
         if feature_metadata is None:
             feature_metadata = FeatureMetadata.from_df(training_data)
-        feature_metadata = feature_metadata.add_special_types({config['image_column_name']: ['image_path']})
+        feature_metadata = feature_metadata.add_special_types({config['image_column']: ['image_path']})
         predictor_fit_args['feature_metadata'] = feature_metadata
 
     tuning_data = None
