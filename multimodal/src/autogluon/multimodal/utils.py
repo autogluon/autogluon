@@ -2060,6 +2060,11 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
         num_gpus = detected_num_gpus
     else:
         num_gpus = min(config_num_gpus, detected_num_gpus)
+        warnings.warn(
+            f"Using the detected GPU number {detected_num_gpus}, "
+            f"smaller than the GPU number {config_num_gpus} in the config.",
+            UserWarning,
+        )
 
     if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
         warnings.warn(
