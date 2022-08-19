@@ -897,6 +897,7 @@ class MultiModalPredictor:
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
+        self._config = config
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
