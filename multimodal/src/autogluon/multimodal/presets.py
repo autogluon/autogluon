@@ -51,7 +51,6 @@ def multilingual():
 
 
 @automm_presets.register()
-<<<<<<< HEAD
 def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
