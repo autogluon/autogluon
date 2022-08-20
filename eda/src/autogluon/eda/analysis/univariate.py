@@ -5,10 +5,10 @@ from typing import Union, List, Type, Dict, Any
 import pandas as pd
 from pandas import DataFrame
 
+from autogluon.common.features.infer_types import get_type_map_raw, get_type_group_map_special
 from ..backend.base import RenderingBackend
 from ..backend.univariate import HistogramAnalysisRenderer, DatasetSummaryAnalysisRenderer
 from ..base import AbstractAnalysis
-from autogluon.common.features.infer_types import get_type_map_raw, get_type_group_map_special
 
 ALL = '__all__'
 
