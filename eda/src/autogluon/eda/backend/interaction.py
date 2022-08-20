@@ -122,6 +122,37 @@ class TwoFeatureInteractionCountplotRenderer(RenderingBackend, SimpleJupyterRend
             plt.show(fig)
 
 
+class TwoFeatureInteractionScatterplotRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
+
+    def render(self, model: Dict[str, Any]):
+        for t, source in model['datasets'].items():
+            kwargs = model['kwargs'].copy()
+
+            plot_kwargs = kwargs.pop('plot_kwargs', {})
+
+            fig, ax = plt.subplots(**plot_kwargs)
+
+            axes_args = dict(
+                x=model['x'],
+                y=model['y'],
+            )
+            if 'hue' in model:
+                axes_args['hue'] = model['hue']
+
+            sns.scatterplot(
+                ax=ax,
+                data=source,
+                **axes_args,
+                **kwargs
+            )
+
+            if 'hue' in model:
+                self.render_text(f'Interaction between {model["x"]}/{model["y"]}/{model["hue"]} in {t}', text_type='h2')
+            else:
+                self.render_text(f'Interaction between {model["x"]} and {model["y"]} in {t}', text_type='h2')
+            plt.show(fig)
+
+
 class TwoFeatureInteractionKDEPlotRenderer(RenderingBackend, SimpleJupyterRenderingToolsMixin):
 
     def render(self, model: Dict[str, Any]):

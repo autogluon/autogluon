@@ -26,7 +26,7 @@ class TwoFeatureInteraction(AbstractAnalysis):
 
 class ThreeFeatureInteraction(TwoFeatureInteraction):
     def __init__(self,
-                 hue,
+                 hue=None,
                  rendering_backend: Type[RenderingBackend] = ThreeFeatureInteractionBoxplotRenderer,
                  **kwargs) -> None:
         super().__init__(rendering_backend=rendering_backend, **kwargs)
