@@ -24,8 +24,8 @@ data:
     turn_off_epoch: 5  # The epoch when the mixup will be turned off.
     label_smoothing: 0.1  # Label smoothing.
   templates:
-    turn_on: True
-    num_templates: 10 # The number of templates to sample from uniformly.
+    turn_on: False
+    num_templates: 30 # The number of templates to sample from uniformly.
     preset_templates: ["super_glue", "rte"] # Select templates from a dataset template collection in the form (Dataset, Subset). For full list see data/templates. 
     custom_templates: # Specify your own template in jinja format as well as answer choices for the model to select from.
       # 1:
