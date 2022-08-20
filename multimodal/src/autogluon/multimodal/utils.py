@@ -73,7 +73,6 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    ZERO_SHOT,
 )
 from .data import (
     CategoricalProcessor,

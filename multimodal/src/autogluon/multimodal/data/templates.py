@@ -256,8 +256,8 @@ def download_sourceprompt_templates():
     response = requests.get(SOURCEPROMPT_URL)
     temporary_zip_file = pkg_resources.resource_filename(__name__, "templates.zip")
     open(temporary_zip_file, "wb").write(response.content)
-    md5_checksum = hashlib.md5(open(temporary_zip_file, "rb").read()).hexdigest()
-    assert md5_checksum == SOURCEPROMPT_MD5, f"MD5 Checksum for downloaded SourcePrompt does not match."
+    sha256_checksum = hashlib.sha256(open(temporary_zip_file, "rb").read()).hexdigest()
+    assert sha256_checksum == SOURCEPROMPT_MD5, f"SHA256 Checksum for downloaded SourcePrompt does not match."
     with zipfile.ZipFile(temporary_zip_file, "r") as zip_ref:
         zip_ref.extractall(os.path.join(TEMPLATES_FOLDER_PATH, ".."))
     os.remove(temporary_zip_file)
