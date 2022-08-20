@@ -1,1 +1,4 @@
-from .predictor import TabularCloudPredictor, TextCloudPredictor
+from .tabular_cloud_predictor import TabularCloudPredictor
+from .text_cloud_predictor import TextCloudPredictor
+from .image_cloud_predictor import ImageCloudPredictor
+from .multimodal_cloud_predictor import MultiModalCloudPredictor

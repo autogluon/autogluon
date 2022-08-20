@@ -191,7 +191,7 @@ class TimeSeriesEvaluator:
         for item_id in data.iter_items():
             y_true_w_hist = data.loc[item_id][self.target_column]
 
-            target = np.array(y_true_w_hist[-self.prediction_length :])
+            target = np.array(y_true_w_hist[-self.prediction_length :])  # noqa: E203
             target_history = np.array(y_true_w_hist[: -self.prediction_length])
 
             item_metrics = {}

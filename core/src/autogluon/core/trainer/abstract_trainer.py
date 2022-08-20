@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
@@ -362,7 +363,9 @@ class AbstractTrainer:
                 base_model_names.remove(base_model_name)
                 predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
                 if verbose:
-                    messages_to_log.append(f'\t{round(predict_1_time_full_set_old, 4)}s -> {round(predict_1_time_full_set, 4)}s ({base_model_name})')
+                    predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
+                    predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                    messages_to_log.append(f'\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_name})')
 
         score_val_dict = self.get_models_attribute_dict(attribute='val_score', models=base_model_names)
         sorted_scores = sorted(score_val_dict.items(), key=lambda x: x[1])
@@ -376,11 +379,14 @@ class AbstractTrainer:
             i += 1
             predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
             if verbose:
-                messages_to_log.append(f'\t{round(predict_1_time_full_set_old, 4)}s -> {round(predict_1_time_full_set, 4)}s ({base_model_to_remove})')
+                predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
+                predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                messages_to_log.append(f'\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_to_remove})')
 
         if messages_to_log:
+            infer_limit_threshold_log, time_unit_threshold = convert_time_in_s_to_log_friendly(time_in_sec=infer_limit_threshold)
             logger.log(20, f'Removing {len(messages_to_log)}/{num_models_og} base models to satisfy inference constraint '
-                           f'(constraint={round(infer_limit_threshold, 4)}s) ...')
+                           f'(constraint={round(infer_limit_threshold_log, 3)}{time_unit_threshold}) ...')
             for msg in messages_to_log:
                 logger.log(20, msg)
 
@@ -1313,19 +1319,13 @@ class AbstractTrainer:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get('predict_1_batch_size', None)
             assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
-            time_unit = "s"
             predict_1_time = model.predict_1_time
-            if round(predict_1_time, 2) == 0:
-                # TODO: Consider moving this to a dedicated function and using across package for nicer logging of time
-                time_unit = 'ms'
-                predict_1_time = predict_1_time*1000
-            logger.log(20, f'\t{round(predict_1_time, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
+            predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
+            logger.log(20, f'\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)')
+
             predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute='predict_1_time')
-            time_unit = "s"
-            if round(predict_1_time_full, 2) == 0:
-                time_unit = 'ms'
-                predict_1_time_full = predict_1_time_full * 1000
-            logger.log(20, f'\t{round(predict_1_time_full, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
+            predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
+            logger.log(20, f'\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self,
@@ -1888,7 +1888,7 @@ class AbstractTrainer:
         model: AbstractModel = self.load_model(model)
         predict_func_kwargs = dict(model=model)
         return compute_permutation_feature_importance(
-            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, **kwargs
+            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, quantile_levels=self.quantile_levels, **kwargs
         )
 
     def _get_models_load_info(self, model_names):

@@ -31,12 +31,15 @@ from . import version as ag_version
 from .constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
+    BBOX,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
     CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
+    DEPRECATED_ZERO_SHOT,
+    FEATURE_EXTRACTION,
     FEATURES,
     FEW_SHOT,
     GREEDY_SOUP,
@@ -50,6 +53,7 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    OBJECT_DETECTION,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -58,7 +62,7 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    ZERO_SHOT,
+    ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -78,6 +82,7 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_num_gpus,
     compute_score,
     convert_checkpoint_name,
     create_model,
@@ -92,8 +97,7 @@ from .utils import (
     infer_scarcity_mode_by_data_size,
     init_data_processors,
     init_df_preprocessor,
-    init_zero_shot,
-    is_interactive,
+    init_pretrained,
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
@@ -125,6 +129,7 @@ class MultiModalPredictor:
         self,
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
+        pipeline: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -142,6 +147,9 @@ class MultiModalPredictor:
             (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
+        pipeline
+            This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
+            TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -202,6 +210,7 @@ class MultiModalPredictor:
 
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
+        self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -219,8 +228,19 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if problem_type is not None and problem_type.lower() == ZERO_SHOT:
-            self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
+        if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
+            warnings.warn(
+                f'problem_type="{problem_type}" is deprecated. For inference with CLIP model, '
+                f'use pipeline="zero_shot_image_classification" instead.',
+                DeprecationWarning,
+            )
+            self._problem_type = None
+            self._pipeline = ZERO_SHOT_IMAGE_CLASSIFICATION
+
+        if self._pipeline is not None:
+            self._config, self._model, self._data_processors = init_pretrained(
+                pipeline=self._pipeline, hyperparameters=hyperparameters
+            )
 
     @property
     def path(self):
@@ -233,6 +253,10 @@ class MultiModalPredictor:
     @property
     def problem_type(self):
         return self._problem_type
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -347,7 +371,7 @@ class MultiModalPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                     num_trials: int
-                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs t o be specified.
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
                     scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
                         If str is passed, AutoGluon will create the scheduler for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
@@ -712,6 +736,20 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
+        if not self._config.distiller.softmax_regression_loss_type:
+            # automatically infer loss func based on problem type if not specified
+            if self._problem_type == "regression":
+                softmax_regression_loss_func = nn.MSELoss()
+            else:
+                assert self._output_shape > 1
+                softmax_regression_loss_func = nn.CrossEntropyLoss()
+        elif self._config.distiller.softmax_regression_loss_type == "mse":
+            softmax_regression_loss_func = nn.MSELoss()
+        elif self._config.distiller.softmax_regression_loss_type == "cross_entropy":
+            softmax_regression_loss_func = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.softmax_regression_loss_type}")
+
         output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
         if output_feature_loss_type == "cosine":
             output_feature_loss_func = nn.CosineEmbeddingLoss()
@@ -767,6 +805,7 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            softmax_regression_loss_func,
             output_feature_adaptor,
             output_feature_loss_func,
             rkd_loss_func,
@@ -875,9 +914,6 @@ class MultiModalPredictor:
         self._model = model
         self._loss_func = loss_func
 
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
-
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
@@ -908,6 +944,7 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
                 output_feature_adaptor,
                 output_feature_loss_func,
                 rkd_loss_func,
@@ -922,12 +959,13 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
                 output_feature_adaptor,
                 output_feature_loss_func,
                 rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -973,10 +1011,12 @@ class MultiModalPredictor:
                 baseline_funcs=baseline_funcs,
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
+                softmax_regression_weight=config.distiller.softmax_regression_weight,
                 temperature=config.distiller.temperature,
                 output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                softmax_regression_loss_func=softmax_regression_loss_func,
                 output_feature_adaptor=output_feature_adaptor,
                 output_feature_loss_func=output_feature_loss_func,
                 rkd_loss_func=rkd_loss_func,
@@ -1051,23 +1091,7 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = (
-            math.floor(config.env.num_gpus)
-            if isinstance(config.env.num_gpus, (int, float))
-            else len(config.env.num_gpus)
-        )
-        if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
-            num_gpus = torch.cuda.device_count()
-
-        if is_interactive() and num_gpus > 1:
-            warnings.warn(
-                "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
-                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-                "MultiModalPredictor in a script.",
-                UserWarning,
-            )
-            num_gpus = 1
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(
@@ -1112,6 +1136,13 @@ class MultiModalPredictor:
             else:
                 strategy = None
                 num_gpus = min(num_gpus, 1)
+
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy
+        self._config = config
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
@@ -1304,13 +1335,7 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        num_gpus = (
-            math.floor(self._config.env.num_gpus)
-            if isinstance(self._config.env.num_gpus, (int, float))
-            else len(self._config.env.num_gpus)
-        )
-        if num_gpus < 0:
-            num_gpus = torch.cuda.device_count()
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
@@ -1581,6 +1606,9 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
+        if self._pipeline == OBJECT_DETECTION:
+            ret_type = BBOX
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1599,7 +1627,7 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                if logits_or_prob.ndim == 2:
+                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
                     pred = logits_or_prob.argmax(axis=1)
                 else:
                     pred = logits_or_prob
@@ -1717,7 +1745,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=False,
         )
-        if self._problem_type in [ZERO_SHOT]:
+        if self._pipeline in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
             if return_masks:
                 masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)

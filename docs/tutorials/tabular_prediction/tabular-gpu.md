@@ -57,7 +57,7 @@ list_text_presets()
 
 ### Vision models
 
-Text model preset to use can be set via:
+Vision model preset to use can be set via:
 
 ```{.python}
 hyperparameters['AG_IMAGE_NN'] = {'model': '<model>'}

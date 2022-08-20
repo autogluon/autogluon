@@ -2,7 +2,7 @@ import copy
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import autogluon.core as ag
 from autogluon.common.savers import save_pkl

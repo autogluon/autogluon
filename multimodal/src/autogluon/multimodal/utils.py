@@ -3,6 +3,7 @@ import datetime
 import functools
 import hashlib
 import logging
+import math
 import os
 import pickle
 import sys
@@ -34,6 +35,7 @@ from .constants import (
     ALL_MODALITIES,
     AUTOMM,
     AVERAGE_PRECISION,
+    BBOX,
     BINARY,
     CATEGORICAL,
     CATEGORICAL_MLP,
@@ -53,6 +55,7 @@ from .constants import (
     LOGITS,
     MASKS,
     METRIC_MODE_MAP,
+    MMDET_IMAGE,
     MULTICLASS,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -86,6 +89,7 @@ from .models import (
     CategoricalTransformer,
     CLIPForImageText,
     HFAutoModelForTextPrediction,
+    MMDetAutoModelForObjectDetection,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
@@ -767,6 +771,7 @@ def create_model(
                 cls_token=True if len(names) == 1 else False,
                 embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
@@ -795,8 +800,14 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
+            )
+        elif model_name.lower().startswith(MMDET_IMAGE):
+            model = MMDetAutoModelForObjectDetection(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
             )
         elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
@@ -1641,6 +1652,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         feature_masks = [ele[COLUMN_FEATURES][MASKS] for ele in outputs]  # a list of dicts
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
+    elif ret_type == BBOX:
+        return [ele[BBOX] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
@@ -1654,7 +1667,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     return ret
 
 
-def init_zero_shot(
+def init_pretrained(
+    pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -1675,7 +1689,7 @@ def init_zero_shot(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    config = get_config(presets="zero_shot", overrides=hyperparameters)
+    config = get_config(presets=pipeline, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
@@ -2067,3 +2081,46 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
             path = None
 
     return path
+
+
+def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
+    """
+    Compute the gpu number to initialize the lightning trainer.
+
+    Parameters
+    ----------
+    config_num_gpus
+        The gpu number provided by config.
+    strategy
+        A lightning trainer's strategy such as "ddp", "ddp_spawn", and "dp".
+
+    Returns
+    -------
+    A valid gpu number for the current environment and config.
+    """
+    config_num_gpus = (
+        math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
+    )
+    detected_num_gpus = torch.cuda.device_count()
+
+    if config_num_gpus < 0:  # In case config_num_gpus is -1, meaning using all gpus.
+        num_gpus = detected_num_gpus
+    else:
+        num_gpus = min(config_num_gpus, detected_num_gpus)
+        warnings.warn(
+            f"Using the detected GPU number {detected_num_gpus}, "
+            f"smaller than the GPU number {config_num_gpus} in the config.",
+            UserWarning,
+        )
+
+    if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
+        warnings.warn(
+            "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
+            "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
+            "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
+            "MultiModalPredictor in a script.",
+            UserWarning,
+        )
+        num_gpus = 1
+
+    return num_gpus
