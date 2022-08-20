@@ -17,6 +17,10 @@ import pkg_resources
 import yaml
 from jinja2 import BaseLoader, Environment, meta
 
+from ..constants import AUTOMM
+
+logger = logging.getLogger(AUTOMM)
+
 # Truncation of jinja template variables
 # 1710 = 300 words x 4.7 avg characters per word + 300 spaces
 TEXT_VAR_LENGTH = 2048
@@ -238,6 +242,32 @@ LANGUAGES = {
     "za": "Zhuang, Chuang",
     "zu": "Zulu",
 }
+
+
+def download_sourceprompt_templates():
+    import hashlib
+    import zipfile
+
+    import requests
+
+    from ..constants import SOURCEPROMPT_MD5, SOURCEPROMPT_URL
+
+    logger.info("Downloading Prompt Collection.")
+    response = requests.get(SOURCEPROMPT_URL)
+    temporary_zip_file = pkg_resources.resource_filename(__name__, "templates.zip")
+    open(temporary_zip_file, "wb").write(response.content)
+    md5_checksum = hashlib.md5(open(temporary_zip_file, "rb").read()).hexdigest()
+    assert md5_checksum == SOURCEPROMPT_MD5, f"MD5 Checksum for downloaded SourcePrompt does not match."
+    with zipfile.ZipFile(temporary_zip_file, "r") as zip_ref:
+        zip_ref.extractall(os.path.join(TEMPLATES_FOLDER_PATH, ".."))
+    os.remove(temporary_zip_file)
+
+
+def fetching_templates_if_not_exist():
+    if os.path.exists(TEMPLATES_FOLDER_PATH):
+        return True
+    else:
+        download_sourceprompt_templates()
 
 
 def highlight(input):
@@ -472,6 +502,7 @@ class TemplateCollection:
     def __init__(self):
 
         # Dict of all the DatasetTemplates, key is the tuple (dataset_name, subset_name)
+        fetching_templates_if_not_exist()
         self.datasets_templates: Dict[(str, Optional[str]), DatasetTemplates] = self._collect_datasets()
 
     @property
