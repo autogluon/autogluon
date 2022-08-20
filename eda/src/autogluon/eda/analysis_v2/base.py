@@ -64,3 +64,18 @@ class AbstractAnalysis(ABC):
         for c in self.children:
             c.fit(**kwargs)
         return self.state
+
+
+class NamespaceAbstractAnalysis(AbstractAnalysis, ABC):
+    def __init__(self,
+                 namespace: str = None,
+                 parent: Union[None, AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
+                 **kwargs) -> None:
+        super().__init__(parent, children, **kwargs)
+        self.namespace = namespace
+
+    def _get_state_from_parent(self) -> AnalysisState:
+        state = super()._get_state_from_parent()
+        state[self.namespace] = {}
+        return state[self.namespace]

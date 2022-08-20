@@ -3,29 +3,22 @@ from __future__ import annotations
 from typing import List, Union
 
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw
+from . import NamespaceAbstractAnalysis
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
 DATASET_ARGS = ['train_data', 'test_data', 'tuning_data']
 
 
-class Sampler(AbstractAnalysis):
+class Sampler(NamespaceAbstractAnalysis):
 
     def __init__(self,
                  namespace: str = 'sample',
                  sample: Union[None, int] = None,
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [], **kwargs) -> None:
-        super().__init__(parent, children, **kwargs)
-        self.namespace = namespace
+        super().__init__(namespace, parent, children, **kwargs)
         self.sample = sample
-
-    def _get_state_from_parent(self) -> AnalysisState:
-        state = super()._get_state_from_parent()
-        if self.sample is not None:
-            state[self.namespace] = {}
-            state = state[self.namespace]
-        return state
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.sample_size = self.sample
