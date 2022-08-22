@@ -194,6 +194,7 @@ class TimeSeriesPredictor:
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
+        enable_ensemble: bool = True,
         **kwargs,
     ) -> "TimeSeriesPredictor":
         """Fit models to predict distributional forecasts of multiple related time series
@@ -250,7 +251,9 @@ class TimeSeriesPredictor:
             choices for each of the recommended models can be found in the references.
         hyperparameter_tune_kwargs : str or dict, default = None
             # TODO
-
+        enable_ensemble: bool, default = True
+            If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
+            ``hyperparameters``.
         References
         ----------
             - DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html
@@ -283,6 +286,7 @@ class TimeSeriesPredictor:
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            enable_ensemble=enable_ensemble,
             **kwargs,
         )
         logger.info("================ TimeSeriesPredictor ================")
@@ -325,6 +329,7 @@ class TimeSeriesPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_left,
             verbosity=verbosity,
+            enable_ensemble=enable_ensemble,
         )
 
         self.save()
