@@ -472,7 +472,7 @@ def inject_lora_to_linear_layer(
     module_filter
         Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
         If None, loRA is considered for all modules
-        
+
     Returns
     -------
     Model with injected LoRA modules.
