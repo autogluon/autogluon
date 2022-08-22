@@ -185,12 +185,6 @@ class TFewModel(nn.Module):
 
         inputs_embeds = self.model.encoder.embed_tokens(text_token_ids)
 
-        if self.gradient_checkpointing:
-            # FIXME(?) This is a hack! We added a DummyLayer to ensure that the
-            #  gradient checkpointing will assign output layer as require_grad=True
-            #  Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
-            inputs_embeds = self.dummy_layer(inputs_embeds)
-
         # Forward input through the encoder
         encoder_hidden_states_or = self.model.encoder(inputs_embeds=inputs_embeds, attention_mask=text_masks)[0]
         encoder_hidden_states = encoder_hidden_states_or.unsqueeze(dim=1).repeat(1, num_choices, 1, 1).flatten(0, 1)
@@ -206,7 +200,17 @@ class TFewModel(nn.Module):
             decoder_attention_mask=decoder_attention_mask,
         )
 
-        target_template_logits = model_output.logits  # Decoder Logits over the vocabulary for target template sequence
+        if self.gradient_checkpointing:
+            # FIXME(?) This is a hack! We added a DummyLayer to ensure that the
+            #  gradient checkpointing will assign output layer as require_grad=True
+            #  Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
+            model_output = self.dummy_layer(model_output.logits)
+        else:
+            model_output = model_output.logits
+
+        target_template_logits = model_output  # Decoder Logits over the vocabulary for target template sequence
+
+
         lm_target = flat_choices_ids - 100 * (flat_choices_ids == self.tokenizer.pad_token_id).long()
         # Calculate entropy of target templates' logits to target template, i.e. how close the target template is to what
         # the model would predict, going from sentence start token (target_template_logits) to sentence end token (
@@ -229,7 +233,7 @@ class TFewModel(nn.Module):
         column_features, column_feature_masks = get_column_features(
             batch=batch,
             column_name_prefix=self.text_column_prefix,
-            features=model_output.logits,
+            features=model_output,
             valid_lengths=text_valid_length,
         )
         ret[COLUMN_FEATURES][FEATURES].update(column_features)

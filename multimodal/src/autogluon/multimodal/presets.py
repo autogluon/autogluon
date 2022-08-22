@@ -55,7 +55,7 @@ def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "bigscience/T0_3B",
-        "model.t_few.gradient_checkpointing": False,
+        "model.t_few.gradient_checkpointing": False, # Currently instable.
         "optimization.learning_rate": 3e-3,
         "optimization.lr_decay": 1.0,
         "optimization.efficient_finetune": "ia3",

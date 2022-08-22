@@ -75,8 +75,8 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             "petfinder",
             ["t_few"],
             "t5-small",
-            "swin_tiny_patch4_window7_224",
-            GREEDY_SOUP,
+            None,
+            BEST,
             IA3,
             "auto",
         ),
@@ -182,6 +182,7 @@ def test_predictor(
             hyperparameters.update(
                 {
                     "model.t_few.checkpoint_name": "t5-small",
+                    "model.t_few.gradient_checkpointing": False,
                 }
             )
         else:

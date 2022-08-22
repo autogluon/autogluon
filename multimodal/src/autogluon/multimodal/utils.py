@@ -913,7 +913,8 @@ def save_pretrained_models(
     path
         The path to save pretrained checkpoints.
     """
-    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names])
+    # TODO? Fix hardcoded model names.
+    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)) for model_name in config.model.names])
     if not requires_saving:
         return config
 
