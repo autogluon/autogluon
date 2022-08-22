@@ -181,7 +181,6 @@ def test_predictor(
         if "t_few" in model_names:
             hyperparameters.update(
                 {
-                    "model.hf_text.checkpoint_name": text_backbone,
                     "model.t_few.checkpoint_name": "t5-small",
                 }
             )
