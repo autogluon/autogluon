@@ -536,5 +536,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         with the same hash value (assuming no collisions).
         """
         df_with_timestamp = self.reset_index(level=TIMESTAMP)
-        hash_per_row = pd.util.hash_pandas_object(df_with_timestamp, index=False)
-        return hash_per_row.groupby(ITEMID, sort=False).apply(lambda x: hashlib.md5(x.values).hexdigest())
+        hash_per_timestep = pd.util.hash_pandas_object(df_with_timestamp, index=False)
+        # groupby preserves the order of the timesteps
+        return hash_per_timestep.groupby(ITEMID, sort=False).apply(lambda x: hashlib.md5(x.values).hexdigest())
