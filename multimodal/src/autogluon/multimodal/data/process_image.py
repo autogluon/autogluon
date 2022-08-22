@@ -13,6 +13,7 @@ from timm.data.constants import (
     IMAGENET_INCEPTION_MEAN,
     IMAGENET_INCEPTION_STD,
 )
+from torch import nn
 from torchvision import transforms
 from transformers import AutoConfig
 
@@ -63,6 +64,7 @@ class ImageProcessor:
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
+        model: Optional[nn.Module] = None,
     ):
         """
         Parameters
@@ -101,6 +103,8 @@ class ImageProcessor:
             Used in trival augment as the maximum scale that can be random generated
             A value of 0 means turn off trivial augment
             https://arxiv.org/pdf/2103.10158.pdf
+        model
+            The model using this data processor.
         """
         self.checkpoint_name = checkpoint_name
         self.prefix = prefix
@@ -116,11 +120,7 @@ class ImageProcessor:
         self.std = None
 
         if self.prefix == MMDET_IMAGE:
-            # TODO: can we pass the config information here when we build the model?
-            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-            cfg = checkpoint_name + ".py"
-            if isinstance(cfg, str):
-                cfg = mmcv.Config.fromfile(cfg)
+            cfg = model.model.cfg
 
         if checkpoint_name is not None:
             if self.prefix == MMDET_IMAGE:
