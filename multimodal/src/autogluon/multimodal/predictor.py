@@ -1800,11 +1800,12 @@ class MultiModalPredictor:
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
 
+        config = copy.deepcopy(self._config)
         if standalone:
-            self._config = save_pretrained_model_configs(model=self._model, config=self._config, path=path)
+            config = save_pretrained_model_configs(model=self._model, config=config, path=path)
 
         os.makedirs(path, exist_ok=True)
-        OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
+        OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
