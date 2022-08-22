@@ -1,8 +1,8 @@
 import collections
-from functools import lru_cache
 import logging
 import os
 import random
+from functools import lru_cache
 from typing import List, Optional, Tuple
 
 import torch
