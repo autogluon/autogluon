@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import itertools
 from collections.abc import Iterable
 from typing import Any, Optional, Tuple, Type
@@ -174,7 +175,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return len(self._item_index)
 
     def num_timesteps_per_item(self) -> pd.Series:
-        return self.groupby(level=ITEMID).size()
+        return self.groupby(level=ITEMID, sort=False).size()
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -525,3 +526,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
         df_view._cached_freq = freq
 
         return df_view
+
+    def hash_each_item(self) -> pd.Series:
+        """Hash each time series in the dataset to a 32-character hex string.
+
+        Hash is computed based on the timestamps and values of the time series (item_id is ignored).
+
+        This means that any model that doesn't use static features will make identical predictions for two time series
+        with the same hash value (assuming no collisions).
+        """
+        df_with_timestamp = self.reset_index(level=TIMESTAMP)
+        hash_per_row = pd.util.hash_pandas_object(df_with_timestamp, index=False)
+        return hash_per_row.groupby(ITEMID, sort=False).apply(lambda x: hashlib.md5(x.values).hexdigest())
