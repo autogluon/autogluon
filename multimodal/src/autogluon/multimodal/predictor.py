@@ -83,12 +83,12 @@ from .utils import (
     average_checkpoints,
     compute_num_gpus,
     compute_score,
-    convert_checkpoint_name,
     create_model,
     data_to_df,
     extract_from_output,
     filter_search_space,
     get_config,
+    get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
     infer_dtypes_by_model_names,
@@ -100,7 +100,7 @@ from .utils import (
     logits_to_prob,
     modify_duplicate_model_names,
     process_save_path,
-    save_pretrained_models,
+    save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
     tensor_to_ndarray,
@@ -1785,7 +1785,7 @@ class MultiModalPredictor:
         }
         return state_dict_processed
 
-    def save(self, path: str, standalone: Optional[bool] = False):
+    def save(self, path: str, standalone: Optional[bool] = True):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -1801,7 +1801,7 @@ class MultiModalPredictor:
         """
 
         if standalone:
-            self._config = save_pretrained_models(model=self._model, config=self._config, path=path)
+            self._config = save_pretrained_model_configs(model=self._model, config=self._config, path=path)
 
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
@@ -1860,9 +1860,9 @@ class MultiModalPredictor:
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
-        config = convert_checkpoint_name(
+        config = get_local_pretrained_config_paths(
             config=config, path=path
-        )  # check the config for loading offline pretrained models
+        )  # check the config to load offline pretrained model configs
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)

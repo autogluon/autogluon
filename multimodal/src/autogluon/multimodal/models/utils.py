@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import nn
+from transformers import AutoConfig, AutoModel
 
 from .lora_layers import LoRALinear
 
@@ -454,3 +455,28 @@ def get_model_head(model: nn.Module):
         raise ValueError(f"Model {type(model)} doesn't have head. Need to check its implementation.")
 
     return head
+
+
+def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = True):
+    """
+    Get a Huggingface config and model based on a checkpoint name.
+
+    Parameters
+    ----------
+    checkpoint_name
+        A model checkpoint name.
+    pretrained
+         Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+
+    Returns
+    -------
+    A Huggingface config and model.
+    """
+    config = AutoConfig.from_pretrained(checkpoint_name)
+
+    if pretrained:
+        model = AutoModel.from_pretrained(checkpoint_name)
+    else:
+        model = AutoModel.from_config(config)
+
+    return config, model
