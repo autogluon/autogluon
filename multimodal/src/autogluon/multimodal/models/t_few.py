@@ -210,7 +210,6 @@ class TFewModel(nn.Module):
 
         target_template_logits = model_output  # Decoder Logits over the vocabulary for target template sequence
 
-
         lm_target = flat_choices_ids - 100 * (flat_choices_ids == self.tokenizer.pad_token_id).long()
         # Calculate entropy of target templates' logits to target template, i.e. how close the target template is to what
         # the model would predict, going from sentence start token (target_template_logits) to sentence end token (
