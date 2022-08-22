@@ -1975,9 +1975,7 @@ def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold:
     Mode in  [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT]
     """
     row_num = len(df_train)
-    if row_num == 0:
-        return ZERO_SHOT
-    elif row_num < scarcity_threshold:
+    if row_num < scarcity_threshold:
         return FEW_SHOT
     else:
         return DEFAULT_SHOT

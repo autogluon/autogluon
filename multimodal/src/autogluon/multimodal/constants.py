@@ -163,4 +163,4 @@ MODEL_CHECKPOINT = "model.ckpt"
 # url
 S3_PREFIX = "s3://"
 SOURCEPROMPT_URL = "https://automl-mm-bench.s3.amazonaws.com/few_shot/templates.zip"
-SOURCEPROMPT_MD5 = "65c43e2c9e6e18b89d82e9a4d36b35d5111e2fe14c27d9506f848a0182d77e49"
+SOURCEPROMPT_SHA1 = "c25cdf3730ff96ab4859b72e18d46ff117b62bd6"

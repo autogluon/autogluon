@@ -21,10 +21,6 @@ from ..constants import AUTOMM
 
 logger = logging.getLogger(AUTOMM)
 
-# Truncation of jinja template variables
-# 1710 = 300 words x 4.7 avg characters per word + 300 spaces
-TEXT_VAR_LENGTH = 2048
-
 # Local path to the folder containing the templates
 TEMPLATES_FOLDER_PATH = pkg_resources.resource_filename(__name__, "templates")
 
@@ -245,19 +241,14 @@ LANGUAGES = {
 
 
 def download_sourceprompt_templates():
-    import hashlib
     import zipfile
 
-    import requests
+    from autogluon.multimodal.utils import download
 
-    from ..constants import SOURCEPROMPT_MD5, SOURCEPROMPT_URL
+    from ..constants import SOURCEPROMPT_SHA1, SOURCEPROMPT_URL
 
-    logger.info("Downloading Prompt Collection.")
-    response = requests.get(SOURCEPROMPT_URL)
     temporary_zip_file = pkg_resources.resource_filename(__name__, "templates.zip")
-    open(temporary_zip_file, "wb").write(response.content)
-    sha256_checksum = hashlib.sha256(open(temporary_zip_file, "rb").read()).hexdigest()
-    assert sha256_checksum == SOURCEPROMPT_MD5, f"SHA256 Checksum for downloaded SourcePrompt does not match."
+    temporary_zip_file = download(url=SOURCEPROMPT_URL, path=temporary_zip_file, sha1_hash=SOURCEPROMPT_SHA1)
     with zipfile.ZipFile(temporary_zip_file, "r") as zip_ref:
         zip_ref.extractall(os.path.join(TEMPLATES_FOLDER_PATH, ".."))
     os.remove(temporary_zip_file)
@@ -401,12 +392,12 @@ class Template(yaml.YAMLObject):
         else:
             return None
 
-    def apply(self, example, truncate=True, highlight_variables=False):
+    def apply(self, example, truncate=True, truncation_length=2048, highlight_variables=False):
         """
         Creates a prompt by applying this template to an example
 
         :param example: the dataset example to create a prompt for
-        :param truncate: if True, example fields will be truncated to TEXT_VAR_LENGTH chars
+        :param truncate: if True, example fields will be truncated to truncation_length chars
         :param highlight_variables: highlight the added variables
         :return: tuple of 2 strings, for prompt and output
         """
@@ -415,7 +406,7 @@ class Template(yaml.YAMLObject):
         # Truncates the prompt if needed
         if truncate:
             trunc_command = (
-                f" | string | truncate({TEXT_VAR_LENGTH}) }}}}"  # Escaping curly braces requires doubling them
+                f" | string | truncate({truncation_length}) }}}}"  # Escaping curly braces requires doubling them
             )
             jinja = jinja.replace("}}", trunc_command)
 

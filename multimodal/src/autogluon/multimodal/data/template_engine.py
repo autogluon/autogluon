@@ -1,7 +1,13 @@
+import logging
+
 import numpy as np
 from omegaconf import OmegaConf
 
 from autogluon.multimodal.data.templates import DatasetTemplates, Template, TemplateCollection
+
+from ..constants import AUTOMM
+
+logger = logging.getLogger(AUTOMM)
 
 
 class TemplateEngine:
@@ -24,16 +30,24 @@ class TemplateEngine:
         self.all_datasets = collection.keys
         self.preset_templates = OmegaConf.select(self.template_config, "preset_templates", default=None)
         self.custom_templates = OmegaConf.select(self.template_config, "custom_templates", default=None)
+        self.num_templates = OmegaConf.select(self.template_config, "num_templates", default=30)
+        self.template_length = OmegaConf.select(self.template_config, "template_length", default=2048)
 
         if self.preset_templates:
             assert (
                 len(self.preset_templates) == 2
             ), f"Preset templates has the wrong format. Needs to be [DATASET, SUBSET]."
             dataset_templates = DatasetTemplates(self.preset_templates[0], self.preset_templates[1])
-            self.templates += dataset_templates.templates.values()
+            current_templates = list(dataset_templates.templates.values())
+            self.templates += current_templates[: self.num_templates]
 
         if self.custom_templates:
             for key, value in self.custom_templates.items():
+                if len(self.templates) >= self.num_templates:
+                    logger.warning(
+                        f"Ignored custom template '{value.template}' as template engine already has {self.num_templates} templates."
+                    )
+                    break
                 template = Template(key, value.template, "custom", answer_choices=value.answer_choices)
                 self.templates.append(template)
 
@@ -60,4 +74,4 @@ class TemplateEngine:
         if not self.templates:
             return [None, example]
         template = np.random.choice(self.templates)
-        return [template, template.apply(example)]
+        return [template, template.apply(example, truncation_length=self.template_length)]

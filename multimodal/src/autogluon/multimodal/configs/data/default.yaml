@@ -26,6 +26,7 @@ data:
   templates:
     turn_on: False
     num_templates: 30 # The number of templates to sample from uniformly.
+    template_length: 2048 # Truncation of jinja template variables
     preset_templates: ["super_glue", "rte"] # Select templates from a dataset template collection in the form (Dataset, Subset). For full list see data/templates. 
     custom_templates: # Specify your own template in jinja format as well as answer choices for the model to select from.
       # 1:
