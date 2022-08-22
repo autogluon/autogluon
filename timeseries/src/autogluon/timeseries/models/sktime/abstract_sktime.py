@@ -11,7 +11,7 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 
-from ...dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
+from ...dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from ...utils.seasonality import get_seasonality
 from ..abstract import AbstractTimeSeriesModel
 
