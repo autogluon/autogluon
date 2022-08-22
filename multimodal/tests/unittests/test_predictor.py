@@ -82,6 +82,15 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
         ),
         (
             "hateful_memes",
+            ["timm_image", "t_few", "clip", "fusion_mlp"],
+            "t5-small",
+            "swin_tiny_patch4_window7_224",
+            BEST,
+            IA3,
+            "auto",
+        ),
+        (
+            "hateful_memes",
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
             "swin_tiny_patch4_window7_224",
@@ -145,7 +154,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
         ),
     ],
 )
-def test_predictor(
+def test_predictor_k(
     dataset_name,
     model_names,
     text_backbone,
@@ -173,6 +182,8 @@ def test_predictor(
         "model.names": model_names,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "env.per_gpu_batch_size": 1,
+        "env.eval_batch_size_ratio": 1,
         "optimization.top_k_average_method": top_k_average_method,
         "optimization.efficient_finetune": efficient_finetune,
         "optimization.loss_function": loss_function,
@@ -209,7 +220,7 @@ def test_predictor(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -221,7 +232,7 @@ def test_predictor(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
     )
     verify_predictor_save_load(predictor, dataset.test_df)
 
@@ -233,7 +244,7 @@ def test_predictor(
             train_data=dataset.train_df,
             config=config,
             hyperparameters=hyperparameters,
-            time_limit=30,
+            time_limit=20,
         )
 
 
@@ -264,6 +275,8 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
         "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "env.per_gpu_batch_size": 1,
+        "env.eval_batch_size_ratio": 1,
     }
 
     predictor = MultiModalPredictor(
@@ -280,7 +293,7 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=30,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -360,6 +373,8 @@ def test_customizing_model_names(
         {
             "env.num_workers": 0,
             "env.num_workers_evaluation": 0,
+            "env.per_gpu_batch_size": 1,
+            "env.eval_batch_size_ratio": 1,
         }
     )
     hyperparameters_gt = copy.deepcopy(hyperparameters)
@@ -551,7 +566,7 @@ def test_model_configs():
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            time_limit=30,
+            time_limit=20,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )
@@ -578,12 +593,13 @@ def test_modifying_duplicate_model_names():
 
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp", "t_few"],
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
-        "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
+        "env.per_gpu_batch_size": 1,
+        "env.eval_batch_size_ratio": 1,
     }
 
     teacher_predictor.fit(
