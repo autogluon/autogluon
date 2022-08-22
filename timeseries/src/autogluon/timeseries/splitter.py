@@ -3,7 +3,7 @@ from typing import Tuple
 
 import pandas as pd
 
-from .dataset import TimeSeriesDataFrame
+from .dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +58,9 @@ class AbstractTimeSeriesSplitter:
 def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> TimeSeriesDataFrame:
     """Append a suffix to each item_id in a TimeSeriesDataFrame."""
 
-    def add_suffix(multiindex_element):
-        item_id, timestamp = multiindex_element
-        return (f"{item_id}{suffix}", timestamp)
-
     result = ts_dataframe.copy(deep=False)
-    result.index = result.index.map(add_suffix)
+    new_item_id = result.index.get_level_values(level=ITEMID).astype(str) + suffix
+    result.index = pd.MultiIndex.from_arrays([new_item_id, result.index.get_level_values(TIMESTAMP)])
     return result
 
 
