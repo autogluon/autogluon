@@ -252,8 +252,8 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs : str or dict, default = None
             # TODO
         enable_ensemble: bool, default = True
-            If True, the ``TimeSeriesPredictor`` will fit all models specified via ``hyperparameters``, and also fit a
-            simple weighted ensemble on trained models.
+            If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
+            ``hyperparameters``.
         References
         ----------
             - DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html

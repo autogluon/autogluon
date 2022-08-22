@@ -193,7 +193,7 @@ class SimpleAbstractTrainer:
             return X
 
     # FIXME: Copy pasted from Tabular
-    def get_minimum_model_set(self, model, include_self=True) -> list:
+    def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
         """Gets the minimum set of models that the provided model depends on, including itself.
         Returns a list of model names"""
         if not isinstance(model, str):
@@ -335,8 +335,24 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def _add_model(
         self,
         model: AbstractTimeSeriesModel,
-        base_models=None,
+        base_models: List[str] = None,
     ):
+        """Add a model to the model graph of the trainer. If the model is an ensemble, also add
+        information about dependencies to the model graph (list of models specified via ``base_models``).
+
+        Parameters
+        ----------
+        model : AbstractTimeSeriesModel
+            The model to be added to the model graph.
+        base_models : List[str], optional, default None
+            If the model is an ensemble, the list of base model names that are included in the ensemble.
+            Expected only when ``model`` is a ``TimeSeriesEnsembleWrapper``.
+
+        Raises
+        ------
+        AssertionError
+            If ``base_models`` are provided and ``model`` is not a ``TimeSeriesEnsembleWrapper``.
+        """
         node_attrs = dict(
             path=model.path,
             type=type(model),
@@ -345,11 +361,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             val_score=model.val_score,
         )
         if isinstance(model, TimeSeriesEnsembleWrapper):
-            node_attrs.update(
-                dict(
-                    model=model,
-                )
-            )
+            node_attrs.update({"model": model})
         self.model_graph.add_node(model.name, **node_attrs)
 
         if base_models:
@@ -607,7 +619,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
                 logger.info(
                     "Not fitting ensemble due to lack of time remaining. "
-                    "Time left: {time_left_for_ensemble:.2f} seconds"
+                    f"Time left: {time_left_for_ensemble:.2f} seconds"
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
