@@ -425,6 +425,7 @@ def inject_ia3_to_linear_layer(
     module_filter
         Apply (IA)^3 only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
         If None, (IA)^3 is considered for all modules
+
     Returns
     -------
     Model with injected (IA)3 modules.
@@ -471,6 +472,7 @@ def inject_lora_to_linear_layer(
     module_filter
         Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
         If None, loRA is considered for all modules
+        
     Returns
     -------
     Model with injected LoRA modules.
