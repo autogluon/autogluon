@@ -1,4 +1,5 @@
 import collections
+from functools import lru_cache
 import logging
 import os
 import random
@@ -30,6 +31,11 @@ from .utils import DummyLayer, assign_layer_ids, get_column_features
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
+
+
+@lru_cache(None)
+def warn_once(logger, msg: str):
+    logger.warning(msg)
 
 
 class TFewModel(nn.Module):
@@ -82,6 +88,9 @@ class TFewModel(nn.Module):
         self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name)
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
         self.eos_token = self.tokenizer.eos_token
+        self.out_features = (
+            self.model.config.hidden_size
+        )  # required attribute for some features, e.g. data augmentation
 
         self.gradient_checkpointing = gradient_checkpointing
         if gradient_checkpointing:
@@ -140,10 +149,24 @@ class TFewModel(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        # TODO: Bad style, asserts should be put somewhere in data.
-        assert batch[
-            self.choices_key
-        ].numel(), f"No target choices found in batch. Ensure that 'data.templates_turn_on=True'. and that a valid preset or custom templates are provided."
+        # TODO: Bad style, check for choices in multimodal.data. Split TemplateEngine into TextTemplateEngine and LabelTemplateEngine.
+
+        if not batch[self.choices_key].numel():
+            warn_once(
+                logger,
+                msg="No target choices found in batch. Ensure that 'data.templates_turn_on=True' and that a valid preset or custom templates are provided.",
+            )
+            warn_once(logger, msg="Fallback to numerical representation of classes...")
+            batch[self.choices_key] = (
+                torch.tensor(
+                    self.tokenizer([str(i) for i in range(self.num_classes)], return_tensors="pt", padding=True)[
+                        "input_ids"
+                    ]
+                )
+                .repeat(batch[self.text_token_ids_key].size(0), 1, 1)
+                .to(batch[self.text_token_ids_key])
+            )
+
         assert (
             batch[self.choices_key].size(1) == self.num_classes
         ), f"Number of target choices is different from number of classes, but they must be the same. Please check template."
@@ -169,8 +192,8 @@ class TFewModel(nn.Module):
             inputs_embeds = self.dummy_layer(inputs_embeds)
 
         # Forward input through the encoder
-        encoder_hidden_states = self.model.encoder(inputs_embeds=inputs_embeds, attention_mask=text_masks)[0]
-        encoder_hidden_states = encoder_hidden_states.unsqueeze(dim=1).repeat(1, num_choices, 1, 1).flatten(0, 1)
+        encoder_hidden_states_or = self.model.encoder(inputs_embeds=inputs_embeds, attention_mask=text_masks)[0]
+        encoder_hidden_states = encoder_hidden_states_or.unsqueeze(dim=1).repeat(1, num_choices, 1, 1).flatten(0, 1)
 
         attention_mask = text_masks.unsqueeze(dim=1).repeat(1, num_choices, 1).flatten(0, 1)
         decoder_input_ids = torch.cat([torch.zeros_like(flat_choices_ids[:, :1]), flat_choices_ids[:, :-1]], dim=1)
@@ -217,6 +240,9 @@ class TFewModel(nn.Module):
                 LOGITS: choices_scores,  # needed for default crossentropy loss
                 TEMPLATE_LOGITS: target_template_logits,  # needed for unlikelihood loss
                 LM_TARGET: lm_target,  # needed for lm loss
+                FEATURES: encoder_hidden_states_or[
+                    :, 0, :
+                ],  # needed to ensure compatibility to encoder-only pipelines
             }
         )
 
