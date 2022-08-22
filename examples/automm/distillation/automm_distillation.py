@@ -1,15 +1,19 @@
 import argparse
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 from datasets import load_dataset
 
 from time import time
+import os
 
 GLUE_METRICS = {
     "mnli": {"val": "accuracy", "eval": ["accuracy"]},
     "qqp": {"val": "accuracy", "eval": ["accuracy", "f1"]},
     "qnli": {"val": "accuracy", "eval": ["accuracy"]},
     "sst2": {"val": "accuracy", "eval": ["accuracy"]},
-    "stsb": {"val": "pearsonr", "eval": ["pearsonr", "spearmanr"]},  # Current default soft label loss func is for classification, should automatically select loss_func
+    "stsb": {
+        "val": "pearsonr",
+        "eval": ["pearsonr", "spearmanr"],
+    },  # Current default soft label loss func is for classification, should automatically select loss_func
     "mrpc": {"val": "accuracy", "eval": ["accuracy"]},
     "rte": {"val": "accuracy", "eval": ["accuracy"]},
     # "cola": "", #phi coeffiecient is not implemented
@@ -17,7 +21,7 @@ GLUE_METRICS = {
 
 
 def main(args):
-    assert args.glue_task in (list(GLUE_METRICS.keys()) + ["mnlim", "mnlimm"]), 'Unsupported dataset name.'
+    assert args.glue_task in (list(GLUE_METRICS.keys()) + ["mnlim", "mnlimm"]), "Unsupported dataset name."
 
     ### Dataset Loading
     if args.glue_task == "mnlimm":
@@ -38,41 +42,65 @@ def main(args):
     else:
         valid_df = dataset["validation"].to_pandas()
 
+    teacher_predictor_name = f"{args.glue_task}-{args.teacher_model.replace('/', '-')}"
+    teacher_predictor_path = os.path.join(args.save_path, teacher_predictor_name)
+    nodistill_predictor_name = f"{args.glue_task}-{args.student_model.replace('/', '-')}"
+    nodistill_predictor_path = os.path.join(args.save_path, nodistill_predictor_name)
+
     ### Train and evaluate the teacher model
-    teacher_predictor = AutoMMPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
-    teacher_predictor.fit(
-        train_df,
-        hyperparameters={
-            "env.num_gpus": args.num_gpu,
-            "model.hf_text.checkpoint_name": args.teacher_model,
-            "optimization.learning_rate": 1.0e-4,
-            "optimization.weight_decay": 1.0e-3,
-        },
-        time_limit=args.time_limit,
-        seed=args.seed,
-    )
+    resume_teacher = args.resume
+    try:
+        teacher_predictor = MultiModalPredictor.load(teacher_predictor_path)
+        print("Using pretrained teacher model: %s" % teacher_predictor_path)
+    except:
+        resume_teacher = False
+        print("No pretrained model at: %s" % teacher_predictor_path)
+    if not resume_teacher:
+        teacher_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+        teacher_predictor.fit(
+            train_df,
+            hyperparameters={
+                "env.num_gpus": args.num_gpu,
+                "model.hf_text.checkpoint_name": args.teacher_model,
+                "optimization.learning_rate": 1.0e-4,
+                "optimization.weight_decay": 1.0e-3,
+            },
+            time_limit=args.time_limit,
+            seed=args.seed,
+        )
+        teacher_predictor.save(teacher_predictor_path)
     start = time()
     teacher_result = teacher_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
     teacher_usedtime = time() - start
 
     ### Train and evaluate a smaller pretrained model
-    nodistill_predictor = AutoMMPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
-    nodistill_predictor.fit(
-        train_df,
-        hyperparameters={
-            "env.num_gpus": args.num_gpu,
-            "optimization.max_epochs": args.max_epochs,
-            "model.hf_text.checkpoint_name": args.student_model,
-            "optimization.learning_rate": 1.0e-4,
-            "optimization.weight_decay": 1.0e-3,
-        },
-        time_limit=args.time_limit,
-        seed=args.seed,
-    )
+    resume_nodistill = args.resume
+    try:
+        nodistill_predictor = MultiModalPredictor.load(nodistill_predictor_path)
+        print("Using pretrained nodistill model: %s" % nodistill_predictor_path)
+    except:
+        print("No pretrained model at: %s" % nodistill_predictor_path)
+        resume_nodistill = False
+    if not resume_nodistill:
+        nodistill_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+        nodistill_predictor.fit(
+            train_df,
+            hyperparameters={
+                "env.num_gpus": args.num_gpu,
+                "optimization.max_epochs": args.max_epochs,
+                "model.hf_text.checkpoint_name": args.student_model,
+                "optimization.learning_rate": 1.0e-4,
+                "optimization.weight_decay": 1.0e-3,
+            },
+            time_limit=args.time_limit,
+            seed=args.seed,
+        )
+        nodistill_predictor.save(nodistill_predictor_path)
     nodistill_result = nodistill_predictor.evaluate(data=valid_df, metrics=GLUE_METRICS[glue_task]["eval"])
 
     ### Distill and evaluate a student model
     from autogluon.multimodal.constants import MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER
+
     config = {
         MODEL: f"fusion_mlp_image_text_tabular",
         DATA: "default",
@@ -80,7 +108,7 @@ def main(args):
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
-    student_predictor = AutoMMPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
+    student_predictor = MultiModalPredictor(label="label", eval_metric=GLUE_METRICS[glue_task]["val"])
     student_predictor.fit(
         train_df,
         config=config,
@@ -93,7 +121,14 @@ def main(args):
             "distiller.temperature": args.temperature,
             "distiller.hard_label_weight": args.hard_label_weight,
             "distiller.soft_label_weight": args.soft_label_weight,
-            'model.hf_text.text_trivial_aug_maxscale': 0.0,
+            "distiller.softmax_regression_weight": args.softmax_regression_weight,
+            "distiller.output_feature_loss_weight": args.output_feature_loss_weight,
+            "distiller.rkd_distance_loss_weight": args.rkd_distance_loss_weight,
+            "distiller.rkd_angle_loss_weight": args.rkd_angle_loss_weight,
+            "distiller.soft_label_loss_type": args.soft_label_loss_type,
+            "distiller.softmax_regression_loss_type": args.softmax_regression_loss_type,
+            "distiller.output_feature_loss_type": args.output_feature_loss_type,
+            "model.hf_text.text_trivial_aug_maxscale": 0.0,
         },
         teacher_predictor=teacher_predictor,
         time_limit=args.time_limit,
@@ -114,10 +149,7 @@ def main(args):
         print("Student Model's %s: %.6f" % (k, student_result[k]))
         print(
             "Distillation Ratio (the fraction of the teacher's performance achieved by the student): %.6f"
-            % (
-                float(student_result[k] - nodistill_result[k])
-                / float(teacher_result[k] - nodistill_result[k])
-            )
+            % (float(student_result[k] - nodistill_result[k]) / float(teacher_result[k] - nodistill_result[k]))
         )
     print("Teacher Model's time: %.6f" % teacher_usedtime)
     print("Student Model's time: %.6f" % student_usedtime)
@@ -128,7 +160,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--glue_task", default="qnli", type=str)
     parser.add_argument("--teacher_model", default="google/bert_uncased_L-12_H-768_A-12", type=str)
-    parser.add_argument("--student_model", default="google/bert_uncased_L-4_H-768_A-12", type=str)
+    parser.add_argument("--student_model", default="google/bert_uncased_L-6_H-768_A-12", type=str)
     parser.add_argument("--seed", default=123, type=int)
     parser.add_argument("--max_epochs", default=1000, type=int)
     parser.add_argument("--time_limit", default=None, type=int)
@@ -136,6 +168,19 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", default=5.0, type=float)
     parser.add_argument("--hard_label_weight", default=0.1, type=float)
     parser.add_argument("--soft_label_weight", default=1.0, type=float)
+    parser.add_argument("--softmax_regression_weight", default=0.1, type=float)
+    parser.add_argument("--output_feature_loss_weight", default=0.01, type=float)
+    parser.add_argument("--rkd_distance_loss_weight", default=0.0, type=float)
+    parser.add_argument("--rkd_angle_loss_weight", default=0.0, type=float)
+    parser.add_argument("--soft_label_loss_type", default="", type=str)
+    parser.add_argument("--softmax_regression_loss_type", default="mse", type=str)
+    parser.add_argument("--output_feature_loss_type", default="mse", type=str)
+    parser.add_argument(
+        "--save_path",
+        default="./AutogluonModels/cache_finetuned",
+        type=str,
+    )
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
 
     main(args)

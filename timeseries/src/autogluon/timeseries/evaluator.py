@@ -3,7 +3,7 @@ See also, https://ts.gluon.ai/api/gluonts/gluonts.evaluation.html
 """
 import logging
 import warnings
-from typing import Callable, List, Optional, Any
+from typing import Any, Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -18,33 +18,23 @@ logger = logging.getLogger(__name__)
 # time series against a forecast
 
 
-def mean_square_error(
-    *, target: np.ndarray, forecast: np.ndarray, **kwargs  # noqa: F841
-) -> float:
+def mean_square_error(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
     return np.mean(np.square(target - forecast))  # noqa
 
 
-def abs_error(
-    *, target: np.ndarray, forecast: np.ndarray, **kwargs  # noqa: F841
-) -> float:
+def abs_error(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
     return np.sum(np.abs(target - forecast))  # noqa
 
 
-def mean_abs_error(
-    *, target: np.ndarray, forecast: np.ndarray, **kwargs  # noqa: F841
-) -> float:
+def mean_abs_error(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
     return np.mean(np.abs(target - forecast))  # noqa
 
 
-def quantile_loss(
-    *, target: np.ndarray, forecast: np.ndarray, q: float, **kwargs  # noqa: F841
-) -> float:
+def quantile_loss(*, target: np.ndarray, forecast: np.ndarray, q: float, **kwargs) -> float:  # noqa: F841
     return 2 * np.sum(np.abs((forecast - target) * ((target <= forecast) - q)))
 
 
-def coverage(
-    *, target: np.ndarray, forecast: np.ndarray, **kwargs  # noqa: F841
-) -> float:
+def coverage(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
     return np.mean(target < forecast)  # noqa
 
 
@@ -52,9 +42,7 @@ def mape(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noq
     return np.mean(np.abs(target - forecast) / np.abs(target))  # noqa
 
 
-def symmetric_mape(
-    *, target: np.ndarray, forecast: np.ndarray, **kwargs  # noqa: F841
-) -> float:
+def symmetric_mape(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
     return 2 * np.mean(np.abs(target - forecast) / (np.abs(target) + np.abs(forecast)))
 
 
@@ -119,18 +107,13 @@ class TimeSeriesEvaluator:
         name of default metric returned by
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
+
     AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
-    METRIC_COEFFICIENTS = {
-        "MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1
-    }
+    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
-    def __init__(
-        self, eval_metric: str, prediction_length: int, target_column: str = "target"
-    ):
-        assert (
-            eval_metric in self.AVAILABLE_METRICS
-        ), f"Metric {eval_metric} not available"
+    def __init__(self, eval_metric: str, prediction_length: int, target_column: str = "target"):
+        assert eval_metric in self.AVAILABLE_METRICS, f"Metric {eval_metric} not available"
 
         self.prediction_length = prediction_length
         self.eval_metric = eval_metric
@@ -138,39 +121,33 @@ class TimeSeriesEvaluator:
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
 
+    @property
+    def coefficient(self) -> int:
+        return self.METRIC_COEFFICIENTS[self.eval_metric]
+
+    @property
+    def higher_is_better(self) -> bool:
+        return self.coefficient > 0
+
     def _safemean(self, data: Any):
-        data_filled = np.nan_to_num(
-            data, neginf=np.nan, posinf=np.nan, nan=np.nan
-        )
+        data_filled = np.nan_to_num(data, neginf=np.nan, posinf=np.nan, nan=np.nan)
         return np.nanmean(data_filled)
 
-    def _mase(
-        self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
-    ) -> float:
+    def _mase(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
         metric_callables = [mean_abs_error, in_sample_naive_1_error]
-        df = self.get_metrics_per_ts(
-            data, predictions, metric_callables=metric_callables
-        )
+        df = self.get_metrics_per_ts(data, predictions, metric_callables=metric_callables)
         return float(self._safemean(df["mean_abs_error"] / df["in_sample_naive_1_error"]))
 
-    def _mape(
-        self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
-    ) -> float:
+    def _mape(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
         df = self.get_metrics_per_ts(data, predictions, metric_callables=[mape])
         return float(self._safemean(df["mape"]))
 
-    def _smape(
-        self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
-    ) -> float:
-        df = self.get_metrics_per_ts(
-            data, predictions, metric_callables=[symmetric_mape]
-        )
+    def _smape(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
+        df = self.get_metrics_per_ts(data, predictions, metric_callables=[symmetric_mape])
         return float(self._safemean(df["symmetric_mape"]))
 
     def _mse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
-        df = self.get_metrics_per_ts(
-            data, predictions, metric_callables=[mean_square_error]
-        )
+        df = self.get_metrics_per_ts(data, predictions, metric_callables=[mean_square_error])
         return float(np.mean(df["mean_square_error"]))
 
     def _rmse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
@@ -196,15 +173,11 @@ class TimeSeriesEvaluator:
         w_quantile_losses = []
         total_abs_target = df["abs_target_sum"].sum()
         for q in quantiles:
-            w_quantile_losses.append(
-                df[f"quantile_loss[{str(q)}]"].sum() / total_abs_target
-            )
+            w_quantile_losses.append(df[f"quantile_loss[{str(q)}]"].sum() / total_abs_target)
 
         return float(np.mean(w_quantile_losses))
 
-    def _get_minimizing_forecast(
-        self, predictions: TimeSeriesDataFrame, metric_callable: Callable
-    ) -> np.ndarray:
+    def _get_minimizing_forecast(self, predictions: TimeSeriesDataFrame, metric_callable: Callable) -> np.ndarray:
         """get field from among predictions that minimizes the given metric"""
         if "0.5" in predictions.columns and metric_callable is not mean_square_error:
             return np.array(predictions["0.5"])
@@ -212,9 +185,7 @@ class TimeSeriesEvaluator:
             logger.warning("Median forecast not found. Defaulting to mean forecasts.")
 
         if "mean" not in predictions.columns:
-            ValueError(
-                f"Mean forecast not found. Cannot evaluate metric {metric_callable.__name__}"
-            )
+            ValueError(f"Mean forecast not found. Cannot evaluate metric {metric_callable.__name__}")
         return np.array(predictions["mean"])
 
     def get_metrics_per_ts(
@@ -228,7 +199,7 @@ class TimeSeriesEvaluator:
         for item_id in data.iter_items():
             y_true_w_hist = data.loc[item_id][self.target_column]
 
-            target = np.array(y_true_w_hist[-self.prediction_length:])
+            target = np.array(y_true_w_hist[-self.prediction_length :])  # noqa: E203
             target_history = np.array(y_true_w_hist[: -self.prediction_length])
 
             item_metrics = {}
@@ -236,18 +207,14 @@ class TimeSeriesEvaluator:
                 if metric_callable is quantile_loss:
                     assert all(0 <= q <= 1 for q in quantiles)
                     for q in quantiles:
-                        assert (
-                            str(q) in predictions.columns
-                        ), f"Quantile {q} not found in predictions"
+                        assert str(q) in predictions.columns, f"Quantile {q} not found in predictions"
                         item_metrics[f"quantile_loss[{str(q)}]"] = quantile_loss(
                             target=target,
                             forecast=np.array(predictions.loc[item_id][str(q)]),
                             q=q,
                         )
                 else:
-                    forecast = self._get_minimizing_forecast(
-                        predictions.loc[item_id], metric_callable=metric_callable
-                    )
+                    forecast = self._get_minimizing_forecast(predictions.loc[item_id], metric_callable=metric_callable)
                     item_metrics[metric_callable.__name__] = metric_callable(
                         target=target,
                         forecast=forecast,
@@ -289,16 +256,9 @@ class TimeSeriesEvaluator:
             return TimeSeriesEvaluator.DEFAULT_METRIC
         return metric
 
-    def __call__(
-        self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
-    ) -> float:
-        assert all(
-            len(predictions.loc[i]) == self.prediction_length
-            for i in predictions.iter_items()
-        )
-        assert set(predictions.iter_items()) == set(
-            data.iter_items()
-        ), "Prediction and data indices do not match."
+    def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
+        assert all(len(predictions.loc[i]) == self.prediction_length for i in predictions.iter_items())
+        assert set(predictions.iter_items()) == set(data.iter_items()), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)

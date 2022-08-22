@@ -11,9 +11,10 @@ import sklearn
 from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_DATETIME, R_CATEGORY, R_BOOL, S_TEXT_SPECIAL, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import REGRESSION, BINARY, QUANTILE
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import try_import_fastai
-from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -196,10 +197,10 @@ class NNFastAiTabularModel(AbstractModel):
         if num_gpus is not None:
             # TODO: Control CPU vs GPU usage during inference
             if num_gpus == 0:
-                torch_core.default_device(use_cuda=False)
+                torch_core.default_device(False)
             else:
                 # TODO: respect CUDA_VISIBLE_DEVICES to select proper GPU
-                torch_core.default_device(use_cuda=True)
+                torch_core.default_device(True)
 
         logger.log(15, f'Fitting Neural Network with parameters {params}...')
         data = self._preprocess_train(X, y, X_val, y_val)
@@ -512,6 +513,10 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         return 10 * get_approximate_df_mem_usage(X).sum()
+    
+    def _get_hpo_backend(self):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        return RAY_BACKEND
 
     def _more_tags(self):
         return {'can_refit_full': True}

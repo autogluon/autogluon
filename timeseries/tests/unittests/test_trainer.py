@@ -81,7 +81,8 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     )
     leaderboard = trainer.leaderboard()
 
-    expected_board_length += int(trainer.enable_ensemble)
+    if len(hyperparameters) > 1:
+        expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -97,7 +98,9 @@ def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
     test_data = get_data_frame_with_item_index(["A", "B", "C"])
 
     leaderboard = trainer.leaderboard(test_data)
-    expected_board_length += int(trainer.enable_ensemble)
+
+    if len(hyperparameters) > 1:
+        expected_board_length += int(trainer.enable_ensemble)
 
     assert len(leaderboard) == expected_board_length
     assert not np.any(np.isnan(leaderboard["score_test"]))
@@ -180,14 +183,18 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
-            hyperparameter_tune=True,
+            hyperparameter_tune_kwargs={
+                "num_trials": 2,
+                "searcher": "random",
+                "scheduler": "local",
+            },
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 4 + 1
+    assert len(leaderboard) == 2 + 1  # include ensemble
 
-    config_history = trainer.hpo_results[model_name]["config_history"]
-    assert len(config_history) == 4
+    config_history = next(iter(trainer.hpo_results.values()))["config_history"]
+    assert len(config_history) == 2
     assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
 
 
@@ -248,15 +255,16 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
-            hyperparameter_tune=True,
+            hyperparameter_tune_kwargs={
+                "num_samples": 2,
+                "searcher": "random",
+                "scheduler": "local",
+            },
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 4 + 1
-
-    config_history = trainer.hpo_results["Prophet"]["config_history"]
-    assert len(config_history) == 4
-    assert all(1 <= model["n_changepoints"] <= 4 for model in config_history.values())
+    assert len(leaderboard) == 2 + 1  # include ensemble
+    assert all([1 <= v["params"]["epochs"] < 5 for k, v in trainer.model_graph.nodes.items()])
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
@@ -284,7 +292,8 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     )
     leaderboard = trainer.leaderboard()
 
-    expected_board_length += int(trainer.enable_ensemble)
+    if len(hyperparameters) > 1:  # account for ensemble
+        expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -408,8 +417,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 
     model_names = trainer.get_model_names()
 
-    if trainer.enable_ensemble:
-        expected_number_of_unique_names += 1
+    # account for the ensemble if it should be fitted, and drop ensemble names
+    if trainer.enable_ensemble and sum(len(hp) for hp in hyperparameter_list) > 1:
+        model_names = [n for n in model_names if "WeightedEnsemble" not in n]
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
         assert any(name.endswith(suffix) for name in model_names)
@@ -455,7 +465,9 @@ def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_ca
             assert model._user_params[k] == v
 
 
+@mock.patch("autogluon.timeseries.models.presets.get_default_hps")
 def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_then_hpo_is_performed(
+    mock_default_hps,
     temp_model_path,
 ):
     hyperparameters = {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": ag.Int(1, 4)}}
@@ -468,14 +480,17 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
-            hyperparameter_tune=True,
+            hyperparameter_tune_kwargs={
+                "num_trials": 2,
+                "searcher": "random",
+                "scheduler": "local",
+            },
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 4 + 1  # ensemble
-
+    assert len(leaderboard) == 2 + 1  # include ensemble
     config_history = next(iter(trainer.hpo_results.values()))["config_history"]
-    assert len(config_history) == 4
+    assert len(config_history) == 2
     assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
 
 

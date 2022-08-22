@@ -12,10 +12,8 @@ from flaky import flaky
 from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-
-from autogluon.timeseries import TimeSeriesEvaluator, TimeSeriesDataFrame
-from autogluon.timeseries.models import DeepARModel, AutoETSModel
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries.models import AutoETSModel, DeepARModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
@@ -102,7 +100,6 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
 @flaky
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
-    scheduler_options = scheduler_factory(hyperparameter_tune_kwargs="auto")
 
     model = model_class(
         path=temp_model_path,
@@ -113,9 +110,11 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         },
     )
 
-    _, _, results = model.hyperparameter_tune(
-        scheduler_options=scheduler_options,
-        time_limit=300,
+    hyperparameter_tune_kwargs = "auto"
+
+    models, results = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        time_limit=100,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )

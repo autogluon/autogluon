@@ -1,4 +1,3 @@
-import copy
 import logging
 import re
 from typing import List

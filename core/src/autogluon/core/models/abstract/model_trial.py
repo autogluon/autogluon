@@ -2,6 +2,7 @@ import os
 import time
 import logging
 
+from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND, VALID_BACKEND
 from ...utils.loaders import load_pkl
 from ...utils.exceptions import TimeLimitExceeded
 
@@ -9,21 +10,23 @@ logger = logging.getLogger(__name__)
 
 
 def model_trial(args,
-                reporter,
                 model_cls,
                 init_params,
                 train_path,
                 val_path,
                 time_start,
+                hpo_executor,
+                reporter=None,  # reporter only used by custom strategy, hence optional
                 time_limit=None,
                 fit_kwargs=None,
+                checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
                 ):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
     try:
         if fit_kwargs is None:
             fit_kwargs = dict()
 
-        model = init_model(args=args, model_cls=model_cls, init_params=init_params)
+        model = init_model(args=args, model_cls=model_cls, init_params=init_params, backend=hpo_executor.executor_type)
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
@@ -37,21 +40,28 @@ def model_trial(args,
             y_val=y_val,
             time_start=time_start,
             time_limit=time_limit,
-            reporter=None,
-        )
+        )   
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
             logger.exception(e, exc_info=True)
-        reporter.terminate()
+        # In case of TimeLimitExceed, val_score could be None
+        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score if model.val_score is not None else float('-inf'))
+        if reporter is not None:
+            reporter.terminate()
     else:
-        reporter(epoch=1, validation_performance=model.val_score)
+        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score)
 
 
-def init_model(args, model_cls, init_params):
+def init_model(args, model_cls, init_params, backend):
     args = args.copy()
-    task_id = args.pop('task_id')
 
-    file_prefix = f"T{task_id+1}"  # append to all file names created during this trial. Do NOT change!
+    if backend == CUSTOM_BACKEND:
+        task_id = args.pop('task_id')
+        file_prefix = f"T{task_id+1}"  # append to all file names created during this trial. Do NOT change!
+    elif backend == RAY_BACKEND:
+        from ray import tune
+        task_id = tune.get_trial_id()
+        file_prefix = task_id
 
     init_params['hyperparameters'].update(args)
     init_params['name'] = init_params['name'] + os.path.sep + file_prefix
@@ -59,7 +69,7 @@ def init_model(args, model_cls, init_params):
     return model_cls(**init_params)
 
 
-def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, time_limit=None, reporter=None):
+def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, time_limit=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -70,7 +80,7 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
         time_left = None
 
     time_fit_start = time.time()
-    model.fit(**fit_args, time_limit=time_left, reporter=reporter)
+    model.fit(**fit_args, time_limit=time_left)
     time_fit_end = time.time()
 
     if model._get_tags().get('valid_oof', False):
@@ -105,5 +115,6 @@ def skip_hpo(model, X, y, X_val, y_val, time_limit=None, **kwargs):
     )
     hpo_results = {'total_time': model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
+    hpo_results['hpo_model_performances'] = hpo_model_performances
     hpo_models = {model.name: model.path}
-    return hpo_models, hpo_model_performances, hpo_results
+    return hpo_models, hpo_results

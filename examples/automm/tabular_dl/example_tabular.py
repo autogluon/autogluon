@@ -2,7 +2,8 @@ import os
 import argparse
 import json
 import pandas as pd
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
+from ray import tune
 
 from dataset import (
     AdultTabularDataset,
@@ -51,6 +52,12 @@ automm_hyperparameters = {
     "optimization.top_k": 3,
 }
 
+hyperparameter_tune_kwargs = {
+    "searcher": "random",
+    "scheduler": "FIFO",
+    "num_trials": 50,
+}
+
 
 def main(args):
 
@@ -84,7 +91,7 @@ def main(args):
 
     if args.mode == "single":
         ### model initalization
-        predictor = AutoMMPredictor(
+        predictor = MultiModalPredictor(
             label=train_data.label_column,
             problem_type=train_data.problem_type,
             eval_metric=train_data.metric,
@@ -98,6 +105,38 @@ def main(args):
             tuning_data=val_data.data,
             seed=args.seed,
             hyperparameters=automm_hyperparameters,
+        )
+
+        ### model inference
+        scores = predictor.evaluate(data=test_data.data, metrics=[test_data.metric])
+        with open(os.path.join(args.exp_dir, "scores.json"), "w") as f:
+            json.dump(scores, f)
+        print(scores)
+    elif args.mode == "single_hpo":
+        automm_hyperparameters["model.fusion_transformer.ffn_dropout"] = tune.uniform(0.0, 0.5)
+        automm_hyperparameters["model.fusion_transformer.attention_dropout"] = tune.uniform(0.0, 0.5)
+        automm_hyperparameters["model.fusion_transformer.residual_dropout"] = tune.uniform(0.0, 0.2)
+        automm_hyperparameters["model.fusion_transformer.ffn_d_hidden"] = tune.randint(150, 300)
+        automm_hyperparameters["model.numerical_transformer.ffn_d_hidden"] = tune.randint(150, 300)
+        automm_hyperparameters["optimization.learning_rate"] = tune.uniform(0.00001, 0.001)
+        automm_hyperparameters["optimization.end_lr"] = 1e-5
+
+        ### model initalization
+        predictor = MultiModalPredictor(
+            label=train_data.label_column,
+            problem_type=train_data.problem_type,
+            eval_metric=train_data.metric,
+            path=args.exp_dir,
+            verbosity=4,
+        )
+
+        ### model training
+        predictor.fit(
+            train_data=train_data.data,
+            tuning_data=val_data.data,
+            seed=args.seed,
+            hyperparameters=automm_hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
 
         ### model inference
@@ -148,9 +187,20 @@ if __name__ == "__main__":
     parser.add_argument("--exp_dir", default=None, type=str, help="Path to the outputs.")
     parser.add_argument("--lr", default=1e-04, type=float, help="Initial learning rate.")
     parser.add_argument("--end_lr", default=1e-04, type=float, help="End learning rate.")
-    parser.add_argument("--mode", choices=["single", "weighted", "single_bag5", "stack5"], default="single", help="Method to run with.")
+    parser.add_argument(
+        "--mode",
+        choices=["single", "single_hpo", "weighted", "single_bag5", "stack5"],
+        default="single",
+        help="Method to run with.",
+    )
     parser.add_argument("--seed", default=0, type=int)
-    parser.add_argument("--embedding_arch", type=str, nargs="+", default=None, help="Embedding architecture for numerical features in FT_Transformer.")
+    parser.add_argument(
+        "--embedding_arch",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Embedding architecture for numerical features in FT_Transformer.",
+    )
     args = parser.parse_args()
 
     if args.exp_dir is None:

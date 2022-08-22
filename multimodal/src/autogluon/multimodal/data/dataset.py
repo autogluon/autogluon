@@ -1,9 +1,11 @@
 import logging
-import torch
-import pandas as pd
 from typing import List
+
+import pandas as pd
+import torch
+
+from ..constants import AUTOMM, GET_ITEM_ERROR_RETRY
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
-from ..constants import GET_ITEM_ERROR_RETRY, AUTOMM
 
 logger = logging.getLogger(AUTOMM)
 
@@ -47,7 +49,8 @@ class BaseDataset(torch.utils.data.Dataset):
             for per_modality in per_processors_group:
                 per_modality_features = getattr(per_preprocessor, f"transform_{per_modality}")(data)
                 setattr(self, f"{per_modality}_{i}", per_modality_features)
-                self.lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
+                if per_modality_features:
+                    self.lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
         assert len(set(self.lengths)) == 1
 
     def __len__(self):
@@ -79,7 +82,9 @@ class BaseDataset(torch.utils.data.Dataset):
             for i, per_processors_group in enumerate(self.processors):
                 for per_modality, per_modality_processors in per_processors_group.items():
                     for per_model_processor in per_modality_processors:
-                        ret.update(per_model_processor(getattr(self, f"{per_modality}_{i}"), idx, self.is_training))
+                        per_modality_features = getattr(self, f"{per_modality}_{i}")
+                        if per_modality_features:
+                            ret.update(per_model_processor(per_modality_features, idx, self.is_training))
         except Exception as e:
             logger.debug(f"Skipping sample {idx} due to '{e}'")
             self._consecutive_errors += 1

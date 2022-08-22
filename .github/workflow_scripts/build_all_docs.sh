@@ -15,9 +15,9 @@ source $(dirname "$0")/write_to_s3.sh
 
 if [[ (-n $PR_NUMBER) || ($GIT_REPO != awslabs/autogluon) ]]
 then
-    bucket='autogluon-doc-staging'
+    bucket='autogluon-staging'
     if [[ -n $PR_NUMBER ]]; then path=$PR_NUMBER; else path=$BRANCH; fi
-    site=$bucket.s3.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
+    site=$bucket.s3-website-us-west-2.amazonaws.com/$path/$COMMIT_SHA  # site is the actual bucket location that will serve the doc
 else
     if [[ $BRANCH == 'master' ]]
     then
@@ -30,8 +30,8 @@ else
             path=$BRANCH
         fi
     fi
-    bucket='autogluon-website'
-    site=$bucket/$path
+    bucket='autogluon.mxnet.io'
+    site=$bucket/$path  # site is the actual bucket location that will serve the doc
 fi
 
 other_doc_version_text='Stable Version Documentation'
@@ -50,7 +50,7 @@ then
 else
     BUCKET=autogluon-ci-push
     BUILD_DOCS_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA
-    S3_PATH=s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/all
+    S3_PATH=s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/all  # We still write to BRANCH so copy_docs.sh knows where to find it
 fi
 
 mkdir -p docs/_build/rst/tutorials/
@@ -67,7 +67,7 @@ sed -i -e "s@###_OTHER_VERSIONS_DOCUMENTATION_BRANCH_###@$other_doc_version_bran
 
 shopt -s extglob
 rm -rf ./docs/tutorials/!(index.rst)
-cd docs && d2lbook build rst && d2lbook build html
+cd docs && d2lbook build rst && d2lbook build html && cp static/images/* _build/html/_static
 
 COMMAND_EXIT_CODE=$?
 if [ $COMMAND_EXIT_CODE -ne 0 ]; then
@@ -78,7 +78,7 @@ DOC_PATH=_build/html/
 # Write docs to s3
 write_to_s3 $BUCKET $DOC_PATH $S3_PATH
 # Write root_index to s3 if master
-if [[ ($BRANCH == 'master') && ($REPO == awslabs/autogluon) ]]
+if [[ ($BRANCH == 'master') && ($GIT_REPO == awslabs/autogluon) ]]
 then
-    write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/${path}/$COMMIT_SHA/root_index.html
+    write_to_s3 $BUCKET root_index.html s3://$BUCKET/build_docs/$BRANCH/$COMMIT_SHA/root_index.html
 fi

@@ -4,7 +4,6 @@ logger = logging.getLogger(__name__)
 
 import numpy as np
 from scipy import stats
-from sklearn.neighbors import KNeighborsClassifier as _KNeighborsClassifier, KNeighborsRegressor as _KNeighborsRegressor
 from sklearn.neighbors._base import _get_weights
 from sklearn.utils.extmath import weighted_mode
 
@@ -14,10 +13,11 @@ from sklearn.utils.extmath import weighted_mode
 # TODO: Code is largely identical to `predict` and `predict_proba` methods, but due to how those methods are coded, we can't call them directly.
 #  This means if code within those methods changes, the LOO equivalents may start to become outdated.
 
-__all__ = ['KNeighborsClassifier', 'KNeighborsRegressor']
+__all__ = ['KNeighborsClassifierLOOMixin', 'KNeighborsRegressorLOOMixin']
 
 
-class KNeighborsClassifier(_KNeighborsClassifier):
+class KNeighborsClassifierLOOMixin:
+    @staticmethod
     def predict_loo(self):
         """Predict the class labels for the training data via leave-one-out.
 
@@ -53,6 +53,7 @@ class KNeighborsClassifier(_KNeighborsClassifier):
 
         return y_pred
 
+    @staticmethod
     def predict_proba_loo(self):
         """Return probability estimates for the training data via leave-one-out.
 
@@ -101,7 +102,8 @@ class KNeighborsClassifier(_KNeighborsClassifier):
         return probabilities
 
 
-class KNeighborsRegressor(_KNeighborsRegressor):
+class KNeighborsRegressorLOOMixin:
+    @staticmethod
     def predict_loo(self):
         """Predict the target for the training data via leave-one-out.
 

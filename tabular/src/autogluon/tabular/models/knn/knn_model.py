@@ -6,7 +6,7 @@ import psutil
 import time
 
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
-from autogluon.core.constants import REGRESSION
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.models import AbstractModel
@@ -28,18 +28,13 @@ class KNNModel(AbstractModel):
         if self.params_aux.get('use_daal', True):
             try:
                 # TODO: Add more granular switch, currently this affects all future KNN models even if they had `use_daal=False`
-                from sklearnex import patch_sklearn
-                patch_sklearn("knn_classifier")
-                patch_sklearn("knn_regressor")
+                from sklearnex.neighbors import KNeighborsClassifier, KNeighborsRegressor
                 # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
                 logger.log(15, '\tUsing sklearnex KNN backend...')
             except:
-                pass
-        try:
-            from ._knn_loo_variants import KNeighborsClassifier, KNeighborsRegressor
-        except:
+                from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+        else:
             from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-            logger.warning('WARNING: Leave-one-out variants of KNN failed to import. Falling back to standard KNN implementations.')
         if self.problem_type == REGRESSION:
             return KNeighborsRegressor
         else:
@@ -136,12 +131,11 @@ class KNNModel(AbstractModel):
         return y_oof_pred_proba
 
     def _get_oof_pred_proba(self, X, **kwargs):
-        if callable(getattr(self.model, "predict_proba_loo", None)):
-            y_oof_pred_proba = self.model.predict_proba_loo()
-        elif callable(getattr(self.model, "predict_loo", None)):
-            y_oof_pred_proba = self.model.predict_loo()
+        from ._knn_loo_variants import KNeighborsClassifierLOOMixin, KNeighborsRegressorLOOMixin
+        if self.problem_type in [BINARY, MULTICLASS]:
+            y_oof_pred_proba = KNeighborsClassifierLOOMixin.predict_proba_loo(self.model)
         else:
-            raise AssertionError(f'Model class {type(self.model)} does not support out-of-fold prediction generation.')
+            y_oof_pred_proba = KNeighborsRegressorLOOMixin.predict_loo(self.model)
         y_oof_pred_proba = self._convert_proba_to_unified_form(y_oof_pred_proba)
         if X is not None and self._X_unused_index:
             X_unused = X.iloc[self._X_unused_index]

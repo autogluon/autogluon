@@ -1,9 +1,7 @@
-"""Wrapper of the AutoMMPredictor."""
+"""Wrapper of the MultiModalPredictor."""
 from typing import Dict, Optional
 import logging
 import os
-
-import numpy as np
 import pandas as pd
 
 
@@ -16,11 +14,11 @@ from autogluon.core.models import AbstractModel
 logger = logging.getLogger(__name__)
 
 
-class AutoMMPredictorModel(AbstractModel):
+class MultiModalPredictorModel(AbstractModel):
     _NN_MODEL_NAME = 'automm_model'
 
     def __init__(self, **kwargs):
-        """Wrapper of autogluon.multimodal.AutoMMPredictor.
+        """Wrapper of autogluon.multimodal.MultiModalPredictor.
 
         The features can be a mix of
         - image column
@@ -107,7 +105,7 @@ class AutoMMPredictorModel(AbstractModel):
 
         """
         try_import_autogluon_text()
-        from autogluon.multimodal import AutoMMPredictor
+        from autogluon.multimodal import MultiModalPredictor
 
         # Decide name of the label column
         if 'label' in X.columns:
@@ -126,7 +124,7 @@ class AutoMMPredictorModel(AbstractModel):
         verbosity = kwargs.get('verbosity', 2)
         num_gpus = kwargs.get('num_gpus', None)
         if sample_weight is not None:  # TODO: support
-            logger.log(15, "sample_weight not yet supported for AutoMMPredictorModel, "
+            logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
                            "this model will ignore them in training.")
 
         X_train.insert(len(X_train.columns), self._label_column_name, y)
@@ -136,7 +134,7 @@ class AutoMMPredictorModel(AbstractModel):
         verbosity_text = max(0, verbosity - 1)
         root_logger = logging.getLogger('autogluon')
         root_log_level = root_logger.level
-        self.model = AutoMMPredictor(label=self._label_column_name,
+        self.model = MultiModalPredictor(label=self._label_column_name,
                                      problem_type=self.problem_type,
                                      path=self.path,
                                      eval_metric=self.eval_metric,
@@ -186,8 +184,8 @@ class AutoMMPredictorModel(AbstractModel):
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if model._load_model:
             try_import_autogluon_text()
-            from autogluon.multimodal import AutoMMPredictor
-            model.model = AutoMMPredictor.load(os.path.join(path, cls._NN_MODEL_NAME))
+            from autogluon.multimodal import MultiModalPredictor
+            model.model = MultiModalPredictor.load(os.path.join(path, cls._NN_MODEL_NAME))
         model._load_model = None
         return model
 
@@ -215,5 +213,5 @@ class AutoMMPredictorModel(AbstractModel):
         }
 
     def _more_tags(self):
-        # `can_refit_full=False` because AutoMMPredictor does not communicate how to train until the best epoch in refit_full.
+        # `can_refit_full=False` because MultiModalPredictor does not communicate how to train until the best epoch in refit_full.
         return {'can_refit_full': False}

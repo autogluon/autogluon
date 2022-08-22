@@ -1,11 +1,6 @@
 from typing import Optional
-from .constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    DISTILLER,
-)
+
+from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -52,6 +47,44 @@ def multilingual():
         "optimization.top_k": 1,
         "env.precision": "bf16",
         "env.per_gpu_batch_size": 4,
+    }
+
+
+@automm_presets.register()
+def zero_shot_classification():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
+        "env.eval_batch_size_ratio": 1,
+    }
+
+
+@automm_presets.register()
+def zero_shot_image_classification():
+    return {
+        "model.names": ["clip"],
+        "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+        "model.clip.max_text_len": 0,
+        "env.eval_batch_size_ratio": 1,
+    }
+
+
+@automm_presets.register()
+def object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.num_gpus": 0,
+    }
+
+
+def feature_extraction():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
+        "model.hf_text.pooling_mode": "mean",
+        "env.eval_batch_size_ratio": 1,
     }
 
 

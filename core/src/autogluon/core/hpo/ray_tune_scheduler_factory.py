@@ -1,5 +1,4 @@
-from ray.tune.schedulers import TrialScheduler, FIFOScheduler, AsyncHyperBandScheduler, PopulationBasedTraining
-from ray.tune.schedulers.pb2 import PB2
+from ray.tune.schedulers import FIFOScheduler, AsyncHyperBandScheduler
 
 class SchedulerFactory:
     

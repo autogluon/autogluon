@@ -1,20 +1,14 @@
 import numpy as np
 import pytest
-
-from gluonts.evaluation import (
-    Evaluator as GluonTSEvaluator,
-    make_evaluation_predictions,
-)
+from gluonts.evaluation import Evaluator as GluonTSEvaluator
+from gluonts.evaluation import make_evaluation_predictions
 from gluonts.model.forecast import SampleForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
-from autogluon.timeseries.models.gluonts.abstract_gluonts import (
-    AbstractGluonTSModel,
-)
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 from .common import DUMMY_TS_DATAFRAME
-
 
 GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE"]
 

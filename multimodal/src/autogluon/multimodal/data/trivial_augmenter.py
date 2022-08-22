@@ -4,14 +4,15 @@ This file implements TrivialAugment.(https://arxiv.org/abs/2103.10158) We extend
 Code is partically adapted from its official implementation https://github.com/automl/trivialaugment
 """
 
-import random
 import logging
-from selectors import EpollSelector
-from PIL import ImageOps, ImageEnhance, ImageFilter, Image, ImageDraw
+import random
+
 import nlpaug.augmenter.word as naw
-from .utils import InsertPunctuation
 import nltk
-from ..constants import IMAGE, TEXT, AUTOMM
+from PIL import Image, ImageEnhance, ImageOps
+
+from ..constants import AUTOMM, IMAGE, TEXT
+from .utils import InsertPunctuation
 
 logger = logging.getLogger(AUTOMM)
 

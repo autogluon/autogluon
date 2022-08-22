@@ -82,7 +82,7 @@ class TabularPredictor:
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
         For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
-    path : str, default = None
+    path : Union[str, pathlib.Path], default = None
         Path to directory where models and intermediate outputs should be saved.
         If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
         Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
@@ -2774,8 +2774,6 @@ class TabularPredictor:
                     'hyperparameter_tune_kwargs was specified in both ag_args and in kwargs. Please only specify once.')
             else:
                 ag_args['hyperparameter_tune_kwargs'] = hyperparameter_tune_kwargs
-        if not self._validate_hyperparameter_tune_kwargs(ag_args.get('hyperparameter_tune_kwargs', None), time_limit):
-            ag_args.pop('hyperparameter_tune_kwargs', None)
         if ag_args.get('hyperparameter_tune_kwargs', None) is not None:
             logger.log(30,
                        'Warning: hyperparameter tuning is currently experimental and may cause the process to hang.')

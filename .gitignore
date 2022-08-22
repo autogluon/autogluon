@@ -112,7 +112,6 @@ ENV/
 # mypy
 .mypy_cache/
 
-*.png*
 *.jpg*
 *.jpeg*
 .idea/*
@@ -137,6 +136,7 @@ tabular/src/autogluon/tabular/version.py
 text/src/autogluon/text/version.py
 vision/src/autogluon/vision/version.py
 multimodal/src/autogluon/multimodal/version.py
+cloud/src/autogluon/cloud/version.py
 
 AutogluonModels
 VERSION.minor

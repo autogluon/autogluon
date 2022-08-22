@@ -1,18 +1,15 @@
 import logging
 import time
-from typing import Type, Optional, Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Type, Union
 
 import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
-from . import TimeSeriesEvaluator
 
+from . import TimeSeriesEvaluator
 from .dataset import TimeSeriesDataFrame
 from .models.abstract import AbstractTimeSeriesModel
-from .trainer import (
-    AutoTimeSeriesTrainer,
-    AbstractTimeSeriesTrainer,
-)
+from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +50,14 @@ class TimeSeriesLearner(AbstractLearner):
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame = None,
         hyperparameters: Union[str, Dict] = None,
-        hyperparameter_tune: bool = False,
+        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         **kwargs,
     ) -> None:
         return self._fit(
             train_data=train_data,
             val_data=val_data,
             hyperparameters=hyperparameters,
-            hyperparameter_tune=hyperparameter_tune,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             **kwargs,
         )
 
@@ -69,8 +66,7 @@ class TimeSeriesLearner(AbstractLearner):
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameters: Union[str, Dict] = None,
-        hyperparameter_tune: bool = False,
-        scheduler_options: Tuple[Type, Dict[str, Any]] = None,
+        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
         **kwargs,
     ) -> None:
@@ -89,10 +85,10 @@ class TimeSeriesLearner(AbstractLearner):
                 path=self.model_context,
                 prediction_length=self.prediction_length,
                 eval_metric=self.eval_metric,
-                scheduler_options=scheduler_options,
                 target=self.target,
                 quantile_levels=self.quantile_levels,
-                verbosity=kwargs.get("verbosity", 2)
+                verbosity=kwargs.get("verbosity", 2),
+                enable_ensemble=kwargs.get("enable_ensemble", True),
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -102,8 +98,8 @@ class TimeSeriesLearner(AbstractLearner):
         self.trainer.fit(
             train_data=train_data,
             val_data=val_data,
-            hyperparameter_tune=hyperparameter_tune,
             hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_limit,
         )
         self.save_trainer(trainer=self.trainer)
@@ -143,6 +139,4 @@ class TimeSeriesLearner(AbstractLearner):
     def refit_full(self, models="all"):
         # TODO: Implement refitting
         # return self.load_trainer().refit_full(models=models)
-        raise NotImplementedError(
-            "refitting logic currently not implemented in autogluon.timeseries"
-        )
+        raise NotImplementedError("refitting logic currently not implemented in autogluon.timeseries")

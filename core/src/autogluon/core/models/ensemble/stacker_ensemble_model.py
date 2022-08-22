@@ -1,5 +1,6 @@
 import copy
 import logging
+import os
 import time
 from typing import Dict
 
@@ -154,9 +155,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root
+        abs_path_root_orig = os.path.abspath(path_root_orig) + os.path.sep
         super().set_contexts(path_context=path_context)
         for model, model_path in self.base_model_paths_dict.items():
-            model_local_path = model_path.split(path_root_orig, 1)[1]
+            model_path = os.path.abspath(model_path) + os.path.sep
+            model_local_path = model_path.split(abs_path_root_orig, 1)[1]
             self.base_model_paths_dict[model] = self.path_root + model_local_path
 
     def set_stack_columns(self, stack_column_prefix_lst):
@@ -171,12 +174,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
 
-    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, compute_base_preds=True, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, hpo_executor, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
         preprocess_kwargs = {'compute_base_preds': compute_base_preds}
-        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=scheduler_options, preprocess_kwargs=preprocess_kwargs, **kwargs)
+        return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, hpo_executor=hpo_executor, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
     def get_params(self):
         init_args = dict(

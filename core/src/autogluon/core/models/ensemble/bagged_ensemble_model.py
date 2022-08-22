@@ -1027,14 +1027,15 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
     # FIXME: with use_bag_holdout=True, the fold-1 scores that are logged are of the inner validation score, not the holdout score.
     #  Fix this by passing X_val, y_val into this method
-    def _hyperparameter_tune(self, X, y, k_fold, scheduler_options, preprocess_kwargs=None, groups=None, **kwargs):
+    def _hyperparameter_tune(self, X, y, k_fold, hpo_executor, preprocess_kwargs=None, groups=None, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
         kwargs['feature_metadata'] = self.feature_metadata
         kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
         model_base = self._get_model_base()
-        model_base.set_contexts(self.path + 'hpo' + os.path.sep)
+        hpo_context = self.path + 'hpo' + os.path.sep
+        model_base.set_contexts(hpo_context)
 
         # TODO: Preprocess data here instead of repeatedly
         if preprocess_kwargs is None:
@@ -1061,15 +1062,22 @@ class BaggedEnsembleModel(AbstractModel):
             train_index, test_index = kfolds[0]
             X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
             y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
-        orig_time = scheduler_options[1]['time_out']
+        orig_time = hpo_executor.time_limit
         if orig_time:
-            scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_model_performances, hpo_results = model_base.hyperparameter_tune(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, scheduler_options=scheduler_options, **kwargs)
-        scheduler_options[1]['time_out'] = orig_time
+            hpo_executor.time_limit = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
+        hpo_models, hpo_results = model_base.hyperparameter_tune(
+            X=X_fold,
+            y=y_fold,
+            X_val=X_val_fold,
+            y_val=y_val_fold,
+            hyperparameter_tune_kwargs=None,
+            hpo_executor=hpo_executor,
+            **kwargs)
+        hpo_executor.time_limit = orig_time
 
         bags = {}
-        bags_performance = {}
-        for i, (model_name, model_path) in enumerate(hpo_models.items()):
+        for i, (model_name, model_info) in enumerate(hpo_models.items()):
+            model_path = model_info['path']
             child: AbstractModel = self._child_type.load(path=model_path)
 
             # TODO: Create new Ensemble Here
@@ -1116,11 +1124,22 @@ class BaggedEnsembleModel(AbstractModel):
                 bag._cv_splitters = [cv_splitter]
 
             bag.save()
-            bags[bag.name] = bag.path
-            bags_performance[bag.name] = bag.val_score
+            bags[bag.name] = dict(**model_info)
+            bags[bag.name]['path'] = bag.path
+
+            # delete original child from its disk location since it is being saved to a new location in the bag
+            child: AbstractModel = self._child_type.load(path=model_path)
+            child.delete_from_disk(silent=True)
+
+        # cleanup artifacts
+        for artifact_dir in [model_base._path_v2, model_base.path_root]:
+            try:
+                os.rmdir(artifact_dir)
+            except OSError:
+                pass
 
         # TODO: hpo_results likely not correct because no renames
-        return bags, bags_performance, hpo_results
+        return bags, hpo_results
 
     def _more_tags(self):
         return {

@@ -1,10 +1,10 @@
-from torch import nn
-from torch import Tensor
-import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Union, cast
-from .ft_transformer import FT_Transformer, _TokenInitialization, CLSToken
-from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
+from typing import List, Optional
+
 import torch
+from torch import Tensor, nn
+
+from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL
+from .ft_transformer import CLSToken, FT_Transformer, _TokenInitialization
 
 
 class Periodic(nn.Module):

@@ -2,12 +2,13 @@
 :label:`sec_automm_customization`
 
 AutoMM has a powerful yet easy-to-use configuration design.
-This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of four parts:
+This tutorial walks you through various AutoMM configurations to empower you the customization flexibility. Specifically, AutoMM configurations consist of several parts:
 
 - optimization
 - environment
 - model
 - data
+- distiller
 
 ## Optimization
 
@@ -117,6 +118,42 @@ How often within one training epoch to check the validation set. Can specify as 
 predictor.fit(hyperparameters={"optimization.val_check_interval": 0.5})
 # check validation set 4 times during a training epoch
 predictor.fit(hyperparameters={"optimization.val_check_interval": 0.25})
+```
+
+### optimization.gradient_clip_algorithm
+The gradient clipping algorithm to use. Support to clip gradients by value or norm.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.gradient_clip_algorithm": "norm"})
+# clip gradients by value
+predictor.fit(hyperparameters={"optimization.gradient_clip_algorithm": "value"})
+```
+
+### optimization.gradient_clip_val
+Gradient clipping value, which can be the absolute value or gradient norm depending on the choice of `optimization.gradient_clip_algorithm`.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.gradient_clip_val": 1})
+# cap the gradients to 5
+predictor.fit(hyperparameters={"optimization.gradient_clip_val": 5})
+```
+
+### optimization.track_grad_norm
+Track the p-norm of gradients during training. May be set to ‘inf’ infinity-norm. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
+```
+# default used by AutoMM (no tracking)
+predictor.fit(hyperparameters={"optimization.track_grad_norm": -1})
+# track the 2-norm
+predictor.fit(hyperparameters={"optimization.track_grad_norm": 2})
+```
+
+### optimization.log_every_n_steps
+How often to log within steps.
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"optimization.log_every_n_steps": 10})
+# log once every 50 steps
+predictor.fit(hyperparameters={"optimization.log_every_n_steps": 50})
 ```
 
 ### optimization.top_k
@@ -276,6 +313,95 @@ predictor.fit(hyperparameters={"model.hf_text.checkpoint_name": "google/electra-
 predictor.fit(hyperparameters={"model.hf_text.checkpoint_name": "roberta-base"})
 ```
 
+### model.hf_text.pooling_mode
+The feature pooling mode for transformer architectures.
+
+- `cls`: uses the cls feature vector to represent a sentence.
+- `mean`: averages all the token feature vectors to represent a sentence.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.pooling_mode": "cls"})
+# using the mean pooling
+predictor.fit(hyperparameters={"model.hf_text.pooling_mode": "mean"})
+```
+
+### model.hf_text.tokenizer_name
+Choose the text tokenizer. It is recommended to use the default auto tokenizer. 
+
+- `hf_auto`: the [Huggingface auto tokenizer](https://huggingface.co/docs/transformers/model_doc/auto#transformers.AutoTokenizer).
+- `bert`: the [BERT tokenizer](https://huggingface.co/docs/transformers/v4.21.1/en/model_doc/bert#transformers.BertTokenizer).
+- `electra`: the [ELECTRA tokenizer](https://huggingface.co/docs/transformers/v4.21.1/en/model_doc/electra#transformers.ElectraTokenizer).
+- `clip`: the [CLIP tokenizer](https://huggingface.co/docs/transformers/v4.21.1/en/model_doc/clip#transformers.CLIPTokenizer).
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.tokenizer_name": "hf_auto"})
+# using the tokenizer of the ELECTRA model
+predictor.fit(hyperparameters={"model.hf_text.tokenizer_name": "electra"})
+```
+
+### model.hf_text.max_text_len
+Set the maximum text length. Different models may allow different maximum lengths. If `model.hf_text.max_text_len` > 0, we choose the minimum between `model.hf_text.max_text_len` and the maximum length allowed by the model. Setting `model.hf_text.max_text_len` <= 0 would use the model's maximum length.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.max_text_len": 512})
+# set to use the length allowed by the tokenizer.
+predictor.fit(hyperparameters={"model.hf_text.max_text_len": -1})
+```
+
+### model.hf_text.insert_sep
+Whether to insert the SEP token between texts from different columns of a dataframe.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.insert_sep": True})
+# use no SEP token.
+predictor.fit(hyperparameters={"model.hf_text.insert_sep": False})
+```
+
+### model.hf_text.text_segment_num
+How many text segments are used in a token sequence. Each text segment has one [token type ID](https://huggingface.co/transformers/v2.11.0/glossary.html#token-type-ids). We choose the minimum between `model.hf_text.text_segment_num` and the default used by the model.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.text_segment_num": 2})
+# use 1 text segment
+predictor.fit(hyperparameters={"model.hf_text.text_segment_num": 1})
+```
+
+### model.hf_text.stochastic_chunk
+Whether to randomly cut a text chunk if a sample's text token number is larger than `model.hf_text.max_text_len`. If False, cut a token sequence from index 0 to the maximum allowed length. Otherwise, randomly sample a start index to cut a text chunk.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.stochastic_chunk": False})
+# select a stochastic text chunk if a text sequence is over-long
+predictor.fit(hyperparameters={"model.hf_text.stochastic_chunk": True})
+```
+
+### model.hf_text.text_aug_detect_length
+Perform text augmentation only when the text token number is no less than `model.hf_text.text_aug_detect_length`.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"model.hf_text.text_aug_detect_length": 10})
+# Allow text augmentation for texts whose token number is no less than 5
+predictor.fit(hyperparameters={"model.hf_text.text_aug_detect_length": 5})
+```
+
+### model.hf_text.text_trivial_aug_maxscale
+Set the maximum percentage of text tokens to conduct data augmentation. For each text token sequence, we randomly sample a percentage in [0, `model.hf_text.text_trivial_aug_maxscale`] and one operation from four trivial augmentations, including synonym replacement, random word swap, random word deletion, and random punctuation insertion, to do text augmentation.
+
+```
+# by default, AutoMM doesn't do text augmentation
+predictor.fit(hyperparameters={"model.hf_text.text_trivial_aug_maxscale": 0})
+# Enable trivial augmentation by setting the max scale to 0.1
+predictor.fit(hyperparameters={"model.hf_text.text_trivial_aug_maxscale": 0.1})
+```
+
+
 ### model.timm_image.checkpoint_name
 Select an image backbone from [TIMM](https://github.com/rwightman/pytorch-image-models/tree/master/timm/models).
 ```
@@ -384,7 +510,7 @@ predictor.fit(hyperparameters={"data.mixup.mixup_alpha": 1.0})
 ```
 
 ### data.mixup.cutmix_alpha
-Cutomix alpha value. Cutomix is active if `data.mixup.cutmix_alpha` > 0. 
+Cutmix alpha value. Cutmix is active if `data.mixup.cutmix_alpha` > 0. 
 
 ```
 # by default, Cutmix is turned off by using alpha 1.0
@@ -443,3 +569,42 @@ predictor.fit(hyperparameters={"data.mixup.turn_off_epoch": 5})
 predictor.fit(hyperparameters={"data.mixup.turn_off_epoch": 7})
 ```
 
+## Distiller
+
+### distiller.soft_label_loss_type
+What loss to compute when using teacher's output (logits) to supervise student's.
+
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.soft_label_loss_type": "cross_entropy"})
+# default used by AutoMM for regression
+predictor.fit(hyperparameters={"distiller.soft_label_loss_type": "mse"})
+```
+
+### distiller.temperature
+Before computing the soft label loss, scale the teacher and student logits with it (teacher_logits / temperature, student_logits / temperature).
+
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.temperature": 5})
+# set temperature to 1
+predictor.fit(hyperparameters={"distiller.temperature": 1})
+```
+
+### distiller.hard_label_weight
+Scale the student's hard label (groundtruth) loss with this weight (hard_label_loss * hard_label_weight).
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.hard_label_weight": 0.2})
+# set not to scale the hard label loss
+predictor.fit(hyperparameters={"distiller.hard_label_weight": 1})
+```
+
+### distiller.soft_label_weight
+Scale the student's soft label (teacher's output) loss with this weight (soft_label_loss * soft_label_weight).
+```
+# default used by AutoMM for classification
+predictor.fit(hyperparameters={"distiller.soft_label_weight": 50})
+# set not to scale the soft label loss
+predictor.fit(hyperparameters={"distiller.soft_label_weight": 1})
+```

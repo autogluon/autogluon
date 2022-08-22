@@ -1,21 +1,17 @@
 import logging
-import torch
-from torch import nn
-import torch.nn.functional as F
+from typing import Callable, Dict, Optional, Union
+
 import pytorch_lightning as pl
-from .utils import (
-    get_optimizer,
-    get_lr_scheduler,
-    apply_two_stages_lr,
-    apply_layerwise_lr_decay,
-    apply_single_lr,
-)
-from ..constants import LOGITS, WEIGHT, AUTOMM
-from typing import Union, Optional, List, Dict, Callable
-from ..data.mixup import MixupModule, multimodel_mixup
+import torch
+import torch.nn.functional as F
 import torchmetrics
-from torchmetrics.aggregation import BaseAggregator
+from torch import nn
 from torch.nn.modules.loss import _Loss
+from torchmetrics.aggregation import BaseAggregator
+
+from ..constants import AUTOMM, LOGITS, WEIGHT
+from ..data.mixup import MixupModule, multimodel_mixup
+from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)
 

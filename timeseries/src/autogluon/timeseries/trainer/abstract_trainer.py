@@ -1,10 +1,11 @@
 import copy
 import logging
 import os
-import pprint
 import time
 import traceback
-from typing import Optional, Tuple, List, Any, Dict, Union, Type
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from warnings import warn
 
 import networkx as nx
@@ -13,18 +14,14 @@ from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.utils.savers import save_pkl, save_json
 from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_json, save_pkl
 
-from .. import TimeSeriesEvaluator, TimeSeriesDataFrame
+from .. import TimeSeriesDataFrame, TimeSeriesEvaluator
 from ..models.abstract import AbstractTimeSeriesModel
+from ..models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
 from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from ..utils.warning_filters import disable_tqdm
-from ..models.ensemble.greedy_ensemble import (
-    TimeSeriesEnsembleSelection,
-    TimeSeriesEnsembleWrapper,
-)
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -51,7 +48,7 @@ class SimpleAbstractTrainer:
 
         self._extra_banned_names = set()
 
-    def get_model_names(self) -> List[str]:
+    def get_model_names(self, **kwargs) -> List[str]:
         """Get all model names that are registered in the model graph"""
         return list(self.model_graph.nodes)
 
@@ -61,9 +58,7 @@ class SimpleAbstractTrainer:
         """
         return self.get_model_names() + list(self._extra_banned_names)
 
-    def get_models_attribute_dict(
-        self, attribute: str, models: List[str] = None
-    ) -> Dict[str, Any]:
+    def get_models_attribute_dict(self, attribute: str, models: List[str] = None) -> Dict[str, Any]:
         """Get an attribute from the `model_graph` for each of the model names
         specified. If `models` is none, the attribute will be returned for all models"""
         results = {}
@@ -79,11 +74,7 @@ class SimpleAbstractTrainer:
         if not models:
             raise ValueError("Trainer has no fit models that can infer.")
         model_performances = self.get_models_attribute_dict(attribute="val_score")
-        performances_list = [
-            (m, model_performances[m])
-            for m in models
-            if model_performances[m] is not None
-        ]
+        performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
 
         if not performances_list:
             raise ValueError("No fitted models have validation scores computed.")
@@ -96,9 +87,7 @@ class SimpleAbstractTrainer:
             model = model.name
         return self.model_graph.nodes[model][attribute]
 
-    def set_model_attribute(
-        self, model: Union[str, AbstractModel], attribute: str, val
-    ):
+    def set_model_attribute(self, model: Union[str, AbstractModel], attribute: str, val):
         """Set a member attribute for given model in the `model_graph`."""
         if not isinstance(model, str):
             model = model.name
@@ -186,9 +175,7 @@ class SimpleAbstractTrainer:
             return self.get_model_attribute(model=model_name, attribute="model")
         return model_type.load(path=path, reset_paths=self.reset_paths)
 
-    def construct_model_templates(
-        self, hyperparameters: Union[str, Dict[str, Any]], **kwargs
-    ):
+    def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
         raise NotImplementedError
 
     # TODO: This is horribly inefficient beyond simple weighted ensembling.
@@ -206,9 +193,9 @@ class SimpleAbstractTrainer:
             return X
 
     # FIXME: Copy pasted from Tabular
-    # Gets the minimum set of models that the provided model depends on, including itself
-    # Returns a list of model names
-    def get_minimum_model_set(self, model, include_self=True) -> list:
+    def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
+        """Gets the minimum set of models that the provided model depends on, including itself.
+        Returns a list of model names"""
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
@@ -233,9 +220,7 @@ class SimpleAbstractTrainer:
         return model_info_dict
 
     @classmethod
-    def load_info(
-        cls, path, reset_paths=False, load_model_if_required=True
-    ) -> Dict[str, Any]:
+    def load_info(cls, path, reset_paths=False, load_model_if_required=True) -> Dict[str, Any]:
         load_path = path + cls.trainer_info_name
         try:
             return load_pkl.load(path=load_path)
@@ -263,9 +248,7 @@ class SimpleAbstractTrainer:
             except AssertionError:
                 best_model = None
         if best_model is not None:
-            best_model_score_val = self.get_model_attribute(
-                model=best_model, attribute="val_score"
-            )
+            best_model_score_val = self.get_model_attribute(model=best_model, attribute="val_score")
         else:
             best_model_score_val = None
 
@@ -351,9 +334,25 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     def _add_model(
         self,
-        model: Union[AbstractTimeSeriesModel, TimeSeriesEnsembleWrapper],
-        base_models=None,
+        model: AbstractTimeSeriesModel,
+        base_models: List[str] = None,
     ):
+        """Add a model to the model graph of the trainer. If the model is an ensemble, also add
+        information about dependencies to the model graph (list of models specified via ``base_models``).
+
+        Parameters
+        ----------
+        model : AbstractTimeSeriesModel
+            The model to be added to the model graph.
+        base_models : List[str], optional, default None
+            If the model is an ensemble, the list of base model names that are included in the ensemble.
+            Expected only when ``model`` is a ``TimeSeriesEnsembleWrapper``.
+
+        Raises
+        ------
+        AssertionError
+            If ``base_models`` are provided and ``model`` is not a ``TimeSeriesEnsembleWrapper``.
+        """
         node_attrs = dict(
             path=model.path,
             type=type(model),
@@ -362,16 +361,40 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             val_score=model.val_score,
         )
         if isinstance(model, TimeSeriesEnsembleWrapper):
-            node_attrs.update(
-                dict(
-                    model=model,
-                )
-            )
+            node_attrs.update({"model": model})
         self.model_graph.add_node(model.name, **node_attrs)
 
         if base_models:
+            assert isinstance(model, TimeSeriesEnsembleWrapper)
             for base_model in base_models:
                 self.model_graph.add_edge(base_model, model.name)
+
+    def _get_model_levels(self) -> Dict[str, int]:
+        """Get a dictionary mapping each model to their level in the model graph"""
+
+        # get nodes without a parent
+        rootset = set(self.model_graph.nodes)
+        for e in self.model_graph.edges():
+            rootset.discard(e[1])
+
+        # get shortest paths
+        paths_from = defaultdict(dict)
+        for source_node, paths_to in nx.shortest_path_length(self.model_graph):
+            for dest_node in paths_to:
+                paths_from[dest_node][source_node] = paths_to[dest_node]
+
+        # determine levels
+        levels = {}
+        for n in paths_from:
+            levels[n] = max(paths_from[n].get(src, 0) for src in rootset)
+
+        return levels
+
+    def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
+        """Get model names that are registered in the model graph"""
+        if level is not None:
+            return list(node for node, l in self._get_model_levels().items() if l == level)
+        return list(self.model_graph.nodes)
 
     def _train_single(
         self,
@@ -398,55 +421,47 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Union[str, dict] = "auto",
     ):
-        scheduler_cls, scheduler_options = scheduler_factory(
-            hyperparameter_tune_kwargs, time_out=time_limit
-        )
-        if all(scheduler_options.get(s) is None for s in ["num_trials", "time_out"]):
-            scheduler_options["num_trials"] = 10
-
-        logger.debug(
-            f"\tTuning hyperparameters of {model.name}. scheduler "
-            f"options: {scheduler_cls.__name__}, {pprint.pformat(scheduler_options, indent=10)}. "
-        )
+        default_num_trials = None
+        if time_limit is None and (
+            "num_samples" not in hyperparameter_tune_kwargs or isinstance(hyperparameter_tune_kwargs, str)
+        ):
+            default_num_trials = 10
 
         with disable_tqdm():
-            hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(
+            hpo_models, hpo_results = model.hyperparameter_tune(
                 train_data=train_data,
                 val_data=val_data,
-                scheduler_options=(scheduler_cls, scheduler_options),
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
+                default_num_trials=default_num_trials,
             )
-        hpo_results.pop("search_strategy", None)
+
         self.hpo_results[model.name] = hpo_results
         model_names_trained = []
+        # TODO: Does this code still work if all model configurations failed?
         # add each of the trained HPO configurations to the trained models
-        for model_hpo_name, model_path in hpo_models.items():
-            model_hpo = self.load_model(
-                model_hpo_name, path=model_path, model_type=type(model)
-            )
-            self._add_model(model_hpo)
-            model_names_trained.append(model_hpo.name)
+        for model_hpo_name, model_info in hpo_models.items():
+            model_path = model_info["path"]
+            # Only load model configurations that didn't fail
+            if Path(model_path).exists():
+                model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+                self._add_model(model_hpo)
+                model_names_trained.append(model_hpo.name)
 
-        logger.info(
-            f"\tTrained {len(model_names_trained)} models while tuning {model.name}."
-        )
+        logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
-        if hpo_results:
+        # TODO: log result for ray backend
+        if hpo_results and isinstance(hpo_results, dict):
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = '-'
+                sign_str = "-"
             else:
-                sign_str = ''
+                sign_str = ""
             logger.info(
                 f"\t{hpo_results.get('best_reward'):<7.4f}".ljust(15)
                 + f"= Validation score ({sign_str}{self.eval_metric})"
             )
-            logger.info(
-                f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15)
-                + "= Total tuning time"
-            )
-            logger.debug(
-                f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}"
-            )
+            logger.info(f"\t{hpo_results.get('total_time'):<7.2f} s".ljust(15) + "= Total tuning time")
+            logger.debug(f"\tBest hyperparameter configuration: {hpo_results.get('best_config')}")
 
         return model_names_trained
 
@@ -469,14 +484,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         try:
             if time_limit is not None:
                 if time_limit <= 0:
-                    logger.info(
-                        f"\tSkipping {model.name} due to lack of time remaining."
-                    )
+                    logger.info(f"\tSkipping {model.name} due to lack of time remaining.")
                     return model_names_trained
 
-            model = self._train_single(
-                train_data, model, val_data=val_data, time_limit=time_limit
-            )
+            model = self._train_single(train_data, model, val_data=val_data, time_limit=time_limit)
             fit_end_time = time.time()
 
             val_score = model.score(val_data) if val_data is not None else None
@@ -486,17 +497,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
             if model.predict_time is None:
-                model.predict_time = (
-                    None if val_score is None else (pred_end_time - fit_end_time)
-                )
+                model.predict_time = None if val_score is None else (pred_end_time - fit_end_time)
 
             self._log_scores_and_times(val_score, model.fit_time, model.predict_time)
 
             self.save_model(model=model)
-        except Exception as err:
-            logger.error(
-                f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model."
-            )
+        except (Exception, MemoryError) as err:
+            logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")
         else:
             self._add_model(model=model)  # noqa: F821
@@ -514,20 +521,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ):
         if val_score is not None:
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = '-'
+                sign_str = "-"
             else:
-                sign_str = ''
-            logger.info(
-                f"\t{val_score:<7.4f}".ljust(15)
-                + f"= Validation score ({sign_str}{self.eval_metric})"
-            )
+                sign_str = ""
+            logger.info(f"\t{val_score:<7.4f}".ljust(15) + f"= Validation score ({sign_str}{self.eval_metric})")
         if fit_time is not None:
             logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
         if predict_time is not None:
-            logger.info(
-                f"\t{predict_time:<7.2f} s".ljust(15)
-                + "= Validation (prediction) runtime"
-            )
+            logger.info(f"\t{predict_time:<7.2f} s".ljust(15) + "= Validation (prediction) runtime")
 
     def _train_multi(
         self,
@@ -535,13 +536,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameters: Optional[Union[str, Dict]] = None,
         models: Optional[List[AbstractTimeSeriesModel]] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune: bool = False,
+        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
 
-        logger.info(
-            f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
+        logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         time_start = time.time()
         if hyperparameters is not None:
@@ -559,7 +558,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
-                hyperparameter_tune=hyperparameter_tune,
+                hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
             )
 
@@ -571,14 +570,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         model_names_trained = []
         for i, model in enumerate(models):
-            if hyperparameter_tune:
+            if hyperparameter_tune_kwargs is not None:
                 time_left = time_limit_model_split
 
                 fit_log_message = f"Hyperparameter tuning model: {model.name}. "
                 if time_limit is not None and time_limit_model_split is not None:
                     fit_log_message += (
-                        f"Tuning model for up to {time_limit_model_split:.2f}s "
-                        f"of the {time_limit:.2f}s remaining."
+                        f"Tuning model for up to {time_limit_model_split:.2f}s " f"of the {time_limit:.2f}s remaining."
                     )
                 logger.info(fit_log_message)
 
@@ -588,6 +586,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                         time_limit=time_left,
                         train_data=train_data,
                         val_data=val_data,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                     )
             else:
                 time_left = None
@@ -602,8 +601,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                         break
 
                     fit_log_message += (
-                        f"Training for up to {time_left:.2f}s of "
-                        f"the {time_left:.2f}s of remaining time."
+                        f"Training for up to {time_left:.2f}s of " f"the {time_left:.2f}s of remaining time."
                     )
 
                 logger.info(fit_log_message)
@@ -612,27 +610,61 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
 
         if self.enable_ensemble:
-            try:
-                model_names_trained.append(
-                    self.fit_ensemble(val_data=val_data, model_names=model_names_trained)
+            models_available_for_ensemble = self.get_model_names(level=0)
+
+            time_left_for_ensemble = None
+            if time_limit is not None:
+                time_left_for_ensemble = time_limit - (time.time() - time_start)
+
+            if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
+                logger.info(
+                    "Not fitting ensemble due to lack of time remaining. "
+                    f"Time left: {time_left_for_ensemble:.2f} seconds"
                 )
-            except Exception as e:  # noqa
-                logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
+            elif len(models_available_for_ensemble) <= 1:
+                logger.info(
+                    f"Not fitting ensemble as "
+                    + (
+                        "no models were successfully trained."
+                        if not models_available_for_ensemble
+                        else "only 1 model was trained."
+                    )
+                )
+            else:
+                try:
+                    model_names_trained.append(
+                        self.fit_ensemble(
+                            val_data=val_data,
+                            model_names=models_available_for_ensemble,
+                            time_limit=time_left_for_ensemble,
+                        )
+                    )
+                except Exception as e:  # noqa
+                    logger.error(f"\tEnsemble training failed with error \n{traceback.format_exc()}.")
 
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         try:
             best_model = self.get_model_best()
             logger.info(f"Best model: {best_model}")
-            logger.info(
-                f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}"
-            )
+            logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
         except ValueError as e:
             logger.error(str(e))
 
         return model_names_trained
 
-    def fit_ensemble(self, val_data, model_names):
+    def _get_ensemble_model_name(self) -> str:
+        """Ensure we don't have name collisions in the ensemble model name"""
+        ensemble_name = "WeightedEnsemble"
+        increment = 1
+        while ensemble_name in self._get_banned_model_names():
+            increment += 1
+            ensemble_name = f"WeightedEnsemble_{increment}"
+        return ensemble_name
+
+    def fit_ensemble(
+        self, val_data: TimeSeriesDataFrame, model_names: List[str], time_limit: Optional[float] = None
+    ) -> str:
         evaluator = TimeSeriesEvaluator(
             eval_metric=self.eval_metric,
             prediction_length=self.prediction_length,
@@ -647,72 +679,53 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
             # FIXME: This differs from predictions made to calc val_score for the models. Try to align.
             #  Can either seed for deterministic results or cache the pred during val_score calc and reuse.
-            model_preds[model_name] = model.predict_for_scoring(
-                data=val_data, quantile_levels=self.quantile_levels
-            )
+            model_preds[model_name] = model.predict_for_scoring(data=val_data, quantile_levels=self.quantile_levels)
 
         time_start = time.time()
 
-        higher_is_better = (
-            TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == 1
-        )
         ensemble = TimeSeriesEnsembleSelection(
             ensemble_size=100,
-            problem_type="regression",
             metric=evaluator,
-            higher_is_better=higher_is_better,
         )
         predictions = [model_preds[p] for p in model_names]
-        ensemble.fit(predictions=predictions, labels=val_data)
-        ensemble_weights = ensemble.weights_
-        final_models_ensemble = []
-        final_weights_ensemble = []
-        for i, w in enumerate(ensemble_weights):
-            if w != 0:
-                final_models_ensemble.append(model_names[i])
-                final_weights_ensemble.append(w)
 
-        # FIXME: Ensure we don't have name collisions
+        ensemble.fit(
+            predictions=predictions,
+            labels=val_data,
+            time_limit=time_limit,
+        )
+
         # FIXME: This is currently **extremely** hacky to simply get it working.
         #  Align on design / API of ensembles after v0.5.
         simple_ensemble = TimeSeriesEnsembleWrapper(
-            weights=final_weights_ensemble,
-            name="WeightedEnsemble",
+            weights={model_names[i]: w for i, w in enumerate(ensemble.weights_) if w != 0},
+            name=self._get_ensemble_model_name(),
             freq=val_data.freq,
             prediction_length=self.prediction_length,
             eval_metric=self.eval_metric,
             path=self.path,
-            invalid_model_names=self._get_banned_model_names(),
             target=self.target,
             quantiles=self.quantile_levels,
         )
         time_end = time.time()
         simple_ensemble.fit_time = time_end - time_start
 
-        predictions: List[TimeSeriesDataFrame] = [
-            model_preds[p] for p in final_models_ensemble
-        ]
-        forecasts = simple_ensemble.predict(predictions)
-        model_score = (
-            evaluator(val_data, forecasts)
-            * TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric]
-        )
-
-        simple_ensemble.val_score = model_score
+        forecasts = simple_ensemble.predict({n: model_preds[n] for n in simple_ensemble.model_names})
+        simple_ensemble.val_score = evaluator(val_data, forecasts) * evaluator.coefficient
 
         predict_time = 0
         # FIXME: This is a hack, should instead leverage `predict_time_marginal` as in Tabular.
-        for m in final_models_ensemble:
-            predict_time += self.get_model_attribute(model=m, attribute='predict_time')
+        for m in simple_ensemble.model_names:
+            predict_time += self.get_model_attribute(model=m, attribute="predict_time")
         simple_ensemble.predict_time = predict_time
 
         self._log_scores_and_times(
-            val_score=model_score,
+            val_score=simple_ensemble.val_score,
             fit_time=simple_ensemble.fit_time,
             predict_time=simple_ensemble.predict_time,
         )
 
-        self._add_model(model=simple_ensemble, base_models=final_models_ensemble)
+        self._add_model(model=simple_ensemble, base_models=simple_ensemble.model_names)
         return simple_ensemble.name
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
@@ -736,32 +749,33 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
             for model_name in model_names:
                 try:
+                    # TODO: time only prediction and not score for pred_time_val and pred_time_test
+                    time_start_test_score = time.time()
                     model_info[model_name]["score_test"] = self.score(data, model_name)
+                    model_info[model_name]["pred_time_test"] = time.time() - time_start_test_score
                 except Exception as e:  # noqa
-                    logger.error(
-                        f"Cannot score with model {model_name}. An error occurred: {str(e)}"
-                    )
+                    logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
                     model_info[model_name]["score_test"] = float("nan")
+                    model_info[model_name]["pred_time_test"] = float("nan")
 
         df = pd.DataFrame(model_info.values())
 
         sort_column = "score_test" if "score_test" in df.columns else "score_val"
-        df.sort_values(
-            by=[sort_column, "model"], ascending=[False, False], inplace=True
-        )
+        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
         df.reset_index(drop=True, inplace=True)
 
         explicit_column_order = [
             "model",
             "score_test",
             "score_val",
+            "pred_time_test",
             "pred_time_val",
             "fit_time_marginal",
             "fit_order",
         ]
-        explicit_column_order = [
-            c for c in explicit_column_order if c in df.columns
-        ] + [c for c in df.columns if c not in explicit_column_order]
+        explicit_column_order = [c for c in explicit_column_order if c in df.columns] + [
+            c for c in df.columns if c not in explicit_column_order
+        ]
 
         return df[explicit_column_order]
 
@@ -803,14 +817,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> float:
         model = self._get_model_for_prediction(model)
         eval_metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=eval_metric,
-            prediction_length=self.prediction_length,
-            target_column=self.target,
-        )
 
         if isinstance(model, TimeSeriesEnsembleWrapper):
-            # FIXME: This section is hacky
+            evaluator = TimeSeriesEvaluator(
+                eval_metric=eval_metric,
+                prediction_length=self.prediction_length,
+                target_column=self.target,
+            )
             model_preds = {}
             base_models = self.get_minimum_model_set(model, include_self=False)
             for base_model in base_models:
@@ -818,13 +831,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 model_preds[base_model] = base_model_loaded.predict_for_scoring(
                     data, quantile_levels=self.quantile_levels
                 )
-            # FIXME: dict doesn't guarantee order!
             forecasts = model.predict(model_preds)
 
-            model_score = (
-                evaluator(data, forecasts)
-                * TimeSeriesEvaluator.METRIC_COEFFICIENTS[eval_metric]
-            )
+            model_score = evaluator(data, forecasts) * evaluator.coefficient
             return model_score
 
         return model.score(data, metric=eval_metric)
@@ -865,16 +874,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 train_data=refit_full_data,
                 val_data=None,
                 hyperparameters=None,
-                hyperparameter_tune=False,
+                hyperparameter_tune_kwargs=None,
                 models=[model_full],
             )
 
             if len(models_trained) == 1:
                 model_full_dict[model_name] = models_trained[0]
             for model_trained in models_trained:
-                self._model_full_dict_val_score[
-                    model_trained
-                ] = self.get_model_attribute(model_name, "val_score")
+                self._model_full_dict_val_score[model_trained] = self.get_model_attribute(model_name, "val_score")
             models_trained_full += models_trained
 
         self.model_full_dict.update(model_full_dict)
@@ -894,10 +901,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         existing_models = self.get_model_names()
         valid_model_set = []
         for model in models:
-            if (
-                model in self.model_full_dict
-                and self.model_full_dict[model] in existing_models
-            ):
+            if model in self.model_full_dict and self.model_full_dict[model] in existing_models:
                 logger.log(
                     20,
                     f"Model '{model}' already has a refit _FULL model: "

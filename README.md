@@ -7,7 +7,8 @@
 ## AutoML for Image, Text, and Tabular Data
 
 [![Latest Release](https://img.shields.io/github/v/release/awslabs/autogluon)](https://github.com/awslabs/autogluon/releases)
-[![Build Status](https://ci.gluon.ai/view/all/job/autogluon/job/master/badge/icon)](https://ci.gluon.ai/view/all/job/autogluon/job/master/)
+[![Continuous Integration](https://github.com/awslabs/autogluon/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/awslabs/autogluon/actions/workflows/continuous_integration.yml)
+[![Platform Tests](https://github.com/awslabs/autogluon/actions/workflows/platform_tests-command.yml/badge.svg?event=schedule)](https://github.com/awslabs/autogluon/actions/workflows/platform_tests-command.yml)
 [![Python Versions](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue)](https://pypi.org/project/autogluon/)
 [![GitHub license](docs/static/apache2.svg)](./LICENSE)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
@@ -23,7 +24,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:
 # pip install -U pip
 # pip install -U setuptools wheel
-# pip install autogluon  # autogluon==0.5.0
+# pip install autogluon  # autogluon==0.5.2
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -32,12 +33,13 @@ predictor = TabularPredictor(label='class').fit(train_data, time_limit=120)  # F
 leaderboard = predictor.leaderboard(test_data)
 ```
 
-| AutoGluon Task | Quickstart | API |
-| :--- | :---: | :---: |
-| TabularPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-0) |
-| TextPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-3) |
-| ImagePredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-1) |
-| ObjectDetector | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/object_detection/beginner.html) | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-2) |
+| AutoGluon Task      |                                                                                Quickstart                                                                                |                                                                                API                                                                                |
+|:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+| TabularPredictor    | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-quickstart.html) |                 [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#module-0)                 |
+| TextPredictor       | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html)        |       [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.text.TextPredictor)       |
+| ImagePredictor      | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)       |     [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.vision.ImagePredictor)      |
+| ObjectDetector      | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/object_detection/beginner.html)       |     [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.vision.ObjectDetector)      |
+| MultiModalPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/multimodal/index.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.multimodal.MultiModalPredictor) |
 
 ## Resources
 

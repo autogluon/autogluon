@@ -1,7 +1,9 @@
-from typing import Optional, Union, Tuple, List, Dict
+import re
+from typing import Dict, List, Optional, Tuple
+
 import torch
 from torch import nn
-from ..constants import MASKS, COLUMN_FEATURES, FEATURES
+
 from .lora_layers import LoRALinear
 
 
@@ -316,7 +318,7 @@ def get_column_features(
     column_name_prefix: str,
     features: torch.Tensor,
     valid_lengths: torch.Tensor,
-    has_cls_feature: bool,
+    cls_feature: Optional[torch.Tensor] = None,
 ):
     """
     Index the features of one column defined by `column_name_prefix`.
@@ -335,9 +337,8 @@ def get_column_features(
         The features of columns whose names starts with column_name_prefix.
     valid_lengths
         The valid image number or text token number of each sample in a batch.
-    has_cls_feature
-        Whether the features include the cls feature. If True, then the joined names of all
-        columns share the cls feature.
+    cls_feature
+        The cls feature containing information from all feature columns.
 
     Returns
     -------
@@ -348,7 +349,7 @@ def get_column_features(
     feature_masks = {}
 
     cut_idx = len(column_name_prefix) + 1
-    if has_cls_feature:
+    if cls_feature is not None:
         all_column_names = []
         # creat a zero mask to do logical_or with each column's mask
         joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
@@ -370,22 +371,24 @@ def get_column_features(
             column_name = key[cut_idx:]
             column_features[column_name] = torch.stack(per_col_features, dim=0)  # (b, num_features)
             feature_masks[column_name] = per_col_masks  # (b,)
-            if has_cls_feature:
+            if cls_feature is not None:
                 all_column_names.append(column_name)
                 joint_mask = torch.logical_or(joint_mask, per_col_masks)
 
     # all the columns of one model's input share the model's cls feature
     if (
-        has_cls_feature and len(all_column_names) > 0
+        cls_feature is not None and len(all_column_names) > 0
     ):  # some models', e.g, timm_image, output doesn't have the cls feature.
-        joint_column_name = "_".join(all_column_names)
-        column_features[joint_column_name] = features[:, 0, :]
-        feature_masks[joint_column_name] = joint_mask.to(features)
         # remove the individual column features since these column features not independent
         for column_name in all_column_names:
             column_features.pop(column_name)
             feature_masks.pop(column_name)
 
+        joint_column_name = "_".join(all_column_names)
+        column_features[joint_column_name] = cls_feature
+        feature_masks[joint_column_name] = joint_mask.to(features)
+
+    # print(f"column_features: {column_features}")
     return column_features, feature_masks
 
 
@@ -417,7 +420,7 @@ def inject_lora_to_linear_layer(
         if len(list(module.children())) > 0:
             inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
 
-        if isinstance(module, nn.Linear) and (not filter or any(x in n for x in filter)):
+        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
             lora_layer = LoRALinear(
                 module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
             )
@@ -426,3 +429,28 @@ def inject_lora_to_linear_layer(
             setattr(model, n, lora_layer)
 
     return model  # return model to enable method chaining
+
+
+def get_model_head(model: nn.Module):
+    """
+    Return the model's head. Different models may have different head names.
+
+    Parameters
+    ----------
+    model
+        A Pytorch model.
+
+    Returns
+    -------
+    The model's head.
+    """
+    if hasattr(model, "head"):
+        head = model.head  # move the head outside
+    elif hasattr(model, "last_linear"):
+        head = model.last_linear
+    elif hasattr(model, "fc"):
+        head = model.fc
+    else:
+        raise ValueError(f"Model {type(model)} doesn't have head. Need to check its implementation.")
+
+    return head

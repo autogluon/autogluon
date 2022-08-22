@@ -3,10 +3,6 @@ try:
 except ImportError:
     pass
 
-from . import data
-from . import models
-from . import constants
-from . import utils
-from . import optimization
-from . import predictor
-from .predictor import AutoMMPredictor
+from . import constants, data, models, optimization, predictor, utils
+from .predictor import AutoMMPredictor, MultiModalPredictor
+from .utils import download

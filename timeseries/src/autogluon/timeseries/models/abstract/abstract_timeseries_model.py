@@ -1,16 +1,19 @@
 import copy
 import logging
+import os
 import time
-from typing import Any, Dict, Union, Tuple, Optional, List
+from typing import Any, Dict, List, Optional, Union
 
 import autogluon.core as ag
-from autogluon.core.models import AbstractModel
 from autogluon.common.savers import save_pkl
-from ... import TimeSeriesEvaluator
+from autogluon.core.hpo.exceptions import EmptySearchSpace
+from autogluon.core.hpo.executors import HpoExecutor
+from autogluon.core.models import AbstractModel
 
+from ... import TimeSeriesEvaluator
 from ...dataset import TimeSeriesDataFrame
 from ...utils.metadata import get_prototype_metadata_dict
-from .model_trial import skip_hpo, model_trial
+from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +87,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(
-            eval_metric
-        )
+        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.stopping_metric = None
         self.problem_type = "timeseries"
         self.conformalize = False
@@ -222,11 +223,11 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         quantiles = quantile_levels or self.quantile_levels
         if not all(0 < q < 1 for q in quantiles):
-            raise ValueError(
-                "Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive)."
-            )
+            raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
-    def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
+    def predict(
+        self, data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]], **kwargs
+    ) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
         This method produces predictions for the forecast horizon *after* the individual time series.
 
@@ -236,8 +237,9 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
-            The dataset where each time series is the "context" for predictions.
+        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
+            The dataset where each time series is the "context" for predictions. For ensemble models that depend on
+            the predictions of other models, this method may accept a dictionary of previous models' predictions.
 
         Other Parameters
         ----------------
@@ -279,9 +281,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        return self.predict(
-            data.slice_by_timestep(slice(None, -self.prediction_length)), **kwargs
-        )
+        return self.predict(data.slice_by_timestep(slice(None, -self.prediction_length)), **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
@@ -318,77 +318,65 @@ class AbstractTimeSeriesModel(AbstractModel):
         predictions = self.predict_for_scoring(data)
         metric_value = evaluator(data, predictions)
 
-        return metric_value * TimeSeriesEvaluator.METRIC_COEFFICIENTS[metric]
+        return metric_value * evaluator.coefficient
 
     def _hyperparameter_tune(
         self,
         train_data: TimeSeriesDataFrame,
         val_data: TimeSeriesDataFrame,
-        scheduler_options: Tuple[Any, Dict],
+        hpo_executor: HpoExecutor,
         **kwargs,
     ):
         # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
-        logger.debug(
-            f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}"
-        )
+        logger.debug(f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}")
         search_space = self._get_search_space()
 
-        scheduler_cls, scheduler_params = scheduler_options
-        if scheduler_cls is None or scheduler_params is None:
-            raise ValueError(
-                "scheduler_cls and scheduler_params cannot be None for hyperparameter tuning"
-            )
-        time_limit = scheduler_params.get("time_out", None)
-        if time_limit is None:
-            scheduler_params["num_trials"] = scheduler_params.get("num_trials", 9999)
-        else:
-            scheduler_params.pop("num_trials", None)
+        try:
+            hpo_executor.validate_search_space(search_space, self.name)
+        except EmptySearchSpace:
+            return skip_hpo(self, train_data, val_data, time_limit=hpo_executor.time_limit)
 
-        if not any(
-            isinstance(search_space[hyperparameter], ag.Space)
-            for hyperparameter in search_space
-        ):
-            logger.warning(
-                f"\tNo hyperparameter search space specified for {self.name}. Skipping HPO. "
-                f"Will train one model based on the provided hyperparameters."
-            )
-            return skip_hpo(self, train_data, val_data, time_limit=time_limit)
-        else:
-            logger.debug(f"\tHyperparameter search space for {self.name}: ")
-            for hyperparameter in search_space:
-                if isinstance(search_space[hyperparameter], ag.Space):
-                    logger.debug(f"\t{hyperparameter}: {search_space[hyperparameter]}")
-
+        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
+        directory = self.path
         dataset_train_filename = "dataset_train.pkl"
-        train_path = self.path + dataset_train_filename
+        train_path = os.path.join(self.path, dataset_train_filename)
         save_pkl.save(path=train_path, object=train_data)
 
         dataset_val_filename = "dataset_val.pkl"
-        val_path = self.path + dataset_val_filename
+        val_path = os.path.join(self.path, dataset_val_filename)
         save_pkl.save(path=val_path, object=val_data)
 
+        fit_kwargs = dict()
         train_fn_kwargs = dict(
             model_cls=self.__class__,
             init_params=self.get_params(),
             time_start=time_start,
-            time_limit=time_limit,
-            fit_kwargs=scheduler_params["resource"].copy(),
+            time_limit=hpo_executor.time_limit,
+            fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
+            hpo_executor=hpo_executor,
         )
 
-        scheduler = scheduler_cls(
-            model_trial,
-            search_space=search_space,
+        model_estimate_memory_usage = None
+        if self.estimate_memory_usage is not None:
+            model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
+        hpo_executor.execute(
+            model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
-            **scheduler_params,
+            directory=directory,
+            minimum_cpu_per_trial=self.get_minimum_resources().get("num_cpus", 1),
+            minimum_gpu_per_trial=self.get_minimum_resources().get("num_gpus", 0),
+            model_estimate_memory_usage=model_estimate_memory_usage,
+            adapter_type="timeseries",
         )
 
-        scheduler.run()
-        scheduler.join_jobs()
-
-        return self._get_hpo_results(scheduler, scheduler_params, time_start)
+        return hpo_executor.get_hpo_results(
+            model_name=self.name,
+            model_path_root=self.path_root,
+            time_start=time_start,
+        )
 
     def preprocess(self, data: Any, **kwargs) -> Any:
         return data

@@ -1,31 +1,38 @@
-import torch
 import logging
+from typing import List, Optional, Tuple
+
+import torch
 from torch import nn
-import warnings
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel
 from transformers import logging as hf_logging
+from transformers.models.t5 import T5PreTrainedModel
+
 from ..constants import (
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    TEXT_SEGMENT_IDS,
-    LABEL,
-    LOGITS,
-    FEATURES,
     AUTOMM,
     COLUMN,
     COLUMN_FEATURES,
+    FEATURES,
+    LABEL,
+    LOGITS,
     MASKS,
+    TEXT_SEGMENT_IDS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
 )
-from typing import Optional, List, Tuple
-from .utils import (
-    assign_layer_ids,
-    init_weights,
-    get_column_features,
-)
+from .utils import assign_layer_ids, get_column_features, init_weights
 
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
+
+
+class DummyLayer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
+
+    def forward(self, x):
+        return x + self.dummy_bias - self.dummy_bias
 
 
 class HFAutoModelForTextPrediction(nn.Module):
@@ -39,6 +46,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         prefix: str,
         checkpoint_name: str = "microsoft/deberta-v3-base",
         num_classes: Optional[int] = 0,
+        pooling_mode: Optional[str] = "cls",
+        gradient_checkpointing: Optional[bool] = False,
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -61,18 +70,37 @@ class HFAutoModelForTextPrediction(nn.Module):
                     - 'xlm-roberta-base'
         num_classes
             The number of classes. 1 for a regression task.
+        pooling_mode
+            The pooling mode for the Transformer. Can be "cls", or "mean"
+        gradient_checkpointing
+            Whether to enable gradient checkpointing
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
+
         self.model = AutoModel.from_pretrained(checkpoint_name)
+        if isinstance(self.model, T5PreTrainedModel):
+            self.is_t5 = True
+            # Remove the decoder in T5
+            del self.model.decoder
+        else:
+            self.is_t5 = False
+
+        self.gradient_checkpointing = gradient_checkpointing
+        if gradient_checkpointing:
+            self.model.gradient_checkpointing_enable()
+            if self.is_t5:
+                self.dummy_layer = DummyLayer()
+
         self.out_features = self.model.config.hidden_size
 
-        self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(self.out_features, num_classes) if num_classes else nn.Identity()
         self.head.apply(init_weights)
 
         self.prefix = prefix
+        self.pooling_mode = pooling_mode
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
@@ -132,14 +160,37 @@ class HFAutoModelForTextPrediction(nn.Module):
         steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
         text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
 
-        outputs = self.model(
-            input_ids=text_token_ids,
-            token_type_ids=text_segment_ids,
-            attention_mask=text_masks,
-        )
-        cls_features = outputs.last_hidden_state[:, 0, :]
+        if self.is_t5:
+            # For the T5 model, we will only use the encoder to encode the sentence. This is adopted in
+            # "Sentence-T5 (ST5): Scalable Sentence Encoders from Pre-trained Text-to-Text Models"
+            # (https://aclanthology.org/2022.findings-acl.146.pdf).
+            inputs_embeds = self.model.encoder.embed_tokens(text_token_ids)
+            if self.gradient_checkpointing:
+                # FIXME(?) This is a hack! We added a DummyLayer to ensure that the
+                #  gradient checkpointing will assign output layer as require_grad=True
+                #  Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
+                inputs_embeds = self.dummy_layer(inputs_embeds)
+            outputs = self.model.encoder(
+                inputs_embeds=inputs_embeds,
+                attention_mask=text_masks,
+            )
+        else:
+            outputs = self.model(
+                input_ids=text_token_ids,
+                token_type_ids=text_segment_ids,
+                attention_mask=text_masks,
+            )
+        if self.pooling_mode == "cls":
+            pooled_features = outputs.last_hidden_state[:, 0, :]
+        elif self.pooling_mode == "mean":
+            pooled_features = (outputs.last_hidden_state * text_masks.unsqueeze(-1)).sum(1)
+            sum_mask = text_masks.unsqueeze(-1).sum(1)
+            sum_mask = torch.clamp(sum_mask, min=1e-9)
+            pooled_features = pooled_features / sum_mask
+        else:
+            raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
 
-        logits = self.head(cls_features)
+        logits = self.head(pooled_features)
 
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
         column_features, column_feature_masks = get_column_features(
@@ -147,7 +198,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             column_name_prefix=self.text_column_prefix,
             features=outputs.last_hidden_state,
             valid_lengths=text_valid_length,
-            has_cls_feature=True,
+            cls_feature=pooled_features,
         )
         ret[COLUMN_FEATURES][FEATURES].update(column_features)
         ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
@@ -155,7 +206,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         ret.update(
             {
                 LOGITS: logits,
-                FEATURES: cls_features,
+                FEATURES: pooled_features,
             }
         )
 
@@ -177,8 +228,16 @@ class HFAutoModelForTextPrediction(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         model_prefix = "model"
-        pre_encoder_patterns = ("embeddings", "LayerNorm", "wte", "wpe")
-        post_encoder_patterns = ("head", "pooler", "ln_f")
+        pre_encoder_patterns = (
+            "embeddings",
+            "LayerNorm",
+            "wte",
+            "wpe",
+            "shared.weight",
+            "encoder.conv.conv",
+            "dummy_layer",
+        )
+        post_encoder_patterns = ("head", "pooler", "ln_f", "final_layer_norm")
         names = [n for n, _ in self.named_parameters()]
 
         name_to_id, names = assign_layer_ids(

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Union, Optional, Any
+from typing import Any, Dict, Optional, Union
 
 from ..models.presets import get_preset_models
 from .abstract_trainer import AbstractTimeSeriesTrainer, TimeSeriesDataFrame
@@ -32,7 +32,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         train_data: TimeSeriesDataFrame,
         hyperparameters: Union[str, Dict[Any, Dict]],
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameter_tune: bool = False,
+        hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         time_limit: float = None,
     ):
         """
@@ -50,8 +50,8 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             presets.
         val_data: TimeSeriesDataFrame
             Optional validation data set to report validation scores on.
-        hyperparameter_tune
-            Whether to perform hyperparameter tuning when learning individual models.
+        hyperparameter_tune_kwargs
+            Args for hyperparameter tuning
         time_limit
             Time limit for training
         """
@@ -59,6 +59,6 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             train_data,
             val_data=val_data,
             hyperparameters=hyperparameters,
-            hyperparameter_tune=hyperparameter_tune,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             time_limit=time_limit,
         )

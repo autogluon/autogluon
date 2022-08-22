@@ -1,7 +1,7 @@
 AutoGluon: AutoML for Text, Image, and Tabular Data
 ====================================================
 
-.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.5.0-blue
+.. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.5.2-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
 .. |StableVersion| image:: https://img.shields.io/github/v/release/awslabs/autogluon?color=blue&label=stable%20release&sort=semver
@@ -37,13 +37,13 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
    >>> predictor = TabularPredictor(label='class').fit(train_data=train_data)
    >>> predictions = predictor.predict(test_data)
 
-   AutoGluon can be applied for prediction tasks that involve image or text data. For adopting state-of-the-art deep learning models for multimodal prediction problems, you may try `autogluon.multimodal`:
+   AutoGluon can be applied for prediction tasks that involve image and text data. For adopting state-of-the-art deep learning models for multimodal prediction problems, you may try `autogluon.multimodal`:
 
-   >>> from autogluon.multimodal import AutoMMPredictor
+   >>> from autogluon.multimodal import MultiModalPredictor
    >>> from datasets import load_dataset
    >>> train_data = load_dataset("glue", 'mrpc')['train'].to_pandas().drop('idx', axis=1)
    >>> test_data = load_dataset("glue", 'mrpc')['validation'].to_pandas().drop('idx', axis=1)
-   >>> predictor = AutoMMPredictor(label='label').fit(train_data)
+   >>> predictor = MultiModalPredictor(label='label').fit(train_data)
    >>> predictions = predictor.predict(test_data)
    >>> score = predictor.evaluate(test_data)
 
@@ -102,6 +102,11 @@ Tutorials
 
       How to train time series models for forecasting.
 
+Launch Tutorial Notebooks
+-------------------------
+
+.. raw:: html
+   :file: static/platforms.html
 
 .. toctree::
    :maxdepth: 2

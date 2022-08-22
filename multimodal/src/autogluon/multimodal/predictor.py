@@ -1,133 +1,122 @@
 from __future__ import annotations
-import logging
-import os
-import numpy as np
-import json
-import warnings
-import sys
-import shutil
-from datetime import timedelta
-import pandas as pd
-import pickle
+
 import copy
-import yaml
-import torch
-from torch import nn
-from torch.nn.modules.loss import _Loss
-import torch.nn.functional as F
-import torchmetrics
-from omegaconf import OmegaConf, DictConfig
+import json
+import logging
+import math
 import operator
+import os
+import pickle
+import shutil
+import sys
+import warnings
+from datetime import timedelta
+from typing import Callable, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.types import _METRIC
-from typing import Optional, List, Dict, Union, Callable
+import torch
+import yaml
+from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
-from autogluon.core.utils.try_import import try_import_ray_lightning
-from autogluon.core.utils.utils import default_holdout_frac
+from torch import nn
+
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.core.utils.try_import import try_import_ray_lightning
+from autogluon.core.utils.utils import default_holdout_frac
 
+from . import version as ag_version
 from .constants import (
-    LABEL,
+    AUTOMM,
+    AUTOMM_TUTORIAL_MODE,
+    BBOX,
+    BEST,
+    BEST_K_MODELS_FILE,
     BINARY,
+    CLASSIFICATION,
+    COLUMN_FEATURES,
+    DATA,
+    DEPRECATED_ZERO_SHOT,
+    FEATURE_EXTRACTION,
+    FEATURES,
+    GREEDY_SOUP,
+    LABEL,
+    LAST_CHECKPOINT,
+    LOGITS,
+    MASKS,
+    MATCHER,
+    MAX,
+    MIN,
+    MODEL,
+    MODEL_CHECKPOINT,
     MULTICLASS,
+    OBJECT_DETECTION,
+    PROBABILITY,
+    RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    TEXT,
+    UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    LOGITS,
-    FEATURES,
-    AUTOMM,
-    AUTOMM_TUTORIAL_MODE,
-    UNIFORM_SOUP,
-    GREEDY_SOUP,
-    BEST,
-    MIN,
-    MAX,
-    TEXT,
-    RAY_TUNE_CHECKPOINT,
-    BEST_K_MODELS_FILE,
-    LAST_CHECKPOINT,
-    MODEL_CHECKPOINT,
-    MODEL,
-    DATA,
-    PROBABILITY,
-    MATCHER,
+    ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
-
 from .data.datamodule import BaseDataModule
-from .data.infer_types import infer_column_problem_types
-from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-
-from .utils import (
-    create_model,
-    init_df_preprocessor,
-    init_data_processors,
-    select_model,
-    compute_score,
-    average_checkpoints,
-    infer_metrics,
-    get_minmax_mode,
-    filter_search_space,
-    get_config,
-    LogFilter,
-    apply_log_filter,
-    save_pretrained_models,
-    convert_checkpoint_name,
-    save_text_tokenizers,
-    load_text_tokenizers,
-    modify_duplicate_model_names,
-    assign_feature_column_names,
-    turn_on_off_feature_column_info,
-    try_to_infer_pos_label,
-    get_mixup,
-    CustomUnpickler,
-    is_interactive,
-    data_to_df,
+from .data.infer_types import (
+    infer_column_types,
+    infer_label_column_type_by_problem_type,
+    infer_problem_type_output_shape,
 )
-from .optimization.utils import (
-    get_metric,
-    get_loss_func,
-    update_config_by_rules,
-)
-from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
-
-from . import version as ag_version
+from .optimization.lit_module import LitModule
+from .optimization.rkd_loss import RKDLoss
+from .optimization.utils import get_loss_func, get_metric
+from .utils import (
+    AutoMMModelCheckpoint,
+    CustomUnpickler,
+    LogFilter,
+    apply_log_filter,
+    assign_feature_column_names,
+    average_checkpoints,
+    compute_num_gpus,
+    compute_score,
+    convert_checkpoint_name,
+    create_model,
+    data_to_df,
+    extract_from_output,
+    filter_search_space,
+    get_config,
+    get_minmax_mode,
+    get_mixup,
+    infer_dtypes_by_model_names,
+    infer_metrics,
+    init_data_processors,
+    init_df_preprocessor,
+    init_pretrained,
+    load_text_tokenizers,
+    logits_to_prob,
+    modify_duplicate_model_names,
+    process_save_path,
+    save_pretrained_models,
+    save_text_tokenizers,
+    select_model,
+    tensor_to_ndarray,
+    try_to_infer_pos_label,
+    turn_on_off_feature_column_info,
+    update_config_by_rules,
+)
 
 logger = logging.getLogger(AUTOMM)
 
 
-class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
+class MultiModalPredictor:
     """
-    Class that inherits pl.callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.
-
-    - Issue1:
-
-    It solves the issue described in https://github.com/PyTorchLightning/pytorch-lightning/issues/5582.
-    For ddp_spawn, the checkpoint_callback.best_k_models will be empty.
-    Here, we resolve it by storing the best_models to "SAVE_DIR/best_k_models.yaml".
-
-    """
-
-    def _update_best_and_save(
-        self,
-        current: torch.Tensor,
-        trainer: "pl.Trainer",
-        monitor_candidates: Dict[str, _METRIC],
-    ) -> None:
-        super(AutoMMModelCheckpoint, self)._update_best_and_save(
-            current=current, trainer=trainer, monitor_candidates=monitor_candidates
-        )
-        self.to_yaml()
-
-
-class AutoMMPredictor:
-    """
-    AutoMMPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
+    MultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
     are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
-    and the AutoMMPredictor can predict the values of one column conditioned on the features from the other columns.
+    and the MultiModalPredictor can predict the values of one column conditioned on the features from the other columns.
 
     The prediction can be either classification or regression. The feature columns can contain
     image paths, text, numerical, and categorical values.
@@ -136,9 +125,11 @@ class AutoMMPredictor:
 
     def __init__(
         self,
-        label: str,
+        label: Optional[str] = None,
         problem_type: Optional[str] = None,
+        pipeline: Optional[str] = None,
         eval_metric: Optional[str] = None,
+        hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
         warn_if_exist: Optional[bool] = True,
@@ -154,9 +145,27 @@ class AutoMMPredictor:
             (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
+        pipeline
+            This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
+            TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+        hyperparameters
+            This is to override some default configurations.
+            For example, changing the text and image backbones can be done by formatting:
+
+            a string
+            hyperparameters = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+
+            or a list of strings
+            hyperparameters = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+
+            or a dictionary
+            hyperparameters = {
+                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                        }
         path
             Path to directory where models and intermediate outputs should be saved.
             If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
@@ -194,8 +203,12 @@ class AutoMMPredictor:
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
 
+        if path is not None:
+            path = process_save_path(path=path)
+
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
+        self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -213,6 +226,20 @@ class AutoMMPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
+        if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
+            warnings.warn(
+                f'problem_type="{problem_type}" is deprecated. For inference with CLIP model, '
+                f'use pipeline="zero_shot_image_classification" instead.',
+                DeprecationWarning,
+            )
+            self._problem_type = None
+            self._pipeline = ZERO_SHOT_IMAGE_CLASSIFICATION
+
+        if self._pipeline is not None:
+            self._config, self._model, self._data_processors = init_pretrained(
+                pipeline=self._pipeline, hyperparameters=hyperparameters
+            )
+
     @property
     def path(self):
         return self._save_path
@@ -224,6 +251,10 @@ class AutoMMPredictor:
     @property
     def problem_type(self):
         return self._problem_type
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -249,12 +280,12 @@ class AutoMMPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, AutoMMPredictor] = None,
+        teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
         hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
-        Fit AutoMMPredictor predict label column of a dataframe based on the other columns,
+        Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
         which may contain image path, text, numeric, or categorical features.
 
         Parameters
@@ -338,7 +369,7 @@ class AutoMMPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                     num_trials: int
-                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs t o be specified.
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
                     scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
                         If str is passed, AutoGluon will create the scheduler for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
@@ -354,7 +385,7 @@ class AutoMMPredictor:
 
         Returns
         -------
-        An "AutoMMPredictor" object (itself).
+        An "MultiModalPredictor" object (itself).
         """
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
@@ -376,24 +407,26 @@ class AutoMMPredictor:
 
         pl.seed_everything(seed, workers=True)
 
-        if self._resume or save_path is None:
-            save_path = self._save_path
-        else:
-            save_path = os.path.expanduser(save_path)
+        if self._resume:
+            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
+            save_path = process_save_path(path=self._save_path, resume=True)
+        elif save_path is not None:
+            save_path = process_save_path(path=save_path)
+        elif self._save_path is not None:
+            save_path = process_save_path(path=self._save_path, raise_if_exist=False)
 
         if not self._resume:
             save_path = setup_outputdir(
                 path=save_path,
                 warn_if_exist=self._warn_if_exist,
             )
-        else:
-            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
-        save_path = os.path.abspath(save_path)
+
+        save_path = os.path.abspath(os.path.expanduser(save_path))
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
         if tuning_data is None:
-            if self._problem_type in [BINARY, MULTICLASS]:
+            if self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION]:
                 stratify = train_data[self._label_column]
             else:
                 stratify = None
@@ -408,12 +441,24 @@ class AutoMMPredictor:
                 random_state=np.random.RandomState(seed),
             )
 
-        column_types, problem_type, output_shape = infer_column_problem_types(
-            train_df=train_data,
-            valid_df=tuning_data,
+        column_types = infer_column_types(
+            data=train_data,
+            valid_data=tuning_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+        )
+        column_types = infer_label_column_type_by_problem_type(
+            column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
-            provided_column_types=column_types,
+            data=train_data,
+            valid_data=tuning_data,
+        )
+        problem_type, output_shape = infer_problem_type_output_shape(
+            label_column=self._label_column,
+            column_types=column_types,
+            data=train_data,
+            provided_problem_type=self._problem_type,
         )
 
         logger.debug(f"column_types: {column_types}")
@@ -429,6 +474,9 @@ class AutoMMPredictor:
             column_types = self._column_types
 
         if self._problem_type is not None:
+            if self._problem_type == CLASSIFICATION:
+                # Set the problem type to be inferred problem type
+                self._problem_type = problem_type
             assert self._problem_type == problem_type, (
                 f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
             )
@@ -492,13 +540,13 @@ class AutoMMPredictor:
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
-        from autogluon.core.hpo import (
-            run,
-            cleanup_trials,
-            cleanup_checkpoints,
-            EmptySearchSpace,
+        from autogluon.core.hpo.ray_hpo import (
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
+            EmptySearchSpace,
+            cleanup_checkpoints,
+            cleanup_trials,
+            run,
         )
 
         ray_tune_adapter = AutommRayTuneAdapter()
@@ -523,6 +571,7 @@ class AutoMMPredictor:
                 save_dir=save_path,
                 ray_tune_adapter=ray_tune_adapter,
                 total_resources=resources,
+                minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
                 time_budget_s=time_budget_s,
                 keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
                 checkpoint_score_attr=metric,
@@ -542,7 +591,7 @@ class AutoMMPredictor:
             )
             if best_trial is None:
                 raise ValueError(
-                    "AutoMMPredictor wasn't able to find the best trial."
+                    "MultiModalPredictor wasn't able to find the best trial."
                     "Either all trials failed or"
                     "it's likely that the time is not enough to train a single epoch for trials."
                 )
@@ -551,7 +600,7 @@ class AutoMMPredictor:
             cleanup_trials(save_path, best_trial.trial_id)
             best_trial_path = os.path.join(save_path, best_trial.trial_id)
             # reload the predictor metadata
-            predictor = AutoMMPredictor._load_metadata(predictor=self, path=best_trial_path)
+            predictor = MultiModalPredictor._load_metadata(predictor=self, path=best_trial_path)
             # construct the model
             model = create_model(
                 config=predictor._config,
@@ -610,7 +659,7 @@ class AutoMMPredictor:
 
     def _setup_distillation(
         self,
-        teacher_predictor: Union[str, AutoMMPredictor],
+        teacher_predictor: Union[str, MultiModalPredictor],
     ):
         """
         Prepare for distillation. It verifies whether the student and teacher predictors have consistent
@@ -631,6 +680,12 @@ class AutoMMPredictor:
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
+        output_feature_adaptor
+            The adaptor used to adapt student output feature to the shape of teacher's.
+        output_feature_loss_func
+            The loss function using minimize distance between output_feature of teacher and student.
+        rkd_loss_func
+            The loss function using rkd distance and angle loss between output_feature of teacher and student.
         df_preprocessor
             The teacher predictor's dataframe preprocessor.
         data_processors
@@ -638,7 +693,7 @@ class AutoMMPredictor:
         """
         logger.debug("setting up distillation...")
         if isinstance(teacher_predictor, str):
-            teacher_predictor = AutoMMPredictor.load(teacher_predictor)
+            teacher_predictor = MultiModalPredictor.load(teacher_predictor)
 
         # verify that student and teacher configs are consistent.
         assert self._problem_type == teacher_predictor._problem_type
@@ -663,19 +718,55 @@ class AutoMMPredictor:
             else:
                 assert self._output_shape > 1
                 soft_label_loss_func = nn.CrossEntropyLoss()
-        elif self._config.distiller.soft_label_loss_type == "mean_square_error":
+        elif self._config.distiller.soft_label_loss_type == "mse":
             soft_label_loss_func = nn.MSELoss()
         elif self._config.distiller.soft_label_loss_type == "cross_entropy":
             soft_label_loss_func = nn.CrossEntropyLoss()
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
+        if not self._config.distiller.softmax_regression_loss_type:
+            # automatically infer loss func based on problem type if not specified
+            if self._problem_type == "regression":
+                softmax_regression_loss_func = nn.MSELoss()
+            else:
+                assert self._output_shape > 1
+                softmax_regression_loss_func = nn.CrossEntropyLoss()
+        elif self._config.distiller.softmax_regression_loss_type == "mse":
+            softmax_regression_loss_func = nn.MSELoss()
+        elif self._config.distiller.softmax_regression_loss_type == "cross_entropy":
+            softmax_regression_loss_func = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.softmax_regression_loss_type}")
+
+        output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
+        if output_feature_loss_type == "cosine":
+            output_feature_loss_func = nn.CosineEmbeddingLoss()
+        elif output_feature_loss_type == "mse":
+            output_feature_loss_func = nn.MSELoss()
+        else:
+            raise ValueError(f"Unknown output_feature_loss_type: {output_feature_loss_type}")
+
+        # Adapt student's output_feature feature to teacher's
+        # Refer to FitNet: https://arxiv.org/abs/1412.6550
+        teacher_model_dim = teacher_predictor._model.out_features
+        student_model_dim = self._model.out_features
+        output_feature_adaptor = (
+            nn.Linear(student_model_dim, teacher_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
+
+        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.0)
+        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.0)
+        rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
+
         # turn on returning column information in data processors
-        self._data_processors = turn_on_off_feature_column_info(
+        turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
         )
-        teacher_predictor._data_processors = turn_on_off_feature_column_info(
+        turn_on_off_feature_column_info(
             data_processors=teacher_predictor._data_processors,
             flag=True,
         )
@@ -703,6 +794,10 @@ class AutoMMPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            softmax_regression_loss_func,
+            output_feature_adaptor,
+            output_feature_loss_func,
+            rkd_loss_func,
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
@@ -721,7 +816,7 @@ class AutoMMPredictor:
         presets: Optional[str] = None,
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        teacher_predictor: Union[str, AutoMMPredictor] = None,
+        teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
@@ -756,7 +851,6 @@ class AutoMMPredictor:
         if self._data_processors is None:
             data_processors = init_data_processors(
                 config=config,
-                df_preprocessor=df_preprocessor,
             )
         else:  # continuing training
             data_processors = self._data_processors
@@ -809,13 +903,10 @@ class AutoMMPredictor:
         self._model = model
         self._loss_func = loss_func
 
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
-
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
-            data_processors = turn_on_off_feature_column_info(
+            turn_on_off_feature_column_info(
                 data_processors=data_processors,
                 flag=True,
             )
@@ -842,6 +933,10 @@ class AutoMMPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = self._setup_distillation(
@@ -853,9 +948,13 @@ class AutoMMPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -890,6 +989,9 @@ class AutoMMPredictor:
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
+            output_feature_loss_weight = OmegaConf.select(
+                self._config, "distiller.output_feature_loss_weight", default=0.01
+            )
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
@@ -898,9 +1000,15 @@ class AutoMMPredictor:
                 baseline_funcs=baseline_funcs,
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
+                softmax_regression_weight=config.distiller.softmax_regression_weight,
                 temperature=config.distiller.temperature,
+                output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                softmax_regression_loss_func=softmax_regression_loss_func,
+                output_feature_adaptor=output_feature_adaptor,
+                output_feature_loss_func=output_feature_loss_func,
+                rkd_loss_func=rkd_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -971,24 +1079,12 @@ class AutoMMPredictor:
             version="",
         )
 
-        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
-        if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
-            num_gpus = torch.cuda.device_count()
-
-        if is_interactive() and num_gpus > 1:
-            warnings.warn(
-                "Interactive environment is detected. Currently, AutoMMPredictor does not support multi-gpu "
-                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-                "AutoMMPredictor in a script.",
-                UserWarning,
-            )
-            num_gpus = 1
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(
                 "Only CPU is detected in the instance. "
-                "AutoMMPredictor will be trained with CPU only. "
+                "MultiModalPredictor will be trained with CPU only. "
                 "This may results in slow training speed. "
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
@@ -1029,6 +1125,13 @@ class AutoMMPredictor:
                 strategy = None
                 num_gpus = min(num_gpus, 1)
 
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy
+        self._config = config
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path)
+
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1045,12 +1148,15 @@ class AutoMMPredictor:
                 max_time=max_time,
                 callbacks=callbacks,
                 logger=tb_logger,
-                gradient_clip_val=1,
-                gradient_clip_algorithm="norm",
+                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
+                gradient_clip_algorithm=OmegaConf.select(
+                    config, "optimization.gradient_clip_algorithm", default="norm"
+                ),
                 accumulate_grad_batches=grad_steps,
-                log_every_n_steps=10,
+                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
                 enable_progress_bar=enable_progress_bar,
                 fast_dev_run=config.env.fast_dev_run,
+                track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
             )
 
@@ -1098,7 +1204,8 @@ class AutoMMPredictor:
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
-                best_k_models = yaml.load(f, Loader=yaml.Loader)
+                best_k_models = yaml.safe_load(f)
+
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -1203,36 +1310,21 @@ class AutoMMPredictor:
     def _predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        ret_type: str,
         requires_label: bool,
-    ) -> torch.Tensor:
+    ) -> List[Dict]:
 
-        required_columns = self._df_preprocessor.required_feature_names
-        if requires_label:
-            required_columns.append(self._df_preprocessor.label_column)
-        data = data_to_df(
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
             data=data,
-            required_columns=required_columns,
-            all_columns=self._df_preprocessor.all_column_names,
+            requires_label=requires_label,
         )
 
-        # For prediction data with no labels provided.
-        if not requires_label:
-            data_processors = copy.deepcopy(self._data_processors)
-            data_processors.pop(LABEL, None)
-        else:
-            data_processors = self._data_processors
-
-        num_gpus = (
-            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
-        )
-        if num_gpus < 0:
-            num_gpus = torch.cuda.device_count()
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
                 "Only CPU is detected in the instance. "
-                "AutoMMPredictor will predict with CPU only. "
+                "MultiModalPredictor will predict with CPU only. "
                 "This may results in slow prediction speed. "
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
@@ -1263,12 +1355,12 @@ class AutoMMPredictor:
             strategy = None
 
         if hasattr(self._config, MATCHER):
-            data_processors = turn_on_off_feature_column_info(
+            turn_on_off_feature_column_info(
                 data_processors=data_processors,
                 flag=True,
             )
         predict_dm = BaseDataModule(
-            df_preprocessor=self._df_preprocessor,
+            df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
@@ -1307,6 +1399,7 @@ class AutoMMPredictor:
                 benchmark=False,
                 enable_progress_bar=self._enable_progress_bar,
                 deterministic=self._config.env.deterministic,
+                max_epochs=-1,  # Add max_epochs to disable warning
                 logger=False,
             )
 
@@ -1321,26 +1414,42 @@ class AutoMMPredictor:
                     task,
                     datamodule=predict_dm,
                 )
-        if ret_type == LOGITS:
-            logits = [ele[LOGITS] for ele in outputs]
-            ret = torch.cat(logits)
-        elif ret_type == PROBABILITY:
-            probability = [ele[PROBABILITY] for ele in outputs]
-            ret = torch.cat(probability)
-        elif ret_type == FEATURES:
-            features = [ele[FEATURES] for ele in outputs]
-            ret = torch.cat(features)
-        else:
-            raise ValueError(f"Unknown return type: {ret_type}")
 
-        return ret
+        return outputs
 
-    @staticmethod
-    def _logits_to_prob(logits: torch.Tensor):
-        assert logits.ndim == 2
-        prob = F.softmax(logits.float(), dim=1)
-        prob = prob.detach().cpu().float().numpy()
-        return prob
+    def _on_predict_start(
+        self,
+        config: DictConfig,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+    ):
+        data = data_to_df(data=data)
+
+        if self._column_types is None:
+            allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
+            column_types = infer_column_types(
+                data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
+            )
+        else:  # called .fit() or .load()
+            column_types = self._column_types
+
+        if self._df_preprocessor is None:
+            df_preprocessor = init_df_preprocessor(
+                config=config.data,
+                column_types=column_types,
+                label_column=self._label_column,
+                train_df_x=data,
+                train_df_y=data[self._label_column] if self._label_column else None,
+            )
+        else:  # called .fit() or .load()
+            df_preprocessor = self._df_preprocessor
+
+        data_processors = copy.deepcopy(self._data_processors)
+        # For prediction data with no labels provided.
+        if not requires_label:
+            data_processors.pop(LABEL, None)
+
+        return data, df_preprocessor, data_processors
 
     def evaluate(
         self,
@@ -1371,17 +1480,18 @@ class AutoMMPredictor:
         else:
             ret_type = LOGITS
 
-        logits_or_prob = self._predict(
+        outputs = self._predict(
             data=data,
-            ret_type=ret_type,
             requires_label=True,
         )
+        logits_or_prob = extract_from_output(ret_type=ret_type, outputs=outputs)
+
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
             if ret_type == LOGITS:
-                y_pred_prob = self._logits_to_prob(logits_or_prob)
+                y_pred_prob = logits_to_prob(logits_or_prob)
             else:
-                y_pred_prob = logits_or_prob.detach().cpu().float().numpy()
+                y_pred_prob = logits_or_prob
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(
@@ -1425,10 +1535,38 @@ class AutoMMPredictor:
         else:
             return results
 
+    def _match_queries_and_candidates(
+        self,
+        query_data: Union[pd.DataFrame, dict, list],
+        candidate_data: Union[pd.DataFrame, dict, list],
+        return_prob: Optional[bool] = False,
+    ):
+        query_embeddings = self.extract_embedding(query_data, as_tensor=True)
+        assert (
+            len(query_embeddings) == 1
+        ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
+        query_embeddings = list(query_embeddings.values())[0]
+
+        candidate_embeddings = self.extract_embedding(candidate_data, as_tensor=True)
+        assert (
+            len(candidate_embeddings) == 1
+        ), f"Multiple embedding types `{candidate_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
+        candidate_embeddings = list(candidate_embeddings.values())[0]
+
+        if return_prob:
+            ret = (100.0 * query_embeddings @ candidate_embeddings.T).float().softmax(dim=-1)
+        else:
+            ret = (query_embeddings @ candidate_embeddings.T).argmax(dim=-1)
+
+        ret = tensor_to_ndarray(ret)
+
+        return ret
+
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        as_pandas: Optional[bool] = True,
+        candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        as_pandas: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -1438,6 +1576,8 @@ class AutoMMPredictor:
         data
              The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
+        candidate_data
+            The candidate data from which to search the query data's matches.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
 
@@ -1450,22 +1590,42 @@ class AutoMMPredictor:
         else:
             ret_type = LOGITS
 
-        logits_or_prob = self._predict(
-            data=data,
-            ret_type=ret_type,
-            requires_label=False,
-        )
-        pred = self._df_preprocessor.transform_prediction(
-            y_pred=logits_or_prob,
-        )
-        if as_pandas:
+        if self._pipeline == OBJECT_DETECTION:
+            ret_type = BBOX
+
+        if candidate_data:
+            pred = self._match_queries_and_candidates(
+                query_data=data,
+                candidate_data=candidate_data,
+                return_prob=False,
+            )
+        else:
+            outputs = self._predict(
+                data=data,
+                requires_label=False,
+            )
+            logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+
+            if self._df_preprocessor:
+                pred = self._df_preprocessor.transform_prediction(
+                    y_pred=logits_or_prob,
+                )
+            else:
+                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
+                    pred = logits_or_prob.argmax(axis=1)
+                else:
+                    pred = logits_or_prob
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
+
         return pred
 
     def predict_proba(
         self,
         data: Union[pd.DataFrame, dict, list],
-        as_pandas: Optional[bool] = True,
+        candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
     ):
         """
@@ -1477,6 +1637,8 @@ class AutoMMPredictor:
         data
             The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
+        candidate_data
+            The candidate data from which to search the query data's matches.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -1489,9 +1651,8 @@ class AutoMMPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        assert self._problem_type in [
-            BINARY,
-            MULTICLASS,
+        assert self._problem_type not in [
+            REGRESSION,
         ], f"Problem {self._problem_type} has no probability output."
 
         if hasattr(self._config, MATCHER):
@@ -1499,16 +1660,23 @@ class AutoMMPredictor:
         else:
             ret_type = LOGITS
 
-        logits_or_prob = self._predict(
-            data=data,
-            ret_type=ret_type,
-            requires_label=False,
-        )
-
-        if ret_type == LOGITS:
-            prob = self._logits_to_prob(logits_or_prob)
+        if candidate_data:
+            prob = self._match_queries_and_candidates(
+                query_data=data,
+                candidate_data=candidate_data,
+                return_prob=True,
+            )
         else:
-            prob = logits_or_prob.detach().cpu().float().numpy()
+            outputs = self._predict(
+                data=data,
+                requires_label=False,
+            )
+            logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+
+            if ret_type == LOGITS:
+                prob = logits_to_prob(logits_or_prob)
+            else:
+                prob = logits_or_prob
 
         if not as_multiclass:
             if self._problem_type == BINARY:
@@ -1518,13 +1686,17 @@ class AutoMMPredictor:
                     problem_type=self._problem_type,
                 )
                 prob = prob[:, pos_label]
-        if as_pandas:
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
+
         return prob
 
     def extract_embedding(
         self,
         data: Union[pd.DataFrame, dict, list],
+        return_masks: Optional[bool] = False,
+        as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
     ):
         """
@@ -1535,6 +1707,11 @@ class AutoMMPredictor:
         data
             The data to extract embeddings for. Should contain same column names as training dataset and
             follow same format (except for the `label` column).
+        return_masks
+            If true, returns a mask dictionary, whose keys are the same as those in the features dictionary.
+            If a sample has empty input in feature column `image_0`, the sample will has mask 0 under key `image_0`.
+        as_tensor
+            Whether to return a Pytorch tensor.
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
 
@@ -1544,16 +1721,30 @@ class AutoMMPredictor:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        features = self._predict(
+        turn_on_off_feature_column_info(
+            data_processors=self._data_processors,
+            flag=True,
+        )
+        outputs = self._predict(
             data=data,
-            ret_type=FEATURES,
             requires_label=False,
         )
-        features = features.detach().cpu().numpy()
+        if self._pipeline in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
+            features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
+            if return_masks:
+                masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)
+        else:
+            features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
+
         if as_pandas:
             features = pd.DataFrame(features, index=data.index)
+            if return_masks:
+                masks = pd.DataFrame(masks, index=data.index)
 
-        return features
+        if return_masks:
+            return features, masks
+        else:
+            return features
 
     def _as_pandas(
         self,
@@ -1650,15 +1841,22 @@ class AutoMMPredictor:
             model_path = os.path.join(self._save_path, "model.ckpt")
             if os.path.isfile(model_path):
                 shutil.copy(model_path, path)
+            else:
+                # FIXME(?) Fix the saving logic
+                RuntimeError(
+                    f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
+                    f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
+                    f"removed."
+                )
 
     @staticmethod
     def _load_metadata(
-        predictor: AutoMMPredictor,
+        predictor: MultiModalPredictor,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
@@ -1692,7 +1890,6 @@ class AutoMMPredictor:
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             data_processors = init_data_processors(
                 config=config,
-                df_preprocessor=df_preprocessor,
             )
 
         predictor._label_column = assets["label_column"]
@@ -1711,8 +1908,9 @@ class AutoMMPredictor:
 
         return predictor
 
-    @staticmethod
+    @classmethod
     def load(
+        cls,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -1738,10 +1936,10 @@ class AutoMMPredictor:
         -------
         The loaded predictor object.
         """
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        predictor = AutoMMPredictor(label="dummy_label")
-        predictor = AutoMMPredictor._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
+        predictor = cls(label="dummy_label")
+        predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
         model = create_model(
             config=predictor._config,
@@ -1788,7 +1986,7 @@ class AutoMMPredictor:
             logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
             ckpt_path = None  # must set None since we do not resume training
 
-        model = AutoMMPredictor._load_state_dict(
+        model = cls._load_state_dict(
             model=model,
             path=load_path,
         )
@@ -1852,3 +2050,13 @@ class AutoMMPredictor:
             return None
         else:
             return self.class_labels[1]
+
+
+class AutoMMPredictor(MultiModalPredictor):
+    def __init__(self, **kwargs):
+        warnings.warn(
+            "AutoMMPredictor has been renamed as 'MultiModalPredictor'. "
+            "Consider to use MultiModalPredictor instead. Using AutoMMPredictor will "
+            "raise an exception starting in v0.7."
+        )
+        super(AutoMMPredictor, self).__init__(**kwargs)

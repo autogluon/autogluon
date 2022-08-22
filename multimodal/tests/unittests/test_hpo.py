@@ -1,21 +1,14 @@
 import os
 import shutil
+
 import pytest
 from ray import tune
-
-from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
-from autogluon.multimodal import AutoMMPredictor
-
-from datasets import PetFinderDataset
-from utils import get_home_dir
 from test_predictor import verify_predictor_save_load
+from unittest_datasets import PetFinderDataset
+from utils import get_home_dir
 
-pytest.skip(
-    "HPO testing fails due to RuntimeError: CUDA error: out of memory, "
-    "but the GPU memory usage is low. Something seems wrong with ray. "
-    "Need to investigate the reasons. Skip the tests for now.",
-    allow_module_level=True
-)
+from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
+from autogluon.multimodal import MultiModalPredictor
 
 
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
@@ -39,7 +32,7 @@ def test_hpo(searcher, scheduler):
         "num_trials": 2,
     }
 
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
@@ -89,7 +82,7 @@ def test_hpo_distillation(searcher, scheduler):
         "num_trials": 2,
     }
 
-    teacher_predictor = AutoMMPredictor(
+    teacher_predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,
@@ -116,7 +109,7 @@ def test_hpo_distillation(searcher, scheduler):
     }
 
     # test for distillation
-    predictor = AutoMMPredictor(
+    predictor = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
         eval_metric=dataset.metric,

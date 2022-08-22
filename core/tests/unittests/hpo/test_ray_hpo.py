@@ -2,7 +2,7 @@ import psutil
 import pytest
 import tempfile
 
-from autogluon.core.hpo import (
+from autogluon.core.hpo.ray_hpo import (
     RayTuneAdapter,
     TabularRayTuneAdapter,
     AutommRayTuneAdapter,
@@ -10,7 +10,7 @@ from autogluon.core.hpo import (
     run,
 )
 from autogluon.core.utils import get_cpu_count, get_gpu_count_all
-from autogluon.core.hpo.constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
+from autogluon.core.hpo.ray_tune_constants import SEARCHER_PRESETS, SCHEDULER_PRESETS
 from ray import tune
 
 
@@ -18,6 +18,10 @@ class DummyAdapter(RayTuneAdapter):
     
     supported_searchers = list(SEARCHER_PRESETS.keys())
     supported_schedulers = list(SCHEDULER_PRESETS.keys())
+    
+    @property
+    def adapter_type(self):
+        return 'dummy'
     
     def get_resource_calculator(self, **kwargs):
         pass

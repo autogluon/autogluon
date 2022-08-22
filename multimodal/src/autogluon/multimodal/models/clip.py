@@ -1,26 +1,24 @@
-import torch
 import logging
+from typing import Optional
+
+import torch
 from torch import nn
 from transformers import CLIPModel
-from .utils import (
-    assign_layer_ids,
-    init_weights,
-    get_column_features,
-)
+
 from ..constants import (
-    IMAGE,
-    IMAGE_VALID_NUM,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    LABEL,
-    LOGITS,
-    FEATURES,
     AUTOMM,
     COLUMN,
     COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
     MASKS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
 )
-from typing import Optional
+from .utils import assign_layer_ids, get_column_features, init_weights
 
 logger = logging.getLogger(AUTOMM)
 
@@ -35,7 +33,7 @@ class CLIPForImageText(nn.Module):
         self,
         prefix: str,
         checkpoint_name: str,
-        num_classes: Optional[int] = 0,
+        num_classes: Optional[int] = None,
     ):
         """
         Load the pretrained CLIP from huggingface transformers.
@@ -56,7 +54,7 @@ class CLIPForImageText(nn.Module):
         self.model = CLIPModel.from_pretrained(checkpoint_name)
         self.out_features = self.model.config.projection_dim
 
-        self.head = nn.Linear(self.out_features, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(self.out_features, num_classes) if num_classes else nn.Identity()
         self.head.apply(init_weights)
 
         self.prefix = prefix
@@ -115,71 +113,81 @@ class CLIPForImageText(nn.Module):
         -------
             A dictionary with logits and features.
         """
-        text_token_ids = batch[self.text_token_ids_key]
-        text_valid_length = batch[self.text_valid_length_key]
-        images = batch[self.image_key]
-        image_valid_num = batch[self.image_valid_num_key]
-
-        steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
-        text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
-        assert torch.equal(text_valid_length, text_masks.sum(dim=-1))
-
-        assert images.dim() == 5
-        b, n, c, h, w = images.shape
-        vision_outputs = self.model.vision_model(
-            pixel_values=images.reshape((b * n, c, h, w)),
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict=True,
-        )
-        image_features = self.model.visual_projection(vision_outputs.pooler_output)
-        steps = torch.arange(0, n).type_as(image_valid_num)
-        image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(image_features)  # (b, n)
-        image_features = image_features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
-
+        has_image = self.image_key in batch
+        has_text = self.text_token_ids_key in batch
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
-        # collect image features by image column names
-        image_column_features, image_column_feature_masks = get_column_features(
-            batch=batch,
-            column_name_prefix=self.image_column_prefix,
-            features=image_features,
-            valid_lengths=image_valid_num,
-            has_cls_feature=False,
-        )
-        ret[COLUMN_FEATURES][FEATURES].update(image_column_features)
-        ret[COLUMN_FEATURES][MASKS].update(image_column_feature_masks)
 
-        image_features = image_features.sum(dim=1)  # (b, num_features)
+        if has_image:
+            images = batch[self.image_key]
+            image_valid_num = batch[self.image_valid_num_key]
+            assert images.dim() == 5
+            b, n, c, h, w = images.shape
+            vision_outputs = self.model.vision_model(
+                pixel_values=images.reshape((b * n, c, h, w)),
+                output_attentions=True,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            image_features = self.model.visual_projection(vision_outputs.pooler_output)
+            steps = torch.arange(0, n).type_as(image_valid_num)
+            image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(image_features)  # (b, n)
+            image_features = image_features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
 
-        text_outputs = self.model.text_model(
-            input_ids=text_token_ids,
-            attention_mask=text_masks,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict=True,
-        )
-        text_features = self.model.text_projection(text_outputs.pooler_output)  # (b, num_features)
+            # normalized features
+            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
-        features = image_features + text_features
-        logits = self.head(features)
+            # collect image features by image column names
+            image_column_features, image_column_feature_masks = get_column_features(
+                batch=batch,
+                column_name_prefix=self.image_column_prefix,
+                features=image_features,
+                valid_lengths=image_valid_num,
+            )
+            ret[COLUMN_FEATURES][FEATURES].update(image_column_features)
+            ret[COLUMN_FEATURES][MASKS].update(image_column_feature_masks)
 
-        # collect text features by text column names
-        text_column_features, text_column_feature_masks = get_column_features(
-            batch=batch,
-            column_name_prefix=self.text_column_prefix,
-            features=self.model.text_projection(text_outputs.last_hidden_state),
-            valid_lengths=text_valid_length,
-            has_cls_feature=True,
-        )
-        ret[COLUMN_FEATURES][FEATURES].update(text_column_features)
-        ret[COLUMN_FEATURES][MASKS].update(text_column_feature_masks)
+            image_features = image_features.mean(dim=1)  # (b, num_features)
 
-        ret.update(
-            {
-                LOGITS: logits,
-                FEATURES: features,
-            }
-        )
+        if has_text:
+            text_token_ids = batch[self.text_token_ids_key]
+            text_valid_length = batch[self.text_valid_length_key]
+            steps = torch.arange(0, text_token_ids.shape[1]).type_as(text_valid_length)
+            text_masks = (steps.reshape((1, -1)) < text_valid_length.reshape((-1, 1))).type_as(text_token_ids)
+            assert torch.equal(text_valid_length, text_masks.sum(dim=-1))
+
+            text_outputs = self.model.text_model(
+                input_ids=text_token_ids,
+                attention_mask=text_masks,
+                output_attentions=True,
+                output_hidden_states=True,
+                return_dict=True,
+            )
+            text_features = self.model.text_projection(text_outputs.pooler_output)  # (b, num_features)
+
+            # normalized features
+            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
+            # collect text features by text column names
+            text_column_features, text_column_feature_masks = get_column_features(
+                batch=batch,
+                column_name_prefix=self.text_column_prefix,
+                features=self.model.text_projection(text_outputs.last_hidden_state),
+                valid_lengths=text_valid_length,
+                cls_feature=text_features,
+            )
+            ret[COLUMN_FEATURES][FEATURES].update(text_column_features)
+            ret[COLUMN_FEATURES][MASKS].update(text_column_feature_masks)
+
+        if has_image and has_text:
+            if self.num_classes:
+                features = image_features + text_features
+                logits = self.head(features)
+                ret[FEATURES] = features
+            else:
+                # cosine similarity as logits
+                logits = torch.sum(image_features * text_features, dim=-1)
+
+            ret[LOGITS] = logits
 
         return {self.prefix: ret}
 

@@ -1,11 +1,11 @@
-import torch
-import json
+from typing import List, Optional
+
 from torch import nn
+
+from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL
 from .mlp import MLP
-from ..constants import NUMERICAL, LABEL, LOGITS, FEATURES
-from typing import Optional, List
-from .utils import init_weights
 from .numerical_transformer import NumEmbeddings
+from .utils import init_weights
 
 
 class NumericalMLP(nn.Module):

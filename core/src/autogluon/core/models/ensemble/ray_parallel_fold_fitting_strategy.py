@@ -3,7 +3,6 @@ from numpy import ndarray
 from pandas import DataFrame, Series
 from ray.util import placement_group, placement_group_table
 import time
-from time import sleep
 
 from autogluon.core.models.ensemble.fold_fitting_strategy import SequentialLocalFoldFittingStrategy
 

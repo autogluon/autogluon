@@ -9,14 +9,16 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import psutil
+import shutil
+from pathlib import Path
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
 from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
-from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
@@ -109,6 +111,11 @@ class AbstractTrainer:
     @property
     def path_utils(self) -> str:
         return self.path_root + 'utils' + os.path.sep
+
+    @property
+    def _path_attr(self) -> str:
+        """Path to cached model graph attributes"""
+        return f'{self.path_utils}attr{os.path.sep}'
 
     @property
     def path_data(self) -> str:
@@ -213,7 +220,9 @@ class AbstractTrainer:
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
         for model, prev_path in model_paths.items():
-            model_local_path = prev_path.split(self.path, 1)[1]
+            prev_path = os.path.abspath(prev_path) + os.path.sep
+            abs_path = os.path.abspath(self.path) + os.path.sep
+            model_local_path = prev_path.split(abs_path, 1)[1]
             new_path = path + model_local_path
             model_paths[model] = new_path
 
@@ -354,7 +363,9 @@ class AbstractTrainer:
                 base_model_names.remove(base_model_name)
                 predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
                 if verbose:
-                    messages_to_log.append(f'\t{round(predict_1_time_full_set_old, 4)}s -> {round(predict_1_time_full_set, 4)}s ({base_model_name})')
+                    predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
+                    predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                    messages_to_log.append(f'\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_name})')
 
         score_val_dict = self.get_models_attribute_dict(attribute='val_score', models=base_model_names)
         sorted_scores = sorted(score_val_dict.items(), key=lambda x: x[1])
@@ -368,11 +379,14 @@ class AbstractTrainer:
             i += 1
             predict_1_time_full_set = self.get_model_attribute_full(model=base_model_names, attribute=attribute)
             if verbose:
-                messages_to_log.append(f'\t{round(predict_1_time_full_set_old, 4)}s -> {round(predict_1_time_full_set, 4)}s ({base_model_to_remove})')
+                predict_1_time_full_set_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set)
+                predict_1_time_full_set_old_log, time_unit_old = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_set_old)
+                messages_to_log.append(f'\t{round(predict_1_time_full_set_old_log, 3)}{time_unit_old}\t-> {round(predict_1_time_full_set_log, 3)}{time_unit}\t({base_model_to_remove})')
 
         if messages_to_log:
+            infer_limit_threshold_log, time_unit_threshold = convert_time_in_s_to_log_friendly(time_in_sec=infer_limit_threshold)
             logger.log(20, f'Removing {len(messages_to_log)}/{num_models_og} base models to satisfy inference constraint '
-                           f'(constraint={round(infer_limit_threshold, 4)}s) ...')
+                           f'(constraint={round(infer_limit_threshold_log, 3)}{time_unit_threshold}) ...')
             for msg in messages_to_log:
                 logger.log(20, msg)
 
@@ -472,7 +486,7 @@ class AbstractTrainer:
         logger.log(20, f'Fitting {len(models)} L{level} models ...')
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
-            X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False)
+            X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_val_cache=True)
         compute_score = not refit_full
         if refit_full and X_val is not None:
             X_init = pd.concat([X_init, X_val])
@@ -493,7 +507,7 @@ class AbstractTrainer:
     # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
                             fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True,
-                            infer_limit=None, infer_limit_batch_size=None) -> List[str]:
+                            infer_limit=None, infer_limit_batch_size=None, use_val_cache=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -509,7 +523,7 @@ class AbstractTrainer:
             ag_args_fit['predict_1_batch_size'] = infer_limit_batch_size
         else:
             ag_args_fit = None
-        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False)
+        X_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache)
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
@@ -582,7 +596,14 @@ class AbstractTrainer:
     # Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
     # fit = get oof pred proba
     # if record_pred_time is `True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
-    def get_model_pred_proba_dict(self, X, models, model_pred_proba_dict=None, model_pred_time_dict=None, fit=False, record_pred_time=False):
+    def get_model_pred_proba_dict(self,
+                                  X,
+                                  models,
+                                  model_pred_proba_dict=None,
+                                  model_pred_time_dict=None,
+                                  fit=False,
+                                  record_pred_time=False,
+                                  use_val_cache: bool = False):
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         if model_pred_time_dict is None:
@@ -591,13 +612,17 @@ class AbstractTrainer:
         if fit:
             model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
         else:
+            if use_val_cache:
+                _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
             model_set = set()
             for model in models:
-                if model in model_set:
+                if model in model_set or model in model_pred_proba_dict:
                     continue
                 min_model_set = set(self.get_minimum_model_set(model))
                 model_set = model_set.union(min_model_set)
             model_set = model_set.difference(set(model_pred_proba_dict.keys()))
+            if use_val_cache:
+                model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=model_set, model_pred_proba_dict=model_pred_proba_dict)
             models_to_load = list(model_set)
             subgraph = nx.subgraph(self.model_graph, models_to_load)
 
@@ -644,12 +669,32 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
+    def _update_pred_proba_dict_with_val_cache(self, model_set: set, model_pred_proba_dict):
+        """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
+        for model in model_set:
+            y_pred_proba = self.get_model_attribute(model, attribute='cached_y_pred_proba_val', default=None)
+            if isinstance(y_pred_proba, bool):
+                if y_pred_proba:
+                    try:
+                        y_pred_proba = self._load_model_y_pred_proba_val(model)
+                    except FileNotFoundError:
+                        y_pred_proba = None
+                else:
+                    y_pred_proba = None
+            if y_pred_proba is not None:
+                model_pred_proba_dict[model] = y_pred_proba
+        model_set = model_set.difference(set(model_pred_proba_dict.keys()))
+        return model_set, model_pred_proba_dict
+
     # TODO: Remove _get_inputs_to_stacker_legacy eventually, move logic internally into this function instead
-    def get_inputs_to_stacker(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True):
+    def get_inputs_to_stacker(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True, use_val_cache=False):
         if base_models is None:
             base_models = []
         if not fit:
-            model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=base_models, model_pred_proba_dict=model_pred_proba_dict)
+            model_pred_proba_dict = self.get_model_pred_proba_dict(X=X,
+                                                                   models=base_models,
+                                                                   model_pred_proba_dict=model_pred_proba_dict,
+                                                                   use_val_cache=use_val_cache)
             model_pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
         else:
             # TODO: After _get_inputs_to_stacker_legacy is removed, this if/else is not necessary, instead pass fit param to get_model_pred_proba_dict()
@@ -1059,6 +1104,7 @@ class AbstractTrainer:
         fit_start_time = time.time()
         time_limit = model_fit_kwargs.get('time_limit', None)
         model_names_trained = []
+        y_pred_proba_val = None
         try:
             fit_log_message = f'Fitting model: {model.name} ...'
             if time_limit is not None:
@@ -1097,14 +1143,16 @@ class AbstractTrainer:
                 model.predict_time = None
             elif isinstance(model, BaggedEnsembleModel):
                 if X_val is not None and y_val is not None:
-                    score = model.score(X=X_val, y=y_val, sample_weight=w_val)
+                    y_pred_proba_val = model.predict_proba(X_val)
+                    score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
                 elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
                 else:
                     score = None
             else:
                 if X_val is not None and y_val is not None:
-                    score = model.score(X=X_val, y=y_val, sample_weight=w_val)
+                    y_pred_proba_val = model.predict_proba(X_val)
+                    score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
                 else:
                     score = None
             pred_end_time = time.time()
@@ -1146,13 +1194,13 @@ class AbstractTrainer:
                 logger.exception('Detailed Traceback:')
             del model
         else:
-            self._add_model(model=model, stack_name=stack_name, level=level)
+            self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val)
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         return model_names_trained
 
-    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 1) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = 'core', level: int = 1, y_pred_proba_val=None) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -1185,6 +1233,13 @@ class AbstractTrainer:
         predict_child_time = model.predict_time / num_children if model.predict_time is not None else None
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
+
+        extra_attributes = dict()
+        if y_pred_proba_val is not None:
+            # Cache y_pred_proba_val for later reuse to avoid redundant predict calls
+            self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
+            extra_attributes['cached_y_pred_proba_val'] = True
+
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
@@ -1203,6 +1258,7 @@ class AbstractTrainer:
             level=level,
             num_children=num_children,
             **fit_metadata,
+            **extra_attributes,
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
@@ -1218,6 +1274,22 @@ class AbstractTrainer:
         if self.low_memory:
             del model
         return True
+
+    def _path_attr_model(self, model: str):
+        """Returns directory where attributes are cached"""
+        return f'{self._path_attr}{model}{os.path.sep}'
+
+    def _path_to_model_attr(self, model: str, attribute: str):
+        """Returns pkl file path for a cached model attribute"""
+        return f'{self._path_attr_model(model)}{attribute}.pkl'
+
+    def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
+        """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
+        save_pkl.save(path=self._path_to_model_attr(model=model, attribute='y_pred_proba_val'), object=y_pred_proba_val)
+
+    def _load_model_y_pred_proba_val(self, model: str):
+        """Load cached y_pred_proba_val for a given model"""
+        return load_pkl.load(path=self._path_to_model_attr(model=model, attribute='y_pred_proba_val'))
 
     # TODO: Once Python min-version is 3.8, can refactor to use positional-only argument for model
     #  https://peps.python.org/pep-0570/#empowering-library-authors
@@ -1247,19 +1319,13 @@ class AbstractTrainer:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get('predict_1_batch_size', None)
             assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
-            time_unit = "s"
             predict_1_time = model.predict_1_time
-            if round(predict_1_time, 2) == 0:
-                # TODO: Consider moving this to a dedicated function and using across package for nicer logging of time
-                time_unit = 'ms'
-                predict_1_time = predict_1_time*1000
-            logger.log(20, f'\t{round(predict_1_time, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
+            predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
+            logger.log(20, f'\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)')
+
             predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute='predict_1_time')
-            time_unit = "s"
-            if round(predict_1_time_full, 2) == 0:
-                time_unit = 'ms'
-                predict_1_time_full = predict_1_time_full * 1000
-            logger.log(20, f'\t{round(predict_1_time_full, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | FULL)')
+            predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
+            logger.log(20, f'\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)')
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(self,
@@ -1296,9 +1362,6 @@ class AbstractTrainer:
                 raise ValueError(f'n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}')
             elif k_fold_start != 0:
                 raise ValueError(f'k_fold_start must be 0 to hyperparameter_tune, value = {k_fold_start}')
-            if not isinstance(hyperparameter_tune_kwargs, tuple):
-                num_trials = 1 if time_limit is None else 1000
-                hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial='auto', ngpus_per_trial='auto')
             # hpo_models (dict): keys = model_names, values = model_paths
             fit_log_message = f'Hyperparameter tuning model: {model.name} ...'
             if time_limit is not None:
@@ -1314,9 +1377,22 @@ class AbstractTrainer:
             logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, k_fold=k_fold, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
+                    hpo_models, hpo_results = model.hyperparameter_tune(
+                        X=X,
+                        y=y,
+                        k_fold=k_fold,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        **model_fit_kwargs
+                    )
                 else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X, y=y, X_val=X_val, y_val=y_val, scheduler_options=hyperparameter_tune_kwargs, **model_fit_kwargs)
+                    hpo_models, hpo_results = model.hyperparameter_tune(
+                        X=X,
+                        y=y,
+                        X_val=X_val,
+                        y_val=y_val,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        **model_fit_kwargs
+                    )
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)
@@ -1327,8 +1403,8 @@ class AbstractTrainer:
                 # self.hpo_results[model.name] = hpo_results
                 model_names_trained = []
                 self._extra_banned_names.add(model.name)
-                for model_hpo_name, model_path in hpo_models.items():
-                    model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+                for model_hpo_name, model_info in hpo_models.items():
+                    model_hpo = self.load_model(model_hpo_name, path=model_info['path'], model_type=type(model))
                     logger.log(20, f'Fitted model: {model_hpo.name} ...')
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
@@ -1812,7 +1888,7 @@ class AbstractTrainer:
         model: AbstractModel = self.load_model(model)
         predict_func_kwargs = dict(model=model)
         return compute_permutation_feature_importance(
-            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, **kwargs
+            X=X, y=y, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs, eval_metric=eval_metric, quantile_levels=self.quantile_levels, **kwargs
         )
 
     def _get_models_load_info(self, model_names):
@@ -2151,6 +2227,7 @@ class AbstractTrainer:
                 os.rmdir(self.path_data)
             except OSError:
                 pass
+            shutil.rmtree(path=Path(self._path_attr), ignore_errors=True)
             try:
                 os.rmdir(self.path_utils)
             except OSError:
@@ -2207,10 +2284,8 @@ class AbstractTrainer:
                 model = self.load_model(model)
                 model.delete_from_disk()
 
-        self.model_graph.remove_nodes_from(models_to_remove)
         for model in models_to_remove:
-            if model in self.models:
-                self.models.pop(model)
+            self._delete_model_from_graph(model=model)
 
         models_kept = self.get_model_names()
 
@@ -2222,6 +2297,13 @@ class AbstractTrainer:
 
         # TODO: Delete from all the other model dicts
         self.save()
+
+    def _delete_model_from_graph(self, model: str):
+        self.model_graph.remove_node(model)
+        if model in self.models:
+            self.models.pop(model)
+        path_attr_model = Path(self._path_attr_model(model))
+        shutil.rmtree(path=path_attr_model, ignore_errors=True)
 
     @classmethod
     def load(cls, path, reset_paths=False):

@@ -2,7 +2,7 @@
 :label:`sec_automm_textprediction_multimodal`
 
 In many applications, text data may be mixed with numeric/categorical data. 
-AutoGluon's `AutoMMPredictor` can train a single neural network that jointly operates on multiple feature types, 
+AutoGluon's `MultiModalPredictor` can train a single neural network that jointly operates on multiple feature types, 
 including text, categorical, and numerical columns. The general idea is to embed the text, categorical and numeric fields 
 separately and fuse these features across modalities. This tutorial demonstrates such an application.
 
@@ -23,7 +23,7 @@ np.random.seed(123)
 
 ## Book Price Prediction Data
 
-For demonstration, we use the book price prediction dataset from the [MachineHack Salary Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview). Our goal is to predict a book's price given various features like its author, the abstract, the book's rating, etc.
+For demonstration, we use the book price prediction dataset from the [MachineHack Book Price Prediction Hackathon](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview). Our goal is to predict a book's price given various features like its author, the abstract, the book's rating, etc.
 
 ```{.python .input}
 !mkdir -p price_of_books
@@ -59,21 +59,21 @@ train_data.head()
 
 ## Training
 
-We can simply create a AutoMMPredictor and call `predictor.fit()` to train a model that operates on across all types of features. 
+We can simply create a MultiModalPredictor and call `predictor.fit()` to train a model that operates on across all types of features. 
 Internally, the neural network will be automatically generated based on the inferred data type of each feature column. 
 To save time, we subsample the data and only train for three minutes.
 
 
 ```{.python .input}
-from autogluon.multimodal import AutoMMPredictor
+from autogluon.multimodal import MultiModalPredictor
 time_limit = 3 * 60  # set to larger value in your applications
-predictor = AutoMMPredictor(label='Price', path='automm_text_book_price_prediction')
+predictor = MultiModalPredictor(label='Price', path='automm_text_book_price_prediction')
 predictor.fit(train_data, time_limit=time_limit)
 ```
 
 ## Prediction
 
-We can easily obtain predictions and extract data embeddings using the AutoMMPredictor.
+We can easily obtain predictions and extract data embeddings using the MultiModalPredictor.
 
 
 ```{.python .input}
@@ -115,14 +115,14 @@ In addition, to deal with multiple text fields, we separate these fields with th
 
 ## How does this compare with TabularPredictor?
 
-Note that `TabularPredictor` can also handle data tables with text, numeric, and categorical columns, but it uses an ensemble of many types of models and may featurize text. `AutoMMPredictor` instead directly fuses multiple neural network models directly and handles 
-raw text (which are also capable of handling additional numerical/categorical columns). We generally recommend `TabularPredictor` if your table contains mainly numeric/categorical columns and AutoMMPredictor if your table contains mainly text columns, 
-but you may easily try both and we encourage this. In fact, `TabularPredictor.fit(..., hyperparameters='multimodal')` will train a AutoMMPredictor along with many other tabular models and ensemble them together. 
+Note that `TabularPredictor` can also handle data tables with text, numeric, and categorical columns, but it uses an ensemble of many types of models and may featurize text. `MultiModalPredictor` instead directly fuses multiple neural network models directly and handles 
+raw text (which are also capable of handling additional numerical/categorical columns). We generally recommend `TabularPredictor` if your table contains mainly numeric/categorical columns and MultiModalPredictor if your table contains mainly text columns, 
+but you may easily try both and we encourage this. In fact, `TabularPredictor.fit(..., hyperparameters='multimodal')` will train a MultiModalPredictor along with many other tabular models and ensemble them together. 
 Refer to the tutorial ":ref:`sec_tabularprediction_text_multimodal`"  for more details.
 
 ## Other Examples
 
-You may go to https://github.com/awslabs/autogluon/tree/master/examples/automm to explore other AutoMMPredictor examples.
+You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
 
 ## Customization
-To customize AutoMM, please refer to :ref:`sec_automm_customization`.
+To learn how to customize AutoMM, please refer to :ref:`sec_automm_customization`.

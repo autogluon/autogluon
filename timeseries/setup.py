@@ -1,18 +1,16 @@
 #!/usr/bin/env python
-import warnings
-
-from packaging.version import parse as vparse
+import importlib.util
 
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import os
+import warnings
+
+from packaging.version import parse as vparse
 from setuptools import setup
-import importlib.util
 
 filepath = os.path.abspath(os.path.dirname(__file__))
-filepath_import = os.path.join(
-    filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py"
-)
+filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
 ag = importlib.util.module_from_spec(spec)
 # Identical to `from autogluon.core import _setup_utils as ag`, but works without `autogluon.core` being installed.
@@ -29,7 +27,7 @@ install_requires = [
     "scipy",
     "pandas",
     "psutil>=5.7.3,<5.9",
-    "gluonts>=0.8.0",
+    "gluonts>=0.8.0,<0.10.0",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
 ]
@@ -47,14 +45,14 @@ except (ImportError, AssertionError):
     )
 
 extras_require = {
-    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1"],
-    "sktime": ["sktime~=0.12", "pmdarima~=1.8", "tbats~=1.1"],
+    "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black~=22.0,>=22.3"],
+    "sktime": ["sktime~=0.13,>=0.13.1", "pmdarima~=1.8.2", "tbats~=1.1"],
 }
 
 all_requires = []
 for extra_package in ["sktime"]:
     all_requires += extras_require[extra_package]
-extras_require['all'] = list(set(all_requires))
+extras_require["all"] = list(set(all_requires))
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

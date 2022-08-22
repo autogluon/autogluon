@@ -10,6 +10,7 @@ import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import try_import_torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
@@ -328,7 +329,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             # validation
             if val_dataset is not None:
                 # compute validation score
-                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric)
+                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
                 if np.isnan(val_metric):
                     if best_epoch == 0:
                         raise RuntimeError(f"NaNs encountered in {self.__class__.__name__} training. "
@@ -395,9 +396,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     # FIXME: torch.set_num_threads(self._num_cpus_infer) is required because XGBoost<=1.5 mutates global OpenMP thread limit
     #  If this isn't here, inference speed is slowed down massively.
     #  Remove once upgraded to XGBoost>=1.6
-    def _predict_proba(self, X, **kwargs):
-        from ..._utils.torch_utils import TorchThreadManager
-        with TorchThreadManager(num_threads=self._num_cpus_infer):
+    def _predict_proba(self, X, _reset_threads=True, **kwargs):
+        if _reset_threads:
+            from ..._utils.torch_utils import TorchThreadManager
+            with TorchThreadManager(num_threads=self._num_cpus_infer):
+                pred_proba = self._predict_proba_internal(X=X, **kwargs)
+        else:
             pred_proba = self._predict_proba_internal(X=X, **kwargs)
         return pred_proba
 
@@ -596,6 +600,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             model._architecture_desc = None
             model.model = torch.load(model.path + model.params_file_name)
         return model
+    
+    def _get_hpo_backend(self):
+        """Choose which backend(Ray or Custom) to use for hpo"""
+        return RAY_BACKEND
 
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
