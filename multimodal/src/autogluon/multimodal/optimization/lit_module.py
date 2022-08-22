@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, LM_TARGET, LOGITS, TEMPLATE_LOGITS, WEIGHT
+from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
@@ -163,7 +163,9 @@ class LitModule(pl.LightningModule):
         loss = 0
         for _, per_output in output.items():
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            if TEMPLATE_LOGITS in per_output:  # Not sure the condition creates too much overhead?
+            if (
+                TEMPLATE_LOGITS in per_output and self.model.prefix == T_FEW
+            ):  # Do only add template loss if T-Few. #TODO Add compatibility to Fusion models.
                 loss += self._compute_template_loss(per_output, label) * weight
             else:
                 loss += (

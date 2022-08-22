@@ -178,11 +178,19 @@ def test_predictor(
         "optimization.loss_function": loss_function,
     }
     if text_backbone is not None:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": text_backbone,
-            }
-        )
+        if "t_few" in model_names:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": text_backbone,
+                    "model.t_few.checkpoint_name": "t5-small",
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": text_backbone,
+                }
+            )
     if image_backbone is not None:
         hyperparameters.update(
             {
