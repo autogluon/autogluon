@@ -253,6 +253,7 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
         "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -452,8 +453,7 @@ def test_model_configs():
             },
             "t_few": {
                 "checkpoint_name": "t5-small",
-                "gradient_checkpointing": True,
-                "label_templates": {"test{}".format(x): x for x in range(40)},
+                "gradient_checkpointing": False,
                 "data_types": ["text"],
                 "tokenizer_name": "hf_auto",
                 "length_norm": 1.0,
@@ -573,6 +573,7 @@ def test_modifying_duplicate_model_names():
         "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
