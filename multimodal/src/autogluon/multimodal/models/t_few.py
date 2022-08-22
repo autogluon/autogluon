@@ -158,11 +158,9 @@ class TFewModel(nn.Module):
             )
             warn_once(logger, msg="Fallback to numerical representation of classes...")
             batch[self.choices_key] = (
-                torch.tensor(
-                    self.tokenizer([str(i) for i in range(self.num_classes)], return_tensors="pt", padding=True)[
-                        "input_ids"
-                    ]
-                )
+                self.tokenizer([str(i) for i in range(self.num_classes)], return_tensors="pt", padding=True)[
+                    "input_ids"
+                ]
                 .repeat(batch[self.text_token_ids_key].size(0), 1, 1)
                 .to(batch[self.text_token_ids_key])
             )

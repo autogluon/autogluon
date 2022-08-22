@@ -923,7 +923,7 @@ def save_pretrained_models(
     else:  # assumes the fusion model has a model attribute, a nn.ModuleList
         model = model.model
     for per_model in model:
-        if per_model.prefix.lower().startswith((CLIP, HF_TEXT)):
+        if per_model.prefix.lower().startswith((CLIP, HF_TEXT, T_FEW)):
             per_model.model.save_pretrained(os.path.join(path, per_model.prefix))
             model_config = getattr(config.model, per_model.prefix)
             model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
@@ -945,7 +945,7 @@ def convert_checkpoint_name(config: DictConfig, path: str) -> DictConfig:
         The saving path to the pretrained Huggingface models.
     """
     for model_name in config.model.names:
-        if model_name.lower().startswith((CLIP, HF_TEXT)):
+        if model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
