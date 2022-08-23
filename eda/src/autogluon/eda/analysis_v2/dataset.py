@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List, Union
 
+import pandas as pd
+
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw
 from . import NamespaceAbstractAnalysis
 from .base import AbstractAnalysis
@@ -26,6 +28,21 @@ class Sampler(NamespaceAbstractAnalysis):
             for ds in DATASET_ARGS:
                 if ds in args:
                     self.args[ds] = args[ds].sample(self.sample)
+
+
+class DatasetSummary(AbstractAnalysis):
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        s = {}
+        for ds in DATASET_ARGS:
+            if ds in args:
+                df = args[ds]
+                summary = df.describe(include='all').T
+                summary = summary.join(pd.DataFrame({'dtypes': df.dtypes}))
+                summary['count'] = summary['count'].astype(int)
+                summary = summary.sort_index()
+                s[ds] = summary.to_dict()
+        state.dataset_stats = s
 
 
 class RawTypesAnalysis(AbstractAnalysis):
@@ -59,16 +76,15 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 
 class MissingValuesAnalysis(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
-        s = {
-            'count': {},
-            'ratio': {},
-        }
-
+        s = {}
         for ds in DATASET_ARGS:
+            s[ds] = {
+                'count': {},
+                'ratio': {},
+            }
             if ds in args:
                 na = args[ds].isna().sum()
                 na = na[na > 0]
-                s['count'][ds] = na.to_dict()
-                s['ratio'][ds] = (na / len(args[ds])).to_dict()
-
+                s[ds]['count'] = na.to_dict()
+                s[ds]['ratio'] = (na / len(args[ds])).to_dict()
         state.missing_statistics = s
