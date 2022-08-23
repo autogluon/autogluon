@@ -287,6 +287,10 @@ class TFewModel(nn.Module):
             logger.debug(f"outer layers are treated as head: {names}")
         for n in names:
             assert n not in name_to_id
-            name_to_id[n] = 0
+            name_to_id[n] = 1
+
+        for name, id in name_to_id.items():  # no layer should be assigned zero id as zero id is finetuned
+            if id == 0:
+                name_to_id[name] = 1
 
         return name_to_id
