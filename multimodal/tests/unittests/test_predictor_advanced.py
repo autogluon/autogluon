@@ -47,7 +47,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     predictor.fit(
         train_data,
         hyperparameters={
-            "model.names" : ["hf_text"],
+            "model.names": ["hf_text"],
             "model.hf_text.checkpoint_name": backbone,
             "model.hf_text.pooling_mode": pooling_mode,
             "model.hf_text.gradient_checkpointing": True,
