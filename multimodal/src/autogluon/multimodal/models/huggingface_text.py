@@ -18,7 +18,6 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-
 from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 hf_logging.set_verbosity_error()
