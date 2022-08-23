@@ -11,9 +11,11 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from autogluon.common.loaders import load_json
+from autogluon.common.savers import save_json
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
@@ -183,6 +185,7 @@ class TabularPredictor:
     Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
     _predictor_version_file_name = '__version__'
+    _predictor_metadata_file_name = 'metadata.json'
 
     def __init__(
             self,
@@ -2793,11 +2796,29 @@ class TabularPredictor:
         version = load_str.load(path=version_file_path)
         return version
 
+    @classmethod
+    def _load_metadata_file(cls, path: str, silent=True):
+        metadata_file_path = path + cls._predictor_metadata_file_name
+        return load_json.load(path=metadata_file_path, verbose=not silent)
+
     def _save_version_file(self, silent=False):
         from ..version import __version__
         version_file_contents = f'{__version__}'
         version_file_path = self.path + self._predictor_version_file_name
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
+
+    def _save_metadata_file(self, silent=False):
+        """
+        Save metadata json file to disk containing information such as
+        python version, autogluon version, installed packages, operating system, etc.
+        """
+        metadata_file_path = self.path + self._predictor_metadata_file_name
+
+        metadata = get_autogluon_metadata()
+
+        save_json.save(path=metadata_file_path, obj=metadata)
+        if not silent:
+            logger.log(15, f'Saving {metadata_file_path}')
 
     def save(self, silent=False):
         """
@@ -2820,6 +2841,10 @@ class TabularPredictor:
         self._learner = tmp_learner
         self._trainer = tmp_trainer
         self._save_version_file(silent=silent)
+        try:
+            self._save_metadata_file(silent=silent)
+        except Exception as e:
+            logger.log(30, f'Failed to save metadata file due to exception {e}, skipping...')
         if not silent:
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
@@ -2834,7 +2859,7 @@ class TabularPredictor:
         return predictor
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True):
+    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True, require_py_version_match: bool = True, check_packages: bool = False):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -2851,6 +2876,13 @@ class TabularPredictor:
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the `autogluon.tabular` version of the loaded predictor does not match the installed version of `autogluon.tabular`.
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
+        require_py_version_match : bool, default = True
+            If True, will raise an AssertionError if the Python version of the loaded predictor does not match the installed Python version.
+                Micro version differences such as 3.9.2 and 3.9.7 will log a warning but will not raise an exception.
+            If False, will allow loading of models trained on incompatible python versions, but is NOT recommended. Users may run into numerous issues if attempting this.
+        check_packages : bool, default = False
+            If True, checks package versions of the loaded predictor against the package versions of the current environment.
+            Warnings will be logged for each mismatch of package version.
         """
         if verbosity is not None:
             set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
@@ -2896,6 +2928,28 @@ class TabularPredictor:
                     f'Predictor was created on version {version_init} but is being loaded with version {version_load}. '
                     f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
                     f'this error can be bypassed by specifying `require_version_match=False`.')
+
+        try:
+            metadata_init = cls._load_metadata_file(path=path)
+        except:
+            logger.warning(f'WARNING: Could not find metadata file at "{path + cls._predictor_metadata_file_name}".\n'
+                           f'This could mean that the predictor was fit in a version `<=0.5.2`.')
+            metadata_init = None
+
+        metadata_load = get_autogluon_metadata()
+
+        if metadata_init is not None:
+            try:
+                compare_autogluon_metadata(original=metadata_init, current=metadata_load, check_packages=check_packages)
+            except:
+                logger.log(30, 'WARNING: Exception raised while comparing metadata files, skipping comparison...')
+            if require_py_version_match:
+                if metadata_init['py_version'] != metadata_load['py_version']:
+                    raise AssertionError(
+                        f'Predictor was created on Python version {metadata_init["py_version"]} '
+                        f'but is being loaded with Python version {metadata_load["py_version"]}. '
+                        f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
+                        f'this error can be bypassed by specifying `require_py_version_match=False`.')
 
         if predictor is None:
             predictor = cls._load(path=path)
