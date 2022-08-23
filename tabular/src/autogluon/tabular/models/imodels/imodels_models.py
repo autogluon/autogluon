@@ -31,6 +31,8 @@ class _IModelsModel(AbstractModel):
                 self._ohe = OneHotEncoder(dtype=np.uint8, handle_unknown='ignore')
                 self._ohe.fit(X=X[self._categorical_featnames])
                 self._ohe_columns = self._ohe.get_feature_names_out()
+            else:
+                self._ohe=None # otherwise no model is fitted when there are not self._categorical_featnames
 
         if self._ohe is not None:
             X_index = X.index
