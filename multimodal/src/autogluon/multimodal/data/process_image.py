@@ -39,17 +39,7 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import (
-    AUTOMM,
-    CLIP,
-    CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD,
-    COLUMN,
-    IMAGE,
-    IMAGE_VALID_NUM,
-    MMDET_IMAGE,
-    TIMM_IMAGE,
-)
+from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE, MMOCR_IMAGE
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
@@ -129,9 +119,16 @@ class ImageProcessor:
         self.mean = None
         self.std = None
 
+        if self.prefix == MMDET_IMAGE:
+            # TODO: can we pass the config information here when we build the model?
+            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            cfg = checkpoint_name + ".py"
+            if isinstance(cfg, str):
+                cfg = mmcv.Config.fromfile(cfg)
+
         if checkpoint_name is not None:
-            if self.prefix == MMDET_IMAGE:
-                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=model.model.cfg)
+            if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_IMAGE:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
             else:
                 self.size, self.mean, self.std = self.extract_default(checkpoint_name)
         if self.size is None:
@@ -158,7 +155,7 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == MMDET_IMAGE:
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_IMAGE:
             assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
             cfg = model.model.cfg
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
@@ -197,7 +194,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix == MMDET_IMAGE:
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_IMAGE:
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
@@ -386,7 +383,7 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == MMDET_IMAGE:
+                if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_IMAGE:
                     data = dict(img_info=dict(filename=img_path), img_prefix=None)
                     images.append(self.val_processor(data))
                 else:
@@ -424,7 +421,7 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-        if self.prefix == MMDET_IMAGE:
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_IMAGE:
             ret.update({self.image_key: images[0]})
         else:
             ret.update(
