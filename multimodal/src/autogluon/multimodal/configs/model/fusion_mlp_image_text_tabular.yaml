@@ -77,7 +77,7 @@ model:
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
   t_few:
-    checkpoint_name: "bigscience/T0_3B"
+    checkpoint_name: "t5-small" #"bigscience/T0_3B"
     gradient_checkpointing: False
     data_types:
       - "text"

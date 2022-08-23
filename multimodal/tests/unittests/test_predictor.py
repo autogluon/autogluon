@@ -200,7 +200,7 @@ def test_predictor(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=20,
+        time_limit=30,
         save_path=save_path,
     )
 
@@ -212,7 +212,7 @@ def test_predictor(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=20,
+        time_limit=30,
     )
     verify_predictor_save_load(predictor, dataset.test_df)
 
@@ -224,7 +224,7 @@ def test_predictor(
             train_data=dataset.train_df,
             config=config,
             hyperparameters=hyperparameters,
-            time_limit=20,
+            time_limit=30,
         )
 
 
@@ -270,7 +270,7 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=20,
+        time_limit=30,
         save_path=save_path,
     )
 
@@ -363,7 +363,7 @@ def test_customizing_model_names(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=10,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -379,7 +379,7 @@ def test_customizing_model_names(
         train_data=dataset.train_df,
         config=config,
         hyperparameters=hyperparameters,
-        time_limit=10,
+        time_limit=20,
     )
     assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
     for per_name in hyperparameters_gt["model.names"]:
@@ -527,7 +527,7 @@ def test_model_configs():
         predictor.fit(
             train_data=dataset.train_df,
             config=config,
-            time_limit=20,
+            time_limit=30,
             save_path=save_path,
             hyperparameters=hyperparameters,
         )
