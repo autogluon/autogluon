@@ -573,6 +573,7 @@ def init_df_preprocessor(
 
 def init_data_processors(
     config: DictConfig,
+    model: Optional[nn.Module] = None,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -587,6 +588,8 @@ def init_data_processors(
     ----------
     config
         A DictConfig object. The model config should be accessible by "config.model".
+    model
+        The model object.
 
     Returns
     -------
@@ -622,6 +625,7 @@ def init_data_processors(
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
                         missing_value_strategy=config.data.image.missing_value_strategy,
+                        model=model,
                     )
                 )
             elif d_type == TEXT:
@@ -1673,6 +1677,7 @@ def init_pretrained(
 
     data_processors = init_data_processors(
         config=config,
+        model=model,
     )
 
     return config, model, data_processors

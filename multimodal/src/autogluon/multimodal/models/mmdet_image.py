@@ -8,6 +8,8 @@ from torch import nn
 
 try:
     import mmcv
+    from mmcv.ops import RoIPool
+    from mmcv.parallel import scatter
     from mmcv.runner import load_checkpoint
 except ImportError:
     mmcv = None
@@ -121,6 +123,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         data = batch[self.image_key]
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
+
+        device = next(self.model.parameters()).device  # model device
+        if next(self.model.parameters()).is_cuda:
+            # scatter to specified GPU
+            data = scatter(data, [device])[0]
+        else:
+            for m in self.model.modules():
+                assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
+
         results = self.model(return_loss=False, rescale=True, **data)
 
         ret = {BBOX: results}
