@@ -39,7 +39,17 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import AUTOMM, CLIP_IMAGE_MEAN, CLIP_IMAGE_STD, COLUMN, IMAGE, IMAGE_VALID_NUM, MMDET_IMAGE
+from ..constants import (
+    AUTOMM,
+    CLIP,
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    COLUMN,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    MMDET_IMAGE,
+    TIMM_IMAGE,
+)
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
@@ -119,12 +129,9 @@ class ImageProcessor:
         self.mean = None
         self.std = None
 
-        if self.prefix == MMDET_IMAGE:
-            cfg = model.model.cfg
-
         if checkpoint_name is not None:
             if self.prefix == MMDET_IMAGE:
-                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=cfg)
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=model.model.cfg)
             else:
                 self.size, self.mean, self.std = self.extract_default(checkpoint_name)
         if self.size is None:
@@ -153,6 +160,7 @@ class ImageProcessor:
 
         if self.prefix == MMDET_IMAGE:
             assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+            cfg = model.model.cfg
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
             self.val_processor = Compose(cfg.data.test.pipeline)
             self.train_processor = Compose(cfg.data.test.pipeline)
@@ -229,8 +237,7 @@ class ImageProcessor:
         else:
             raise ValueError(f"unknown image normalization: {norm_type}")
 
-    @staticmethod
-    def extract_default(checkpoint_name, cfg=None):
+    def extract_default(self, checkpoint_name, cfg=None):
         """
         Extract some default hyper-parameters, e.g., image size, mean, and std,
         from a pre-trained (timm or huggingface) checkpoint.
@@ -249,7 +256,11 @@ class ImageProcessor:
         std
             Image normalizaiton std.
         """
-        try:  # timm checkpoint
+        if self.prefix.lower().startswith(MMDET_IMAGE):
+            image_size = cfg.test_pipeline[1]["img_scale"][0]
+            mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
+            std = cfg.test_pipeline[1]["transforms"][2]["std"]
+        elif self.prefix.lower().startswith(TIMM_IMAGE):
             model = create_model(
                 checkpoint_name,
                 pretrained=True,
@@ -258,30 +269,24 @@ class ImageProcessor:
             image_size = model.default_cfg["input_size"][-1]
             mean = model.default_cfg["mean"]
             std = model.default_cfg["std"]
-        except Exception as exp1:
-            try:  # huggingface checkpoint
-                config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-                extracted = extract_value_from_config(
-                    config=config,
-                    keys=("image_size",),
-                )
-                if len(extracted) == 0:
-                    image_size = None
-                elif len(extracted) >= 1:
-                    image_size = extracted[0]
-                    if isinstance(image_size, tuple):
-                        image_size = image_size[-1]
-                else:
-                    raise ValueError(f" more than one image_size values are detected: {extracted}")
-                mean = None
-                std = None
-            except Exception as exp2:
-                try:  # mmdetection checkpoint
-                    image_size = cfg.test_pipeline[1]["img_scale"][0]
-                    mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
-                    std = cfg.test_pipeline[1]["transforms"][2]["std"]
-                except Exception as exp3:
-                    raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp3
+        elif self.prefix.lower().startswith(CLIP):
+            config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
+            extracted = extract_value_from_config(
+                config=config,
+                keys=("image_size",),
+            )
+            if len(extracted) == 0:
+                image_size = None
+            elif len(extracted) >= 1:
+                image_size = extracted[0]
+                if isinstance(image_size, tuple):
+                    image_size = image_size[-1]
+            else:
+                raise ValueError(f" more than one image_size values are detected: {extracted}")
+            mean = None
+            std = None
+        else:
+            raise ValueError(f"Unknown image processor prefix: {self.prefix}")
 
         return image_size, mean, std
 
