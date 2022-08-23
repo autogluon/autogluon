@@ -64,6 +64,8 @@ class DeepARModel(AbstractGluonTSModel):
         Number of RNN layers (default: 2)
     num_cells: int
         Number of RNN cells for each layer (default: 40)
+    epochs: int
+        Number of epochs the model will be trained for (default: 100)
     cell_type: str
         Type of recurrent cells to use (available: 'lstm' or 'gru';
         default: 'lstm')
@@ -119,6 +121,8 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     add_age_feature: bool
         Adds an age feature. (default: False)
         The age feature starts with a small value at the start of the time series and grows over time.
+    epochs: int
+        Number of epochs the model will be trained for (default: 100)
     seed: int
         Will set the specified int seed for numpy and MXNet if specified. (default: None)
     decoder_mlp_dim_seq: List[int]
@@ -186,6 +190,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     mean_scaling: bool
         Scale the network input by the data mean and the network output by
         its inverse (default: True)
+    epochs: int
+        Number of epochs the model will be trained for (default: 100)
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
@@ -227,6 +233,8 @@ class TransformerModel(AbstractGluonTSModel):
         the main transformer network. Available operations: 'd' for
         dropout, 'r' for residual connections and 'n' for normalization
         (default: 'drn').
+    epochs: int
+        Number of epochs the model will be trained for (default: 100)
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator

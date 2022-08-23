@@ -46,10 +46,12 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
+MINIMUM_CONTEXT_LENGTH = 10
 
 
 # TODO: Should we include TBATS to the presets?
 def get_default_hps(key, prediction_length):
+    context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH) 
     default_model_hps = {
         "toy": {
             "SimpleFeedForward": {
@@ -82,13 +84,13 @@ def get_default_hps(key, prediction_length):
                 "suppress_warnings": True,
             },
             "SimpleFeedForward": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "Transformer": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "DeepAR": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
         },
         "default_hpo": {
@@ -96,15 +98,15 @@ def get_default_hps(key, prediction_length):
                 "cell_type": ag.Categorical("gru", "lstm"),
                 "num_layers": ag.Int(1, 4),
                 "num_cells": ag.Categorical(20, 30, 40, 50),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "SimpleFeedForward": {
                 "batch_normalization": ag.Categorical(True, False),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "Transformer": {
                 "model_dim": ag.Categorical(8, 16, 32),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "AutoETS": {
                 "error": ag.Categorical("add", "mul"),
