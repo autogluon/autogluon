@@ -55,3 +55,28 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
                 self.render_text(header, text_type='h3')
 
             self.display_obj(df)
+
+
+class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
+
+    def __init__(self, headers: bool = False, namespace: str = None, **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return 'raw_types' in state
+
+    def _render(self, state: AnalysisState) -> None:
+        sample_size = state.get('sample_size', None)
+
+        df = pd.DataFrame(state.raw_types).sort_index()
+        warnings = df.eq(df.iloc[:, 0], axis=0)
+        df['warnings'] = warnings.all(axis=1).map({True: '', False: '⚠️'})
+        df.fillna('--', inplace=True)
+
+        if self.headers:
+            sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
+            header = f'Types warnings summary{sample_info}'
+            self.render_text(header, text_type='h3')
+
+        self.display_obj(df)
