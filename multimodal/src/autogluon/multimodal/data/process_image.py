@@ -56,6 +56,7 @@ from ..constants import (
     MMOCR_TEXT_DET,
     TIMM_IMAGE,
 )
+
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
@@ -134,13 +135,6 @@ class ImageProcessor:
         self.size = None
         self.mean = None
         self.std = None
-
-        if self.prefix == MMDET_IMAGE:
-            # TODO: can we pass the config information here when we build the model?
-            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-            cfg = checkpoint_name + ".py"
-            if isinstance(cfg, str):
-                cfg = mmcv.Config.fromfile(cfg)
 
         if checkpoint_name is not None:
             if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
@@ -307,7 +301,6 @@ class ImageProcessor:
             std = None
         else:
             raise ValueError(f"Unknown image processor prefix: {self.prefix}")
-
         return image_size, mean, std
 
     def construct_processor(

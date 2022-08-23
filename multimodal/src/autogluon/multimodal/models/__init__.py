@@ -10,3 +10,4 @@ from .numerical_mlp import NumericalMLP
 from .numerical_transformer import NumericalTransformer
 from .t_few import TFewModel
 from .timm_image import TimmAutoModelForImagePrediction
+from .mmocr_image import MMOCRAutoModelForTextDetection

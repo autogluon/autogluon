@@ -21,6 +21,7 @@ def download_sample_images():
     "checkpoint_name",
     ["textsnake_r50_fpn_unet_1200e_ctw1500"],
 )
+
 def test_mmocr_text_detection_inference(checkpoint_name):
     mmocr_image_name = download_sample_images()
 
