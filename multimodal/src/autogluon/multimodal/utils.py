@@ -919,7 +919,9 @@ def save_pretrained_model_configs(
     if not requires_saving:
         return config
 
-    if len(config.model.names) == 1:
+    if (
+        len(config.model.names) == 1
+    ):  # TODO: Not sure this is a sufficient check. Hyperparameter "model.names" : ["hf_text", "fusion_mlp"] fails here.
         model = nn.ModuleList([model])
     else:  # assumes the fusion model has a model attribute, a nn.ModuleList
         model = model.model

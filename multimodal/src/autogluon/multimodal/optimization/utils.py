@@ -486,7 +486,6 @@ def apply_two_stages_lr(
 def get_trainable_params_efficient_finetune(
     norm_param_names: List[str],
     efficient_finetune: Optional[str] = None,
-    trainable_param_names: Optional[List[str]] = None,
 ):
     """
      Get the list of trainable parameters according to the provided efficient finetuning method.
@@ -504,8 +503,7 @@ def get_trainable_params_efficient_finetune(
     -------
     Get list of trainable parameter names according to the provided efficient finetuning method.
     """
-    if trainable_param_names == None:
-        trainable_param_names = [".*head*.", ".*fusion_mlp*.", ".*adapter*."]  # backwards compatibility
+    trainable_param_names = []
 
     if efficient_finetune == BIT_FIT:
         trainable_param_names.append(".*bias*.")
@@ -570,10 +568,14 @@ def apply_layerwise_lr_decay(
     norm_param_names = get_norm_layer_param_names(model)
 
     trainable_param_names = get_trainable_params_efficient_finetune(
-        norm_param_names, efficient_finetune=efficient_finetune, trainable_param_names=trainable_param_names
+        norm_param_names,
+        efficient_finetune=efficient_finetune,
     )
 
     for name, param in model.named_parameters():
+        layer_id = model.name_to_id[name]
+        if layer_id == 0:  # Set top layer (e.g. head, fusion_mlp, adapter) as being trainable.
+            param.requires_grad = True
         if efficient_finetune and not any(
             [re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names]
         ):

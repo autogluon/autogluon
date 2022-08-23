@@ -63,7 +63,6 @@ def few_shot_text_classification():
         "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
         "optimization.val_check_interval": 1.0,
         "optimization.top_k_average_method": "best",
-        "optimization.trainable_param_names": [],
         "optimization.warmup_steps": 0.06,
         "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
         "optimization.lora.filter": ["k|v|wi_1.*"],

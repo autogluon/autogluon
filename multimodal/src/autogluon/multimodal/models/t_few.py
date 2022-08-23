@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
-from transformers import AutoModel, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers import logging as hf_logging
 
 from ..constants import (
@@ -86,6 +86,7 @@ class TFewModel(nn.Module):
         self.num_classes = num_classes
 
         self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name)
+        self.config = AutoConfig.from_pretrained(checkpoint_name)
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
         self.eos_token = self.tokenizer.eos_token
         self.out_features = (
