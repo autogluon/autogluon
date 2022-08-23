@@ -42,8 +42,10 @@ from .constants import (
     CATEGORICAL_TRANSFORMER,
     CLIP,
     COLUMN_FEATURES,
+    DEFAULT_SHOT,
     F1,
     FEATURES,
+    FEW_SHOT,
     FUSION_MLP,
     FUSION_TRANSFORMER,
     HF_TEXT,
@@ -63,6 +65,7 @@ from .constants import (
     RMSE,
     ROC_AUC,
     S3_PREFIX,
+    T_FEW,
     TEXT,
     TIMM_IMAGE,
     VALID_CONFIG_KEYS,
@@ -90,9 +93,10 @@ from .models import (
     MultimodalFusionTransformer,
     NumericalMLP,
     NumericalTransformer,
+    TFewModel,
     TimmAutoModelForImagePrediction,
 )
-from .models.utils import inject_lora_to_linear_layer
+from .models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -641,6 +645,7 @@ def init_data_processors(
                         text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
                         text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
+                        template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -725,6 +730,17 @@ def create_model(
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
                 pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+                pretrained=pretrained,
+            )
+        elif model_name.lower().startswith(T_FEW):
+            model = TFewModel(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+                length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
+                unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
+                mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
+                num_classes=num_classes,
                 gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
                 pretrained=pretrained,
             )
@@ -870,6 +886,13 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
             model=model,
             lora_r=config.optimization.lora.r,
             lora_alpha=config.optimization.lora.alpha,
+            module_filter=config.optimization.lora.module_filter,
+            filter=config.optimization.lora.filter,
+        )
+    elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
+        model = inject_ia3_to_linear_layer(
+            model=model,
+            module_filter=config.optimization.lora.module_filter,
             filter=config.optimization.lora.filter,
         )
 
@@ -896,16 +919,19 @@ def save_pretrained_model_configs(
     path
         The path to save pretrained model configs.
     """
-    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names])
+    # TODO? Fix hardcoded model names.
+    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)) for model_name in config.model.names])
     if not requires_saving:
         return config
 
-    if len(config.model.names) == 1:
+    if (
+        len(config.model.names) == 1
+    ):  # TODO: Not sure this is a sufficient check. Hyperparameter "model.names" : ["hf_text", "fusion_mlp"] fails here.
         model = nn.ModuleList([model])
     else:  # assumes the fusion model has a model attribute, a nn.ModuleList
         model = model.model
     for per_model in model:
-        if per_model.prefix.lower().startswith((CLIP, HF_TEXT)):
+        if per_model.prefix.lower().startswith((CLIP, HF_TEXT, T_FEW)):
             per_model.config.save_pretrained(os.path.join(path, per_model.prefix))
             model_config = getattr(config.model, per_model.prefix)
             model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
@@ -926,7 +952,7 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
         The saving path to the pretrained model configs.
     """
     for model_name in config.model.names:
-        if model_name.lower().startswith((CLIP, HF_TEXT)):
+        if model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
@@ -1939,6 +1965,28 @@ def download(
                 )
 
     return fname
+
+
+def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold: int = 50):
+    """
+    Infer based on the number of training sample the data scarsity. Select mode accordingly from [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT].
+
+    Parameters
+    ---------------
+    df_train
+        Training dataframe
+    scarcity_threshold
+        Threshold number of samples when to select FEW_SHOT mode
+
+    Returns
+    --------
+    Mode in  [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT]
+    """
+    row_num = len(df_train)
+    if row_num < scarcity_threshold:
+        return FEW_SHOT
+    else:
+        return DEFAULT_SHOT
 
 
 def infer_dtypes_by_model_names(model_config: DictConfig):

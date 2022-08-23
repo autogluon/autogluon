@@ -41,6 +41,7 @@ from .constants import (
     DEPRECATED_ZERO_SHOT,
     FEATURE_EXTRACTION,
     FEATURES,
+    FEW_SHOT,
     GREEDY_SOUP,
     LABEL,
     LAST_CHECKPOINT,
@@ -93,6 +94,7 @@ from .utils import (
     get_mixup,
     infer_dtypes_by_model_names,
     infer_metrics,
+    infer_scarcity_mode_by_data_size,
     init_data_processors,
     init_df_preprocessor,
     init_pretrained,
@@ -460,6 +462,15 @@ class MultiModalPredictor:
             data=train_data,
             provided_problem_type=self._problem_type,
         )
+
+        # Determine data scarcity mode, i.e. a few-shot scenario
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=train_data, scarcity_threshold=50
+        )  # Add as seperate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset 'few_shot_text_classification' for better performance."
+            )
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
@@ -1027,6 +1038,7 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1158,6 +1170,9 @@ class MultiModalPredictor:
                 fast_dev_run=config.env.fast_dev_run,
                 track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
+                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
+                if hasattr(config.optimization, "check_val_every_n_epoch")
+                else 1,
             )
 
         with warnings.catch_warnings():
@@ -1293,6 +1308,7 @@ class MultiModalPredictor:
                 old_prefix="student_model",
                 new_prefix="model",
             )
+
         checkpoint = {"state_dict": avg_state_dict}
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 

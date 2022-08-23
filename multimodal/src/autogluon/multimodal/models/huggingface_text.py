@@ -18,20 +18,11 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
+from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
-
-
-class DummyLayer(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
-
-    def forward(self, x):
-        return x + self.dummy_bias - self.dummy_bias
 
 
 class HFAutoModelForTextPrediction(nn.Module):
