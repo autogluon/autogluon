@@ -576,8 +576,10 @@ def apply_layerwise_lr_decay(
         layer_id = model.name_to_id[name]
         if layer_id == 0:  # Set top layer (e.g. head, fusion_mlp, adapter) as being trainable.
             param.requires_grad = True
-        if efficient_finetune and not any(
-            [re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names]
+        elif (
+            efficient_finetune is not None
+            and efficient_finetune != "None"
+            and not any([re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names])
         ):
             param.requires_grad = False
 
