@@ -72,6 +72,24 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             "auto",
         ),
         (
+            "petfinder",
+            ["t_few"],
+            "t5-small",
+            None,
+            BEST,
+            IA3,
+            "auto",
+        ),
+        (
+            "hateful_memes",
+            ["timm_image", "t_few", "clip", "fusion_mlp"],
+            "t5-small",
+            "swin_tiny_patch4_window7_224",
+            BEST,
+            IA3,
+            "auto",
+        ),
+        (
             "hateful_memes",
             ["timm_image", "hf_text", "clip", "fusion_mlp"],
             "monsoon-nlp/hindi-bert",
@@ -249,9 +267,10 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
 
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -448,6 +467,20 @@ def test_model_configs():
                 "data_types": ["numerical"],
                 "embedding_arch": ["linear", "relu"],
                 "merge": "concat",
+            },
+            "t_few": {
+                "checkpoint_name": "t5-small",
+                "gradient_checkpointing": False,
+                "data_types": ["text"],
+                "tokenizer_name": "hf_auto",
+                "length_norm": 1.0,
+                "unlikely_loss": 1.0,
+                "mc_loss": 1.0,
+                "max_text_len": 512,
+                "insert_sep": True,
+                "text_segment_num": 2,
+                "stochastic_chunk": False,
+                "text_aug_detect_length": 10,
             },
             "hf_text": {
                 "checkpoint_name": "google/electra-small-discriminator",

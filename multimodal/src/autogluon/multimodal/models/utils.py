@@ -483,7 +483,7 @@ def inject_lora_to_linear_layer(
                 if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
                     assert isinstance(
                         layer, nn.Linear
-                    ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
                     lora_layer = LoRALinear(
                         layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
                     )
