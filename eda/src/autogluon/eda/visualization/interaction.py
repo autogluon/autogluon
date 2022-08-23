@@ -68,6 +68,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         return {
             'countplot': sns.countplot,
             'barplot': sns.barplot,
+            'boxplot': sns.boxplot,
             'kdeplot': sns.kdeplot,
             'scatterplot': sns.scatterplot,
         }.get(chart_type)
@@ -83,9 +84,9 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             ('category', 'category', None): 'barplot',
             ('category', 'category', 'category'): 'barplot',
 
-            ('category', 'numeric', None): 'kdeplot',
+            ('category', 'numeric', None): 'boxplot',
             ('numeric', 'category', None): 'kdeplot',
-            ('category', 'numeric', 'category'): 'kdeplot',
+            ('category', 'numeric', 'category'): 'boxplot',
             ('numeric', 'category', 'category'): 'kdeplot',
 
             ('numeric', 'numeric', None): 'scatterplot',
