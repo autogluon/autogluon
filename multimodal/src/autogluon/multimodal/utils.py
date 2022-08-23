@@ -738,6 +738,7 @@ def create_model(
                 mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
                 num_classes=num_classes,
                 gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+                pretrained=pretrained,
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(

@@ -53,6 +53,7 @@ class TFewModel(nn.Module):
         unlikely_loss: float = 1.0,  # Adds loss term that lowers probability of incorrect outputs
         mc_loss: float = 1.0,  # Adds multiple choice cross entropy loss
         gradient_checkpointing: Optional[bool] = False,
+        pretrained: Optional[bool] = True,
     ):
         """
         Load a pretrained T5-based text transformer backbone.
@@ -78,6 +79,8 @@ class TFewModel(nn.Module):
             Adds loss term that lowers probability of incorrect outputs
         mc_loss
             Adds multiple choice cross entropy loss
+        pretrained
+            Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
@@ -85,8 +88,13 @@ class TFewModel(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name)
         self.config = AutoConfig.from_pretrained(checkpoint_name)
+
+        if pretrained:
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_name)
+        else:
+            self.model = AutoModelForSeq2SeqLM.from_config(self.config)
+
         self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
         self.eos_token = self.tokenizer.eos_token
         self.out_features = (
