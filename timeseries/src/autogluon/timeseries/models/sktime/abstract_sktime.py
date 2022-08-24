@@ -11,7 +11,8 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 
-from ... import TimeSeriesDataFrame
+from ...dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from ...utils.hashing import hash_ts_dataframe_items
 from ...utils.seasonality import get_seasonality
 from ..abstract import AbstractTimeSeriesModel
 
@@ -68,7 +69,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self.sktime_forecaster: Optional[BaseForecaster] = None
-        self._fit_index: Optional[pd.Index] = None
+        self._fit_hash: Optional[pd.Series] = None
 
     def _get_sktime_forecaster_init_args(self, min_length: int, inferred_period: int = 1):
         """Get arguments that will be passed to the sktime forecaster at initialization."""
@@ -141,7 +142,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
 
             self.sktime_forecaster.fit(self._to_sktime_data_frame(train_data[[self.target]]), fh=self._fh())
 
-        self._fit_index = train_data.index.copy()
+        self._fit_hash = hash_ts_dataframe_items(train_data)
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data, quantile_levels=quantile_levels, **kwargs)
@@ -149,9 +150,11 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         if not self.sktime_forecaster:
             raise ValueError("No sktime forecaster found. Please fit the model first.")
 
-        # TODO: reconsider when to refit the model. currently we refit whenever train and
-        #  test indices are not identical
-        if not self._fit_index.equals(data.index):
+        # sktime trains one local model for each time series (item), so we need to refit if a different set of items is
+        # given for prediction. We check that train and pred items match using hash based on `timestamp` and `target`
+        # fields (`item_id` can be different as long as `timestamp` and `target` fields match)
+        data_hash = hash_ts_dataframe_items(data)
+        if len(self._fit_hash) != len(data_hash) or (self._fit_hash.values != data_hash.values).any():
             logger.warning(
                 f"Different set of items than those provided during training were provided for "
                 f"prediction. The model {self.name} will be re-trained on newly provided data"
@@ -171,4 +174,10 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         quantile_predictions.columns = [str(q) for q in quantile_predictions.columns.levels[1]]  # noqa
 
         predictions = pd.concat([mean_predictions, quantile_predictions], axis=1)
-        return self._to_time_series_data_frame(predictions, freq=data.freq)
+        predictions_df = self._to_time_series_data_frame(predictions, freq=data.freq)
+        # Make sure item_id matches `data` (in case trainining and prediction data use different `item_id`s)
+        fit_item_id_to_pred_item_id = dict(zip(self._fit_hash.index, data_hash.index))
+        pred_item_id = predictions_df.index.get_level_values(ITEMID).map(fit_item_id_to_pred_item_id.get)
+        pred_timestamp = predictions_df.index.get_level_values(TIMESTAMP)
+        predictions_df.index = pd.MultiIndex.from_arrays([pred_item_id, pred_timestamp], names=(ITEMID, TIMESTAMP))
+        return predictions_df

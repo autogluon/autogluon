@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import itertools
 from collections.abc import Iterable
 from typing import Any, Optional, Tuple, Type
@@ -174,7 +175,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return len(self._item_index)
 
     def num_timesteps_per_item(self) -> pd.Series:
-        return self.groupby(level=ITEMID).size()
+        return self.groupby(level=ITEMID, sort=False).size()
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
