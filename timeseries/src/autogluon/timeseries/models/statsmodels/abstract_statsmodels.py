@@ -21,7 +21,7 @@ class ModelFitSummary:
     contrast, StatsmodelsFittedModel stores the intermediate results and therefore can often take several gigabytes
     when pickled.
 
-    ModelFitSummary is consumed by AbstractStatsmodelsModel._predict_local_model to generate predictions.
+    ModelFitSummary is consumed by AbstractStatsmodelsModel._predict_using_fit_summary to generate predictions.
     """
 
     model_name: str
