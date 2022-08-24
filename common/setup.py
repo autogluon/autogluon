@@ -21,6 +21,7 @@ install_requires = [
     'numpy',
     'pandas',
     'boto3',
+    'setuptools',
 ]
 
 extras_require = dict()

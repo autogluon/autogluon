@@ -8,7 +8,7 @@ from sagemaker.serializers import CSVSerializer, NumpySerializer
 from sagemaker.fw_utils import (
     model_code_key_prefix,
 )
-from .serializers import ParquetSerializer, JsonLineSerializer
+from .serializers import ParquetSerializer, MultiModalSerializer, JsonLineSerializer
 from .deserializers import PandasDeserializer
 from .sagemaker_utils import retrieve_latest_framework_version
 
@@ -86,6 +86,16 @@ class AutoGluonImageRealtimePredictor(Predictor):
         super().__init__(
             *args,
             serializer=NumpySerializer(),
+            deserializer=PandasDeserializer(),
+            **kwargs
+        )
+
+
+class AutoGluonMultiModalRealtimePredictor(Predictor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            *args,
+            serializer=MultiModalSerializer(),
             deserializer=PandasDeserializer(),
             **kwargs
         )

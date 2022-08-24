@@ -47,6 +47,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     predictor.fit(
         train_data,
         hyperparameters={
+            "model.names": ["hf_text"],
             "model.hf_text.checkpoint_name": backbone,
             "model.hf_text.pooling_mode": pooling_mode,
             "model.hf_text.gradient_checkpointing": True,
@@ -62,7 +63,7 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     )
     predictions = predictor.predict(test_data, as_pandas=False)
     tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
-    npt.assert_allclose(tunable_ratio, expected_ratio, 1e-05, 1e-05)
+    npt.assert_allclose(tunable_ratio, expected_ratio, 2e-05, 2e-05)
     predictor.save(save_path + "_new")
     new_predictor = MultiModalPredictor.load(save_path + "_new")
     new_predictions = new_predictor.predict(test_data, as_pandas=False)

@@ -1,12 +1,32 @@
+import base64
 import logging
 import os
+import PIL
 import tarfile
 import shutil
 import uuid
 import zipfile
 
+from PIL import Image
+
 
 logger = logging.getLogger(__name__)
+
+
+def read_image_bytes_and_encode(image_path):
+    image_obj = open(image_path, 'rb')
+    image_bytes = image_obj.read()
+    image_obj.close()
+    b64_image = base64.b85encode(image_bytes).decode("utf-8")
+
+    return b64_image
+
+
+def convert_image_path_to_encoded_bytes_in_dataframe(dataframe, image_column):
+    assert image_column in dataframe, 'Please specify a valid image column name'
+    dataframe[image_column] = [read_image_bytes_and_encode(path) for path in dataframe[image_column]]
+
+    return dataframe
 
 
 def zipfolder(output_filename, dir_name):
@@ -29,6 +49,15 @@ def zipfolder(output_filename, dir_name):
 
 def is_compressed_file(filename):
     return tarfile.is_tarfile(filename) or zipfile.is_zipfile(filename)
+
+
+def is_image_file(filename):
+    try:
+        Image.open(filename)
+    except PIL.UnidentifiedImageError:
+        # Not an image
+        return False
+    return True
 
 
 def unzip_file(tarball_path, save_path):

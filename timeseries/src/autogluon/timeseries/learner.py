@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, Optional, Type, Union
 
 import pandas as pd
 
@@ -88,6 +88,7 @@ class TimeSeriesLearner(AbstractLearner):
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
+                enable_ensemble=kwargs.get("enable_ensemble", True),
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)

@@ -31,6 +31,7 @@ from . import version as ag_version
 from .constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
+    BBOX,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
@@ -40,6 +41,7 @@ from .constants import (
     DEPRECATED_ZERO_SHOT,
     FEATURE_EXTRACTION,
     FEATURES,
+    FEW_SHOT,
     GREEDY_SOUP,
     LABEL,
     LAST_CHECKPOINT,
@@ -51,6 +53,7 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    OBJECT_DETECTION,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -79,26 +82,27 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_num_gpus,
     compute_score,
-    convert_checkpoint_name,
     create_model,
     data_to_df,
     extract_from_output,
     filter_search_space,
     get_config,
+    get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
     infer_dtypes_by_model_names,
     infer_metrics,
+    infer_scarcity_mode_by_data_size,
     init_data_processors,
     init_df_preprocessor,
     init_pretrained,
-    is_interactive,
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
     process_save_path,
-    save_pretrained_models,
+    save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
     tensor_to_ndarray,
@@ -249,6 +253,10 @@ class MultiModalPredictor:
     @property
     def problem_type(self):
         return self._problem_type
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -454,6 +462,15 @@ class MultiModalPredictor:
             data=train_data,
             provided_problem_type=self._problem_type,
         )
+
+        # Determine data scarcity mode, i.e. a few-shot scenario
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=train_data, scarcity_threshold=50
+        )  # Add as seperate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset 'few_shot_text_classification' for better performance."
+            )
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
@@ -897,9 +914,6 @@ class MultiModalPredictor:
         self._model = model
         self._loss_func = loss_func
 
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
-
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
@@ -1024,6 +1038,7 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1076,23 +1091,7 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = (
-            math.floor(config.env.num_gpus)
-            if isinstance(config.env.num_gpus, (int, float))
-            else len(config.env.num_gpus)
-        )
-        if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
-            num_gpus = torch.cuda.device_count()
-
-        if is_interactive() and num_gpus > 1:
-            warnings.warn(
-                "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
-                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-                "MultiModalPredictor in a script.",
-                UserWarning,
-            )
-            num_gpus = 1
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(
@@ -1138,6 +1137,13 @@ class MultiModalPredictor:
                 strategy = None
                 num_gpus = min(num_gpus, 1)
 
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy
+        self._config = config
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path)
+
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1164,6 +1170,9 @@ class MultiModalPredictor:
                 fast_dev_run=config.env.fast_dev_run,
                 track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
+                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
+                if hasattr(config.optimization, "check_val_every_n_epoch")
+                else 1,
             )
 
         with warnings.catch_warnings():
@@ -1299,6 +1308,7 @@ class MultiModalPredictor:
                 old_prefix="student_model",
                 new_prefix="model",
             )
+
         checkpoint = {"state_dict": avg_state_dict}
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
@@ -1325,13 +1335,7 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        num_gpus = (
-            math.floor(self._config.env.num_gpus)
-            if isinstance(self._config.env.num_gpus, (int, float))
-            else len(self._config.env.num_gpus)
-        )
-        if num_gpus < 0:
-            num_gpus = torch.cuda.device_count()
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
@@ -1602,6 +1606,9 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
+        if self._pipeline == OBJECT_DETECTION:
+            ret_type = BBOX
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1620,7 +1627,7 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                if logits_or_prob.ndim == 2:
+                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
                     pred = logits_or_prob.argmax(axis=1)
                 else:
                     pred = logits_or_prob
@@ -1794,7 +1801,7 @@ class MultiModalPredictor:
         }
         return state_dict_processed
 
-    def save(self, path: str, standalone: Optional[bool] = False):
+    def save(self, path: str, standalone: Optional[bool] = True):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -1809,11 +1816,12 @@ class MultiModalPredictor:
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
 
+        config = copy.deepcopy(self._config)
         if standalone:
-            self._config = save_pretrained_models(model=self._model, config=self._config, path=path)
+            config = save_pretrained_model_configs(model=self._model, config=config, path=path)
 
         os.makedirs(path, exist_ok=True)
-        OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
+        OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
@@ -1869,9 +1877,9 @@ class MultiModalPredictor:
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
-        config = convert_checkpoint_name(
+        config = get_local_pretrained_config_paths(
             config=config, path=path
-        )  # check the config for loading offline pretrained models
+        )  # check the config to load offline pretrained model configs
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)

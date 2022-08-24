@@ -5,21 +5,10 @@ import pandas as pd
 import pytest
 
 from autogluon.timeseries import TimeSeriesDataFrame
-
-try:
-    from sktime.forecasting.arima import ARIMA, AutoARIMA
-    from sktime.forecasting.ets import AutoETS
-    from sktime.forecasting.tbats import TBATS
-    from sktime.forecasting.theta import ThetaForecaster
-except ImportError:
-    pytest.skip("sktime not available", allow_module_level=True)
-
-from autogluon.timeseries.models.sktime import (
+from autogluon.timeseries.models.sktime import (  # AutoARIMAModel,; TBATSModel,
     AbstractSktimeModel,
     ARIMAModel,
-    AutoARIMAModel,
     AutoETSModel,
-    TBATSModel,
     ThetaModel,
 )
 

@@ -370,7 +370,7 @@ class TextPredictor:
             as_pandas=as_pandas,
         )
 
-    def save(self, path, standalone=False):
+    def save(self, path, standalone=True):
         """
         Save this Predictor to file in directory specified by `path`.
         The relevant files will be saved in two parts:
@@ -386,9 +386,9 @@ class TextPredictor:
         ----------
         path: str
             The path to directory in which to save this Predictor.
-        standalone: bool, default = False
-            Whether to save the downloaded model for offline deployment. 
-            If `standalone = True`, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name).
+        standalone: bool, default = True
+            Whether to save the Huggingface's pretrained model config for offline deployment.
+            If `standalone = True`, save the Huggingface's pretrained model config to os.path.join(path, model_name).
             Also, see `MultiModalPredictor.save()` for more detials.
             Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
         """

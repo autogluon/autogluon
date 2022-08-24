@@ -57,6 +57,50 @@ class LoRALayer:
         self.merge_weights = merge_weights
 
 
+class IA3Linear(nn.Linear, LoRALayer):
+    """
+    (IA)^3 incorporated in a Linear Layer. Weights of Linear layer are set to be frozen per default.
+
+    Parameters
+    ----------
+    in_features
+        input dimension, set to the original linear layer input dimension LoRA is replacing.
+    out_features
+        output dimension, set to the original linear layer output dimension LoRA is replacing.
+    scaling_rank
+        Merging weights during inference to reduce latency.
+
+    References
+    ----------
+    1. Liu, Haokun and Tam, Derek and Muqeeth, Mohammed and Mohta, Jay and Huang, Tenghao and Bansal, Mohit and Raffel, Colin,
+    "Few-Shot Parameter-Efficient Fine-Tuning is Better and Cheaper than In-Context Learning", 2022
+    https://arxiv.org/pdf/2205.05638.pdf
+    2. Code: https://github.com/r-three/t-few
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        **kwargs,
+    ):
+        nn.Linear.__init__(self, in_features, out_features, **kwargs)
+        LoRALayer.__init__(self, r=4, lora_alpha=4, lora_dropout=0.0, merge_weights=True)  # Default arguments, only
+        # In essence the $b$ parameter of LoRA.
+        self.lora_b = nn.Parameter(torch.ones(out_features, 1))
+        self.weight.requires_grad = False
+
+    def forward(self, x: torch.Tensor):
+        hidden = F.linear(x, self.weight, self.bias)
+        hidden = hidden * self.lora_b.flatten()
+        return hidden
+
+    def extra_repr(self):
+        return "in_features={}, out_features={}, bias={}".format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
+
 class LoRALinear(nn.Linear, LoRALayer):
     """
     LoRA incorporated in Linear Layer. Weights of linear layer are set to be frozen per default.
@@ -106,7 +150,6 @@ class LoRALinear(nn.Linear, LoRALayer):
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
-            # self.weight.requires_grad = True
         self.reset_parameters()
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T

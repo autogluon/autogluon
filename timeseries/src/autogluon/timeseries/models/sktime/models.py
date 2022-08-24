@@ -1,5 +1,4 @@
 import logging
-from typing import Any, Dict
 
 from sktime.forecasting.arima import ARIMA, AutoARIMA
 from sktime.forecasting.ets import AutoETS

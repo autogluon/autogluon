@@ -205,7 +205,9 @@ class LGBModel(AbstractModel):
                             retrain = False
                     if retrain:
                         logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
-                        train_params.pop('callbacks')
+                        train_params.pop('callbacks', None)
+                        train_params.pop('valid_sets', None)
+                        train_params.pop('valid_names', None)
                         train_params['num_boost_round'] = self.model.best_iteration
                         self.model = lgb.train(**train_params)
                     else:

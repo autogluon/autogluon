@@ -121,6 +121,14 @@ class TimeSeriesEvaluator:
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
 
+    @property
+    def coefficient(self) -> int:
+        return self.METRIC_COEFFICIENTS[self.eval_metric]
+
+    @property
+    def higher_is_better(self) -> bool:
+        return self.coefficient > 0
+
     def _safemean(self, data: Any):
         data_filled = np.nan_to_num(data, neginf=np.nan, posinf=np.nan, nan=np.nan)
         return np.nanmean(data_filled)
@@ -191,7 +199,7 @@ class TimeSeriesEvaluator:
         for item_id in data.iter_items():
             y_true_w_hist = data.loc[item_id][self.target_column]
 
-            target = np.array(y_true_w_hist[-self.prediction_length :])
+            target = np.array(y_true_w_hist[-self.prediction_length :])  # noqa: E203
             target_history = np.array(y_true_w_hist[: -self.prediction_length])
 
             item_metrics = {}
