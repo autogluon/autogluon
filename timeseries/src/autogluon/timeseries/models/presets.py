@@ -51,7 +51,7 @@ MINIMUM_CONTEXT_LENGTH = 10
 
 # TODO: Should we include TBATS to the presets?
 def get_default_hps(key, prediction_length):
-    context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH) 
+    context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
         "toy": {
             "SimpleFeedForward": {
