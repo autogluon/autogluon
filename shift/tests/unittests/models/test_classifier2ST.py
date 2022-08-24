@@ -24,13 +24,11 @@ def get_dogs_data():
 
 def fit_tst():
     data = get_dogs_data()
-    pred = ImagePredictor()
-    tst = Classifier2ST(pred)
-    tst.fit(data, sample_label='label')
+    tst = Classifier2ST(ImagePredictor, sample_label='label')
+    tst.fit(data)
     return tst
 
 def test_make_source_target_label():
-    split = 0.5
     data = get_dogs_data()
     source, target = data.query('label == 0'), data.query('label == 1')
     data2 = Classifier2ST._make_source_target_label((source, target), 'shift_label')
@@ -43,25 +41,19 @@ def test_classifier2ST_fit():
 
 def test_sample_anomaly_score():
     tst = fit_tst()
-    as_rand = tst.sample_anomaly_scores(how='top')
-    assert as_rand.shape[0] == 100
-    idx = as_rand.index[[0, -1]]
-    test_s = tst._test.loc[idx]
-    prob_s = tst._classifier.predict_proba(test_s)
-    assert prob_s.iloc[0,1] > prob_s.iloc[1,1]
-    as_top = tst.sample_anomaly_scores(how='top')
+    as_top = tst.sample_anomaly_scores(how='top', sample_size=100)
     assert as_top.shape[0] == 100
     idx = as_top.index[[0, -1]]
     test_s = tst._test.loc[idx]
-    prob_s = tst._classifier.predict_proba(test_s)
-    assert prob_s.iloc[0, 1] > prob_s.iloc[1, 1]
+    prob_s = tst.classifier.predict_proba(test_s)
+    assert prob_s.iloc[0,1] > prob_s.iloc[1,1]
+    assert as_top.shape[0] == 100
 
 def test_null_test():
     data = get_dogs_data()
     data['label'] = np.random.permutation(data['label'])
-    pred = ImagePredictor()
-    tst = Classifier2ST(pred)
-    tst.fit(data, sample_label='label')
+    tst = Classifier2ST(ImagePredictor, sample_label='label')
+    tst.fit(data)
     val = 0.5
     assert math.isclose(tst.test_stat, val, abs_tol = 1e-1), \
         f'test stat ({tst.test_stat}) is too far from similar ({val})'

@@ -30,6 +30,7 @@ def test_xsd_cs():
     xsd.fit(train, test)
     sumry = xsd.summary()
     js = xsd.json()
+    assert len(js) == 4
     assert xsd.decision() == 'detected'
 
 def test_xsd():
