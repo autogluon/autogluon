@@ -12,6 +12,7 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from autogluon.common.utils.log_utils import set_logger_verbosity
 
 from ...dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from ...utils.hashing import hash_ts_dataframe_items
 from ...utils.seasonality import get_seasonality
 from ..abstract import AbstractTimeSeriesModel
 
@@ -141,7 +142,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
 
             self.sktime_forecaster.fit(self._to_sktime_data_frame(train_data[[self.target]]), fh=self._fh())
 
-        self._fit_hash = train_data.hash_each_item()
+        self._fit_hash = hash_ts_dataframe_items(train_data)
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data, quantile_levels=quantile_levels, **kwargs)
@@ -152,7 +153,7 @@ class AbstractSktimeModel(AbstractTimeSeriesModel):
         # sktime trains one local model for each time series (item), so we need to refit if a different set of items is
         # given for prediction. We check that train and pred items match using hash based on `timestamp` and `target`
         # fields (`item_id` can be different as long as `timestamp` and `target` fields match)
-        data_hash = data.hash_each_item()
+        data_hash = hash_ts_dataframe_items(data)
         if len(self._fit_hash) != len(data_hash) or (self._fit_hash.values != data_hash.values).any():
             logger.warning(
                 f"Different set of items than those provided during training were provided for "
