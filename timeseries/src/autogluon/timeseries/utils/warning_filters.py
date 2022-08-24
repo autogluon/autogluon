@@ -2,8 +2,12 @@ import contextlib
 import functools
 import logging
 import os
+import warnings
 
-__all__ = ["evaluator_warning_filter", "disable_root_logger", "disable_tqdm"]
+from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
+
+
+__all__ = ["evaluator_warning_filter", "statsmodels_warning_filter", "disable_root_logger", "disable_tqdm"]
 
 
 @contextlib.contextmanager
@@ -16,6 +20,17 @@ def evaluator_warning_filter():
         yield
     finally:
         os.environ["PYTHONWARNINGS"] = env_py_warnings
+
+
+@contextlib.contextmanager
+def statsmodels_warning_filter():
+    with warnings.catch_warnings():
+        for warning_category in [RuntimeWarning, UserWarning, ConvergenceWarning, ValueWarning]:
+            warnings.simplefilter("ignore", category=warning_category)
+        try:
+            yield
+        finally:
+            pass
 
 
 @contextlib.contextmanager
