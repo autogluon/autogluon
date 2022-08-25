@@ -2,7 +2,11 @@ name: Continuous Integration
 
 on:
   push:
+    paths-ignore:
+      - 'cloud/**'
   pull_request_target:
+    paths-ignore:
+      - 'cloud/**'
 
 permissions:
   id-token: write

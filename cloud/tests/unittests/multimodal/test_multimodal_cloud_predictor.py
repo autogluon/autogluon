@@ -1,16 +1,14 @@
-import pytest
 import tempfile
 import zipfile
 
 from autogluon.cloud import MultiModalCloudPredictor
 
-from utils import (
+from ..utils import (
     _prepare_data,
     _test_functionality
 )
 
 
-@pytest.mark.cloud
 def test_multimodal_text_only():
     train_data = 'text_train.csv'
     tune_data = 'text_tune.csv'
@@ -29,11 +27,11 @@ def test_multimodal_text_only():
             time_limit=time_limit
         )
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-text',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-text',
             local_output_path='test_multimodal_text_cloud_predictor'
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-text-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-text-no-train',
             local_output_path='test_multimodal_text_cloud_predictor_no_train'
         )
         _test_functionality(
@@ -46,7 +44,6 @@ def test_multimodal_text_only():
         )
 
 
-@pytest.mark.cloud
 def test_multimodal_image_only():
     train_data = 'image_train_relative.csv'
     train_image = 'shopee-iet.zip'
@@ -65,11 +62,11 @@ def test_multimodal_image_only():
             time_limit=time_limit
         )
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-image',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-image',
             local_output_path='test_multimodal_image_cloud_predictor'
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-image-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-image-no-train',
             local_output_path='test_multimodal_image_cloud_predictor_no_train'
         )
         _test_functionality(
@@ -83,7 +80,6 @@ def test_multimodal_image_only():
         )
 
 
-@pytest.mark.cloud
 def test_multimodal_tabular_text():
     train_data = 'tabular_text_train.csv'
     test_data = 'tabular_text_test.csv'
@@ -99,11 +95,11 @@ def test_multimodal_tabular_text():
             time_limit=time_limit
         )
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-tabular-text',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-tabular-text',
             local_output_path='test_multimodal_tabular_text_cloud_predictor'
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-tabular-text-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-tabular-text-no-train',
             local_output_path='test_multimodal_tabular_text_cloud_predictor_no_train'
         )
         _test_functionality(
@@ -116,7 +112,6 @@ def test_multimodal_tabular_text():
         )
 
 
-@pytest.mark.cloud
 def test_multimodal_tabular_text_image():
     train_data = 'tabular_text_image_train.csv'
     test_data = 'tabular_text_image_test.csv'
@@ -135,11 +130,11 @@ def test_multimodal_tabular_text_image():
             time_limit=time_limit
         )
         cloud_predictor = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-tabular-text-image',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-tabular-text-image',
             local_output_path='test_multimodal_tabular_text_image_cloud_predictor'
         )
         cloud_predictor_no_train = MultiModalCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-multimodal-tabular-text-image-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-tabular-text-image-no-train',
             local_output_path='test_multimodal_tabular_text_image_cloud_predictor_no_train'
         )
         _test_functionality(

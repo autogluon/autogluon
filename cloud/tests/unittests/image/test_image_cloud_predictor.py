@@ -1,15 +1,13 @@
-import pytest
 import tempfile
 
 from autogluon.cloud import ImageCloudPredictor
 
-from utils import (
+from ..utils import (
     _prepare_data,
     _test_functionality
 )
 
 
-@pytest.mark.cloud
 def test_image():
     train_data = 'image_train_relative.csv'
     train_image = 'shopee-iet.zip'
@@ -28,11 +26,11 @@ def test_image():
             time_limit=time_limit
         )
         cloud_predictor = ImageCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-image',
+            cloud_output_path='s3://autogluon-cloud-ci/test-image',
             local_output_path='test_image_cloud_predictor'
         )
         cloud_predictor_no_train = ImageCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-image-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-image-no-train',
             local_output_path='test_image_cloud_predictor_no_train'
         )
         _test_functionality(

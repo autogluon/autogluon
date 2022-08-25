@@ -1,0 +1,15 @@
+name: "Test Cloud Module"
+inputs:
+  submodule-to-test:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout Code and Setup AWS Credentials
+        uses: ./.github/actions/checkout-code-and-setup-aws
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCloudCIRole
+      - name: Test Cloud Submodule
+        run: |
+          chmod +x ./.github/workflow_scripts/test_cloud.sh && ./.github/workflow_scripts/test_cloud.sh ${{ inputs.submodule-to-test }}

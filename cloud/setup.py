@@ -24,6 +24,7 @@ install_requires = [
     'opencv-python>=4.6,<4.7'
     'pandas',
     'sagemaker>=2.94',
+    'pyarrow>=9.0',
 ]
 
 extras_require = dict()

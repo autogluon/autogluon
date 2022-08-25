@@ -1,15 +1,13 @@
-import pytest
 import tempfile
 
 from autogluon.cloud import TextCloudPredictor
 
-from utils import (
+from ..utils import (
     _prepare_data,
     _test_functionality
 )
 
 
-@pytest.mark.cloud
 def test_text():
     train_data = 'text_train.csv'
     tune_data = 'text_tune.csv'
@@ -28,11 +26,11 @@ def test_text():
             time_limit=time_limit
         )
         cloud_predictor = TextCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-text',
+            cloud_output_path='s3://autogluon-cloud-ci/test-text',
             local_output_path='test_text_cloud_predictor'
         )
         cloud_predictor_no_train = TextCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-text-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-text-no-train',
             local_output_path='test_text_cloud_predictor_no_train'
         )
         _test_functionality(

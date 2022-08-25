@@ -1,16 +1,14 @@
-import pytest
 import tempfile
 import zipfile
 
 from autogluon.cloud import TabularCloudPredictor
 
-from utils import (
+from ..utils import (
     _prepare_data,
     _test_functionality
 )
 
 
-@pytest.mark.cloud
 def test_tabular():
     train_data = 'tabular_train.csv'
     tune_data = 'tabular_tune.csv'
@@ -29,11 +27,11 @@ def test_tabular():
             time_limit=time_limit,
         )
         cloud_predictor = TabularCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-tabular',
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular',
             local_output_path='test_tabular_cloud_predictor'
         )
         cloud_predictor_no_train = TabularCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-tabular-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular-no-train',
             local_output_path='test_tabular_cloud_predictor_no_train'
         )
         _test_functionality(
@@ -45,7 +43,6 @@ def test_tabular():
         )
 
 
-@pytest.mark.cloud
 def test_tabular_tabular_text_image():
     train_data = 'tabular_text_image_train.csv'
     test_data = 'tabular_text_image_test.csv'
@@ -69,11 +66,11 @@ def test_tabular_tabular_text_image():
             }
         )
         cloud_predictor = TabularCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-tabular-tabular-text-image',
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular-tabular-text-image',
             local_output_path='test_tabular_tabular_text_image_cloud_predictor'
         )
         cloud_predictor_no_train = TabularCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-tabular-tabular-text-image-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular-tabular-text-image-no-train',
             local_output_path='test_tabular_tabular_text_image_cloud_predictor_no_train'
         )
         _test_functionality(
@@ -99,7 +96,6 @@ def test_tabular_tabular_text_image():
         )
 
 
-@pytest.mark.cloud
 def test_tabular_tabular_text():
     train_data = 'tabular_text_train.csv'
     test_data = 'tabular_text_test.csv'
@@ -119,11 +115,11 @@ def test_tabular_tabular_text():
             }
         )
         cloud_predictor = TabularCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-tabular-tabular-text',
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular-tabular-text',
             local_output_path='test_tabular_tabular_text_cloud_predictor'
         )
         cloud_predictor_no_train = TabularCloudPredictor(
-            cloud_output_path='s3://ag-cloud-predictor/test-tabular-tabular-text-no-train',
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular-tabular-text-no-train',
             local_output_path='test_tabular_tabular_text_cloud_predictor_no_train'
         )
         _test_functionality(

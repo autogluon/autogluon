@@ -1,0 +1,28 @@
+name: "Checkout Source Code and Setup AWS Credentials"
+inputs:
+  role-to-assume:
+    required: true
+  role-duration-seconds:
+    required: false
+    default: 7200
+  aws-region:
+    required: false
+    default: us-east-1
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+      uses: actions/checkout@v2
+    - name: Checkout repository(Pull Request Target)
+      if: ${{ github.event_name == 'pull_request_target' }}
+      uses: actions/checkout@v2
+      with:
+        ref: "refs/pull/${{ github.event.number }}/merge"
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        role-duration-seconds: ${{ inputs.role-duration-seconds }}
+        aws-region: ${{ inputs.aws-region }}
