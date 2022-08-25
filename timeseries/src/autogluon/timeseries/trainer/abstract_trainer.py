@@ -805,9 +805,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         data: TimeSeriesDataFrame,
         model: Optional[AbstractTimeSeriesModel] = None,
         **kwargs,
-    ) -> TimeSeriesDataFrame:
+    ) -> Union[TimeSeriesDataFrame, None]:
         model = self._get_model_for_prediction(model)
-        return self._predict_model(data, model, **kwargs)
+        try:
+            return self._predict_model(data, model, **kwargs)
+        except Exception as err:
+            logger.error(f"\tWarning: Model {model.name} failed during prediction with exception: {err}")
+            other_models = [m for m in self.get_model_names() if m != model.name]
+            if len(other_models) > 0:
+                logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
+            return None
 
     def score(
         self,

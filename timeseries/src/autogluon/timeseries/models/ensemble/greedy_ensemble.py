@@ -68,10 +68,17 @@ class SimpleTimeSeriesWeightedEnsemble(AbstractWeightedEnsemble):
         preds: List[TimeSeriesDataFrame],
         weights: List[float],
     ) -> TimeSeriesDataFrame:
-        assert len(set(v.shape for v in preds)) == 1
+        if all(p is None for p in preds):
+            raise RuntimeError("All input models failed during prediction, WeightedEnsemble cannot predict.")
+        assert len(set(p.shape for p in preds if p is not None)) == 1
 
-        # TODO: handle NaNs
-        return sum(p * w for p, w in zip(preds, weights))
+        weights = np.array(weights)
+        for idx, p in enumerate(preds):
+            if p is None:
+                weights[idx] = 0
+        weights = weights / np.sum(weights)
+
+        return sum(p * w for p, w in zip(preds, weights) if p is not None)
 
 
 class TimeSeriesEnsembleWrapper(AbstractTimeSeriesModel):

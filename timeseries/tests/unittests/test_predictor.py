@@ -1,9 +1,11 @@
-"""Unit tests for learners"""
+"""Unit tests for predictors"""
 import copy
+import logging
 
 import numpy as np
 import pandas as pd
 import pytest
+from unittest import mock
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -17,7 +19,7 @@ from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"AutoETS": {}, "SimpleFeedForward": {"epochs": 1}},
+    {"AutoETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
 ]
 
 
@@ -439,3 +441,20 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
     )
     assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+
+
+def test_given_model_fails_when_predictor_predicts_then_error_is_logged(temp_model_path, caplog):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        enable_ensemble=False,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"ARIMA": {"maxiter": 1, "seasonal_period": 1, "seasonal_order": (0, 0, 0)}},
+    )
+    with mock.patch("autogluon.timeseries.models.sktime.models.ARIMA.predict") as arima_predict:
+        arima_predict.side_effect = RuntimeError("Numerical error")
+        with caplog.at_level(logging.ERROR):
+            predictor.predict(DUMMY_TS_DATAFRAME)
+            assert "Model ARIMA failed during prediction with exception: Numerical error" in caplog.text
