@@ -443,7 +443,7 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
     assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
 
 
-def test_given_model_fails_when_predictor_predicts_then_error_is_logged(temp_model_path, caplog):
+def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_learner(temp_model_path):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
         eval_metric="MAPE",
@@ -455,6 +455,5 @@ def test_given_model_fails_when_predictor_predicts_then_error_is_logged(temp_mod
     )
     with mock.patch("autogluon.timeseries.models.sktime.models.ARIMA.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with caplog.at_level(logging.ERROR):
+        with pytest.raises(RuntimeError, match="Prediction failed, please provide a different model to"):
             predictor.predict(DUMMY_TS_DATAFRAME)
-            assert "Model ARIMA failed during prediction with exception: Numerical error" in caplog.text
