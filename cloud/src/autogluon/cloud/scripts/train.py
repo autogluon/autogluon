@@ -3,11 +3,13 @@ import os
 import shutil
 import yaml
 
-import autogluon.text
-
 from autogluon.tabular import TabularPredictor, TabularDataset, FeatureMetadata
-from autogluon.text import TextPredictor
 from autogluon.vision import ImagePredictor
+from autogluon.text import TextPredictor
+
+# Not following import style because importing autogluon.text before other module would cause segfault
+# https://github.com/awslabs/autogluon/issues/2042
+import autogluon.text
 
 from distutils.version import LooseVersion
 if LooseVersion(autogluon.text.__version__) < LooseVersion('0.5'):
@@ -97,6 +99,12 @@ if __name__ == "__main__":
 
     train_file = get_input_path(args.training_dir)
     training_data = TabularDataset(train_file)
+    if predictor_type == 'tabular' and 'image_column' in config:
+        feature_metadata = predictor_fit_args.get('feature_metadata', None)
+        if feature_metadata is None:
+            feature_metadata = FeatureMetadata.from_df(training_data)
+        feature_metadata = feature_metadata.add_special_types({config['image_column']: ['image_path']})
+        predictor_fit_args['feature_metadata'] = feature_metadata
 
     tuning_data = None
     if args.tune_dir:
