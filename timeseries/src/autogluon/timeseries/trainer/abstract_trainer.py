@@ -623,7 +623,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
-                    f"Not fitting ensemble as "
+                    "Not fitting ensemble as "
                     + (
                         "no models were successfully trained."
                         if not models_available_for_ensemble
