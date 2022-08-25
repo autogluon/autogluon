@@ -599,8 +599,14 @@ def test_tabularHPO():
         subsample_size = 100
         nn_options = {'num_epochs': 2}
         gbm_options = {'num_boost_round': 20}
-        hyperparameters = {'GBM': gbm_options, 'NN_TORCH': nn_options}
-        time_limit = 60
+        hyperparameters = {
+            'GBM': gbm_options,
+            'NN_TORCH': nn_options,
+            'RF': {},
+            'XT': {},
+            'KNN': {},
+        }
+        time_limit = 120
         hyperparameter_tune_kwargs['num_trials'] = 5
 
     fit_args = {'verbosity': verbosity,}
