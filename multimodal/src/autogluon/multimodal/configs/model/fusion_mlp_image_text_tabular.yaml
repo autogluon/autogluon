@@ -122,7 +122,7 @@ model:
     image_size: 224
     max_img_num_per_col: 2
 
-  mmocr_image:
+  mmocr_text_detection:
     checkpoint_name: "TextSnake"
     data_types:
       - "image"

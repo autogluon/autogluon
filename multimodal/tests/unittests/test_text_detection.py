@@ -17,26 +17,16 @@ def download_sample_images():
 
 @pytest.mark.parametrize(
     "checkpoint_name",
-    [
-        "textsnake_r50_fpn_unet_1200e_ctw1500",
-        "dbnet_r18_fpnc_1200e_icdar2015"
-    ],
+    ["textsnake_r50_fpn_unet_1200e_ctw1500", "dbnet_r18_fpnc_1200e_icdar2015"],
 )
-
 def test_mmocr_text_detection_inference(checkpoint_name):
     mmocr_image_name = download_sample_images()
 
     predictor = MultiModalPredictor(
         hyperparameters={
-            "model.mmocr_image.checkpoint_name": checkpoint_name,
+            "model.mmocr_text_detection.checkpoint_name": checkpoint_name,
         },
-        pipeline= "ocr_text_detection"
+        pipeline="ocr_text_detection",
     )
 
     predictor.predict({"image": [mmocr_image_name]})
-  
-
-# if __name__ == '__main__':
-#     path = "textsnake_r50_fpn_unet_1200e_ctw1500"
-#     #path = "dbnet_r18_fpnc_1200e_icdar2015"
-#     test_mmocr_text_detection_inference(path)

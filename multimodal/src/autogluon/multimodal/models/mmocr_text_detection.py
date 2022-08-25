@@ -8,13 +8,13 @@ from torch import nn
 
 try:
     import mmcv
+    from mmcv.parallel import scatter
     from mmcv.runner import load_checkpoint
 except ImportError:
     mmcv = None
 
 try:
     import mmocr
-    from mmocr.utils.ocr import MMOCR
     from mmocr.models import build_detector
     from mmocr.utils.model import revert_sync_batchnorm
 except ImportError:
@@ -82,20 +82,21 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         # self.prefix = prefix
 
         # previous version2
-        #self.model = init_detector(config_file, checkpoints[0])
-        
+        # self.model = init_detector(config_file, checkpoints[0])
+
         checkpoint = checkpoints[0]
-        self.model = build_detector(self.config.model, test_cfg=self.config.get('test_cfg'))
+        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
         if checkpoint is not None:
-            checkpoint = load_checkpoint(self.model, checkpoint, map_location='cpu')
-            if 'CLASSES' in checkpoint.get('meta', {}):
-                self.model.CLASSES = checkpoint['meta']['CLASSES']
+            checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
+            if "CLASSES" in checkpoint.get("meta", {}):
+                self.model.CLASSES = checkpoint["meta"]["CLASSES"]
             else:
-                warnings.simplefilter('once')
-                warnings.warn('Class names are not saved in the checkpoint\'s '
-                            'meta data, use COCO classes by default.')
+                warnings.simplefilter("once")
+                warnings.warn(
+                    "Class names are not saved in the checkpoint's " "meta data, use COCO classes by default."
+                )
                 assert mmdet is not None, "Please install MMDET by: pip install mmdet."
-                self.model.CLASSES = get_classes('coco')
+                self.model.CLASSES = get_classes("coco")
         self.model = revert_sync_batchnorm(self.model)
         self.model.cfg = self.config
         self.prefix = prefix
@@ -135,16 +136,20 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         -------
             A dictionary with bounding boxes.
         """
-        
+
         data = batch[self.image_key]
         # single image
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
-        
+
+        device = next(self.model.parameters()).device  # model device
+        if next(self.model.parameters()).is_cuda:
+            # scatter to specified GPU
+            data = scatter(data, [device])[0]
         # results = self.model.readtext(**data)
         results = self.model(return_loss=False, rescale=True, **data)
 
-        ret = {BBOX: results[0]['boundary_result']}
+        ret = {BBOX: results[0]["boundary_result"]}
         return {self.prefix: ret}
 
     def get_layer_ids(

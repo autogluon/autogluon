@@ -146,7 +146,7 @@ CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
 MMDET_IMAGE = "mmdet_image"
-MMOCR_IMAGE = "mmocr_image"
+MMOCR_TEXT_DET = "mmocr_text_detection"
 
 # metric learning loss type
 CONTRASTIVE_LOSS = "contrastive_loss"
