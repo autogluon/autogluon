@@ -81,6 +81,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
         if checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
+
         self.model = revert_sync_batchnorm(self.model)
         self.model.cfg = self.config
         self.prefix = prefix
@@ -130,7 +131,6 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         if next(self.model.parameters()).is_cuda:
             # scatter to specified GPU
             data = scatter(data, [device])[0]
-
         results = self.model(return_loss=False, rescale=True, **data)
 
         ret = {BBOX: results[0]["boundary_result"]}
@@ -145,6 +145,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         the input end. The layers defined in this class, e.g., head, have id 0.
 
         Setting all layers as the same id 0 for now.
+
         TODO: Need to investigate mmocr's model definitions
 
         Returns

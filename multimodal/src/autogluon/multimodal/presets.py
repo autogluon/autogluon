@@ -103,21 +103,10 @@ def object_detection():
         "env.precision": 32,
     }
 
-
 @automm_presets.register()
 def ocr_text_detection():
     return {
         "model.names": ["mmocr_text_detection"],
-        "model.mmdet_image.checkpoint_name": "TextSnake",
-        "env.eval_batch_size_ratio": 1,
-        "env.num_gpus": 1,
-        "env.precision": 32,
-    }
-
-@automm_presets.register()
-def ocr_text_detection():
-    return {
-        "model.names": ["mmocr_image"],
         "model.mmdet_image.checkpoint_name": "TextSnake",
         "env.eval_batch_size_ratio": 1,
         "env.num_gpus": 0,
