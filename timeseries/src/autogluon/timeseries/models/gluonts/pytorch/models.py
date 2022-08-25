@@ -5,23 +5,22 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
-import pytorch_lightning as pl
 from gluonts.core.component import from_hyperparameters
+from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
 from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
-from gluonts.torch.model.deepar import DeepAREstimator
-
-# TODO: enable in GluonTS v0.10
-# from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
-# from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
 
-from ..abstract_gluonts import SimpleGluonTSDataset, AbstractGluonTSModel
+from ..abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
 from .callback import PLTimeLimitCallback
+
+# TODO: enable in GluonTS v0.10
+# from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
+# from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 
 
 logger = logging.getLogger(__name__)
@@ -99,11 +98,9 @@ class DeepARPyTorchModel(AbstractGluonTSPytorchModel):
         """Get GluonTS specific constructor arguments for estimator objects, an alias to
         `self._get_model_params` for better readability."""
         init_kwargs = self._get_model_params()
-        
+
         # GluonTS does not handle context_length=1 well, and sets the context to only prediction_length
         # we set it to a minimum of 10 here.
-        init_kwargs["context_length"] = max(
-            10, init_kwargs.get("context_length", self.prediction_length)
-        )
-        
+        init_kwargs["context_length"] = max(10, init_kwargs.get("context_length", self.prediction_length))
+
         return init_kwargs

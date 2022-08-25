@@ -1,10 +1,9 @@
 """PyTorch Lightning equivalents of GluonTS callbacks"""
-import time
 import logging
+import time
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +19,7 @@ class PLTimeLimitCallback(pl.callbacks.Callback):
     def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         self.start_time = time.time()
 
-    def on_epoch_end(
-        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"
-    ) -> bool:
+    def on_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> bool:
         if self.time_limit is not None:
             cur_time = time.time()
             if cur_time - self.start_time > self.time_limit:
