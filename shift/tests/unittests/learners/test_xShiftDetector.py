@@ -29,14 +29,21 @@ def test_xsd_cs():
     xsd = XShiftDetector(TabularPredictor, label='class')
     xsd.fit(train, test)
     sumry = xsd.summary()
-    js = xsd.json()
-    assert len(js) == 4
+    js = xsd.results()
+    assert len(js) == 3
     assert xsd.decision() == 'detected'
 
 def test_xsd():
     train, test = load_adult_data()
-    xsd = XShiftDetector(TabularPredictor, label='class')
+    xsd = XShiftDetector(TabularPredictor, label='class', classifier_kwargs = {'path' : 'AutogluonModels'})
     xsd.fit(train, test)
     sumry = xsd.summary()
-    js = xsd.json()
-    assert xsd.decision() == 'not detected'
+    js = xsd.results()
+    assert xsd.decision() == 'not_detected'
+
+def test_anomaly_scores():
+    train, test = load_adult_data()
+    xsd = XShiftDetector(TabularPredictor, label='class',  classifier_kwargs = {'path' : 'AutogluonModels'})
+    xsd.fit(train, test)
+    phat = xsd.anomaly_scores()
+    assert phat.shape[0] == test.shape[0]
