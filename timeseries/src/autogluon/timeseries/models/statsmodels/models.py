@@ -34,7 +34,7 @@ class StatsmodelsETSModel(AbstractStatsmodelsModel):
         # Infer seasonal_periods if seasonal_periods is not given / is set to None
         seasonal_period = model_init_args.pop("seasonal_period", None)
         if seasonal_period is None:
-            seasonal_period = get_seasonality(timeseries.freq)
+            seasonal_period = get_seasonality(self.freq)
         # Disable seasonality if the model cannot be fit with seasonality
         if len(timeseries) < 2 * seasonal_period or seasonal_period == 1:
             model_init_args["seasonal"] = None
@@ -71,6 +71,7 @@ class StatsmodelsARIMAModel(AbstractStatsmodelsModel):
         "seasonal_order",
         "seasonal_period",
         "trend",
+        "enforce_stationarity",
     ]
     statsmodels_allowed_fit_args = [
         "maxiter",
@@ -80,11 +81,15 @@ class StatsmodelsARIMAModel(AbstractStatsmodelsModel):
         self, timeseries: TimeSeriesDataFrame, default_model_init_args: dict, default_model_fit_args: dict
     ) -> ModelFitSummary:
         model_init_args = default_model_init_args.copy()
-        model_init_args.setdefault("trend", "c")
+        # Set trend to constant if trend = True
+        trend = model_init_args.pop("trend", True)
+        if trend:
+            model_init_args["trend"] = "c"
+        model_init_args.setdefault("enforce_stationarity", False)
         # Infer seasonal_periods if seasonal_periods is not given / is set to None
         seasonal_period = model_init_args.pop("seasonal_period", None)
         if seasonal_period is None:
-            seasonal_period = get_seasonality(timeseries.freq)
+            seasonal_period = get_seasonality(self.freq)
         seasonal_order = model_init_args.pop("seasonal_order", (0, 0, 0))
 
         # Disable seasonality if seasonal_period is too short

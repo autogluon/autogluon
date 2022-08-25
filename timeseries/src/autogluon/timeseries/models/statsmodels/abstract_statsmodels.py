@@ -98,9 +98,12 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         if quantile_levels is None:
             quantile_levels = self.quantile_levels
         # Make sure that we fitted a local model to each time series in data
-        self._fit(train_data=data)
-
         data_hash = hash_ts_dataframe_items(data)
+        items_to_fit = [item_id for item_id, ts_hash in data_hash.iteritems() if ts_hash not in self._fitted_models]
+        if len(items_to_fit) > 0:
+            logger.info(f"{self.name} received {len(items_to_fit)} items not seen during training, re-running fit")
+            self._fit(train_data=data)
+
         # TODO: Parallelize prediction
         predictions_per_item = {}
         with statsmodels_warning_filter():
