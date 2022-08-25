@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import pprint
+import shutil
 import time
 from typing import Union
 
@@ -2132,7 +2133,7 @@ class TabularPredictor:
                 return self._trainer.model_best
         return self._trainer.get_model_best(can_infer=can_infer)
 
-    def set_model_best(self, model: str):
+    def set_model_best(self, model: str, save_trainer: bool = False):
         """
         Sets the model to be used by default when calling `predictor.predict(data)`.
         By default, this is the model with the best validation score, but this is not always the case.
@@ -2142,6 +2143,8 @@ class TabularPredictor:
         ----------
         model : str
             Name of model to set to best. If model does not exist or cannot infer, raises an AssertionError.
+        save_trainer : bool, default = False
+            If True, self._trainer is saved with the new model_best value, such that it is reflected when predictor is loaded in future from disk.
         """
         self._assert_is_fit('set_model_best')
         models = self._trainer.get_model_names(can_infer=True)
@@ -2149,6 +2152,8 @@ class TabularPredictor:
             self._trainer.model_best = model
         else:
             raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
+        if save_trainer:
+            self._trainer.save()
 
     def get_model_full_dict(self, inverse=False):
         """
@@ -2556,6 +2561,21 @@ class TabularPredictor:
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete,
                                     allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
                                     dry_run=dry_run)
+
+    def get_size_disk(self) -> int:
+        """
+        Returns the combined size of all files under the `predictor.path` directory in bytes.
+        """
+        start_path = self.path
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(start_path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                # skip if it is symbolic link
+                if not os.path.islink(fp):
+                    file_size = os.path.getsize(fp)
+                    total_size += file_size
+        return total_size
 
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
@@ -3298,6 +3318,93 @@ class TabularPredictor:
         labels = data[self.label]
         cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
         return cls
+
+    # TODO: Add .delete() method to easily clean-up clones?
+    #  Would need to be careful that user doesn't delete important things accidentally.
+    # TODO: Add .save_zip() and load_zip() methods to pack and unpack artifacts into a single file to simplify deployment code?
+    def clone(self,
+              path: str,
+              *,
+              return_clone: bool = False,
+              dirs_exist_ok: bool = False):
+        """
+        Clone the predictor and all of its artifacts to a new location on local disk.
+        This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
+        more advanced operations (such as fit_extra and refit_full).
+
+        Parameters
+        ----------
+        path : str
+            Directory path the cloned predictor will be saved to.
+        return_clone : bool, default = False
+            If True, returns the loaded cloned TabularPredictor object.
+            If False, returns the local path to the cloned TabularPredictor object.
+        dirs_exist_ok : bool, default = False
+            If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
+            If False, will raise an exception if the path directory already exists and avoid performing the copy.
+
+        Returns
+        -------
+        If return_clone == True, returns the loaded cloned TabularPredictor object.
+        If return_clone == False, returns the local path to the cloned TabularPredictor object.
+
+        """
+        assert path != self.path, f"Cannot clone into the same directory as the original predictor! (path='{path}')"
+        path_clone = shutil.copytree(src=self.path, dst=path, dirs_exist_ok=dirs_exist_ok)
+        logger.log(30, f"Cloned {self.__class__.__name__} located in '{self.path}' to '{path_clone}'.\n"
+                       f"\tTo load the cloned predictor: predictor_clone = {self.__class__.__name__}.load(path=\"{path_clone}\")")
+        if return_clone:
+            return self.__class__.load(path=path_clone)
+        else:
+            return path_clone
+
+    def clone_for_deployment(self,
+                             path: str,
+                             *,
+                             model: str = 'best',
+                             return_clone: bool = False,
+                             dirs_exist_ok: bool = False):
+        """
+        Clone the predictor and all of its artifacts to a new location on local disk,
+        then delete the clones artifacts unnecessary during prediction.
+        This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
+        more advanced operations (such as fit_extra and refit_full).
+
+        Parameters
+        ----------
+        path : str
+            Directory path the cloned predictor will be saved to.
+        model : str, default = 'best'
+            The model to use in the optimized predictor clone.
+            All other unrelated models will be deleted to save disk space.
+        return_clone : bool, default = False
+            If True, returns the loaded cloned TabularPredictor object.
+            If False, returns the local path to the cloned TabularPredictor object.
+        dirs_exist_ok : bool, default = False
+            If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
+            If False, will raise an exception if the path directory already exists and avoid performing the copy.
+
+        Returns
+        -------
+        If return_clone == True, returns the loaded cloned TabularPredictor object.
+        If return_clone == False, returns the local path to the cloned TabularPredictor object.
+        """
+        predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
+        if model == 'best':
+            model = predictor_clone.get_model_best()
+            logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
+        else:
+            logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
+        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        if isinstance(model, str) and model in predictor_clone.get_model_names(can_infer=True):
+            predictor_clone.set_model_best(model=model, save_trainer=True)
+        logger.log(30, f"Clone: Removing artifacts unnecessary for prediction. "
+                       f"NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work")
+        predictor_clone.save_space()
+        if return_clone:
+            return predictor_clone
+        else:
+            return predictor_clone.path
 
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:
