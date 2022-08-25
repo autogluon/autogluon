@@ -2,13 +2,12 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
-from statsmodels.tsa.statespace.mlemodel import MLEResults
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-from ... import TimeSeriesDataFrame
-from ...utils.seasonality import get_seasonality
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.utils.seasonality import get_seasonality
+
 from .abstract_statsmodels import AbstractStatsmodelsModel, ModelFitSummary
 
 

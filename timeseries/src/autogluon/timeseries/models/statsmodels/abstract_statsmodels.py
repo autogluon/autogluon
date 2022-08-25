@@ -5,10 +5,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from ...dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
-from ...utils.hashing import hash_ts_dataframe_items
-from ...utils.warning_filters import statsmodels_warning_filter
-from ..abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
+from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         return default_model_init_args, default_model_fit_args
 
     def _fit_local_model(
-        self, timeseries: TimeSeriesDataFrame, model_init_args: dict, model_fit_args: dict
+        self, timeseries: TimeSeriesDataFrame, default_model_init_args: dict, default_model_fit_args: dict
     ) -> ModelFitSummary:
         """Fit a single local model to the time series."""
         raise NotImplementedError
