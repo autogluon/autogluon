@@ -8,8 +8,8 @@ from ..utils import post_fit
 
 class Classifier2ST:
     """A classifier 2 sample test, which tests for a difference between a source and target dataset.  It fits a
-    classifier to predict if a sample is in the source and target dataset, then computes a evaluation metric on a
-    holdout test which becomes the test statistic.
+    classifier to predict if a sample is in the source and target dataset, then computes an evaluation metric on a
+    holdout which becomes the test statistic.
 
     Parameters
     ----------
@@ -22,6 +22,8 @@ class Classifier2ST:
         Binary classification metric to use for the classifier 2 sample test
     split : float, default = 0.5
         Training/test split proportion for classifier 2 sample test
+    classifier_kwargs : dict, default = {}
+        The kwargs passed to the classifier, a member of classifier_class
     """
     def __init__(self,
                  classifier_class,
@@ -90,7 +92,18 @@ class Classifier2ST:
     def _pvalue_half_permutation(self,
                                  num_permutations=1000):
         """The half permutation method for computing p-values.
-        See Section 9.1 of https://arxiv.org/pdf/1602.02210.pdf"""
+        See Section 9.1 of https://arxiv.org/pdf/1602.02210.pdf
+
+        Parameters
+        ----------
+        num_permutations: int, default = 1000
+            The number of permutations for the permutation test
+
+        Returns
+        -------
+        pval: float
+            The p-value for the 2-sample test
+        """
         perm_stats = [self.test_stat]
         yhat = self.classifier.predict(self._test)
         for i in range(num_permutations):
@@ -112,9 +125,9 @@ class Classifier2ST:
         Parameters
         ----------
         method : str
-            one of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
-        num_permutations: int
-            the number of permutations used for any permutation based method
+            One of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+        num_permutations: int, default = 1000
+            The number of permutations used for any permutation based method
 
         Returns
         -------
@@ -148,8 +161,7 @@ class Classifier2ST:
 
         Returns
         -------
-        phat: pd.DataFrame
-            prediction probability for subset with labels as columns and "rank" as column for the rank
+        pd.DataFrame of prediction probability (anomaly scores) for subset with labels as columns
         """
         how_valid = ['all', 'top', 'rand']
         assert how in how_valid, 'parameter how is not in valid set: ' + ' '.join(how_valid)
@@ -180,6 +192,10 @@ class Classifier2ST:
     @post_fit
     def feature_importance(self):
         """Returns the feature importances for the trained classifier for source v. target
+
+        Returns
+        -------
+        pd.DataFrame of feature importances
         """
         assert self.has_fi, "Classifier class does not have feature_importance method"
         fi_scores = self.classifier.feature_importance(self._test)

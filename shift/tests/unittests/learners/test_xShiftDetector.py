@@ -1,5 +1,5 @@
 import pandas as pd
-from autogluon.shift import XShiftDetector
+from autogluon.shift import C2STShiftDetector
 from autogluon.tabular import TabularPredictor
 import os
 
@@ -26,7 +26,7 @@ def load_adult_cs_data():
 
 def test_xsd_cs():
     train, test = load_adult_cs_data()
-    xsd = XShiftDetector(TabularPredictor, label='class')
+    xsd = C2STShiftDetector(TabularPredictor, label='class')
     xsd.fit(train, test)
     sumry = xsd.summary()
     js = xsd.results()
@@ -35,7 +35,7 @@ def test_xsd_cs():
 
 def test_xsd():
     train, test = load_adult_data()
-    xsd = XShiftDetector(TabularPredictor, label='class', classifier_kwargs = {'path' : 'AutogluonModels'})
+    xsd = C2STShiftDetector(TabularPredictor, label='class', classifier_kwargs = {'path' : 'AutogluonModels'})
     xsd.fit(train, test)
     sumry = xsd.summary()
     js = xsd.results()
@@ -43,7 +43,7 @@ def test_xsd():
 
 def test_anomaly_scores():
     train, test = load_adult_data()
-    xsd = XShiftDetector(TabularPredictor, label='class',  classifier_kwargs = {'path' : 'AutogluonModels'})
+    xsd = C2STShiftDetector(TabularPredictor, label='class',  classifier_kwargs = {'path' : 'AutogluonModels'})
     xsd.fit(train, test)
     phat = xsd.anomaly_scores()
     assert phat.shape[0] == test.shape[0]

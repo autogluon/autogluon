@@ -1,12 +1,13 @@
 ## This is the public API that should be exposed to the general user
-
+import pandas as pd
 from autogluon.core.metrics import BINARY_METRICS
 import warnings
 from ..utils import post_fit
 from ..models.classifier2ST import Classifier2ST
+from typing import Any, Union, Optional
 
 
-class XShiftDetector:
+class C2STShiftDetector:
     """Detect a change in covariate (X) distribution between training and test, which we call XShift.  It can tell you
     if your training set is not representative of your test set distribution.  This is done with a Classifier 2
     Sample Test.
@@ -22,15 +23,18 @@ class XShiftDetector:
     sample_label : str, default = 'i2vkyc0p64'
         The label internally used for the classifier 2 sample test, the only reason to change it is in the off chance
         that the default value is a column in the data.
+    classifier_kwargs : dict, default = {}
+        The kwargs passed to the classifier, a member of classifier_class
 
     Methods
     -------
     fit : fits the detector on training and test covariate data
     results, summary : outputs the results of XShift detection
-        - `test_stat`: test statistic
-        - pvalue (optional, if compute_pvalue=True in .fit)
+        - test statistic
+        - de
         - detector feature importances
     anomaly_scores : computes anomaly scores for test samples
+    pvalue: a p-value for the two sample test
 
     Usage
     -----
@@ -41,14 +45,16 @@ class XShiftDetector:
     >>> xshiftd.decision()
     Output the summary...
     >>> xshiftd.summary()
+    Return the anomaly scores...
+    >>> asdf = xshiftd.anomaly_scores()
     """
 
     def __init__(self,
-                 classifier_class,
-                 label=None,
-                 eval_metric='balanced_accuracy',
-                 sample_label='i2vkyc0p64',
-                 classifier_kwargs={}):
+                 classifier_class: Any,
+                 label: Optional[str]=None,
+                 eval_metric: str='balanced_accuracy',
+                 sample_label: str='i2vkyc0p64',
+                 classifier_kwargs: dict={}):
         named_metrics = BINARY_METRICS
         assert eval_metric in named_metrics.keys(), \
             'eval_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
@@ -66,7 +72,11 @@ class XShiftDetector:
         self.fi_scores = None
         self.teststat_thresh = None
 
-    def fit(self, X, X_test, compute_fi = True, **kwargs):
+    def fit(self,
+            X: pd.DataFrame,
+            X_test: pd.DataFrame,
+            compute_fi: bool=True,
+            **kwargs):
         """Fit the XShift detector.
 
         Parameters
@@ -96,7 +106,8 @@ class XShiftDetector:
         self._X_test = X_test
 
     @post_fit
-    def decision(self, teststat_thresh=0.55):
+    def decision(self,
+                 teststat_thresh: float=0.55) -> str:
         """Decision function for testing XShift.  Uncertainty quantification is currently not supported.
 
         Parameters
@@ -116,7 +127,10 @@ class XShiftDetector:
             return 'not_detected'
 
     @post_fit
-    def anomaly_scores(self, join_test=True, how='all'):
+    def anomaly_scores(self,
+                       join_test: bool=True,
+                       how: str='all',
+                       sample_size: int=100) -> pd.DataFrame:
         """Return anomaly scores for all points
 
         Parameters
@@ -130,19 +144,26 @@ class XShiftDetector:
         sample_size: int
             size of the subsample to compute anomaly scores, only relevant for how = 'rand', 'top'
 
+        Returns
+        -------
+        pd.DataFrame of test data anomaly score (joined with test dataframe if join_test=True)
         """
-        as_top = self.C2ST.sample_anomaly_scores(how=how)
+        as_top = self.C2ST.sample_anomaly_scores(how=how, sample_size=sample_size)
         as_top = as_top[[1]].rename(columns={1: 'xshift_test_proba'})
         if join_test:
             return as_top.join(self._X_test)
         return as_top
 
     @post_fit
-    def results(self):
-        """Output the results in dictionary
-        - `detection_status`: One of ['detected', 'not detected']
-        - `test_statistic`: the C2ST statistic
-        - `feature_importance`: the feature importance dataframe
+    def results(self) -> dict:
+        """Output the results of the C2ST in dictionary
+
+        Returns
+        -------
+        dict of
+            - `detection_status`: One of ['detected', 'not detected']
+            - `test_statistic`: the C2ST statistic
+            - `feature_importance`: the feature importance dataframe, if computed
         """
         res_json = {
             'detection_status': self.decision(),
@@ -153,13 +174,18 @@ class XShiftDetector:
         return res_json
 
     @post_fit
-    def summary(self, format="markdown"):
-        """Output the results in a human readable format
+    def summary(self,
+                format: str="markdown") -> str:
+        """Output the results of C2ST in a human readable format
 
         Parameters
         ----------
         format : str, default = 'markdown'
             The format of the outputted string
+
+        Returns
+        -------
+        str of summary
         """
         assert format == 'markdown', 'Only markdown format is supported'
         if self.decision() == 'not_detected':
@@ -187,3 +213,22 @@ class XShiftDetector:
                 )
                 return ret_md + fi_md
         return ret_md
+
+    @post_fit
+    def pvalue(self,
+               method: str='half permutation',
+               num_permutations: int=1000) -> float:
+        """Compute the p-value which measures the significance level for the test statistic
+
+        Parameters
+        ----------
+        method : str
+            One of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+        num_permutations: int, default = 1000
+            The number of permutations used for any permutation based method
+
+        Returns
+        -------
+        float of the p-value for the 2-sample test
+        """
+        return self.C2ST.pvalue(method=method, num_permutations=num_permutations)

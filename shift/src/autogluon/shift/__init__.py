@@ -1,2 +1,2 @@
-from .learners.xShiftDetector import XShiftDetector
+from .learners.xShiftDetector import C2STShiftDetector
 
