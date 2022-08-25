@@ -5,21 +5,19 @@ from typing import List, Union
 import pandas as pd
 
 from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw
-from . import NamespaceAbstractAnalysis
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
 DATASET_ARGS = ['train_data', 'test_data', 'tuning_data']
 
 
-class Sampler(NamespaceAbstractAnalysis):
+class Sampler(AbstractAnalysis):
 
     def __init__(self,
-                 namespace: str = 'sample',
                  sample: Union[None, int] = None,
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [], **kwargs) -> None:
-        super().__init__(namespace, parent, children, **kwargs)
+        super().__init__(parent, children, **kwargs)
         self.sample = sample
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
