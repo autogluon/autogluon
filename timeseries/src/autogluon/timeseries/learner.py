@@ -109,10 +109,13 @@ class TimeSeriesLearner(AbstractLearner):
     def predict(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[AbstractTimeSeriesModel] = None,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        return self.load_trainer().predict(data=data, model=model, **kwargs)
+        prediction = self.load_trainer().predict(data=data, model=model, **kwargs)
+        if prediction is None:
+            raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
+        return prediction
 
     def score(
         self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None

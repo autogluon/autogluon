@@ -623,7 +623,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
-                    f"Not fitting ensemble as "
+                    "Not fitting ensemble as "
                     + (
                         "no models were successfully trained."
                         if not models_available_for_ensemble
@@ -803,11 +803,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def predict(
         self,
         data: TimeSeriesDataFrame,
-        model: Optional[AbstractTimeSeriesModel] = None,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         **kwargs,
-    ) -> TimeSeriesDataFrame:
+    ) -> Union[TimeSeriesDataFrame, None]:
+        model_was_selected_automatically = model is None
         model = self._get_model_for_prediction(model)
-        return self._predict_model(data, model, **kwargs)
+        try:
+            return self._predict_model(data, model, **kwargs)
+        except Exception as err:
+            logger.error(f"\tWarning: Model {model.name} failed during prediction with exception: {err}")
+            other_models = [m for m in self.get_model_names() if m != model.name]
+            if len(other_models) > 0 and model_was_selected_automatically:
+                logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
+            return None
 
     def score(
         self,

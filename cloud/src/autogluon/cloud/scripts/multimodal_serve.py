@@ -30,6 +30,7 @@ def _save_image_and_update_dataframe_column(bytes):
     im_name = f'multimodal_image_{image_index}.png'
     im.save(im_name)
     image_index += 1
+    print(f'Image saved as {im_name}')
 
     return im_name
 
@@ -115,7 +116,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         # find image column
         image_column = None
         for column_name, column_type in model._column_types.items():
-            if column_type == 'image_path':
+            if column_type in ('image_path', 'image'):
                 image_column = column_name
                 break
         # save image column bytes to disk and update the column with saved path
@@ -124,13 +125,13 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
             data[image_column] = [_save_image_and_update_dataframe_column(bytes) for bytes in data[image_column]]
 
     if model.problem_type == BINARY or model.problem_type == MULTICLASS:
-        pred_proba = model.predict_proba(data)
+        pred_proba = model.predict_proba(data, as_pandas=True)
         pred = get_pred_from_proba_df(pred_proba, problem_type=model.problem_type)
         pred_proba.columns = [str(c) + '_proba' for c in pred_proba.columns]
         pred.name = str(pred.name) + '_pred' if pred.name is not None else 'pred'
         prediction = pd.concat([pred, pred_proba], axis=1)
     else:
-        prediction = model.predict(data)
+        prediction = model.predict(data, as_pandas=True)
 
     if isinstance(prediction, pd.Series):
         prediction = prediction.to_frame()
