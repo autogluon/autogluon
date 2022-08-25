@@ -1,11 +1,11 @@
 """Unit tests for predictors"""
 import copy
 import logging
+from unittest import mock
 
 import numpy as np
 import pandas as pd
 import pytest
-from unittest import mock
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
