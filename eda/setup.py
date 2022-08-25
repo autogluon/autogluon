@@ -19,9 +19,12 @@ submodule = 'eda'
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
     'numpy',
+    'scipy',
+    'scikit-learn',
     'pandas',
+    'matplotlib',
     'missingno',
-    'altair',
+    'phik',
     'seaborn',
 ]
 

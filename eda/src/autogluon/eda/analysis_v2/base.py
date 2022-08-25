@@ -79,3 +79,9 @@ class NamespaceAbstractAnalysis(AbstractAnalysis, ABC):
         state = super()._get_state_from_parent()
         state[self.namespace] = {}
         return state[self.namespace]
+
+
+class Namespace(NamespaceAbstractAnalysis):
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        pass
