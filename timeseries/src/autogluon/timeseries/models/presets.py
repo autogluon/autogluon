@@ -16,8 +16,7 @@ from .gluonts import (
     TransformerModel,
 )
 from .sktime import ARIMAModel, AutoARIMAModel, AutoETSModel
-from .statsmodels import StatsmodelsETSModel, StatsmodelsARIMAModel
-
+from .statsmodels import StatsmodelsARIMAModel, StatsmodelsETSModel
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +47,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoARIMA=20,
     ARIMA=50,
     AutoETS=60,
+    StatsmodelsARIMA=50,
+    StatsmodelsETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
