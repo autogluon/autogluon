@@ -307,6 +307,7 @@ class CloudPredictor(ABC):
         predictor_init_args,
         predictor_fit_args,
         image_path=None,
+        image_column=None,
         leaderboard=True,
         framework_version='latest',
         job_name=None,
@@ -339,6 +340,8 @@ class CloudPredictor(ABC):
             If your images live under a root directory `example_images/`, then you would provide `example_images` as the `image_path`.
             And you want to make sure in your training/tuning file, the column corresponding to the images is a relative path prefix with the root directory.
             For example, `example_images/train/image1.png`. An absolute path will NOT work as the file will be moved to a remote system.
+        image_column: str, default = None
+            The column name in the training/tuning data that contains the image paths.
         leaderboard: bool, default = True
             Whether to include the leaderboard in the output artifact
         framework_version: str, default = `latest`
@@ -371,7 +374,6 @@ class CloudPredictor(ABC):
         `CloudPredictor` object. Returns self.
         """
         assert not self._fit_job.completed, 'Predictor is already fit! To fit additional models, create a new `CloudPredictor`'
-        # TODO: Add warning for multi-model image not working properly
         predictor_fit_args = copy.deepcopy(predictor_fit_args)
         train_data = predictor_fit_args.pop('train_data')
         tune_data = predictor_fit_args.pop('tuning_data', None)
@@ -397,7 +399,14 @@ class CloudPredictor(ABC):
             autogluon_sagemaker_estimator_kwargs.pop('source_dir', None)
 
         self._setup_bucket(cloud_bucket)
-        config = self._construct_config(predictor_init_args, predictor_fit_args, leaderboard)
+        config_args = dict(
+            predictor_init_args=predictor_init_args,
+            predictor_fit_args=predictor_fit_args,
+            leaderboard=leaderboard,
+        )
+        if image_column is not None:
+            config_args['image_column'] = image_column
+        config = self._construct_config(**config_args)
         inputs = self._upload_fit_artifact(
             train_data=train_data,
             tune_data=tune_data,
@@ -497,7 +506,7 @@ class CloudPredictor(ABC):
         return predictor_cls.load(local_model_path)
 
     def _upload_predictor(self, predictor_path, key_prefix):
-        cloud_bucket = s3_path_to_bucket_prefix(self.cloud_output_path)
+        cloud_bucket, _ = s3_path_to_bucket_prefix(self.cloud_output_path)
         if not is_s3_url(predictor_path):
             if os.path.isfile(predictor_path):
                 if tarfile.is_tarfile(predictor_path):
@@ -644,10 +653,10 @@ class CloudPredictor(ABC):
             raise e
 
     def predict_real_time(
-            self,
-            test_data,
-            accept='application/x-parquet'
-        ):
+        self,
+        test_data,
+        accept='application/x-parquet'
+    ):
         """
         Predict with the deployed SageMaker endpoint. A deployed SageMaker endpoint is required.
         This is intended to provide a low latency inference.
