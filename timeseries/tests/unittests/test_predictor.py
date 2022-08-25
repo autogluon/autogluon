@@ -19,7 +19,7 @@ from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"AutoETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"StatsmodelsETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
 ]
 
 
@@ -180,8 +180,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"AutoETS": {}, "SimpleFeedForward": {"epochs": 1}},
-        {"AutoETS": {}, "SimpleFeedForward": {"epochs": ag.Int(1, 3)}},
+        {"StatsmodelsETS": {}, "SimpleFeedForward": {"epochs": 1}},
+        {"StatsmodelsETS": {}, "SimpleFeedForward": {"epochs": ag.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
