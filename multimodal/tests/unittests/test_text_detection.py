@@ -18,7 +18,8 @@ def download_sample_images():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "textsnake_r50_fpn_unet_1200e_ctw1500"
+        "textsnake_r50_fpn_unet_1200e_ctw1500",
+        "dbnet_r18_fpnc_1200e_icdar2015"
     ],
 )
 
@@ -36,4 +37,6 @@ def test_mmocr_text_detection_inference(checkpoint_name):
   
 
 # if __name__ == '__main__':
-#     test_mmocr_text_detection_inference("textsnake_r50_fpn_unet_1200e_ctw1500")
+#     path = "textsnake_r50_fpn_unet_1200e_ctw1500"
+#     #path = "dbnet_r18_fpnc_1200e_icdar2015"
+#     test_mmocr_text_detection_inference(path)
