@@ -49,7 +49,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
     def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred=None, sample_weight=None):  # noqa
         dummy_pred = copy.deepcopy(self.dummy_pred if dummy_pred is None else dummy_pred)
         dummy_pred[list(dummy_pred.columns)] = y_pred_proba
-        score = -metric(y_true, dummy_pred) * metric.coefficient
+        score = metric(y_true, dummy_pred) * metric.coefficient
         # score: higher is better, regret: lower is better, so we flip the sign
         return -score
 
