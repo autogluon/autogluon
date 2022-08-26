@@ -1,9 +1,6 @@
-## This API should be assumed to be private and only exposed to developers
-## for the public API look at learners
-
-from autogluon.core.metrics import balanced_accuracy
 import numpy as np
 import pandas as pd
+from autogluon.core.metrics import balanced_accuracy
 from ..utils import post_fit
 
 class Classifier2ST:
@@ -66,14 +63,14 @@ class Classifier2ST:
             - a dataframe with a label column where 1 = target and 0 = source
             - a tuple of source dataframe and target dataframe
         """
-
         if isinstance(data, pd.DataFrame):
             sample_label = self.sample_label
             assert sample_label in data.columns, "sample_label needs to be a column of data"
             assert self.split, "sample_label requires the split parameter"
+            data = data.copy() # makes a copy
         else:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
-            data = self._make_source_target_label(data, self.sample_label)
+            data = self._make_source_target_label(data, self.sample_label) # makes a copy
         if data.index.has_duplicates:
             self.original_index = data.index
             data.index = pd.RangeIndex(data.shape[0])
@@ -101,8 +98,7 @@ class Classifier2ST:
 
         Returns
         -------
-        pval: float
-            The p-value for the 2-sample test
+        float of the p-value for the 2-sample test
         """
         perm_stats = [self.test_stat]
         yhat = self.classifier.predict(self._test)
@@ -113,32 +109,31 @@ class Classifier2ST:
                 perm_yhat
             )
             perm_stats.append(perm_test_stat)
-        p_val = (self.test_stat <= np.array(perm_stats)).mean()
-        return p_val
+        pval = (self.test_stat <= np.array(perm_stats)).mean()
+        return pval
 
     @post_fit
     def pvalue(self,
-               method='half permutation',
+               method='half_permutation',
                num_permutations=1000):
         """Compute the p-value which measures the significance level for the test statistic
 
         Parameters
         ----------
         method : str
-            One of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+            One of 'half_permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
         num_permutations: int, default = 1000
             The number of permutations used for any permutation based method
 
         Returns
         -------
-        pval: float
-            The p-value for the 2-sample test
+        float of the p-value for the 2-sample test
         """
         valid_methods = [
-            'half permutation'
+            'half_permutation'
         ]
         assert method in valid_methods, 'method must be one of ' + ', '.join(valid_methods)
-        if method == 'half permutation':
+        if method == 'half_permutation':
             pval = self._pvalue_half_permutation(
                 num_permutations=num_permutations)
         return pval
@@ -147,8 +142,8 @@ class Classifier2ST:
     def sample_anomaly_scores(self,
                               how='all',
                               sample_size=100):
-        """Return anomaly ranks for a subset of test datapoint from target set.  Rank of 1 means most like the target
-        set and unlike source set, rank of 0 means opposite.
+        """Return anomaly score for a subset of test datapoint from target set.  A higher score means most like the
+        target set and unlike source set.
 
         Parameters
         ----------
@@ -156,7 +151,7 @@ class Classifier2ST:
             - 'all' = all test points
             - 'rand' = random selection of held out rows in test set
             - 'top' = most anomalous values in held out test set
-        sample_size: int
+        sample_size: int, default = 100
             size of the subsample to compute anomaly scores, only relevant for how = 'rand', 'top'
 
         Returns

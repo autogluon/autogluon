@@ -1,10 +1,11 @@
 ## This is the public API that should be exposed to the general user
+
+import warnings
+from typing import Any, Optional
 import pandas as pd
 from autogluon.core.metrics import BINARY_METRICS
-import warnings
 from ..utils import post_fit
 from ..models.classifier2ST import Classifier2ST
-from typing import Any, Union, Optional
 
 
 class C2STShiftDetector:
@@ -81,8 +82,10 @@ class C2STShiftDetector:
 
         Parameters
         ----------
-        X, X_test : pd.DataFrame
-            Training dataframe and test dataframe
+        X : pd.DataFrame
+            Training dataframe
+        X_test : pd.DataFrame
+            Test dataframe
         compute_fi : bool, default = True
             True to compute the feature importances, this may be computationally intensive
         **kwargs (optional): keyword arguments to .fit() for the classifier_class
@@ -112,7 +115,7 @@ class C2STShiftDetector:
 
         Parameters
         ----------
-        teststat_thresh : float
+        teststat_thresh : float, default = 0.55
             the threshold for the test statistic
 
         Returns
@@ -216,14 +219,14 @@ class C2STShiftDetector:
 
     @post_fit
     def pvalue(self,
-               method: str='half permutation',
+               method: str='half_permutation',
                num_permutations: int=1000) -> float:
         """Compute the p-value which measures the significance level for the test statistic
 
         Parameters
         ----------
         method : str
-            One of 'half permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+            One of 'half_permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
         num_permutations: int, default = 1000
             The number of permutations used for any permutation based method
 

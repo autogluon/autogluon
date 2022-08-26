@@ -39,6 +39,7 @@ def test_xsd():
     xsd.fit(train, test)
     sumry = xsd.summary()
     js = xsd.results()
+    pval = xsd.pvalue()
     assert xsd.decision() == 'not_detected'
 
 def test_anomaly_scores():
