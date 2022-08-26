@@ -82,7 +82,7 @@ def get_default_hps(key, prediction_length):
             },
             "StatsmodelsARIMA": {
                 "maxiter": 50,
-                "order": (2, 0, 0),
+                "order": (1, 1, 1),
                 "seasonal_order": (0, 0, 0),
             },
             "SimpleFeedForward": {
