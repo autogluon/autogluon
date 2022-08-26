@@ -1,7 +1,7 @@
 from typing import Union, List
 
-from autogluon.eda import AnalysisState
-from autogluon.eda.visualization import AbstractVisualization
+from .. import AnalysisState
+from ..visualization import AbstractVisualization
 
 
 class SimpleLinearLayout:

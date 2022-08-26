@@ -1,7 +1,7 @@
 from typing import Union, List, Any, Dict
 
-from autogluon.eda import AnalysisState
-from autogluon.eda.analysis_v2 import AbstractAnalysis, DATASET_ARGS
+from .. import AnalysisState
+from ..analysis_v2 import AbstractAnalysis, DATASET_ARGS
 
 
 class FeatureInteraction(AbstractAnalysis):
