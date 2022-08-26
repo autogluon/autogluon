@@ -1,6 +1,7 @@
 import copy
 import logging
 import re
+from packaging.version import parse as vparse
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Type
 
@@ -42,6 +43,13 @@ class SimpleGluonTSDataset(GluonTSDataset):
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
+        
+        # GluonTS v0.10 and above prefer pd.Period as the main timestamp type
+        self.time_type_constructor: Type = (
+            lambda t: pd.Period(t, freq=self.freq) 
+            if vparse(gluonts.__version__) > vparse("0.9") else 
+            pd.Timestamp
+        )
 
     @property
     def freq(self):
@@ -56,7 +64,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             yield {
                 "item_id": j,
                 "target": df[self.target_field_name].to_numpy(dtype=np.float64),
-                "start": pd.Timestamp(df.index[0], freq=self.freq),
+                "start": self.time_type_constructor(df.index[0]),
             }
 
 
@@ -279,9 +287,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     QuantileForecast(
                         forecast_arrays=np.array(tmp),
                         start_date=forecast.start_date,
-                        freq=forecast.freq,
                         forecast_keys=quantiles,
                         item_id=forecast.item_id,
+                        # freq=forecast.freq,
                     )
                 )
                 forecast_means.append(forecast.mean)
@@ -308,7 +316,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             df = pd.DataFrame(item_forecast_dict)
             df[ITEMID] = item_id
             df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date,
+                start=forecasts[i].start_date.to_timestamp(),
                 periods=self.prediction_length,
                 freq=self.freq,
             )
