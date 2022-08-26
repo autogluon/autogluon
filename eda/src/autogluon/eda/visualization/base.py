@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 
-from autogluon.eda import AnalysisState
+from .. import AnalysisState
 
 logger = logging.getLogger(__name__)
 

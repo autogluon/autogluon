@@ -5,8 +5,8 @@ import seaborn as sns
 from pandas import DataFrame
 
 from autogluon.common.features.types import *
-from autogluon.eda import AnalysisState
-from autogluon.eda.visualization import JupyterMixin, AbstractVisualization
+from . import AnalysisState
+from ..visualization import JupyterMixin, AbstractVisualization
 
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
@@ -15,7 +15,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                  headers: bool = False,
                  namespace: str = None,
                  numeric_as_categorical_threshold=20,
-                 fig_args: Union[None, Dict[str, Any]] = None,
+                 fig_args: Union[None, Dict[str, Any]] = {},
                  **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers

@@ -1,8 +1,14 @@
-import pandas as pd
+from typing import Any, Dict, Union
 
-from autogluon.eda import AnalysisState
-from autogluon.eda.visualization.base import AbstractVisualization
-from autogluon.eda.visualization.jupyter import JupyterMixin
+import ipywidgets as wgts
+import matplotlib.pyplot as plt
+import missingno as msno
+import pandas as pd
+from IPython.display import display
+
+from .base import AbstractVisualization
+from .jupyter import JupyterMixin
+from .. import AnalysisState
 
 
 class DatasetStatistics(AbstractVisualization, JupyterMixin):
@@ -77,3 +83,37 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
             self.render_text(header, text_type='h3')
 
         self.display_obj(df)
+
+
+class MissingValues(AbstractVisualization, JupyterMixin):
+
+    def __init__(self,
+                 headers: bool = False,
+                 namespace: str = None,
+                 fig_args: Union[None, Dict[str, Any]] = {},
+                 **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+        self.fig_args = fig_args
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return 'missing_statistics' in state
+
+    def _render(self, state: AnalysisState) -> None:
+        sample_size = state.get('sample_size', None)
+        for ds, data in state.missing_statistics.items():
+            if self.headers:
+                sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
+                header = f'{ds} missing values analysis{sample_info}'
+                self.render_text(header, text_type='h3')
+
+            widgets = [msno.matrix, msno.bar, msno.heatmap, msno.dendrogram]
+            outs = [wgts.Output() for _ in widgets]
+            tab = wgts.Tab(children=outs)
+            for i, c in enumerate([w.__name__ for w in widgets]):
+                tab.set_title(i, c)
+            display(tab)
+            for widget, out in zip(widgets, outs):
+                with out:
+                    ax = widget(data.data, **self._kwargs)
+                    plt.show(ax)

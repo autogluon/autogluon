@@ -76,13 +76,14 @@ class MissingValuesAnalysis(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
         for ds in DATASET_ARGS:
-            s[ds] = {
-                'count': {},
-                'ratio': {},
-            }
             if ds in args:
+                s[ds] = {
+                    'count': {},
+                    'ratio': {},
+                }
                 na = args[ds].isna().sum()
                 na = na[na > 0]
                 s[ds]['count'] = na.to_dict()
                 s[ds]['ratio'] = (na / len(args[ds])).to_dict()
+                s[ds]['data'] = args[ds]
         state.missing_statistics = s
