@@ -712,6 +712,8 @@ class TabularPredictor:
         >>> time_limit = 3600  # set as long as you are willing to wait (in sec)
         >>> predictor = TabularPredictor(label=label, eval_metric=eval_metric).fit(train_data, presets=['best_quality'], time_limit=time_limit)
         """
+
+        print('Start training')
         if self._learner.is_fit:
             raise AssertionError(
                 'Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.')
