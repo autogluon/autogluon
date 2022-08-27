@@ -1,10 +1,11 @@
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, List
 
 import ipywidgets as wgts
 import matplotlib.pyplot as plt
 import missingno as msno
 import pandas as pd
 from IPython.display import display
+from pandas import DataFrame
 
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
@@ -35,7 +36,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
             if 'dataset_stats' in state:
                 stats = {**stats, **state.dataset_stats[ds]}
             if 'missing_statistics' in state:
-                stats = {**stats, **{f'missing_{k}': v for k, v in state.missing_statistics[ds].items()}}
+                stats = {**stats, **{f'missing_{k}': v for k, v in state.missing_statistics[ds].items() if k in ['count', 'ratio']}}
             if 'raw_types' in state:
                 stats['raw_types'] = state.raw_types[ds]
             if 'special_types' in state:
@@ -44,11 +45,9 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
             # Fix counts
             df = pd.DataFrame(stats)
             if 'dataset_stats' in state:
-                for k in ['unique', 'freq']:
-                    df[k] = df[k].fillna(-1).astype(int)
-                df = df.fillna('')
-                for k in ['unique', 'freq']:
-                    df[k] = df[k].replace({-1: ''})
+                df = self.__fix_counts(df, ['unique', 'freq'])
+            if 'missing_statistics' in state:
+                df = self.__fix_counts(df, ['missing_count'])
 
             df = df.fillna('')
 
@@ -58,6 +57,11 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
                 self.render_text(header, text_type='h3')
 
             self.display_obj(df)
+
+    def __fix_counts(self, df: DataFrame, cols: List[str]) -> DataFrame:
+        for k in cols:
+            df[k] = df[k].fillna(-1).astype(int).replace({-1: ''})
+        return df
 
 
 class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):

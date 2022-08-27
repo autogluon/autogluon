@@ -28,7 +28,7 @@ class FeatureInteraction(AbstractAnalysis):
         interactions: List[Dict[str, Any]] = state.get('interactions', [])
 
         for ds in DATASET_ARGS:
-            if ds in args:
+            if ds in args and args[ds] is not None:
                 missing_cols = [c for c in cols.values() if c not in args[ds].columns]
                 if len(missing_cols) == 0:
                     df = args[ds][cols.values()]

@@ -24,7 +24,7 @@ class Sampler(AbstractAnalysis):
         state.sample_size = self.sample
         if self.sample is not None:
             for ds in DATASET_ARGS:
-                if ds in args:
+                if ds in args and args[ds] is not None:
                     self.args[ds] = args[ds].sample(self.sample)
 
 
@@ -33,10 +33,11 @@ class DatasetSummary(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
         for ds in DATASET_ARGS:
-            if ds in args:
+            if ds in args and args[ds] is not None:
                 df = args[ds]
                 summary = df.describe(include='all').T
                 summary = summary.join(pd.DataFrame({'dtypes': df.dtypes}))
+                summary['unique'] = args[ds].nunique()
                 summary['count'] = summary['count'].astype(int)
                 summary = summary.sort_index()
                 s[ds] = summary.to_dict()
@@ -48,7 +49,7 @@ class RawTypesAnalysis(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.raw_types = {}
         for ds in DATASET_ARGS:
-            if ds in args:
+            if ds in args and args[ds] is not None:
                 state.raw_types[ds] = get_type_map_raw(args[ds])
 
 
@@ -57,7 +58,7 @@ class SpecialTypesAnalysis(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.special_types = {}
         for ds in DATASET_ARGS:
-            if ds in args:
+            if ds in args and args[ds] is not None:
                 state.special_types[ds] = self.infer_special_types(args[ds])
 
     def infer_special_types(self, ds):
@@ -76,7 +77,7 @@ class MissingValuesAnalysis(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
         for ds in DATASET_ARGS:
-            if ds in args:
+            if ds in args and args[ds] is not None:
                 s[ds] = {
                     'count': {},
                     'ratio': {},
