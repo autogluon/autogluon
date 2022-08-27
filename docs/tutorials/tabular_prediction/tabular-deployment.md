@@ -156,6 +156,21 @@ size_original = predictor.get_size_disk()
 size_opt = predictor_clone_opt.get_size_disk()
 print(f'Size Original:  {size_original} bytes')
 print(f'Size Optimized: {size_opt} bytes')
+print(f'Optimized predictor achieved a {round((1 - (size_opt/size_original)) * 100, 1)}% reduction in disk usage.')
+```
+
+We can also investigate the difference in the files that exist in the original and optimized predictor.
+
+Original:
+
+```{.python .input}
+predictor.get_size_disk_per_file()
+```
+
+Optimized:
+
+```{.python .input}
+predictor_clone_opt.get_size_disk_per_file()
 ```
 
 Now all that is left is to upload the optimized predictor to a centralized storage location such as S3.

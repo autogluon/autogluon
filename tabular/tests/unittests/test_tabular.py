@@ -87,7 +87,7 @@ def test_advanced_functionality():
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     savedir_predictor_original = savedir + 'predictor/'
-    predictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
+    predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
     extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
@@ -139,7 +139,7 @@ def test_advanced_functionality():
     assert len(leaderboard) == len(leaderboard_loaded)
     assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
 
-    assert predictor.get_size_disk() > 0  # Assert that .get_size_disk() produces a >0 result and doesn't crash
+    _assert_predictor_size(predictor=predictor)
     # Test cloning logic
     with pytest.raises(AssertionError):
         # Ensure don't overwrite existing predictor
@@ -197,6 +197,14 @@ def test_advanced_functionality():
     y_pred_proba_clone_2 = predictor_clone.predict_proba(data=test_data)
     assert y_pred_proba.equals(y_pred_proba_clone_2)
     print('Tabular Advanced Functionality Test Succeeded.')
+
+
+def _assert_predictor_size(predictor: TabularPredictor):
+    predictor_size_disk = predictor.get_size_disk()
+    predictor_size_disk_per_file = predictor.get_size_disk_per_file()
+    assert predictor_size_disk > 0  # Assert that .get_size_disk() produces a >0 result and doesn't crash
+    assert len(predictor_size_disk_per_file) > 0
+    assert predictor_size_disk == predictor_size_disk_per_file.sum()
 
 
 def test_advanced_functionality_bagging():

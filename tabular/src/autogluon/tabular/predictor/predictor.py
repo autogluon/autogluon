@@ -14,6 +14,7 @@ import pandas as pd
 
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
+from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
@@ -2566,16 +2567,36 @@ class TabularPredictor:
         """
         Returns the combined size of all files under the `predictor.path` directory in bytes.
         """
-        start_path = self.path
-        total_size = 0
-        for dirpath, dirnames, filenames in os.walk(start_path):
-            for f in filenames:
-                fp = os.path.join(dirpath, f)
-                # skip if it is symbolic link
-                if not os.path.islink(fp):
-                    file_size = os.path.getsize(fp)
-                    total_size += file_size
-        return total_size
+        return get_directory_size(self.path)
+
+    def get_size_disk_per_file(self,
+                               *,
+                               sort_by: str = "size",
+                               include_path_in_name: bool = False) -> pd.Series:
+        """
+        Returns the size of each file under the `predictor.path` directory in bytes.
+
+        Parameters
+        ----------
+        sort_by : str, default = "size"
+            If None, output files will be ordered based on order of search in os.walk(path).
+            If "size", output files will be ordered in descending order of file size.
+            If "name", output files will be ordered by name in ascending alphabetical order.
+        include_path_in_name : bool, default = False
+            If True, includes the full path of the file including the input `path` as part of the index in the output pd.Series.
+            If False, removes the `path` prefix of the file path in the index of the output pd.Series.
+
+            For example, for a file located at `foo/bar/model.pkl`, with path='foo/'
+                If True, index will be `foo/bar/model.pkl`
+                If False, index will be `bar/model.pkl`
+
+        Returns
+        -------
+        pd.Series with index file path and value file size in bytes.
+        """
+        return get_directory_size_per_file(self.path,
+                                           sort_by=sort_by,
+                                           include_path_in_name=include_path_in_name)
 
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
@@ -3353,10 +3374,7 @@ class TabularPredictor:
         path_clone = shutil.copytree(src=self.path, dst=path, dirs_exist_ok=dirs_exist_ok)
         logger.log(30, f"Cloned {self.__class__.__name__} located in '{self.path}' to '{path_clone}'.\n"
                        f"\tTo load the cloned predictor: predictor_clone = {self.__class__.__name__}.load(path=\"{path_clone}\")")
-        if return_clone:
-            return self.__class__.load(path=path_clone)
-        else:
-            return path_clone
+        return self.__class__.load(path=path_clone) if return_clone else path_clone
 
     def clone_for_deployment(self,
                              path: str,
@@ -3370,6 +3388,13 @@ class TabularPredictor:
         This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
         more advanced operations (such as fit_extra and refit_full).
 
+        Identical to performing the following operations in order:
+
+        predictor_clone = predictor.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
+        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        predictor_clone.set_model_best(model=model, save_trainer=True)
+        predictor_clone.save_space()
+
         Parameters
         ----------
         path : str
@@ -3377,12 +3402,14 @@ class TabularPredictor:
         model : str, default = 'best'
             The model to use in the optimized predictor clone.
             All other unrelated models will be deleted to save disk space.
+            Refer to the `models_to_keep` argument of `predictor.delete_models` for available options.
+            Internally calls `predictor_clone.delete_models(models_to_keep=model, dry_run=False)`
         return_clone : bool, default = False
             If True, returns the loaded cloned TabularPredictor object.
             If False, returns the local path to the cloned TabularPredictor object.
         dirs_exist_ok : bool, default = False
             If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
-            If False, will raise an exception if the path directory already exists and avoid performing the copy.
+            If False, will raise an exception if the path directory already exists and avoids performing the copy.
 
         Returns
         -------
@@ -3401,10 +3428,7 @@ class TabularPredictor:
         logger.log(30, f"Clone: Removing artifacts unnecessary for prediction. "
                        f"NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work")
         predictor_clone.save_space()
-        if return_clone:
-            return predictor_clone
-        else:
-            return predictor_clone.path
+        return predictor_clone if return_clone else predictor_clone.path
 
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:
