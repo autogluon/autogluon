@@ -597,10 +597,7 @@ def test_tabularHPO():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 2}
-        gbm_options = {'num_boost_round': 20}
-        hyperparameters = {'GBM': gbm_options, 'NN_TORCH': nn_options}
-        time_limit = 60
+        time_limit = 240
         hyperparameter_tune_kwargs['num_trials'] = 5
 
     fit_args = {'verbosity': verbosity,}
