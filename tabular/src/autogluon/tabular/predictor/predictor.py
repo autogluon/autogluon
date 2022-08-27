@@ -3388,6 +3388,9 @@ class TabularPredictor:
         This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
         more advanced operations (such as fit_extra and refit_full).
 
+        Note that the clone can no longer fit new models,
+        and most functionality except for predict and predict_proba will no longer work.
+
         Identical to performing the following operations in order:
 
         predictor_clone = predictor.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
