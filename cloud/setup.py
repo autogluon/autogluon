@@ -25,6 +25,7 @@ install_requires = [
     'pandas',
     'sagemaker>=2.94',
     'pyarrow>=9.0',
+    'Pillow>=9.0.0'
 ]
 
 extras_require = dict()
