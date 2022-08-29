@@ -1,6 +1,7 @@
 """
 Example script to predict the vital status of patients with Head-Neck Squamous Cell Carcinoma.
 Dataset is originally from https://portal.gdc.cancer.gov/projects/TCGA-HNSC.
+Paper working on similar task: https://bmcbioinformatics.biomedcentral.com/track/pdf/10.1186/s12859-019-2929-8.pdf
 """
 
 import pandas as pd
@@ -8,8 +9,8 @@ import numpy as np
 import argparse
 import os
 import random
-from autogluon.tabular import TabularPredictor
-from autogluon.multimodal import MultiModalPredictor
+from autogluon.tabular import TabularPredictor, TabularDataset
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 import torch as th
 from sklearn.model_selection import train_test_split
 from autogluon.multimodal.utils import download
@@ -17,7 +18,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-# Dataset information
+# Dataset information for TCGA dataset
 INFO = {
     "name": "cancer_survival.tsv",
     "url": "s3://automl-mm-bench/life-science/clinical.tsv",
@@ -28,15 +29,20 @@ INFO = {
 def get_parser():
     parser = argparse.ArgumentParser(
         description='The Basic Example of AutoGluon for TCGA dataset.')
-    parser.add_argument('--path', default="./dataset")
+    parser.add_argument('--path', default='./dataset')
     parser.add_argument('--test_size', default=0.3)
     parser.add_argument('--shuffle', default=True)
     parser.add_argument('--seed', type=int, default=123)
-    parser.add_argument('--exp_path', default="./results")
+    parser.add_argument('--task', choices=['TCGA_HNSC', 'adult'],
+                        default='adult')
+    parser.add_argument('--mode', choices=['FT_Transformer', 'all_models'],
+                        default='all_models')
+    parser.add_argument('--num_gpus', type=int, default=None)
+    parser.add_argument('--num_workers', type=int, default=12)
     return parser
 
 
-def data_loader(path="./dataset/"):
+def data_loader(path="./dataset/", ):
     name = INFO["name"]
     full_path = os.path.join(path, name)
     if os.path.exists(full_path):
@@ -72,23 +78,29 @@ def preprocess(df, test_size, shuffle):
 
 
 def train(args):
-    df = data_loader(args.path)
+    if args.task == "adult":
+        df_train = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+        df_test = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+        label = "class"
+    elif args.task == "TCGA_HNSC":
+        df = data_loader(args.path)
+        df_train, df_test = preprocess(df, args.test_size, args.shuffle)
+        label = "vital_status"
+    else:
+        raise NotImplementedError
 
-    df_train, df_test = preprocess(df, args.test_size, args.shuffle)
-    label = "vital_status"
     metric = "accuracy"
-
-    # from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
-    # hyperparameters = get_hyperparameter_config('multimodal')
-
-    predictor = TabularPredictor(label=label, eval_metric=metric, path=args.exp_path).fit(
+    hyperparameters = {} if args.mode == "FT_Transformer" else get_hyperparameter_config('default')
+    hyperparameters['FT_TRANSFORMER'] = {"env.num_gpus": args.num_gpus, "env.num_workers": args.num_workers}
+    predictor = TabularPredictor(label=label,
+                                 eval_metric=metric,
+                                 ).fit(
         train_data=df_train,
-        # hyperparameters=hyperparameters,
+        hyperparameters=hyperparameters,
         time_limit=900,
     )
     leaderboard = predictor.leaderboard(df_test)
-
-    leaderboard.to_csv(os.path.join(args.exp_path, "leaderboard.csv"))
+    leaderboard.to_csv("./leaderboard.csv")
     return
 
 
