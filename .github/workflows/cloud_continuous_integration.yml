@@ -52,22 +52,22 @@ jobs:
   #       uses: ./.github/actions/test-cloud
   #       with:
   #         submodule-to-test: general
-  test_tabular_cloud:
-    needs: permission_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-        uses: actions/checkout@v2
-      - name: Checkout repository(Pull Request Target)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: actions/checkout@v2
-        with:
-          ref: "refs/pull/${{ github.event.number }}/merge"
-      - name: Test Tabular Cloud
-        uses: ./.github/actions/test-cloud
-        with:
-          submodule-to-test: tabular
+  # test_tabular_cloud:
+  #   needs: permission_check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  #       uses: actions/checkout@v2
+  #     - name: Checkout repository(Pull Request Target)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: actions/checkout@v2
+  #       with:
+  #         ref: "refs/pull/${{ github.event.number }}/merge"
+  #     - name: Test Tabular Cloud
+  #       uses: ./.github/actions/test-cloud
+  #       with:
+  #         submodule-to-test: tabular
   # test_text_cloud:
   #   needs: permission_check
   #   runs-on: ubuntu-latest
@@ -100,19 +100,19 @@ jobs:
   #       uses: ./.github/actions/test-cloud
   #       with:
   #         submodule-to-test: image
-  # test_multimodal_cloud:
-  #   needs: permission_check
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-  #       uses: actions/checkout@v2
-  #     - name: Checkout repository(Pull Request Target)
-  #       if: ${{ github.event_name == 'pull_request_target' }}
-  #       uses: actions/checkout@v2
-  #       with:
-  #         ref: "refs/pull/${{ github.event.number }}/merge"
-  #     - name: Test Multimodal Cloud
-  #       uses: ./.github/actions/test-cloud
-  #       with:
-  #         submodule-to-test: multimodal
+  test_multimodal_cloud:
+    needs: permission_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        uses: actions/checkout@v2
+      - name: Checkout repository(Pull Request Target)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
+        with:
+          ref: "refs/pull/${{ github.event.number }}/merge"
+      - name: Test Multimodal Cloud
+        uses: ./.github/actions/test-cloud
+        with:
+          submodule-to-test: multimodal
