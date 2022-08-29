@@ -17,7 +17,7 @@ def download_sample_images():
 
 @pytest.mark.parametrize(
     "checkpoint_name",
-    ["textsnake_r50_fpn_unet_1200e_ctw1500", "dbnet_r18_fpnc_1200e_icdar2015"],
+    ["textsnake_r50_fpn_unet_1200e_ctw1500"],
 )
 def test_mmocr_text_detection_inference(checkpoint_name):
     mmocr_image_name = download_sample_images()
@@ -29,4 +29,11 @@ def test_mmocr_text_detection_inference(checkpoint_name):
         pipeline="ocr_text_detection",
     )
 
-    predictor.predict({"image": [mmocr_image_name]})
+    # two dimensions, (num of text lines, 2 * num of coordinate points)
+    pred = predictor.predict({"image": [mmocr_image_name]})
+
+    assert len(pred[0]) == 9  # num of text lines
+    true_res_list = [751, 477, 757, 809, 977, 1239, 885, 1043, 1039]  # from MMOCR
+
+    for i, line in enumerate(pred[0]):
+        assert len(line) == true_res_list[i]  # 2 * num of coordinate points

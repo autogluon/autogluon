@@ -111,6 +111,7 @@ def ocr_text_detection():
         "model.mmdet_image.checkpoint_name": "TextSnake",
         "env.eval_batch_size_ratio": 1,
         "env.num_gpus": 1,
+        "env.precision": 32,
     }
 
 

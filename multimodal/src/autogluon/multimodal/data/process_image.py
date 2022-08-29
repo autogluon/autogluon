@@ -35,7 +35,7 @@ except ImportError:
 try:
     import mmocr
 except ImportError:
-    mmdet = None
+    mmocr = None
 
 try:
     from torchvision.transforms import InterpolationMode

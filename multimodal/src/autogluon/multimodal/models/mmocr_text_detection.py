@@ -35,7 +35,7 @@ logger = logging.getLogger(AUTOMM)
 class MMOCRAutoModelForTextDetection(nn.Module):
     """
     Support MMOCR object detection models.
-    Refer to https://github.com/open-mmlab/mmdetection
+    Refer to https://github.com/open-mmlab/mmocr
     """
 
     def __init__(
@@ -46,12 +46,12 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         pretrained: Optional[bool] = True,
     ):
         """
-        Load a pretrained object detector from MMdetection.
+        Load a pretrained ocr text detection detector from MMOCR.
 
         Parameters
         ----------
         prefix
-            The prefix of the MMdetAutoModelForObjectDetection model.
+            The prefix of the MMdetAutoModelForTextDetection model.
         checkpoint_name
             Name of the mmdet checkpoint.
         num_classes
@@ -75,28 +75,11 @@ class MMOCRAutoModelForTextDetection(nn.Module):
 
         # build model and load pretrained weights
         assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
-        # previous version1
-        # print(self.config)
-        # self.model = MMOCR(det_config=config_file, det_ckpt=checkpoints[0],recog=None)
-        # self.model.cfg = self.config  # save the config in the model for convenience
-        # self.prefix = prefix
-
-        # previous version2
-        # self.model = init_detector(config_file, checkpoints[0])
 
         checkpoint = checkpoints[0]
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
         if checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
-            if "CLASSES" in checkpoint.get("meta", {}):
-                self.model.CLASSES = checkpoint["meta"]["CLASSES"]
-            else:
-                warnings.simplefilter("once")
-                warnings.warn(
-                    "Class names are not saved in the checkpoint's " "meta data, use COCO classes by default."
-                )
-                assert mmdet is not None, "Please install MMDET by: pip install mmdet."
-                self.model.CLASSES = get_classes("coco")
         self.model = revert_sync_batchnorm(self.model)
         self.model.cfg = self.config
         self.prefix = prefix
@@ -146,7 +129,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         if next(self.model.parameters()).is_cuda:
             # scatter to specified GPU
             data = scatter(data, [device])[0]
-        # results = self.model.readtext(**data)
+
         results = self.model(return_loss=False, rescale=True, **data)
 
         ret = {BBOX: results[0]["boundary_result"]}
@@ -161,7 +144,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         the input end. The layers defined in this class, e.g., head, have id 0.
 
         Setting all layers as the same id 0 for now.
-        TODO: Need to investigate mmdetection's model definitions
+        TODO: Need to investigate mmocr's model definitions
 
         Returns
         -------
