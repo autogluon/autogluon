@@ -1,4 +1,4 @@
-name: "Checkout Source Code and Setup AWS Credentials"
+name: "Setup AWS Credentials"
 inputs:
   role-to-assume:
     required: true
@@ -12,14 +12,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout repository
-      if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-      uses: actions/checkout@v2
-    - name: Checkout repository(Pull Request Target)
-      if: ${{ github.event_name == 'pull_request_target' }}
-      uses: actions/checkout@v2
-      with:
-        ref: "refs/pull/${{ github.event.number }}/merge"
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
