@@ -34,13 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-      if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-      uses: actions/checkout@v2
-    - name: Checkout repository(Pull Request Target)
-      if: ${{ github.event_name == 'pull_request_target' }}
-      uses: actions/checkout@v2
-      with:
-        ref: "refs/pull/${{ github.event.number }}/merge"
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        uses: actions/checkout@v2
+      - name: Checkout repository(Pull Request Target)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
+        with:
+          ref: "refs/pull/${{ github.event.number }}/merge"
       - name: Test General Cloud
         uses: ./.github/actions/test-cloud
         with:
