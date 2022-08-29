@@ -3,7 +3,6 @@ from typing import List, Optional, Tuple
 
 import torch
 from torch import nn
-from transformers import AutoModel
 from transformers import logging as hf_logging
 from transformers.models.t5 import T5PreTrainedModel
 
@@ -19,20 +18,11 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import assign_layer_ids, get_column_features, init_weights
+from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 hf_logging.set_verbosity_error()
 
 logger = logging.getLogger(AUTOMM)
-
-
-class DummyLayer(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
-
-    def forward(self, x):
-        return x + self.dummy_bias - self.dummy_bias
 
 
 class HFAutoModelForTextPrediction(nn.Module):
@@ -48,6 +38,7 @@ class HFAutoModelForTextPrediction(nn.Module):
         num_classes: Optional[int] = 0,
         pooling_mode: Optional[str] = "cls",
         gradient_checkpointing: Optional[bool] = False,
+        pretrained: Optional[bool] = True,
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -74,13 +65,16 @@ class HFAutoModelForTextPrediction(nn.Module):
             The pooling mode for the Transformer. Can be "cls", or "mean"
         gradient_checkpointing
             Whether to enable gradient checkpointing
+        pretrained
+            Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
 
-        self.model = AutoModel.from_pretrained(checkpoint_name)
+        self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
+
         if isinstance(self.model, T5PreTrainedModel):
             self.is_t5 = True
             # Remove the decoder in T5

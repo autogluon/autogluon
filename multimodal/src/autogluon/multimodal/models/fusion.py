@@ -71,6 +71,7 @@ class MultimodalFusionMLP(nn.Module):
             assert loss_weight > 0
         self.loss_weight = loss_weight
         self.model = nn.ModuleList(models)
+        self.num_classes = num_classes
 
         raw_in_features = [per_model.out_features for per_model in models]
         if adapt_in_features is not None:

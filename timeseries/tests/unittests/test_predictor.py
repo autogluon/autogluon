@@ -1,23 +1,25 @@
-"""Unit tests for learners"""
+"""Unit tests for predictors"""
 import copy
+import logging
+from unittest import mock
 
 import numpy as np
 import pandas as pd
 import pytest
-from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel
-from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
+from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory, MQRNNEstimator
 from autogluon.timeseries.predictor import TimeSeriesPredictor
+from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter
 
 from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"AutoETS": {}, "SimpleFeedForward": {"epochs": 1}},
+    {"AutoETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
 ]
 
 
@@ -133,7 +135,7 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
 def test_given_hyperparameters_and_custom_models_when_predictor_called_then_leaderboard_is_correct(
     temp_model_path, eval_metric, hyperparameters, expected_board_length
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=eval_metric)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
@@ -141,7 +143,7 @@ def test_given_hyperparameters_and_custom_models_when_predictor_called_then_lead
     )
     leaderboard = predictor.leaderboard()
 
-    if predictor._trainer.enable_ensemble:
+    if predictor._trainer.enable_ensemble and len(hyperparameters) > 1:
         expected_board_length += 1
 
     assert len(leaderboard) == expected_board_length
@@ -384,3 +386,74 @@ def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(t
 
     loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
     assert loaded_predictor.ignore_time_index == ignore_time_index
+
+
+@pytest.mark.parametrize(
+    "splitter_string, expected_splitter_class",
+    [("last_window", LastWindowSplitter), ("multi_window", MultiWindowSplitter)],
+)
+def test_when_passing_magic_string_as_validation_splitter_then_correct_splitter_object_is_created(
+    splitter_string, expected_splitter_class
+):
+    predictor = TimeSeriesPredictor(validation_splitter=splitter_string)
+    assert isinstance(predictor.validation_splitter, expected_splitter_class)
+
+
+def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        enable_ensemble=True,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "SimpleFeedForward": {"epochs": 1},
+            "DeepAR": {"epochs": 1},
+        },
+    )
+    assert any("ensemble" in n.lower() for n in predictor.get_model_names())
+
+
+def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_then_ensemble_is_not_fitted(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        enable_ensemble=True,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+
+
+def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_fitted(temp_model_path):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        enable_ensemble=False,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+
+
+def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_learner(temp_model_path):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        eval_metric="MAPE",
+        enable_ensemble=False,
+    )
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"ARIMA": {"maxiter": 1, "seasonal_period": 1, "seasonal_order": (0, 0, 0)}},
+    )
+    with mock.patch("autogluon.timeseries.models.sktime.models.ARIMA.predict") as arima_predict:
+        arima_predict.side_effect = RuntimeError("Numerical error")
+        with pytest.raises(RuntimeError, match="Prediction failed, please provide a different model to"):
+            predictor.predict(DUMMY_TS_DATAFRAME)

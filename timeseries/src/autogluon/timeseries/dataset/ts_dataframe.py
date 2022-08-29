@@ -174,7 +174,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return len(self._item_index)
 
     def num_timesteps_per_item(self) -> pd.Series:
-        return self.groupby(level=ITEMID).size()
+        return self.groupby(level=ITEMID, sort=False).size()
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -208,11 +208,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if df[TIMESTAMP].isnull().any():
             raise ValueError(f"`{TIMESTAMP}` column can not have nan")
         if not df[TIMESTAMP].dtype == "datetime64[ns]":
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’.")
-
-        # TODO: check if time series are irregularly sampled. this check was removed as
-        # TODO: pandas is inconsistent in identifying freq when period-end timestamps
-        # TODO: are provided.
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64[ns]`.")
+        item_id_column = df[ITEMID]
+        # workaround for pd.api.types.is_string_dtype issue https://github.com/pandas-dev/pandas/issues/15585
+        item_id_is_string = (item_id_column == item_id_column.astype(str)).all()
+        item_id_is_int = pd.api.types.is_integer_dtype(item_id_column)
+        if not (item_id_is_string or item_id_is_int):
+            raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
@@ -229,9 +231,15 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not isinstance(data.index, pd.MultiIndex):
             raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
         if not data.index.dtypes.array[1] == "datetime64[ns]":
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’.")
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64[ns]`.")
         if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
             raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
+        item_id_index = data.index.get_level_values(level=ITEMID)
+        # workaround for pd.api.types.is_string_dtype issue https://github.com/pandas-dev/pandas/issues/15585
+        item_id_is_string = (item_id_index == item_id_index.astype(str)).all()
+        item_id_is_int = pd.api.types.is_integer_dtype(item_id_index)
+        if not (item_id_is_string or item_id_is_int):
+            raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
     def _construct_pandas_frame_from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:

@@ -46,10 +46,12 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
+MINIMUM_CONTEXT_LENGTH = 10
 
 
 # TODO: Should we include TBATS to the presets?
 def get_default_hps(key, prediction_length):
+    context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
         "toy": {
             "SimpleFeedForward": {
@@ -73,22 +75,22 @@ def get_default_hps(key, prediction_length):
                 "trend": "add",
                 "seasonal": "add",
                 "auto": False,
-                "initialization_method": "heuristic",
+                "initialization_method": "estimated",
             },
             "ARIMA": {
                 "maxiter": 50,
-                "order": (1, 1, 1),
-                "seasonal_order": (1, 0, 0),
+                "order": (1, 0, 0),
+                "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
             },
             "SimpleFeedForward": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "Transformer": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "DeepAR": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
         },
         "default_hpo": {
@@ -96,15 +98,15 @@ def get_default_hps(key, prediction_length):
                 "cell_type": ag.Categorical("gru", "lstm"),
                 "num_layers": ag.Int(1, 4),
                 "num_cells": ag.Categorical(20, 30, 40, 50),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "SimpleFeedForward": {
                 "batch_normalization": ag.Categorical(True, False),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "Transformer": {
                 "model_dim": ag.Categorical(8, 16, 32),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "AutoETS": {
                 "error": ag.Categorical("add", "mul"),
@@ -116,9 +118,9 @@ def get_default_hps(key, prediction_length):
                 "fail_if_misconfigured": True,
             },
             "ARIMA": {
-                "maxiter": 50,
-                "order": ag.Categorical((1, 1, 1), (2, 0, 1)),
-                "seasonal_order": ag.Categorical((1, 0, 0), (1, 0, 1), (1, 1, 1)),
+                "maxiter": ag.Categorical(50),
+                "order": (1, 0, 0),
+                "seasonal_order": (0, 0, 0),
                 "suppress_warnings": True,
                 "fail_if_misconfigured": True,
             },
