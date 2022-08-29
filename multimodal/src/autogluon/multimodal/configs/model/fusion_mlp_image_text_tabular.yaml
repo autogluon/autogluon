@@ -4,9 +4,7 @@ model:
     - "numerical_mlp"
     - "hf_text"
     - "timm_image"
-    - "clip"
     - "fusion_mlp"
-    - "t_few"
   categorical_mlp:
     hidden_size: 64
     activation: "leaky_relu"
