@@ -10,4 +10,4 @@ setup_build_env
 install_cloud
 
 cd cloud/
-python3 -m pytest --junitxml=results.xml tests/unittests/$MODULE/
+python3 -m pytest -n 2 --junitxml=results.xml tests/unittests/$MODULE/
