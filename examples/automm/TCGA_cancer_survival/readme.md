@@ -25,14 +25,14 @@ XGBoost |  0.905363  | 0.925676 | 0.416847  | 0.027664
 WeightedEnsemble_L2 |  0.873817 | 0.945946 | 1.636808  | 0.028049
 FTTransformer | 0.864353 | 0.891892 | 51.305847 | 0.384669
 
-Full leaderboard details are available at ```./results/leaderboard.csv```. Note that the TCGA-HNSC is a very small tabular dataset with only 1k rows and 29 columns. To test the performance on a larger dataset, we have also included the [adult dataset](https://archive.ics.uci.edu/ml/datasets/adult) with 49k instances. ``` python3 example_cancer_survival.py --task adult --mode all_models ```. The results are as follows:
+Full leaderboard details are available at ```./results/leaderboard.csv```. Note that the TCGA-HNSC is a very small tabular dataset with only 1k rows and 29 columns. To test the performance on a larger dataset, we have also included the [adult dataset](https://archive.ics.uci.edu/ml/datasets/adult) with 49k instances. Simply change the task from ```TCGA_HNSC``` to ```adult```. For example, ``` python3 example_cancer_survival.py --task adult --mode all_models ```. The results are as follows:
 
 Model(adults) | Test accuracy | Validation accuracy | Train time | Test time  
 ----  | ----  | ----  | ----  | ---- 
 XGBoost |  0.877162 | 0.8872 | 0.697971 | 0.038446
 WeightedEnsemble_L2 |  0.876548 | 0.8908 | 42.201000 | 0.316964
 CatBoost |  0.874808 | 0.8828 | 4.263231 |  0.016138 
-FTTransformer  |  0.859249 | 0.8696 | 221.684279 | 2.576508 
+FTTransformer  |  0.862217 | 0.8696 | 820.485878 | 2.732730
 RandomForestEntr | 0.857918 | 0.8620 | 0.979820 | 0.249948
 NeuralNetFastAI | 0.857304 | 0.8620  | 32.106148 | 0.137593
 NeuralNetTorch |  0.856382  | 0.8588 | 40.264039   | 0.177079 
