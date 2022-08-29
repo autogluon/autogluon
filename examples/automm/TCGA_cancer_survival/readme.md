@@ -15,7 +15,7 @@ python3 example_cancer_survival.py --task TCGA_HNSC --mode FT_Transformer
 
 ### 3. Results:
 
-Model | Test accuracy | Validation accuracy | Train time | Test time  
+Model(TCGA-HNSC) | Test accuracy | Validation accuracy | Train time | Test time  
 ----  | ----  | ----  | ----  | ---- 
 NeuralNetTorch |  0.943218 | 0.925676 | 2.700217 | 0.027071
 RandomForestGini |  0.940063 | 0.891892 | 0.603893 | 0.108412
@@ -27,7 +27,7 @@ FTTransformer | 0.864353 | 0.891892 | 51.305847 | 0.384669
 
 Full leaderboard details are available at ```./results/leaderboard.csv```. Note that the TCGA-HNSC is a very small tabular dataset with only 1k rows and 29 columns. To test the performance on a larger dataset, we have also included the [adult dataset](https://archive.ics.uci.edu/ml/datasets/adult) with 49k instances. ``` python3 example_cancer_survival.py --task adult --mode all_models ```. The results are as follows:
 
-Model | Test accuracy | Validation accuracy | Train time | Test time  
+Model(adults) | Test accuracy | Validation accuracy | Train time | Test time  
 ----  | ----  | ----  | ----  | ---- 
 XGBoost |  0.877162 | 0.8872 | 0.697971 | 0.038446
 WeightedEnsemble_L2 |  0.876548 | 0.8908 | 42.201000 | 0.316964
@@ -37,4 +37,4 @@ RandomForestEntr | 0.857918 | 0.8620 | 0.979820 | 0.249948
 NeuralNetFastAI | 0.857304 | 0.8620  | 32.106148 | 0.137593
 NeuralNetTorch |  0.856382  | 0.8588 | 40.264039   | 0.177079 
 
-While Decision Tree-based models are still the top-performing approaches, FT_Transformer beat other deep-learning approaches.
+While Decision Tree-based models are still the top-performing approaches, FT_Transformer beats other deep-learning approaches.
