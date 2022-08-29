@@ -22,4 +22,4 @@ CatBoost  |  0.905363 | 0.939189 | 4.804489 | 0.025413
 XGBoost |  0.905363  | 0.925676 | 0.416847  | 0.027664
 WeightedEnsemble_L2 |  0.873817 | 0.945946 | 1.636808  | 0.028049
 
-Full leaderboard information is available at ```./results/leaderboard.csv```
+Full leaderboard details are available at ```./results/leaderboard.csv```
