@@ -6,9 +6,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
-from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
 

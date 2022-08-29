@@ -69,8 +69,8 @@ class StatsmodelsARIMAModel(AbstractStatsmodelsModel):
         "order",
         "seasonal_order",
         "seasonal_period",
-        "trend",
         "enforce_stationarity",
+        "with_intercept",
     ]
     statsmodels_allowed_fit_args = [
         "maxiter",
@@ -81,10 +81,8 @@ class StatsmodelsARIMAModel(AbstractStatsmodelsModel):
     ) -> ModelFitSummary:
         model_init_args = default_model_init_args.copy()
         # Set trend to constant if trend = True
-        trend = model_init_args.pop("trend", True)
-        if trend:
-            model_init_args["trend"] = "c"
-        model_init_args.setdefault("enforce_stationarity", False)
+        model_init_args.setdefault("enforce_stationarity", True)
+        model_init_args.setdefault("with_intercept", True)
         # Infer seasonal_periods if seasonal_periods is not given / is set to None
         seasonal_period = model_init_args.pop("seasonal_period", None)
         if seasonal_period is None:
