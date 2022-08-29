@@ -18,23 +18,31 @@ defaults:
     shell: bash
 
 jobs:
-  # permission_check:
-  #   runs-on: ubuntu
-  #   steps:
-  #     - name: Check PR Safe to Run
-  #       if: ${{ github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, 'cloud safe to test') == false }}
-  #       run: exit 1
-  #     - name: Remove Safe to Test Label  # One commit is safe doesn't mean the next commit is safe.
-  #       if: ${{ github.event_name == 'pull_request_target' }}
-  #       uses: actions-ecosystem/action-remove-labels@v1.3.0
-  #       with:
-  #         labels: 'cloud safe to test'
-  test_general_cloud:
-    # needs: permission_check
+  permission_check:
     runs-on: ubuntu-latest
     steps:
+      - name: Check PR Safe to Run
+        if: ${{ github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, 'cloud safe to test') == false }}
+        run: exit 1
+      - name: Remove Safe to Test Label  # One commit is safe doesn't mean the next commit is safe.
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions-ecosystem/action-remove-labels@v1.3.0
+        with:
+          labels: 'cloud safe to test'
+  test_general_cloud:
+    needs: permission_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+      if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+      uses: actions/checkout@v2
+    - name: Checkout repository(Pull Request Target)
+      if: ${{ github.event_name == 'pull_request_target' }}
+      uses: actions/checkout@v2
+      with:
+        ref: "refs/pull/${{ github.event.number }}/merge"
       - name: Test General Cloud
-        uses: ./.github/actions/checkout-code-and-setup-aws
+        uses: ./.github/actions/test-cloud
         with:
           submodule-to-test: general
   # test_tabular_cloud:
