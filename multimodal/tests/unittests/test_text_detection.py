@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 import requests
+from mim.commands.download import download
+from mmocr.utils.ocr import MMOCR
 from PIL import Image
 
 from autogluon.multimodal import MultiModalPredictor
@@ -32,8 +34,21 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     # two dimensions, (num of text lines, 2 * num of coordinate points)
     pred = predictor.predict({"image": [mmocr_image_name]})
 
-    assert len(pred[0]) == 9  # num of text lines
-    true_res_list = [751, 477, 757, 809, 977, 1239, 885, 1043, 1039]  # from MMOCR
+    # original MMOCR model's output
+    checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
+    checkpoint = checkpoints[0]
+    config_file = checkpoint_name + ".py"
+    ocr = MMOCR(det_ckpt=checkpoint, det_config=config_file, recog=None)
+    MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
+    true_res_list = []
+    for i in MMOCR_res[0]["boundary_result"]:
+        true_res_list.append(len(i))
 
+    # compare the outputs of original model's output and our model
+    assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
     for i, line in enumerate(pred[0]):
         assert len(line) == true_res_list[i]  # 2 * num of coordinate points
+
+
+if __name__ == "__main__":
+    test_mmocr_text_detection_inference("textsnake_r50_fpn_unet_1200e_ctw1500")
