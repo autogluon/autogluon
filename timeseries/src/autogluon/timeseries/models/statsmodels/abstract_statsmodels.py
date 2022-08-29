@@ -1,27 +1,28 @@
 import logging
 import re
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+from joblib import Parallel, delayed
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
-from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ModelFitSummary:
+class FittedLocalModel:
     """Stores the parameters of a fitted Statsmodels time series model.
 
-    ModelFitSummary doesn't store intermediate results and therefore takes up very little disk space when pickled. In
+    FittedLocalModel doesn't store intermediate results and therefore takes up very little disk space when pickled. In
     contrast, StatsmodelsFittedModel stores the intermediate results and therefore can often take several gigabytes
     when pickled.
 
-    ModelFitSummary is consumed by AbstractStatsmodelsModel._predict_using_fit_summary to generate predictions.
+    FittedLocalModel is consumed by AbstractStatsmodelsModel._predict_using_fit_summary to generate predictions.
     """
 
     model_name: str
@@ -30,6 +31,29 @@ class ModelFitSummary:
 
 
 class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
+    """Abstract class for local models that are fitted for each time series in a dataset.
+
+    Parameters
+    ----------
+    path: str
+        directory to store model artifacts.
+    freq: str
+        string representation (compatible with GluonTS frequency strings) for the data provided.
+        For example, "1D" for daily data, "1H" for hourly data, etc.
+    prediction_length: int
+        Number of time steps ahead (length of the forecast horizon) the model will be optimized
+        to predict. At inference time, this will be the number of time steps the model will
+        predict.
+    name: str
+        Name of the model. Also, name of subdirectory inside path where model will be saved.
+    eval_metric: str
+        objective function the model will be scored on, will use mean_wQuantileLoss by default.
+    hyperparameters:
+        various hyperparameters that will be used by model (can be search spaces instead of
+        fixed values). See *Other Parameters* in each inheriting model's documentation for
+        possible values.
+    """
+
     statsmodels_allowed_init_args: List[str] = []
     statsmodels_allowed_fit_args: List[str] = []
     quantile_method_name: str = "pred_int"
@@ -54,7 +78,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        self._fitted_models: Dict[str, ModelFitSummary] = {}
+        self._fitted_models: Dict[str, FittedLocalModel] = {}
 
     def _get_default_model_init_and_fit_args(self) -> Tuple[dict, dict]:
         default_model_init_args = {}
@@ -75,28 +99,35 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         return default_model_init_args, default_model_fit_args
 
     def _fit_local_model(
-        self, timeseries: TimeSeriesDataFrame, default_model_init_args: dict, default_model_fit_args: dict
-    ) -> ModelFitSummary:
+        self, timeseries: pd.Series, default_model_init_args: dict, default_model_fit_args: dict
+    ) -> FittedLocalModel:
         """Fit a single local model to the time series."""
         raise NotImplementedError
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: int = None, **kwargs):
+        # Select timeseries that don't have a fitted local model
         train_hash = hash_ts_dataframe_items(train_data)
         items_to_fit = [item_id for item_id, ts_hash in train_hash.iteritems() if ts_hash not in self._fitted_models]
+        timeseries_to_fit = (train_data.loc[item_id][self.target] for item_id in items_to_fit)
         default_model_init_args, default_model_fit_args = self._get_default_model_init_and_fit_args()
-        # TODO: Parallelize fitting
-        with statsmodels_warning_filter():
-            for item_id in items_to_fit:
-                self._fitted_models[train_hash.loc[item_id]] = self._fit_local_model(
-                    timeseries=train_data.loc[item_id],
-                    default_model_init_args=default_model_init_args,
-                    default_model_fit_args=default_model_fit_args,
-                )
+        # TODO: Should we rather set n_jobs in __init__?
+        self.n_jobs = default_model_fit_args.pop("n_jobs", -1)
+
+        # Fit models in parallel
+        fit_fn = partial(
+            self._fit_local_model,
+            default_model_fit_args=default_model_fit_args,
+            default_model_init_args=default_model_init_args,
+        )
+        fitted_models = Parallel(n_jobs=self.n_jobs)(delayed(fit_fn)(timeseries=ts) for ts in timeseries_to_fit)
+        for item_id, model in zip(items_to_fit, fitted_models):
+            self._fitted_models[train_hash.loc[item_id]] = model
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         self._check_predict_inputs(data, quantile_levels=quantile_levels, **kwargs)
         if quantile_levels is None:
             quantile_levels = self.quantile_levels
+
         # Make sure that we fitted a local model to each time series in data
         data_hash = hash_ts_dataframe_items(data)
         items_to_fit = [item_id for item_id, ts_hash in data_hash.iteritems() if ts_hash not in self._fitted_models]
@@ -104,31 +135,30 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             logger.info(f"{self.name} received {len(items_to_fit)} items not seen during training, re-running fit")
             self._fit(train_data=data)
 
-        # TODO: Parallelize prediction
-        predictions_per_item = {}
-        with statsmodels_warning_filter():
-            for item_id, ts_hash in data_hash.iteritems():
-                predictions_per_item[item_id] = self._predict_using_fit_summary(
-                    fit_summary=self._fitted_models[ts_hash],
-                    timeseries=data.loc[item_id],
-                    quantile_levels=quantile_levels,
-                )
-        result_df = pd.concat(predictions_per_item)
+        # Make predictions in parallel
+        predict_fn = partial(self._predict_with_local_model, quantile_levels=quantile_levels)
+        timeseries_with_models = (
+            (data.loc[item_id][self.target], self._fitted_models[ts_hash])
+            for item_id, ts_hash in data_hash.iteritems()
+        )
+        predictions = Parallel(n_jobs=self.n_jobs)(
+            delayed(predict_fn)(timeseries=ts, fitted_model=model) for ts, model in timeseries_with_models
+        )
+
+        # Combine all predictions into a single DataFrame
+        result_df = pd.concat({item_id: pred for item_id, pred in zip(data.iter_items(), predictions)})
         result_df.index.rename([ITEMID, TIMESTAMP], inplace=True)
         return TimeSeriesDataFrame(result_df)
 
-    def _predict_using_fit_summary(
-        self,
-        fit_summary: ModelFitSummary,
-        timeseries: TimeSeriesDataFrame,
-        quantile_levels: List[float],
+    def _predict_with_local_model(
+        self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
     ) -> pd.DataFrame:
         raise NotImplementedError
 
-    def _get_predictions_from_fitted_model(self, fitted_model, cutoff, quantile_levels):
+    def _get_predictions_from_initialized_model(self, initialized_model, cutoff, quantile_levels):
         start = cutoff + pd.tseries.frequencies.to_offset(self.freq)
         end = cutoff + self.prediction_length * pd.tseries.frequencies.to_offset(self.freq)
-        predictions = fitted_model.get_prediction(start=start, end=end)
+        predictions = initialized_model.get_prediction(start=start, end=end)
         results = [predictions.predicted_mean.rename("mean")]
         for q in quantile_levels:
             if q < 0.5:
@@ -137,6 +167,8 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             else:
                 coverage = 2 * (1 - q)
                 column_index = 1
+            # Different statsmodels models call the method that produces probabilistic forecasts differently, we store
+            # the correct method name in self.quantile_method_name
             quantile_pred = getattr(predictions, self.quantile_method_name)(alpha=coverage)
             # Select lower bound of the confidence interval if q < 0.5, upper bound otherwise
             results.append(quantile_pred.iloc[:, column_index].rename(str(q)))
