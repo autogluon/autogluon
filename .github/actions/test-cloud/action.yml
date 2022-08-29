@@ -13,5 +13,6 @@ runs:
         role-duration-seconds: 7200
         aws-region: us-east-1
     - name: Test Cloud Submodule
+      shell: bash
       run: |
         chmod +x ./.github/workflow_scripts/test_cloud.sh && ./.github/workflow_scripts/test_cloud.sh ${{ inputs.submodule-to-test }}
