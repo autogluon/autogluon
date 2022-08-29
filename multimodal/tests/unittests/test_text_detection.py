@@ -48,7 +48,3 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
     for i, line in enumerate(pred[0]):
         assert len(line) == true_res_list[i]  # 2 * num of coordinate points
-
-
-if __name__ == "__main__":
-    test_mmocr_text_detection_inference("textsnake_r50_fpn_unet_1200e_ctw1500")
