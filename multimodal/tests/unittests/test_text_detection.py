@@ -43,6 +43,7 @@ def test_mmocr_text_detection_inference(checkpoint_name):
 
     # compare the outputs of original model's output and our model
     assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
+
     for i in range(len(pred[0])):
         p = pred[0][i]
         m = MMOCR_res[0]["boundary_result"][i]
