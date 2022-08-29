@@ -3,18 +3,13 @@ import zipfile
 
 from autogluon.cloud import MultiModalCloudPredictor
 
-from ..utils import (
-    _prepare_data,
-    _test_functionality
-)
 
-
-def test_multimodal_text_only():
+def test_multimodal_text_only(test_helper):
     train_data = 'text_train.csv'
     tune_data = 'text_tune.csv'
     test_data = 'text_test.csv'
     with tempfile.TemporaryDirectory() as root:
-        _prepare_data(train_data, tune_data, test_data)
+        test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
 
         predictor_init_args = dict(
@@ -34,7 +29,7 @@ def test_multimodal_text_only():
             cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-text-no-train',
             local_output_path='test_multimodal_text_cloud_predictor_no_train'
         )
-        _test_functionality(
+        test_helper.test_functionality(
             cloud_predictor,
             predictor_init_args,
             predictor_fit_args,
@@ -44,12 +39,12 @@ def test_multimodal_text_only():
         )
 
 
-def test_multimodal_image_only():
+def test_multimodal_image_only(test_helper):
     train_data = 'image_train_relative.csv'
     train_image = 'shopee-iet.zip'
     test_data = 'test_images/BabyPants_1035.jpg'
     with tempfile.TemporaryDirectory() as root:
-        _prepare_data(train_data, train_image, test_data)
+        test_helper.prepare_data(train_data, train_image, test_data)
         test_data = 'BabyPants_1035.jpg'
         time_limit = 60
 
@@ -69,7 +64,7 @@ def test_multimodal_image_only():
             cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-image-no-train',
             local_output_path='test_multimodal_image_cloud_predictor_no_train'
         )
-        _test_functionality(
+        test_helper.test_functionality(
             cloud_predictor,
             predictor_init_args,
             predictor_fit_args,
@@ -80,11 +75,11 @@ def test_multimodal_image_only():
         )
 
 
-def test_multimodal_tabular_text():
+def test_multimodal_tabular_text(test_helper):
     train_data = 'tabular_text_train.csv'
     test_data = 'tabular_text_test.csv'
     with tempfile.TemporaryDirectory() as root:
-        _prepare_data(train_data, test_data)
+        test_helper.prepare_data(train_data, test_data)
         time_limit = 60
 
         predictor_init_args = dict(
@@ -102,7 +97,7 @@ def test_multimodal_tabular_text():
             cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-tabular-text-no-train',
             local_output_path='test_multimodal_tabular_text_cloud_predictor_no_train'
         )
-        _test_functionality(
+        test_helper.test_functionality(
             cloud_predictor,
             predictor_init_args,
             predictor_fit_args,
@@ -112,12 +107,12 @@ def test_multimodal_tabular_text():
         )
 
 
-def test_multimodal_tabular_text_image():
+def test_multimodal_tabular_text_image(test_helper):
     train_data = 'tabular_text_image_train.csv'
     test_data = 'tabular_text_image_test.csv'
     images = 'tabular_text_image_images.zip'
     with tempfile.TemporaryDirectory() as root:
-        _prepare_data(train_data, test_data, images)
+        test_helper.prepare_data(train_data, test_data, images)
         with zipfile.ZipFile(images, 'r') as zip_ref:
             zip_ref.extractall('.')
         time_limit = 120
@@ -137,7 +132,7 @@ def test_multimodal_tabular_text_image():
             cloud_output_path='s3://autogluon-cloud-ci/test-multimodal-tabular-text-image-no-train',
             local_output_path='test_multimodal_tabular_text_image_cloud_predictor_no_train'
         )
-        _test_functionality(
+        test_helper.test_functionality(
             cloud_predictor,
             predictor_init_args,
             predictor_fit_args,
