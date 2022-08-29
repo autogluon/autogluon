@@ -192,3 +192,5 @@ Refer to the [TabularPredictor documentation](../../api/autogluon.predictor.html
 ## Advanced Usage
 
 For more advanced usage examples of AutoGluon, refer to :ref:`sec_tabularadvanced`
+
+If you are interested in deployment optimization, refer to the :ref:`sec_tabulardeployment` tutorial.
