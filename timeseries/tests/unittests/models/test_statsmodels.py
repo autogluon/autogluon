@@ -14,7 +14,7 @@ TESTABLE_MODELS = [
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_statsmodels_models_saved_then_fitted_models_can_be_loaded(model_class, temp_model_path):
-    model = model_class(freq=DUMMY_TS_DATAFRAME.freq, path=temp_model_path)
+    model = model_class(path=temp_model_path)
     model.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"maxiter": 1})
     model.save()
 
@@ -27,7 +27,7 @@ def test_when_statsmodels_models_saved_then_fitted_models_can_be_loaded(model_cl
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("n_jobs", [0.5, 3])
 def test_when_statsmodels_models_saved_then_n_jobs_is_saved(model_class, n_jobs, temp_model_path):
-    model = model_class(freq=DUMMY_TS_DATAFRAME.freq, path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
+    model = model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
     model.save()
 
     loaded_model = model.__class__.load(path=model.path)
@@ -42,9 +42,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     train_data = get_data_frame_with_item_index(list(range(train_data_size)))
     test_data = get_data_frame_with_item_index(list(range(test_data_size)))
 
-    model = model_class(
-        path=temp_model_path, prediction_length=3, hyperparameters={"maxiter": 1}, freq=train_data.freq
-    )
+    model = model_class(path=temp_model_path, prediction_length=3, hyperparameters={"maxiter": 1})
     model.fit(train_data=train_data)
 
     with caplog.at_level(logging.INFO):
@@ -79,12 +77,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     expected_seasonal_period,
 ):
     train_data = get_data_frame_with_item_index(["A", "B", "C"], data_length=ts_length, freq=freqstr)
-    model = model_class(
-        path=temp_model_path,
-        prediction_length=3,
-        hyperparameters=hyperparameters,
-        freq=train_data.freq,
-    )
+    model = model_class(path=temp_model_path, prediction_length=3, hyperparameters=hyperparameters)
 
     model.fit(train_data=train_data)
     single_fitted_model = next(iter(model._fitted_models.values()))
@@ -111,10 +104,7 @@ def test_when_seasonal_period_is_provided_then_inferred_period_is_overriden(
 ):
     train_data = get_data_frame_with_item_index(["A", "B", "C"], data_length=ts_length, freq=freqstr)
     model = model_class(
-        path=temp_model_path,
-        prediction_length=3,
-        hyperparameters={"seasonal_period": provided_seasonal_period},
-        freq=train_data.freq,
+        path=temp_model_path, prediction_length=3, hyperparameters={"seasonal_period": provided_seasonal_period}
     )
 
     model.fit(train_data=train_data)

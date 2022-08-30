@@ -9,6 +9,8 @@ import pandas as pd
 from joblib import Parallel, delayed
 from statsmodels.tsa.base.tsa_model import TimeSeriesModelResults as StatsmodelsTSModelResults
 
+from autogluon.common.utils.log_utils import set_logger_verbosity
+
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
@@ -134,6 +136,18 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         raise NotImplementedError
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: int = None, **kwargs):
+        verbosity = kwargs.get("verbosity", 2)
+        set_logger_verbosity(verbosity, logger=logger)
+        self._check_fit_params()
+
+        if self.freq is None:
+            self.freq = train_data.freq
+        else:
+            if self.freq != train_data.freq:
+                raise RuntimeError(
+                    f"Frequency of train_data {train_data.freq} must match the frequency {self.freq} of {self.name}"
+                )
+
         # Select timeseries that don't have a fitted local model
         train_hash = hash_ts_dataframe_items(train_data)
         items_to_fit = [item_id for item_id, ts_hash in train_hash.iteritems() if ts_hash not in self._fitted_models]
