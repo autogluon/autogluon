@@ -11,7 +11,7 @@ from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetMxnetModel, TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
     ImagePredictorModel, VowpalWabbitModel, \
-    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel, MultiModalPredictorModel
+    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel, MultiModalPredictorModel, FTTransformerModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,7 @@ MODEL_TYPES = dict(
     AG_TEXT_NN=TextPredictorModel,
     AG_IMAGE_NN=ImagePredictorModel,
     AG_AUTOMM=MultiModalPredictorModel,
+    FT_TRANSFORMER=FTTransformerModel,
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
@@ -107,6 +108,7 @@ DEFAULT_MODEL_NAMES = {
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
     MultiModalPredictorModel: 'MultiModalPredictor',
+    FTTransformerModel: 'FTTransformer',
     FastTextModel: 'FastText',
     VowpalWabbitModel: 'VowpalWabbit',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',
