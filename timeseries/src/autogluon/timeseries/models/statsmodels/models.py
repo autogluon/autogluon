@@ -45,7 +45,7 @@ class ETSModel(AbstractStatsmodelsModel):
         Number of iterations during optimization.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
-        When set to a float between 0 and 1, that fraction of available CPU cores is used.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
     """
@@ -142,7 +142,7 @@ class ARIMAModel(AbstractStatsmodelsModel):
         Number of iterations during optimization.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
-        When set to a float between 0 and 1, that fraction of available CPU cores is used.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
     """
