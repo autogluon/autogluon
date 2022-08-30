@@ -1,15 +1,5 @@
 """Wrapper of the MultiModalPredictor."""
-from typing import Dict, Optional
 import logging
-import os
-import pandas as pd
-
-
-from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
-    S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
-from autogluon.core.constants import REGRESSION
-from autogluon.core.utils import get_cpu_count, get_gpu_count_torch, try_import_autogluon_text
-from autogluon.core.models import AbstractModel
 from .automm_model import MultiModalPredictorModel
 
 logger = logging.getLogger(__name__)
