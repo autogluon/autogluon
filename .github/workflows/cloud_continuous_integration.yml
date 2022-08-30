@@ -16,6 +16,7 @@ on:
 
 permissions:
   id-token: write
+  contents: read
   pull-requests: write  # For removing tags from the PR
 
 defaults:
