@@ -6,7 +6,6 @@ on:
       - 'cloud/**'
       - '.github/workflows/cloud_continuous_integration.yml'
       - '.github/workflow_scripts/test_cloud.sh'
-  pull_request:
   pull_request_target:
     types: [labeled]
     paths:
@@ -16,7 +15,7 @@ on:
 
 permissions:
   id-token: write
-  contents: write
+  contents: read
   pull-requests: write  # For removing tags from the PR
 
 defaults:
@@ -47,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/checkout@v2
       - name: Checkout repository(Pull Request Target)
         if: ${{ github.event_name == 'pull_request_target' }}
@@ -63,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/checkout@v2
       - name: Checkout repository(Pull Request Target)
         if: ${{ github.event_name == 'pull_request_target' }}
@@ -79,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/checkout@v2
       - name: Checkout repository(Pull Request Target)
         if: ${{ github.event_name == 'pull_request_target' }}
@@ -95,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/checkout@v2
       - name: Checkout repository(Pull Request Target)
         if: ${{ github.event_name == 'pull_request_target' }}
@@ -111,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/checkout@v2
       - name: Checkout repository(Pull Request Target)
         if: ${{ github.event_name == 'pull_request_target' }}
