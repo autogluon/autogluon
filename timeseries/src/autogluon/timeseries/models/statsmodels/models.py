@@ -35,12 +35,12 @@ class ETSModel(AbstractStatsmodelsModel):
     seasonal : str or None, default = "add"
         Seasonal component model. Allowed values are "add" (additive), "mul" (multiplicative) and None (disabled).
         Note that "mul" is only applicable to time series with positive values.
-    seasonal_periods : int or None, default = None
+    seasonal_period : int or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
         weekly cycle or 12 for monthly data with an annual cycle.
-        When set to None, seasonal_periods will be inferred from the frequency of the training data. Can also be
+        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
-        If seasonal_periods (inferred or provided) is equal to 1, seasonality will be disabled.
+        If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
     maxiter : int, default = 1000
         Number of iterations during optimization.
     n_jobs : int or float, default = 0.5
@@ -68,28 +68,29 @@ class ETSModel(AbstractStatsmodelsModel):
         model_init_args = default_model_init_args.copy()
         model_init_args.setdefault("trend", "add")
 
-        # Infer seasonal_periods if seasonal_periods is not given / is set to None
-        seasonal_periods = model_init_args.pop("seasonal_periods", None)
-        if seasonal_periods is None:
-            seasonal_periods = get_seasonality(self.freq)
+        # Infer seasonal_period if seasonal_period is not given / is set to None
+        seasonal_period = model_init_args.pop("seasonal_period", None)
+        if seasonal_period is None:
+            seasonal_period = get_seasonality(self.freq)
 
         seasonal = model_init_args.setdefault("seasonal", "add")
         if seasonal is not None:
-            if seasonal_periods <= 1:
+            if seasonal_period <= 1:
                 logger.warning(
-                    f"{self.name} with seasonal = {seasonal} requires seasonal_periods > 1 "
-                    f"(received seasonal_periods = {seasonal_periods}). Disabling seasonality."
+                    f"{self.name} with seasonal = {seasonal} requires seasonal_period > 1 "
+                    f"(received seasonal_period = {seasonal_period}). Disabling seasonality."
                 )
                 model_init_args["seasonal"] = None
+                model_init_args["seasonal_periods"] = 1
             else:
-                model_init_args["seasonal_periods"] = seasonal_periods
+                model_init_args["seasonal_periods"] = seasonal_period
 
         model_fit_args = default_model_fit_args.copy()
         return model_init_args, model_fit_args
 
     def _fit_local_model(self, timeseries: pd.Series, model_init_args: dict, model_fit_args: dict) -> FittedLocalModel:
-        # Disable seasonality if timeseries is too short for given seasonal_periods
-        if len(timeseries) < 2 * model_init_args.get("seasonal_periods"):
+        # Disable seasonality if timeseries is too short for given seasonal_period
+        if model_init_args["seasonal"] is not None and len(timeseries) < 2 * model_init_args.get("seasonal_periods"):
             model_init_args = model_init_args.copy()
             model_init_args["seasonal"] = None
 
@@ -127,12 +128,12 @@ class ARIMAModel(AbstractStatsmodelsModel):
         The (p, d, q) order of the model for the number of AR parameters, differences, and MA parameters to use.
     seasonal_order: Tuple[int, int, int], default = (0, 0, 0)
         The (P, D, Q) parameters of the seasonal ARIMA model. Setting to (0, 0, 0) disables seasonality.
-    seasonal_periods : int or None, default = None
+    seasonal_period : int or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
         weekly cycle or 12 for monthly data with an annual cycle.
-        When set to None, seasonal_periods will be inferred from the frequency of the training data. Can also be
+        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
-        If seasonal_periods (inferred or provided) is equal to 1, seasonality will be disabled.
+        If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
     enforce_stationarity : bool, default = True
         Whether to transform the AR parameters to enforce stationarity in the autoregressive component of the model.
         If ARIMA crashes during fitting with an LU decomposition error, you can either set enforce_stationarity to
@@ -150,7 +151,7 @@ class ARIMAModel(AbstractStatsmodelsModel):
     statsmodels_allowed_init_args = [
         "order",
         "seasonal_order",
-        "seasonal_periods",
+        "seasonal_period",
         "enforce_stationarity",
     ]
     statsmodels_allowed_fit_args = [
@@ -164,10 +165,10 @@ class ARIMAModel(AbstractStatsmodelsModel):
         model_init_args.setdefault("enforce_stationarity", True)
         model_init_args["trend"] = "c"
 
-        # Infer seasonal_periods if seasonal_periods is not given / is set to None
-        seasonal_periods = model_init_args.pop("seasonal_periods", None)
-        if seasonal_periods is None:
-            seasonal_periods = get_seasonality(self.freq)
+        # Infer seasonal_period if seasonal_period is not given / is set to None
+        seasonal_period = model_init_args.pop("seasonal_period", None)
+        if seasonal_period is None:
+            seasonal_period = get_seasonality(self.freq)
 
         seasonal_order = model_init_args.pop("seasonal_order", (0, 0, 0))
         seasonal_order_is_valid = len(seasonal_order) == 3 and all(isinstance(p, int) for p in seasonal_order)
@@ -178,10 +179,10 @@ class ARIMAModel(AbstractStatsmodelsModel):
             )
 
         # Disable seasonality if seasonal_period is too short
-        if seasonal_periods <= 1:
+        if seasonal_period <= 1:
             model_init_args["seasonal_order"] = (0, 0, 0, 0)
         else:
-            model_init_args["seasonal_order"] = tuple(seasonal_order) + (seasonal_periods,)
+            model_init_args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
 
         model_fit_args = default_model_fit_args.copy()
         return model_init_args, model_fit_args
