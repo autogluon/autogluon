@@ -13,7 +13,7 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
-from autogluon.timeseries.models import ETSModel, DeepARModel
+from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 

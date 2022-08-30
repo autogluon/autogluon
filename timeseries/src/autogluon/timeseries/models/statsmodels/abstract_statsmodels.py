@@ -110,7 +110,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
                 unused_args.append(key)
         if len(unused_args) > 0:
             logger.warning(
-                f" {self.name} ignores the following hyperparameters: {unused_args}. "
+                f" {self.name} ignores following hyperparameters: {unused_args}. "
                 f"See the docstring of {self.name} for the list of supported hyperparameters."
             )
         return default_model_init_args, default_model_fit_args
@@ -144,6 +144,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         model_init_args, model_fit_args = self._update_model_init_and_fit_args(
             default_model_init_args=default_model_init_args, default_model_fit_args=default_model_fit_args
         )
+        print("model_init_args", model_init_args)
 
         # Fit models in parallel
         fit_fn = partial(self._fit_local_model, model_fit_args=model_fit_args, model_init_args=model_init_args)
