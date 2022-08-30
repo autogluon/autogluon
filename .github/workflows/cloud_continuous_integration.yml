@@ -85,7 +85,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: "refs/pull/${{ github.event.number }}/merge"
-      - name: Test Tabular Text
+      - name: Test Tabular Cloud
         uses: ./.github/actions/test-cloud
         with:
           submodule-to-test: text
