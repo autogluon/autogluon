@@ -19,7 +19,7 @@ from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"StatsmodelsETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
 ]
 
 

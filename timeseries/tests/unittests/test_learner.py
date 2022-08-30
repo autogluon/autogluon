@@ -19,7 +19,7 @@ from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "AutoETS": {}},
+    {"DeepAR": {"epochs": 1}, "ETS": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 

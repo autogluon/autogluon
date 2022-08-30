@@ -80,6 +80,8 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
+        if hyperparameters is None:
+            hyperparameters = {}
         # Use 50% of the available CPU cores by default
         n_jobs = hyperparameters.get("n_jobs", 0.5)
         if isinstance(n_jobs, float) and 0 < n_jobs <= 1.0:

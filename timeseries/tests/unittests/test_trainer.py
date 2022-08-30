@@ -24,7 +24,7 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "AutoETS": {}},
+    {"DeepAR": {"epochs": 1}, "ETS": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
