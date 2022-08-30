@@ -9,7 +9,7 @@ automm_presets = Registry("automm_presets")
 @automm_presets.register()
 def default():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -18,7 +18,7 @@ def default():
 @automm_presets.register()
 def medium_quality_faster_train():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
@@ -28,7 +28,7 @@ def medium_quality_faster_train():
 @automm_presets.register()
 def high_quality():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -37,7 +37,7 @@ def high_quality():
 @automm_presets.register()
 def best_quality():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
         "env.per_gpu_batch_size": 1,
@@ -47,7 +47,7 @@ def best_quality():
 @automm_presets.register()
 def multilingual():
     return {
-        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
         "optimization.top_k": 1,
         "env.precision": "bf16",
