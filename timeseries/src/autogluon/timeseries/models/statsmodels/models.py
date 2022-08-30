@@ -12,7 +12,7 @@ from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filte
 from .abstract_statsmodels import AbstractStatsmodelsModel, FittedLocalModel
 
 
-class StatsmodelsETSModel(AbstractStatsmodelsModel):
+class ETSModel(AbstractStatsmodelsModel):
     """Exponential smoothing with trend and seasonality model.
 
     Based on `statsmodels.tsa.exponential_smoothing.ets.ETSModel`.
@@ -54,7 +54,6 @@ class StatsmodelsETSModel(AbstractStatsmodelsModel):
     ]
     statsmodels_allowed_fit_args = [
         "maxiter",
-        "n_jobs",
     ]
 
     def _fit_local_model(
@@ -93,7 +92,7 @@ class StatsmodelsETSModel(AbstractStatsmodelsModel):
         )
 
 
-class StatsmodelsARIMAModel(AbstractStatsmodelsModel):
+class ARIMAModel(AbstractStatsmodelsModel):
     """Autoregressive Integrated Moving Average (ARIMA) model.
 
     Based on `statsmodels.tsa.statespace.sarimax.SARIMAX`
@@ -131,7 +130,6 @@ class StatsmodelsARIMAModel(AbstractStatsmodelsModel):
     ]
     statsmodels_allowed_fit_args = [
         "maxiter",
-        "n_jobs",
     ]
 
     def _fit_local_model(

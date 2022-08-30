@@ -15,8 +15,8 @@ from .gluonts import (
     SimpleFeedForwardModel,
     TransformerModel,
 )
-from .sktime import ARIMAModel, AutoARIMAModel, AutoETSModel
-from .statsmodels import StatsmodelsARIMAModel, StatsmodelsETSModel
+from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
+from .statsmodels import ARIMAModel, ETSModel
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,11 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    SktimeARIMA=SktimeARIMAModel,
+    SktimeAutoARIMA=SktimeAutoARIMAModel,
+    SktimeAutoETS=SktimeAutoETSModel,
+    ETS=ETSModel,
     ARIMA=ARIMAModel,
-    AutoARIMA=AutoARIMAModel,
-    AutoETS=AutoETSModel,
-    StatsmodelsETS=StatsmodelsETSModel,
-    StatsmodelsARIMA=StatsmodelsARIMAModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -44,11 +44,11 @@ DEFAULT_MODEL_PRIORITY = dict(
     DeepAR=50,
     Prophet=10,
     AutoTabular=10,
-    AutoARIMA=20,
+    SktimeAutoARIMA=20,
+    SktimeARIMA=50,
+    SktimeAutoETS=60,
     ARIMA=50,
-    AutoETS=60,
-    StatsmodelsARIMA=50,
-    StatsmodelsETS=60,
+    ETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
@@ -66,21 +66,20 @@ def get_default_hps(key, prediction_length):
             },
             "Transformer": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
-            "AutoETS": {"maxiter": 20, "seasonal": None},
+            "ETS": {"maxiter": 20, "seasonal": None},
             "ARIMA": {
                 "maxiter": 10,
                 "order": (1, 0, 0),
                 "seasonal_order": (0, 0, 0),
-                "suppress_warnings": True,
             },
         },
         "default": {
-            "StatsmodelsETS": {
+            "ETS": {
                 "maxiter": 200,
                 "trend": "add",
                 "seasonal": "add",
             },
-            "StatsmodelsARIMA": {
+            "ARIMA": {
                 "maxiter": 50,
                 "order": (1, 1, 1),
                 "seasonal_order": (0, 0, 0),
@@ -110,15 +109,15 @@ def get_default_hps(key, prediction_length):
                 "model_dim": ag.Categorical(8, 16, 32),
                 "context_length": context_length,
             },
-            "StatsmodelsETS": {
+            "ETS": {
+                "maxiter": 200,
                 "error": ag.Categorical("add", "mul"),
                 "trend": ag.Categorical("add", "mul", None),
                 "seasonal": ag.Categorical("add", None),
-                "maxiter": 200,
             },
-            "StatsmodelsARIMA": {
+            "ARIMA": {
                 "maxiter": 50,
-                "order": ag.Categorical((2, 0, 1), (2, 1, 1)),
+                "order": ag.Categorical((2, 0, 1), (2, 1, 1), (1, 1, 1)),
                 "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 1)),
             },
         },

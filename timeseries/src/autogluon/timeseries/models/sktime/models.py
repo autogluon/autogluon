@@ -10,7 +10,7 @@ from . import AbstractSktimeModel
 logger = logging.getLogger(__name__)
 
 
-class ThetaModel(AbstractSktimeModel):
+class SktimeThetaModel(AbstractSktimeModel):
     """Theta model for forecasting.
 
     This is a special case of AutoETS model that can only be applied to positive data.
@@ -68,7 +68,7 @@ class ThetaModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class TBATSModel(AbstractSktimeModel):
+class SktimeTBATSModel(AbstractSktimeModel):
     """TBATS forecaster with multiple seasonalities.
 
     See `AbstractSktimeModel` for common parameters.
@@ -127,7 +127,7 @@ class TBATSModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class AutoETSModel(AbstractSktimeModel):
+class SktimeAutoETSModel(AbstractSktimeModel):
     """AutoETS model from sktime.
 
     See `AbstractSktimeModel` for common parameters.
@@ -237,7 +237,7 @@ class AutoETSModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class ARIMAModel(AbstractSktimeModel):
+class SktimeARIMAModel(AbstractSktimeModel):
     """ARIMA model from sktime.
 
     See `AbstractSktimeModel` for common parameters.
@@ -322,7 +322,7 @@ class ARIMAModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class AutoARIMAModel(AbstractSktimeModel):
+class SktimeAutoARIMAModel(AbstractSktimeModel):
     """AutoARIMA model from sktime.
 
     This model automatically selects the (p, d, q) and (P, D, Q) parameters of ARIMA by

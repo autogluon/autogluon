@@ -78,9 +78,11 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
+        self.n_jobs: int = self._get_model_params().get("n_jobs", -1)
         self._fitted_models: Dict[str, FittedLocalModel] = {}
 
     def _get_default_model_init_and_fit_args(self) -> Tuple[dict, dict]:
+        """Separate arguments that will be passed to __init__ and fit methods of the underlying SM model."""
         default_model_init_args = {}
         default_model_fit_args = {}
         unused_args = []
@@ -89,6 +91,9 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
                 default_model_init_args[key] = value
             elif key in self.statsmodels_allowed_fit_args:
                 default_model_fit_args[key] = value
+            elif key == "n_jobs":
+                # n_jobs shouldn't be passed to the statsmodels model
+                pass
             else:
                 unused_args.append(key)
         if len(unused_args) > 0:
@@ -97,6 +102,18 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
                 f"See the docstring of {self.name} for the list of supported hyperparameters."
             )
         return default_model_init_args, default_model_fit_args
+
+    def _update_model_init_and_fit_args(
+        self, default_model_init_args: dict, default_model_fit_args: dict
+    ) -> Tuple[dict, dict]:
+        """Update the arguments passed to the underlying SM model.
+
+        This method takes care of
+         - renaming arguments if AutoGluon API uses a different name than the underlying SM model
+         - overriding the default values
+         - fixing incompatible configurations (e.g., disabling seasonality if the seasonal period is unknown)
+        """
+        raise NotImplementedError
 
     def _fit_local_model(
         self, timeseries: pd.Series, default_model_init_args: dict, default_model_fit_args: dict
@@ -109,16 +126,15 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         train_hash = hash_ts_dataframe_items(train_data)
         items_to_fit = [item_id for item_id, ts_hash in train_hash.iteritems() if ts_hash not in self._fitted_models]
         timeseries_to_fit = (train_data.loc[item_id][self.target] for item_id in items_to_fit)
+
+        # Get initialization / fitting args and update them, if necessary
         default_model_init_args, default_model_fit_args = self._get_default_model_init_and_fit_args()
-        # TODO: Should we rather set n_jobs in __init__?
-        self.n_jobs = default_model_fit_args.pop("n_jobs", -1)
+        model_init_args, model_fit_args = self._update_model_init_and_fit_args(
+            default_model_init_args=default_model_init_args, default_model_fit_args=default_model_fit_args
+        )
 
         # Fit models in parallel
-        fit_fn = partial(
-            self._fit_local_model,
-            default_model_fit_args=default_model_fit_args,
-            default_model_init_args=default_model_init_args,
-        )
+        fit_fn = partial(self._fit_local_model, model_fit_args=model_fit_args, model_init_args=model_init_args)
         fitted_models = Parallel(n_jobs=self.n_jobs)(delayed(fit_fn)(timeseries=ts) for ts in timeseries_to_fit)
         for item_id, model in zip(items_to_fit, fitted_models):
             self._fitted_models[train_hash.loc[item_id]] = model

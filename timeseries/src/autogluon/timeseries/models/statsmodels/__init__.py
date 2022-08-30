@@ -1,7 +1,7 @@
 from .abstract_statsmodels import AbstractStatsmodelsModel
-from .models import StatsmodelsARIMAModel, StatsmodelsETSModel
+from .models import ARIMAModel, ETSModel
 
 __all__ = [
-    "StatsmodelsETSModel",
-    "StatsmodelsARIMAModel",
+    "ETSModel",
+    "ARIMAModel",
 ]
