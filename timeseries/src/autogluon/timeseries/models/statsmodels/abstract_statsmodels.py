@@ -10,7 +10,6 @@ from joblib import Parallel, delayed
 from statsmodels.tsa.base.tsa_model import TimeSeriesModelResults as StatsmodelsTSModelResults
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.hashing import hash_ts_dataframe_items
