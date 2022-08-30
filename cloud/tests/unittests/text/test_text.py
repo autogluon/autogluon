@@ -8,7 +8,7 @@ def test_text(test_helper):
     tune_data = 'text_tune.csv'
     test_data = 'text_test.csv'
     with tempfile.TemporaryDirectory() as root:
-        test_helper._prepare_data(train_data, tune_data, test_data)
+        test_helper.prepare_data(train_data, tune_data, test_data)
         time_limit = 60
 
         predictor_init_args = dict(
@@ -28,7 +28,7 @@ def test_text(test_helper):
             cloud_output_path='s3://autogluon-cloud-ci/test-text-no-train',
             local_output_path='test_text_cloud_predictor_no_train'
         )
-        test_helper._test_functionality(
+        test_helper.test_functionality(
             cloud_predictor,
             predictor_init_args,
             predictor_fit_args,
