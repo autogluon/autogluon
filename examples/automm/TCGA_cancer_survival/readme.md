@@ -2,7 +2,7 @@
 
 ### 1. Task and dataset
 
-This is a simple example of using AutoGluon on [The Cancer Genome Atlas (TCGA) portal](https://portal.gdc.cancer.gov/). In this example, we leveraged the clinical information to predict whether patients have survived from Head and Neck Squamous Cell Carcinoma or not. More details about this dataset and the task is available at [TCGA-HNSC](https://portal.gdc.cancer.gov/projects/TCGA-HNSC). We shows how to use AutoGluon TabularPredictor for this task.
+This is a simple example of using AutoGluon for classification tasks on [the Cancer Genome Atlas (TCGA) portal](https://portal.gdc.cancer.gov/). In this example, we leveraged the clinical information to predict whether patients have survived from Head and Neck Squamous Cell Carcinoma or not. Features include patients' age, gender, cancer stage, therapy received, and many others. More details about this dataset and the task are available at [TCGA-HNSC](https://portal.gdc.cancer.gov/projects/TCGA-HNSC). We used AutoGluon TabularPredictor for this task, with a special focus on the FT_Transformer model.
 
 ### 2. Run experiments:
 
@@ -12,8 +12,11 @@ python3 example_cancer_survival.py --task TCGA_HNSC --mode all_models
 # Just on FT_Transformer 
 python3 example_cancer_survival.py --task TCGA_HNSC --mode FT_Transformer
 ```
+All models were run for a maximum time of 900 seconds. Use ```--path``` for intended path to save TCGA dataset, and ```--num_gpus, --num_workers``` to configure the computing resource.
 
 ### 3. Results:
+
+The performance of AutoGluon on the TCGA-HNSC dataset is as follows:
 
 Model(TCGA-HNSC) | Test accuracy | Validation accuracy | Train time | Test time  
 ----  | ----  | ----  | ----  | ---- 
