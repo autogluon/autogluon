@@ -3,16 +3,16 @@ name: Cloud Continuous Integration
 on:
   push:
     paths:
-      # - 'cloud/**'
-      # - '.github/workflows/cloud_continuous_integration.yml'
-      # - '.github/workflow_scripts/test_cloud.sh'
+      - 'cloud/**'
+      - '.github/workflows/cloud_continuous_integration.yml'
+      - '.github/workflow_scripts/test_cloud.sh'
   pull_request:
   pull_request_target:
     types: [labeled]
-    # paths:
-    #   - 'cloud/**'
-    #   - '.github/workflows/cloud_continuous_integration.yml'
-    #   - '.github/workflow_scripts/test_cloud.sh'
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/cloud_continuous_integration.yml'
+      - '.github/workflow_scripts/test_cloud.sh'
 
 permissions:
   id-token: write
