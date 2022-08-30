@@ -2,10 +2,12 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import partial
+from multiprocessing import cpu_count
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from joblib import Parallel, delayed
+from statsmodels.tsa.base.tsa_model import TimeSeriesModelResults as StatsmodelsTSModelResults
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -78,7 +80,15 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        self.n_jobs: int = self._get_model_params().get("n_jobs", -1)
+        # Use 50% of the available CPU cores by default
+        n_jobs = hyperparameters.get("n_jobs", 0.5)
+        if isinstance(n_jobs, float) and 0 < n_jobs <= 1.0:
+            self.n_jobs = max(int(cpu_count() * n_jobs), 1)
+        elif isinstance(n_jobs, int):
+            self.n_jobs = n_jobs
+        else:
+            raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
+
         self._fitted_models: Dict[str, FittedLocalModel] = {}
 
     def _get_default_model_init_and_fit_args(self) -> Tuple[dict, dict]:
@@ -92,7 +102,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             elif key in self.statsmodels_allowed_fit_args:
                 default_model_fit_args[key] = value
             elif key == "n_jobs":
-                # n_jobs shouldn't be passed to the statsmodels model
+                # n_jobs isn't passed to the underlying statsmodels model
                 pass
             else:
                 unused_args.append(key)
@@ -171,7 +181,9 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
     ) -> pd.DataFrame:
         raise NotImplementedError
 
-    def _get_predictions_from_initialized_model(self, initialized_model, cutoff, quantile_levels):
+    def _get_predictions_from_initialized_model(
+        self, initialized_model: StatsmodelsTSModelResults, cutoff: pd.Timestamp, quantile_levels: List[float]
+    ) -> pd.DataFrame:
         start = cutoff + pd.tseries.frequencies.to_offset(self.freq)
         end = cutoff + self.prediction_length * pd.tseries.frequencies.to_offset(self.freq)
         predictions = initialized_model.get_prediction(start=start, end=end)
