@@ -4,7 +4,7 @@ from .automm_model import MultiModalPredictorModel
 
 logger = logging.getLogger(__name__)
 
-
+# TODO: Add unit tests
 class FTTransformerModel(MultiModalPredictorModel):
     def __init__(self, **kwargs):
         """Wrapper of autogluon.multimodal.MultiModalPredictor.

@@ -37,8 +37,8 @@ def get_parser():
                         default='adult')
     parser.add_argument('--mode', choices=['FT_Transformer', 'all_models'],
                         default='all_models')
-    parser.add_argument('--num_gpus', type=int, default=None)
-    parser.add_argument('--num_workers', type=int, default=12)
+    parser.add_argument('--num_gpus', type=int, default=-1)
+    parser.add_argument('--num_workers', type=int, default=2)
     return parser
 
 
