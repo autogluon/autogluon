@@ -4,38 +4,38 @@ import zipfile
 from autogluon.cloud import TabularCloudPredictor
 
 
-# def test_tabular(test_helper):
-#     train_data = 'tabular_train.csv'
-#     tune_data = 'tabular_tune.csv'
-#     test_data = 'tabular_test.csv'
-#     with tempfile.TemporaryDirectory() as root:
-#         test_helper.prepare_data(train_data, tune_data, test_data)
-#         time_limit = 60
+def test_tabular(test_helper):
+    train_data = 'tabular_train.csv'
+    tune_data = 'tabular_tune.csv'
+    test_data = 'tabular_test.csv'
+    with tempfile.TemporaryDirectory() as root:
+        test_helper.prepare_data(train_data, tune_data, test_data)
+        time_limit = 60
 
-#         predictor_init_args = dict(
-#             label='class',
-#             eval_metric='roc_auc'
-#         )
-#         predictor_fit_args = dict(
-#             train_data=train_data,
-#             tuning_data=tune_data,
-#             time_limit=time_limit,
-#         )
-#         cloud_predictor = TabularCloudPredictor(
-#             cloud_output_path='s3://autogluon-cloud-ci/test-tabular',
-#             local_output_path='test_tabular_cloud_predictor'
-#         )
-#         cloud_predictor_no_train = TabularCloudPredictor(
-#             cloud_output_path='s3://autogluon-cloud-ci/test-tabular-no-train',
-#             local_output_path='test_tabular_cloud_predictor_no_train'
-#         )
-#         test_helper.test_functionality(
-#             cloud_predictor,
-#             predictor_init_args,
-#             predictor_fit_args,
-#             cloud_predictor_no_train,
-#             test_data
-#         )
+        predictor_init_args = dict(
+            label='class',
+            eval_metric='roc_auc'
+        )
+        predictor_fit_args = dict(
+            train_data=train_data,
+            tuning_data=tune_data,
+            time_limit=time_limit,
+        )
+        cloud_predictor = TabularCloudPredictor(
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular',
+            local_output_path='test_tabular_cloud_predictor'
+        )
+        cloud_predictor_no_train = TabularCloudPredictor(
+            cloud_output_path='s3://autogluon-cloud-ci/test-tabular-no-train',
+            local_output_path='test_tabular_cloud_predictor_no_train'
+        )
+        test_helper.test_functionality(
+            cloud_predictor,
+            predictor_init_args,
+            predictor_fit_args,
+            cloud_predictor_no_train,
+            test_data
+        )
 
 
 def test_tabular_tabular_text_image(test_helper):
