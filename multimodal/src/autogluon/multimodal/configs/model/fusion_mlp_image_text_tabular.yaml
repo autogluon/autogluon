@@ -1,11 +1,10 @@
 model:
   names:
-    # Can attach the list of models to use, e.g.
-    # - "categorical_mlp"
-    # - "numerical_mlp"
-    # - "hf_text"
-    # - "timm_image"
-    # - "fusion_mlp"
+    - "categorical_mlp"
+    - "numerical_mlp"
+    - "hf_text"
+    - "timm_image"
+    - "fusion_mlp"
   categorical_mlp:
     hidden_size: 64
     activation: "leaky_relu"
