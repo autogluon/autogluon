@@ -247,7 +247,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                         inplace=True,
                     )
 
-        return df
+        # Make sure the item_ids are sorted in the same order as in data
+        return df.loc[list(data.iter_items())]
 
     def _predict_gluonts_forecasts(self, data: TimeSeriesDataFrame, **kwargs) -> List[Forecast]:
         gts_data = self._to_gluonts_dataset(data)
