@@ -13,7 +13,7 @@ TESTABLE_MODELS = [
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_statsmodels_models_saved_then_fitted_models_can_be_loaded(model_class, temp_model_path):
+def test_when_statsmodels_model_saved_then_fitted_models_can_be_loaded(model_class, temp_model_path):
     model = model_class(path=temp_model_path)
     model.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"maxiter": 1})
     model.save()
@@ -22,6 +22,15 @@ def test_when_statsmodels_models_saved_then_fitted_models_can_be_loaded(model_cl
     for ts_hash, model in model._fitted_models.items():
         assert ts_hash in loaded_model._fitted_models
         assert loaded_model._fitted_models[ts_hash] == model
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_statsmodels_model_is_saved_and_loaded_then_model_can_predict(model_class, temp_model_path):
+    model = model_class(path=temp_model_path)
+    model.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"maxiter": 1})
+    model.save()
+    loaded_model = model.__class__.load(path=model.path)
+    loaded_model.predict(data=DUMMY_TS_DATAFRAME)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

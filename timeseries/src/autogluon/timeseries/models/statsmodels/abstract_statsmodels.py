@@ -158,7 +158,6 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         model_init_args, model_fit_args = self._update_model_init_and_fit_args(
             default_model_init_args=default_model_init_args, default_model_fit_args=default_model_fit_args
         )
-        print("model_init_args", model_init_args)
 
         # Fit models in parallel
         fit_fn = partial(self._fit_local_model, model_fit_args=model_fit_args, model_init_args=model_init_args)
@@ -196,14 +195,48 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
     def _predict_with_local_model(
         self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
     ) -> pd.DataFrame:
+        """Make predictions for a single time series using the fitted local model.
+
+        Parameters
+        ----------
+        timeseries:
+            Time series containing target values with timestamp index.
+        fitted_model:
+            Fitted local model that will be used to make predictions for this time series.
+        quantile_levels:
+            List of quantiles that should be predicted.
+
+        Returns
+        -------
+        pred_df:
+            DataFrame with timestamp as index and mean & quantile forecasts as columns.
+        """
         raise NotImplementedError
 
-    def _get_predictions_from_initialized_model(
-        self, initialized_model: StatsmodelsTSModelResults, cutoff: pd.Timestamp, quantile_levels: List[float]
+    def _get_predictions_from_statsmodels_model(
+        self, sm_model: StatsmodelsTSModelResults, cutoff: pd.Timestamp, quantile_levels: List[float]
     ) -> pd.DataFrame:
+        """Make predictions using an initialized statsmodels model.
+
+        This method should be called inside _predict_with_local_model.
+
+        Parameters
+        ----------
+        sm_model:
+            Statsmodels model that was created from a FittedLocalModel and initialized with the observed data.
+        cutoff:
+            Timestamp of the last observation in the observed time series.
+        quantile_levels:
+            List of quantiles that should be predicted.
+
+        Returns
+        -------
+        pred_df:
+            DataFrame with timestamp as index and mean & quantile forecasts as columns.
+        """
         start = cutoff + pd.tseries.frequencies.to_offset(self.freq)
         end = cutoff + self.prediction_length * pd.tseries.frequencies.to_offset(self.freq)
-        predictions = initialized_model.get_prediction(start=start, end=end)
+        predictions = sm_model.get_prediction(start=start, end=end)
         results = [predictions.predicted_mean.rename("mean")]
         for q in quantile_levels:
             if q < 0.5:

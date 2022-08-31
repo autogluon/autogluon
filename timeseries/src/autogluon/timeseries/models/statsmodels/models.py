@@ -110,9 +110,9 @@ class ETSModel(AbstractStatsmodelsModel):
             base_model = StatsmodelsETS(endog=timeseries, freq=self.freq, **fitted_model.model_init_args)
             parameters = np.array(list(fitted_model.parameters.values()))
             # This is a hack that allows us to set the parameters to their estimated values & initialize the model
-            initialized_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
-        return self._get_predictions_from_initialized_model(
-            initialized_model=initialized_model, cutoff=timeseries.index.max(), quantile_levels=quantile_levels
+            sm_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
+        return self._get_predictions_from_statsmodels_model(
+            sm_model=sm_model, cutoff=timeseries.index.max(), quantile_levels=quantile_levels
         )
 
 
@@ -204,7 +204,7 @@ class ARIMAModel(AbstractStatsmodelsModel):
         with statsmodels_warning_filter():
             base_model = StatsmodelsSARIMAX(endog=timeseries, freq=self.freq, **fitted_model.model_init_args)
             # This is a hack that allows us to set the parameters to their estimated values & initialize the model
-            initialized_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
-        return self._get_predictions_from_initialized_model(
-            initialized_model=initialized_model, cutoff=timeseries.index.max(), quantile_levels=quantile_levels
+            sm_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
+        return self._get_predictions_from_statsmodels_model(
+            sm_model=sm_model, cutoff=timeseries.index.max(), quantile_levels=quantile_levels
         )
