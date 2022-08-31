@@ -32,7 +32,7 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     )
 
     # two dimensions, (num of text lines, 2 * num of coordinate points)
-    pred = predictor.predict({"image": [mmocr_image_name]})
+    pred = predictor.predict({"image": [mmocr_image_name, mmocr_image_name, mmocr_image_name]})
 
     # original MMOCR model's output
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
@@ -40,11 +40,17 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     config_file = checkpoint_name + ".py"
     ocr = MMOCR(det_ckpt=checkpoint, det_config=config_file, recog=None)
     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
-    true_res_list = []
-    for i in MMOCR_res[0]["boundary_result"]:
-        true_res_list.append(len(i))
 
     # compare the outputs of original model's output and our model
     assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
-    for i, line in enumerate(pred[0]):
-        assert len(line) == true_res_list[i]  # 2 * num of coordinate points
+    for i in range(len(pred[0])):
+        p = pred[0][i]
+        m = MMOCR_res[0]["boundary_result"][i]
+        assert len(p) == len(m)  # 2 * num of coordinate points
+
+        for j in range(len(p)):
+            assert abs(p[j] - m[j]) <= 1e-6
+
+
+if __name__ == "__main__":
+    test_mmocr_text_detection_inference("textsnake_r50_fpn_unet_1200e_ctw1500")
