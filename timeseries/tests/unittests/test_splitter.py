@@ -34,7 +34,7 @@ def test_when_multi_window_splitter_splits_then_train_lengths_are_correct(
     train_data, val_data = splitter.split(ts_dataframe=ts_dataframe, prediction_length=prediction_length)
     num_total_validation_steps = num_windows * (prediction_length - overlap) + overlap
 
-    for item_id in train_data.iter_items():
+    for item_id in train_data.iter_item_ids():
         new_length = len(train_data.loc[item_id])
         expected_length = original_lengths.loc[item_id] - num_total_validation_steps
         assert expected_length == new_length
@@ -50,7 +50,7 @@ def test_when_multi_window_splitter_splits_then_val_index_and_lengths_are_correc
 
     train_data, val_data = splitter.split(ts_dataframe=ts_dataframe, prediction_length=prediction_length)
 
-    for new_item_id in val_data.iter_items():
+    for new_item_id in val_data.iter_item_ids():
         old_item_id, start, end = get_original_item_id_and_slice(new_item_id)
         new_length = len(val_data.loc[new_item_id])
         expected_length = len(ts_dataframe.loc[old_item_id][start:end])

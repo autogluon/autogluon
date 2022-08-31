@@ -196,7 +196,7 @@ class TimeSeriesEvaluator:
         quantiles: Optional[List[float]] = None,
     ) -> pd.DataFrame:
         metrics = []
-        for item_id in data.iter_items():
+        for item_id in data.iter_item_ids():
             y_true_w_hist = data.loc[item_id][self.target_column]
 
             target = np.array(y_true_w_hist[-self.prediction_length :])  # noqa: E203
@@ -257,8 +257,8 @@ class TimeSeriesEvaluator:
         return metric
 
     def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
-        assert all(len(predictions.loc[i]) == self.prediction_length for i in predictions.iter_items())
-        assert set(predictions.iter_items()) == set(data.iter_items()), "Prediction and data indices do not match."
+        assert all(len(predictions.loc[i]) == self.prediction_length for i in predictions.iter_item_ids())
+        assert set(predictions.iter_item_ids()) == set(data.iter_item_ids()), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)

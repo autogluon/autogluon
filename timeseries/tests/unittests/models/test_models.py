@@ -79,7 +79,7 @@ def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
 
         (call_df,) = patch_method.call_args[0]
 
-        for j in DUMMY_TS_DATAFRAME.iter_items():
+        for j in DUMMY_TS_DATAFRAME.iter_item_ids():
             assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length])
 
 
