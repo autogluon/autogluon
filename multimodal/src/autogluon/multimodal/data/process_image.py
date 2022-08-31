@@ -56,7 +56,6 @@ from ..constants import (
     MMOCR_TEXT_DET,
     TIMM_IMAGE,
 )
-
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config

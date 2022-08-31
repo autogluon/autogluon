@@ -50,7 +50,3 @@ def test_mmocr_text_detection_inference(checkpoint_name):
 
         for j in range(len(p)):
             assert abs(p[j] - m[j]) <= 1e-6
-
-
-if __name__ == "__main__":
-    test_mmocr_text_detection_inference("textsnake_r50_fpn_unet_1200e_ctw1500")
