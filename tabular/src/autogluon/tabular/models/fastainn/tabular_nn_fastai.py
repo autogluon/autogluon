@@ -217,10 +217,6 @@ class NNFastAiTabularModel(AbstractModel):
         if params.get('layers', None) is not None:
             layers = params['layers']
             if isinstance(layers, tuple):
-            if isinstance(layers, tuple):
-            if isinstance(layers, tuple):
-                layers = list(layers)
-                layers = list(layers)
                 layers = list(layers)
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
