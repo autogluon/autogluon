@@ -64,6 +64,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
 
+        # TODO: the logic here (line69 ~ line75) could be shared across multiple mmlab code, consider wrap them in utils.py.
         # download config and checkpoint files using openmim
         checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
 
