@@ -54,6 +54,7 @@ from .constants import (
     MODEL_CHECKPOINT,
     MULTICLASS,
     OBJECT_DETECTION,
+    OCR_TEXT_DETECTION,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -1606,7 +1607,7 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
-        if self._pipeline == OBJECT_DETECTION:
+        if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
 
         if candidate_data:

@@ -60,6 +60,7 @@ function install_multimodal {
     python3 -m pip install --upgrade -e multimodal/[tests]
     mim install mmcv-full
     python3 -m pip install --upgrade mmdet
+    python3 -m pip install --upgrade mmocr
 }
 
 function install_text {

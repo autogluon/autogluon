@@ -56,6 +56,7 @@ from .constants import (
     MASKS,
     METRIC_MODE_MAP,
     MMDET_IMAGE,
+    MMOCR_TEXT_DET,
     MULTICLASS,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -89,6 +90,7 @@ from .models import (
     CLIPForImageText,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
+    MMOCRAutoModelForTextDetection,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
@@ -812,6 +814,11 @@ def create_model(
             )
         elif model_name.lower().startswith(MMDET_IMAGE):
             model = MMDetAutoModelForObjectDetection(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+            )
+        elif model_name.lower().startswith(MMOCR_TEXT_DET):
+            model = MMOCRAutoModelForTextDetection(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
             )
