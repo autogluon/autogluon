@@ -258,7 +258,9 @@ class TimeSeriesEvaluator:
 
     def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
         assert all(len(predictions.loc[i]) == self.prediction_length for i in predictions.iter_item_ids())
-        assert set(predictions.iter_item_ids()) == set(data.iter_item_ids()), "Prediction and data indices do not match."
+        assert set(predictions.iter_item_ids()) == set(
+            data.iter_item_ids()
+        ), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
