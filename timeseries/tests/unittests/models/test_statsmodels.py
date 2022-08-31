@@ -37,11 +37,19 @@ def test_when_statsmodels_model_is_saved_and_loaded_then_model_can_predict(model
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("n_jobs", [0.5, 3])
 def test_when_statsmodels_models_saved_then_n_jobs_is_saved(model_class, n_jobs, temp_model_path):
-    model = model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
+    model = model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs, "maxiter": 1})
     model.save()
 
     loaded_model = model.__class__.load(path=model.path)
     assert model.n_jobs == loaded_model.n_jobs
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_statsmodels_model_fitted_then_freq_is_saved_to_sm_model_init_args(model_class, temp_model_path):
+    model = model_class(path=temp_model_path, hyperparameters={"maxiter": 1})
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    single_fitted_model = next(iter(model._fitted_models.values()))
+    assert single_fitted_model.sm_model_init_args["freq"] == DUMMY_TS_DATAFRAME.freq
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
