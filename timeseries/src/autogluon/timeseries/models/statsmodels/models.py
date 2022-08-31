@@ -6,6 +6,7 @@ import pandas as pd
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel as StatsmodelsETS
 from statsmodels.tsa.statespace.sarimax import SARIMAX as StatsmodelsSARIMAX
 
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import statsmodels_warning_filter
 
@@ -62,57 +63,58 @@ class ETSModel(AbstractStatsmodelsModel):
         "maxiter",
     ]
 
-    def _update_model_init_and_fit_args(
-        self, default_model_init_args: dict, default_model_fit_args: dict
-    ) -> Tuple[dict, dict]:
-        model_init_args = default_model_init_args.copy()
-        model_init_args.setdefault("trend", "add")
+    def _update_sm_model_init_args(self, sm_model_init_args: dict, data: TimeSeriesDataFrame) -> dict:
+        sm_model_init_args = sm_model_init_args.copy()
+        sm_model_init_args["freq"] = data.freq
+        sm_model_init_args.setdefault("trend", "add")
 
         # Infer seasonal_period if seasonal_period is not given / is set to None
-        seasonal_period = model_init_args.pop("seasonal_period", None)
+        seasonal_period = sm_model_init_args.pop("seasonal_period", None)
         if seasonal_period is None:
-            seasonal_period = get_seasonality(self.freq)
+            seasonal_period = get_seasonality(data.freq)
+        sm_model_init_args["seasonal_periods"] = seasonal_period
 
-        seasonal = model_init_args.setdefault("seasonal", "add")
-        # Disable seaasonality if seasonal_period is too short
-        if seasonal is not None:
-            if seasonal_period <= 1:
-                logger.warning(
-                    f"{self.name} with seasonal = {seasonal} requires seasonal_period > 1 "
-                    f"(received seasonal_period = {seasonal_period}). Disabling seasonality."
-                )
-                model_init_args["seasonal"] = None
-                model_init_args["seasonal_periods"] = 1
-            else:
-                model_init_args["seasonal_periods"] = seasonal_period
+        seasonal = sm_model_init_args.setdefault("seasonal", "add")
+        # Disable seasonality if seasonal_period is too short
+        if seasonal is not None and seasonal_period <= 1:
+            logger.warning(
+                f"{self.name} with seasonal = {seasonal} requires seasonal_period > 1 "
+                f"(received seasonal_period = {seasonal_period}). Disabling seasonality."
+            )
+            sm_model_init_args["seasonal"] = None
+            sm_model_init_args["seasonal_periods"] = 1
 
-        model_fit_args = default_model_fit_args.copy()
-        return model_init_args, model_fit_args
+        return sm_model_init_args
 
-    def _fit_local_model(self, timeseries: pd.Series, model_init_args: dict, model_fit_args: dict) -> FittedLocalModel:
+    def _fit_local_model(
+        self, timeseries: pd.Series, sm_model_init_args: dict, sm_model_fit_args: dict
+    ) -> FittedLocalModel:
         # Disable seasonality if timeseries is too short for given seasonal_period
-        if model_init_args["seasonal"] is not None and len(timeseries) < 2 * model_init_args.get("seasonal_periods"):
-            model_init_args = model_init_args.copy()
-            model_init_args["seasonal"] = None
+        if sm_model_init_args["seasonal"] is not None and len(timeseries) < 2 * sm_model_init_args["seasonal_periods"]:
+            sm_model_init_args = sm_model_init_args.copy()
+            sm_model_init_args["seasonal"] = None
 
         with statsmodels_warning_filter():
-            model = StatsmodelsETS(endog=timeseries, freq=self.freq, **model_init_args)
-            fit_result = model.fit(full_output=False, disp=False, **model_fit_args)
+            model = StatsmodelsETS(endog=timeseries, **sm_model_init_args)
+            fit_result = model.fit(full_output=False, disp=False, **sm_model_fit_args)
         # Only save the parameters of the trained model, not the model itself
         parameters = dict(zip(fit_result.param_names, fit_result.params))
-        return FittedLocalModel(model_name=self.name, model_init_args=model_init_args, parameters=parameters)
+        return FittedLocalModel(model_name=self.name, sm_model_init_args=sm_model_init_args, parameters=parameters)
 
     def _predict_with_local_model(
         self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
     ) -> pd.DataFrame:
         assert fitted_model.model_name == self.name
         with statsmodels_warning_filter():
-            base_model = StatsmodelsETS(endog=timeseries, freq=self.freq, **fitted_model.model_init_args)
+            base_model = StatsmodelsETS(endog=timeseries, **fitted_model.sm_model_init_args)
             parameters = np.array(list(fitted_model.parameters.values()))
             # This is a hack that allows us to set the parameters to their estimated values & initialize the model
             sm_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
         return self._get_predictions_from_statsmodels_model(
-            sm_model=sm_model, cutoff=timeseries.index.max(), quantile_levels=quantile_levels
+            sm_model=sm_model,
+            cutoff=timeseries.index.max(),
+            quantile_levels=quantile_levels,
+            freq=fitted_model.sm_model_init_args["freq"],
         )
 
 
@@ -159,19 +161,18 @@ class ARIMAModel(AbstractStatsmodelsModel):
         "maxiter",
     ]
 
-    def _update_model_init_and_fit_args(
-        self, default_model_init_args: dict, default_model_fit_args: dict
-    ) -> Tuple[dict, dict]:
-        model_init_args = default_model_init_args.copy()
-        model_init_args.setdefault("enforce_stationarity", True)
-        model_init_args["trend"] = "c"
+    def _update_sm_model_init_args(self, sm_model_init_args: dict, data: TimeSeriesDataFrame) -> dict:
+        sm_model_init_args = sm_model_init_args.copy()
+        sm_model_init_args["freq"] = data.freq
+        sm_model_init_args["trend"] = "c"
+        sm_model_init_args.setdefault("enforce_stationarity", True)
 
         # Infer seasonal_period if seasonal_period is not given / is set to None
-        seasonal_period = model_init_args.pop("seasonal_period", None)
+        seasonal_period = sm_model_init_args.pop("seasonal_period", None)
         if seasonal_period is None:
-            seasonal_period = get_seasonality(self.freq)
+            seasonal_period = get_seasonality(data.freq)
 
-        seasonal_order = model_init_args.pop("seasonal_order", (0, 0, 0))
+        seasonal_order = sm_model_init_args.pop("seasonal_order", (0, 0, 0))
         seasonal_order_is_valid = len(seasonal_order) == 3 and all(isinstance(p, int) for p in seasonal_order)
         if not seasonal_order_is_valid:
             raise ValueError(
@@ -181,20 +182,21 @@ class ARIMAModel(AbstractStatsmodelsModel):
 
         # Disable seasonality if seasonal_period is too short
         if seasonal_period <= 1:
-            model_init_args["seasonal_order"] = (0, 0, 0, 0)
+            sm_model_init_args["seasonal_order"] = (0, 0, 0, 0)
         else:
-            model_init_args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
+            sm_model_init_args["seasonal_order"] = tuple(seasonal_order) + (seasonal_period,)
 
-        model_fit_args = default_model_fit_args.copy()
-        return model_init_args, model_fit_args
+        return sm_model_init_args
 
-    def _fit_local_model(self, timeseries: pd.Series, model_init_args: dict, model_fit_args: dict) -> FittedLocalModel:
+    def _fit_local_model(
+        self, timeseries: pd.Series, sm_model_init_args: dict, sm_model_fit_args: dict
+    ) -> FittedLocalModel:
         with statsmodels_warning_filter():
-            model = StatsmodelsSARIMAX(endog=timeseries, freq=self.freq, **model_init_args)
-            fit_result = model.fit(disp=False, **model_fit_args)
+            model = StatsmodelsSARIMAX(endog=timeseries, **sm_model_init_args)
+            fit_result = model.fit(disp=False, **sm_model_fit_args)
         # Only save the parameters of the trained model, not the model itself
         parameters = dict(fit_result.params.iteritems())
-        return FittedLocalModel(model_name=self.name, model_init_args=model_init_args, parameters=parameters)
+        return FittedLocalModel(model_name=self.name, sm_model_init_args=sm_model_init_args, parameters=parameters)
 
     def _predict_with_local_model(
         self, timeseries: pd.Series, fitted_model: FittedLocalModel, quantile_levels: List[float]
@@ -202,9 +204,12 @@ class ARIMAModel(AbstractStatsmodelsModel):
         assert fitted_model.model_name == self.name
         parameters = np.array(list(fitted_model.parameters.values()))
         with statsmodels_warning_filter():
-            base_model = StatsmodelsSARIMAX(endog=timeseries, freq=self.freq, **fitted_model.model_init_args)
+            base_model = StatsmodelsSARIMAX(endog=timeseries, **fitted_model.sm_model_init_args)
             # This is a hack that allows us to set the parameters to their estimated values & initialize the model
             sm_model = base_model.fit(start_params=parameters, maxiter=0, disp=False)
         return self._get_predictions_from_statsmodels_model(
-            sm_model=sm_model, cutoff=timeseries.index.max(), quantile_levels=quantile_levels
+            sm_model=sm_model,
+            cutoff=timeseries.index.max(),
+            quantile_levels=quantile_levels,
+            freq=fitted_model.sm_model_init_args["freq"],
         )

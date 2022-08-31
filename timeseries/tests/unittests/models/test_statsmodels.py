@@ -1,10 +1,11 @@
 import logging
 
+import pandas as pd
 import pytest
 
 from autogluon.timeseries.models.statsmodels import ARIMAModel, ETSModel
 
-from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_item_index
 
 TESTABLE_MODELS = [
     ARIMAModel,
@@ -44,6 +45,20 @@ def test_when_statsmodels_models_saved_then_n_jobs_is_saved(model_class, n_jobs,
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 3, 10])
+def test_when_statsmodels_model_predicts_then_time_index_is_correct(model_class, prediction_length, temp_model_path):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    model = model_class(path=temp_model_path, prediction_length=prediction_length)
+    model.fit(train_data=data, hyperparameters={"maxiter": 1})
+    predictions = model.predict(data=data)
+    for item_id in data.iter_items():
+        cutoff = data.loc[item_id].index.max()
+        start = cutoff + pd.tseries.frequencies.to_offset(data.freq)
+        expected_timestamps = pd.date_range(start, periods=prediction_length, freq=data.freq)
+        assert (predictions.loc[item_id].index == expected_timestamps).all()
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("train_data_size, test_data_size", [(5, 10), (10, 5), (5, 5)])
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     model_class, temp_model_path, train_data_size, test_data_size, caplog
@@ -61,9 +76,9 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
 
 def get_seasonal_period_from_fitted_local_model(model, model_name):
     if model_name == "ARIMA":
-        return model.model_init_args["seasonal_order"][-1]
+        return model.sm_model_init_args["seasonal_order"][-1]
     elif model_name == "ETS":
-        return model.model_init_args["seasonal_periods"]
+        return model.sm_model_init_args["seasonal_periods"]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -134,7 +149,7 @@ def test_when_invalid_model_arguments_provided_then_statsmodels_ignores_them(mod
         model.fit(train_data=DUMMY_TS_DATAFRAME)
         assert "ignores following hyperparameters: ['bad_argument']" in caplog.text
         single_fitted_model = next(iter(model._fitted_models.values()))
-        assert "bad_argument" not in single_fitted_model.model_init_args
+        assert "bad_argument" not in single_fitted_model.sm_model_init_args
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

@@ -26,10 +26,19 @@ class FittedLocalModel:
     when pickled.
 
     FittedLocalModel is consumed by AbstractStatsmodelsModel._predict_using_fit_summary to generate predictions.
+
+    Attributes
+    ----------
+    model_name:
+        Name of the class
+    sm_model_init_args:
+        Arguments passed to the __init__ method of the SM model
+    parameters:
+        Estimated learnable paramters of the model (after completing the fitting procedure)
     """
 
     model_name: str
-    model_init_args: Dict[str, Any]
+    sm_model_init_args: Dict[str, Any]
     parameters: Dict[str, Any]
 
 
@@ -94,16 +103,16 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
 
         self._fitted_models: Dict[str, FittedLocalModel] = {}
 
-    def _get_default_model_init_and_fit_args(self) -> Tuple[dict, dict]:
+    def _get_sm_model_init_and_fit_args(self) -> Tuple[dict, dict]:
         """Separate arguments that will be passed to __init__ and fit methods of the underlying SM model."""
-        default_model_init_args = {}
-        default_model_fit_args = {}
+        sm_model_init_args = {}
+        sm_model_fit_args = {}
         unused_args = []
         for key, value in self._get_model_params().items():
             if key in self.statsmodels_allowed_init_args:
-                default_model_init_args[key] = value
+                sm_model_init_args[key] = value
             elif key in self.statsmodels_allowed_fit_args:
-                default_model_fit_args[key] = value
+                sm_model_fit_args[key] = value
             elif key == "n_jobs":
                 # n_jobs isn't passed to the underlying statsmodels model
                 pass
@@ -114,11 +123,9 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
                 f" {self.name} ignores following hyperparameters: {unused_args}. "
                 f"See the docstring of {self.name} for the list of supported hyperparameters."
             )
-        return default_model_init_args, default_model_fit_args
+        return sm_model_init_args, sm_model_fit_args
 
-    def _update_model_init_and_fit_args(
-        self, default_model_init_args: dict, default_model_fit_args: dict
-    ) -> Tuple[dict, dict]:
+    def _update_sm_model_init_args(self, sm_model_init_args: dict, data: TimeSeriesDataFrame) -> dict:
         """Update the arguments passed to the underlying SM model.
 
         This method takes care of
@@ -129,7 +136,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         raise NotImplementedError
 
     def _fit_local_model(
-        self, timeseries: pd.Series, default_model_init_args: dict, default_model_fit_args: dict
+        self, timeseries: pd.Series, sm_model_init_args: dict, sm_model_fit_args: dict
     ) -> FittedLocalModel:
         """Fit a single local model to the time series."""
         raise NotImplementedError
@@ -154,13 +161,13 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         timeseries_to_fit = (train_data.loc[item_id][self.target] for item_id in items_to_fit)
 
         # Get initialization / fitting args and update them, if necessary
-        default_model_init_args, default_model_fit_args = self._get_default_model_init_and_fit_args()
-        model_init_args, model_fit_args = self._update_model_init_and_fit_args(
-            default_model_init_args=default_model_init_args, default_model_fit_args=default_model_fit_args
-        )
+        sm_model_init_args, sm_model_fit_args = self._get_sm_model_init_and_fit_args()
+        sm_model_init_args = self._update_sm_model_init_args(sm_model_init_args=sm_model_init_args, data=train_data)
 
         # Fit models in parallel
-        fit_fn = partial(self._fit_local_model, model_fit_args=model_fit_args, model_init_args=model_init_args)
+        fit_fn = partial(
+            self._fit_local_model, sm_model_fit_args=sm_model_fit_args, sm_model_init_args=sm_model_init_args
+        )
         fitted_models = Parallel(n_jobs=self.n_jobs)(delayed(fit_fn)(timeseries=ts) for ts in timeseries_to_fit)
         for item_id, model in zip(items_to_fit, fitted_models):
             self._fitted_models[train_hash.loc[item_id]] = model
@@ -214,7 +221,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         raise NotImplementedError
 
     def _get_predictions_from_statsmodels_model(
-        self, sm_model: StatsmodelsTSModelResults, cutoff: pd.Timestamp, quantile_levels: List[float]
+        self, sm_model: StatsmodelsTSModelResults, cutoff: pd.Timestamp, quantile_levels: List[float], freq: str
     ) -> pd.DataFrame:
         """Make predictions using an initialized statsmodels model.
 
@@ -228,14 +235,16 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
             Timestamp of the last observation in the observed time series.
         quantile_levels:
             List of quantiles that should be predicted.
+        freq:
+            Pandas frequency string.
 
         Returns
         -------
         pred_df:
             DataFrame with timestamp as index and mean & quantile forecasts as columns.
         """
-        start = cutoff + pd.tseries.frequencies.to_offset(self.freq)
-        end = cutoff + self.prediction_length * pd.tseries.frequencies.to_offset(self.freq)
+        start = cutoff + pd.tseries.frequencies.to_offset(freq)
+        end = cutoff + self.prediction_length * pd.tseries.frequencies.to_offset(freq)
         predictions = sm_model.get_prediction(start=start, end=end)
         results = [predictions.predicted_mean.rename("mean")]
         for q in quantile_levels:

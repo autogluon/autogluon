@@ -1,42 +1,18 @@
 import logging
-import random
 from ast import literal_eval
-from typing import Dict
 
-import pandas as pd
 import pytest
 
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID
 from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitter, append_suffix_to_item_id
+
+from .common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
 SPLITTERS = [
     LastWindowSplitter(),
     MultiWindowSplitter(num_windows=2, overlap=0),
     MultiWindowSplitter(num_windows=5, overlap=2),
 ]
-
-
-def get_data_frame_with_variable_lengths(item_id_to_length: Dict[str, int]):
-    tuples = []
-    for item_id, length in item_id_to_length.items():
-        for ts in pd.date_range(pd.Timestamp("2022-01-01"), periods=length):
-            tuples.append((item_id, ts))
-    index = pd.MultiIndex.from_tuples(tuples, names=[ITEMID, TIMESTAMP])
-    df = TimeSeriesDataFrame(
-        pd.DataFrame(
-            index=index,
-            data=[random.random() for _ in index],
-            columns=["target"],
-        )
-    )
-    df.freq  # compute _cached_freq
-    return df
-
-
-DUMMY_VARIABLE_LENGTH_TS_DATAFRAME = get_data_frame_with_variable_lengths(
-    item_id_to_length={"A": 22, "B": 50, "C": 10, "D": 17}
-)
 
 
 def get_original_item_id_and_slice(tuning_item_id: str):
