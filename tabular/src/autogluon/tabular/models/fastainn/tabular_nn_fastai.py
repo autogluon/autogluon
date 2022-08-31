@@ -177,6 +177,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         import torch
         torch.set_num_threads(num_cpus)
+
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
@@ -216,6 +217,10 @@ class NNFastAiTabularModel(AbstractModel):
         if params.get('layers', None) is not None:
             layers = params['layers']
             if isinstance(layers, tuple):
+            if isinstance(layers, tuple):
+            if isinstance(layers, tuple):
+                layers = list(layers)
+                layers = list(layers)
                 layers = list(layers)
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
