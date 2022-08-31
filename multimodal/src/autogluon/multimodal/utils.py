@@ -625,6 +625,7 @@ def init_data_processors(
                         checkpoint_name=model_config.checkpoint_name,
                         train_transform_types=model_config.train_transform_types,
                         val_transform_types=model_config.val_transform_types,
+                        samples_per_gpu = config.env.per_gpu_batch_size, #TODO: should be different in MMDET eval, now we force eval_batch_size_ratio in MMDET to be 1
                         norm_type=model_config.image_norm,
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
@@ -1659,7 +1660,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
-        return [ele[BBOX] for ele in outputs]
+        return [bbox for ele in outputs for bbox in ele[BBOX]]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
