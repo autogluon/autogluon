@@ -126,3 +126,18 @@ def test_when_invalid_model_arguments_provided_then_statsmodels_ignores_them(mod
         assert "ignores following hyperparameters: ['bad_argument']" in caplog.text
         single_fitted_model = next(iter(model._fitted_models.values()))
         assert "bad_argument" not in single_fitted_model.model_init_args
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_train_and_test_data_have_different_freq_then_exception_is_raised(model_class, temp_model_path):
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=3,
+        hyperparameters={"maxiter": 1},
+    )
+    train_data = get_data_frame_with_item_index([1, 2, 3], freq="H")
+    test_data = get_data_frame_with_item_index([1, 2, 3], freq="D")
+
+    model.fit(train_data=train_data)
+    with pytest.raises(RuntimeError, match="must match the frequency"):
+        model.predict(test_data)

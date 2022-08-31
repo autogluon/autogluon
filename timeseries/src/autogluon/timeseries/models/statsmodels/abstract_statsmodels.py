@@ -144,7 +144,8 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         else:
             if self.freq != train_data.freq:
                 raise RuntimeError(
-                    f"Frequency of train_data {train_data.freq} must match the frequency {self.freq} of {self.name}"
+                    f"Frequency {train_data.freq} of the dataset must match the frequency "
+                    f"{self.freq} of the {self.name} model"
                 )
 
         # Select timeseries that don't have a fitted local model

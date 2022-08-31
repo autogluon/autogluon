@@ -74,6 +74,7 @@ class ETSModel(AbstractStatsmodelsModel):
             seasonal_period = get_seasonality(self.freq)
 
         seasonal = model_init_args.setdefault("seasonal", "add")
+        # Disable seaasonality if seasonal_period is too short
         if seasonal is not None:
             if seasonal_period <= 1:
                 logger.warning(
