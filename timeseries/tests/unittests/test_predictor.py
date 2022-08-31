@@ -19,7 +19,7 @@ from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"AutoETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
 ]
 
 
@@ -180,8 +180,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"AutoETS": {}, "SimpleFeedForward": {"epochs": 1}},
-        {"AutoETS": {}, "SimpleFeedForward": {"epochs": ag.Int(1, 3)}},
+        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": ag.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -453,7 +453,7 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_l
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"ARIMA": {"maxiter": 1, "seasonal_period": 1, "seasonal_order": (0, 0, 0)}},
     )
-    with mock.patch("autogluon.timeseries.models.sktime.models.ARIMA.predict") as arima_predict:
+    with mock.patch("autogluon.timeseries.models.statsmodels.models.ARIMAModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
         with pytest.raises(RuntimeError, match="Prediction failed, please provide a different model to"):
             predictor.predict(DUMMY_TS_DATAFRAME)
