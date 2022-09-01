@@ -6,7 +6,6 @@ from .serialization import *
 from .sync_remote import *
 from .custom_queue import Queue
 from .defaultdict import keydefaultdict
-from .deprecated import deprecated
 from .custom_process import CustomProcess
 from .utils import *
 from .version_utils import show_versions

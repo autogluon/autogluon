@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from pandas.core.internals import ArrayManager, BlockManager
 
-from autogluon.core.utils.deprecated import deprecated
+from autogluon.common.utils.deprecated import deprecated
 
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
@@ -125,7 +125,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return self.index.unique(level=ITEMID)
 
     @property
-    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.")
+    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.", version_removed="0.7")
     def _item_index(self):
         return self.index.unique(level=ITEMID)
 
@@ -173,7 +173,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         self._cached_freq = freq
         return freq
 
-    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.")
+    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.", version_removed="0.7")
     def iter_items(self) -> Iterable[Any]:
         return iter(self.item_ids)
 
