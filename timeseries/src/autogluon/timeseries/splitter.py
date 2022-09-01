@@ -59,7 +59,7 @@ def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> 
     """Append a suffix to each item_id in a TimeSeriesDataFrame."""
 
     result = ts_dataframe.copy(deep=False)
-    new_item_id = result.index.get_level_values(level=ITEMID).astype(str) + suffix
+    new_item_id = result.index.get_level_values(ITEMID).astype(str) + suffix
     result.index = pd.MultiIndex.from_arrays([new_item_id, result.index.get_level_values(TIMESTAMP)])
     return result
 
@@ -142,44 +142,63 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
                       1970-01-08       8
     """
 
-    def __init__(self, num_windows: int = 3, overlap: int = 0):
+    def __init__(self, num_windows: int = 3):
         self.num_windows = num_windows
-        self.overlap = overlap
 
     def describe_validation_strategy(self, prediction_length):
         return (
-            f"Will use the last {self.num_windows} windows (each with prediction_length {prediction_length} "
-            f"time steps and overlap {self.overlap}) as a hold-out validation set."
+            f"Will use the last {self.num_windows} windows (each with prediction_length = {prediction_length} "
+            f"time steps) as a hold-out validation set."
         )
 
     def _split(
         self, ts_dataframe: TimeSeriesDataFrame, prediction_length: int
     ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        if self.overlap >= prediction_length:
-            raise ValueError(
-                f"SlidingWindowSplitter.overlap {self.overlap} must be < prediction_length {prediction_length}"
-            )
-        step_size = prediction_length - self.overlap
+        original_item_order = ts_dataframe.item_ids
+        original_freq = ts_dataframe.freq
 
-        length_per_series = ts_dataframe.index.get_level_values(0).value_counts(sort=False)
-        num_total_validation_steps = prediction_length + step_size * (self.num_windows - 1)
-        num_too_short_series = (length_per_series <= num_total_validation_steps).sum()
-        if num_too_short_series > 0:
-            logger.warning(f"{num_too_short_series} are too short and won't appear in the training set")
-        if num_too_short_series == ts_dataframe.num_items:
-            raise ValueError(f"{self.name} produced an empty training set since all sequences are too short")
+        train_dataframes = []
+        validation_dataframes = []
+        for window_idx in range(self.num_windows):
+            num_timesteps_per_item = ts_dataframe.num_timesteps_per_item()
 
-        validation_dataframes = [append_suffix_to_item_id(ts_dataframe, "_[None:None]")]
+            item_index = num_timesteps_per_item.index
+            long_enough = num_timesteps_per_item > 2 * prediction_length
+            # Convert boolean indicator into item_id index
+            can_be_split = item_index[long_enough]
+            cannot_be_split = item_index[~long_enough]
 
-        for window_idx in range(1, self.num_windows):
-            ts_dataframe = ts_dataframe.slice_by_timestep(None, -step_size)
-            total_offset = step_size * window_idx
-            next_val_dataframe = append_suffix_to_item_id(ts_dataframe, f"_[None:{-total_offset}]")
-            validation_dataframes.append(next_val_dataframe)
+            train_dataframes.append(ts_dataframe.loc[cannot_be_split])
+            # Keep timeseries that are long enough for the next round of splitting
+            ts_dataframe = ts_dataframe.loc[can_be_split]
 
-        train_data = ts_dataframe.slice_by_timestep(None, -prediction_length)
+            if window_idx == 0:
+                suffix = "_[None:None]"
+                # TODO: Should we also warn users if there are too few items in the validation set?
+                if len(can_be_split) == 0:
+                    raise ValueError(
+                        f"Cannot create a validation set because all training time series are too short. "
+                        f"At least some time series in train_data must have length >= 2 * prediction_length + 1 "
+                        f"(at least {2 * prediction_length + 1}) but the longest training series has length "
+                        f"{num_timesteps_per_item.max()}. Please decrease prediction_length, provide longer "
+                        f"time series in train_data, or provide tuning_data."
+                    )
+            else:
+                suffix = f"_[None:-{window_idx * prediction_length}]"
+                if len(can_be_split) == 0:
+                    break
+
+            validation_dataframes.append(append_suffix_to_item_id(ts_dataframe, suffix))
+            ts_dataframe = ts_dataframe.slice_by_timestep(None, -prediction_length)
+
+        train_dataframes.append(ts_dataframe)
+
+        train_data = pd.concat(train_dataframes).loc[original_item_order]
+        train_data._cached_freq = original_freq
         val_data = pd.concat(validation_dataframes)
-        val_data._cached_freq = train_data._cached_freq
+
+        val_data = pd.concat(validation_dataframes)
+        val_data._cached_freq = original_freq
 
         return train_data, val_data
 
