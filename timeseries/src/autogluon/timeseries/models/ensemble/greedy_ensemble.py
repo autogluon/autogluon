@@ -38,10 +38,8 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
     def _fit(self, predictions, labels, time_limit=None, sample_weight=None):
         self.dummy_pred = copy.deepcopy(predictions[0])
-        # This should never happen; sanity check to make sure that predict is implemented correctly for all models
-        # TODO: Maybe automatically sort the index to align the index for all predictions?
-        if not all(self.dummy_pred.index.equals(pred.index) for pred in predictions):
-            raise RuntimeError("Predictions for all models should have the exact same index")
+        # This should never happen; sanity check to make sure that all predictions have the same index
+        assert all(self.dummy_pred.index.equals(pred.index) for pred in predictions)
         super()._fit(
             predictions=[d.values for d in predictions],
             labels=labels,
