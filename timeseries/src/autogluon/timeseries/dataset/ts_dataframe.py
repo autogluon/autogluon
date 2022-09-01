@@ -124,8 +124,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def item_ids(self) -> pd.Index:
         return self.index.unique(level=ITEMID)
 
-    @deprecated("Please use public attribute `item_ids` instead.")
     @property
+    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.")
     def _item_index(self):
         return self.index.unique(level=ITEMID)
 
