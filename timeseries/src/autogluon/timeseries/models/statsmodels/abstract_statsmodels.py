@@ -195,7 +195,7 @@ class AbstractStatsmodelsModel(AbstractTimeSeriesModel):
         )
 
         # Combine all predictions into a single DataFrame
-        result_df = pd.concat({item_id: pred for item_id, pred in zip(data.iter_item_ids(), predictions)})
+        result_df = pd.concat({item_id: pred for item_id, pred in zip(data.item_ids, predictions)})
         result_df.index.rename([ITEMID, TIMESTAMP], inplace=True)
         return TimeSeriesDataFrame(result_df)
 

@@ -121,7 +121,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return TimeSeriesDataFrame
 
     @property
-    def _item_index(self) -> pd.Index:
+    def item_ids(self) -> pd.Index:
+        return self.index.unique(level=ITEMID)
+
+    @deprecated("Please use public attribute `item_ids` instead.")
+    @property
+    def _item_index(self):
         return self.index.unique(level=ITEMID)
 
     @property
@@ -136,13 +141,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not isinstance(self.index, pd.MultiIndex):
             return
 
-        if value is not None and not set(value.index).issuperset(set(self._item_index)):
+        if value is not None and not set(value.index).issuperset(set(self.item_ids)):
             raise ValueError("Static features index should match item index")
 
         # if static features being set are a strict superset of the item index, we take a
         # subset to ensure consistency
-        if value is not None and len(set(value.index) - set(self._item_index)) > 0:
-            value = value.loc[self._item_index].copy()
+        if value is not None and len(set(value.index) - set(self.item_ids)) > 0:
+            value = value.loc[self.item_ids].copy()
 
         self._static_features = value
 
@@ -158,7 +163,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         # check the frequencies of the first 100 items to see if frequencies are consistent and
         # can be inferred
-        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self._item_index[:100]]
+        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.item_ids[:100]]
         freq = freq_for_each_series[0]
         if len(set(freq_for_each_series)) > 1 or freq is None:
             self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
@@ -168,16 +173,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         self._cached_freq = freq
         return freq
 
-    @deprecated("Please use `TimeSeriesDataFrame.iter_item_ids()` instead.")
+    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.")
     def iter_items(self) -> Iterable[Any]:
-        return iter(self._item_index)
-
-    def iter_item_ids(self) -> Iterable[Any]:
-        return iter(self._item_index)
+        return iter(self.item_ids)
 
     @property
     def num_items(self):
-        return len(self._item_index)
+        return len(self.item_ids)
 
     def num_timesteps_per_item(self) -> pd.Series:
         return self.groupby(level=ITEMID, sort=False).size()
@@ -520,7 +522,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         # build the surrogate index
         indexes = []
-        for i in self._item_index:
+        for i in self.item_ids:
             idx = pd.MultiIndex.from_product(
                 [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)]
             )

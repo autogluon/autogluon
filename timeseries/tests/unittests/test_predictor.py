@@ -347,7 +347,7 @@ def test_given_irregular_time_series_when_predictor_called_with_ignore_then_pred
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions._item_index
+    predicted_item_index = predictions.item_ids
     assert all(predicted_item_index == df._item_index)  # noqa
     assert all(len(predictions.loc[i]) == 1 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
