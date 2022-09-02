@@ -3,7 +3,7 @@ from typing import Tuple
 
 import pandas as pd
 
-from .dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
+from .dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 
 logger = logging.getLogger(__name__)
 
