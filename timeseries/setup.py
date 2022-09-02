@@ -23,6 +23,7 @@ version = ag.update_version(version)
 submodule = "timeseries"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
+    "joblib~=1.1",
     "numpy",
     "scipy",
     "pandas",

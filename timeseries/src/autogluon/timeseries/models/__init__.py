@@ -1,5 +1,6 @@
 from .gluonts import AutoTabularModel, DeepARModel, MQCNNModel, SimpleFeedForwardModel, TransformerModel
-from .sktime import ARIMAModel, AutoARIMAModel, AutoETSModel, TBATSModel, ThetaModel
+from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, SktimeTBATSModel, SktimeThetaModel
+from .statsmodels import ARIMAModel, ETSModel
 
 __all__ = [
     "AutoTabularModel",
@@ -7,9 +8,11 @@ __all__ = [
     "SimpleFeedForwardModel",
     "MQCNNModel",
     "TransformerModel",
+    "SktimeARIMAModel",
+    "SktimeAutoARIMAModel",
+    "SktimeAutoETSModel",
+    "SktimeTBATSModel",
+    "SktimeThetaModel",
     "ARIMAModel",
-    "AutoARIMAModel",
-    "AutoETSModel",
-    "TBATSModel",
-    "ThetaModel",
+    "ETSModel",
 ]

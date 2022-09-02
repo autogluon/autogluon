@@ -1,6 +1,6 @@
 """Common utils and data for all model tests"""
 import random
-from typing import List, Union
+from typing import Dict, List, Union
 
 import pandas as pd
 from gluonts.dataset.common import ListDataset
@@ -51,7 +51,29 @@ def get_data_frame_with_item_index(
     )
 
 
-DUMMY_TS_DATAFRAME = get_data_frame_with_item_index(["A", "B", "C", "D"])
+DUMMY_TS_DATAFRAME = get_data_frame_with_item_index(["10", "A", "2", "1"])
+
+
+def get_data_frame_with_variable_lengths(item_id_to_length: Dict[str, int]):
+    tuples = []
+    for item_id, length in item_id_to_length.items():
+        for ts in pd.date_range(pd.Timestamp("2022-01-01"), periods=length, freq="D"):
+            tuples.append((item_id, ts))
+    index = pd.MultiIndex.from_tuples(tuples, names=[ITEMID, TIMESTAMP])
+    df = TimeSeriesDataFrame(
+        pd.DataFrame(
+            index=index,
+            data=[random.random() for _ in index],
+            columns=["target"],
+        )
+    )
+    df.freq  # compute _cached_freq
+    return df
+
+
+DUMMY_VARIABLE_LENGTH_TS_DATAFRAME = get_data_frame_with_variable_lengths(
+    item_id_to_length={"A": 22, "B": 50, "C": 10, "D": 17}
+)
 
 
 def dict_equal_primitive(this, that):

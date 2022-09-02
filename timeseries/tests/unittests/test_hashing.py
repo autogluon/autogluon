@@ -36,7 +36,7 @@ def test_given_values_are_different_when_hashing_then_hash_is_different():
 
 def test_when_hashing_then_item_id_order_is_preserved():
     df = _build_ts_dataframe(item_ids=["C", "1", "A"], datetime_index=DATETIME_INDEX, target=TARGETS)
-    assert hash_ts_dataframe_items(df).index.equals(df._item_index)
+    assert hash_ts_dataframe_items(df).index.equals(df.item_ids)
 
 
 def test_when_items_are_permuted_then_hash_values_are_permuted():

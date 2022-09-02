@@ -18,6 +18,7 @@ DEPRECATED_ZERO_SHOT = "zero_shot"
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
+OCR_TEXT_DETECTION = "ocr_text_detection"
 
 # Input keys
 IMAGE = "image"
@@ -86,6 +87,7 @@ PREDICT = "predict"
 HUGGINGFACE = "huggingface"
 TIMM = "timm"
 MMDET = "mmdet"
+MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
 ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL]
@@ -144,6 +146,7 @@ CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
 MMDET_IMAGE = "mmdet_image"
+MMOCR_TEXT_DET = "mmocr_text_detection"
 
 # metric learning loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

@@ -19,6 +19,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
       In-depth tutorial on controlling various aspects of model fitting.
 
    .. card::
+      :title: Deployment Optimization
+      :link: tabular-deployment.html
+
+      Tutorial on optimizing the predictor artifact for production deployment.
+
+   .. card::
       :title: Kaggle Tutorial
       :link: tabular-kaggle.html
 
@@ -90,6 +96,7 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
    tabular-quickstart
    tabular-indepth
+   tabular-deployment
    tabular-kaggle
    tabular-multimodal
    tabular-multimodal-text-others

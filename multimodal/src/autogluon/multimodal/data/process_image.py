@@ -33,6 +33,11 @@ except ImportError:
     mmdet = None
 
 try:
+    import mmocr
+except ImportError:
+    mmocr = None
+
+try:
     from torchvision.transforms import InterpolationMode
 
     BICUBIC = InterpolationMode.BICUBIC
@@ -48,6 +53,7 @@ from ..constants import (
     IMAGE,
     IMAGE_VALID_NUM,
     MMDET_IMAGE,
+    MMOCR_TEXT_DET,
     TIMM_IMAGE,
 )
 from .collator import Pad, Stack
@@ -130,7 +136,7 @@ class ImageProcessor:
         self.std = None
 
         if checkpoint_name is not None:
-            if self.prefix == MMDET_IMAGE:
+            if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
                 self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=model.model.cfg)
             else:
                 self.size, self.mean, self.std = self.extract_default(checkpoint_name)
@@ -158,8 +164,11 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == MMDET_IMAGE:
-            assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+            if self.prefix == MMDET_IMAGE:
+                assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+            else:
+                assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
             cfg = model.model.cfg
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
             self.val_processor = Compose(cfg.data.test.pipeline)
@@ -197,7 +206,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix == MMDET_IMAGE:
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
@@ -260,6 +269,10 @@ class ImageProcessor:
             image_size = cfg.test_pipeline[1]["img_scale"][0]
             mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
             std = cfg.test_pipeline[1]["transforms"][2]["std"]
+        elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
+            image_size = cfg.data.test.pipeline[1]["img_scale"][0]
+            mean = cfg.data.test.pipeline[1]["transforms"][1]["mean"]
+            std = cfg.data.test.pipeline[1]["transforms"][1]["std"]
         elif self.prefix.lower().startswith(TIMM_IMAGE):
             model = create_model(
                 checkpoint_name,
@@ -287,7 +300,6 @@ class ImageProcessor:
             std = None
         else:
             raise ValueError(f"Unknown image processor prefix: {self.prefix}")
-
         return image_size, mean, std
 
     def construct_processor(
@@ -386,7 +398,7 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == MMDET_IMAGE:
+                if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
                     data = dict(img_info=dict(filename=img_path), img_prefix=None)
                     images.append(self.val_processor(data))
                 else:
@@ -424,7 +436,7 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-        if self.prefix == MMDET_IMAGE:
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
             ret.update({self.image_key: images[0]})
         else:
             ret.update(
