@@ -50,8 +50,8 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -75,8 +75,8 @@ def test_given_different_target_name_when_predictor_called_then_model_can_predic
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -92,8 +92,8 @@ def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(temp_
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -169,8 +169,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 
         assert isinstance(predictions, TimeSeriesDataFrame)
 
-        predicted_item_index = predictions.index.levels[0]
-        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+        predicted_item_index = predictions.item_ids
+        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))
 
@@ -220,8 +220,8 @@ def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_p
 
         assert isinstance(predictions, TimeSeriesDataFrame)
 
-        predicted_item_index = predictions.index.levels[0]
-        assert all(predicted_item_index == df.index.levels[0])  # noqa
+        predicted_item_index = predictions.item_ids
+        assert all(predicted_item_index == df.item_ids)  # noqa
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))
 
@@ -245,8 +245,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -347,7 +347,7 @@ def test_given_irregular_time_series_when_predictor_called_with_ignore_then_pred
     assert isinstance(predictions, TimeSeriesDataFrame)
 
     predicted_item_index = predictions.item_ids
-    assert all(predicted_item_index == df._item_index)  # noqa
+    assert all(predicted_item_index == df.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 1 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 

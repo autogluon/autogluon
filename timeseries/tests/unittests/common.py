@@ -51,7 +51,7 @@ def get_data_frame_with_item_index(
     )
 
 
-DUMMY_TS_DATAFRAME = get_data_frame_with_item_index(["A", "B", "C", "D"])
+DUMMY_TS_DATAFRAME = get_data_frame_with_item_index(["10", "A", "2", "1"])
 
 
 def get_data_frame_with_variable_lengths(item_id_to_length: Dict[str, int]):
