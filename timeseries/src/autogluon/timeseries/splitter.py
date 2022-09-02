@@ -65,32 +65,30 @@ def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> 
 
 
 class MultiWindowSplitter(AbstractTimeSeriesSplitter):
-    """Slide window from the end of each series to generate validation series.
+    """Reserve multiple windows at the end of each time series as the validation set.
+
+    MultiWindowSplitter ensures that each training series doesn't get shorter than ``>= prediction_length + 1``.
 
     The first valdation series contains the entire series (i.e. the last ``prediction_length`` elements are used for
-    computing the validation score). The end of each following validation series is moved
-    ``prediction_length - overlap`` steps to the left.
+    computing the validation score). For each following validation series we cut off the last ``prediction_length``
+    time steps. This process is repeated until ``num_windows`` validation series are generated, or until all training
+    series have length less than ``prediction_length + 1``.
 
-    The validation set has up to ``self.num_windows`` as many items as the input dataset (can have fewer items if some
-    training series are too short to split into ``self.num_windows`` many windows).
-
-    Example: input_series = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], prediction_length = 3, overlap = 1, num_windows = 2
+    Example:
+        input_series = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], prediction_length = 3, num_windows = 2
 
     Validation:
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # val score computed on [8, 9, 10]
-        [1, 2, 3, 4, 5, 6, 7, 8]  # val score computed on [6, 7, 8]
+        [1, 2, 3, 4, 5, 6, 7]  # val score computed on [5, 6, 7]
 
     Train:
-        [1, 2, 3, 4, 5]  # train loss computed on [1, 2, 3, 4, 5]
+        [1, 2, 3, 4]  # train loss computed on [1, 2, 3, 4]
 
 
     Parameters
     ----------
     num_windows: int, default = 3
         Number of windows to generate from each time series in the dataset.
-    overlap: int, default = 0
-        Number of steps shared between two consecutive validation windows. Can be used to increase the # of validation
-        windows while keeping more data for training.
 
     Example
     -------
@@ -109,7 +107,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
                 1970-01-08       8
                 1970-01-09       9
                 1970-01-10      10
-        >>> splitter = SlidingWindowSplitter(num_windows=2, overlap=1)
+        >>> splitter = SlidingWindowSplitter(num_windows=2)
         >>> train_data, val_data = splitter.split(ts_dataframe, prediction_length=3)
         >>> print(train_data)
                                 target
@@ -118,7 +116,6 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
                 1970-01-02       2
                 1970-01-03       3
                 1970-01-04       4
-                1970-01-05       5
         >>> print(val_data)
                                     target
         item_id       timestamp
@@ -132,14 +129,13 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
                       1970-01-08       8
                       1970-01-09       9
                       1970-01-10      10
-        0_[None:-2]   1970-01-01       1
+        0_[None:-3]   1970-01-01       1
                       1970-01-02       2
                       1970-01-03       3
                       1970-01-04       4
                       1970-01-05       5
                       1970-01-06       6
                       1970-01-07       7
-                      1970-01-08       8
     """
 
     def __init__(self, num_windows: int = 3):
@@ -147,8 +143,8 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
 
     def describe_validation_strategy(self, prediction_length):
         return (
-            f"Will use the last {self.num_windows} windows (each with prediction_length = {prediction_length} "
-            f"time steps) as a hold-out validation set."
+            f"Will use the last {self.num_windows} windows (each with prediction_length = {prediction_length} time "
+            f"steps) as a hold-out validation set."
         )
 
     def _split(
@@ -210,4 +206,7 @@ class LastWindowSplitter(MultiWindowSplitter):
         super().__init__(num_windows=1)
 
     def describe_validation_strategy(self, prediction_length: int):
-        return f"Will use the last prediction_length {prediction_length} time steps as a hold-out validation set."
+        return (
+            f"Will use the last prediction_length = {prediction_length} time steps of each time series as a hold-out "
+            "validation set."
+        )
