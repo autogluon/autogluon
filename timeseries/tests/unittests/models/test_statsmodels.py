@@ -59,7 +59,7 @@ def test_when_statsmodels_model_predicts_then_time_index_is_correct(model_class,
     model = model_class(path=temp_model_path, prediction_length=prediction_length)
     model.fit(train_data=data, hyperparameters={"maxiter": 1})
     predictions = model.predict(data=data)
-    for item_id in data.iter_items():
+    for item_id in data.item_ids:
         cutoff = data.loc[item_id].index.max()
         start = cutoff + pd.tseries.frequencies.to_offset(data.freq)
         expected_timestamps = pd.date_range(start, periods=prediction_length, freq=data.freq)
