@@ -275,7 +275,7 @@ class MultiModalPredictor:
     def fit(
         self,
         train_data: pd.DataFrame,
-        presets: str = None,
+        presets: str = "default",
         config: Optional[dict] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -825,7 +825,7 @@ class MultiModalPredictor:
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
-        presets: Optional[str] = None,
+        presets: Optional[str] = "default",
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,

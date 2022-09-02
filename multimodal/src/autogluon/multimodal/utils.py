@@ -227,7 +227,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
-    presets: Optional[str] = None,
+    presets: Optional[str] = "default",
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
     is_distill: Optional[bool] = False,
@@ -326,6 +326,7 @@ def get_config(
         if preset_overrides:
             config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
 
+    verify_model_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
         # avoid manipulating the user-provided overrides
@@ -357,9 +358,11 @@ def verify_model_names(config: DictConfig):
     """
     # must have attribute `names`
     assert hasattr(config, "names")
+    # return if no names available
+    if not config.names:
+        return
     # assure no duplicate names
     assert len(config.names) == len(set(config.names))
-    assert len(config.names) > 0
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
