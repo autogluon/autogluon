@@ -97,6 +97,7 @@ def get_seasonal_period_from_fitted_local_model(model, model_name):
         ("H", 100, 24),
         ("2H", 100, 12),
         ("B", 100, 5),
+        ("D", 100, 7),
         ("M", 100, 12),
     ],
 )
@@ -124,6 +125,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
         ("H", 100, 12),
         ("2H", 100, 5),
         ("B", 100, 10),
+        ("D", 100, 8),
         ("M", 100, 24),
     ],
 )

@@ -5,7 +5,7 @@ import pandas as pd
 DEFAULT_SEASONALITIES = {
     "T": 60 * 24,
     "H": 24,
-    "D": 1,
+    "D": 7,
     "W": 1,
     "M": 12,
     "B": 5,
