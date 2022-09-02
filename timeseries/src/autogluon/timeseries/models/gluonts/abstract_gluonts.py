@@ -48,10 +48,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
         return self.time_series_df.freq
 
     def __len__(self):
-        return len(self.time_series_df.index.levels[0])  # noqa
+        return len(self.time_series_df.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for j in self.time_series_df.index.levels[0]:  # noqa
+        for j in self.time_series_df.item_ids:  # noqa
             df = self.time_series_df.loc[j]
             yield {
                 "item_id": j,
@@ -248,7 +248,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                     )
 
         # Make sure the item_ids are sorted in the same order as in data
-        return df.loc[list(data.iter_items())]
+        return df.loc[data.item_ids]
 
     def _predict_gluonts_forecasts(self, data: TimeSeriesDataFrame, **kwargs) -> List[Forecast]:
         gts_data = self._to_gluonts_dataset(data)

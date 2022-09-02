@@ -178,8 +178,8 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.unique(level=0)
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.unique(level=0))  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(k in predictions.columns for k in ["mean"] + [str(q) for q in quantile_levels])
 
 
@@ -197,8 +197,8 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.unique(level=0)
-    assert all(predicted_item_index == train_data.index.unique(level=0))
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == train_data.item_ids)
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
 
@@ -273,7 +273,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert len(predictions) == test_data.num_items * prediction_length
 
-    predicted_item_index = predictions.index.unique(level=0)
-    assert all(predicted_item_index == test_data.index.unique(level=0))  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == test_data.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)

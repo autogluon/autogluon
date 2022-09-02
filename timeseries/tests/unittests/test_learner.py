@@ -90,8 +90,8 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -179,8 +179,8 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
 
         assert isinstance(predictions, TimeSeriesDataFrame)
 
-        predicted_item_index = predictions.index.unique(level=0)
-        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.unique(level=0))  # noqa
+        predicted_item_index = predictions.item_ids
+        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))
 
