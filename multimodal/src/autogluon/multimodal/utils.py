@@ -326,7 +326,6 @@ def get_config(
         if preset_overrides:
             config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
 
-    verify_model_names(config.model)
     logger.debug(f"overrides: {overrides}")
     if overrides is not None:
         # avoid manipulating the user-provided overrides
@@ -360,6 +359,7 @@ def verify_model_names(config: DictConfig):
     assert hasattr(config, "names")
     # assure no duplicate names
     assert len(config.names) == len(set(config.names))
+    assert len(config.names) > 0
     # verify that strings in `config.names` match the keys of `config`.
     keys = list(config.keys())
     keys.remove("names")
