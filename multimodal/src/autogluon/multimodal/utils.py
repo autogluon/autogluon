@@ -62,6 +62,7 @@ from .constants import (
     METRIC_MODE_MAP,
     MMDET_IMAGE,
     MMOCR_TEXT_DET,
+    MMOCR_TEXT_RECOG,
     MULTICLASS,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -96,6 +97,7 @@ from .models import (
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
     MMOCRAutoModelForTextDetection,
+    MMOCRAutoModelForTextRecognition,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
@@ -1734,7 +1736,7 @@ def tensor_to_ndarray(tensor: torch.Tensor):
     return tensor.detach().cpu().float().numpy()
 
 
-def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
+def extract_from_output(outputs: List[Dict], ret_type: Union[str, List[str]], as_ndarray: Optional[bool] = True):
     """
     Extract desired information, e.g., logits or features, from a list of model outputs.
     Support returning a concatenated tensor/ndarray or a dictionary of tensors/ndarrays.
@@ -1777,6 +1779,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
             return [bbox[0] for ele in outputs for bbox in ele[BBOX]]
         else:
             return [bbox for ele in outputs for bbox in ele[BBOX]]
+    elif isinstance(ret_type, List):
+        return outputs
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

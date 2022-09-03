@@ -119,6 +119,16 @@ def ocr_text_detection():
         "env.precision": 32,
     }
 
+@automm_presets.register()
+def ocr_text_recognition():
+    return {
+        "model.names": ["mmocr_text_recognition"],
+        "model.mmdet_image.checkpoint_name": "ABINet",
+        "env.eval_batch_size_ratio": 1,
+        "env.num_gpus": 1,
+        "env.precision": 32,
+    }
+
 
 @automm_presets.register()
 def feature_extraction():
