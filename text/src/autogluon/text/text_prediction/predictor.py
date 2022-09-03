@@ -389,8 +389,8 @@ class TextPredictor:
         standalone: bool, default = True
             Whether to save the Huggingface's pretrained model config for offline deployment.
             If `standalone = True`, save the Huggingface's pretrained model config to os.path.join(path, model_name).
-            Also, see `MultiModalPredictor.save()` for more detials.
-            Note that `standalone = True` only works for `backen = pytorch` and does noting in `backen = mxnet`.
+            Also, see `MultiModalPredictor.save()` for more details.
+            Note that `standalone = True` only works for `backend = pytorch` and does noting in `backend = mxnet`.
         """
 
         self._predictor.save(path=path, standalone=standalone)

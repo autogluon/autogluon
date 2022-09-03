@@ -415,7 +415,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
             job_fold_map[ref] = fold_ctx
             job_refs.append(ref)
 
-        # update ensemble whenver a model return
+        # update ensemble whenever a model return
         unfinished = job_refs
         while unfinished:
             finished, unfinished = self.ray.wait(unfinished, num_returns=1)

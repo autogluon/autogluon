@@ -48,7 +48,7 @@
                                                (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
     Tested on AWS Windows instance t3.xlarge, 
                                                (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
-                                               - Pytorch scores are slighty different, all else same.
+                                               - Pytorch scores are slightly different, all else same.
 
 """
 import sys
@@ -98,7 +98,7 @@ tests = [
                   'XGBoost': (-10.8, 0.01),
         },
     },
-    {   # If we explictly exclude some models the others should return unchanged and the ensemble result will be changed.
+    {   # If we explicitly exclude some models the others should return unchanged and the ensemble result will be changed.
         'name': 'small regression excluded models',
         'type': 'regression',
         'n_samples': 100,
@@ -168,7 +168,7 @@ tests = [
                   'XGBoost': (-19.12, 0.01),
         },
     },
-    {   # High quality preset on small datset.
+    {   # High quality preset on small dastset.
         'name': 'small regression high quality',
         'type': 'regression',
         'n_samples': 100,
@@ -203,7 +203,7 @@ tests = [
                   'XGBoost_BAG_L1_FULL': (-9.76, 0.01),
         }
     },
-    {   # Best quality preset on small datset.
+    {   # Best quality preset on small dastset.
         'name': 'small regression best quality',
         'type': 'regression',
         'n_samples': 100,

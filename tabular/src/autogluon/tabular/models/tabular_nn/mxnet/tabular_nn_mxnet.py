@@ -1,7 +1,7 @@
 """ MXNet neural networks for tabular data containing numerical, categorical, and text fields.
     First performs neural network specific pre-processing of the data.
     Contains separate input modules which are applied to different columns of the data depending on the type of values they contain:
-    - Numeric columns are pased through single Dense layer (binary categorical variables are treated as numeric)
+    - Numeric columns are passed through single Dense layer (binary categorical variables are treated as numeric)
     - Categorical columns are passed through separate Embedding layers
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
@@ -34,7 +34,7 @@ EPS = 1e-10  # small number
 _has_warned_mxnet_deprecation = False
 
 
-# TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
+# TODO: Gets stuck after inferring feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
 class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
     """ Class for neural network models that operate on tabular data.
@@ -463,7 +463,7 @@ class TabularNeuralNetMxnetModel(AbstractNeuralNetworkModel):
             df (pd.DataFrame): Data to be processed (X)
             labels (pd.Series): labels to be processed (y)
             test (bool): Is this test data where each datapoint should be processed separately using predetermined preprocessing steps.
-                         Otherwise preprocessor uses all data to determine propreties like best scaling factors, number of categories, etc.
+                         Otherwise preprocessor uses all data to determine properties like best scaling factors, number of categories, etc.
         Returns:
             Dataset object
         """
@@ -616,6 +616,6 @@ Once PR is merged into sklearn, may want to switch: category_encoders.Ordinal ->
 
 - Save preprocessed data so that we can do HPO of neural net hyperparameters more efficiently, while also doing HPO of preprocessing hyperparameters?
       Naive full HPO method requires redoing preprocessing in each trial even if we did not change preprocessing hyperparameters.
-      Alternative is we save each proprocessed dataset & corresponding TabularNeuralNetModel object with its unique param names in the file. Then when we try a new HP-config, we first try loading from file if one exists.
+      Alternative is we save each preprocessed dataset & corresponding TabularNeuralNetModel object with its unique param names in the file. Then when we try a new HP-config, we first try loading from file if one exists.
 
 """

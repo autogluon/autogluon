@@ -1,16 +1,16 @@
-# CLIP in AutoMM - Zero-Shot Image Classification 
+# CLIP in AutoMM - Zero-Shot Image Classification
+
 :label:`sec_automm_clip_zeroshot_imgcls`
 
-When you want to classify an image to different classes, it is standard to train an image classifier based on the class names. However, it is tedious to collect training data. And if the collected data is too few or too imbalanced, you may not get a decent image classifier. So you wonder, is there a strong enough model that can handle this situaton without the training efforts? 
+When you want to classify an image to different classes, it is standard to train an image classifier based on the class names. However, it is tedious to collect training data. And if the collected data is too few or too imbalanced, you may not get a decent image classifier. So you wonder, is there a strong enough model that can handle this situaton without the training efforts?
 
 Actually there is! OpenAI has introduced a model named [CLIP](https://openai.com/blog/clip/), which can be applied to any visual classification benchmark by simply providing the names of the visual categories to be recognized. And its accuracy is high, e.g., CLIP can achieve 76.2% top-1 accuracy on ImageNet without using any of the 1.28M training samples. This performance matches with original supervised ResNet50 on ImageNet, quite promising for a classification task with 1000 classes!
 
-So in this tutorial, let's dive deep into CLIP. We will show you how to use CLIP model to do zero-shot image classification in AutoGluon. 
-
+So in this tutorial, let's dive deep into CLIP. We will show you how to use CLIP model to do zero-shot image classification in AutoGluon.
 
 ## Simple Demo
 
-Here we provide a simple demo to classify what dog breed is in the picture below. 
+Here we provide a simple demo to classify what dog breed is in the picture below.
 
 ```{.python .input}
 from IPython.display import Image, display
@@ -35,7 +35,7 @@ print("Label probs:", prob)
 
 Clearly, according to the probabilities, we know there is a Husky in the photo (which I think is correct)!
 
-Let's try a harder example. Below is a photo of two Segways. This object class is not common in most existing vision datasets. 
+Let's try a harder example. Below is a photo of two Segways. This object class is not common in most existing vision datasets.
 
 ```{.python .input}
 url = "https://live.staticflickr.com/7236/7114602897_9cf00b2820_b.jpg"
@@ -52,14 +52,14 @@ prob = predictor.predict_proba({"image": [segway_image]}, {"text": ['segway', 'b
 print("Label probs:", prob)
 ```
 
-This is amazing, right? Now a bit knowledge on why and how CLIP works. CLIP is called Contrastive Language-Image Pre-training. It is trained on a massive number of data (400M image-text pairs). By using a simple loss objective, CLIP tries to predict which out of a set of randomly sampled text is actually paired with an given image in the training dateset. As a result, CLIP models can then be applied to nearly arbitrary visual classification tasks just like the examples we have shown above.
-
+This is amazing, right? Now a bit knowledge on why and how CLIP works. CLIP is called Contrastive Language-Image Pre-training. It is trained on a massive number of data (400M image-text pairs). By using a simple loss objective, CLIP tries to predict which out of a set of randomly sampled text is actually paired with an given image in the training dataset. As a result, CLIP models can then be applied to nearly arbitrary visual classification tasks just like the examples we have shown above.
 
 ## More about CLIP
 
-CLIP is powerful, and it was designed to mitigate a number of major problems in the standard deep learning approach to computer vision, such as costly datasets, closed set prediction and poor generalization performance. CLIP is a good solution to many problems, however, it is not the ultimate solution. CLIP has its own limitations. For example, CLIP is vulnerable to typographic attacks, i.e., if you add some text to an image, CLIP's predictions will be easily affected by the text. Let's see one example from OpenAI's blog post on [multimodal neurons](https://openai.com/blog/multimodal-neurons/). 
+CLIP is powerful, and it was designed to mitigate a number of major problems in the standard deep learning approach to computer vision, such as costly datasets, closed set prediction and poor generalization performance. CLIP is a good solution to many problems, however, it is not the ultimate solution. CLIP has its own limitations. For example, CLIP is vulnerable to typographic attacks, i.e., if you add some text to an image, CLIP's predictions will be easily affected by the text. Let's see one example from OpenAI's blog post on [multimodal neurons](https://openai.com/blog/multimodal-neurons/).
 
-Suppose we have a photo of a Granny Smith apple, 
+Suppose we have a photo of a Granny Smith apple,
+
 ```{.python .input}
 url = "https://cdn.openai.com/multimodal-neurons/assets/apple/apple-blank.jpg"
 image_path = download(url)
@@ -92,15 +92,13 @@ prob = predictor.predict_proba({"image": [image_path]}, {"text": ['Granny Smith'
 print("Label probs:", prob)
 ```
 
-Suddenly, the apple becomes iPod. 
+Suddenly, the apple becomes iPod.
 
-CLIP also has other limitations. If you are interested, you can read [CLIP paper](https://arxiv.org/abs/2103.00020) for more details. Or you can stay here, play with your own examples! 
-
+CLIP also has other limitations. If you are interested, you can read [CLIP paper](https://arxiv.org/abs/2103.00020) for more details. Or you can stay here, play with your own examples!
 
 ## Other Examples
 
 You may go to [AutoMM Examples](https://github.com/awslabs/autogluon/tree/master/examples/automm) to explore other examples about AutoMM.
-
 
 ## Customization
 

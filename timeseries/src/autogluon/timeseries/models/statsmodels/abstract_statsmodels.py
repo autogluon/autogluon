@@ -34,7 +34,7 @@ class FittedLocalModel:
     sm_model_init_args:
         Arguments passed to the __init__ method of the SM model
     parameters:
-        Estimated learnable paramters of the model (after completing the fitting procedure)
+        Estimated learnable parameters of the model (after completing the fitting procedure)
     """
 
     model_name: str

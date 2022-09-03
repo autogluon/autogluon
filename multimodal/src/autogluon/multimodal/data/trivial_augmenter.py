@@ -1,7 +1,7 @@
 """
 This file implements TrivialAugment.(https://arxiv.org/abs/2103.10158) We extend it for multi-modality setting. 
 
-Code is partically adapted from its official implementation https://github.com/automl/trivialaugment
+Code is partially adapted from its official implementation https://github.com/automl/trivialaugment
 """
 
 import logging
@@ -280,7 +280,7 @@ class TrivialAugment:
     def augment_text(self, data):
         op = random.choice(self.all_transform)
 
-        # use specified operation magnitude if avalible
+        # use specified operation magnitude if available
         if isinstance(op, tuple):
             op, scale = op
         else:

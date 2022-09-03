@@ -246,7 +246,7 @@ def test_predictor(
         )
 
 
-def test_standalone():  # test standalong feature in MultiModalPredictor.save()
+def test_standalone():  # test standalone feature in MultiModalPredictor.save()
     from unittest import mock
 
     import torch
@@ -307,7 +307,7 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
     online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
     del loaded_online_predictor
 
-    # Check if the predictor can be loaded from an offline enivronment.
+    # Check if the predictor can be loaded from an offline environment.
     with requests_gag:
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
         with tempfile.TemporaryDirectory() as tmpdirname:

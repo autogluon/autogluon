@@ -137,7 +137,7 @@ class MixupModule(Mixup):
 
 def mixup_others(x, lam):
     """
-    Mixup special types of data, espcially for tuple.
+    Mixup special types of data, especially for tuple.
     It is the simplest way of mixup for non image data.
     If lam >=0.5: choose the origin, else: choose the other one.
 
