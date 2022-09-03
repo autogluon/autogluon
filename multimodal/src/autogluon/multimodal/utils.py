@@ -227,7 +227,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
 
 
 def get_config(
-    presets: Optional[str] = "default",
+    presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
     is_distill: Optional[bool] = False,
@@ -291,6 +291,9 @@ def get_config(
     """
     if config is None:
         config = {}
+
+    if not config and not presets:
+        presets = "default"
 
     if not isinstance(config, DictConfig):
         basic_config = get_basic_automm_config(is_distill=is_distill)
