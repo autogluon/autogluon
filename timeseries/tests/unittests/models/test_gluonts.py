@@ -13,6 +13,7 @@ from autogluon.timeseries.models.gluonts import (  # AutoTabularModel,; MQRNNMod
     MQCNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
@@ -161,3 +162,28 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
     assert results["config_history"][1]["n_changepoints"] == 4
 
     assert all(c["growth"] == "linear" for c in results["config_history"].values())
+
+
+@pytest.mark.parametrize(
+    "quantiles, should_fail",
+    [
+        ([0.1, 0.5, 0.3, 0.9], False),
+        ([0.9], False),
+        ([0.1, 0.5, 0.55], True),
+    ],
+)
+def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_model_path, quantiles, should_fail):
+    model = TemporalFusionTransformerModel(
+        path=temp_model_path,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        prediction_length=4,
+        quantile_levels=quantiles,
+        hyperparameters={"epochs": 1},
+    )
+    if should_fail:
+        with pytest.raises(ValueError, match="quantile_levels are a subset of"):
+            model.fit(train_data=DUMMY_TS_DATAFRAME)
+            model.predict(DUMMY_TS_DATAFRAME)
+    else:
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
+        model.predict(DUMMY_TS_DATAFRAME)
