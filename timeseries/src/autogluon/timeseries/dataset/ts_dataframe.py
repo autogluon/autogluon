@@ -384,9 +384,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Returns
         -------
         data_before: TimeSeriesDataFrame
-            Data frame containing all rows of the original data frame before the ``cutoff_time`` (excluding ``cutoff_time``).
+            A new time series dataframe containing entries of the original time series before the ``cutoff_time``
+            (excluding ``cutoff_time``).
         data_after: TimeSeriesDataFrame
-            Data frame containing all rows of the original data frame after the ``cutoff_time`` (including ``cutoff_time``).
+            A new time series dataframe containing entries of the original time series after the ``cutoff_time``
+            (including ``cutoff_time``).
         """
 
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
@@ -476,10 +478,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
                   2 2019-01-05       8
 
         """
-        num_timesteps_per_item = self.num_timesteps_per_item()
+        length_per_item = self.length_per_item()
         # Create a boolean index that selects the correct slice in each timeseries
         boolean_indicators = []
-        for length in num_timesteps_per_item:
+        for length in length_per_item:
             indicator = np.zeros(length, dtype=bool)
             indicator[start_index:end_index] = True
             boolean_indicators.append(indicator)
