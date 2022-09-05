@@ -16,10 +16,16 @@ def download_sample_images():
 
     return mmocr_image_name
 
+
 # TODO: when using crnn checkpoint, the results are wrong.
 @pytest.mark.parametrize(
     "checkpoint_name",
-    ["abinet_academic", "sar_r31_parallel_decoder_academic", "seg_r31_1by16_fpnocr_academic", "nrtr_r31_1by16_1by8_academic"],
+    [
+        "abinet_academic",
+        "sar_r31_parallel_decoder_academic",
+        "seg_r31_1by16_fpnocr_academic",
+        "nrtr_r31_1by16_1by8_academic",
+    ],
 )
 def test_mmocr_text_recognition_inference(checkpoint_name):
     mmocr_image_name = download_sample_images()
@@ -40,5 +46,5 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
     ocr = MMOCR(recog_ckpt=checkpoint, recog_config=config_file, det=None)
     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
 
-    assert pred[0]['text'] == MMOCR_res[0]['text']
-    assert pred[0]['score'] == MMOCR_res[0]['score']
+    assert pred[0]["text"] == MMOCR_res[0]["text"]
+    assert pred[0]["score"] == MMOCR_res[0]["score"]

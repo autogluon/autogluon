@@ -27,7 +27,7 @@ except ImportError:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_model_head, get_mmocr_models
+from .utils import assign_layer_ids, get_column_features, get_mmocr_models, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 

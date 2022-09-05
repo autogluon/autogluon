@@ -544,12 +544,14 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
 
     return config, model
 
+
 def get_mmocr_models(checkpoint_name):
     import mmcv
     import mmocr
-    from mmocr.models import build_detector
-    from mmcv.runner import load_checkpoint
     from mim.commands.download import download
+    from mmcv.runner import load_checkpoint
+    from mmocr.models import build_detector
+
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
 
     # read config files

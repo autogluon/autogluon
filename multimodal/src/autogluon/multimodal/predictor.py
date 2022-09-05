@@ -1720,7 +1720,7 @@ class MultiModalPredictor:
 
         if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
-        
+
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
 

@@ -1,11 +1,10 @@
 import logging
 import warnings
-from typing import Optional
+from typing import List, Optional
 
 import torch
 from mim.commands.download import download
 from torch import nn
-from typing import List
 
 try:
     import mmcv
@@ -27,8 +26,20 @@ try:
 except ImportError:
     mmdet = None
 
-from ..constants import AUTOMM, TEXT, SCORE, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_model_head, get_mmocr_models
+from ..constants import (
+    AUTOMM,
+    COLUMN,
+    COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
+    MASKS,
+    SCORE,
+    TEXT,
+)
+from .utils import assign_layer_ids, get_column_features, get_mmocr_models, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 
@@ -132,18 +143,18 @@ class MMOCRAutoModelForTextRecognition(nn.Module):
         if isinstance(data["img_metas"], List):
             data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         else:
-            data["img_metas"] = data['img_metas'].data
+            data["img_metas"] = data["img_metas"].data
 
         if isinstance(data["img"], List):
             data["img"] = [img.data[0] for img in data["img"]]
         else:
-            data["img"] = data['img'].data 
-            
+            data["img"] = data["img"].data
+
         device = next(self.model.parameters()).device  # model device
         if next(self.model.parameters()).is_cuda:
             # scatter to specified GPU
             data = scatter(data, [device])[0]
-       
+
         results = self.model(return_loss=False, rescale=True, **data)
 
         ret = {TEXT: results[0]["text"], SCORE: results[0]["score"]}
