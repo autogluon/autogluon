@@ -28,7 +28,7 @@ except ImportError:
     mmdet = None
 
 from ..constants import AUTOMM, TEXT, SCORE, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_model_head
+from .utils import assign_layer_ids, get_column_features, get_model_head, get_mmocr_models
 
 logger = logging.getLogger(AUTOMM)
 
@@ -65,24 +65,28 @@ class MMOCRAutoModelForTextRecognition(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
 
-        # TODO: the logic here (line69 ~ line75) could be shared across multiple mmlab code, consider wrap them in utils.py.
-        # download config and checkpoint files using openmim
-        checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
+        # # TODO: the logic here (line69 ~ line75) could be shared across multiple mmlab code, consider wrap them in utils.py.
+        # # download config and checkpoint files using openmim
+        # checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
 
-        # read config files
-        assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        config_file = checkpoint_name + ".py"
-        if isinstance(config_file, str):
-            self.config = mmcv.Config.fromfile(config_file)
+        # # read config files
+        # assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+        # config_file = checkpoint_name + ".py"
+        # if isinstance(config_file, str):
+        #     self.config = mmcv.Config.fromfile(config_file)
 
-        # build model and load pretrained weights
-        assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
+        # # build model and load pretrained weights
+        # assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
 
-        checkpoint = checkpoints[0]
-        self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
-        if checkpoint is not None:
-            checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
+        # checkpoint = checkpoints[0]
+        # self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
+        # if checkpoint is not None:
+        #     checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
 
+        # self.model = revert_sync_batchnorm(self.model)
+        # self.model.cfg = self.config
+        # self.prefix = prefix
+        self.model, self.config = get_mmocr_models(checkpoint_name)
         self.model = revert_sync_batchnorm(self.model)
         self.model.cfg = self.config
         self.prefix = prefix

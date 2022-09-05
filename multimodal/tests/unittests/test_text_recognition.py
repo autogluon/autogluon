@@ -31,7 +31,6 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
         pipeline="ocr_text_recognition",
     )
 
-    # two dimensions, (num of text lines, 2 * num of coordinate points)
     pred = predictor.predict({"image": [mmocr_image_name]})
 
     # original MMOCR model's output
