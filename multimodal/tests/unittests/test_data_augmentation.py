@@ -42,12 +42,6 @@ def test_mixup():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "optimization.top_k_average_method": BEST,
@@ -64,7 +58,6 @@ def test_mixup():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
@@ -83,12 +76,6 @@ def test_textagumentor_deepcopy():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "env.num_workers": 0,
@@ -106,7 +93,6 @@ def test_textagumentor_deepcopy():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
@@ -118,7 +104,6 @@ def test_textagumentor_deepcopy():
     # Test copied data processors
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=10,
     )
@@ -129,7 +114,6 @@ def test_textagumentor_deepcopy():
     # Test copied data processors
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=10,
     )
@@ -144,12 +128,6 @@ def test_trivialaugment():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "optimization.top_k_average_method": BEST,
@@ -169,7 +147,6 @@ def test_trivialaugment():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,

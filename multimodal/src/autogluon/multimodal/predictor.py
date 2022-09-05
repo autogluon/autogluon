@@ -275,7 +275,7 @@ class MultiModalPredictor:
     def fit(
         self,
         train_data: pd.DataFrame,
-        presets: str = None,
+        presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,

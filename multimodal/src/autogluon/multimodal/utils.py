@@ -292,6 +292,9 @@ def get_config(
     if config is None:
         config = {}
 
+    if not config and not presets:
+        presets = "default"
+
     if not isinstance(config, DictConfig):
         basic_config = get_basic_automm_config(is_distill=is_distill)
         if presets is None:
@@ -358,6 +361,9 @@ def verify_model_names(config: DictConfig):
     """
     # must have attribute `names`
     assert hasattr(config, "names")
+    # return if no names available
+    if not config.names:
+        return
     # assure no duplicate names
     assert len(config.names) == len(set(config.names))
     # verify that strings in `config.names` match the keys of `config`.
