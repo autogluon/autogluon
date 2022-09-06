@@ -12,7 +12,7 @@ The goal of AutoMM is to democratize these giant foundation models to every deve
 The idea is to either finetune a small subset of the weights in the foundation model (e.g., [BitFit](https://aclanthology.org/2022.acl-short.1.pdf)), or adding a tiny tunable structure on top of the fixed backbone (e.g., [Prompt Tuning](https://aclanthology.org/2021.emnlp-main.243.pdf), [LoRA](https://arxiv.org/pdf/2106.09685.pdf), [Adapter](https://arxiv.org/abs/1902.00751), [MAM Adapter](https://arxiv.org/pdf/2110.04366.pdf), [$IA^3$](https://arxiv.org/abs/2205.05638)). 
 These techniques can effectively reduce the peak memory usage and model training time, while maintaining the performance.
 
-In this tutorial, we introduce how to apply parameter-efficient finetuning to train the MultiModalPredictor. We will reuse the same multilingual dataset as in :ref:`sec_automm_textprediction_multilingual` and train models with the `"ia3_bias"` algorithm. `"ia3_bias"` is an parameter-efficient finetuning algorithm that combines $IA^3$ and BitFit. In addition, we will demonstrate how to combine parameter-efficient finetuning and gradient checkpointing to finetune the mT5-XL encoder that has close to 2 billion parameters.
+In this tutorial, we introduce how to apply parameter-efficient finetuning to train the MultiModalPredictor. We will reuse the same multilingual dataset as in :ref:`sec_automm_textprediction_multilingual` and train models with the `"ia3_bias"` algorithm. `"ia3_bias"` is an parameter-efficient finetuning algorithm that combines $IA^3$ and BitFit.
 
 ## Prepare Dataset
 
@@ -66,7 +66,7 @@ In AutoMM, to enable efficient finetuning, just specify the `optimization.effici
 from autogluon.multimodal import MultiModalPredictor
 
 predictor = MultiModalPredictor(label="label",
-                                path="multilingual_ia3_v1")
+                                path="multilingual_ia3")
 predictor.fit(train_en_df,
               presets="multilingual",
               hyperparameters={
@@ -95,29 +95,23 @@ print('Score in the Japanese Testset:', score_in_jp)
 ## Combine Gradient Checkpointing and Parameter-efficient Finetuning
 
 By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint.html) and parameter-efficient finetuning, it is feasible to finetune 
-models that have two billion parameters with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
-Here, we finetune the [google/mt5-xl](https://huggingface.co/google/mt5-xl) model with $IA^3$. 
-To reduce the training time, we further downsampled training set to 200 samples. 
+models that have two billion parameters (e.g., [google/mt5-xl](https://huggingface.co/google/mt5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
 To turn on gradient checkpointing, you can just set up `"model.hf_text.gradient_checkpointing"` to `True`.
-
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
 
-train_en_df_sub = train_en_df.sample(200, random_state=123).reset_index(drop=True)
-
 predictor = MultiModalPredictor(label="label",
-                                path="multilingual_mt5_3b_v4")
-predictor.fit(train_en_df_sub,
+                                path="multilingual_ia3_gradient_checkpoint")
+predictor.fit(train_en_df,
               presets="multilingual",
               hyperparameters={
-                  "model.hf_text.checkpoint_name": "google/mt5-xl",
                   "model.hf_text.gradient_checkpointing": True,
                   "optimization.efficient_finetune": "ia3_bias",
                   "optimization.lr_decay": 0.9,
-                  "optimization.learning_rate": 2e-03,
-                  "optimization.end_lr": 2e-03,
-                  "optimization.max_epochs": 2,
+                  "optimization.learning_rate": 3e-03,
+                  "optimization.end_lr": 3e-03,
+                  "optimization.max_epochs": 3,
                   "optimization.warmup_steps": 0,
                   "env.batch_size": 32,
               })
