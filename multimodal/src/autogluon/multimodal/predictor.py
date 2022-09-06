@@ -1254,7 +1254,9 @@ class MultiModalPredictor:
                     monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
                     ingredients = [top_k_model_paths[0]]
                     if len(ingredients) > 1:
-                        logger.info(f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm.")
+                        logger.info(
+                            f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm."
+                        )
 
                         self._model = self._load_state_dict(
                             model=model,
