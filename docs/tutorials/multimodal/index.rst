@@ -60,7 +60,7 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
       :link: efficient_finetuning_basic.html
 
-      How to use take advantage of larger foundation models with the help of parameter-efficient finetuning.
+      How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
 
    .. card::
       :title: Customize AutoMM
