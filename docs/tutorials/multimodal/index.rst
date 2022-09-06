@@ -45,12 +45,6 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
 
    .. card::
-      :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
-      :link: efficient_finetuning_basic.html
-
-      How to use take advantage of larger foundation models with the help of parameter-efficient finetuning.
-
-   .. card::
       :title: CLIP in AutoMM - Zero-Shot Image Classification 
       :link: clip_zeroshot.html
 
@@ -61,6 +55,12 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       :link: clip_embedding.html
 
       How to use CLIP to extract embeddings for retrieval problem.
+
+   .. card::
+      :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
+      :link: efficient_finetuning_basic.html
+
+      How to use take advantage of larger foundation models with the help of parameter-efficient finetuning.
 
    .. card::
       :title: Customize AutoMM
