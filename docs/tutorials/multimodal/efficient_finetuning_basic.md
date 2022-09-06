@@ -95,8 +95,10 @@ print('Score in the Japanese Testset:', score_in_jp)
 ## Combine Gradient Checkpointing and Parameter-efficient Finetuning
 
 By combining [gradient checkpointing](https://pytorch.org/docs/stable/checkpoint.html) and parameter-efficient finetuning, it is feasible to finetune 
-models that have two billion parameters (e.g., [google/mt5-xl](https://huggingface.co/google/mt5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
-To turn on gradient checkpointing, you can just set up `"model.hf_text.gradient_checkpointing"` to `True`.
+models that have close to two billion parameters (e.g., [google/mt5-xl](https://huggingface.co/google/mt5-xl)) with a single GPU in [AWS G4 instances](https://aws.amazon.com/ec2/instance-types/g4/). 
+To turn on gradient checkpointing, all you need is to set `"model.hf_text.gradient_checkpointing"` to `True`. 
+To improve the training speed, we won't use [google/mt5-xl](https://huggingface.co/google/mt5-xl) in the following example and 
+you can try it by setting `"model.hf_text.checkpoint_name": "google/mt5-xl"`, or refer to [the example](https://gist.github.com/sxjscience/b011460574c7e41c47a42ba86d026cbc).
 
 ```{.python .input}
 from autogluon.multimodal import MultiModalPredictor
