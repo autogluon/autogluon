@@ -179,7 +179,7 @@ predictor.fit(hyperparameters={"optimization.top_k_average_method": "uniform_sou
 ```
 
 ### optimization.efficient_finetune
-A few parameter-efficient finetuning options. It supports finetuning only a small portion of parameters instead of one whole pretrained backbone.
+A few parameter-efficient finetuning options. It supports finetuning only a small portion of parameters instead of the whole pretrained backbone.
 
 - `"bit_fit"`: bias parameters only. See [this paper](https://arxiv.org/pdf/2106.10199.pdf) for details.
 - `"norm_fit"`: normalization parameters + bias parameters. See [this paper](https://arxiv.org/pdf/2003.00152.pdf) for details.

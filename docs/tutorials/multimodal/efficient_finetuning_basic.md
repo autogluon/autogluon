@@ -9,17 +9,23 @@ Following is a figure from the [Microsoft research blog](https://www.microsoft.c
 ![Model Size Scaling](https://www.microsoft.com/en-us/research/uploads/prod/2021/10/model-size-graph.jpg)
 :width:`500px`
 
-The goal of AutoMM is to democratize these giant foundation models to every developers. To finetune the giant models, we adopt the recently popularized **parameter-efficient finetuning** technique. 
-The idea is to either finetune a small subset of the weights in the foundation model (e.g., [BitFit](https://aclanthology.org/2022.acl-short.1.pdf)), or adding a tiny tunable structure on top of the fixed backbone (e.g., [Prompt Tuning](https://aclanthology.org/2021.emnlp-main.243.pdf), [LoRA](https://arxiv.org/pdf/2106.09685.pdf), [Adapter](https://arxiv.org/abs/1902.00751), [MAM Adapter](https://arxiv.org/pdf/2110.04366.pdf), [IA^3](https://arxiv.org/abs/2205.05638)). 
+The goal of AutoMM is to democratize the publicly available foundation models, whether they are big or not, to every developers. 
+To finetune the giant models, we adopt the recently popularized **parameter-efficient finetuning** technique. 
+The idea is to either finetune a small subset of the weights in the foundation model (e.g., [BitFit](https://aclanthology.org/2022.acl-short.1.pdf)), 
+or adding a tiny tunable structure on top of the fixed backbone (e.g., [Prompt Tuning](https://aclanthology.org/2021.emnlp-main.243.pdf),
+[LoRA](https://arxiv.org/pdf/2106.09685.pdf), [Adapter](https://arxiv.org/abs/1902.00751), [MAM Adapter](https://arxiv.org/pdf/2110.04366.pdf), [IA^3](https://arxiv.org/abs/2205.05638)). 
 These techniques can effectively reduce the peak memory usage and model training time, while maintaining the performance.
 
-In this tutorial, we introduce how to apply parameter-efficient finetuning to train the MultiModalPredictor. We will reuse the same multilingual dataset as in :ref:`sec_automm_textprediction_multilingual` and train models with the `"ia3_bias"` algorithm. `"ia3_bias"` is an parameter-efficient finetuning algorithm that combines IA^3 and BitFit.
+In this tutorial, we introduce how to apply parameter-efficient finetuning in MultiModalPredictor.
+We will reuse the same multilingual dataset as in :ref:`sec_automm_textprediction_multilingual` and train 
+models with the `"ia3_bias"` algorithm. `"ia3_bias"` is a parameter-efficient finetuning algorithm that combines IA^3 and BitFit.
 
 ## Prepare Dataset
 
 The [Cross-Lingual Amazon Product Review Sentiment](https://webis.de/data/webis-cls-10.html) dataset contains Amazon product reviews in four languages. 
 Here, we load the English and German fold of the dataset. In the label column, `0` means negative sentiment and `1` means positive sentiment. 
-For the purpose of demonstration, we downsampled the training data to 1000 samples. We will train the model on the English dataset and directly evaluate its performance on the German and Japanese test set.
+For the purpose of demonstration, we downsampled the training data to 1000 samples. We will train the model on the English dataset and 
+directly evaluate its performance on the German and Japanese test set.
 
 
 ```{.python .input}
@@ -81,7 +87,8 @@ predictor.fit(train_en_df,
               })
 ```
 
-The fraction of the tunable parameters is around **0.5%** of all parameters. Actually, the model can still achieve good performance on the test sets (even in the cross-lingual transfer setting). It obtained **comparable results** as full-finetuning as in :ref:`sec_automm_textprediction_multilingual`.
+The fraction of the tunable parameters is around **0.5%** of all parameters. Actually, the model trained purely on English data can achieve good performance 
+on the test sets, even on the German / Japanese test set. It obtained **comparable results** as full-finetuning as in :ref:`sec_automm_textprediction_multilingual`.
 
 
 ```{.python .input}
