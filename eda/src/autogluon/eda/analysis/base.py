@@ -4,6 +4,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List, Union
 
+from pandas import DataFrame
+
 from .. import AnalysisState
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,12 @@ class AbstractAnalysis(ABC):
         if state is None:
             state = AnalysisState()
         return state
+
+    def available_datasets(self, args):
+        for ds in ['train_data', 'test_data', 'tuning_data']:
+            if ds in args and args[ds] is not None:
+                df: DataFrame = args[ds]
+                yield ds, df
 
     def _get_state_from_parent(self) -> AnalysisState:
         state = self.state
