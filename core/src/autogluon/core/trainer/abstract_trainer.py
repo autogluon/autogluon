@@ -51,7 +51,7 @@ class AbstractTrainer:
         self.save_data = save_data
         self.random_state = random_state  # Integer value added to the stack level to get the random_state for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
-        self.sample_weight = sample_weight  # TODO: consider redesign where Trainer doesnt need sample_weight column name and weights are separate from X
+        self.sample_weight = sample_weight  # TODO: consider redesign where Trainer doesn't need sample_weight column name and weights are separate from X
         self.weight_evaluation = weight_evaluation
         if eval_metric is not None:
             self.eval_metric = eval_metric
