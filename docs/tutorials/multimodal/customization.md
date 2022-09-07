@@ -179,18 +179,23 @@ predictor.fit(hyperparameters={"optimization.top_k_average_method": "uniform_sou
 ```
 
 ### optimization.efficient_finetune
-Finetune only a small portion of parameters instead of one whole pretrained backbone.
+Options for parameter-efficient finetuning. Parameter-efficient finetuning means to finetune only a small portion of parameters instead of the whole pretrained backbone.
 
 - `"bit_fit"`: bias parameters only. See [this paper](https://arxiv.org/pdf/2106.10199.pdf) for details.
 - `"norm_fit"`: normalization parameters + bias parameters. See [this paper](https://arxiv.org/pdf/2003.00152.pdf) for details.
 - `"lora"`: LoRA Adaptors. See [this paper](https://arxiv.org/pdf/2106.09685.pdf) for details.
 - `"lora_bias"`: LoRA Adaptors + bias parameters.
 - `"lora_norm"`: LoRA Adaptors + normalization parameters + bias parameters.
+- `"ia3"`: IA3 algorithm. See [this paper](https://arxiv.org/abs/2205.05638) for details.
+- `"ia3_bias"`: IA3 + bias parameters.
+- `"ia3_norm"`: IA3 + normalization parameters + bias parameters.
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"optimization.efficient_finetune": None})
 # finetune only bias parameters
 predictor.fit(hyperparameters={"optimization.efficient_finetune": "bit_fit"})
+# finetune with IA3 + BitFit
+predictor.fit(hyperparameters={"optimization.efficient_finetune": "ia3_bias"})
 ```
 
 ## Environment
@@ -399,6 +404,16 @@ Set the maximum percentage of text tokens to conduct data augmentation. For each
 predictor.fit(hyperparameters={"model.hf_text.text_trivial_aug_maxscale": 0})
 # Enable trivial augmentation by setting the max scale to 0.1
 predictor.fit(hyperparameters={"model.hf_text.text_trivial_aug_maxscale": 0.1})
+```
+
+### model.hf_text.gradient_checkpointing
+Whether to turn on gradient checkpointing to reduce the memory consumption for calculating gradients. For more about gradient checkpointing, feel free to refer to [relevant tutorials](https://github.com/cybertronai/gradient-checkpointing).
+
+```
+# by default, AutoMM doesn't turn on gradient checkpointing
+predictor.fit(hyperparameters={"model.hf_text.gradient_checkpointing": False})
+# Turn on gradient checkpointing
+predictor.fit(hyperparameters={"model.hf_text.gradient_checkpointing": True})
 ```
 
 
