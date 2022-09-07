@@ -6,7 +6,7 @@ AI is undergoing a paradigm shift with the rise of "foundation models", i.e., gi
 These foundation models, which are the key of AutoMM, can be easily adapted to down-stream applications. However, as the size of these foundation models grows, finetuning these models becomes increasingly difficult. 
 Following is a figure from the [Microsoft research blog](https://www.microsoft.com/en-us/research/blog/using-deepspeed-and-megatron-to-train-megatron-turing-nlg-530b-the-worlds-largest-and-most-powerful-generative-language-model/) that demonstrates the trend:
 
-![Model Size Scaling](https://www.microsoft.com/en-us/research/uploads/prod/2021/10/model-size-graph.jpg)
+![Scaling of foundation models](https://www.microsoft.com/en-us/research/uploads/prod/2021/10/model-size-graph.jpg)
 :width:`500px`
 
 The goal of AutoMM is to democratize the publicly available foundation models, whether they are big or not, to every developers. 
