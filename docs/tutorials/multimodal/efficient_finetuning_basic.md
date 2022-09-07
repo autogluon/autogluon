@@ -6,7 +6,8 @@ AI is undergoing a paradigm shift with the rise of "foundation models", i.e., gi
 These foundation models, which are the key of AutoMM, can be easily adapted to down-stream applications. However, as the size of these foundation models grows, finetuning these models becomes increasingly difficult. 
 Following is a figure from the [Microsoft research blog](https://www.microsoft.com/en-us/research/blog/using-deepspeed-and-megatron-to-train-megatron-turing-nlg-530b-the-worlds-largest-and-most-powerful-generative-language-model/) that demonstrates the trend:
 
-<img src="https://www.microsoft.com/en-us/research/uploads/prod/2021/10/model-size-graph.jpg" width="500" height="200"></img>
+![Model Size Scaling](https://www.microsoft.com/en-us/research/uploads/prod/2021/10/model-size-graph.jpg)
+:width:`500px`
 
 The goal of AutoMM is to democratize these giant foundation models to every developers. To finetune the giant models, we adopt the recently popularized **parameter-efficient finetuning** technique. 
 The idea is to either finetune a small subset of the weights in the foundation model (e.g., [BitFit](https://aclanthology.org/2022.acl-short.1.pdf)), or adding a tiny tunable structure on top of the fixed backbone (e.g., [Prompt Tuning](https://aclanthology.org/2021.emnlp-main.243.pdf), [LoRA](https://arxiv.org/pdf/2106.09685.pdf), [Adapter](https://arxiv.org/abs/1902.00751), [MAM Adapter](https://arxiv.org/pdf/2110.04366.pdf), [IA^3](https://arxiv.org/abs/2205.05638)). 
