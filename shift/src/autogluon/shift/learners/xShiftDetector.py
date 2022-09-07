@@ -131,15 +131,12 @@ class C2STShiftDetector:
 
     @post_fit
     def anomaly_scores(self,
-                       join_test: bool=True,
                        how: str='all',
                        sample_size: int=100) -> pd.DataFrame:
         """Return anomaly scores for all points
 
         Parameters
         ----------
-        join_test : bool, default = True
-            If True, join the anomaly scores to the original test dataframe
         how: str, default = 'all'
             - 'all' = all test points
             - 'rand' = random selection of held out rows in test set
@@ -153,8 +150,6 @@ class C2STShiftDetector:
         """
         as_top = self.C2ST.sample_anomaly_scores(how=how, sample_size=sample_size)
         as_top = as_top[[1]].rename(columns={1: 'xshift_test_proba'})
-        if join_test:
-            return as_top.join(self._X_test)
         return as_top
 
     @post_fit

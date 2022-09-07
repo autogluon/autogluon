@@ -43,7 +43,7 @@ def test_xsd():
     assert xsd.decision() == 'not_detected'
 
 def test_anomaly_scores():
-    train, test = load_adult_data()
+    train, test = load_adult_cs_data()
     xsd = C2STShiftDetector(TabularPredictor, label='class',  classifier_kwargs = {'path' : 'AutogluonModels'})
     xsd.fit(train, test)
     phat = xsd.anomaly_scores()

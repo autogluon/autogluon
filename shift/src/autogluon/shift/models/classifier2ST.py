@@ -72,7 +72,7 @@ class Classifier2ST:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
             data = self._make_source_target_label(data, self.sample_label) # makes a copy
         if data.index.has_duplicates:
-            self.original_index = data.index
+            self.original_index = data.index.copy()
             data.index = pd.RangeIndex(data.shape[0])
         self.fit_kwargs = kwargs
         train = data.sample(frac=self.split)
@@ -174,14 +174,15 @@ class Classifier2ST:
         if how == 'all':
             train = self._train.loc[self._train[self.sample_label] == 1].copy()
             phat_test = self.classifier.predict_proba(test)
-            phat_test = phat_test.sort_values(1, ascending=False)
             # train a classifier on the remainder on the holdout and predict on the training set
             # this means that all of the original test dataset gets an anomaly score
             classifier_test = self.classifier_class(**self.classifier_kwargs)
             classifier_test.fit(self._test, **self.fit_kwargs)
             phat_train = self.classifier.predict_proba(train)
-            phat_train = phat_train.sort_values(1, ascending=False)
             phat_samp = pd.concat((phat_train, phat_test))
+        if self.original_index is not None:
+            phat_samp.index = phat_samp.index.map(dict(enumerate(self.original_index)))
+        phat_samp = phat_samp.sort_values(1, ascending=False)
         return phat_samp
 
     @post_fit

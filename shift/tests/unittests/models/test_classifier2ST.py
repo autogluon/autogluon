@@ -49,6 +49,11 @@ def test_sample_anomaly_score():
     assert prob_s.iloc[0,1] > prob_s.iloc[1,1]
     assert as_top.shape[0] == 100
 
+def test_sample_anomaly_score_all():
+    tst = fit_tst()
+    ascr = tst.sample_anomaly_scores(how='all')
+    pass
+
 def test_null_test():
     data = get_dogs_data()
     data['label'] = np.random.permutation(data['label'])
