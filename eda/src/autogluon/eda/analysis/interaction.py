@@ -1,7 +1,7 @@
 from typing import Union, List, Any, Dict
 
 from .. import AnalysisState
-from ..analysis import AbstractAnalysis, DATASET_ARGS
+from ..analysis import AbstractAnalysis
 
 
 class FeatureInteraction(AbstractAnalysis):
@@ -27,15 +27,21 @@ class FeatureInteraction(AbstractAnalysis):
         cols = {k: v for k, v in cols.items() if v is not None}
         interactions: List[Dict[str, Any]] = state.get('interactions', [])
 
-        for ds in DATASET_ARGS:
-            if ds in args and args[ds] is not None:
-                missing_cols = [c for c in cols.values() if c not in args[ds].columns]
-                if len(missing_cols) == 0:
-                    df = args[ds][cols.values()]
-                    ds_interaction = {
-                        'features': cols,
-                        'dataset': ds,
-                        'data': df,
-                    }
-                    interactions.append(ds_interaction)
+        for (ds, df) in self.available_datasets(args):
+            missing_cols = [c for c in cols.values() if c not in df.columns]
+            if len(missing_cols) == 0:
+                df = df[cols.values()]
+                ds_interaction = {
+                    'features': cols,
+                    'dataset': ds,
+                    'data': df,
+                }
+                interactions.append(ds_interaction)
         state.interactions = interactions
+
+#
+# class Correlation(AbstractAnalysis):
+#     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+#         state.correlations = {}
+#         with self.available_datasets(args) as (ds, df):
+#             state.correlations[ds] = args[ds]

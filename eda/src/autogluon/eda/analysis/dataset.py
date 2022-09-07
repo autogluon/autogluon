@@ -8,8 +8,6 @@ from autogluon.common.features.infer_types import get_type_group_map_special, ge
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
-DATASET_ARGS = ['train_data', 'test_data', 'tuning_data']
-
 
 class Sampler(AbstractAnalysis):
 
@@ -23,24 +21,21 @@ class Sampler(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.sample_size = self.sample
         if self.sample is not None:
-            for ds in DATASET_ARGS:
-                if ds in args and args[ds] is not None:
-                    self.args[ds] = args[ds].sample(self.sample)
+            for (ds, df) in self.available_datasets(args):
+                self.args[ds] = df.sample(self.sample)
 
 
 class DatasetSummary(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
-        for ds in DATASET_ARGS:
-            if ds in args and args[ds] is not None:
-                df = args[ds]
-                summary = df.describe(include='all').T
-                summary = summary.join(pd.DataFrame({'dtypes': df.dtypes}))
-                summary['unique'] = args[ds].nunique()
-                summary['count'] = summary['count'].astype(int)
-                summary = summary.sort_index()
-                s[ds] = summary.to_dict()
+        for (ds, df) in self.available_datasets(args):
+            summary = df.describe(include='all').T
+            summary = summary.join(pd.DataFrame({'dtypes': df.dtypes}))
+            summary['unique'] = args[ds].nunique()
+            summary['count'] = summary['count'].astype(int)
+            summary = summary.sort_index()
+            s[ds] = summary.to_dict()
         state.dataset_stats = s
 
 
@@ -48,18 +43,16 @@ class RawTypesAnalysis(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.raw_types = {}
-        for ds in DATASET_ARGS:
-            if ds in args and args[ds] is not None:
-                state.raw_types[ds] = get_type_map_raw(args[ds])
+        for (ds, df) in self.available_datasets(args):
+            state.raw_types[ds] = get_type_map_raw(df)
 
 
 class SpecialTypesAnalysis(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.special_types = {}
-        for ds in DATASET_ARGS:
-            if ds in args and args[ds] is not None:
-                state.special_types[ds] = self.infer_special_types(args[ds])
+        for (ds, df) in self.available_datasets(args):
+            state.special_types[ds] = self.infer_special_types(df)
 
     def infer_special_types(self, ds):
         special_types = {}
@@ -76,15 +69,14 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 class MissingValuesAnalysis(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
-        for ds in DATASET_ARGS:
-            if ds in args and args[ds] is not None:
-                s[ds] = {
-                    'count': {},
-                    'ratio': {},
-                }
-                na = args[ds].isna().sum()
-                na = na[na > 0]
-                s[ds]['count'] = na.to_dict()
-                s[ds]['ratio'] = (na / len(args[ds])).to_dict()
-                s[ds]['data'] = args[ds]
+        for (ds, df) in self.available_datasets(args):
+            s[ds] = {
+                'count': {},
+                'ratio': {},
+            }
+            na = df.isna().sum()
+            na = na[na > 0]
+            s[ds]['count'] = na.to_dict()
+            s[ds]['ratio'] = (na / len(df)).to_dict()
+            s[ds]['data'] = df
         state.missing_statistics = s
