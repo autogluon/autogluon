@@ -270,7 +270,7 @@ Prediction or evaluation uses a larger per gpu batch size `env.per_gpu_batch_siz
 ```
 # default used by AutoMM
 predictor.fit(hyperparameters={"env.eval_batch_size_ratio": 4})
-# use 2x per gpu batch size during prediction or evalution
+# use 2x per gpu batch size during prediction or evaluation
 predictor.fit(hyperparameters={"env.eval_batch_size_ratio": 2})
 ```
 
