@@ -61,6 +61,7 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       :link: efficient_finetuning_basic.html
 
       How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
+      In the tutorial, we will use the combination of IA^3 and BitFit to finetune a multilingual backbone.
 
    .. card::
       :title: Customize AutoMM
