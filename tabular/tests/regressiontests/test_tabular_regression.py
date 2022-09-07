@@ -168,7 +168,7 @@ tests = [
                   'XGBoost': (-19.12, 0.01),
         },
     },
-    {   # High quality preset on small dastset.
+    {   # High quality preset on small dataset.
         'name': 'small regression high quality',
         'type': 'regression',
         'n_samples': 100,
@@ -203,7 +203,7 @@ tests = [
                   'XGBoost_BAG_L1_FULL': (-9.76, 0.01),
         }
     },
-    {   # Best quality preset on small dastset.
+    {   # Best quality preset on small dataset.
         'name': 'small regression best quality',
         'type': 'regression',
         'n_samples': 100,
