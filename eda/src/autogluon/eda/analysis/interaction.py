@@ -1,43 +1,41 @@
-from typing import Type
+from typing import Union, List, Any, Dict
 
-from autogluon.eda import AbstractAnalysis, RenderingBackend
-from autogluon.eda.backend.interaction import TwoFeatureInteractionBoxplotRenderer, ThreeFeatureInteractionBoxplotRenderer
+from .. import AnalysisState
+from ..analysis import AbstractAnalysis, DATASET_ARGS
 
 
-class TwoFeatureInteraction(AbstractAnalysis):
+class FeatureInteraction(AbstractAnalysis):
+
     def __init__(self,
-                 x=None,
-                 y=None,
-                 rendering_backend: Type[RenderingBackend] = TwoFeatureInteractionBoxplotRenderer,
+                 x: Union[None, str] = None,
+                 y: [None, str] = None,
+                 hue: str = None,
+                 parent: Union[None, AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
-        super().__init__(rendering_backend=rendering_backend, **kwargs)
+        super().__init__(parent, children, **kwargs)
         self.x = x
         self.y = y
-
-    def fit(self, **kwargs):
-        self.model = {
-            'x': self.x,
-            'y': self.y,
-            'kwargs': self._kwargs,
-        }
-        self._sample_and_set_model_datasets()
-        self.model['datasets'] = {t: ds[[self.x, self.y]] for t, ds in self._get_datasets().items()}
-
-
-class ThreeFeatureInteraction(TwoFeatureInteraction):
-    def __init__(self,
-                 hue=None,
-                 rendering_backend: Type[RenderingBackend] = ThreeFeatureInteractionBoxplotRenderer,
-                 **kwargs) -> None:
-        super().__init__(rendering_backend=rendering_backend, **kwargs)
         self.hue = hue
 
-    def fit(self, **kwargs):
-        self.model = {
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        cols = {
             'x': self.x,
             'y': self.y,
             'hue': self.hue,
-            'kwargs': self._kwargs,
         }
-        self._sample_and_set_model_datasets()
-        self.model['datasets'] = {t: ds[[self.x, self.y, self.hue]] for t, ds in self._get_datasets().items()}
+        cols = {k: v for k, v in cols.items() if v is not None}
+        interactions: List[Dict[str, Any]] = state.get('interactions', [])
+
+        for ds in DATASET_ARGS:
+            if ds in args and args[ds] is not None:
+                missing_cols = [c for c in cols.values() if c not in args[ds].columns]
+                if len(missing_cols) == 0:
+                    df = args[ds][cols.values()]
+                    ds_interaction = {
+                        'features': cols,
+                        'dataset': ds,
+                        'data': df,
+                    }
+                    interactions.append(ds_interaction)
+        state.interactions = interactions
