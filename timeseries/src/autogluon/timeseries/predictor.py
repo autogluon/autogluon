@@ -45,14 +45,15 @@ class TimeSeriesPredictor:
         https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html
         # TODO: Do we even handle missing values? If so, should we make this more prominent?
     prediction_length : int, default = 1
-        The forecast horizon, i.e., How many time steps into the future the forecasters should be trained to predict.
-        For example, if time series contain daily observations, setting ``prediction_length=3`` will train
-        models that predict up to 3 days in the future from the most recent observation.
+        The forecast horizon, i.e., How many time steps into the future the models should be trained to predict.
+        For example, if time series contain daily observations, setting ``prediction_length = 3`` will train
+        models that predict up to 3 days into the future from the most recent observation.
     eval_metric : str, default = "mean_wQuantileLoss"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options:
 
+        # TODO: Should we add MSE and RMSE here?
         # TODO: mean_wQuantileLoss is not discussed in GluonTS docs
         - ``"mean_wQuantileLoss"`` - mean weighted quantile loss
         - ``"MAPE"`` - mean absolute percentage error
@@ -206,8 +207,7 @@ class TimeSeriesPredictor:
         enable_ensemble: bool = True,
         **kwargs,
     ) -> "TimeSeriesPredictor":
-        """Fit models to predict distributional forecasts of multiple related time series
-        based on historical observations.
+        """Fit probabilistic forecasting models to the given time series dataset.
 
         Parameters
         ----------
@@ -223,8 +223,8 @@ class TimeSeriesPredictor:
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
-            # TODO: Mention that this is a good default and users should override?
-            # TODO: Link to advanced tutorial explaining how to do more fancy validation?
+            # TODO: Mention that this is a good default that users should not override?
+            # TODO: Link to advanced tutorial explaining how to do more fancy validation / how validation works?
         time_limit : int, default = None
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
@@ -272,6 +272,7 @@ class TimeSeriesPredictor:
         enable_ensemble: bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+
         References
         ----------
             - DeepAR: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html
