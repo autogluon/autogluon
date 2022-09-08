@@ -47,14 +47,14 @@ df = pd.read_csv(
     "https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv",
     parse_dates=["Date"],  # make sure that pandas parses the dates
 )
-df
+df.head()
 ```
 Each row of the data frame contains
 - unique ID of each time series — in our case, name of the country (`"name"`)
 - timestamp of the observation (`"Date"`)
 - value of the time series (`"ConfirmedCases"`)
 
-We now convert the original data to a `TimeSeriesDataFrame` used by AutoGluon
+The names of these columns can be arbitrary, but it's important that we provide these names when constructing a `TimeSeriesDataFrame` that is used by AutoGluon
 ```{.python .input}
 ts_dataframe = TimeSeriesDataFrame.from_data_frame(
     df,
@@ -70,14 +70,15 @@ This setting is also sometimes referred to as a "panel" of time series.
 
 `TimeSeriesDataFrame` inherits from [`pandas.DataFrame`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), so all attributes and methods of `pandas.DataFrame` are also available in a `TimeSeriesDataFrame`.
 
-Note how `TimeSeriesDataFrame` organizes the data with a `pandas.MultiIndex` where the first _level_ of the index
-corresponds to the item (here, country) and the second level contains the timestamp of the observation.
+Note how `TimeSeriesDataFrame` organizes the data with a `pandas.MultiIndex`:
+-  the first _level_ of the index corresponds to the item ID (here, country name);
+-  the second level contains the timestamp when each observation was made.
 
 We can use the `loc` accessor, as in pandas, to access individual country data.
 ```{.python .input}
-train_data.loc['Afghanistan_'].head()
+ts_dataframe.loc['Afghanistan_'].head()
 ```
-
+We can also plot the time series for some countries in the dataset
 ```{.python .input}
 plt.figure(figsize=(20, 3))
 for country in ["United Kingdom_", "Germany_"]:
@@ -85,41 +86,44 @@ for country in ["United Kingdom_", "Germany_"]:
 plt.legend()
 ```
 
+## Forecasting task
+Models in `autogluon.timeseries` forecast the value of each time series _multiple steps_ into the future.
+We choose the length of the prediction interval (also known as forecast horizon) depending on our task.
+For example, our COVID cases dataset contains daily data, so we can set `prediction_length = 7` to train models for daily forecasts 7 days into the future.
 
-The primary use case of `autogluon.timeseries` is time series forecasting. In our example, our goal is to train models on COVID case data
+Moreover, models in `autogluon.timeseries` provide a _probabilistic_ forecast.
+That is, in addition to predicting the _mean_ (expected value) of the time series in the future, they also provide the _quantiles_ of the forecast distribution.
+We will discuss this aspect in more detail [below](#making-forecasts-with-timeseriespredictorpredict).
+
+<!-- The primary use case of `autogluon.timeseries` is time series forecasting. In our example, our goal is to train models on COVID case data
 that can forecast the future trajectory of cases given the past, for each country in the data set.
 By default, `autogluon.timeseries` supports multi-step ahead _probabilistic_ forecasting. That is, multiple time steps in the future
 can be forecasted, given that models are trained with the prerequisite number of steps (also known as the _forecast horizon_).
 Moreover, when trained models are used to predict the future, the library will provide both `"mean"`
-forecasts--expected values of the time series in the future, as well as _quantiles_ of the forecast distribution.
+forecasts--expected values of the time series in the future, as well as _quantiles_ of the forecast distribution. -->
 
-In order to train our forecasting models, we first split the data into training and test data sets.
-In forecasting, this is often done via excluding the last `prediction_length` many steps of the data set during training, and
-only use these steps to compute validation scores (also known as an "out of time" validation sample).
-We carry out this split via the `slice_by_timestep` method provided by `TimeSeriesDataFrame` which takes python `slice` objects.
-
-
+We will split our dataset into a training set (used to train & tune models) and a test set (used to evaluate the final performance).
+In forecasting, this is usually done by hiding the last `prediction_length` steps of each time series during training, and only using these last steps to evaluate the forecast quality (also known as an "out of time" validation).
+We perform this split using the `slice_items_by_index` method of `TimeSeriesDataFrame`.
 ```{.python .input}
-prediction_length = 5
+prediction_length = 7
 
 test_data = ts_dataframe.copy()  # the full data set
 
-# the data set with the last prediction_length time steps excluded, i.e., akin to `a[:-5]`
-train_data = ts_dataframe.slice_items_by_index(start_index=None, end_index=-prediction_length)
+# last prediction_length time steps of each time series are excluded, akin to `x[:-7]`
+train_data = ts_dataframe.slice_items_by_index(None, -prediction_length)
 ```
-
-Below, for a single country we plot the training and test data sets showing how they overlap and explicitly mark the forecast horizon of the
-test data set. The test scores will be computed on forecasts provided for this range.
-
+Below, we plot the training and test parts of the time series for a single country, and mark the test forecast horizon.
+We will compute test scores on the forecast horizon during our final evaluation.
 
 ```{.python .input}
 plt.figure(figsize=(20, 3))
-plt.plot(test_data.loc["Germany_"], label="test")
-plt.plot(train_data.loc["Germany_"], label="train")
+plt.plot(test_data.loc["Germany_"], label="Test")
+plt.plot(train_data.loc["Germany_"], label="Train")
 
 test_range = (
-    test_data.loc["Germany_"].index.max(),
     train_data.loc["Germany_"].index.max(),
+    test_data.loc["Germany_"].index.max(),
 )
 
 plt.fill_betweenx(
@@ -127,7 +131,7 @@ plt.fill_betweenx(
     x1=test_range[0],
     x2=test_range[1],
     alpha=0.1,
-    label="test forecast horizon",
+    label="Test forecast horizon",
 )
 
 plt.legend()
@@ -137,10 +141,8 @@ plt.legend()
 ## Training time series models with `TimeSeriesPredictor.fit`
 
 Below we instantiate a `TimeSeriesPredictor` object and instruct AutoGluon to fit models that can forecast up to
-5 time-points into the future (`prediction_length`) and save them in the folder `./autogluon-covidforecast`.
-We also specify that AutoGluon should rank models according to mean absolute percentage error (MAPE) and that
-the target field to be forecasted is `"ConfirmedCases"`.
-
+7 time-points into the future (`prediction_length`) and save them in the folder `./autogluon-covidforecast`.
+We also specify that AutoGluon should rank models according to mean absolute percentage error (MAPE) and that data is stored in the column `"ConfirmedCases"` of the `TimeSeriesDataFrame`.
 
 ```{.python .input}
 predictor = TimeSeriesPredictor(
@@ -149,22 +151,30 @@ predictor = TimeSeriesPredictor(
     prediction_length=prediction_length,
     eval_metric="MAPE",
 )
+
 predictor.fit(
     train_data=train_data,
     presets="low_quality",
 )
 ```
+In a short amount of time AutoGluon fits five time series forecasting models on the training data.
+These models are three neural network forecasters: DeepAR, Transformer, a feedforward neural network; and two simple statistical models: ARIMA and ETS.
+AutoGluon also constructs a weighted ensemble on top of these models capable of quantile forecasting.
 
+Here we used the `"low_quality"` presets to quickly obtain the results.
+In realistic scenarios, we can set `presets` to be one of:
+`"medium_quality"`, `"good_quality"`, `"high_quality"`, `"best_quality"`.
+Higher quality presets will usually produce more accurate forecasts but take longer to train and may produce less efficient models.
 
-In a short amount of time AutoGluon fits four time series forecasting models on the training data.
-These models are three neural network forecasters: DeepAR, MQCNN, a simple feedforward neural network; and a simple exponential smoothing model with
-automatic parameter tuning: Auto-ETS.
-AutoGluon also constructs a weighted ensemble of these models capable of quantile forecasting.
+Note that inside `fit()` the last `prediction_length` steps of the training time series were automatically used as a tuning (validation) set.
+This validation set is used internally by the predictor to rank models and fit the ensemble.
 
 ## Evaluating the performance of different models
 
 We can view the test performance of each model AutoGluon has trained via the `leaderboard()` method.
-We provide the test data set to the leaderboard function to see how well our fitted models are doing on the held out time frame.
+We provide the test data set to the leaderboard function to see how well our fitted models are doing on the held out test data.
+The leaderboard also includes the validation scores that were used internally by the predictor.
+
 In AutoGluon leaderboards, higher scores always correspond to better predictive performance.
 Therefore our MAPE scores are presented with a "flipped" sign, such that higher "negative MAPE"s correspond to better models.
 
@@ -175,43 +185,74 @@ predictor.leaderboard(test_data, silent=True)
 
 ## Making forecasts with `TimeSeriesPredictor.predict`
 
-We can now use the `TimeSeriesPredictor` to look at actual forecasts.
-By default, AutoGluon will select the best performing model to forecast time series with.
-Let's use the predictor to compute forecasts, and plot forecasts for an example country.
-
+We can now use the `TimeSeriesPredictor` to look at the actual forecasts.
+By default, AutoGluon will make forecasts using the model that had the best validation score.
+Let's use the predictor to compute forecasts
 
 ```{.python .input}
 predictions = predictor.predict(train_data)
+predictions.head()
 ```
+Predictions are also stored as a `TimeSeriesDataFrame`. However, now the columns contain the mean and quantile predictions of each model.
+The quantile forecasts give us an idea about the range of possible outcomes.
+For example, if the `"0.1"` quantile is equal to `x`, it means that the model predicts a 10% chance that the target value will be below `x`.
 
-Show forecasts as a table
-
-
-
+We will now visualize the forecast and the actually observed number of COVID cases for a single country.
+We plot the mean forecast, as well as the 10% and 90% quantiles to show the range of potential outcomes.
 ```{.python .input}
 plt.figure(figsize=(20, 3))
 
-ytrue = train_data.loc['France_']["ConfirmedCases"]
-ypred = predictions.loc['France_']
+y_past = train_data.loc["Germany_"]["ConfirmedCases"]
+y_pred = predictions.loc["Germany_"]
+y_true = test_data.loc["Germany_"]["ConfirmedCases"][-prediction_length:]
 
 # prepend the last value of true range to predicted range for plotting continuity
-ypred.loc[ytrue.index[-1]] = [ytrue[-1]] * 10
-ypred = ypred.sort_index()
+y_pred.loc[y_past.index[-1]] = [y_past[-1]] * 10
+y_pred = y_pred.sort_index()
 
-ytrue_test = test_data.loc['France_']["ConfirmedCases"][-5:]
-
-plt.plot(ytrue[-30:], label="Training Data")
-plt.plot(ypred["mean"], label="Mean Forecasts")
-plt.plot(ytrue_test, label="Actual")
+plt.plot(y_past[-30:], label="Training Data")
+plt.plot(y_pred["mean"], label="Mean Forecasts")
+plt.plot(y_true, label="Observed")
 
 plt.fill_between(
-    ypred.index, ypred["0.1"], ypred["0.9"], color="red", alpha=0.1
+    y_pred.index, y_pred["0.1"], y_pred["0.9"], color="red", alpha=0.1
 )
-plt.title("COVID Case Forecasts in France, compared to actual trajectory")
+plt.title("COVID case forecasts in Germany, compared to actual observations")
 _ = plt.legend()
 ```
 
+## Summary
+# TODO: Should we provide a short summary of the main steps?
+We used `autogluon.timeseries` to make probabilistic multi-step forecasts of COVID cases data.
+Here is a short summary of the main steps for applying AutoGluon to time series data.
+```python
+import pandas as pd
 
-As we used a "toy" presets setting (`presets="low_quality"`) our forecasts may appear to not be doing very well. In realistic scenarios,
-users can set `presets` to be one of: `"best_quality"`, `"high_quality"`, `"good_quality"`, `"medium_quality"`.
-Higher quality presets will generally produce superior forecasting accuracy but take longer to train and may produce less efficient models.
+from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
+
+# Load the data into a TimeSeriesDataFrame
+df = pd.read_csv(
+    "https://autogluon.s3-us-west-2.amazonaws.com/datasets/CovidTimeSeries/train.csv",
+    parse_dates=["Date"],
+)
+ts_dataframe = TimeSeriesDataFrame.from_data_frame(
+    df,
+    id_column="name",
+    timestamp_column="Date",
+)
+
+# Create & fit the predictor
+predictor = TimeSeriesPredictor(
+    path="autogluon-covidforecast",
+    target="ConfirmedCases",
+    prediction_length=7,
+    eval_metric="MAPE",
+)
+predictor.fit(
+    train_data=ts_dataframe,
+    presets="low_quality",
+)
+
+# Generate the forecasts
+predictions = predictor.predict(train_data)
+```
