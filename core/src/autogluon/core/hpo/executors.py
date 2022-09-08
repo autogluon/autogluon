@@ -8,6 +8,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Union, Callable
 
+from autogluon.core.space import Bool
+
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
 from .. import Space
@@ -79,15 +81,15 @@ class HpoExecutor(ABC):
         """
         user_cpu_count = initialized_model._get_child_aux_val(key='num_cpus', default=None)
         user_gpu_count = initialized_model._get_child_aux_val(key='num_gpus', default=None)
-        resource_kwargs = initialized_model._preprocess_fit_resources()
+        model_default_num_cpus, model_default_num_gpus = initialized_model._get_default_resources()
 
-        num_gpus = ResourceCalculator.get_total_gpu_count(
-            user_specified_num_gpus=user_gpu_count,
-            model_default_num_gpus=resource_kwargs.get('num_gpus', 0),
-        )
         num_cpus = ResourceCalculator.get_total_cpu_count(
             user_specified_num_cpus=user_cpu_count,
-            model_default_num_cpus=resource_kwargs.get('num_cpus', 0),
+            model_default_num_cpus=model_default_num_cpus,
+        )
+        num_gpus = ResourceCalculator.get_total_gpu_count(
+            user_specified_num_gpus=user_gpu_count,
+            model_default_num_gpus=model_default_num_gpus,
         )
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
@@ -211,6 +213,7 @@ class RayHpoExecutor(HpoExecutor):
             minimum_gpu_per_trial: float,
             model_estimate_memory_usage: float,
             adapter_type: str,
+            trainable_is_parallel: bool = False,
         ):
         """
         Execute ray hpo experiment
@@ -235,6 +238,8 @@ class RayHpoExecutor(HpoExecutor):
             Adapters are used to provide custom info or behavior that's module specific to the ray hpo experiment.
             For more info, please refer to `autogluon/core/hpo/ray_hpo`
             Valid values are ['tabular', 'timeseries', 'automm', 'automm_ray_lightning']
+        trainable_is_parallel
+            Whether the trainable itself will use ray to run parallel job or not.
         """
         from .ray_hpo import (
             run,
@@ -252,6 +257,7 @@ class RayHpoExecutor(HpoExecutor):
             mode='max',
             save_dir=directory,
             ray_tune_adapter=RayTuneAdapterFactory.get_adapter(adapter_type)(),
+            trainable_is_parallel=trainable_is_parallel,
             total_resources=self.resources,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             minimum_gpu_per_trial=minimum_gpu_per_trial,

@@ -116,7 +116,7 @@ class LocalFoldFittingStrategy(AbstractFoldFittingStrategy):
                  X: DataFrame, y: Series, X_pseudo: DataFrame, y_pseudo: Series,
                  sample_weight, time_limit: float, time_start: float,
                  models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray,
-                 save_folds: bool, time_limit_fold_ratio=0.8, **kwargs):
+                 save_folds: bool, time_limit_fold_ratio=0.8, num_cpus=None, num_gpus=None, **kwargs):
         self.model_base = model_base
         self.model_base_kwargs = model_base_kwargs
         self.X = X
@@ -343,7 +343,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         predict_time: float
             The amount of time used to do out of folds predictions for all folds.
     """
-    def __init__(self, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio=0.8, **kwargs):
+    def __init__(self, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio=0.8, num_cpus=None, num_gpus=None, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
@@ -357,8 +357,8 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         # initialize the model base to get necessary info for estimating memory usage
         self._initialized_model_base = copy.deepcopy(self.model_base)
         self._initialized_model_base.initialize(X=self.X, y=self.y, **self.model_base_kwargs)
-        self.num_cpus = self._get_cpu_count()
-        self.num_gpus = self._get_gpu_count()
+        self.num_cpus = self._get_cpu_count(num_cpus)
+        self.num_gpus = self._get_gpu_count(num_gpus)
         self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs, num_folds_parallel)
 
     def is_mem_sufficient(self):
@@ -375,22 +375,24 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         y_mem = get_approximate_df_mem_usage(self.y.to_frame()).sum()
         return X_mem + y_mem
 
-    def _get_gpu_count(self):
+    def _get_gpu_count(self, num_gpus_available):
         _user_gpu_count = self._initialized_model_base._get_child_aux_val(key='num_gpus', default=None)
         resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
-        
+
         return ResourceCalculator.get_total_gpu_count(
             user_specified_num_gpus=_user_gpu_count,
             model_default_num_gpus=resource_kwargs['num_gpus'],
+            num_gpus_available=num_gpus_available
         )
 
-    def _get_cpu_count(self):
+    def _get_cpu_count(self, num_cpus_available):
         _user_cpu_count = self._initialized_model_base._get_child_aux_val(key='num_cpus', default=None)
         resource_kwargs = self._initialized_model_base._preprocess_fit_resources()
 
         return ResourceCalculator.get_total_cpu_count(
             user_specified_num_cpus=_user_cpu_count,
             model_default_num_cpus=resource_kwargs['num_cpus'],
+            num_cpus_available=num_cpus_available
         )
 
     def schedule_fold_model_fit(self, fold_ctx):

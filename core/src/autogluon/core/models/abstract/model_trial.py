@@ -9,24 +9,32 @@ from ...utils.exceptions import TimeLimitExceeded
 logger = logging.getLogger(__name__)
 
 
-def model_trial(args,
-                model_cls,
-                init_params,
-                train_path,
-                val_path,
-                time_start,
-                hpo_executor,
-                reporter=None,  # reporter only used by custom strategy, hence optional
-                time_limit=None,
-                fit_kwargs=None,
-                checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
-                ):
+def model_trial(
+    args,
+    model_cls,
+    init_params,
+    train_path,
+    val_path,
+    time_start,
+    hpo_executor,
+    is_bagged_model=False,
+    reporter=None,  # reporter only used by custom strategy, hence optional
+    time_limit=None,
+    fit_kwargs=None,
+    checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
+):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
     try:
         if fit_kwargs is None:
             fit_kwargs = dict()
 
-        model = init_model(args=args, model_cls=model_cls, init_params=init_params, backend=hpo_executor.executor_type)
+        model = init_model(
+            args=args,
+            model_cls=model_cls,
+            init_params=init_params,
+            backend=hpo_executor.executor_type,
+            is_bagged_model=is_bagged_model
+        )
 
         X, y = load_pkl.load(train_path)
         X_val, y_val = load_pkl.load(val_path)
@@ -52,7 +60,7 @@ def model_trial(args,
         hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score)
 
 
-def init_model(args, model_cls, init_params, backend):
+def init_model(args, model_cls, init_params, backend, is_bagged_model=False):
     args = args.copy()
 
     if backend == CUSTOM_BACKEND:
@@ -63,7 +71,10 @@ def init_model(args, model_cls, init_params, backend):
         task_id = tune.get_trial_id()
         file_prefix = task_id
 
-    init_params['hyperparameters'].update(args)
+    if is_bagged_model:
+        init_params['model_base_kwargs']['hyperparameters'].update(args)
+    else:
+        init_params['hyperparameters'].update(args)
     init_params['name'] = init_params['name'] + os.path.sep + file_prefix
 
     return model_cls(**init_params)

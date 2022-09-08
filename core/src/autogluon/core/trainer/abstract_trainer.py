@@ -1377,13 +1377,28 @@ class AbstractTrainer:
             logger.log(20, fit_log_message)
             try:
                 if isinstance(model, BaggedEnsembleModel):
+                    bagged_model_fit_kwargs = self._get_bagged_model_fit_kwargs(k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start)
+                    model_fit_kwargs.update(bagged_model_fit_kwargs)
                     hpo_models, hpo_results = model.hyperparameter_tune(
                         X=X,
                         y=y,
-                        k_fold=k_fold,
+                        model=model,
+                        X_val=X_val,
+                        y_val=y_val,
+                        X_unlabeled=X_unlabeled,
+                        stack_name=stack_name,
+                        level=level,
+                        compute_score=compute_score,
                         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                         **model_fit_kwargs
                     )
+                    # hpo_models, hpo_results = model.hyperparameter_tune(
+                    #     X=X,
+                    #     y=y,
+                    #     k_fold=k_fold,
+                    #     hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                    #     **model_fit_kwargs
+                    # )
                 else:
                     hpo_models, hpo_results = model.hyperparameter_tune(
                         X=X,
@@ -1521,16 +1536,10 @@ class AbstractTrainer:
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                                             time_limit=time_limit, time_split=time_split, time_ratio=time_ratio, **fit_args)
         else:
-            bagged_time_start = time.time()
-            if hpo_enabled:
-                time_ratio = (1 / k_fold) * hpo_time_ratio
-                models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                                                k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit,
-                                                time_split=time_split, time_ratio=time_ratio, **fit_args)
-                k_fold_start = 1
-            bagged_time_limit = time_limit - (time.time() - bagged_time_start) if time_limit is not None else None
-            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=None, k_fold_start=k_fold_start,
-                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=bagged_time_limit, **fit_args)
+            time_ratio = hpo_time_ratio if hpo_enabled else 1
+            models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, k_fold_start=0,
+                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, time_ratio=time_ratio,
+                                            **fit_args)
 
         multi_fold_time_elapsed = time.time() - multi_fold_time_start
         if time_limit is not None:
