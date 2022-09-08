@@ -39,9 +39,30 @@ class FeatureInteraction(AbstractAnalysis):
                 interactions.append(ds_interaction)
         state.interactions = interactions
 
-#
-# class Correlation(AbstractAnalysis):
-#     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
-#         state.correlations = {}
-#         with self.available_datasets(args) as (ds, df):
-#             state.correlations[ds] = args[ds]
+
+class Correlation(AbstractAnalysis):
+
+    def __init__(self, method='spearman', significance=False, parent: Union[None, AbstractAnalysis] = None, children: List[AbstractAnalysis] = [], **kwargs) -> None:
+        self.method = method
+        self.significance = significance
+        super().__init__(parent, children, **kwargs)
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        state.correlations = {}
+        state.correlations_method = self.method
+        if self.significance:
+            state.significance_matrix = {}
+        for (ds, df) in self.available_datasets(args):
+            if self.method == 'phik':
+                import phik  # required
+                state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
+                if self.significance:
+                    state.significance_matrix[ds] = df.significance_matrix(**self.args, verbose=False)
+
+            else:
+                args = {}
+                if self.method is not None:
+                    args['method'] = self.method
+                state.correlations[ds] = df.corr(**args, **self.args)
+                if self.significance:
+                    state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)

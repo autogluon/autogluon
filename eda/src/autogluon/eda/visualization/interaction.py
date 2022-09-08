@@ -1,7 +1,9 @@
 from typing import Union, Dict, Any
 
+import ipywidgets as wgts
 import matplotlib.pyplot as plt
 import seaborn as sns
+from IPython.display import display
 from pandas import DataFrame
 
 from autogluon.common.features.types import *
@@ -105,3 +107,60 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             return 'category'
         else:
             return None
+
+
+class CorrelationVisualization(AbstractVisualization, JupyterMixin):
+
+    def __init__(self,
+                 headers: bool = False,
+                 namespace: str = None,
+                 fig_args: Union[None, Dict[str, Any]] = {},
+                 **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+        self.fig_args = fig_args
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return self._all_keys_must_be_present(state, ['correlations'])
+
+    def _render(self, state: AnalysisState) -> None:
+        sample_size = state.get('sample_size', None)
+
+        for ds, corr in state.correlations.items():
+            if self.headers:
+                sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
+                header = f'{ds} - {state.correlations_method} correlation matrix{sample_info}'
+                self.render_text(header, text_type='h3')
+
+            widgets = [w for w in ['correlations', 'significance_matrix'] if w in state]
+            outs = [wgts.Output() for _ in widgets]
+            tab = wgts.Tab(children=outs)
+            for i, c in enumerate([w for w in widgets]):
+                titles = {
+                    'correlations': 'correlations',
+                    'significance_matrix': 'significance matrix'
+                }
+                tab.set_title(i, titles[c])
+            display(tab)
+            for widget, out in zip(widgets, outs):
+                with out:
+                    fig, ax = plt.subplots(**self.fig_args)
+
+                    if widget == 'significance_matrix':
+                        args = {'center': 3, 'vmax': 5, 'cmap': 'Spectral', 'robust': True}
+                    else:
+                        args = {
+                            'vmin': 0 if state.correlations_method == 'phik' else -1,
+                            'vmax': 1, 'center': 0, 'cmap': 'Spectral'
+                        }
+
+                    sns.heatmap(state[widget].train_data,
+                                annot=True,
+                                ax=ax,
+                                linewidths=.9,
+                                linecolor='white',
+                                fmt='.2f',
+                                square=True,
+                                **args)
+                    plt.yticks(rotation=0)
+                    plt.show(fig)
