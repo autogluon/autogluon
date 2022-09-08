@@ -23,54 +23,62 @@ logger = logging.getLogger(__name__)
 
 
 class TimeSeriesPredictor:
-    """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time-series by fitting
-    global time series models.
+    """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
 
-    ``TimeSeriesPredictor`` provides probabilistic (distributional) forecasts for univariate time series, where the
-    time series model is essentially a mapping from the past of the time series to its future of length (i.e., forecast
-    horizon) defined by the user. Models are trained to give both forecast "means" (i.e., conditional expectations of
-    future values of a time series given its past), and quantiles of forecast distributions.
+    ``TimeSeriesPredictor`` provides probabilistic (distributional) multi-step-ahead forecasts for univariate time
+    series. The forecast includes both the mean (i.e., conditional expectation of future values given the past), as
+    well as the quantiles of the forecast distribution, indicating the range of possible future outcomes.
 
-    ``TimeSeriesPredictor`` models are learned "globally" from a collection of time series; i.e., a set of time
-    series model parameters are shared across all time series to be predicted, in contrast to
-    classical "local" approaches such as ARIMA.
+    ``TimeSeriesPredictor`` fits both "global" deep learning models that are shared across all time series (e.g.,
+    DeepAR, Temporal Fusion Transformer), as well as "local" statistical models that are fit to each individual time
+    series (e.g., ARIMA, ETS).
 
-    ``TimeSeriesPredictor`` fits a variety of neural network-based forecasting models as well as Bayesian models such
-    as Prophet. It expects input data sets and outputs predictions in the
+    ``TimeSeriesPredictor`` expects input data and makes predictions in the
     :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+
 
     Parameters
     ----------
     target : str, default = "target"
-        Name of column that contains the target values to forecast (i.e., numeric observations of the
-        time series). This column must contain numeric values, and missing target values
-        should be in a pandas compatible format:
+        Name of column that contains the target values to forecast (i.e., numeric observations of the time series).
+        This column must contain numeric values, and missing target values should be in a pandas compatible format:
         https://pandas.pydata.org/pandas-docs/stable/user_guide/missing_data.html
-    eval_metric : str, default = None
+        # TODO: Do we even handle missing values? If so, should we make this more prominent?
+    prediction_length : int, default = 1
+        The forecast horizon, i.e., How many time steps into the future the forecasters should be trained to predict.
+        For example, if time series contain daily observations, setting ``prediction_length=3`` will train
+        models that predict up to 3 days in the future from the most recent observation.
+    eval_metric : str, default = "mean_wQuantileLoss"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
-        metric. Available options include: "MASE", "MAPE", "sMAPE", "mean_wQuantileLoss".
+        metric. Available options:
 
-        If ``eval_metric is None``, it is set by default to "mean_wQuantileLoss".
+        # TODO: mean_wQuantileLoss is not discussed in GluonTS docs
+        - ``"mean_wQuantileLoss"`` - mean weighted quantile loss
+        - ``"MAPE"`` - mean absolute percentage error
+        - ``"sMAPE"`` - symmetric mean absolute percentage error
+        - ``"MASE"`` - mean absolute scaled error
+
+        # TODO: Evaluator is not part of the API, do we expect people to dig into the code? Maybe include description
+        # of metrics in the tutorial?
         For more information about these options, see ``autogluon.timeseries.TimeSeriesEvaluator`` and GluonTS
-        docs at https://ts.gluon.ai/api/gluonts/gluonts.evaluation.metrics.html
-    path : str, default = None
-        Path to directory where models and intermediate outputs should be saved. If unspecified, a timestamped folder
+        docs at https://ts.gluon.ai/stable/api/gluonts/gluonts.evaluation.metrics.html
+    quantile_levels : List[float] or None, default = None
+        List of increasing decimals that specifies which quantiles should be estimated when making distributional
+        forecasts. If None, defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
+        Can alternatively be provided with the keyword argument ``quantiles``.
+        # TODO: Add link to explanation of distributional forecasts?
+    path : str or None, default = None
+        Path to the directory where models and intermediate outputs will be saved. If None, a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` will be created in the working directory to store all models.
     verbosity : int, default = 2
         Verbosity levels range from 0 to 4 and control how much information is printed to stdout. Higher levels
         correspond to more detailed print statements, and ``verbosity=0`` suppresses output including warnings.
         If using ``logging``, you can alternatively control amount of information printed via ``logger.setLevel(L)``,
-        where ``L`` ranges from 0 to 50 (Note: higher values of ``L`` correspond to fewer print statements,
-        opposite of verbosity levels).
-    prediction_length : int, default = 1
-        The forecast horizon, i.e., How many time points into the future forecasters should be trained to predict.
-        For example, if time series contain daily observations, setting ``prediction_length=3`` will train
-        models that predict up to 3 days in the future from the most recent observation.
-    quantile_levels : List[float], default = None
-        List of increasing decimals that specifies which quantiles should be estimated
-        when making distributional forecasts. Can alternatively be provided with the keyword
-        argument ``quantiles``. If ``None``, defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
+        where ``L`` ranges from 0 to 50 (Note: higher values of ``L`` correspond to fewer print statements, opposite
+        of verbosity levels).
+
+    # TODO: Why not move Other Parameters to Parameters? At least `ignore_time_index` and `validation_splitter` seem relevant
 
     Other Parameters
     ----------------
@@ -86,26 +94,27 @@ class TimeSeriesPredictor:
     quantiles : List[float]
         Alias for :attr:`quantile_levels`.
     ignore_time_index : bool, default = False
-        If True, AutoGluon-TimeSeries will ignore any date time indexes given in any dataset in train and test time,
-        and replace any input data indexes with dummy timestamps in second frequency. In this case, sktime models
-        will not activate any seasonality inference if not specified explicitly in ``hyperparameters``, and the
-        forecast output time indexes will be arbitrary values.
+        If True, the predictor will ignore the datetime indexes during both training and testing, and will replace
+        the data indexes with dummy timestamps in second frequency. In this case, the forecast output time indexes will
+        be arbitrary values, and seasonality will be turned off for local models.
     validation_splitter : Union[str, AbstractTimeSeriesSplitter], default = "last_window"
-        Strategy for splitting ``train_data`` into trainining and validation parts during
+        Strategy for splitting ``train_data`` into training and validation parts during
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`. If ``tuning_data`` is passed to
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
 
         - ``"last_window"`` - use last ``prediction_length`` time steps of each time series for validation.
-        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
-        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
+        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series
+            for validation.
+        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom
+            splitting strategy (for advanced users only).
 
 
+    # TODO: Why is only target listed under Attributes and not, e.g., eval_metric? Do we even need to mention anything here?
     Attributes
     ----------
     target : str
-        Name of column in training/validation data that contains the target time-series value to be predicted. If
-        not specified explicitly during :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, this will default to
-        ``"target"``.
+        Name of column in training/validation data that contains the target time series value to be predicted.
+        Defaults to ``"target"``.
     """
 
     predictor_file_name = "predictor.pkl"
@@ -113,10 +122,10 @@ class TimeSeriesPredictor:
     def __init__(
         self,
         target: Optional[str] = None,
+        prediction_length: int = 1,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
-        prediction_length: int = 1,
         quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ):
@@ -209,39 +218,48 @@ class TimeSeriesPredictor:
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
 
-            If ``None``, AutoGluon will split :attr:`train_data` into training and tuning subsets using
+            If None, AutoGluon will split :attr:`train_data` into training and tuning subsets using
             ``self.validation_splitter``. If ``tuning_data`` is provided, ``self.validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+
+            # TODO: Mention that this is a good default and users should override?
+            # TODO: Link to advanced tutorial explaining how to do more fancy validation?
         time_limit : int, default = None
-            Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run for (wall-clock
-            time in seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
-            run until all models have completed training.
-        presets : str, default = None
+            Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
+            seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
+            have completed training.
+        presets : str, default = "medium_quality"
             Optional preset configurations for various arguments in
             :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
 
+            # TODO: Better explanation of how to choose presets
             Can significantly impact predictive accuracy, memory footprint, inference latency of trained models,
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="best_quality"``
             to get a high-accuracy predictor, or set ``presets="low_quality"`` to get a toy predictor that
             trains quickly but lacks accuracy.
+            # TODO: This looks like a legacy sentence, remove it? Are we referring to the `hyperparameters` kwarg here?
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
+            # TODO: Should we even mention low_quality_hpo?
             Available presets are "best_quality", "high_quality", "good_quality", "medium_quality", "low_quality",
             and "low_quality_hpo". Details for these presets can be found in
             ``autogluon/timeseries/configs/presets_configs.py``. If not provided, user-provided values for other
             arguments (specifically, ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used (defaulting
             to their default values specified below).
         hyperparameters : str or dict, default = "default"
+            # TODO: Rework this section, similar to TabularPredictor
             Determines the hyperparameters used by each model.
+
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
             "toy", or "toy_hpo", where "toy" settings correspond to models only intended for prototyping.
+
             If dict is provided, the keys are strings or Types that indicate which model types to train. In this case,
-            the predictor will only train the given model types. Stable model options include: 'DeepAR', 'MQCNN', and
-            'SFF' (SimpleFeedForward). See References for more detail on these models.
+            the predictor will only train the given model types. Stable model options include: "DeepAR", "MQCNN", and
+            "SFF" (SimpleFeedForward). See References for more detail on these models.
 
             Values in the ``hyperparameters`` dict are themselves dictionaries of hyperparameter settings for each model
             type. Each hyperparameter can either be a single fixed value or a search space containing many possible
@@ -250,15 +268,15 @@ class TimeSeriesPredictor:
             values which are given in``autogluon/timeseries/trainer/models/presets.py``. Specific hyperparameter
             choices for each of the recommended models can be found in the references.
         hyperparameter_tune_kwargs : str or dict, default = None
-            # TODO
+            # TODO ?????
         enable_ensemble: bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
         References
         ----------
-            - DeepAR: https://ts.gluon.ai/api/gluonts/gluonts.model.deepar.html
-            - MQCNN: https://ts.gluon.ai/api/gluonts/gluonts.model.seq2seq.html
-            - SFF: https://ts.gluon.ai/api/gluonts/gluonts.model.simple_feedforward.html
+            - DeepAR: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html
+            - MQCNN: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html
+            - SFF: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html
         """
         time_start = time.time()
         if self._learner.is_fit:
@@ -390,15 +408,15 @@ class TimeSeriesPredictor:
         model: Optional[str] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        """Return quantile and mean forecasts given a dataset to predict with.
+        """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
 
         Parameters
         ----------
         data : TimeSeriesDataFrame
             Time series data to forecast with.
-        model : str, default=None
-            Name of the model that you would like to use for forecasting. If None, it will by default use the
-            best model from trainer.
+        model : str or None, default = None
+            Name of the model that you would like to use for prediction. If None, the best model during training
+            (with highest validation score) will be used.
         """
         data = self._check_and_prepare_data_frame(data)
         return self._learner.predict(data, model=model, **kwargs)
@@ -416,10 +434,10 @@ class TimeSeriesPredictor:
 
         Other Parameters
         ----------------
-        model : str, default=None
-            Name of the model to predict with. If None, the best model during training (according to validation
-            score) will be used for evaluation.
-        metric : str, default=None
+        model : str or None, default = None
+            Name of the model that you would like to evaluate. If None, the best model during training
+            (with highest validation score) will be used.
+        metric : str, default = None
             Name of the evaluation metric to compute scores with. If None, defaults to ``self.eval_metric``
 
         Returns
@@ -442,8 +460,7 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         path : str
-            Path where the predictor was saved via
-            :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
+            Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
 
         Returns
         -------
@@ -461,6 +478,7 @@ class TimeSeriesPredictor:
 
     def save(self) -> None:
         """Save this predictor to file in directory specified by this Predictor's ``path``.
+
         Note that :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` already saves the predictor object automatically
         (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
@@ -479,14 +497,15 @@ class TimeSeriesPredictor:
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, silent=False) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
-        pandas data frame containing the columns,
+        pandas data frame with columns:
 
         * ``model``: The name of the model.
-        * ``score_test``: The test score of the model on ``data``, if provided.
-        * ``score_val``: The validation score of the model on the 'eval_metric'.
+        * ``score_test``: The test score of the model on ``data``, if provided. Computed according to ``eval_metric``.
+        * ``score_val``: The validation score of the model using the internal validation data. Computed according
+            to ``eval_metric``.
 
             **NOTE:** Metrics scores are always shown in higher is better form.
-            This means that metrics such as RMSE or MAPE will have their signs `flipped`, and values will be negative.
+            This means that metrics such as MASE or MAPE will have their signs `flipped`, and values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
 
@@ -498,16 +517,15 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         data : TimeSeriesDataFrame
-            dataset used for additional evaluation. If None, the validation set used during training will
-            be used.
+            dataset used for additional evaluation. If None, the validation set used during training will be used.
         silent : bool, default = False
-            Should leaderboard DataFrame be printed?
+            If False, the leaderboard DataFrame will be printed.
 
         Returns
         -------
         leaderboard : pandas.DataFrame
             The leaderboard containing information on all models and in order of best model to worst in terms of
-            validation performance.
+            test performance.
         """
         data = self._check_and_prepare_data_frame(data)
         leaderboard = self._learner.leaderboard(data)
