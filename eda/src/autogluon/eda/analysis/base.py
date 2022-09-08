@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from pandas import DataFrame
 
@@ -44,7 +44,21 @@ class AbstractAnalysis(ABC):
             state = AnalysisState()
         return state
 
-    def available_datasets(self, args):
+    def available_datasets(self, args: AnalysisState) -> Tuple[str, DataFrame]:
+        """
+        Generator which iterates only through the datasets provided in arguments
+
+        Parameters
+        ----------
+        args: AnalysisState
+            arguments passed into the call. These are different from `self.args` in a way that it's arguments assembled from the
+            parents and shadowed via children (allows to isolate reused parameters in upper arguments declarations.
+
+        Returns
+        -------
+            tuple of dataset name (train_data, test_data or tuning_data) and dataset itself
+
+        """
         for ds in ['train_data', 'test_data', 'tuning_data']:
             if ds in args and args[ds] is not None:
                 df: DataFrame = args[ds]
@@ -60,13 +74,37 @@ class AbstractAnalysis(ABC):
         return state
 
     @abstractmethod
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         """
-        Fit composing EDA primitives.
+        @override
+        Component-specific internal processing.
+        This method is designed to be overridden by the component developer
+
+        Parameters
+        ----------
+        state: AnalysisState
+            state to be updated by this fit function
+        args: AnalysisState
+            analysis properties assembled from root of analysis hierarchy to this component (with lower levels shadowing upper level args).
+        fit_kwargs
+            arguments passed into fit call
         """
         raise NotImplemented
 
     def fit(self, **kwargs) -> AnalysisState:
+        """
+        Fit the analysis tree.
+
+        Parameters
+        ----------
+        kwargs
+            fit arguments
+
+        Returns
+        -------
+            state produced by fit
+
+        """
         self.state = self._get_state_from_parent()
         self._fit(self.state, self._gather_args(), **kwargs)
         for c in self.children:
