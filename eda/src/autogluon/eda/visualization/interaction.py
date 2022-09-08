@@ -55,14 +55,22 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     if typ == 'category':
                         df[col] = df[col].astype('object')
 
-                self._get_sns_chart_method(chart_type)(ax=ax, data=df, **chart_args)
+                data = df
+                single_var = False
+                if y is None and hue is None:
+                    single_var = True
+                    if x_type == 'numeric':
+                        data = df[x]
+                        chart_args.pop('x')
+                self._get_sns_chart_method(chart_type)(ax=ax, data=data, **chart_args)
                 for container in ax.containers:
                     ax.bar_label(container)
 
                 if self.headers:
                     sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
                     features = '/'.join([i['features'][k] for k in ['x', 'y', 'hue'] if k in i['features']])
-                    header = f'Feature interaction between {features}{sample_info} in {ds}'
+                    prefix = '' if single_var else 'Feature interaction between '
+                    header = f'{prefix}{features}{sample_info} in {ds}'
                     self.render_text(header, text_type='h3')
                 plt.show(fig)
 
@@ -77,6 +85,9 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
     def _get_chart_type(self, x_type: str, y_type: str, hue_type: Union[None, str]) -> Union[None, str]:
         types = {
+            ('numeric', None, None): 'kdeplot',
+            ('category', None, None): 'countplot',
+
             ('category', None, 'category'): 'countplot',
             (None, 'category', 'category'): 'countplot',
 
