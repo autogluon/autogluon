@@ -21,10 +21,10 @@ class ResourceCalculator(ABC):
     @staticmethod
     def get_total_gpu_count(user_specified_num_gpus: int, model_default_num_gpus: int, num_gpus_available: Optional[float] = None):
         if user_specified_num_gpus is not None:
-            total_gpu = get_gpu_count_all() if num_gpus_available is None else num_gpus_available
+            total_gpu = get_gpu_count_all() if num_gpus_available is None else min(get_gpu_count_all(), num_gpus_available)
             num_gpus = min(user_specified_num_gpus, total_gpu)
         elif model_default_num_gpus > 0:
-            num_gpus = get_gpu_count_all()
+            num_gpus = get_gpu_count_all() if num_gpus_available is None else min(get_gpu_count_all(), num_gpus_available)
         else:
             num_gpus = 0
         return num_gpus

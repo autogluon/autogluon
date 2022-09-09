@@ -1026,10 +1026,6 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
         return oof_pred_proba, oof_pred_model_repeats
 
-    # def _preprocess_fit_resources(self, silent=False, **kwargs):
-    #     """Pass along to child models to avoid altering up-front"""
-    #     return kwargs
-
     def _hyperparameter_tune(
         self,
         X,
@@ -1042,7 +1038,7 @@ class BaggedEnsembleModel(AbstractModel):
     ):
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
-        # initialize the model base to get necessary info for estimating memory usage
+        # initialize the model base to get necessary info for search space and estimating memory usage
         initialized_model_base = copy.deepcopy(self.model_base)
         initialized_model_base.initialize(X=X, y=y, **self.model_base.get_params())
         search_space = initialized_model_base._get_search_space()
@@ -1113,123 +1109,6 @@ class BaggedEnsembleModel(AbstractModel):
         )
 
         return hpo_results
-
-    # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
-    # FIXME: with use_bag_holdout=True, the fold-1 scores that are logged are of the inner validation score, not the holdout score.
-    #  Fix this by passing X_val, y_val into this method
-    # def _hyperparameter_tune(self, X, y, k_fold, hpo_executor, preprocess_kwargs=None, groups=None, **kwargs):
-    #     if len(self.models) != 0:
-    #         raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
-
-    #     kwargs['feature_metadata'] = self.feature_metadata
-    #     kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
-    #     model_base = self._get_model_base()
-    #     hpo_context = self.path + 'hpo' + os.path.sep
-    #     model_base.set_contexts(hpo_context)
-
-    #     # TODO: Preprocess data here instead of repeatedly
-    #     if preprocess_kwargs is None:
-    #         preprocess_kwargs = dict()
-    #     use_child_oof = self.params.get('use_child_oof', False)
-    #     X = self.preprocess(X=X, preprocess=False, fit=True, **preprocess_kwargs)
-
-    #     if use_child_oof:
-    #         k_fold = 1
-    #         X_fold = X
-    #         y_fold = y
-    #         X_val_fold = None
-    #         y_val_fold = None
-    #         train_index = list(range(len(X)))
-    #         test_index = train_index
-    #         cv_splitter = None
-    #     else:
-    #         cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=1, groups=groups)
-    #         if k_fold != cv_splitter.n_splits:
-    #             k_fold = cv_splitter.n_splits
-
-    #         kfolds = cv_splitter.split(X=X, y=y)
-
-    #         train_index, test_index = kfolds[0]
-    #         X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
-    #         y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
-    #     orig_time = hpo_executor.time_limit
-    #     if orig_time:
-    #         hpo_executor.time_limit = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-    #     hpo_models, hpo_results = model_base.hyperparameter_tune(
-    #         X=X_fold,
-    #         y=y_fold,
-    #         X_val=X_val_fold,
-    #         y_val=y_val_fold,
-    #         hyperparameter_tune_kwargs=None,
-    #         hpo_executor=hpo_executor,
-    #         **kwargs)
-    #     hpo_executor.time_limit = orig_time
-
-    #     bags = {}
-    #     for i, (model_name, model_info) in enumerate(hpo_models.items()):
-    #         model_path = model_info['path']
-    #         child: AbstractModel = self._child_type.load(path=model_path)
-
-    #         # TODO: Create new Ensemble Here
-    #         bag = copy.deepcopy(self)
-    #         bag.rename(f"{bag.name}{os.path.sep}T{i+1}")
-    #         bag.set_contexts(self.path_root + bag.name + os.path.sep)
-
-    #         oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
-
-    #         if child._get_tags().get('valid_oof', False):
-    #             y_pred_proba = child.get_oof_pred_proba(X=X, y=y)
-    #             bag._n_repeats_finished = 1
-    #             bag._k_per_n_repeat = [1]
-    #             bag._bagged_mode = False
-    #             bag._child_oof = True  # TODO: Consider a separate tag for refit_folds vs efficient OOF
-    #         else:
-    #             y_pred_proba = child.predict_proba(X_val_fold)
-
-    #         oof_pred_proba[test_index] += y_pred_proba
-    #         oof_pred_model_repeats[test_index] += 1
-
-    #         bag.model_base = None
-    #         child.rename('')
-    #         child.set_contexts(bag.path + child.name + os.path.sep)
-    #         bag.save_model_base(child.convert_to_template())
-
-    #         bag._k = k_fold
-    #         bag._k_fold_end = 1
-    #         bag._n_repeats = 1
-    #         bag._oof_pred_proba = oof_pred_proba
-    #         bag._oof_pred_model_repeats = oof_pred_model_repeats
-    #         child.rename('S1F1')
-    #         child.set_contexts(bag.path + child.name + os.path.sep)
-    #         if not self.params.get('save_bag_folds', True):
-    #             child.model = None
-    #         if bag.low_memory:
-    #             bag.save_child(child, verbose=False)
-    #             bag.models.append(child.name)
-    #         else:
-    #             bag.models.append(child)
-    #         bag.val_score = child.val_score
-    #         bag._add_child_times_to_bag(model=child)
-    #         if cv_splitter is not None:
-    #             bag._cv_splitters = [cv_splitter]
-
-    #         bag.save()
-    #         bags[bag.name] = dict(**model_info)
-    #         bags[bag.name]['path'] = bag.path
-
-    #         # delete original child from its disk location since it is being saved to a new location in the bag
-    #         child: AbstractModel = self._child_type.load(path=model_path)
-    #         child.delete_from_disk(silent=True)
-
-    #     # cleanup artifacts
-    #     for artifact_dir in [model_base._path_v2, model_base.path_root]:
-    #         try:
-    #             os.rmdir(artifact_dir)
-    #         except OSError:
-    #             pass
-
-    #     # TODO: hpo_results likely not correct because no renames
-    #     return bags, hpo_results
 
     def _more_tags(self):
         return {

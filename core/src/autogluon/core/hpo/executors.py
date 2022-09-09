@@ -8,8 +8,6 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Union, Callable
 
-from autogluon.core.space import Bool
-
 from .constants import RAY_BACKEND, CUSTOM_BACKEND
 from .exceptions import EmptySearchSpace
 from .. import Space
@@ -81,15 +79,15 @@ class HpoExecutor(ABC):
         """
         user_cpu_count = initialized_model._get_child_aux_val(key='num_cpus', default=None)
         user_gpu_count = initialized_model._get_child_aux_val(key='num_gpus', default=None)
-        model_default_num_cpus, model_default_num_gpus = initialized_model._get_default_resources()
+        resource_kwargs = initialized_model._preprocess_fit_resources()
 
-        num_cpus = ResourceCalculator.get_total_cpu_count(
-            user_specified_num_cpus=user_cpu_count,
-            model_default_num_cpus=model_default_num_cpus,
-        )
         num_gpus = ResourceCalculator.get_total_gpu_count(
             user_specified_num_gpus=user_gpu_count,
-            model_default_num_gpus=model_default_num_gpus,
+            model_default_num_gpus=resource_kwargs.get('num_gpus', 0),
+        )
+        num_cpus = ResourceCalculator.get_total_cpu_count(
+            user_specified_num_cpus=user_cpu_count,
+            model_default_num_cpus=resource_kwargs.get('num_cpus', 0),
         )
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)

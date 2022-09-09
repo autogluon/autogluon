@@ -1392,13 +1392,6 @@ class AbstractTrainer:
                         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                         **model_fit_kwargs
                     )
-                    # hpo_models, hpo_results = model.hyperparameter_tune(
-                    #     X=X,
-                    #     y=y,
-                    #     k_fold=k_fold,
-                    #     hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                    #     **model_fit_kwargs
-                    # )
                 else:
                     hpo_models, hpo_results = model.hyperparameter_tune(
                         X=X,
