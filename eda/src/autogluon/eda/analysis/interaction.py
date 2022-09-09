@@ -49,6 +49,7 @@ class Correlation(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.correlations = {}
+        state.significance_matrix = {}
         state.correlations_method = self.method
         if self.significance:
             state.significance_matrix = {}
