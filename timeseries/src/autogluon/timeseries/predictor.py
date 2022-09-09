@@ -29,9 +29,9 @@ class TimeSeriesPredictor:
     series. The forecast includes both the mean (i.e., conditional expectation of future values given the past), as
     well as the quantiles of the forecast distribution, indicating the range of possible future outcomes.
 
-    ``TimeSeriesPredictor`` fits both "global" deep learning models that are shared across all time series (e.g.,
-    DeepAR, Temporal Fusion Transformer), as well as "local" statistical models that are fit to each individual time
-    series (e.g., ARIMA, ETS).
+    ``TimeSeriesPredictor`` fits both "global" deep learning models that are shared across all time series
+    (e.g., DeepAR, Transformer), as well as "local" statistical models that are fit to each individual time series
+    (e.g., ARIMA, ETS).
 
     ``TimeSeriesPredictor`` expects input data and makes predictions in the
     :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
@@ -53,7 +53,7 @@ class TimeSeriesPredictor:
         - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the
             specified ``quantile_levels`` scaled by the total value of the time series
         - ``"MAPE"``: mean absolute percentage error
-        - ``"sMAPE"``: symmetric mean absolute percentage error
+        - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error
@@ -100,14 +100,6 @@ class TimeSeriesPredictor:
         If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
     quantiles : List[float]
         Alias for :attr:`quantile_levels`.
-
-
-    # TODO: Why is only target listed under Attributes and not, e.g., eval_metric? Do we even need to mention anything here?
-    Attributes
-    ----------
-    target : str
-        Name of column in training/validation data that contains the target time series value to be predicted.
-        Defaults to ``"target"``.
     """
 
     predictor_file_name = "predictor.pkl"
@@ -266,7 +258,7 @@ class TimeSeriesPredictor:
             - MQCNN: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html
             - SFF: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html
         """
-        # TODO: Rework docstring for presets, hyperparameters and hyperparameter_tune_kwargs
+        # TODO: Update docstring for presets, hyperparameters and hyperparameter_tune_kwargs
         time_start = time.time()
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
