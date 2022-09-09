@@ -4,7 +4,6 @@ from typing import List, Type
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
-
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
