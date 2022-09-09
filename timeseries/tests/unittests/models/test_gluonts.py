@@ -28,6 +28,7 @@ TESTABLE_MODELS = [
     # TransformerModel,
     partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
+    TemporalFusionTransformerModel,
 ]
 
 # if PROPHET_IS_INSTALLED:
@@ -187,3 +188,19 @@ def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_mode
     else:
         model.fit(train_data=DUMMY_TS_DATAFRAME)
         model.predict(DUMMY_TS_DATAFRAME)
+
+
+@pytest.mark.parametrize("quantiles", [[0.1, 0.5, 0.9], [0.2, 0.3, 0.7]])
+def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles(temp_model_path, quantiles):
+    # TFT is not covered by the quantiles test in test_models.py
+    model = TemporalFusionTransformerModel(
+        path=temp_model_path,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        prediction_length=4,
+        quantile_levels=quantiles,
+        hyperparameters={"epochs": 1},
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    predictions = model.predict(data=DUMMY_TS_DATAFRAME)
+    assert "mean" in predictions.columns
+    assert all(str(q) in predictions.columns for q in quantiles)

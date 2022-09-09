@@ -216,6 +216,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             )
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
+        if self.gts_predictor is None:
+            raise ValueError("Please fit the model before predicting.")
 
         logger.debug(f"Predicting with time series model {self.name}")
         logger.debug(

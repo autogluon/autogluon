@@ -172,6 +172,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
             "epochs": 1,
         },
     )
+    # TFT cannot handle arbitrary quantiles
+    if model.name == "TemporalFusionTransformer":
+        return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)

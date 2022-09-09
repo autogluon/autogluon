@@ -1,11 +1,12 @@
 import re
-from typing import Type
+from typing import List, Type
 
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
 
-from ..abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
     import gluonts.model.deepar
@@ -218,6 +219,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
+    supported_quantiles: set = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
 
     def _get_estimator(self) -> GluonTSEstimator:
         """Return the GluonTS Estimator object for the model"""
@@ -226,14 +228,21 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         hyperparameters["hybridize"] = False
         # TFT cannot handle arbitrary quantiles, this is a workaround
         hyperparameters["num_outputs"] = 9
-        supported_quantiles = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-        if not set(self.quantile_levels).issubset(supported_quantiles):
+        if not set(self.quantile_levels).issubset(self.supported_quantiles):
             raise ValueError(
                 f"{self.name} requires that quantile_levels are a subset of "
-                f"{supported_quantiles} (received quantile_levels = {self.quantile_levels})"
+                f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
             )
         with warning_filter():
             return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
+
+    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
+        if quantile_levels is not None and not set(self.quantile_levels).issubset(self.supported_quantiles):
+            raise ValueError(
+                f"{self.name} requires that quantile_levels are a subset of "
+                f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
+            )
+        return super().predict(data=data, quantile_levels=quantile_levels, **kwargs)
 
 
 class TransformerModel(AbstractGluonTSModel):
