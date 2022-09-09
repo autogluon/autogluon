@@ -7,6 +7,13 @@ class CloudTestHelper:
 
     @staticmethod
     def prepare_data(*args):
+        # TODO: make this handle more general structured directory format
+        """
+        Download files specified by args from cloud CI s3 bucket
+
+        args: str
+            names of files to download
+        """
         s3 = boto3.client('s3')
         for arg in args:
             s3.download_file('autogluon-cloud', arg, os.path.basename(arg))
