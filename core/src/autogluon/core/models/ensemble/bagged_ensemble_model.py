@@ -1040,7 +1040,10 @@ class BaggedEnsembleModel(AbstractModel):
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         # initialize the model base to get necessary info for search space and estimating memory usage
         initialized_model_base = copy.deepcopy(self.model_base)
-        initialized_model_base.initialize(X=X, y=y, **self.model_base.get_params())
+        model_init_args = self.model_base.get_params()
+        model_init_args['features'] = self.feature_metadata
+        model_init_args['num_classes'] = self.num_classes
+        initialized_model_base.initialize(X=X, y=y, **model_init_args)
         search_space = initialized_model_base._get_search_space()
 
         try:
@@ -1062,7 +1065,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         model_cls = self.__class__
         init_params = copy.deepcopy(self.get_params())
-        model_base = init_params['model_base']
+        model_base = self._get_model_base()
 
         if not inspect.isclass(model_base):
             init_params['model_base'] = init_params['model_base'].__class__
@@ -1074,7 +1077,7 @@ class BaggedEnsembleModel(AbstractModel):
         fit_kwargs['num_classes'] = self.num_classes
         fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
         fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
-        fit_kwargs.pop('time_limit', None)
+        fit_kwargs.pop('time_limit', None)  # time_limit already set in hpo_executor
         train_fn_kwargs = dict(
             model_cls=model_cls,
             init_params=init_params,
