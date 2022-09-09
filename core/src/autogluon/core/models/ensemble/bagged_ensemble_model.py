@@ -1070,6 +1070,9 @@ class BaggedEnsembleModel(AbstractModel):
         if not inspect.isclass(model_base):
             init_params['model_base'] = init_params['model_base'].__class__
             init_params['model_base_kwargs'] = model_base.get_params()
+        # Here the hyperparameters are unprocessed search space.
+        # HPO Executor will handle passing in the correct parameters.
+        init_params['model_base_kwargs'].pop('hyperparameters', None)
 
         fit_kwargs = copy.deepcopy(kwargs)
         fit_kwargs['k_fold'] = k_fold
