@@ -112,7 +112,7 @@ class AbstractAnalysis(ABC):
         return self.state
 
 
-class NamespaceAbstractAnalysis(AbstractAnalysis, ABC):
+class Namespace(AbstractAnalysis, ABC):
     def __init__(self,
                  namespace: str = None,
                  parent: Union[None, AbstractAnalysis] = None,
@@ -121,13 +121,10 @@ class NamespaceAbstractAnalysis(AbstractAnalysis, ABC):
         super().__init__(parent, children, **kwargs)
         self.namespace = namespace
 
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        pass
+
     def _get_state_from_parent(self) -> AnalysisState:
         state = super()._get_state_from_parent()
         state[self.namespace] = {}
         return state[self.namespace]
-
-
-class Namespace(NamespaceAbstractAnalysis):
-
-    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
-        pass
