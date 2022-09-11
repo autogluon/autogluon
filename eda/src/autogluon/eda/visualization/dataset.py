@@ -51,11 +51,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
 
             df = df.fillna('')
 
-            if self.headers:
-                sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
-                header = f'{ds} dataset summary{sample_info}'
-                self.render_text(header, text_type='h3')
-
+            self.render_header_if_needed(state, f'{ds} dataset summary')
             self.display_obj(df)
 
     def __fix_counts(self, df: DataFrame, cols: List[str]) -> DataFrame:
@@ -81,11 +77,7 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
         df['warnings'] = warnings.all(axis=1).map({True: '', False: '⚠️'})
         df.fillna('--', inplace=True)
 
-        if self.headers:
-            sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
-            header = f'Types warnings summary{sample_info}'
-            self.render_text(header, text_type='h3')
-
+        self.render_header_if_needed(state, 'Types warnings summary')
         self.display_obj(df)
 
 
@@ -93,8 +85,8 @@ class MissingValues(AbstractVisualization, JupyterMixin):
 
     def __init__(self,
                  headers: bool = False,
-                 namespace: str = None,
                  fig_args: Union[None, Dict[str, Any]] = {},
+                 namespace: str = None,
                  **kwargs) -> None:
         super().__init__(namespace, **kwargs)
         self.headers = headers
@@ -106,11 +98,7 @@ class MissingValues(AbstractVisualization, JupyterMixin):
     def _render(self, state: AnalysisState) -> None:
         sample_size = state.get('sample_size', None)
         for ds, data in state.missing_statistics.items():
-            if self.headers:
-                sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
-                header = f'{ds} missing values analysis{sample_info}'
-                self.render_text(header, text_type='h3')
-
+            self.render_header_if_needed(state, f'{ds} missing values analysis')
             widgets = [msno.matrix, msno.bar, msno.heatmap, msno.dendrogram]
             outs = [wgts.Output() for _ in widgets]
             tab = wgts.Tab(children=outs)
