@@ -59,7 +59,7 @@ class AbstractAnalysis(ABC):
             tuple of dataset name (train_data, test_data or tuning_data) and dataset itself
 
         """
-        for ds in ['train_data', 'test_data', 'tuning_data']:
+        for ds in ['train_data', 'test_data', 'tuning_data', 'val_data']:
             if ds in args and args[ds] is not None:
                 df: DataFrame = args[ds]
                 yield ds, df

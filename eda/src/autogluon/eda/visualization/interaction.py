@@ -67,11 +67,9 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     ax.bar_label(container)
 
                 if self.headers:
-                    sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
                     features = '/'.join([i['features'][k] for k in ['x', 'y', 'hue'] if k in i['features']])
                     prefix = '' if single_var else 'Feature interaction between '
-                    header = f'{prefix}{features}{sample_info} in {ds}'
-                    self.render_text(header, text_type='h3')
+                    self.render_header_if_needed(state, f'{prefix}{features} in {ds}')
                 plt.show(fig)
 
     def _get_sns_chart_method(self, chart_type):
@@ -138,11 +136,7 @@ class CorrelationVisualization(AbstractVisualization, JupyterMixin):
         sample_size = state.get('sample_size', None)
 
         for ds, corr in state.correlations.items():
-            if self.headers:
-                sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
-                header = f'{ds} - {state.correlations_method} correlation matrix{sample_info}'
-                self.render_text(header, text_type='h3')
-
+            self.render_header_if_needed(state, f'{ds} - {state.correlations_method} correlation matrix')
             widgets = [w for w in ['correlations', 'significance_matrix'] if w in state]
             outs = [wgts.Output() for _ in widgets]
             tab = wgts.Tab(children=outs)
