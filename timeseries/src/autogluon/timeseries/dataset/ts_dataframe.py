@@ -374,6 +374,32 @@ class TimeSeriesDataFrame(pd.DataFrame):
             self._cached_freq = other._cached_freq
         return self
 
+    def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        """Split dataframe to two different ``TimeSeriesDataFrame`` s before and after a certain ``cutoff_time``.
+
+        Parameters
+        ----------
+        cutoff_time: pd.Timestamp
+            The time to split the current data frame into two data frames.
+
+        Returns
+        -------
+        data_before: TimeSeriesDataFrame
+            Data frame containing time series before the ``cutoff_time`` (exclude ``cutoff_time``).
+        data_after: TimeSeriesDataFrame
+            Data frame containing time series after the ``cutoff_time`` (include ``cutoff_time``).
+        """
+
+        nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
+        data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
+        data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
+        before, after = TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
+            data_after, static_features=self.static_features
+        )
+        before._cached_freq = self._cached_freq
+        after._cached_freq = self._cached_freq
+        return before, after
+
     def slice_by_timestep(self, start_index: Union[int, None], end_index: Union[int, None]) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) indices.
 
@@ -456,11 +482,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     2019-01-05       8
 
         """
+
         if isinstance(start_index, slice):
             time_step_slice = start_index
             warnings.warn(
-                f"Calling function slice_by_timestep with a `slice` argument is deprecated "
-                + "and will be removed in v0.7. Please call the method as `slice_by_timestep(start_index, end_index)",
+                f"Calling function slice_by_timestep with a `slice` argument is deprecated and will be removed "
+                f"in v0.7. Please call the method as `slice_by_timestep(start_index, end_index)",
                 DeprecationWarning,
             )
             if time_step_slice.step is not None and time_step_slice.step != 1:
