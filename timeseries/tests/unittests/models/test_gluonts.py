@@ -13,6 +13,7 @@ from autogluon.timeseries.models.gluonts import (  # AutoTabularModel,; MQRNNMod
     MQCNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
 )
 from autogluon.timeseries.models.gluonts.models import GenericGluonTSModelFactory
 
@@ -27,6 +28,7 @@ TESTABLE_MODELS = [
     # TransformerModel,
     partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator),  # partial constructor for generic model
     GenericGluonTSModelFactory(TransformerEstimator),
+    TemporalFusionTransformerModel,
 ]
 
 # if PROPHET_IS_INSTALLED:
@@ -161,3 +163,44 @@ def test_when_hyperparameter_tune_called_on_prophet_then_hyperparameters_are_pas
     assert results["config_history"][1]["n_changepoints"] == 4
 
     assert all(c["growth"] == "linear" for c in results["config_history"].values())
+
+
+@pytest.mark.parametrize(
+    "quantiles, should_fail",
+    [
+        ([0.1, 0.5, 0.3, 0.9], False),
+        ([0.9], False),
+        ([0.1, 0.5, 0.55], True),
+    ],
+)
+def test_when_tft_quantiles_are_not_deciles_then_value_error_is_raised(temp_model_path, quantiles, should_fail):
+    model = TemporalFusionTransformerModel(
+        path=temp_model_path,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        prediction_length=4,
+        quantile_levels=quantiles,
+        hyperparameters={"epochs": 1},
+    )
+    if should_fail:
+        with pytest.raises(ValueError, match="quantile_levels are a subset of"):
+            model.fit(train_data=DUMMY_TS_DATAFRAME)
+            model.predict(DUMMY_TS_DATAFRAME)
+    else:
+        model.fit(train_data=DUMMY_TS_DATAFRAME)
+        model.predict(DUMMY_TS_DATAFRAME)
+
+
+@pytest.mark.parametrize("quantiles", [[0.1, 0.5, 0.9], [0.2, 0.3, 0.7]])
+def test_when_tft_quantiles_are_deciles_then_forecast_contains_correct_quantiles(temp_model_path, quantiles):
+    # TFT is not covered by the quantiles test in test_models.py
+    model = TemporalFusionTransformerModel(
+        path=temp_model_path,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        prediction_length=4,
+        quantile_levels=quantiles,
+        hyperparameters={"epochs": 1},
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    predictions = model.predict(data=DUMMY_TS_DATAFRAME)
+    assert "mean" in predictions.columns
+    assert all(str(q) in predictions.columns for q in quantiles)

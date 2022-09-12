@@ -13,6 +13,7 @@ from .gluonts import (
     MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
     TransformerModel,
 )
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
@@ -29,6 +30,7 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    TemporalFusionTransformer=TemporalFusionTransformerModel,
     SktimeARIMA=SktimeARIMAModel,
     SktimeAutoARIMA=SktimeAutoARIMAModel,
     SktimeAutoETS=SktimeAutoETSModel,
@@ -41,6 +43,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     MQRNN=40,
     SimpleFeedForward=50,
     Transformer=40,
+    TemporalFusionTransformer=45,
     DeepAR=50,
     Prophet=10,
     AutoTabular=10,
