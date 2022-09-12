@@ -495,10 +495,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
             start_index = time_step_slice.start
             end_index = time_step_slice.stop
 
-        length_per_item = self.num_timesteps_per_item()
+        num_timesteps_per_item = self.num_timesteps_per_item()
         # Create a boolean index that selects the correct slice in each timeseries
         boolean_indicators = []
-        for length in length_per_item:
+        for length in num_timesteps_per_item:
             indicator = np.zeros(length, dtype=bool)
             indicator[start_index:end_index] = True
             boolean_indicators.append(indicator)
