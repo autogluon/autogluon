@@ -121,8 +121,6 @@ class TextProcessor:
         self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
         self.requires_column_info = requires_column_info
-        self.set_keys(model)
-
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
             checkpoint_name=model.checkpoint_name,
@@ -177,14 +175,25 @@ class TextProcessor:
         self.template_config = template_config
         self.template_engine = TemplateEngine(self.template_config)
 
-    def set_keys(self, model: nn.Module):
-        self.text_token_ids_key = model.text_token_ids_key
-        if hasattr(model, "text_segment_ids_key"):
-            self.text_segment_ids_key = model.text_segment_ids_key
-        self.text_valid_length_key = model.text_valid_length_key
-        self.text_column_prefix = model.text_column_prefix
-        if hasattr(model, "choices_key"):
-            self.choices_key = model.choices_key
+    @property
+    def text_token_ids_key(self):
+        return f"{self.prefix}_{TEXT_TOKEN_IDS}"
+
+    @property
+    def text_segment_ids_key(self):
+        return f"{self.prefix}_{TEXT_SEGMENT_IDS}"
+
+    @property
+    def choices_ids_key(self):
+        return f"{self.prefix}_{CHOICES_IDS}"
+
+    @property
+    def text_valid_length_key(self):
+        return f"{self.prefix}_{TEXT_VALID_LENGTH}"
+
+    @property
+    def text_column_prefix(self):
+        return f"{self.text_token_ids_key}_{COLUMN}"
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
@@ -205,12 +214,10 @@ class TextProcessor:
             {
                 self.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
                 self.text_valid_length_key: Stack(),
+                self.text_segment_ids_key: Pad(pad_val=0),
+                self.choices_ids_key: Pad(pad_val=0),
             }
         )
-        if hasattr(self, "text_segment_ids_key"):
-            fn.update({self.text_segment_ids_key: Pad(pad_val=0)})
-        if hasattr(self, "choices_key"):
-            fn.update({self.choices_key: Pad(pad_val=0)})
 
         return fn
 
@@ -291,12 +298,10 @@ class TextProcessor:
             {
                 self.text_token_ids_key: np.array(token_ids, dtype=np.int32),
                 self.text_valid_length_key: len(token_ids),
+                self.text_segment_ids_key: np.array(segment_ids, dtype=np.int32),
+                self.choices_ids_key: np.array(choices_ids, dtype=np.int32),
             }
         )
-        if hasattr(self, "text_segment_ids_key"):
-            ret.update({self.text_segment_ids_key: np.array(segment_ids, dtype=np.int32)})
-        if hasattr(self, "choices_key"):
-            ret.update({self.choices_key: np.array(choices_ids, dtype=np.int32)})
 
         return ret
 

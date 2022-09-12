@@ -31,12 +31,13 @@ class CategoricalProcessor:
         self.prefix = model.prefix
         self.requires_column_info = requires_column_info
 
-        self.set_keys(model)
+    @property
+    def categorical_key(self):
+        return f"{self.prefix}_{CATEGORICAL}"
 
-    def set_keys(self, model: nn.Module):
-        self.categorical_key = model.categorical_key
-        self.label_key = model.label_key
-        self.categorical_column_prefix = model.categorical_column_prefix
+    @property
+    def categorical_column_prefix(self):
+        return f"{self.categorical_key}_{COLUMN}"
 
     def collate_fn(self, categorical_column_names: Optional[List] = None) -> Dict:
         """

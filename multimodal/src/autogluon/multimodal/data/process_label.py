@@ -25,10 +25,10 @@ class LabelProcessor:
             The prefix connecting a processor to its corresponding model.
         """
         self.prefix = model.prefix
-        self.set_keys(model)
 
-    def set_keys(self, model: nn.Module):
-        self.label_key = model.label_key
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
     def collate_fn(self, label_column_names: Optional[List] = None) -> Dict:
         """

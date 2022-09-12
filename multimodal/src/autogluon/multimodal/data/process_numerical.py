@@ -38,12 +38,13 @@ class NumericalProcessor:
         self.merge = merge
         self.requires_column_info = requires_column_info
 
-        self.set_keys(model)
+    @property
+    def numerical_key(self):
+        return f"{self.prefix}_{NUMERICAL}"
 
-    def set_keys(self, model: nn.Module):
-        self.numerical_key = model.numerical_key
-        self.label_key = model.label_key
-        self.numerical_column_prefix = model.numerical_column_prefix
+    @property
+    def numerical_column_prefix(self):
+        return f"{self.numerical_key}_{COLUMN}"
 
     def collate_fn(self, numerical_column_names: List) -> Dict:
         """

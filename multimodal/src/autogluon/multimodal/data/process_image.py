@@ -130,8 +130,6 @@ class ImageProcessor:
         self.mean = None
         self.std = None
 
-        self.set_keys(model)
-
         if model is not None:
             self.size, self.mean, self.std = self.extract_default(model.config)
         if self.size is None:
@@ -171,10 +169,17 @@ class ImageProcessor:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
 
-    def set_keys(self, model: nn.Module):
-        self.image_key = model.image_key
-        self.image_valid_num_key = model.image_valid_num_key
-        self.image_column_prefix = model.image_column_prefix
+    @property
+    def image_key(self):
+        return f"{self.prefix}_{IMAGE}"
+
+    @property
+    def image_valid_num_key(self):
+        return f"{self.prefix}_{IMAGE_VALID_NUM}"
+
+    @property
+    def image_column_prefix(self):
+        return f"{self.image_key}_{COLUMN}"
 
     def collate_fn(self, image_column_names: Optional[List] = None) -> Dict:
         """

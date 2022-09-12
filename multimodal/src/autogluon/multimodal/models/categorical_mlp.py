@@ -3,7 +3,7 @@ from typing import List, Optional
 import torch
 from torch import nn
 
-from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, COLUMN
+from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS
 from .mlp import MLP
 from .utils import init_weights
 
@@ -104,10 +104,6 @@ class CategoricalMLP(nn.Module):
     @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
-
-    @property
-    def categorical_column_prefix(self):
-        return f"{self.categorical_key}_{COLUMN}"
 
     def forward(
         self,
