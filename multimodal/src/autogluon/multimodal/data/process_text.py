@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import torch
+from torch import nn
 from nptyping import NDArray
 from omegaconf import DictConfig
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
@@ -78,8 +78,7 @@ class TextProcessor:
 
     def __init__(
         self,
-        prefix: str,
-        checkpoint_name: str,
+        model: nn.Module,
         tokenizer_name: Optional[str] = "hf_auto",
         max_len: Optional[int] = None,
         insert_sep: Optional[bool] = True,
@@ -119,13 +118,14 @@ class TextProcessor:
         train_augment_types
             All possible augmentation operations
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
-        self.checkpoint_name = checkpoint_name
         self.requires_column_info = requires_column_info
+        self.set_keys(model)
+
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
-            checkpoint_name=checkpoint_name,
+            checkpoint_name=model.checkpoint_name,
         )
         if hasattr(self.tokenizer, "deprecation_warnings"):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
@@ -139,7 +139,7 @@ class TextProcessor:
             if max_len < self.tokenizer.model_max_length:
                 warnings.warn(
                     f"provided max length: {max_len} "
-                    f"is smaller than {checkpoint_name}'s default: {self.tokenizer.model_max_length}"
+                    f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
                 )
             self.max_len = min(max_len, self.tokenizer.model_max_length)
         logger.debug(f"text max length: {self.max_len}")
@@ -147,8 +147,7 @@ class TextProcessor:
         self.insert_sep = insert_sep
         self.eos_only = self.cls_token_id == self.sep_token_id == self.eos_token_id
 
-        config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-        extracted = extract_value_from_config(config=config, keys=("type_vocab_size",))
+        extracted = extract_value_from_config(config=model.config.to_diff_dict(), keys=("type_vocab_size",))
         if len(extracted) == 0:
             default_segment_num = 1
         elif len(extracted) == 1:
@@ -162,7 +161,7 @@ class TextProcessor:
         if text_segment_num < default_segment_num:
             warnings.warn(
                 f"provided text_segment_num: {text_segment_num} "
-                f"is smaller than {checkpoint_name}'s default: {default_segment_num}"
+                f"is smaller than {model.checkpoint_name}'s default: {default_segment_num}"
             )
         self.text_segment_num = min(text_segment_num, default_segment_num)
         assert self.text_segment_num >= 1
@@ -178,25 +177,14 @@ class TextProcessor:
         self.template_config = template_config
         self.template_engine = TemplateEngine(self.template_config)
 
-    @property
-    def text_token_ids_key(self):
-        return f"{self.prefix}_{TEXT_TOKEN_IDS}"
-
-    @property
-    def text_segment_ids_key(self):
-        return f"{self.prefix}_{TEXT_SEGMENT_IDS}"
-
-    @property
-    def choices_ids_key(self):
-        return f"{self.prefix}_{CHOICES_IDS}"
-
-    @property
-    def text_valid_length_key(self):
-        return f"{self.prefix}_{TEXT_VALID_LENGTH}"
-
-    @property
-    def text_column_prefix(self):
-        return f"{self.text_token_ids_key}_{COLUMN}"
+    def set_keys(self, model: nn.Module):
+        self.text_token_ids_key = model.text_token_ids_key
+        if hasattr(model, "text_segment_ids_key"):
+            self.text_segment_ids_key = model.text_segment_ids_key
+        self.text_valid_length_key = model.text_valid_length_key
+        self.text_column_prefix = model.text_column_prefix
+        if hasattr(model, "choices_ids_key"):
+            self.choices_ids_key = model.choices_ids_key
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
@@ -217,10 +205,12 @@ class TextProcessor:
             {
                 self.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
                 self.text_valid_length_key: Stack(),
-                self.text_segment_ids_key: Pad(pad_val=0),
-                self.choices_ids_key: Pad(pad_val=0),
             }
         )
+        if hasattr(self, "text_segment_ids_key"):
+            fn.update({self.text_segment_ids_key: Pad(pad_val=0)})
+        if hasattr(self, "choices_ids_key"):
+            fn.update({self.choices_ids_key: Pad(pad_val=0)})
 
         return fn
 
@@ -301,10 +291,12 @@ class TextProcessor:
             {
                 self.text_token_ids_key: np.array(token_ids, dtype=np.int32),
                 self.text_valid_length_key: len(token_ids),
-                self.text_segment_ids_key: np.array(segment_ids, dtype=np.int32),
-                self.choices_ids_key: np.array(choices_ids, dtype=np.int32),
             }
         )
+        if hasattr(self, "text_segment_ids_key"):
+            ret.update({self.text_segment_ids_key: np.array(segment_ids, dtype=np.int32)})
+        if hasattr(self, "choices_ids_key"):
+            ret.update({self.choices_ids_key: np.array(choices_ids, dtype=np.int32)})
 
         return ret
 

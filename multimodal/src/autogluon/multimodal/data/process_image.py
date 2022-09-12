@@ -6,7 +6,6 @@ from typing import Dict, List, Optional
 import numpy as np
 import PIL
 import torch
-from timm import create_model
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
     IMAGENET_DEFAULT_STD,
@@ -15,7 +14,6 @@ from timm.data.constants import (
 )
 from torch import nn
 from torchvision import transforms
-from transformers import AutoConfig
 
 from .randaug import RandAugment
 
@@ -71,16 +69,14 @@ class ImageProcessor:
 
     def __init__(
         self,
-        prefix: str,
+        model: nn.Module,
         train_transform_types: List[str],
         val_transform_types: List[str],
-        checkpoint_name: Optional[str] = None,
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
-        model: Optional[nn.Module] = None,
     ):
         """
         Parameters
@@ -122,24 +118,22 @@ class ImageProcessor:
         model
             The model using this data processor.
         """
-        self.checkpoint_name = checkpoint_name
-        self.prefix = prefix
         self.train_transform_types = train_transform_types
         self.val_transform_types = val_transform_types
         logger.debug(f"image training transform type: {train_transform_types}")
         logger.debug(f"image validation transform type: {val_transform_types}")
 
+        self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
         self.size = None
         self.mean = None
         self.std = None
 
-        if checkpoint_name is not None:
-            if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
-                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=model.model.cfg)
-            else:
-                self.size, self.mean, self.std = self.extract_default(checkpoint_name)
+        self.set_keys(model)
+
+        if model is not None:
+            self.size, self.mean, self.std = self.extract_default(model.config)
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -177,17 +171,10 @@ class ImageProcessor:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
 
-    @property
-    def image_key(self):
-        return f"{self.prefix}_{IMAGE}"
-
-    @property
-    def image_valid_num_key(self):
-        return f"{self.prefix}_{IMAGE_VALID_NUM}"
-
-    @property
-    def image_column_prefix(self):
-        return f"{self.image_key}_{COLUMN}"
+    def set_keys(self, model: nn.Module):
+        self.image_key = model.image_key
+        self.image_valid_num_key = model.image_valid_num_key
+        self.image_column_prefix = model.image_column_prefix
 
     def collate_fn(self, image_column_names: Optional[List] = None) -> Dict:
         """
@@ -246,7 +233,7 @@ class ImageProcessor:
         else:
             raise ValueError(f"unknown image normalization: {norm_type}")
 
-    def extract_default(self, checkpoint_name, cfg=None):
+    def extract_default(self, config=None):
         """
         Extract some default hyper-parameters, e.g., image size, mean, and std,
         from a pre-trained (timm or huggingface) checkpoint.
@@ -266,26 +253,20 @@ class ImageProcessor:
             Image normalizaiton std.
         """
         if self.prefix.lower().startswith(MMDET_IMAGE):
-            image_size = cfg.test_pipeline[1]["img_scale"][0]
-            mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
-            std = cfg.test_pipeline[1]["transforms"][2]["std"]
+            image_size = config.test_pipeline[1]["img_scale"][0]
+            mean = config.test_pipeline[1]["transforms"][2]["mean"]
+            std = config.test_pipeline[1]["transforms"][2]["std"]
         elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
-            image_size = cfg.data.test.pipeline[1]["img_scale"][0]
-            mean = cfg.data.test.pipeline[1]["transforms"][1]["mean"]
-            std = cfg.data.test.pipeline[1]["transforms"][1]["std"]
+            image_size = config.data.test.pipeline[1]["img_scale"][0]
+            mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
+            std = config.data.test.pipeline[1]["transforms"][1]["std"]
         elif self.prefix.lower().startswith(TIMM_IMAGE):
-            model = create_model(
-                checkpoint_name,
-                pretrained=True,
-                num_classes=0,
-            )
-            image_size = model.default_cfg["input_size"][-1]
-            mean = model.default_cfg["mean"]
-            std = model.default_cfg["std"]
+            image_size = config["input_size"][-1]
+            mean = config["mean"]
+            std = config["std"]
         elif self.prefix.lower().startswith(CLIP):
-            config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
             extracted = extract_value_from_config(
-                config=config,
+                config=config.to_diff_dict(),
                 keys=("image_size",),
             )
             if len(extracted) == 0:

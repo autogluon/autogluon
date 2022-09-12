@@ -16,6 +16,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
     Support TIMM image backbones.
     Refer to https://github.com/rwightman/pytorch-image-models
     """
+    data_types = [IMAGE]
 
     def __init__(
         self,
@@ -51,6 +52,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
         self.model = create_model(checkpoint_name, pretrained=pretrained, num_classes=num_classes)
+        self.config = self.model.default_cfg
         self.num_classes = self.model.num_classes
         self.out_features = self.model.num_features
         self.head = get_model_head(model=self.model)

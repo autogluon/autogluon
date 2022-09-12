@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
+from torch import nn
 from nptyping import NDArray
 
 from ..constants import LABEL
@@ -15,7 +16,7 @@ class LabelProcessor:
 
     def __init__(
         self,
-        prefix: str,
+        model: nn.Module,
     ):
         """
         Parameters
@@ -23,11 +24,11 @@ class LabelProcessor:
         prefix
             The prefix connecting a processor to its corresponding model.
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
+        self.set_keys(model)
 
-    @property
-    def label_key(self):
-        return f"{self.prefix}_{LABEL}"
+    def set_keys(self, model: nn.Module):
+        self.label_key = model.label_key
 
     def collate_fn(self, label_column_names: Optional[List] = None) -> Dict:
         """

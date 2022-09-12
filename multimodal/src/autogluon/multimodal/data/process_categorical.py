@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+from torch import nn
 from nptyping import NDArray
 
 from ..constants import CATEGORICAL, COLUMN
@@ -16,7 +17,7 @@ class CategoricalProcessor:
 
     def __init__(
         self,
-        prefix: str,
+        model: nn.Module,
         requires_column_info: bool = False,
     ):
         """
@@ -27,16 +28,15 @@ class CategoricalProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
         self.requires_column_info = requires_column_info
 
-    @property
-    def categorical_key(self):
-        return f"{self.prefix}_{CATEGORICAL}"
+        self.set_keys(model)
 
-    @property
-    def categorical_column_prefix(self):
-        return f"{self.categorical_key}_{COLUMN}"
+    def set_keys(self, model: nn.Module):
+        self.categorical_key = model.categorical_key
+        self.label_key = model.label_key
+        self.categorical_column_prefix = model.categorical_column_prefix
 
     def collate_fn(self, categorical_column_names: Optional[List] = None) -> Dict:
         """

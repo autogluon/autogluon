@@ -3,7 +3,7 @@ from typing import List, Optional
 import torch
 from torch import Tensor, nn
 
-from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS
+from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, COLUMN
 from .ft_transformer import CLSToken, FT_Transformer, _TokenInitialization
 
 
@@ -81,6 +81,7 @@ class CategoricalTransformer(nn.Module):
     The input dimension is automatically computed based on
     the number of categories in each categorical column.
     """
+    data_types = [CATEGORICAL]
 
     def __init__(
         self,
@@ -241,6 +242,10 @@ class CategoricalTransformer(nn.Module):
     @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
+
+    @property
+    def categorical_column_prefix(self):
+        return f"{self.categorical_key}_{COLUMN}"
 
     def forward(self, batch: dict):
         """

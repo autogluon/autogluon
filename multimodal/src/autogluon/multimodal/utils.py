@@ -508,7 +508,7 @@ def select_model(
     fusion_model_name = []
     for model_name in names:
         model_config = getattr(config.model, model_name)
-        if model_config.data_types is None:
+        if not model_config.data_types:
             fusion_model_name.append(model_name)
             continue
         model_data_status = [data_status[d_type] for d_type in model_config.data_types]
@@ -583,9 +583,57 @@ def init_df_preprocessor(
     return df_preprocessor
 
 
-def init_data_processors(
+def create_data_processor(
+    data_type: str,
     config: DictConfig,
-    model: Optional[nn.Module] = None,
+    model: nn.Module,
+):
+    model_config = getattr(config.model, model.prefix)
+    if data_type == IMAGE:
+        data_processor = ImageProcessor(
+                model=model,
+                train_transform_types=model_config.train_transform_types,
+                val_transform_types=model_config.val_transform_types,
+                norm_type=model_config.image_norm,
+                size=model_config.image_size,
+                max_img_num_per_col=model_config.max_img_num_per_col,
+                missing_value_strategy=config.data.image.missing_value_strategy,
+            )
+    elif data_type == TEXT:
+        data_processor = TextProcessor(
+                model=model,
+                tokenizer_name=model_config.tokenizer_name,
+                max_len=model_config.max_text_len,
+                insert_sep=model_config.insert_sep,
+                text_segment_num=model_config.text_segment_num,
+                stochastic_chunk=model_config.stochastic_chunk,
+                text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+                text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
+                train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
+                template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
+            )
+    elif data_type == CATEGORICAL:
+        data_processor = CategoricalProcessor(
+                model=model,
+            )
+    elif data_type == NUMERICAL:
+        data_processor = NumericalProcessor(
+                model=model,
+                merge=model_config.merge,
+            )
+    elif data_type == LABEL:
+        data_processor = LabelProcessor(model=model)
+    else:
+        raise ValueError(f"unknown data type: {data_type}")
+
+    return data_processor
+
+
+def create_fusion_data_processors(
+    config: DictConfig,
+    model: nn.Module,
+    requires_label: Optional[bool] = True,
+    requires_data: Optional[bool] = True,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -608,10 +656,6 @@ def init_data_processors(
     A dictionary with modalities as the keys. Each modality has a list of processors.
     Note that "label" is also treated as a modality for convenience.
     """
-    names = config.model.names
-    if isinstance(names, str):
-        names = [names]
-
     data_processors = {
         IMAGE: [],
         TEXT: [],
@@ -619,60 +663,32 @@ def init_data_processors(
         NUMERICAL: [],
         LABEL: [],
     }
-    for model_name in names:
-        model_config = getattr(config.model, model_name)
-        # each model has its own label processor
-        data_processors[LABEL].append(LabelProcessor(prefix=model_name))
-        if model_config.data_types is None:
-            continue
-        for d_type in model_config.data_types:
-            if d_type == IMAGE:
-                data_processors[IMAGE].append(
-                    ImageProcessor(
-                        prefix=model_name,
-                        checkpoint_name=model_config.checkpoint_name,
-                        train_transform_types=model_config.train_transform_types,
-                        val_transform_types=model_config.val_transform_types,
-                        norm_type=model_config.image_norm,
-                        size=model_config.image_size,
-                        max_img_num_per_col=model_config.max_img_num_per_col,
-                        missing_value_strategy=config.data.image.missing_value_strategy,
-                        model=model,
-                    )
-                )
-            elif d_type == TEXT:
-                data_processors[TEXT].append(
-                    TextProcessor(
-                        prefix=model_name,
-                        tokenizer_name=model_config.tokenizer_name,
-                        checkpoint_name=model_config.checkpoint_name,
-                        max_len=model_config.max_text_len,
-                        insert_sep=model_config.insert_sep,
-                        text_segment_num=model_config.text_segment_num,
-                        stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
-                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
-                        train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
-                        template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
-                    )
-                )
-            elif d_type == CATEGORICAL:
-                data_processors[CATEGORICAL].append(
-                    CategoricalProcessor(
-                        prefix=model_name,
-                    )
-                )
-            elif d_type == NUMERICAL:
-                data_processors[NUMERICAL].append(
-                    NumericalProcessor(
-                        prefix=model_name,
-                        merge=model_config.merge,
-                    )
-                )
-            else:
-                raise ValueError(f"unknown data type: {d_type}")
 
-    assert len(data_processors[LABEL]) > 0
+    model_dict = {model.prefix: model}
+
+    if model.prefix.lower().startswith("fusion"):
+        for per_model in model.model:
+            model_dict[per_model.prefix] = per_model
+
+    assert list(model_dict.keys()).sort() == config.model.names.sort()
+
+    for per_name, per_model in model_dict.items():
+        if requires_label:
+            # each model has its own label processor
+            label_processor = create_data_processor(
+                data_type=LABEL,
+                config=config,
+                model=per_model,
+            )
+            data_processors[LABEL].append(label_processor)
+        if requires_data and per_model.data_types:
+            for data_type in per_model.data_types:
+                per_data_processor = create_data_processor(
+                    data_type=data_type,
+                    model=per_model,
+                    config=config,
+                )
+                data_processors[data_type].append(per_data_processor)
 
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
@@ -715,6 +731,7 @@ def create_model(
     assert len(names) == len(set(names))
     logger.debug(f"output_shape: {num_classes}")
     all_models = []
+    names = sorted(names)
     for model_name in names:
         model_config = getattr(config.model, model_name)
         if model_name.lower().startswith(CLIP):
@@ -2034,8 +2051,7 @@ def update_config_by_rules(
     config: DictConfig,
 ):
     """
-    Modify configs based on the need of loss func.
-    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
+    Update config by pre-defined rules.
 
     Parameters
     ----------
@@ -2048,6 +2064,37 @@ def update_config_by_rules(
     -------
     The modified config.
     """
+    for model_name in config.model.names:
+        model_config = getattr(config.model, model_name)
+        if model_name.lower().startswith(CLIP):
+            model_class = CLIPForImageText
+        elif model_name.lower().startswith(TIMM_IMAGE):
+            model_class = TimmAutoModelForImagePrediction
+        elif model_name.lower().startswith(HF_TEXT):
+            model_class = HFAutoModelForTextPrediction
+        elif model_name.lower().startswith(T_FEW):
+            model_class = TFewModel
+        elif model_name.lower().startswith(NUMERICAL_MLP):
+            model_class = NumericalMLP
+        elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
+            model_class = NumericalTransformer
+        elif model_name.lower().startswith(CATEGORICAL_MLP):
+            model_class = CategoricalMLP
+        elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
+            model_class = CategoricalTransformer
+        elif model_name.lower().startswith(MMDET_IMAGE):
+            model_class = MMDetAutoModelForObjectDetection
+        elif model_name.lower().startswith(MMOCR_TEXT_DET):
+            model_class = MMOCRAutoModelForTextDetection
+        elif model_name.lower().startswith(FUSION_MLP):
+            model_class = MultimodalFusionMLP
+        elif model_name.lower().startswith(FUSION_TRANSFORMER):
+            model_class = MultimodalFusionTransformer
+        else:
+            raise ValueError(f"unknown model name: {model_name}")
+
+        OmegaConf.update(model_config, "data_types", model_class.data_types, merge=False)
+
     loss_func = OmegaConf.select(config, "optimization.loss_function")
     if loss_func is not None:
         if problem_type == REGRESSION and "bce" in loss_func.lower():

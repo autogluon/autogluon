@@ -37,6 +37,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
     Support MMOCR object detection models.
     Refer to https://github.com/open-mmlab/mmocr
     """
+    data_types = [IMAGE]
 
     def __init__(
         self,

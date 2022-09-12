@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from torch import nn
 
-from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL
+from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL, COLUMN
 from .mlp import MLP
 from .numerical_transformer import NumEmbeddings
 from .utils import init_weights
@@ -12,6 +12,7 @@ class NumericalMLP(nn.Module):
     """
     MLP for numerical input.
     """
+    data_types = [NUMERICAL]
 
     def __init__(
         self,
@@ -95,6 +96,10 @@ class NumericalMLP(nn.Module):
     @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
+
+    @property
+    def numerical_column_prefix(self):
+        return f"{self.numerical_key}_{COLUMN}"
 
     def forward(
         self,

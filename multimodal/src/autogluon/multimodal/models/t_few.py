@@ -25,6 +25,7 @@ from ..constants import (
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
+    TEXT,
 )
 from .utils import DummyLayer, assign_layer_ids, get_column_features
 
@@ -43,6 +44,7 @@ class TFewModel(nn.Module):
     Implementation of T-Few (https://arxiv.org/pdf/2205.05638.pdf).
     Refer to https://github.com/r-three/t-few
     """
+    data_types = [TEXT]
 
     def __init__(
         self,

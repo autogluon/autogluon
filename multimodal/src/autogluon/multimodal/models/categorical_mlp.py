@@ -3,7 +3,7 @@ from typing import List, Optional
 import torch
 from torch import nn
 
-from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS
+from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, COLUMN
 from .mlp import MLP
 from .utils import init_weights
 
@@ -13,6 +13,7 @@ class CategoricalMLP(nn.Module):
     MLP for categorical input. The input dimension is automatically computed based on
     the number of categories in each categorical column.
     """
+    data_types = [CATEGORICAL]
 
     def __init__(
         self,
@@ -103,6 +104,10 @@ class CategoricalMLP(nn.Module):
     @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
+
+    @property
+    def categorical_column_prefix(self):
+        return f"{self.categorical_key}_{COLUMN}"
 
     def forward(
         self,

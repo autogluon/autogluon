@@ -3,7 +3,7 @@ from typing import List, Optional
 import torch
 from torch import Tensor, nn
 
-from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL
+from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL, COLUMN
 from .ft_transformer import CLSToken, FT_Transformer, _TokenInitialization
 
 
@@ -355,6 +355,7 @@ class NumericalTransformer(nn.Module):
     """
     FT-Transformer for numerical tabular features.
     """
+    data_types = [NUMERICAL]
 
     def __init__(
         self,
@@ -519,6 +520,10 @@ class NumericalTransformer(nn.Module):
     @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
+
+    @property
+    def numerical_column_prefix(self):
+        return f"{self.numerical_key}_{COLUMN}"
 
     def forward(self, batch: dict):
         """
