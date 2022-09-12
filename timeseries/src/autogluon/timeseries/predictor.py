@@ -214,7 +214,7 @@ class TimeSeriesPredictor:
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
             have completed training.
-        presets : str, default = "medium_quality"
+        presets : str, optional
             Optional preset configurations for various arguments in
             :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
 
@@ -248,7 +248,7 @@ class TimeSeriesPredictor:
             values which are given in``autogluon/timeseries/trainer/models/presets.py``. Specific hyperparameter
             choices for each of the recommended models can be found in the references.
         hyperparameter_tune_kwargs : str or dict, optional
-        enable_ensemble: bool, default = True
+        enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
 
