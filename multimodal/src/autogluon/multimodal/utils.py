@@ -670,7 +670,7 @@ def create_fusion_data_processors(
         for per_model in model.model:
             model_dict[per_model.prefix] = per_model
 
-    assert list(model_dict.keys()).sort() == config.model.names.sort()
+    assert sorted(list(model_dict.keys())) == sorted(config.model.names)
 
     for per_name, per_model in model_dict.items():
         if requires_label:
@@ -732,6 +732,7 @@ def create_model(
     logger.debug(f"output_shape: {num_classes}")
     all_models = []
     names = sorted(names)
+    config.model.names = names
     for model_name in names:
         model_config = getattr(config.model, model_name)
         if model_name.lower().startswith(CLIP):
