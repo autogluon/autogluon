@@ -2,10 +2,12 @@ from ..analysis import BaseAnalysis, Sampler, RawTypesAnalysis, FeatureInteracti
 from ..visualization import SimpleLinearLayout, FeatureInteractionVisualization
 
 
-def analyze(train_data=None, test_data=None, label=None, sample=None, anlz_facets=[], viz_facets=[]):
+def analyze(train_data=None, test_data=None, val_data=None, model=None, label=None, sample=None, anlz_facets=[], viz_facets=[]):
     a = BaseAnalysis(
         train_data=train_data,
         test_data=test_data,
+        val_data=val_data,
+        model=model,
         label=label,
         children=[
             Sampler(sample=sample, children=anlz_facets),
