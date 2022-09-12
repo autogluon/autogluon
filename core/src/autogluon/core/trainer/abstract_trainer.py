@@ -560,13 +560,13 @@ class AbstractTrainer:
         else:
             return self.get_model_best()
 
-    def get_pred_proba_from_model(self, model, X, model_pred_proba_dict=None, fit=False, cascade=False):
+    def get_pred_proba_from_model(self, model, X, model_pred_proba_dict=None, cascade=False):
         if isinstance(model, list):
             models = model
             model = models[-1]
         else:
             models = [model]
-        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, model_pred_proba_dict=model_pred_proba_dict, fit=fit, cascade=cascade)
+        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
         return model_pred_proba_dict[model]
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
@@ -586,7 +586,7 @@ class AbstractTrainer:
             else:
                 model_set = self.get_minimum_model_set(model)
                 model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
-                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict, fit=fit)
+                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict)
             X = model.preprocess(X=X, preprocess_nonadaptive=preprocess_nonadaptive, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
         elif preprocess_nonadaptive:
             X = model.preprocess(X=X, preprocess_stateful=False)
@@ -692,7 +692,6 @@ class AbstractTrainer:
                                   models: List[str],
                                   model_pred_proba_dict: dict = None,
                                   model_pred_time_dict: dict = None,
-                                  fit: bool = False,
                                   record_pred_time: bool = False,
                                   use_val_cache: bool = False,
                                   cascade: bool = False,
@@ -700,12 +699,12 @@ class AbstractTrainer:
         """
         Optimally computes pred_probas (or predictions if regression) for each model in `models`.
         Will compute each necessary model only once and store predictions in a `model_pred_proba_dict` dictionary.
-        Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
+        Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage.
+
         Parameters
         ----------
         X : pd.DataFrame
             Input data to predict on.
-            Ignored if `fit=True`.
         models : List[str]
             The list of models to predict with.
             Note that if models have dependency models, their dependencies will also be predicted with and included in the output.
@@ -720,11 +719,6 @@ class AbstractTrainer:
             Must be specified alongside `model_pred_proba_dict` if `record_pred_time=True` and `model_pred_proba_dict != None`.
             Ignored if `record_pred_time=False`.
             Note: Mutated in-place to minimize memory usage
-        fit : bool, default = False
-            # TODO: Maybe move to a separate method to avoid confusion
-            Whether to fetch the predictions as if at fit time (Ignore X, return out-of-fold pred_proba). Only valid if in bag mode.
-            If True, actual computation is skipped and cached out-of-fold results are simply loaded and used.
-            Incompatible with `cascade=True`.
         record_pred_time : bool, default = False
             Whether to store marginal inference times of each model as an extra output `model_pred_time_dict`.
         use_val_cache : bool, default = False
@@ -763,21 +757,17 @@ class AbstractTrainer:
             raise AssertionError(f'Ensemble Cascade not implemented for problem_type=={self.problem_type}')
         if cascade and use_val_cache:
             raise AssertionError('cascade and use_val_cache cannot both be True.')
-        if fit:
-            if cascade:
-                raise AssertionError(f'Ensemble Cascade not implemented when `fit==True')
-            model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
+
+        if use_val_cache:
+            _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
+        if not model_pred_proba_dict:
+            # TODO: Pre-construct order if cascade, otherwise this will slow down prediction having to recompute each inference call.
+            model_pred_order = self._construct_model_pred_order(models)
         else:
-            if use_val_cache:
-                _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
-            if not model_pred_proba_dict:
-                # TODO: Pre-construct order if cascade, otherwise this will slow down prediction having to recompute each inference call.
-                model_pred_order = self._construct_model_pred_order(models)
-            else:
-                model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
-            if use_val_cache:
-                model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(model_pred_order), model_pred_proba_dict=model_pred_proba_dict)
-                model_pred_order = [model for model in model_pred_order if model in model_set]
+            model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
+        if use_val_cache:
+            model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(model_pred_order), model_pred_proba_dict=model_pred_proba_dict)
+            model_pred_order = [model for model in model_pred_order if model in model_set]
 
         iloc_model_dict = dict()
         model_pred_proba_dict_cascade = dict()
@@ -795,32 +785,24 @@ class AbstractTrainer:
             if record_pred_time:
                 time_start = time.time()
 
-            if fit:
-                model_type = self.get_model_attribute(model=model_name, attribute='type')
-                if issubclass(model_type, BaggedEnsembleModel):
-                    model_path = self.get_model_attribute(model=model_name, attribute='path')
-                    model_pred_proba_dict[model_name] = model_type.load_oof(path=model_path)
-                else:
-                    raise AssertionError(f'Model {model_name} must be a BaggedEnsembleModel to return oof_pred_proba')
-            else:
+            if cascade:
+                # Keep track of the iloc index of the current model for the rows that are predicted on
+                iloc_model_dict[model_name] = unconfident_idx
+            model = self.load_model(model_name=model_name)
+            if isinstance(model, StackerEnsembleModel):
                 if cascade:
-                    # Keep track of the iloc index of the current model for the rows that are predicted on
-                    iloc_model_dict[model_name] = unconfident_idx
-                model = self.load_model(model_name=model_name)
-                if isinstance(model, StackerEnsembleModel):
-                    if cascade:
-                        # Need to predict only on the unconfident rows that remain
-                        #  This requires getting the correct indices from the dependent models' prior predictions.
-                        cascade_dict = dict()
-                        for m in model_pred_proba_dict_cascade:
-                            # TODO: Can probably be done faster, unsure how expensive this is.
-                            cascade_dict[m] = model_pred_proba_dict_cascade[m][iloc_model_dict[model_name]]
-                        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=cascade_dict)
-                    else:
-                        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
-                    model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
+                    # Need to predict only on the unconfident rows that remain
+                    #  This requires getting the correct indices from the dependent models' prior predictions.
+                    cascade_dict = dict()
+                    for m in model_pred_proba_dict_cascade:
+                        # TODO: Can probably be done faster, unsure how expensive this is.
+                        cascade_dict[m] = model_pred_proba_dict_cascade[m][iloc_model_dict[model_name]]
+                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=cascade_dict)
                 else:
-                    model_pred_proba_dict[model_name] = model.predict_proba(X)
+                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
+            else:
+                model_pred_proba_dict[model_name] = model.predict_proba(X)
 
             if record_pred_time:
                 time_end = time.time()
@@ -1889,7 +1871,7 @@ class AbstractTrainer:
         return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
     def _predict_proba_model(self, X, model, model_pred_proba_dict=None, cascade=False):
-        return self.get_pred_proba_from_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False, cascade=cascade)
+        return self.get_pred_proba_from_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
 
     def _get_dummy_stacker(self, level: int, model_levels: dict, use_orig_features=True) -> StackerEnsembleModel:
         model_names = model_levels[level - 1]
