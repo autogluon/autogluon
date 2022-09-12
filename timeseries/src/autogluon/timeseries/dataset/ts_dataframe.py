@@ -507,29 +507,31 @@ class TimeSeriesDataFrame(pd.DataFrame):
         result._cached_freq = self._cached_freq
         return result
 
-    def subsequence(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
+    def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
+
         Parameters
         ----------
-        start_time: pd.Timestamp
-            Start time (inclusive) of the slice for each time series.
-        end_time: pd.Timestamp
-            End time (exclusive) of the slice for each time series.
+        start: pd.Timestamp
+            The start time (inclusive) of a time range that will be used for subsequence.
+        end: pd.Timestamp
+            The end time (exclusive) of a time range that will be used for subsequence.
+
         Returns
         -------
         ts_df: TimeSeriesDataFrame
-            A new time series dataframe containing entries of the original time series between start and end timestamps.
+            A new data frame in ``TimeSeriesDataFrame`` format contains time-series in a time range
+            defined between start and end time.
         """
-        if end_time < start_time:
-            raise ValueError(f"end_time {end_time} is earlier than start_time {start_time}")
 
-        nanosecond_before_end_time = end_time - pd.Timedelta(nanoseconds=1)
-        result = TimeSeriesDataFrame(
-            self.loc[(slice(None), slice(start_time, nanosecond_before_end_time)), :],
+        if end < start:
+            raise ValueError(f"end time {end} is earlier than stat time {start}")
+
+        nanosecond_before_end = end - pd.Timedelta(nanoseconds=1)
+        return TimeSeriesDataFrame(
+            self.loc[(slice(None), slice(start, nanosecond_before_end)), :],
             static_features=self.static_features,
         )
-        result._cached_freq = self._cached_freq
-        return result
 
     @classmethod
     def from_pickle(cls, filepath_or_buffer: Any) -> "TimeSeriesDataFrame":
