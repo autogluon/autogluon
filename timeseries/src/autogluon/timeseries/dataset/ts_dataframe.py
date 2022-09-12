@@ -400,7 +400,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         after._cached_freq = self._cached_freq
         return before, after
 
-    def slice_by_timestep(self, start_index: Union[int, None], end_index: Union[int, None]) -> TimeSeriesDataFrame:
+    def slice_by_timestep(
+        self, start_index: Optional[int] = None, end_index: Optional[int] = None
+    ) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) indices.
 
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
@@ -486,7 +488,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if isinstance(start_index, slice):
             time_step_slice = start_index
             warnings.warn(
-                f"Calling function slice_by_timestep with a `slice` argument is deprecated and will be removed "
+                f"Calling function slice_by_timestep with a `slice` argument is deprecated and won't be supported "
                 f"in v0.7. Please call the method as `slice_by_timestep(start_index, end_index)",
                 DeprecationWarning,
             )
@@ -507,29 +509,47 @@ class TimeSeriesDataFrame(pd.DataFrame):
         result._cached_freq = self._cached_freq
         return result
 
+    @deprecated("Please use `TimeSeriesDataFrame.slice_by_time` instead.", version_removed="0.7")
     def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
 
         Parameters
         ----------
-        start: pd.Timestamp
-            The start time (inclusive) of a time range that will be used for subsequence.
-        end: pd.Timestamp
-            The end time (exclusive) of a time range that will be used for subsequence.
+        start_time: pd.Timestamp
+            Start time (inclusive) of the slice for each time series.
+        end_time: pd.Timestamp
+            End time (exclusive) of the slice for each time series.
 
         Returns
         -------
         ts_df: TimeSeriesDataFrame
-            A new data frame in ``TimeSeriesDataFrame`` format contains time-series in a time range
-            defined between start and end time.
+            A new time series dataframe containing entries of the original time series between start and end timestamps.
         """
 
-        if end < start:
-            raise ValueError(f"end time {end} is earlier than stat time {start}")
+        return self.slice_by_time(start_time=start, end_time=end)
 
-        nanosecond_before_end = end - pd.Timedelta(nanoseconds=1)
+    def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
+        """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
+
+        Parameters
+        ----------
+        start_time: pd.Timestamp
+            Start time (inclusive) of the slice for each time series.
+        end_time: pd.Timestamp
+            End time (exclusive) of the slice for each time series.
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A new time series dataframe containing entries of the original time series between start and end timestamps.
+        """
+
+        if end_time < start_time:
+            raise ValueError(f"end_time {end_time} is earlier than start_time {start_time}")
+
+        nanosecond_before_end_time = end_time - pd.Timedelta(nanoseconds=1)
         return TimeSeriesDataFrame(
-            self.loc[(slice(None), slice(start, nanosecond_before_end)), :],
+            self.loc[(slice(None), slice(start_time, nanosecond_before_end_time)), :],
             static_features=self.static_features,
         )
 
