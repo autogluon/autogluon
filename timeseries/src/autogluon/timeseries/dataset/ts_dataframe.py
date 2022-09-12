@@ -410,11 +410,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         Parameters
         ----------
-        start_index : int or None, default = None
+        start_index : int or None
             Start index (inclusive) of the slice for each time series.
             Negative values are counted from the end of each time series.
             When set to None, the slice starts from the beginning of each time series.
-        end_index : int or None, default = None
+        end_index : int or None
             End index (exclusive) of the slice for each time series.
             Negative values are counted from the end of each time series.
             When set to None, the slice includes the end of each time series.
