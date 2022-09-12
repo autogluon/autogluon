@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import warnings
 from collections.abc import Iterable
 from typing import Any, Optional, Tuple, Type, Union
 
@@ -181,7 +182,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def num_items(self):
         return len(self.item_ids)
 
-    def length_per_item(self) -> pd.Series:
+    def num_timesteps_per_item(self) -> pd.Series:
         """Length of each time series in the dataframe."""
         return self.groupby(level=ITEMID, sort=False).size()
 
@@ -373,35 +374,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             self._cached_freq = other._cached_freq
         return self
 
-    def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        """Split dataframe into two separate ``TimeSeriesDataFrame``s before and after a certain ``cutoff_time``.
-
-        Parameters
-        ----------
-        cutoff_time: pd.Timestamp
-            The time to split the current data frame into two data frames.
-
-        Returns
-        -------
-        data_before: TimeSeriesDataFrame
-            A new time series dataframe containing entries of the original time series before the ``cutoff_time``
-            (excluding ``cutoff_time``).
-        data_after: TimeSeriesDataFrame
-            A new time series dataframe containing entries of the original time series after the ``cutoff_time``
-            (including ``cutoff_time``).
-        """
-
-        nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
-        data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
-        data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
-        before, after = TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
-            data_after, static_features=self.static_features
-        )
-        before._cached_freq = self._cached_freq
-        after._cached_freq = self._cached_freq
-        return before, after
-
-    def slice_items_by_index(self, start_index: Union[int, None], end_index: Union[int, None]) -> TimeSeriesDataFrame:
+    def slice_by_timestep(self, start_index: Union[int, None], end_index: Union[int, None]) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) indices.
 
         This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
@@ -430,55 +403,72 @@ class TimeSeriesDataFrame(pd.DataFrame):
         .. code-block:: python
 
             >>> print(ts_dataframe)
-            item_id  timestamp  target
-                  0 2019-01-01       0
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-02       3
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-03       6
-                  2 2019-01-04       7
-                  2 2019-01-05       8
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+                    2019-01-02       1
+                    2019-01-03       2
+            1       2019-01-02       3
+                    2019-01-03       4
+                    2019-01-04       5
+            2       2019-01-03       6
+                    2019-01-04       7
+                    2019-01-05       8
 
-            >>> df.slice_items_by_index(0, 1)  # select the first entry of each time series
-            item_id  timestamp  target
-                  0 2019-01-01       0
-                  1 2019-01-02       3
-                  2 2019-01-03       6
+            >>> df.slice_by_timestep(0, 1)  # select the first entry of each time series
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+            1       2019-01-02       3
+            2       2019-01-03       6
 
-            >>> df.slice_items_by_index(-2, None)  # select the last 2 entries of each time series
-            item_id  timestamp  target
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-04       7
-                  2 2019-01-05       8
+            >>> df.slice_by_timestep(-2, None)  # select the last 2 entries of each time series
+                                target
+            item_id timestamp
+            0       2019-01-02       1
+                    2019-01-03       2
+            1       2019-01-03       4
+                    2019-01-04       5
+            2       2019-01-04       7
+                    2019-01-05       8
 
-            >>> df.slice_items_by_index(None, -1)  # select all except the last entry of each time series
-            item_id  timestamp  target
-                  0 2019-01-01       0
-                  0 2019-01-02       1
-                  1 2019-01-02       3
-                  1 2019-01-03       4
-                  2 2019-01-03       6
-                  2 2019-01-04       7
+            >>> df.slice_by_timestep(None, -1)  # select all except the last entry of each time series
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+                    2019-01-02       1
+            1       2019-01-02       3
+                    2019-01-03       4
+            2       2019-01-03       6
+                    2019-01-04       7
 
-            >>> df.slice_items_by_index(None, None)  # copy the entire dataframe
-            item_id  timestamp  target
-                  0 2019-01-01       0
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-02       3
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-03       6
-                  2 2019-01-04       7
-                  2 2019-01-05       8
+            >>> df.slice_by_timestep(None, None)  # copy the entire dataframe
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+                    2019-01-02       1
+                    2019-01-03       2
+            1       2019-01-02       3
+                    2019-01-03       4
+                    2019-01-04       5
+            2       2019-01-03       6
+                    2019-01-04       7
+                    2019-01-05       8
 
         """
-        length_per_item = self.length_per_item()
+        if isinstance(start_index, slice):
+            time_step_slice = start_index
+            warnings.warn(
+                f"Calling function slice_by_timestep with a `slice` argument is deprecated "
+                + "and will be removed in v0.7. Please call the method as `slice_by_timestep(start_index, end_index)",
+                DeprecationWarning,
+            )
+            if time_step_slice.step is not None and time_step_slice.step != 1:
+                raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
+            start_index = time_step_slice.start
+            end_index = time_step_slice.stop
+
+        length_per_item = self.num_timesteps_per_item()
         # Create a boolean index that selects the correct slice in each timeseries
         boolean_indicators = []
         for length in length_per_item:
@@ -490,21 +480,18 @@ class TimeSeriesDataFrame(pd.DataFrame):
         result._cached_freq = self._cached_freq
         return result
 
-    def slice_items_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
+    def subsequence(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
         """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
-
         Parameters
         ----------
         start_time: pd.Timestamp
             Start time (inclusive) of the slice for each time series.
         end_time: pd.Timestamp
             End time (exclusive) of the slice for each time series.
-
         Returns
         -------
         ts_df: TimeSeriesDataFrame
             A new time series dataframe containing entries of the original time series between start and end timestamps.
-
         """
         if end_time < start_time:
             raise ValueError(f"end_time {end_time} is earlier than start_time {start_time}")
@@ -516,69 +503,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         )
         result._cached_freq = self._cached_freq
         return result
-
-    @deprecated("Please use `TimeSeriesDataFrame.slice_items_by_index` instead.", version_removed="0.7")
-    def slice_by_timestep(self, time_step_slice: slice) -> TimeSeriesDataFrame:
-        """Return a slice of time steps (with no regards to the actual timestamp) from within
-        each item in a time series data frame. For example, if a data frame is constructed as::
-
-            item_id  timestamp  target
-                  0 2019-01-01       0
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-02       3
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-03       6
-                  2 2019-01-04       7
-                  2 2019-01-05       8
-
-        then :code:`df.slice_by_timestep(time_step_slice=slice(-2, None))` would return the last two
-        time steps from each item::
-
-            item_id  timestamp  target
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-04       7
-                  2 2019-01-05       8
-
-        Note that this function returns a copy of the original data. This function is useful for
-        constructing holdout sets for validation.
-
-        Parameters
-        ----------
-        time_step_slice: slice
-            A python slice object representing the slices to return from each item
-
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            Data frame containing only the time steps of each ``item_id`` sliced according to the
-            input ``time_step_slice``.
-        """
-        if time_step_slice.step is not None and time_step_slice != 1:
-            raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
-        return self.slice_items_by_index(start_index=time_step_slice.start, end_index=time_step_slice.stop)
-
-    @deprecated("Please use `TimeSeriesDataFrame.slice_items_by_time` instead.", version_removed="0.7")
-    def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
-        """Extract time-series between start (inclusive) and end (exclusive) time.
-
-        Parameters
-        ----------
-        start: pd.Timestamp
-            The start time (inclusive) of a time range that will be used for subsequence.
-        end: pd.Timestamp
-            The end time (exclusive) of a time range that will be used for subsequence.
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            A new data frame in ``TimeSeriesDataFrame`` format contains time-series in a time range
-            defined between start and end time.
-        """
-        return self.slice_items_by_time(start_time=start, end_time=end)
 
     @classmethod
     def from_pickle(cls, filepath_or_buffer: Any) -> "TimeSeriesDataFrame":
