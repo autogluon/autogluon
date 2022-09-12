@@ -1041,7 +1041,7 @@ class BaggedEnsembleModel(AbstractModel):
         # initialize the model base to get necessary info for search space and estimating memory usage
         initialized_model_base = copy.deepcopy(self.model_base)
         model_init_args = self.model_base.get_params()
-        model_init_args['features'] = self.feature_metadata
+        model_init_args['feature_metadata'] = self.feature_metadata
         model_init_args['num_classes'] = self.num_classes
         initialized_model_base.initialize(X=X, y=y, **model_init_args)
         search_space = initialized_model_base._get_search_space()
@@ -1085,18 +1085,28 @@ class BaggedEnsembleModel(AbstractModel):
             model_cls=model_cls,
             init_params=init_params,
             time_start=time_start,
-            time_limit=hpo_executor.time_limit,
+            time_limit=hpo_executor.time_limit * 0.9,  # Some buffer time for the folds to finish
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
             hpo_executor=hpo_executor,
+            is_bagged_model=True,
         )
         model_estimate_memory_usage = None
         if initialized_model_base.estimate_memory_usage is not None:
-            model_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs) * k_fold
+            # Each trial is able to train 1-k_fold folds in parallel.
+            # We provide minimum memory usage as the memory usage of 1 fold for each trial.
+            # Within the trial, it will calculate how many folds to run in parallel based on mem available
+            # TO BE NOTICE, The first batch of trials are likely to be scheduled around the same time.
+            # Hence, the memory estimation of each trial happens when no other trials are running(Consuming memory).
+            # Giving each trial the illusion that they have the full memory available.
+            # TODO: How to handle situation described above?
+            model_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
+        # Here we also provide minimum cpu/gpu requirement as the requirement of 1 fold for each trial.
+        # If granted more resources, the individual trial will be able to utilize those with the resource logic for bagging.
         minimum_resources = self.get_minimum_resources()
-        minimum_cpu_per_trial = minimum_resources.get('num_cpus', 1) * k_fold
-        minimum_gpu_per_trial = minimum_resources.get('num_gpus', 0) * k_fold
+        minimum_cpu_per_trial = minimum_resources.get('num_cpus', 1)
+        minimum_gpu_per_trial = minimum_resources.get('num_gpus', 0)
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,

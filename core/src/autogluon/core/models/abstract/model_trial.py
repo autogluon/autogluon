@@ -70,10 +70,18 @@ def init_model(args, model_cls, init_params, backend, is_bagged_model=False):
         from ray import tune
         task_id = tune.get_trial_id()
         file_prefix = task_id
+    else:
+        raise ValueError(f"Invalid backend: {backend}. Valid options are [{CUSTOM_BACKEND}, {RAY_BACKEND}]")
 
     if is_bagged_model:
+        if 'model_base_kwargs' not in init_params:
+            init_params['model_base_kwargs'] = {}
+        if 'hyperparameters' not in init_params['model_base_kwargs']:
+            init_params['model_base_kwargs']['hyperparameters'] = {}
         init_params['model_base_kwargs']['hyperparameters'].update(args)
     else:
+        if 'hyperparameters' not in init_params:
+            init_params['hyperparameters'] = {}
         init_params['hyperparameters'].update(args)
     init_params['name'] = init_params['name'] + os.path.sep + file_prefix
 

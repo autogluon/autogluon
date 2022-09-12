@@ -436,7 +436,7 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
                                              fold_ctx=fold_ctx)
             except TimeLimitExceeded:
                 # Terminate all ray tasks because a fold failed
-                self.ray.shutdown()
+                self.terminate_all_unfinished_tasks(unfinished)
                 raise TimeLimitExceeded
             # NotEnoughMemoryError is an autogluon custom error,
             # it predict memory usage before hand
@@ -450,17 +450,21 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
                              when calling tabular.fit and try again.'
                 logger.warning(error_msg)
                 # Terminate all ray tasks because a fold failed
-                self.ray.shutdown()
+                self.terminate_all_unfinished_tasks(unfinished)
                 raise NotEnoughMemoryError
             except Exception as e:
                 processed_exception = self._parse_ray_error(e)
                 # Terminate all ray tasks because a fold failed
-                self.ray.shutdown()
+                self.terminate_all_unfinished_tasks(unfinished)
                 raise processed_exception
         self.fit_time = 0
         if self.time_start_fit and self.time_end_fit:
             self.fit_time = self.time_end_fit - self.time_start_fit
         self.bagged_ensemble_model._add_parallel_child_times(fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time)
+
+    def terminate_all_unfinished_tasks(self, unfinished_tasks):
+        for task in unfinished_tasks:
+            self.ray.cancel(task, force=True)
 
     def _fit(self, model_base_ref, X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, time_limit_fold, fold_ctx, resources, kwargs):
         fold, folds_finished, folds_left, \

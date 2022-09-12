@@ -1401,6 +1401,8 @@ class AbstractTrainer:
                         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                         **model_fit_kwargs
                     )
+                if len(hpo_models) == 0:
+                    logger.warning(f'No model was trained while hyperparameter tuning {model.name}... Skipping this model.')
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)
@@ -1531,8 +1533,8 @@ class AbstractTrainer:
         else:
             time_ratio = hpo_time_ratio if hpo_enabled else 1
             models = self._train_multi_fold(models=models, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs, k_fold_start=0,
-                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit, time_ratio=time_ratio,
-                                            **fit_args)
+                                            k_fold_end=k_fold, n_repeats=n_repeats, n_repeat_start=0, time_limit=time_limit,
+                                            time_split=time_split, time_ratio=time_ratio, **fit_args)
 
         multi_fold_time_elapsed = time.time() - multi_fold_time_start
         if time_limit is not None:
