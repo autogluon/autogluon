@@ -112,8 +112,6 @@ class AbstractModel:
         self.num_classes = None
         self.model = None
         self.problem_type = problem_type
-        # temperature scaling parameter that is set by predictor if calibrate is true under TabularPredictor fit()
-        self.temperature_scalar = None
 
         # whether to calibrate predictions via conformal methods
         self.conformalize = None
@@ -251,6 +249,7 @@ class AbstractModel:
             # TODO: v0.1 Document get_features_kwargs_extra in task.fit
             get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
             predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
+            temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
         )
         return default_auxiliary_params
 
@@ -648,7 +647,7 @@ class AbstractModel:
             y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
         logits = np.log(y_pred_proba)
-        y_pred_proba = scipy.special.softmax(logits / self.temperature_scalar, axis=1)
+        y_pred_proba = scipy.special.softmax(logits / self.params_aux.get("temperature_scalar"), axis=1)
         y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
         if self.problem_type == BINARY:
@@ -689,7 +688,7 @@ class AbstractModel:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
 
-        if self.temperature_scalar is not None:
+        if self.params_aux.get("temperature_scalar", None) is not None:
             y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
         elif self.conformalize is not None:
             y_pred_proba = self._apply_conformalization(y_pred_proba)

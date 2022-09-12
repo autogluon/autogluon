@@ -17,13 +17,17 @@ from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
-from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..calibrate.conformity_score import compute_conformity_score
+from ..calibrate.temperature_scaling import tune_temperature_scaling
+from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from ..utils.feature_selection import FeatureSelector
+from ..utils.try_import import try_import_torch
 
 logger = logging.getLogger(__name__)
 
@@ -668,6 +672,15 @@ class AbstractTrainer:
             return model_pred_proba_dict, model_pred_time_dict
         else:
             return model_pred_proba_dict
+
+    def get_model_oof(self, model: str) -> np.ndarray:
+        """Gets the out of fold prediction probabilities for a bagged ensemble model"""
+        model_type = self.get_model_attribute(model=model, attribute='type')
+        if issubclass(model_type, BaggedEnsembleModel):
+            model_path = self.get_model_attribute(model=model, attribute='path')
+            return model_type.load_oof(path=model_path)
+        else:
+            raise AssertionError(f'Model {model} must be a BaggedEnsembleModel to return oof_pred_proba')
 
     def _update_pred_proba_dict_with_val_cache(self, model_set: set, model_pred_proba_dict):
         """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
@@ -2598,3 +2611,76 @@ class AbstractTrainer:
             return proxy_model
         best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows['score_val'] == candidate_model_rows['score_val'].max()]
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows['fit_time'].idxmin()]['model'])
+
+    def calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
+        """
+        Applies temperature scaling to a model.
+        Applies inverse softmax to predicted probs then trains temperature scalar
+        on validation data to maximize negative log likelihood.
+        Inversed softmaxes are divided by temperature scalar
+        then softmaxed to return predicted probs.
+
+        Parameters:
+        -----------
+        model_name: str: default = None
+            model name to tune temperature scaling on.
+            If None, will tune best model only. Best model chosen by validation score
+        lr: float: default = 0.01
+            The learning rate for temperature scaling algorithm
+        max_iter: int: default = 1000
+            Number of iterations optimizer should take for
+            tuning temperature scaler
+        init_val: float: default = 1.0
+            The initial value for temperature scalar term
+        """
+        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
+        try:
+            # FIXME: Avoid depending on torch for temp scaling
+            try_import_torch()
+        except ImportError:
+            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
+            return
+
+        if model_name is None:
+            if self.model_best is not None:
+                models = self.get_model_names(can_infer=True)
+                if self.model_best in models:
+                    model_name = self.model_best
+            if model_name is None:
+                self.get_model_best(can_infer=True)
+
+        model_full_dict = self.get_model_full_dict()
+        model_name_og = model_name
+        for m, m_full in model_full_dict.items():
+            if m_full == model_name:
+                model_name_og = m
+                break
+        if self.bagged_mode:
+            y_val_probs = self.get_model_oof(model_name_og)
+            y_val = self.load_y().to_numpy()
+        else:
+            X_val = self.load_X_val()
+            y_val_probs = self.predict_proba(X_val, model_name_og)
+            y_val = self.load_y_val().to_numpy()
+
+            if self.problem_type == BINARY:
+                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+
+        model = self.load_model(model_name=model_name)
+        if self.problem_type == QUANTILE:
+            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
+            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
+                                                    quantile_levels=self.quantile_levels)
+            model.conformalize = conformalize
+            model.save()
+        else:
+            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+                                                   init_val=init_val, max_iter=max_iter, lr=lr)
+            if temp_scalar is None:
+                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
+                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
+            else:
+                logger.log(15, f'Temperature term found is: {temp_scalar}')
+                model.params_aux["temperature_scalar"] = temp_scalar
+                model.save()
