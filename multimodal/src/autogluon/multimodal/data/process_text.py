@@ -183,8 +183,8 @@ class TextProcessor:
             self.text_segment_ids_key = model.text_segment_ids_key
         self.text_valid_length_key = model.text_valid_length_key
         self.text_column_prefix = model.text_column_prefix
-        if hasattr(model, "choices_ids_key"):
-            self.choices_ids_key = model.choices_ids_key
+        if hasattr(model, "choices_key"):
+            self.choices_key = model.choices_key
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
@@ -209,8 +209,8 @@ class TextProcessor:
         )
         if hasattr(self, "text_segment_ids_key"):
             fn.update({self.text_segment_ids_key: Pad(pad_val=0)})
-        if hasattr(self, "choices_ids_key"):
-            fn.update({self.choices_ids_key: Pad(pad_val=0)})
+        if hasattr(self, "choices_key"):
+            fn.update({self.choices_key: Pad(pad_val=0)})
 
         return fn
 
@@ -295,8 +295,8 @@ class TextProcessor:
         )
         if hasattr(self, "text_segment_ids_key"):
             ret.update({self.text_segment_ids_key: np.array(segment_ids, dtype=np.int32)})
-        if hasattr(self, "choices_ids_key"):
-            ret.update({self.choices_ids_key: np.array(choices_ids, dtype=np.int32)})
+        if hasattr(self, "choices_key"):
+            ret.update({self.choices_key: np.array(choices_ids, dtype=np.int32)})
 
         return ret
 
