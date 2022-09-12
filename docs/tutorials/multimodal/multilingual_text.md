@@ -20,8 +20,8 @@ Here, we load the English and German fold of the dataset. In the label column, `
 
 
 ```{.python .input}
-!wget https://automl-mm-bench.s3.amazonaws.com/multilingual-datasets/amazon_review_sentiment_cross_lingual.zip -O amazon_review_sentiment_cross_lingual.zip
-!unzip -o amazon_review_sentiment_cross_lingual.zip -d .
+!wget --quiet https://automl-mm-bench.s3.amazonaws.com/multilingual-datasets/amazon_review_sentiment_cross_lingual.zip -O amazon_review_sentiment_cross_lingual.zip
+!unzip -q -o amazon_review_sentiment_cross_lingual.zip -d .
 ```
 
 

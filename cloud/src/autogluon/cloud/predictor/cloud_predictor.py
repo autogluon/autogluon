@@ -5,13 +5,11 @@ import yaml
 import tarfile
 import logging
 import pandas as pd
-import PIL
 import sagemaker
 
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
-from PIL import Image
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.loaders import load_pkl

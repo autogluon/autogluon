@@ -171,12 +171,6 @@ def test_predictor(
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": model_names,
@@ -216,7 +210,6 @@ def test_predictor(
         shutil.rmtree(save_path)
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=save_path,
@@ -228,7 +221,6 @@ def test_predictor(
     # Test for continuous fit
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
     )
@@ -240,7 +232,6 @@ def test_predictor(
         predictor = MultiModalPredictor.load(root)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             hyperparameters=hyperparameters,
             time_limit=30,
         )
@@ -257,13 +248,6 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
     )
 
     dataset = PetFinderDataset()
-
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
 
     hyperparameters = {
         "optimization.max_epochs": 1,
@@ -287,7 +271,6 @@ def test_standalone():  # test standalone feature in MultiModalPredictor.save()
 
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=save_path,
@@ -359,12 +342,6 @@ def test_customizing_model_names(
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters.update(
         {
             "env.num_workers": 0,
@@ -380,7 +357,6 @@ def test_customizing_model_names(
         shutil.rmtree(save_path)
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=20,
         save_path=save_path,
@@ -396,7 +372,6 @@ def test_customizing_model_names(
     # Test for continuous fit
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=20,
     )
@@ -411,7 +386,6 @@ def test_customizing_model_names(
         predictor = MultiModalPredictor.load(root)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             hyperparameters=hyperparameters,
             time_limit=10,
         )
@@ -578,12 +552,6 @@ def test_modifying_duplicate_model_names():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
 
     hyperparameters = {
         "optimization.max_epochs": 1,
@@ -597,7 +565,6 @@ def test_modifying_duplicate_model_names():
     teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        config=config,
         time_limit=1,
     )
     student_predictor = MultiModalPredictor(
@@ -607,7 +574,6 @@ def test_modifying_duplicate_model_names():
     )
     student_predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         time_limit=0,
     )
 

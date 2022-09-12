@@ -6,6 +6,7 @@ from .models import (
     MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
     TransformerModel,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "MQRNNModel",
     "ProphetModel",
     "SimpleFeedForwardModel",
+    "TemporalFusionTransformerModel",
     "TransformerModel",
 ]
