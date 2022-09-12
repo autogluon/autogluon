@@ -236,7 +236,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
-        if quantile_levels is not None and not set(self.quantile_levels).issubset(self.supported_quantiles):
+        if quantile_levels is not None and not set(quantile_levels).issubset(self.supported_quantiles):
             raise ValueError(
                 f"{self.name} requires that quantile_levels are a subset of "
                 f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
