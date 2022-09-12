@@ -14,10 +14,10 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
+    TEXT,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
-    TEXT,
 )
 from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
@@ -31,6 +31,7 @@ class HFAutoModelForTextPrediction(nn.Module):
     Support huggingface text backbones.
     Refer to https://github.com/huggingface/transformers
     """
+
     data_types = [TEXT]
 
     def __init__(

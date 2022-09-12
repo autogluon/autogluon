@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Union
 
-from torch import nn
 from nptyping import NDArray
+from torch import nn
 
 from ..constants import LABEL
 from .collator import Stack

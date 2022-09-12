@@ -5,7 +5,6 @@ from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 from autogluon.multimodal.data.process_image import ImageProcessor
 from autogluon.multimodal.models import TimmAutoModelForImagePrediction
 
-
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,
     "hateful_memes": HatefulMeMesDataset,

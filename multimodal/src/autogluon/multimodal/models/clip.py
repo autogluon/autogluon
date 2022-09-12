@@ -14,9 +14,9 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
+    TEXT,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
-    TEXT,
 )
 from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
@@ -28,6 +28,7 @@ class CLIPForImageText(nn.Module):
     Support the CLIP model.
     Refer to https://huggingface.co/docs/transformers/model_doc/clip
     """
+
     data_types = [IMAGE, TEXT]
 
     def __init__(

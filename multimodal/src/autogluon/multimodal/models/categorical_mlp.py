@@ -13,6 +13,7 @@ class CategoricalMLP(nn.Module):
     MLP for categorical input. The input dimension is automatically computed based on
     the number of categories in each categorical column.
     """
+
     data_types = [CATEGORICAL]
 
     def __init__(

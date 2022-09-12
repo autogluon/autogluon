@@ -12,6 +12,7 @@ class NumericalMLP(nn.Module):
     """
     MLP for numerical input.
     """
+
     data_types = [NUMERICAL]
 
     def __init__(

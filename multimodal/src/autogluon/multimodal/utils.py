@@ -591,36 +591,36 @@ def create_data_processor(
     model_config = getattr(config.model, model.prefix)
     if data_type == IMAGE:
         data_processor = ImageProcessor(
-                model=model,
-                train_transform_types=model_config.train_transform_types,
-                val_transform_types=model_config.val_transform_types,
-                norm_type=model_config.image_norm,
-                size=model_config.image_size,
-                max_img_num_per_col=model_config.max_img_num_per_col,
-                missing_value_strategy=config.data.image.missing_value_strategy,
-            )
+            model=model,
+            train_transform_types=model_config.train_transform_types,
+            val_transform_types=model_config.val_transform_types,
+            norm_type=model_config.image_norm,
+            size=model_config.image_size,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
     elif data_type == TEXT:
         data_processor = TextProcessor(
-                model=model,
-                tokenizer_name=model_config.tokenizer_name,
-                max_len=model_config.max_text_len,
-                insert_sep=model_config.insert_sep,
-                text_segment_num=model_config.text_segment_num,
-                stochastic_chunk=model_config.stochastic_chunk,
-                text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
-                text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
-                train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
-                template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
-            )
+            model=model,
+            tokenizer_name=model_config.tokenizer_name,
+            max_len=model_config.max_text_len,
+            insert_sep=model_config.insert_sep,
+            text_segment_num=model_config.text_segment_num,
+            stochastic_chunk=model_config.stochastic_chunk,
+            text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+            text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
+            train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
+            template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
+        )
     elif data_type == CATEGORICAL:
         data_processor = CategoricalProcessor(
-                model=model,
-            )
+            model=model,
+        )
     elif data_type == NUMERICAL:
         data_processor = NumericalProcessor(
-                model=model,
-                merge=model_config.merge,
-            )
+            model=model,
+            merge=model_config.merge,
+        )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
     else:

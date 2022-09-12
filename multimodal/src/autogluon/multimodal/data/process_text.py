@@ -6,9 +6,9 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from torch import nn
 from nptyping import NDArray
 from omegaconf import DictConfig
+from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
 from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH

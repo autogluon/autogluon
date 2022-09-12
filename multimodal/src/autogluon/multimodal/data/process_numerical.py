@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from torch import nn
 from nptyping import NDArray
+from torch import nn
 
 from ..constants import COLUMN, NUMERICAL
 from .collator import Stack

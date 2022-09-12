@@ -16,6 +16,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
     Support TIMM image backbones.
     Refer to https://github.com/rwightman/pytorch-image-models
     """
+
     data_types = [IMAGE]
 
     def __init__(

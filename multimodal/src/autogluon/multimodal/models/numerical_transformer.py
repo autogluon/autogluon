@@ -355,6 +355,7 @@ class NumericalTransformer(nn.Module):
     """
     FT-Transformer for numerical tabular features.
     """
+
     data_types = [NUMERICAL]
 
     def __init__(
