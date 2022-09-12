@@ -28,8 +28,6 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         return self._all_keys_must_be_present(state, ['interactions', 'raw_types'])
 
     def _render(self, state: AnalysisState) -> None:
-        sample_size = state.get('sample_size', None)
-
         for i in state.interactions:
             ds = i['dataset']
             df = i['data'].copy()
@@ -133,8 +131,6 @@ class CorrelationVisualization(AbstractVisualization, JupyterMixin):
         return self._all_keys_must_be_present(state, ['correlations'])
 
     def _render(self, state: AnalysisState) -> None:
-        sample_size = state.get('sample_size', None)
-
         for ds, corr in state.correlations.items():
             self.render_header_if_needed(state, f'{ds} - {state.correlations_method} correlation matrix')
             widgets = [w for w in ['correlations', 'significance_matrix'] if w in state]
