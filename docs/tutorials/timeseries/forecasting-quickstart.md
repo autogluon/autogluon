@@ -10,7 +10,6 @@ Via a simple `fit()` call, AutoGluon can train and tune
 to produce multi-step ahead _probabilistic_ forecasts for univariate time series data.
 
 This tutorial demonstrates how to quickly start using AutoGluon to forecast [the number of COVID-19 cases](https://www.kaggle.com/c/covid19-global-forecasting-week-4) in different countries given historical data.
-
 For a short summary of how to train models and make forecasts in a few lines of code with `autogluon.timeseries`, scroll to the [bottom of this page](#summary).
 
 ---
@@ -36,6 +35,7 @@ from matplotlib import pyplot as plt
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 ```
 To use `autogluon.timeseries`, we will only need the following two classes:
+
 - `TimeSeriesDataFrame` stores a dataset consisting of multiple time series.
 - `TimeSeriesPredictor` takes care of fitting, tuning and selecting the best forecasting models.
 
@@ -52,6 +52,7 @@ df = pd.read_csv(
 df.head()
 ```
 Each row of the data frame contains a single observation (timestep) of a single time series represented by
+
 - unique ID of the time series — in our case, name of the country (`"name"`)
 - timestamp of the observation (`"Date"`)
 - value of the time series (`"ConfirmedCases"`)
@@ -70,9 +71,10 @@ In our case, each item corresponds to a country.
 As another example, items might correspond to different products in demand forecasting.
 This setting is also sometimes referred to as a "panel" of time series.
 
-`TimeSeriesDataFrame` inherits from [`pandas.DataFrame`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), so all attributes and methods of `pandas.DataFrame` are also available in a `TimeSeriesDataFrame`.
+`TimeSeriesDataFrame` inherits from [pandas.DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), so all attributes and methods of `pandas.DataFrame` are also available in a `TimeSeriesDataFrame`.
 
 Note how `TimeSeriesDataFrame` organizes the data with a `pandas.MultiIndex`:
+
 -  the first _level_ of the index corresponds to the item ID (here, country name);
 -  the second level contains the timestamp when each observation was made.
 
@@ -88,7 +90,7 @@ for country in ["United Kingdom_", "Germany_"]:
 plt.legend()
 ```
 
-## Forecasting formulation
+## Forecasting problem formulation
 Models in `autogluon.timeseries` forecast the value of each time series _multiple steps_ into the future.
 We choose the length of the prediction interval (also known as forecast horizon) depending on our task.
 For example, our COVID cases dataset contains daily data, so we can set `prediction_length = 7` to train models that make daily forecasts up to 7 days into the future.
@@ -169,7 +171,7 @@ We provide the test data set to the leaderboard function to see how well our fit
 The leaderboard also includes the validation scores computed on the internal validation dataset.
 
 In AutoGluon leaderboards, higher scores always correspond to better predictive performance.
-Therefore our MAPE scores are presented with a "flipped" sign, such that higher "negative MAPE"s correspond to better models.
+Therefore our MAPE scores are multiplied by `-1`, such that higher "negative MAPE"s correspond to better models.
 
 
 ```{.python .input}
