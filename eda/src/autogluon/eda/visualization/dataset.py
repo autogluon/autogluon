@@ -22,9 +22,6 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
         return self._at_least_one_key_must_be_present(state, ['dataset_stats', 'missing_statistics', 'raw_types'])
 
     def _render(self, state: AnalysisState) -> None:
-        # TODO: Is the namespace sample?
-        sample_size = state.get('sample_size', None)
-
         datasets = []
         for k in ['dataset_stats', 'missing_statistics', 'raw_types']:
             if k in state:
@@ -70,8 +67,6 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
         return 'raw_types' in state
 
     def _render(self, state: AnalysisState) -> None:
-        sample_size = state.get('sample_size', None)
-
         df = pd.DataFrame(state.raw_types).sort_index()
         warnings = df.eq(df.iloc[:, 0], axis=0)
         df['warnings'] = warnings.all(axis=1).map({True: '', False: '⚠️'})
@@ -96,7 +91,6 @@ class MissingValues(AbstractVisualization, JupyterMixin):
         return 'missing_statistics' in state
 
     def _render(self, state: AnalysisState) -> None:
-        sample_size = state.get('sample_size', None)
         for ds, data in state.missing_statistics.items():
             self.render_header_if_needed(state, f'{ds} missing values analysis')
             widgets = [msno.matrix, msno.bar, msno.heatmap, msno.dendrogram]
