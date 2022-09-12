@@ -25,6 +25,7 @@ def get_base_searchspace():
         'max_depth': Int(lower=3, upper=10, default=6),
         'min_child_weight': Int(lower=1, upper=5, default=1),
         'colsample_bytree': Real(lower=0.5, upper=1.0, default=1.0),
+        # Below lines are commented out as they made search worse. Refine ranges before considering reintroducing these hyperparameters.
         # 'gamma': Real(lower=0, upper=5, default=0),
         # 'subsample': Real(lower=0.5, upper=1.0, default=1.0),
         # 'reg_alpha': Real(lower=0.0, upper=10.0, default=0.0),
