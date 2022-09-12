@@ -175,12 +175,12 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
         validation_dataframes = [append_suffix_to_item_id(ts_dataframe, "_[None:None]")]
 
         for window_idx in range(1, self.num_windows):
-            ts_dataframe = ts_dataframe.slice_by_timestep(slice(None, -step_size))
+            ts_dataframe = ts_dataframe.slice_by_timestep(None, -step_size)
             total_offset = step_size * window_idx
             next_val_dataframe = append_suffix_to_item_id(ts_dataframe, f"_[None:{-total_offset}]")
             validation_dataframes.append(next_val_dataframe)
 
-        train_data = ts_dataframe.slice_by_timestep(slice(None, -prediction_length))
+        train_data = ts_dataframe.slice_by_timestep(None, -prediction_length)
         val_data = pd.concat(validation_dataframes)
         val_data._cached_freq = train_data._cached_freq
 
