@@ -567,6 +567,8 @@ class AbstractTrainer:
         else:
             models = [model]
         model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
+        if not isinstance(model, str):
+            model = model.name
         return model_pred_proba_dict[model]
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
@@ -667,8 +669,7 @@ class AbstractTrainer:
         if models_to_ignore is not None:
             model_set = model_set.difference(set(models_to_ignore))
         models_to_load = list(model_set)
-        subgraph = nx.subgraph(self.model_graph, models_to_load)
-
+        subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
         # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
         models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
         while models_to_ignore:
