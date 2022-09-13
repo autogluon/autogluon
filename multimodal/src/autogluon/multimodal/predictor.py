@@ -1484,17 +1484,12 @@ class MultiModalPredictor:
         anno_file: str,
     ):
         """
-        Evaluate object detection model on a test dataset.
+        Evaluate object detection model on a test dataset in COCO format.
 
         Parameters
         ----------
-        data
-            A dataframe, containing the same columns as the training data
-
-        Returns
-        -------
-        A dictionary with the metric names and their corresponding scores.
-        Optionally return a dataframe of prediction results.
+        anno_file
+            The annotation file in COCO format
         """
         data = from_coco(anno_file)[["image", "rois"]]
 
@@ -1561,6 +1556,7 @@ class MultiModalPredictor:
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
+
         Returns
         -------
         A dictionary with the metric names and their corresponding scores.

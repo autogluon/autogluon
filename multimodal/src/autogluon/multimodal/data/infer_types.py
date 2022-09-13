@@ -261,7 +261,8 @@ def infer_column_types(
             column_types[col_name] = NULL
             continue
         if isinstance(data[col_name][idx], list):
-            # Is a list, we ignore the column for now #TODO
+            # Is a list, we will just ignore the column
+            # TODO: Distinguish ROIS_VOC v.s. ROIS_COCO v.s. others?
             column_types[col_name] = ROIS
             continue
         if len(data[col_name].unique()) == 1 and is_training:

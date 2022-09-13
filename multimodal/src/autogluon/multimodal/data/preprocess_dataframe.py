@@ -276,7 +276,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = pd.to_numeric(y).to_numpy()
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
         elif self.label_type == ROIS:
-            pass #need to figure out what to do
+            pass  # Do nothing. TODO: Shall we call fit here?
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
 
@@ -454,7 +454,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
-            y = y_df #TODO
+            y = y_df # Do nothing. TODO: Shall we transform this?
         else:
             raise NotImplementedError
 
