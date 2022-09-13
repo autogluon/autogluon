@@ -16,6 +16,7 @@ from ..constants import (
     NULL,
     NUMERICAL,
     REGRESSION,
+    ROIS,
     TEXT,
 )
 
@@ -258,6 +259,10 @@ def infer_column_types(
         if idx is None:
             # No valid index, thus, we will just ignore the column
             column_types[col_name] = NULL
+            continue
+        if isinstance(data[col_name][idx], list):
+            # Is a list, we ignore the column for now #TODO
+            column_types[col_name] = ROIS
             continue
         if len(data[col_name].unique()) == 1 and is_training:
             column_types[col_name] = NULL

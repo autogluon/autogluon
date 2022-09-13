@@ -88,6 +88,8 @@ from .utils import (
     data_to_df,
     extract_from_output,
     filter_search_space,
+    from_coco,
+    from_voc,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -109,6 +111,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    bbox_xyxy_to_xywh,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -424,6 +427,7 @@ class MultiModalPredictor:
             )
 
         save_path = os.path.abspath(os.path.expanduser(save_path))
+        self._save_path = save_path
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
@@ -1001,8 +1005,12 @@ class MultiModalPredictor:
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
             output_feature_loss_weight = OmegaConf.select(
-                self._config, "distiller.output_feature_loss_weight", default=0.01
+                self._config, "distiller.output_feature_loss_weight", default=0.0
             )
+            softmax_regression_weight = OmegaConf.select(
+                self._config, "distiller.softmax_regression_weight", default=0.0
+            )
+            use_raw_features = OmegaConf.select(self._config, "distiller.use_raw_features", default=False)
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
@@ -1011,9 +1019,10 @@ class MultiModalPredictor:
                 baseline_funcs=baseline_funcs,
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
-                softmax_regression_weight=config.distiller.softmax_regression_weight,
+                softmax_regression_weight=softmax_regression_weight,
                 temperature=config.distiller.temperature,
                 output_feature_loss_weight=output_feature_loss_weight,
+                use_raw_features=use_raw_features,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
                 softmax_regression_loss_func=softmax_regression_loss_func,
@@ -1467,6 +1476,70 @@ class MultiModalPredictor:
 
         return data, df_preprocessor, data_processors
 
+    def evaluate_coco(
+        self,
+        anno_file: str,
+    ):
+        """
+        Evaluate object detection model on a test dataset.
+
+        Parameters
+        ----------
+        data
+            A dataframe, containing the same columns as the training data
+
+        Returns
+        -------
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
+        """
+        data = from_coco(anno_file)[["image", "rois"]]
+
+        outputs = self._predict(
+            data=data,
+            requires_label=False,
+        )
+        ret = extract_from_output(ret_type=BBOX, outputs=outputs)
+
+        from pycocotools.coco import COCO
+        from pycocotools.cocoeval import COCOeval
+
+        cocoGt = COCO(anno_file)
+        catIDs = cocoGt.getCatIds()
+
+        # Cache prediction results as COCO format
+        if not self._save_path:
+            self._save_path = setup_outputdir(
+                path=None,
+                warn_if_exist=self._warn_if_exist,
+            )
+        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
+        dt_file = os.path.join(self._save_path, "object_detection_result_cache.json")
+        coco_format_result = []
+        for i, row in data.iterrows():
+            image_id = int(row["image"][-16:-4])
+            for j, res in enumerate(ret[i]):
+                category_id = catIDs[j]
+                for bbox in res:
+                    coco_format_result.append(
+                        {
+                            "image_id": image_id,
+                            "category_id": category_id,
+                            "bbox": bbox_xyxy_to_xywh(bbox[:4].astype(float).tolist()),
+                            "score": float(bbox[4]),
+                        }
+                    )
+        with open(dt_file, "w") as f:
+            json.dump(coco_format_result, f)
+
+        cocoDt = cocoGt.loadRes(dt_file)
+        annType = "bbox"
+
+        cocoEval = COCOeval(cocoGt, cocoDt, annType)
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()
+
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list],
@@ -1485,7 +1558,6 @@ class MultiModalPredictor:
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
-
         Returns
         -------
         A dictionary with the metric names and their corresponding scores.
@@ -1603,11 +1675,10 @@ class MultiModalPredictor:
         """
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
+        elif self._pipeline == OBJECT_DETECTION:
+            ret_type = BBOX
         else:
             ret_type = LOGITS
-
-        if self._pipeline == OBJECT_DETECTION:
-            ret_type = BBOX
 
         if candidate_data:
             pred = self._match_queries_and_candidates(

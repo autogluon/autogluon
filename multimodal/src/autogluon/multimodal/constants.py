@@ -37,10 +37,12 @@ LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
+RAW_FEATURES = "raw_features"
 MASKS = "masks"
 PROBABILITY = "probability"
 COLUMN_FEATURES = "column_features"
 BBOX = "bbox"
+ROIS = "rois"
 
 
 # Metric
