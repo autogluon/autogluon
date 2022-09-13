@@ -603,8 +603,7 @@ def test_tabularHPObagstack():
         nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001, 0.01)}
         gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01, 0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN_TORCH': nn_options}
-        time_limit = 150
-        hyperparameter_tune_kwargs['num_trials'] = 3
+        time_limit = 50
 
     fit_args = {
         'num_bag_folds': num_bag_folds,

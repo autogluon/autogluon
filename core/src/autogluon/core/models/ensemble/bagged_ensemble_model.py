@@ -1075,6 +1075,8 @@ class BaggedEnsembleModel(AbstractModel):
         # Here the hyperparameters are unprocessed search space.
         # HPO Executor will handle passing in the correct parameters.
         init_params['model_base_kwargs'].pop('hyperparameters', None)
+        # We set soft time limit to avoid trials being terminated directly by ray tune
+        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = copy.deepcopy(kwargs)
         fit_kwargs['k_fold'] = k_fold
@@ -1087,7 +1089,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_cls=model_cls,
             init_params=init_params,
             time_start=time_start,
-            time_limit=hpo_executor.time_limit * 0.9,  # Some buffer time for the folds to finish
+            time_limit=trial_soft_time_limit,
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
