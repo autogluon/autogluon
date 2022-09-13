@@ -387,7 +387,8 @@ class CustomHpoExecutor(HpoExecutor):
             trial_model_name = model_name + os.path.sep + file_id
             trial_model_path = model_path_root + trial_model_name + os.path.sep
             trial_reward = self.scheduler.searcher.get_reward(hpo_results['config_history'][trial])
-
+            if trial_reward is None or trial_reward == float('-inf'):
+                continue
             hpo_models[trial_model_name] = dict(
                 path=trial_model_path,
                 val_score=trial_reward,
