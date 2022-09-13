@@ -2163,14 +2163,31 @@ _URL_REGEX = re.compile(
 )
 
 
-def is_url(url_like):
+def is_url(url_like: str):
+    """
+    Check if a path is url or local.
+
+    Parameters
+    ----------
+    url_like
+        A provided path.
+
+    Returns
+    -------
+    A boolean indicate if the path is an url.
+    """
     if not isinstance(url_like, str):
         return False
     return re.match(_URL_REGEX, url_like) is not None
 
 
-def from_voc(root, splits=None, exts=(".jpg", ".jpeg", ".png")):
-    """construct from pascal VOC format. Modified from gluon cv.
+def from_voc(
+    root: str,
+    splits: Optional[Union[str, tuple]] = None,
+    exts: Optional[Union[str, tuple]] = (".jpg", ".jpeg", ".png"),
+):
+    """
+    Construct dataframe from pascal VOC format. Modified from gluon cv.
     Normally you will see a structure like:
     ├── VOC2007
     │   ├── Annotations
@@ -2179,14 +2196,19 @@ def from_voc(root, splits=None, exts=(".jpg", ".jpeg", ".png")):
     |   |   |   ├── train.txt
     |   |   |   ├── test.txt
     │   ├── JPEGImages
+
     Parameters
     ----------
-    root : str or url
+    root
         The root directory for VOC, e.g., the `VOC2007`. If an url is provided, it will be downloaded and extracted.
-    splits : tuple of str, optional
+    splits
         If given, will search for this name in `ImageSets/Main/`, e.g., ('train', 'test')
-    exts : tuple of str, optional
+    exts
         The supported image formats.
+
+    Returns
+    -------
+    A dataframe with columns "image", "rois", and "image_attr".
     """
     if is_url(root):
         root = download(root)
@@ -2251,18 +2273,21 @@ def from_voc(root, splits=None, exts=(".jpg", ".jpeg", ".png")):
     return df.sort_values("image").reset_index(drop=True)
 
 
-def import_try_install(package, extern_url=None):
-    """Try import the specified package. Modified from gluon cv.
+def import_try_install(package: str, extern_url: Optional[str] = None):
+    """
+    Try import the specified package. Modified from gluon cv.
     If the package not installed, try use pip to install and import if success.
+
     Parameters
     ----------
-    package : str
+    package
         The name of the package trying to import.
-    extern_url : str or None, optional
+    extern_url
         The external url if package is not hosted on PyPI.
         For example, you can install a package using:
          "pip install git+http://github.com/user/repo/tarball/master/egginfo=xxx".
         In this case, you can pass the url to the extern_url.
+
     Returns
     -------
     <class 'Module'>
@@ -2305,7 +2330,9 @@ def import_try_install(package, extern_url=None):
 
 
 def try_import_pycocotools():
-    """Tricks to optionally install and import pycocotools. Modified from gluon cv."""
+    """
+    Tricks to optionally install and import pycocotools. Modified from gluon cv.
+    """
     # first we can try import pycocotools
     try:
         import pycocotools as _
@@ -2325,19 +2352,22 @@ def try_import_pycocotools():
             raise ImportError("Cannot import or install pycocotools, please refer to %s." % faq)
 
 
-def bbox_xywh_to_xyxy(xywh):
-    """Convert bounding boxes from format (xmin, ymin, w, h) to (xmin, ymin, xmax, ymax). Modified from gluon cv.
+def bbox_xywh_to_xyxy(xywh: Optional[Union[list, tuple, np.ndarray]]):
+    """
+    Convert bounding boxes from format (xmin, ymin, w, h) to (xmin, ymin, xmax, ymax). Modified from gluon cv.
+
     Parameters
     ----------
-    xywh : list, tuple or numpy.ndarray
+    xywh
         The bbox in format (x, y, w, h).
         If numpy.ndarray is provided, we expect multiple bounding boxes with
         shape `(N, 4)`.
+
     Returns
     -------
-    tuple or numpy.ndarray
-        The converted bboxes in format (xmin, ymin, xmax, ymax).
-        If input is numpy.ndarray, return is numpy.ndarray correspondingly.
+    A tuple or numpy.ndarray.
+    The converted bboxes in format (xmin, ymin, xmax, ymax).
+    If input is numpy.ndarray, return is numpy.ndarray correspondingly.
     """
     if isinstance(xywh, (tuple, list)):
         if not len(xywh) == 4:
@@ -2353,53 +2383,62 @@ def bbox_xywh_to_xyxy(xywh):
         raise TypeError("Expect input xywh a list, tuple or numpy.ndarray, given {}".format(type(xywh)))
 
 
-def bbox_xyxy_to_xywh(xyxy):
-    """Convert bounding boxes from format (xmin, ymin, xmax, ymax) to (x, y, w, h).
+def bbox_xyxy_to_xywh(xyxy: Optional[Union[list, tuple, np.ndarray]]):
+    """
+    Convert bounding boxes from format (xmin, ymin, xmax, ymax) to (x, y, w, h). Modified from gluon cv.
+
     Parameters
     ----------
-    xyxy : list, tuple or numpy.ndarray
+    xyxy
         The bbox in format (xmin, ymin, xmax, ymax).
         If numpy.ndarray is provided, we expect multiple bounding boxes with
         shape `(N, 4)`.
+
     Returns
     -------
-    tuple or numpy.ndarray
-        The converted bboxes in format (x, y, w, h).
-        If input is numpy.ndarray, return is numpy.ndarray correspondingly.
+    A tuple or numpy.ndarray.
+    The converted bboxes in format (x, y, w, h).
+    If input is numpy.ndarray, return is numpy.ndarray correspondingly.
     """
     if isinstance(xyxy, (tuple, list)):
         if not len(xyxy) == 4:
-            raise IndexError(
-                "Bounding boxes must have 4 elements, given {}".format(len(xyxy)))
+            raise IndexError("Bounding boxes must have 4 elements, given {}".format(len(xyxy)))
         x1, y1 = xyxy[0], xyxy[1]
         w, h = xyxy[2] - x1 + 1, xyxy[3] - y1 + 1
         return x1, y1, w, h
     elif isinstance(xyxy, np.ndarray):
         if not xyxy.size % 4 == 0:
-            raise IndexError(
-                "Bounding boxes must have n * 4 elements, given {}".format(xyxy.shape))
+            raise IndexError("Bounding boxes must have n * 4 elements, given {}".format(xyxy.shape))
         return np.hstack((xyxy[:, :2], xyxy[:, 2:4] - xyxy[:, :2] + 1))
     else:
-        raise TypeError(
-            'Expect input xywh a list, tuple or numpy.ndarray, given {}'.format(type(xyxy)))
+        raise TypeError("Expect input xywh a list, tuple or numpy.ndarray, given {}".format(type(xyxy)))
 
-def bbox_clip_xyxy(xyxy, width, height):
-    """Clip bounding box with format (xmin, ymin, xmax, ymax) to specified boundary. Modified from gluon cv.
+
+def bbox_clip_xyxy(
+    xyxy: Optional[Union[list, tuple, np.ndarray]],
+    width: Optional[Union[int, float]],
+    height: Optional[Union[int, float]],
+):
+    """
+    Clip bounding box with format (xmin, ymin, xmax, ymax) to specified boundary. Modified from gluon cv.
     All bounding boxes will be clipped to the new region `(0, 0, width, height)`.
+
     Parameters
     ----------
-    xyxy : list, tuple or numpy.ndarray
+    xyxy
         The bbox in format (xmin, ymin, xmax, ymax).
         If numpy.ndarray is provided, we expect multiple bounding boxes with
         shape `(N, 4)`.
-    width : int or float
+    width
         Boundary width.
-    height : int or float
+    height
         Boundary height.
+
     Returns
     -------
-    type
-        Description of returned object.
+    A tuple or numpy.ndarray.
+    The clipped bboxes in format (xmin, ymin, xmax, ymax).
+    If input is numpy.ndarray, return is numpy.ndarray correspondingly.
     """
     if isinstance(xyxy, (tuple, list)):
         if not len(xyxy) == 4:
@@ -2421,8 +2460,27 @@ def bbox_clip_xyxy(xyxy, width, height):
         raise TypeError("Expect input xywh a list, tuple or numpy.ndarray, given {}".format(type(xyxy)))
 
 
-def _check_load_coco_bbox(coco, entry, min_object_area=0, use_crowd=False):
-    """Check and load ground-truth labels. Modified from gluon cv."""
+def _check_load_coco_bbox(
+    coco, entry: dict, min_object_area: Optional[Union[int, float]] = 0, use_crowd: Optional[bool] = False
+):
+    """
+    Check and load ground-truth labels. Modified from gluon cv.
+
+    Parameters
+    ----------
+    coco
+        The COCO data class.
+    entry
+        The image annotation entry.
+    min_object_area
+        Minimum object area to consider.
+    use_crowd
+        Use crowd or not.
+
+    Returns
+    -------
+    Valid objects to consider.
+    """
     entry_id = entry["id"]
     # fix pycocotools _isArrayLike which don't work for str in python3
     entry_id = [entry_id] if not isinstance(entry_id, (list, tuple)) else entry_id
@@ -2458,15 +2516,36 @@ def _check_load_coco_bbox(coco, entry, min_object_area=0, use_crowd=False):
     return valid_objs
 
 
-def from_coco(anno_file, root=None, min_object_area=0, use_crowd=False):
-    """Load dataset from coco format annotations. Modified from gluon cv.
+def from_coco(
+    anno_file: Optional[str],
+    root: Optional[str] = None,
+    min_object_area: Optional[Union[int, float]] = 0,
+    use_crowd: Optional[bool] = False,
+):
+    """
+    Load dataset from coco format annotations. Modified from gluon cv.
     The structure of a default coco 2017 dataset looks like:
     .
     ├── annotations
     |   |── instances_val2017.json
     ├── train2017
     └── val2017
-    The default relative root folder (if set to `None`) is `anno_file/../`.
+
+
+    Parameters
+    ----------
+    anno_file
+        The path to the annotation file.
+    root
+        Root of the COCO folder. The default relative root folder (if set to `None`) is `anno_file/../`.
+    min_object_area
+        Minimum object area to consider.
+    use_crowd
+        Use crowd or not.
+
+    Returns
+    -------
+    A dataframe with columns "image", "rois", and "image_attr".
     """
     # construct from COCO format
     try_import_pycocotools()
