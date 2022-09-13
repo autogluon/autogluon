@@ -36,19 +36,19 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
                 f"\n"
                 f"## Test results\n"
                 f"We can predict whether a sample is in the test vs. training set with a {results['eval_metric']} of\n"
-                f"{results['test_statistic']} with a p-value of {results['pvalue']}"
-                f"(larger than the threshold of {results['pvalue_threshold']}).\n"
+                f"{results['test_statistic']:.4f} with a p-value of {results['pvalue']:.4f} "
+                f"(smaller than the threshold of {results['pvalue_threshold']:.4f}).\n"
                 f"\n"
             )
         if 'feature_importance' in results:
             fi_md = (
                 f"## Feature importances\n"
-                f"The variables that are the most responsible for this shift are those with high feature importance:\n"
+                f"The variables that are the most responsible for this shift are those with high feature "
+                f"importance:\n\n"
                 f"{results['feature_importance'].to_markdown()}"
             )
             return ret_md + fi_md
         return ret_md
-
 
     def can_handle(self, state: AnalysisState) -> bool:
         return self._at_least_one_key_must_be_present(state, ['xshift_results'])
@@ -56,5 +56,4 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
     def _render(self, state: AnalysisState) -> None:
         res_md = self.summary(state.xshift_results)
         self.render_markdown(res_md)
-        #self.display_obj(state.xshift_results['pvalue'])
 

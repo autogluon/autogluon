@@ -333,7 +333,6 @@ class XShiftDetector(AbstractAnalysis):
 
     def __init__(self,
                  classifier_class: Union[Any,None] = TabularPredictor,
-                 label: Union[str,None] = None,
                  compute_fi: bool = True,
                  classifier_kwargs: dict = {},
                  parent: Union[None,AbstractAnalysis] = None,
@@ -342,14 +341,17 @@ class XShiftDetector(AbstractAnalysis):
         super().__init__(parent, children, **kwargs)
         self.classifier_kwargs = classifier_kwargs
         self.classifier_class = classifier_class
-        self.label = label
         self.compute_fi = compute_fi
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         # where to put path?
         # how to sample?
+        if 'label' in args:
+            label = args['label']
+        else:
+            label = None
         tst = C2STShiftDetector(classifier_class=self.classifier_class,
-                                label=args['label'],
+                                label=label,
                                 classifier_kwargs=self.classifier_kwargs)
         assert 'train_data' in args, 'train_data required as arg'
         assert 'test_data' in args, 'test_data required as arg'
@@ -358,7 +360,4 @@ class XShiftDetector(AbstractAnalysis):
                 compute_fi=self.compute_fi,
                 verbosity=0)
         state.xshift_results = tst.results()
-        # create c2st
-        # fit c2st
-        # set results to state: decision status, pvalue, test stat, fi scores
         pass
