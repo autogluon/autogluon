@@ -1,8 +1,3 @@
-import numpy as np
-import pandas as pd
-import requests
-from PIL import Image
-
 from autogluon.multimodal import MultiModalPredictor
 
 def test_coco_evaluation(checkpoint_name = "faster_rcnn_r50_fpn_2x_coco"):
