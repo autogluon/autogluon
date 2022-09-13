@@ -45,7 +45,7 @@ jobs:
        # if any recommendations are reported.
       - name: Run Code Guru
         if: steps.iam-role.outcome == 'success'
-        run: ./aws-codeguru-cli/bin/aws-codeguru-cli --region us-west-2 -r ./ -s ./ --no-prompt  --fail-on-recommendations
+        run: ./aws-codeguru-cli/bin/aws-codeguru-cli --region us-west-2 -r ./ --no-prompt
 
       - name: Upload SARIF file to GitHub Security Scans UX
         if: steps.assume-iam-role.outcome == 'success'
