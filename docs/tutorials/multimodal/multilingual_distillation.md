@@ -1,6 +1,8 @@
 # Knowledge Distillation in AutoMM for Text - in A Multilingual Problem
 :label:`sec_automm_distillation_multilingual`
 
+Pretrained foundation models are becoming increasingly larger these days.  
+
 During the deployment of neural networks, limited resources always
 prevent us from using a larger models for better performance. 
 To benefit from large models under this constraint, 
@@ -22,7 +24,12 @@ sentence pairs in six languages.
 Here, we use the English and German to demonstrate.
 In the label column, `0` means different meaning for the pair of sentences and `1` means same meaning.
 
-```{.python .input}
+```
+from autogluon.multimodal import MultiModalPredictor
+from datasets import load_dataset
+from time import time
+import pandas as pd
+
 def getDatasetSplits(pawsx_tasks = ["en", "de"]):
     train_dfs = {}
     val_dfs = {}
@@ -53,7 +60,7 @@ Since `MultiModalPredictor` integrates with the [Huggingface/Transformers](https
 we directly load the multilingual DeBERTaV3 model pretrained by Microsoft from Huggingface/Transformers, 
 with the key as [microsoft/mdeberta-v3-base](https://huggingface.co/microsoft/mdeberta-v3-base).
 
-```{.python .input}
+```
 teacher_predictor = MultiModalPredictor(label="label", eval_metric="accuracy")
 teacher_predictor.fit(
     train_df,
@@ -66,7 +73,7 @@ teacher_predictor.fit(
 )
 ```
 
-```{.python .input}
+```
 teacher_result = {}
 start = time()
 for test_name, test_df in test_dfs.items():
@@ -76,12 +83,12 @@ print('Time used by the teacher model for inference:')
 print(teacher_usedtime)
 ```
 
-```{.python .input}
+```
 print('Result of the teacher model on the German Testset:')
 print(teacher_result["de"])
 ```
 
-```{.python .input}
+```
 print('Result of the teacher model on the English Testset:')
 print(teacher_result["en"])
 ```
@@ -93,7 +100,7 @@ We can still load the multilingual MiniLMv2 model from Huggingface/Transformers,
 with the key as [nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large](ahttps://huggingface.co/nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large). 
 To simplify the experiment, we also just finetune for 4 epochs.
 
-```{.python .input}
+```
 nodistill_predictor = MultiModalPredictor(label="label", eval_metric="accuracy")
 nodistill_predictor.fit(
     train_df,
@@ -106,7 +113,7 @@ nodistill_predictor.fit(
 )
 ```
 
-```{.python .input}
+```
 nodistill_result = {}
 start = time()
 for test_name, test_df in test_dfs.items():
@@ -116,12 +123,12 @@ print('Time used without distillation for inference:')
 print(nodistill_usedtime)
 ```
 
-```{.python .input}
+```
 print('Result without distillation on the German Testset:')
 print(nodistill_result["de"])
 ```
 
-```{.python .input}
+```
 print('Result without distillation on the English Testset:')
 print(nodistill_result["en"])
 ```
@@ -137,7 +144,7 @@ To improve the small model's performance without increasing the
 computational cost during inference, we can apply knowledge distillation, 
 i.e. using the large model to guide the training of the small model.
 
-```{.python .input}
+```
 student_predictor = MultiModalPredictor(label="label", eval_metric="accuracy")
 student_predictor.fit(
     train_df,
@@ -151,7 +158,7 @@ student_predictor.fit(
 )
 ```
 
-```{.python .input}
+```
 student_result = {}
 start = time()
 for test_name, test_df in test_dfs.items():
@@ -161,12 +168,12 @@ print('Time used with distillation for inference:')
 print(student_usedtime)
 ```
 
-```{.python .input}
+```
 print('Result with distillation on the German Testset:')
 print(student_result["de"])
 ```
 
-```{.python .input}
+```
 print('Result with distillation on the English Testset:')
 print(student_result["en"])
 ```
