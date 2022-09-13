@@ -39,6 +39,20 @@ Even though the competition dataset is composed of English only, we found that a
         df["discourse_text"] = df["discourse_text"].apply(resolve_encodings_and_normalize)
         return df
 
+### 1.5 A few examples of normalized texts
+
+    # Example-1 pre-normalization
+    'The same technology can make computer-animated faces more expressive\x97for video games or video surgery. \x93Most human communication is nonverbal, including emotional communication,\x94 notes Dr. Huang. \x93So computers need to understand that, too.\x94Eckman has classified six basic emotions\x97happiness, surprise, anger, disgust, fear, and sadness\x97and then associated each with characteristic movements of the facial muscles. For example, your frontalis pars lateralis muscle (above your eyes) raises your eyebrows when you\x92re surprised; your orbicularis oris (around your mouth) tightens your lips to show anger. '
+
+    # Example-1 post-normalization
+    'The same technology can make computer-animated faces more expressive--for video games or video surgery. "Most human communication is nonverbal, including emotional communication," notes Dr. Huang. "So computers need to understand that, too."Eckman has classified six basic emotions--happiness, surprise, anger, disgust, fear, and sadness--and then associated each with characteristic movements of the facial muscles. For example, your frontalis pars lateralis muscle (above your eyes) raises your eyebrows when you\'re surprised; your orbicularis oris (around your mouth) tightens your lips to show anger. '
+
+    # Example-2 pre-normalization
+    '"Congestion was down\xa0 60\xa0 percent\xa0 in\xa0 the\xa0 capital\xa0 of\xa0 france\xa0 after\xa0 fivedays\xa0 of\xa0 intensifying\xa0 smog."smog\xa0 by\xa0 meaning\xa0 pollution\xa0 went\xa0 down\xa0 just\xa0 60\xa0 percent\xa0 in\xa0 five\xa0 days. Thats\xa0 a\xa0 great\xa0 adavantage\xa0 just\xa0 by\xa0 limting\xa0 car\xa0 usuage. In\xa0 source\xa0 number 1\xa0 explains that " Passenger\xa0 cars\xa0 are\xa0 responsible\xa0 for\xa0 12\xa0 percent\xa0 of\xa0 greenouse\xa0 gas emissions\xa0 in\xa0 Europe.. and up\xa0 to\xa0 50\xa0 perecnt\xa0 in\xa0 some\xa0 car-intensive\xa0 areas\xa0 in\xa0 the\xa0 Untied States." We\xa0 as\xa0 a\xa0 country\xa0 shoud\xa0 lower\xa0 that\xa0 and\xa0 the\xa0 best\xa0 way\xa0 is\xa0 to\xa0 limting\xa0 car usuage . Limting car usage is one of te some advantges to lowering pollution ( greenhouse gas, smog). '
+
+    # Example-2 post-normalization
+    '"Congestion was down  60  percent  in  the  capital  of  france  after  fivedays  of  intensifying  smog."smog  by  meaning  pollution  went  down  just  60  percent  in  five  days. Thats  a  great  adavantage  just  by  limting  car  usuage. In  source  number 1  explains that " Passenger  cars  are  responsible  for  12  percent  of  greenouse  gas emissions  in  Europe.. and up  to  50  perecnt  in  some  car-intensive  areas  in  the  Untied States." We  as  a  country  shoud  lower  that  and  the  best  way  is  to  limting  car usuage . Limting car usage is one of te some advantges to lowering pollution ( greenhouse gas, smog). '
+
 For details, please refer to 
 [`kaggle_feedback_prize_preprocess.py`](./kaggle_feedback_prize_preprocess.py).
 
