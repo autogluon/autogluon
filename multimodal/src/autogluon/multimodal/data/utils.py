@@ -61,7 +61,7 @@ class InsertPunctuation(Augmenter):
         aug_max
             maximum number of punctuation to insert
         aug_p
-            how many punctuation to insert calcualted as aug_p * sentence length
+            how many punctuation to insert calculated as aug_p * sentence length
         """
         super().__init__(
             name=name,

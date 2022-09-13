@@ -63,7 +63,7 @@ class MultimodalFusionMLP(nn.Module):
         loss_weight
             The weight of individual models. For example, if we fuse the features of ViT, CLIP, and BERT,
             The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
-            Basically, it supports adding an auxilliary loss for each individual model.
+            Basically, it supports adding an auxiliary loss for each individual model.
         """
         super().__init__()
         logger.debug("initializing MultimodalFusionMLP")

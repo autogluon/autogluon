@@ -107,7 +107,7 @@ class FeatureSelector:
         """
         Parameters
         ----------
-        mdoel : AbstractModel
+        model : AbstractModel
             Model to perform permutation feature importance recursive feature elimination with.
         time_limit : float
             Time budget for the entire feature selection procedure.
@@ -166,8 +166,8 @@ class FeatureSelector:
             If the training dataset has more than this amount of datapoints, sample this many datapoints without replacement and use
             them as feature selection model training data. If None, do not use subsampling.
         n_fi_subsample : int, default 10000
-            Sample this many datapoints and shuffle them when computing permutation feature importance. If this number is higher than
-            the number of feature importance datapoints, set n_fi_subsample = number of feature importance datapoints.
+            Sample this many data points and shuffle them when computing permutation feature importance. If this number is higher than
+            the number of feature importance data points, set n_fi_subsample = number of feature importance datapoints.
         prune_threshold : Tuple[float,str], default 'noise'
             Consider features whose feature importance scores are below this threshold for pruning. Can be one of ['noise', 'none', float]. If set
             to 'noise', a synthetic columns whose values come from standard normal distribution will be appended to the original dataset, and any

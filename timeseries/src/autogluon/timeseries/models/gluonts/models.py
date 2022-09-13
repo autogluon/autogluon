@@ -1,11 +1,11 @@
 import re
-from typing import Type
+from typing import List, Type
 
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
-
-from ..abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
     import gluonts.model.deepar
@@ -15,6 +15,7 @@ with warning_filter():
     from gluonts.model.seq2seq import MQCNNEstimator, MQRNNEstimator
     from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
     from gluonts.model.transformer import TransformerEstimator
+    from gluonts.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.context import get_mxnet_context
     from gluonts.nursery.autogluon_tabular import TabularEstimator
 
@@ -188,6 +189,59 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
+
+
+class TemporalFusionTransformerModel(AbstractGluonTSModel):
+    """TemporalFusionTransformer model for forecasting, as described in [Lim2020]_.
+
+    .. [Lim2021] Lim, Bryan, et al.
+        "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
+        International Journal of Forecasting. 2021.
+
+    See `AbstractGluonTSModel` for common parameters.
+
+    Other Parameters
+    ----------------
+    context_length : int or None, default = None
+        Number of past values used for prediction.
+        (default: None, in which case context_length = prediction_length)
+    hidden_dim : int, default = 32
+        Size of the hidden layer.
+    num_heads : int, default = 4
+        Number of attention heads in multi-head attention.
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    batch_size : int, default = 32
+        Size of the mini-batch during training.
+    epochs : int, default = 100
+        Number of epochs the model will be trained for.
+    """
+
+    gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
+    supported_quantiles: set = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+
+    def _get_estimator(self) -> GluonTSEstimator:
+        """Return the GluonTS Estimator object for the model"""
+        hyperparameters = self._get_estimator_init_args()
+        # Turning off hybridization prevents MXNet errors when training on GPU
+        hyperparameters["hybridize"] = False
+        # TFT cannot handle arbitrary quantiles, this is a workaround
+        hyperparameters["num_outputs"] = 9
+        if not set(self.quantile_levels).issubset(self.supported_quantiles):
+            raise ValueError(
+                f"{self.name} requires that quantile_levels are a subset of "
+                f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
+            )
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
+
+    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
+        if quantile_levels is not None and not set(quantile_levels).issubset(self.supported_quantiles):
+            raise ValueError(
+                f"{self.name} requires that quantile_levels are a subset of "
+                f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
+            )
+        return super().predict(data=data, quantile_levels=quantile_levels, **kwargs)
 
 
 class TransformerModel(AbstractGluonTSModel):

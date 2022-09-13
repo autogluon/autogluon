@@ -252,7 +252,7 @@ def get_optimizer(
             optimizer_grouped_parameters,
             lr=lr,
             weight_decay=weight_decay,
-            scale_parameter=True,  # Generally recommended to enabel scaling
+            scale_parameter=True,  # Generally recommended to enable scaling
             relative_step=False,
             warmup_init=False,
         )

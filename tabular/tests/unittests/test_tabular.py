@@ -86,7 +86,8 @@ def test_advanced_functionality():
     directory = directory_prefix + 'advanced/' + dataset['name'] + "/"
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = TabularPredictor(label=label, path=savedir).fit(train_data)
+    savedir_predictor_original = savedir + 'predictor/'
+    predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
     extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
@@ -138,6 +139,36 @@ def test_advanced_functionality():
     assert len(leaderboard) == len(leaderboard_loaded)
     assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
 
+    _assert_predictor_size(predictor=predictor)
+    # Test cloning logic
+    with pytest.raises(AssertionError):
+        # Ensure don't overwrite existing predictor
+        predictor.clone(path=predictor.path)
+    path_clone = predictor.clone(path=predictor.path[:-1] + '_clone' + os.path.sep)
+    predictor_clone = TabularPredictor.load(path_clone)
+    assert predictor.path != predictor_clone.path
+    y_pred_proba_clone = predictor_clone.predict_proba(test_data)
+    assert y_pred_proba.equals(y_pred_proba_clone)
+    leaderboard_clone = predictor_clone.leaderboard(data=test_data)
+    assert len(leaderboard) == len(leaderboard_clone)
+
+    # Test cloning for deployment logic
+    path_clone_for_deployment_og = predictor.path[:-1] + '_clone_for_deployment' + os.path.sep
+    with pytest.raises(FileNotFoundError):
+        # Assert that predictor does not exist originally
+        TabularPredictor.load(path_clone_for_deployment_og)
+    path_clone_for_deployment = predictor.clone_for_deployment(path=path_clone_for_deployment_og)
+    assert path_clone_for_deployment == path_clone_for_deployment_og
+    predictor_clone_for_deployment = TabularPredictor.load(path_clone_for_deployment)
+    assert predictor.path != predictor_clone_for_deployment.path
+    y_pred_proba_clone_for_deployment = predictor_clone_for_deployment.predict_proba(test_data)
+    assert y_pred_proba.equals(y_pred_proba_clone_for_deployment)
+    leaderboard_clone_for_deployment = predictor_clone_for_deployment.leaderboard(data=test_data)
+    assert len(leaderboard) >= len(leaderboard_clone_for_deployment)
+    # Raise exception due to lacking fit artifacts
+    with pytest.raises(FileNotFoundError):
+        predictor_clone_for_deployment.refit_full()
+
     assert(predictor.get_model_full_dict() == dict())
     predictor.refit_full()
     assert(len(predictor.get_model_full_dict()) == num_models)
@@ -154,13 +185,26 @@ def test_advanced_functionality():
     assert len(predictor.get_model_names()) == 0
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(extra_info=True)) == 0
+    # Assert that predictor can no longer predict
     try:
         predictor.predict(data=test_data)
     except:
         pass
     else:
         raise AssertionError('predictor.predict should raise exception after all models are deleted')
+    # Assert that clone is not impacted by changes to original
+    assert len(predictor_clone.leaderboard(data=test_data)) == len(leaderboard_clone)
+    y_pred_proba_clone_2 = predictor_clone.predict_proba(data=test_data)
+    assert y_pred_proba.equals(y_pred_proba_clone_2)
     print('Tabular Advanced Functionality Test Succeeded.')
+
+
+def _assert_predictor_size(predictor: TabularPredictor):
+    predictor_size_disk = predictor.get_size_disk()
+    predictor_size_disk_per_file = predictor.get_size_disk_per_file()
+    assert predictor_size_disk > 0  # Assert that .get_size_disk() produces a >0 result and doesn't crash
+    assert len(predictor_size_disk_per_file) > 0
+    assert predictor_size_disk == predictor_size_disk_per_file.sum()
 
 
 def test_advanced_functionality_bagging():
@@ -597,10 +641,7 @@ def test_tabularHPO():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 2}
-        gbm_options = {'num_boost_round': 20}
-        hyperparameters = {'GBM': gbm_options, 'NN_TORCH': nn_options}
-        time_limit = 60
+        time_limit = 240
         hyperparameter_tune_kwargs['num_trials'] = 5
 
     fit_args = {'verbosity': verbosity,}

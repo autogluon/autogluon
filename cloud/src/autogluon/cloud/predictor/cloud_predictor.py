@@ -5,13 +5,11 @@ import yaml
 import tarfile
 import logging
 import pandas as pd
-import PIL
 import sagemaker
 
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
-from PIL import Image
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.loaders import load_pkl
@@ -761,7 +759,7 @@ class CloudPredictor(ABC):
             Any extra arguments needed to pass to transformer.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer for all options.
         **kwargs:
-            Any extra arugments needed to pass to transform.
+            Any extra arguments needed to pass to transform.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer.transform for all options.
         """
         # Sagemaker batch transformation is able to take in headers during the most recent test

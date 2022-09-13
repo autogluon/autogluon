@@ -60,6 +60,7 @@ function install_multimodal {
     python3 -m pip install --upgrade -e multimodal/[tests]
     mim install mmcv-full
     python3 -m pip install --upgrade mmdet
+    python3 -m pip install --upgrade mmocr
 }
 
 function install_text {
@@ -73,6 +74,11 @@ function install_vision {
 
 function install_timeseries {
     python3 -m pip install --upgrade -e timeseries/[all,tests]
+}
+
+function install_cloud {
+    python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
+    python3 -m pip install --upgrade -e cloud/
 }
 
 function install_autogluon {

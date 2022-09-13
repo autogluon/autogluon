@@ -49,7 +49,7 @@ Select your preferences below and run the corresponding install commands:
 
      .. raw:: html
 
-        <div class="mdl-tooltip" data-mdl-for="cpu">Build-in backend for CPU.</div>
+        <div class="mdl-tooltip" data-mdl-for="cpu">Built-in backend for CPU.</div>
         <div class="mdl-tooltip" data-mdl-for="gpu">Required to run on Nvidia GPUs.</div>
 
   .. admonition:: Command:

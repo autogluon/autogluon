@@ -24,7 +24,7 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "AutoETS": {}},
+    {"DeepAR": {"epochs": 1}, "ETS": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
@@ -119,8 +119,8 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -529,7 +529,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
         assert isinstance(predictions, TimeSeriesDataFrame)
 
-        predicted_item_index = predictions.index.levels[0]
-        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+        predicted_item_index = predictions.item_ids
+        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))

@@ -8,7 +8,7 @@ from autogluon.core.constants import REGRESSION
 
 """
 possible TODO: although there is a supervised pretext option below, i.e. pretrain using
-labeled data presumably from a different but related task, curently this cannot be handled 
+labeled data presumably from a different but related task, currently this cannot be handled 
 by the AG API. One simple way to handle it would be to have an optional "pretext label" 
 argument to task.fit that tells the pretraining module to use the supervised pretext task
 with that particular column as the label.

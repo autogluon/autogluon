@@ -162,6 +162,7 @@ class RayHpoExecutor(HpoExecutor):
     }
     
     def __init__(self):
+        super().__init__()
         self.resources = None
         self.hyperparameter_tune_kwargs = None
         self.analysis = None
@@ -239,6 +240,9 @@ class RayHpoExecutor(HpoExecutor):
             run,
             RayTuneAdapterFactory
         )
+        # Disable tensorboard logging to avoid layer warning
+        # TODO: remove this when ray tune fix ray tune pass tuple to hyperopt issue
+        os.environ['TUNE_DISABLE_AUTO_CALLBACK_LOGGERS'] = '1'
         analysis = run(
             trainable=model_trial,
             trainable_args=train_fn_kwargs,
@@ -255,6 +259,7 @@ class RayHpoExecutor(HpoExecutor):
             time_budget_s=self.time_limit,
             verbose=0,
         )
+        os.environ.pop('TUNE_DISABLE_AUTO_CALLBACK_LOGGERS', None)
         self.analysis = analysis
         
     def report(self, reporter, **kwargs):
@@ -291,6 +296,7 @@ class CustomHpoExecutor(HpoExecutor):
     """Implementation of HpoExecutor Interface, where our custom logic is used as the backend"""
     
     def __init__(self):
+        super().__init__()
         self.scheduler_options = None
         self.scheduler = None
         

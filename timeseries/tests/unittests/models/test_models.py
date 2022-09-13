@@ -13,16 +13,17 @@ from gluonts.model.seq2seq import MQRNNEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
-from autogluon.timeseries.models import AutoETSModel, DeepARModel
+from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
+from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS
+TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
 
@@ -79,7 +80,7 @@ def test_when_predict_for_scoring_called_then_model_receives_truncated_data(
 
         (call_df,) = patch_method.call_args[0]
 
-        for j in DUMMY_TS_DATAFRAME.iter_items():
+        for j in DUMMY_TS_DATAFRAME.item_ids:
             assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length])
 
 
@@ -171,14 +172,17 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
             "epochs": 1,
         },
     )
+    # TFT cannot handle arbitrary quantiles
+    if model.name == "TemporalFusionTransformer":
+        return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(k in predictions.columns for k in ["mean"] + [str(q) for q in quantile_levels])
 
 
@@ -196,14 +200,14 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == train_data.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == train_data.item_ids)
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, AutoETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
 )
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
@@ -230,7 +234,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
 
 @pytest.mark.parametrize(
-    "model_class", [DeepARModel, AutoETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
+    "model_class", [DeepARModel, ETSModel, partial(GenericGluonTSModel, gluonts_estimator_class=MQRNNEstimator)]
 )
 @pytest.mark.parametrize(
     "train_data, test_data",
@@ -272,7 +276,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert len(predictions) == test_data.num_items * prediction_length
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == test_data.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == test_data.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == prediction_length for i in predicted_item_index)
     assert all(predictions.loc[i].index[0].hour > 0 for i in predicted_item_index)

@@ -7,7 +7,7 @@ from autogluon.core.constants import REGRESSION
 
 def get_embed_sizes(train_dataset, params, num_categs_per_feature):
     """ Returns list of embedding sizes for each categorical variable.
-        Selects this adaptively based on training_datset.
+        Selects this adaptively based on training_dataset.
         Note: Assumes there is at least one embed feature.
     """
     max_embedding_dim = params['max_embedding_dim']

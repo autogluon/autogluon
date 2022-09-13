@@ -16,7 +16,7 @@ GLUE_METRICS = {
     },  # Current default soft label loss func is for classification, should automatically select loss_func
     "mrpc": {"val": "accuracy", "eval": ["accuracy"]},
     "rte": {"val": "accuracy", "eval": ["accuracy"]},
-    # "cola": "", #phi coeffiecient is not implemented
+    # "cola": "", #phi coefficient is not implemented
 }
 
 
