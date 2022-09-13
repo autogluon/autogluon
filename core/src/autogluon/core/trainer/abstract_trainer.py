@@ -1402,7 +1402,7 @@ class AbstractTrainer:
                         **model_fit_kwargs
                     )
                 if len(hpo_models) == 0:
-                    logger.warning(f'No model was trained while hyperparameter tuning {model.name}... Skipping this model.')
+                    logger.warning(f'No model was trained during hyperparameter tuning {model.name}... Skipping this model.')
             except Exception as err:
                 logger.exception(f'Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.')
                 logger.warning(err)

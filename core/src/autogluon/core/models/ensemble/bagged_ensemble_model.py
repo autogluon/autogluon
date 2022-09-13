@@ -1,8 +1,10 @@
 import copy
 import inspect
 import logging
+import math
 import os
 import platform
+import psutil
 import time
 from collections import Counter
 from statistics import mean
@@ -1092,28 +1094,41 @@ class BaggedEnsembleModel(AbstractModel):
             hpo_executor=hpo_executor,
             is_bagged_model=True,
         )
-        model_estimate_memory_usage = None
+
+        total_cpu_available = hpo_executor.resources.get('num_cpus')  # We should always have num_cpus in resources
+        total_gpu_available = hpo_executor.resources.get('num_gpus', 0)
+        minimum_resources_per_fold = self.get_minimum_resources()
+        minimum_cpu_per_fold = minimum_resources_per_fold.get('num_cpus', 1)
+        minimum_gpu_per_fold = minimum_resources_per_fold.get('num_gpus', 0)
+        fold_estimate_memory_usage = None
+        num_folds_in_parallel_with_mem = math.inf
+
         if initialized_model_base.estimate_memory_usage is not None:
-            # Each trial is able to train 1-k_fold folds in parallel.
-            # We provide minimum memory usage as the memory usage of 1 fold for each trial.
-            # Within the trial, it will calculate how many folds to run in parallel based on mem available
-            # TO BE NOTICE, The first batch of trials are likely to be scheduled around the same time.
-            # Hence, the memory estimation of each trial happens when no other trials are running(Consuming memory).
-            # Giving each trial the illusion that they have the full memory available.
-            # TODO: How to handle situation described above?
-            model_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
-        # Here we also provide minimum cpu/gpu requirement as the requirement of 1 fold for each trial.
-        # If granted more resources, the individual trial will be able to utilize those with the resource logic for bagging.
-        minimum_resources = self.get_minimum_resources()
-        minimum_cpu_per_trial = minimum_resources.get('num_cpus', 1)
-        minimum_gpu_per_trial = minimum_resources.get('num_gpus', 0)
+            fold_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
+            total_memory_available = psutil.virtual_memory().available
+            num_folds_in_parallel_with_mem = total_memory_available // fold_estimate_memory_usage
+
+        num_folds_in_parallel_with_cpu = total_cpu_available // minimum_cpu_per_fold
+        num_folds_in_parallel_with_gpu = math.inf
+        if minimum_gpu_per_fold > 0:
+            num_folds_in_parallel_with_gpu = total_gpu_available // minimum_gpu_per_fold
+        num_folds_in_parallel = min(num_folds_in_parallel_with_mem, num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
+        if num_folds_in_parallel // k_fold < 1:
+            # We can only train 1 trial in parallel
+            num_trials_in_parallel = 1
+        else:
+            num_trials_in_parallel = num_folds_in_parallel // k_fold
+        # We control how many trials run in parallel with minimum_cpu_per_trial and minimum_gpu_per_trial
+        minimum_cpu_per_trial = total_cpu_available // num_trials_in_parallel
+        minimum_gpu_per_trial = total_gpu_available // num_trials_in_parallel
+
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
-            model_estimate_memory_usage=model_estimate_memory_usage,
+            model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
             adapter_type='tabular',
             trainable_is_parallel=True,
         )
