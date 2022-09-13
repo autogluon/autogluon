@@ -113,7 +113,7 @@ class TextProcessor:
         text_detection_length
             A naive way to detect text column versus tabular column that were treated as text
         text_trivial_aug_maxscale
-            Used in trival augment as the maximum scale that can be random generated
+            Used in trivial augment as the maximum scale that can be random generated
             A value of 0 means turn off trivial augment
             https://arxiv.org/pdf/2103.10158.pdf
         train_augment_types
@@ -504,7 +504,7 @@ class TextProcessor:
         for k, v in self.__dict__.items():
             if k != "train_augmenter":
                 setattr(result, k, deepcopy(v, memo))
-        # manual recontruct augmenter
+        # manual reconstruct augmenter
         result.train_augmenter = construct_text_augmenter(result.text_trivial_aug_maxscale, result.train_augment_types)
         return result
 

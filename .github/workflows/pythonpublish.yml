@@ -2,7 +2,7 @@
 # For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
 
 # Note: the first change per day is used to build daily/night release.
-# Therefore, merging one PR per day is recommanded. Otherwise, the we need to mannual trigger the CI later.
+# Therefore, merging one PR per day is recommended. Otherwise, the we need to manually trigger the CI later.
 
 name: Upload Python Package
 
@@ -13,28 +13,27 @@ on:
 
 jobs:
   deploy:
-
     runs-on: ubuntu-18.04
 
     steps:
-    - uses: actions/checkout@master
-    - name: Set up Python
-      uses: actions/setup-python@v1
-      with:
-        python-version: '3.7'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install setuptools wheel twine pypandoc packaging
-    - name: Build and publish
-      env:
-        TWINE_USERNAME: ${{ secrets. PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
-      run: |
-        for v in common core features tabular multimodal text vision timeseries autogluon
-        do
-          cd "$v"/
-          python setup.py sdist bdist_wheel
-          twine upload dist/* --verbose
-          cd ..
-        done
+      - uses: actions/checkout@master
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: "3.7"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine pypandoc packaging
+      - name: Build and publish
+        env:
+          TWINE_USERNAME: ${{ secrets. PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
+        run: |
+          for v in common core features tabular multimodal text vision timeseries autogluon
+          do
+            cd "$v"/
+            python setup.py sdist bdist_wheel
+            twine upload dist/* --verbose
+            cd ..
+          done

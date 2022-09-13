@@ -77,16 +77,16 @@ class SktimeTBATSModel(AbstractSktimeModel):
     ----------------
     use_box_cox: bool or None, default = None
         Whether to use the Box-Cox transform of the data.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     use_trend: bool or None, default = None
         Whether to use a trend component.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     use_damped_trend: bool or None, default = None
         Whether to damp the trend component.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     use_arma_erros: bool or None, default = None
         Whether to model the residuals with ARMA.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     seasonal_period: int, float, array or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For
         example, 4 for quarterly data with an annual cycle, or 7 for daily data with a

@@ -52,7 +52,7 @@ class NNFastAiTabularModel(AbstractModel):
 
             'layers': list of hidden layers sizes; None - use model's heuristics; default is None
 
-            'emb_drop': embedding layers dropout; defaut is 0.1
+            'emb_drop': embedding layers dropout; default is 0.1
 
             'ps': linear layers dropout - list of values applied to every layer in `layers`; default is [0.1]
 

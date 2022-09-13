@@ -116,7 +116,7 @@ class ImageProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         trivial_augment_maxscale
-            Used in trival augment as the maximum scale that can be random generated
+            Used in trivial augment as the maximum scale that can be random generated
             A value of 0 means turn off trivial augment
             https://arxiv.org/pdf/2103.10158.pdf
         model

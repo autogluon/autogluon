@@ -24,7 +24,7 @@ class ParquetSerializer(SimpleBaseSerializer):
                 file, or buffer.
 
         Returns:
-            io.BytesIO: A buffer containing data serialzied in the .parquet format.
+            io.BytesIO: A buffer containing data serialized in the .parquet format.
         """
         if isinstance(data, pd.DataFrame):
             return data.to_parquet()
@@ -49,7 +49,7 @@ class MultiModalSerializer(SimpleBaseSerializer):
         Args:
             content_type (str): The MIME type to signal to the inference endpoint when sending
                 request data (default: "application/x-parquet").
-                To BE NOTICED, ths content_type will not used by MultiModalSerializer
+                To BE NOTICED, this content_type will not used by MultiModalSerializer
                 as it doesn't support dynamic updating. Instead, we pass expected content_type to
                 `initial_args` of `predict()` call to endpoints.
         """
@@ -65,7 +65,7 @@ class MultiModalSerializer(SimpleBaseSerializer):
                 or numpy array
 
         Returns:
-            io.BytesIO: A buffer containing data serialzied in the .parquet or .npy format.
+            io.BytesIO: A buffer containing data serialized in the .parquet or .npy format.
         """
         if isinstance(data, pd.DataFrame):
             return self.parquet_serializer.serialize(data)
@@ -95,7 +95,7 @@ class JsonLineSerializer(SimpleBaseSerializer):
             data (pd.DataFrame): Data to be serialized.
 
         Returns:
-            io.StringIO: A buffer containing data serialzied in the .jsonl format.
+            io.StringIO: A buffer containing data serialized in the .jsonl format.
         """
         if isinstance(data, pd.DataFrame):
             return data.to_json(orient='records', lines=True)

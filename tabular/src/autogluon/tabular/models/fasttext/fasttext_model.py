@@ -175,7 +175,7 @@ class FastTextModel(AbstractModel):
             import fasttext
             fasttext_model_file_name = model.path + cls.model_bin_file_name
             # TODO: hack to subpress a deprecation warning from fasttext
-            # remove it once offcial fasttext is updated beyond 0.9.2
+            # remove it once official fasttext is updated beyond 0.9.2
             # https://github.com/facebookresearch/fastText/issues/1067
             with open(os.devnull, 'w') as f, contextlib.redirect_stderr(f):
                 model.model = fasttext.load_model(fasttext_model_file_name)

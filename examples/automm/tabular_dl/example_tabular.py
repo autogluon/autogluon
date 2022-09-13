@@ -90,7 +90,7 @@ def main(args):
     }
 
     if args.mode == "single":
-        ### model initalization
+        ### model initialization
         predictor = MultiModalPredictor(
             label=train_data.label_column,
             problem_type=train_data.problem_type,
@@ -121,7 +121,7 @@ def main(args):
         automm_hyperparameters["optimization.learning_rate"] = tune.uniform(0.00001, 0.001)
         automm_hyperparameters["optimization.end_lr"] = 1e-5
 
-        ### model initalization
+        ### model initialization
         predictor = MultiModalPredictor(
             label=train_data.label_column,
             problem_type=train_data.problem_type,

@@ -366,7 +366,7 @@ def get_column_features(
     cut_idx = len(column_name_prefix) + 1
     if cls_feature is not None:
         all_column_names = []
-        # creat a zero mask to do logical_or with each column's mask
+        # create a zero mask to do logical_or with each column's mask
         joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
     for key in batch:
         if key.startswith(column_name_prefix):

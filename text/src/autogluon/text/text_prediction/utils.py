@@ -146,7 +146,7 @@ def logging_config(folder: Optional[str] = None,
         logfile.setFormatter(formatter)
         logger.addHandler(logfile)
     if console and need_console_handler:
-        # Initialze the console logging
+        # Initialize the console logging
         logconsole = logging.StreamHandler()
         logconsole.setLevel(console_level)
         logconsole.setFormatter(formatter)

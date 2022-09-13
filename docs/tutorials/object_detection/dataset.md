@@ -1,10 +1,10 @@
 # Object Detection - Prepare Dataset for Object Detector
+
 :label:`sec_object_detection_dataset`
 
 Preparing dataset for object detection is slightly difference and more difficult than image prediction.
 
-
-Our goal in this tutorial is to introduce the simplest methods to initiate or load a object detection datset for `autogluon.vision.ObjectDetector`.
+Our goal in this tutorial is to introduce the simplest methods to initiate or load a object detection dataset for `autogluon.vision.ObjectDetector`.
 
 There are generally two ways to load a dataset for ObjectDetector:
 
@@ -19,6 +19,7 @@ from autogluon.vision import ObjectDetector
 ```
 
 ## Load an existing object detection dataset
+
 Pascal VOC and MS COCO are two most popular data format for object detection. Most public available object detection datasets follow either one of these two formats. In this tutorial we will not touch the details. You may view the original introduction for [VOC](http://host.robots.ox.ac.uk/pascal/VOC/) and [COCO](https://cocodataset.org/#home).
 
 To distinguish these two formats, you can either refer to the labeling tool or check the folder structure. Usually annotations in VOC format are individual `xml` files, while COCO format use a single `json` file to store all annotations.
