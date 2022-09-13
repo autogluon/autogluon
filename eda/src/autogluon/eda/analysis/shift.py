@@ -1,10 +1,11 @@
-from typing import Union, List
-
+from typing import Union, List, Any, Optional
+import warnings
 import pandas as pd
-
+import numpy as np
+from autogluon.core.metrics import balanced_accuracy, BINARY_METRICS
+from autogluon.tabular import TabularPredictor
 from .. import AnalysisState
 from .base import AbstractAnalysis
-from autogluon.core.metrics import balanced_accuracy
 
 
 def post_fit(func):
@@ -51,7 +52,6 @@ class Classifier2ST:
         self.eval_metric = eval_metric
         self._is_fit = False
         self._test = None
-        self._train = None
         self.test_stat = None
         self.original_index = None
         self.has_fi = None
@@ -94,7 +94,6 @@ class Classifier2ST:
         yhat = self.classifier.predict(test)
         self.test_stat = self.eval_metric(test[self.sample_label], yhat)
         self._test = test  # for feature importance and sample anomalies
-        self._train = train # for sample anomalies with how = 'all'
         self.has_fi = (getattr(self.classifier, "feature_importance", None) is not None)
         self._is_fit = True
 
@@ -164,21 +163,201 @@ class Classifier2ST:
         return fi_scores
 
 
+class C2STShiftDetector:
+    """Detect a change in covariate (X) distribution between training and test, which we call XShift.  It can tell you
+    if your training set is not representative of your test set distribution.  This is done with a Classifier 2
+    Sample Test.
+
+    Parameters
+    ----------
+    classifier_class : an AutoGluon predictor, such as autogluon.tabular.TabularPredictor
+        The predictor that will be fit on training set and predict the test set
+    label : str, default = None
+        The Y variable that is to be predicted (if it appears in the train/test data then it will be removed)
+    eval_metric : str, default = 'balanced_accuracy'
+        The metric used for the C2ST, it must be one of the binary metrics from autogluon.core.metrics
+    sample_label : str, default = 'i2vkyc0p64'
+        The label internally used for the classifier 2 sample test, the only reason to change it is in the off chance
+        that the default value is a column in the data.
+    classifier_kwargs : dict, default = {}
+        The kwargs passed to the classifier, a member of classifier_class
+
+    Methods
+    -------
+    fit : fits the detector on training and test covariate data
+    results, summary : outputs the results of XShift detection
+        - test statistic
+        - detection status
+        - p-value
+        - detector feature importances
+    anomaly_scores : computes anomaly scores for test samples
+    pvalue: a p-value for the two sample test
+
+    Usage
+    -----
+    >>> xshiftd = C2STShiftDetector(TabularPredictor, label='class')
+    Fit the detector...
+    >>> xshiftd.fit(X, X_test)
+    Output the decision...
+    >>> xshiftd.decision()
+    Output the summary...
+    >>> xshiftd.summary()
+    """
+
+    def __init__(self,
+                 classifier_class: Any,
+                 label: Optional[str]=None,
+                 eval_metric: str='balanced_accuracy',
+                 sample_label: str='i2vkyc0p64',
+                 classifier_kwargs: dict={}):
+        named_metrics = BINARY_METRICS
+        assert eval_metric in named_metrics.keys(), \
+            'eval_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
+        self.eval_metric = named_metrics[eval_metric]  #is this necessary?
+        self.C2ST = Classifier2ST(classifier_class,
+                                  sample_label=sample_label,
+                                  eval_metric=self.eval_metric,
+                                  classifier_kwargs=classifier_kwargs)
+        if not label:
+            warnings.warn('label is not specified, please ensure that train_data, test_data do not have the Y (label) '
+                          'variable')
+        self.label = label
+        self._is_fit = False
+        self.fi_scores = None
+
+    def fit(self,
+            X: pd.DataFrame,
+            X_test: pd.DataFrame,
+            compute_fi: bool=True,
+            **kwargs):
+        """Fit the XShift detector.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Training dataframe
+        X_test : pd.DataFrame
+            Test dataframe
+        compute_fi : bool, default = True
+            True to compute the feature importances, this may be computationally intensive
+        **kwargs (optional): keyword arguments to .fit() for the classifier_class
+        """
+        assert self.C2ST.sample_label not in X.columns, \
+            f'your data columns contain {self.C2ST.sample_label} which is used internally'
+
+        if self.label:
+            if self.label in X.columns:
+                X = X.drop(columns=[self.label])
+            if self.label in X_test.columns:
+                X_test = X_test.drop(columns=[self.label])
+
+        self.C2ST.fit((X, X_test), **kwargs)
+
+        # Feature importance
+        if self.C2ST.has_fi and compute_fi:
+            self.fi_scores = self.C2ST.feature_importance()
+
+        self._is_fit = True
+        self._X_test = X_test
+
+    @post_fit
+    def decision(self,
+                 pvalue_thresh: float=0.01,
+                 pvalue_kwargs: dict = {}) -> str:
+        """Decision function for testing XShift.  Uncertainty quantification is currently not supported.
+
+        Parameters
+        ----------
+        teststat_thresh : float, default = 0.55
+            the threshold for the test statistic
+
+        Returns
+        -------
+        One of ['detected', 'not detected']
+        """
+        # default teststat_thresh by metric
+        p_value = self.pvalue(**pvalue_kwargs)
+        if p_value < pvalue_thresh:
+            return 'detected', p_value
+        else:
+            return 'not_detected', p_value
+
+    @post_fit
+    def results(self,
+                pvalue_thresh: float=0.01,
+                pvalue_kwargs: dict={}) -> dict:
+        """Output the results of the C2ST in dictionary
+
+        Returns
+        -------
+        dict of
+            - `detection_status`: One of ['detected', 'not detected']
+            - `test_statistic`: the C2ST statistic
+            - 'pvalue'
+            - 'pvalue_threshold'
+            - `feature_importance`: the feature importance dataframe, if computed
+        """
+        det_status, pvalue = self.decision(pvalue_thresh=pvalue_thresh, pvalue_kwargs=pvalue_kwargs)
+        res_json = {
+            'detection_status': det_status,
+            'test_statistic': self.C2ST.test_stat,
+            'pvalue': pvalue,
+            'pvalue_threshold': pvalue_thresh,
+            'eval_metric': self.eval_metric.name,
+        }
+        if self.fi_scores is not None:
+            res_json['feature_importance'] = self.fi_scores
+        return res_json
+
+    @post_fit
+    def pvalue(self,
+               method: str='half_permutation',
+               num_permutations: int=1000) -> float:
+        """Compute the p-value which measures the significance level for the test statistic
+
+        Parameters
+        ----------
+        method : str
+            One of 'half_permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
+        num_permutations: int, default = 1000
+            The number of permutations used for any permutation based method
+
+        Returns
+        -------
+        float of the p-value for the 2-sample test
+        """
+        return self.C2ST.pvalue(method=method, num_permutations=num_permutations)
+
+
 class XShiftDetector(AbstractAnalysis):
 
     def __init__(self,
+                 classifier_class: Union[Any,None] = TabularPredictor,
+                 label: Union[str,None] = None,
+                 compute_fi: bool = True,
                  classifier_kwargs: dict = {},
-                 eval_metric: str = 'balanced_accuracy',
-                 sample_label: str = 'i2vkyc0p64',
-                 parent: Union[None, AbstractAnalysis] = None,
+                 parent: Union[None,AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         self.classifier_kwargs = classifier_kwargs
-        self.eval_metric = eval_metric
-        self.sample_label = sample_label
+        self.classifier_class = classifier_class
+        self.label = label
+        self.compute_fi = compute_fi
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        # where to put path?
+        # how to sample?
+        tst = C2STShiftDetector(classifier_class=self.classifier_class,
+                                label=args['label'],
+                                classifier_kwargs=self.classifier_kwargs)
+        assert 'train_data' in args, 'train_data required as arg'
+        assert 'test_data' in args, 'test_data required as arg'
+        tst.fit(X=args['train_data'],
+                X_test=args['test_data'],
+                compute_fi=self.compute_fi,
+                verbosity=0)
+        state.xshift_results = tst.results()
         # create c2st
         # fit c2st
         # set results to state: decision status, pvalue, test stat, fi scores
