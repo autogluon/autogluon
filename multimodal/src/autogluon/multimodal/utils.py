@@ -520,15 +520,15 @@ def select_model(
     if len(selected_model_names) == 0:
         raise ValueError("No model is available for this dataset.")
     # only allow no more than 1 fusion model
-    assert len(fusion_model_name) <= 1
+    if len(fusion_model_name) > 1:
+        raise ValueError(f"More than one fusion models `{fusion_model_name}` are detected, but only one is allowed.")
 
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
     elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
-        if data_status[CATEGORICAL] or data_status[NUMERICAL]:
-            # retain the fusion model for uni-modal tabular data.
-            assert len(fusion_model_name) == 1
+        # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
+        if selected_model_names[0].startswith((CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER)):
             selected_model_names.extend(fusion_model_name)
         else:
             # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
@@ -588,6 +588,24 @@ def create_data_processor(
     config: DictConfig,
     model: nn.Module,
 ):
+    """
+    Create one data processor based on the data type and model.
+
+    Parameters
+    ----------
+    data_type
+        Data type.
+    config
+        The config may contain information required by creating a data processor.
+        In future, we may move the required config information into the model.config
+        to make the data processor conditioned only on the model itself.
+    model
+        The model.
+
+    Returns
+    -------
+    One data processor.
+    """
     model_config = getattr(config.model, model.prefix)
     if data_type == IMAGE:
         data_processor = ImageProcessor(
@@ -636,7 +654,7 @@ def create_fusion_data_processors(
     requires_data: Optional[bool] = True,
 ):
     """
-    Create the data processors according to the model config. This function creates one processor for
+    Create the data processors for late-fusion models. This function creates one processor for
     each modality of each model. For example, if one model config contains BERT, ViT, and CLIP, then
     BERT would have its own text processor, ViT would have its own image processor, and CLIP would have
     its own text and image processors. This is to support training arbitrary combinations of single-modal
