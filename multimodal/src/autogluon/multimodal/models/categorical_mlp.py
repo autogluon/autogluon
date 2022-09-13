@@ -14,8 +14,6 @@ class CategoricalMLP(nn.Module):
     the number of categories in each categorical column.
     """
 
-    data_types = [CATEGORICAL]
-
     def __init__(
         self,
         prefix: str,

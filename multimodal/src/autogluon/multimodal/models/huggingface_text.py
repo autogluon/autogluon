@@ -14,7 +14,6 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
-    TEXT,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
@@ -31,8 +30,6 @@ class HFAutoModelForTextPrediction(nn.Module):
     Support huggingface text backbones.
     Refer to https://github.com/huggingface/transformers
     """
-
-    data_types = [TEXT]
 
     def __init__(
         self,

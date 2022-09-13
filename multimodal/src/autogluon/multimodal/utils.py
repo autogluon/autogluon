@@ -699,8 +699,9 @@ def create_fusion_data_processors(
                 model=per_model,
             )
             data_processors[LABEL].append(label_processor)
-        if requires_data and per_model.data_types:
-            for data_type in per_model.data_types:
+        model_config = getattr(config.model, per_model.prefix)
+        if requires_data and model_config.data_types:
+            for data_type in model_config.data_types:
                 per_data_processor = create_data_processor(
                     data_type=data_type,
                     model=per_model,
@@ -2070,7 +2071,8 @@ def update_config_by_rules(
     config: DictConfig,
 ):
     """
-    Update config by pre-defined rules.
+    Modify configs based on the need of loss func.
+    Now it support changing the preprocessing of numerical label into Minmaxscaler while using BCEloss.
 
     Parameters
     ----------
@@ -2083,37 +2085,6 @@ def update_config_by_rules(
     -------
     The modified config.
     """
-    for model_name in config.model.names:
-        model_config = getattr(config.model, model_name)
-        if model_name.lower().startswith(CLIP):
-            model_class = CLIPForImageText
-        elif model_name.lower().startswith(TIMM_IMAGE):
-            model_class = TimmAutoModelForImagePrediction
-        elif model_name.lower().startswith(HF_TEXT):
-            model_class = HFAutoModelForTextPrediction
-        elif model_name.lower().startswith(T_FEW):
-            model_class = TFewModel
-        elif model_name.lower().startswith(NUMERICAL_MLP):
-            model_class = NumericalMLP
-        elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
-            model_class = NumericalTransformer
-        elif model_name.lower().startswith(CATEGORICAL_MLP):
-            model_class = CategoricalMLP
-        elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
-            model_class = CategoricalTransformer
-        elif model_name.lower().startswith(MMDET_IMAGE):
-            model_class = MMDetAutoModelForObjectDetection
-        elif model_name.lower().startswith(MMOCR_TEXT_DET):
-            model_class = MMOCRAutoModelForTextDetection
-        elif model_name.lower().startswith(FUSION_MLP):
-            model_class = MultimodalFusionMLP
-        elif model_name.lower().startswith(FUSION_TRANSFORMER):
-            model_class = MultimodalFusionTransformer
-        else:
-            raise ValueError(f"unknown model name: {model_name}")
-
-        OmegaConf.update(model_config, "data_types", model_class.data_types, merge=False)
-
     loss_func = OmegaConf.select(config, "optimization.loss_function")
     if loss_func is not None:
         if problem_type == REGRESSION and "bce" in loss_func.lower():

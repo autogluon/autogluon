@@ -33,8 +33,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
     Refer to https://github.com/open-mmlab/mmdetection
     """
 
-    data_types = [IMAGE]
-
     def __init__(
         self,
         prefix: str,

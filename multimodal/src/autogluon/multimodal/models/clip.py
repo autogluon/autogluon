@@ -14,7 +14,6 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
-    TEXT,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
@@ -28,8 +27,6 @@ class CLIPForImageText(nn.Module):
     Support the CLIP model.
     Refer to https://huggingface.co/docs/transformers/model_doc/clip
     """
-
-    data_types = [IMAGE, TEXT]
 
     def __init__(
         self,

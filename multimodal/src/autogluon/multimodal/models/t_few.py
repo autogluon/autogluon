@@ -22,7 +22,6 @@ from ..constants import (
     LOGITS,
     MASKS,
     TEMPLATE_LOGITS,
-    TEXT,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
@@ -44,8 +43,6 @@ class TFewModel(nn.Module):
     Implementation of T-Few (https://arxiv.org/pdf/2205.05638.pdf).
     Refer to https://github.com/r-three/t-few
     """
-
-    data_types = [TEXT]
 
     def __init__(
         self,

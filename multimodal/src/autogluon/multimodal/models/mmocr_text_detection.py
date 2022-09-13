@@ -38,8 +38,6 @@ class MMOCRAutoModelForTextDetection(nn.Module):
     Refer to https://github.com/open-mmlab/mmocr
     """
 
-    data_types = [IMAGE]
-
     def __init__(
         self,
         prefix: str,

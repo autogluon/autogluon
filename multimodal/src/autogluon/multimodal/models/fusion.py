@@ -19,8 +19,6 @@ class MultimodalFusionMLP(nn.Module):
     concatenates the adapted features, and fuses the features through MLP.
     """
 
-    data_types = []
-
     def __init__(
         self,
         prefix: str,
@@ -220,8 +218,6 @@ class MultimodalFusionTransformer(nn.Module):
     Specifically, it adapts the features of each model to specified dimensions,
     concatenates the adapted features, and fuses the features through Transformer.
     """
-
-    data_types = []
 
     def __init__(
         self,
