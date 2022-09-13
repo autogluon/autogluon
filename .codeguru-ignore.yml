@@ -1,0 +1,11 @@
+version: 1.0
+
+# ExcludeById:
+#   - 'security-764ea718423ce472134805f16e2616a36c3636fab21927453102041'
+
+ExcludeTags:
+  - 'maintainability'
+
+excludeFiles:
+  - "examples/**"
+

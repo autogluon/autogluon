@@ -1,0 +1,54 @@
+name: Run CodeGuru Reviewer
+
+on: [ push, pull_request, workflow_dispatch ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  RunCodeGuru:
+    name: Run CodeGuru Reviewer CLI in CICD
+    runs-on: ubuntu-latest
+    steps:
+      # Setup Java 8 or higher. This is needed to run the codeguru cli
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+
+      # To configure this role, use this CDK example:
+      # https://github:com/aws-samples/aws-codeguru-reviewer-cicd-cdk-sample
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        continue-on-error: true
+        id: iam-role
+        with:
+          role-to-assume: arn:aws:iam::048169001733:role/GuruGitHubCICDRole
+          aws-region: us-west-2
+
+      # Only continue if fetching the AWS credentials was successful.
+      - uses: actions/checkout@v2
+        if: steps.iam-role.outcome == 'success'
+        with:
+          fetch-depth: 0 # the fetch depth needs to be provided if we only want to check a certain commit range.
+
+      # Download a release of the CodeGuru Reviewer CLI.
+      - name: Download CodeGuru Reviewer CLI
+        shell: bash
+        env:
+          VERSION: 0.2.1
+        run: curl -OL "https://github.com/aws/aws-codeguru-cli/releases/download/$VERSION/aws-codeguru-cli.zip"
+      - run: unzip aws-codeguru-cli.zip
+
+       # Run CodeGuru Reviewer on the current project and use the --fail-on-recommendations option to fail
+       # if any recommendations are reported.
+      - name: Run Code Guru
+        if: steps.iam-role.outcome == 'success'
+        run: ./aws-codeguru-cli/bin/aws-codeguru-cli --region us-west-2 -r ./ -s ./ --no-prompt  --fail-on-recommendations
+
+      - name: Upload SARIF file to GitHub Security Scans UX
+        if: steps.assume-iam-role.outcome == 'success'
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: codeguru-results.sarif.json
