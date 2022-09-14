@@ -1,8 +1,10 @@
 import copy
 import inspect
 import logging
+import math
 import os
 import platform
+import psutil
 import time
 from collections import Counter
 from statistics import mean
@@ -14,7 +16,9 @@ import pandas as pd
 from autogluon.common.utils.log_utils import DuplicateFilter
 from .fold_fitting_strategy import AbstractFoldFittingStrategy, SequentialLocalFoldFittingStrategy, ParallelLocalFoldFittingStrategy
 from ..abstract.abstract_model import AbstractModel
+from ..abstract.model_trial import model_trial, skip_hpo
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE, REFIT_FULL_SUFFIX
+from ...hpo.exceptions import EmptySearchSpace
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
@@ -421,6 +425,8 @@ class BaggedEnsembleModel(AbstractModel):
                    sample_weight=None,
                    save_folds=True,
                    groups=None,
+                   num_cpus=None,
+                   num_gpus=None,
                    **kwargs):
         fold_fitting_strategy = self.params.get('fold_fitting_strategy', 'auto')
         if fold_fitting_strategy == 'auto':
@@ -479,7 +485,7 @@ class BaggedEnsembleModel(AbstractModel):
             bagged_ensemble_model=self, X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, sample_weight=sample_weight,
             time_limit=time_limit, time_start=time_start, models=models,
             oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats,
-            save_folds=save_folds
+            save_folds=save_folds, num_cpus=num_cpus, num_gpus=num_gpus,
         )
         # noinspection PyCallingNonCallable
         if fold_fitting_strategy == ParallelLocalFoldFittingStrategy:
@@ -562,7 +568,6 @@ class BaggedEnsembleModel(AbstractModel):
 
             for fold_in_set in range(fold_in_set_start, fold_in_set_end):  # For each fold
                 fold = fold_in_set + (repeat * k_fold)
-
                 fold_ctx = dict(
                     model_name_suffix=f'S{repeat + 1}F{fold_in_set + 1}',  # S5F3 = 3rd fold of the 5th repeat set
                     fold=kfolds[fold],
@@ -994,6 +999,9 @@ class BaggedEnsembleModel(AbstractModel):
     def get_minimum_resources(self) -> Dict[str, int]:
         return self._get_model_base().get_minimum_resources()
 
+    def _get_default_resources(self):
+        return self._get_model_base()._get_default_resources()
+
     def _validate_fit_memory_usage(self, **kwargs):
         # memory is checked downstream on the child model
         pass
@@ -1020,126 +1028,120 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
         return oof_pred_proba, oof_pred_model_repeats
 
-    def _preprocess_fit_resources(self, silent=False, **kwargs):
-        """Pass along to child models to avoid altering up-front"""
-        return kwargs
+    def _hyperparameter_tune(
+        self,
+        X,
+        y,
+        X_val,
+        y_val,
+        k_fold,
+        hpo_executor,
+        **kwargs
+    ):
+        time_start = time.time()
+        logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
+        # initialize the model base to get necessary info for search space and estimating memory usage
+        initialized_model_base = copy.deepcopy(self.model_base)
+        model_init_args = self.model_base.get_params()
+        model_init_args['feature_metadata'] = self.feature_metadata
+        model_init_args['num_classes'] = self.num_classes
+        initialized_model_base.initialize(X=X, y=y, **model_init_args)
+        search_space = initialized_model_base._get_search_space()
 
-    # TODO: Currently double disk usage, saving model in HPO and also saving model in bag
-    # FIXME: with use_bag_holdout=True, the fold-1 scores that are logged are of the inner validation score, not the holdout score.
-    #  Fix this by passing X_val, y_val into this method
-    def _hyperparameter_tune(self, X, y, k_fold, hpo_executor, preprocess_kwargs=None, groups=None, **kwargs):
-        if len(self.models) != 0:
-            raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
+        try:
+            hpo_executor.validate_search_space(search_space, self.name)
+        except EmptySearchSpace:
+            return skip_hpo(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
-        kwargs['feature_metadata'] = self.feature_metadata
-        kwargs['num_classes'] = self.num_classes  # TODO: maybe don't pass num_classes to children
+        # Use absolute path here because ray tune will change the working directory
+        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
+        directory = self.path  # also create model directory if it doesn't exist
+        # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
+        dataset_train_filename = 'dataset_train.pkl'
+        train_path = os.path.join(directory, dataset_train_filename)
+        save_pkl.save(path=train_path, object=(X, y))
+
+        dataset_val_filename = 'dataset_val.pkl'
+        val_path = os.path.join(directory, dataset_val_filename)
+        save_pkl.save(path=val_path, object=(X_val, y_val))
+
+        model_cls = self.__class__
+        init_params = copy.deepcopy(self.get_params())
         model_base = self._get_model_base()
-        hpo_context = self.path + 'hpo' + os.path.sep
-        model_base.set_contexts(hpo_context)
 
-        # TODO: Preprocess data here instead of repeatedly
-        if preprocess_kwargs is None:
-            preprocess_kwargs = dict()
-        use_child_oof = self.params.get('use_child_oof', False)
-        X = self.preprocess(X=X, preprocess=False, fit=True, **preprocess_kwargs)
+        if not inspect.isclass(model_base):
+            init_params['model_base'] = init_params['model_base'].__class__
+            init_params['model_base_kwargs'] = model_base.get_params()
+        # Here the hyperparameters are unprocessed search space.
+        # HPO Executor will handle passing in the correct parameters.
+        init_params['model_base_kwargs'].pop('hyperparameters', None)
+        # We set soft time limit to avoid trials being terminated directly by ray tune
+        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
-        if use_child_oof:
-            k_fold = 1
-            X_fold = X
-            y_fold = y
-            X_val_fold = None
-            y_val_fold = None
-            train_index = list(range(len(X)))
-            test_index = train_index
-            cv_splitter = None
-        else:
-            cv_splitter = self._get_cv_splitter(n_splits=k_fold, n_repeats=1, groups=groups)
-            if k_fold != cv_splitter.n_splits:
-                k_fold = cv_splitter.n_splits
-
-            kfolds = cv_splitter.split(X=X, y=y)
-
-            train_index, test_index = kfolds[0]
-            X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[test_index, :]
-            y_fold, y_val_fold = y.iloc[train_index], y.iloc[test_index]
-        orig_time = hpo_executor.time_limit
-        if orig_time:
-            hpo_executor.time_limit = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_results = model_base.hyperparameter_tune(
-            X=X_fold,
-            y=y_fold,
-            X_val=X_val_fold,
-            y_val=y_val_fold,
-            hyperparameter_tune_kwargs=None,
+        fit_kwargs = copy.deepcopy(kwargs)
+        fit_kwargs['k_fold'] = k_fold
+        fit_kwargs['feature_metadata'] = self.feature_metadata
+        fit_kwargs['num_classes'] = self.num_classes
+        fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
+        fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
+        fit_kwargs.pop('time_limit', None)  # time_limit already set in hpo_executor
+        train_fn_kwargs = dict(
+            model_cls=model_cls,
+            init_params=init_params,
+            time_start=time_start,
+            time_limit=trial_soft_time_limit,
+            fit_kwargs=fit_kwargs,
+            train_path=train_path,
+            val_path=val_path,
             hpo_executor=hpo_executor,
-            **kwargs)
-        hpo_executor.time_limit = orig_time
+            is_bagged_model=True,
+        )
 
-        bags = {}
-        for i, (model_name, model_info) in enumerate(hpo_models.items()):
-            model_path = model_info['path']
-            child: AbstractModel = self._child_type.load(path=model_path)
+        total_cpu_available = hpo_executor.resources.get('num_cpus')  # We should always have num_cpus in resources
+        total_gpu_available = hpo_executor.resources.get('num_gpus', 0)
+        minimum_resources_per_fold = self.get_minimum_resources()
+        minimum_cpu_per_fold = minimum_resources_per_fold.get('num_cpus', 1)
+        minimum_gpu_per_fold = minimum_resources_per_fold.get('num_gpus', 0)
+        fold_estimate_memory_usage = None
+        num_folds_in_parallel_with_mem = math.inf
 
-            # TODO: Create new Ensemble Here
-            bag = copy.deepcopy(self)
-            bag.rename(f"{bag.name}{os.path.sep}T{i+1}")
-            bag.set_contexts(self.path_root + bag.name + os.path.sep)
+        if initialized_model_base.estimate_memory_usage is not None:
+            fold_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
+            total_memory_available = psutil.virtual_memory().available
+            num_folds_in_parallel_with_mem = total_memory_available // fold_estimate_memory_usage
 
-            oof_pred_proba, oof_pred_model_repeats = self._construct_empty_oof(X=X, y=y)
+        num_folds_in_parallel_with_cpu = total_cpu_available // minimum_cpu_per_fold
+        num_folds_in_parallel_with_gpu = math.inf
+        if minimum_gpu_per_fold > 0:
+            num_folds_in_parallel_with_gpu = total_gpu_available // minimum_gpu_per_fold
+        num_folds_in_parallel = min(num_folds_in_parallel_with_mem, num_folds_in_parallel_with_cpu, num_folds_in_parallel_with_gpu)
+        if num_folds_in_parallel // k_fold < 1:
+            # We can only train 1 trial in parallel
+            num_trials_in_parallel = 1
+        else:
+            num_trials_in_parallel = num_folds_in_parallel // k_fold
+        # We control how many trials run in parallel with minimum_cpu_per_trial and minimum_gpu_per_trial
+        minimum_cpu_per_trial = total_cpu_available // num_trials_in_parallel
+        minimum_gpu_per_trial = total_gpu_available // num_trials_in_parallel
 
-            if child._get_tags().get('valid_oof', False):
-                y_pred_proba = child.get_oof_pred_proba(X=X, y=y)
-                bag._n_repeats_finished = 1
-                bag._k_per_n_repeat = [1]
-                bag._bagged_mode = False
-                bag._child_oof = True  # TODO: Consider a separate tag for refit_folds vs efficient OOF
-            else:
-                y_pred_proba = child.predict_proba(X_val_fold)
+        hpo_executor.execute(
+            model_trial=model_trial,
+            train_fn_kwargs=train_fn_kwargs,
+            directory=directory,
+            minimum_cpu_per_trial=minimum_cpu_per_trial,
+            minimum_gpu_per_trial=minimum_gpu_per_trial,
+            model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
+            adapter_type='tabular',
+            trainable_is_parallel=True,
+        )
 
-            oof_pred_proba[test_index] += y_pred_proba
-            oof_pred_model_repeats[test_index] += 1
+        hpo_results = hpo_executor.get_hpo_results(
+            model_name=self.name,
+            model_path_root=self.path_root,
+            time_start=time_start,
+        )
 
-            bag.model_base = None
-            child.rename('')
-            child.set_contexts(bag.path + child.name + os.path.sep)
-            bag.save_model_base(child.convert_to_template())
-
-            bag._k = k_fold
-            bag._k_fold_end = 1
-            bag._n_repeats = 1
-            bag._oof_pred_proba = oof_pred_proba
-            bag._oof_pred_model_repeats = oof_pred_model_repeats
-            child.rename('S1F1')
-            child.set_contexts(bag.path + child.name + os.path.sep)
-            if not self.params.get('save_bag_folds', True):
-                child.model = None
-            if bag.low_memory:
-                bag.save_child(child, verbose=False)
-                bag.models.append(child.name)
-            else:
-                bag.models.append(child)
-            bag.val_score = child.val_score
-            bag._add_child_times_to_bag(model=child)
-            if cv_splitter is not None:
-                bag._cv_splitters = [cv_splitter]
-
-            bag.save()
-            bags[bag.name] = dict(**model_info)
-            bags[bag.name]['path'] = bag.path
-
-            # delete original child from its disk location since it is being saved to a new location in the bag
-            child: AbstractModel = self._child_type.load(path=model_path)
-            child.delete_from_disk(silent=True)
-
-        # cleanup artifacts
-        for artifact_dir in [model_base._path_v2, model_base.path_root]:
-            try:
-                os.rmdir(artifact_dir)
-            except OSError:
-                pass
-
-        # TODO: hpo_results likely not correct because no renames
-        return bags, hpo_results
+        return hpo_results
 
     def _more_tags(self):
         return {

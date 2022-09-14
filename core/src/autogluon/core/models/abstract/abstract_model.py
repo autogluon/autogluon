@@ -1030,6 +1030,8 @@ class AbstractModel:
 
         model_cls = self.__class__
         init_params = self.get_params()
+        # We set soft time limit to avoid trials being terminated directly by ray tune
+        trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = dict()
         fit_kwargs['feature_metadata'] = self.feature_metadata
@@ -1040,7 +1042,7 @@ class AbstractModel:
             model_cls=model_cls,
             init_params=init_params,
             time_start=time_start,
-            time_limit=hpo_executor.time_limit,
+            time_limit=trial_soft_time_limit,
             fit_kwargs=fit_kwargs,
             train_path=train_path,
             val_path=val_path,
