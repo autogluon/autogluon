@@ -866,6 +866,25 @@ class AbstractModel:
             transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
         )
 
+    # TODO: Pick up from here, rename to save, implement _get_compiler(), etc.
+    def compile(self, path: str = None, verbose=True) -> str:
+        if path is None:
+            path = self.path
+        file_path = path + self.model_file_name
+
+        save_in_pkl = True
+        if self.model is not None:
+            self._compiler = self._get_compiler()
+            if self._compiler is not None:
+                self.model = self._compiler.compile(obj=self, path=path)
+                save_in_pkl = self._compiler.save_in_pkl
+        _model = self.model
+        if not save_in_pkl:
+            self.model = None
+        save_pkl.save(path=file_path, object=self, verbose=verbose)
+        self.model = _model
+        return path
+
     def get_trained_params(self) -> dict:
         """
         Returns the hyperparameters of the trained model.

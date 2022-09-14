@@ -10,6 +10,7 @@ __all__ = [
     'try_import_mxnet',
     'try_import_catboost',
     'try_import_lightgbm',
+    'try_import_lleaves',
     'try_import_xgboost',
     'try_import_faiss',
     'try_import_fastai',
@@ -161,6 +162,15 @@ def try_import_lightgbm():
     except OSError as e:
         raise ImportError("`import lightgbm` failed. If you are using Mac OSX, "
                           "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
+
+
+def try_import_lleaves():
+    try:
+        import lleaves
+    except ImportError as e:
+        raise ImportError("`import lleaves` failed. "
+                          "A quick tip is to install via `pip install lleaves`. "
+                          "Detailed info: {}".format(str(e)))
 
 
 def try_import_xgboost():

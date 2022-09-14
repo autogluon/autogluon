@@ -15,7 +15,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.utils import try_import_lightgbm
+from autogluon.core.utils import try_import_lightgbm, try_import_lleaves
 
 from . import lgb_utils
 from .hyperparameters.parameters import get_param_baseline, get_lgb_objective, DEFAULT_NUM_BOOST_ROUND
@@ -24,6 +24,59 @@ from .lgb_utils import construct_dataset
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
+
+
+class LGBLLeavesPredictor:
+    def __init__(self, model):
+        self.model = model
+
+    def predict(self, X, **kwargs):
+        return self.model.predict(X, **kwargs)
+
+
+class LGBNativeCompiler:
+    name = 'native'
+    save_in_pkl = True
+
+    @staticmethod
+    def can_compile():
+        return True
+
+    @staticmethod
+    def compile(obj, path: str):
+        obj.model.save_model(path + 'model.txt', num_iteration=obj.model.best_iteration)
+        return obj.model
+
+    @staticmethod
+    def load(obj, path: str):
+        import lightgbm as lgb
+        return lgb.Booster(model_file=path + 'model.txt')
+
+
+class LGBModelLLeavesCompiler:
+    name = 'lleaves'
+    save_in_pkl = False
+
+    @staticmethod
+    def can_compile():
+        try:
+            try_import_lleaves()
+            return True
+        except ImportError:
+            return False
+
+    @staticmethod
+    def compile(obj, path: str):
+        LGBNativeCompiler.compile(obj=obj, path=path)
+        return LGBModelLLeavesCompiler.load(obj=obj, path=path)
+
+    @staticmethod
+    def load(obj, path: str):
+        import lleaves
+        llvm_model = lleaves.Model(model_file=path + 'model.txt')
+        llvm_model.compile(cache=path + 'lleaves.o')
+        model = LGBLLeavesPredictor(model=llvm_model)
+        return model
 
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
@@ -42,6 +95,7 @@ class LGBModel(AbstractModel):
         self._features_internal_map = None
         self._features_internal_list = None
         self._requires_remap = None
+        self._is_model_saved = False
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
@@ -116,6 +170,9 @@ class LGBModel(AbstractModel):
             params['verbose'] = -1
 
         num_rows_train = len(X)
+        X = self.preprocess(X, is_train=True)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
         dataset_train, dataset_val = self.generate_datasets(
             X=X, y=y, params=params, X_val=X_val, y_val=y_val,
             sample_weight=sample_weight, sample_weight_val=sample_weight_val
@@ -226,9 +283,9 @@ class LGBModel(AbstractModel):
             # psutil.cpu_count() is faster in inference than psutil.cpu_count(logical=False)
             num_cpus = psutil.cpu_count()
         if self.problem_type == REGRESSION:
-            return self.model.predict(X, num_threads=num_cpus)
+            return self.model.predict(X, n_jobs=num_cpus)
 
-        y_pred_proba = self.model.predict(X, num_threads=num_cpus)
+        y_pred_proba = self.model.predict(X, n_jobs=num_cpus)
         if self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
@@ -277,10 +334,6 @@ class LGBModel(AbstractModel):
     def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, save=False):
         lgb_dataset_params_keys = ['two_round']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
-
-        X = self.preprocess(X, is_train=True)
-        if X_val is not None:
-            X_val = self.preprocess(X_val)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
 
         y_og = None
@@ -339,6 +392,42 @@ class LGBModel(AbstractModel):
     @property
     def _features(self):
         return self._features_internal_list
+
+    def _valid_compilers(self):
+        return [LGBNativeCompiler, LGBModelLLeavesCompiler]
+
+    def _get_compiler(self):
+        compiler = self.params_aux.get('compiler', None)
+        compilers = self._valid_compilers()
+        compiler_names = {c.name: c for c in compilers}
+        if compiler is not None and compiler not in compiler_names:
+            raise AssertionError(f'Unknown compiler: {compiler}. Valid compilers: {compiler_names}')
+        if compiler is None:
+            return LGBNativeCompiler
+        compiler_cls = compiler_names[compiler]
+        if not compiler_cls.can_compile():
+            compiler_cls = LGBNativeCompiler
+        return compiler_cls
+
+    def save(self, path: str = None, verbose=True) -> str:
+        if self.model is not None:
+            self._compiler = self._get_compiler()
+            self._is_model_saved = True
+        _model = self.model
+        self.model = None
+        path = super().save(path=path, verbose=verbose)
+        self.model = _model
+        if _model is not None:
+            kwargs = dict(path=path)
+            self.model = self._compiler.compile(obj=self, **kwargs)
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._is_model_saved:
+            model.model = model._compiler.load(obj=model, path=path)
+        return model
 
     def _ag_params(self) -> set:
         return {'ag.early_stop'}

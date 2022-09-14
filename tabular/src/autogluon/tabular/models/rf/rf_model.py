@@ -18,6 +18,72 @@ from autogluon.features.generators import LabelEncoderFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
+# FIXME: DOESNT WORK ON REGRESSION PREDICTIONS
+class RFOnnxPredictor:
+    def __init__(self, obj, model):
+        self.num_classes = obj.num_classes
+        self.model = model
+
+    def predict(self, X):
+        input_name = self.model.get_inputs()[0].name
+        label_name = self.model.get_outputs()[0].name
+        return self.model.run([label_name], {input_name: X})[0]
+
+    def predict_proba(self, X):
+        input_name = self.model.get_inputs()[0].name
+        label_name = self.model.get_outputs()[1].name
+        pred_proba = self.model.run([label_name], {input_name: X})[0]
+        pred_proba = np.array([[r[i] for i in range(self.num_classes)] for r in pred_proba])
+        return pred_proba
+
+
+class RFOnnxCompiler:
+    name = 'onnx'
+    save_in_pkl = False
+
+    @staticmethod
+    def can_compile():
+        try:
+            import skl2onnx
+            return True
+        except ImportError:
+            return False
+
+    @staticmethod
+    def compile(obj, path: str):
+        print('compiling')
+        # Convert into ONNX format
+        from skl2onnx import convert_sklearn
+        from skl2onnx.common.data_types import FloatTensorType
+        initial_type = [('float_input', FloatTensorType([None, obj._num_features_post_process]))]
+        onx = convert_sklearn(obj.model, initial_types=initial_type)
+        import os
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + "model.onnx", "wb") as f:
+            f.write(onx.SerializeToString())
+        return RFOnnxCompiler.load(obj=obj, path=path)
+
+    @staticmethod
+    def load(obj, path: str):
+        import onnxruntime as rt
+        model = rt.InferenceSession(path + "model.onnx")
+        return RFOnnxPredictor(obj=obj, model=model)
+
+    # @staticmethod
+    # def predict(obj, X):
+    #     input_name = obj._model_onnx.get_inputs()[0].name
+    #     label_name = obj._model_onnx.get_outputs()[0].name
+    #     return obj._model_onnx.run([label_name], {input_name: X})[0]
+    #
+    # @staticmethod
+    # def predict_proba(obj, X):
+    #     input_name = obj._model_onnx.get_inputs()[0].name
+    #     label_name = obj._model_onnx.get_outputs()[1].name
+    #     pred_proba = obj._model_onnx.run([label_name], {input_name: X})[0]
+    #     pred_proba = np.array([[r[i] for i in range(obj.num_classes)] for r in pred_proba])
+    #     return pred_proba
+
+
 class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
@@ -26,6 +92,7 @@ class RFModel(AbstractModel):
         super().__init__(**kwargs)
         self._feature_generator = None
         self._daal = False  # Whether daal4py backend is being used
+        self._num_features_post_process = None
 
     def _get_model_type(self):
         if self.problem_type == QUANTILE:
@@ -152,6 +219,7 @@ class RFModel(AbstractModel):
         n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
 
         X = self.preprocess(X)
+        self._num_features_post_process = X.shape[1]
         n_estimator_increments = [n_estimators_final]
 
         num_trees_per_estimator = self._get_num_trees_per_estimator()
@@ -224,6 +292,44 @@ class RFModel(AbstractModel):
             model.estimators_ = None
         self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
+        # self.compile(path=self.path)
+
+    def compile(self, path: str):
+        print('compiling')
+        # Convert into ONNX format
+        from skl2onnx import convert_sklearn
+        from skl2onnx.common.data_types import FloatTensorType
+        initial_type = [('float_input', FloatTensorType([None, self._num_features_post_process]))]
+        onx = convert_sklearn(self.model, initial_types=initial_type)
+        import os
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + "model.onnx", "wb") as f:
+            f.write(onx.SerializeToString())
+
+        # Compute the prediction with ONNX Runtime
+        import onnxruntime as rt
+        import numpy
+        self._model_onnx = rt.InferenceSession(path + "model.onnx")
+        # input_name = sess.get_inputs()[0].name
+        # label_name = sess.get_outputs()[0].name
+        # pred_onx = sess.run([label_name], {input_name: X_test.astype(numpy.float32)})[0]
+
+    def _load_onnx(self, path: str):
+        import onnxruntime as rt
+        sess = rt.InferenceSession(path + "model.onnx")
+        return sess
+
+    def _predict_onnx(self, X):
+        input_name = self._model_onnx.get_inputs()[0].name
+        label_name = self._model_onnx.get_outputs()[0].name
+        return self._model_onnx.run([label_name], {input_name: X})[0]
+
+    def _predict_proba_onnx(self, X):
+        input_name = self._model_onnx.get_inputs()[0].name
+        label_name = self._model_onnx.get_outputs()[1].name
+        pred_proba = self._model_onnx.run([label_name], {input_name: X})[0]
+        pred_proba = np.array([[r[i] for i in range(self.num_classes)] for r in pred_proba])
+        return pred_proba
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
     def _predict_proba(self, X, **kwargs):
@@ -237,6 +343,7 @@ class RFModel(AbstractModel):
             return self.model.predict(X, quantile_levels=self.quantile_levels)
 
         y_pred_proba = self.model.predict_proba(X)
+        # y_pred_proba = self._predict_proba_onnx(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
     def get_oof_pred_proba(self, X, normalize=None, **kwargs):
@@ -358,3 +465,72 @@ class RFModel(AbstractModel):
         else:
             tags['valid_oof'] = True
         return tags
+
+    # def save(self, path: str = None, verbose=True) -> str:
+    #     _model = self.model
+    #     # self.model = None
+    #     # _model_onnx = self._model_onnx
+    #     # self._model_onnx = None
+    #     if _model is not None:
+    #         self._is_model_saved = True
+    #     # if _model_onnx is not None:
+    #     #     self._is_model_onnx_saved = True
+    #     path = super().save(path=path, verbose=verbose)
+    #     # if _model is not None:
+    #     #     save_func_map = {
+    #     #         'onnx': self._save_onnx,
+    #     #         None: self._save_native,
+    #     #     }
+    #     #     kwargs = dict(path=path, model=_model)
+    #     #     save_func_map[self._get_compiler()](**kwargs)
+    #     self.model = _model
+    #     # self._model_onnx = _model_onnx
+    #     return path
+    #
+    # @classmethod
+    # def load(cls, path: str, reset_paths=True, verbose=True):
+    #     model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+    #     # model._model_onnx = model._load_onnx(path=path)
+    #     # if model._is_model_saved:
+    #     #     load_func_map = {
+    #     #         'onnx': model._load_onnx,
+    #     #         None: model._load_native,
+    #     #     }
+    #     #     model.model = load_func_map[model._get_compiler()](path=path)
+    #     return model
+    #
+    def _valid_compilers(self):
+        return [RFOnnxCompiler]
+
+    def _get_compiler(self):
+        compiler = self.params_aux.get('compiler', None)
+        compilers = self._valid_compilers()
+        compiler_names = {c.name: c for c in compilers}
+        if compiler is not None and compiler not in compiler_names:
+            raise AssertionError(f'Unknown compiler: {compiler}. Valid compilers: {compiler_names}')
+        if compiler is None:
+            return RFOnnxCompiler
+        compiler_cls = compiler_names[compiler]
+        if not compiler_cls.can_compile():
+            compiler_cls = RFOnnxCompiler
+        return compiler_cls
+
+    def save(self, path: str = None, verbose=True) -> str:
+        _model = self.model
+        if self.model is not None:
+            self._compiler = self._get_compiler()
+            self._is_model_saved = True
+            if self._compiler is not None:
+                self.model = None  # Don't save model in pkl
+        path = super().save(path=path, verbose=verbose)
+        self.model = _model
+        if _model is not None and self._compiler is not None:
+            self.model = self._compiler.compile(obj=self, path=path)
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._is_model_saved:
+            model.model = model._compiler.load(obj=model, path=path)
+        return model
