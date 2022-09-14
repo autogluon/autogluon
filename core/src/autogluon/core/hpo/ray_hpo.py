@@ -231,7 +231,7 @@ def run(
     )
 
     if not ray.is_initialized():
-        ray.init(log_to_driver=True, **total_resources)
+        ray.init(log_to_driver=False, **total_resources)
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -360,7 +360,7 @@ def _get_searcher(
             if searcher not in supported_searchers:
                 logger.warning(f'{searcher} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers}')
         if default_hyperparameters is None:
-            default_hyperparameters = dict()
+            default_hyperparameters = [dict()]
         searcher = SearcherFactory.get_searcher(
             searcher_name=searcher,
             user_init_args=user_init_args,
