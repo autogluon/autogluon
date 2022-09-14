@@ -41,11 +41,11 @@ class Classifier2ST:
                  sample_label='xshift_label',
                  eval_metric=balanced_accuracy,
                  split=0.5,
+                 compute_fi = True,
                  classifier_kwargs = {}
                  ):
         classifier_kwargs.update({'label': sample_label, 'eval_metric': eval_metric})
-        self.classifier_kwargs = classifier_kwargs
-        self.classifier = classifier_class(**self.classifier_kwargs)
+        self.classifier = classifier_class(**classifier_kwargs)
         self.classifier_class = classifier_class
         self.split = split
         self.sample_label = sample_label
@@ -53,9 +53,8 @@ class Classifier2ST:
         self._is_fit = False
         self._test = None
         self.test_stat = None
-        self.original_index = None
         self.has_fi = None
-        self.fit_kwargs = None
+        self.compute_fi = compute_fi
 
     @staticmethod
     def _make_source_target_label(data, sample_label):
@@ -85,16 +84,15 @@ class Classifier2ST:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
             data = self._make_source_target_label(data, self.sample_label) # makes a copy
         if data.index.has_duplicates:
-            self.original_index = data.index.copy()
             data.index = pd.RangeIndex(data.shape[0])
-        self.fit_kwargs = kwargs
         train = data.sample(frac=self.split)
         test = data.drop(train.index)
         self.classifier.fit(train, **kwargs)
         yhat = self.classifier.predict(test)
         self.test_stat = self.eval_metric(test[self.sample_label], yhat)
-        self._test = test  # for feature importance and sample anomalies
         self.has_fi = (getattr(self.classifier, "feature_importance", None) is not None)
+        if self.has_fi and self.compute_fi:
+            self._test = test  # for feature importance
         self._is_fit = True
 
     @post_fit
@@ -126,14 +124,11 @@ class Classifier2ST:
 
     @post_fit
     def pvalue(self,
-               method='half_permutation',
-               num_permutations=1000):
+               num_permutations: int=1000):
         """Compute the p-value which measures the significance level for the test statistic
 
         Parameters
         ----------
-        method : str
-            One of 'half_permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
         num_permutations: int, default = 1000
             The number of permutations used for any permutation based method
 
@@ -141,13 +136,7 @@ class Classifier2ST:
         -------
         float of the p-value for the 2-sample test
         """
-        valid_methods = [
-            'half_permutation'
-        ]
-        assert method in valid_methods, 'method must be one of ' + ', '.join(valid_methods)
-        if method == 'half_permutation':
-            pval = self._pvalue_half_permutation(
-                num_permutations=num_permutations)
+        pval = self._pvalue_half_permutation(num_permutations=num_permutations)
         return pval
 
     @post_fit
@@ -159,6 +148,7 @@ class Classifier2ST:
         pd.DataFrame of feature importances
         """
         assert self.has_fi, "Classifier class does not have feature_importance method"
+        assert self.compute_fi, "Set compute_fi to True to compute feature importances"
         fi_scores = self.classifier.feature_importance(self._test)
         return fi_scores
 
@@ -207,16 +197,18 @@ class C2STShiftDetector:
     def __init__(self,
                  classifier_class: Any,
                  label: Optional[str]=None,
+                 compute_fi: bool = True,
                  eval_metric: str='balanced_accuracy',
                  sample_label: str='i2vkyc0p64',
                  classifier_kwargs: dict={}):
         named_metrics = BINARY_METRICS
         assert eval_metric in named_metrics.keys(), \
             'eval_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
-        self.eval_metric = named_metrics[eval_metric]  #is this necessary?
+        self.eval_metric = named_metrics[eval_metric]
         self.C2ST = Classifier2ST(classifier_class,
                                   sample_label=sample_label,
                                   eval_metric=self.eval_metric,
+                                  compute_fi = compute_fi,
                                   classifier_kwargs=classifier_kwargs)
         if not label:
             warnings.warn('label is not specified, please ensure that train_data, test_data do not have the Y (label) '
@@ -224,11 +216,11 @@ class C2STShiftDetector:
         self.label = label
         self._is_fit = False
         self.fi_scores = None
+        self.compute_fi = compute_fi
 
     def fit(self,
             X: pd.DataFrame,
             X_test: pd.DataFrame,
-            compute_fi: bool=True,
             **kwargs):
         """Fit the XShift detector.
 
@@ -254,7 +246,7 @@ class C2STShiftDetector:
         self.C2ST.fit((X, X_test), **kwargs)
 
         # Feature importance
-        if self.C2ST.has_fi and compute_fi:
+        if self.C2ST.has_fi and self.compute_fi:
             self.fi_scores = self.C2ST.feature_importance()
 
         self._is_fit = True
@@ -311,14 +303,11 @@ class C2STShiftDetector:
 
     @post_fit
     def pvalue(self,
-               method: str='half_permutation',
                num_permutations: int=1000) -> float:
         """Compute the p-value which measures the significance level for the test statistic
 
         Parameters
         ----------
-        method : str
-            One of 'half_permutation' (method 1 of https://arxiv.org/pdf/1602.02210.pdf), ...
         num_permutations: int, default = 1000
             The number of permutations used for any permutation based method
 
@@ -326,10 +315,14 @@ class C2STShiftDetector:
         -------
         float of the p-value for the 2-sample test
         """
-        return self.C2ST.pvalue(method=method, num_permutations=num_permutations)
+        return self.C2ST.pvalue(num_permutations=num_permutations)
 
 
 class XShiftDetector(AbstractAnalysis):
+    """Detect a change in covariate (X) distribution between training and test, which we call XShift.  It can tell you
+    if your training set is not representative of your test set distribution.  This is done with a Classifier 2
+    Sample Test.
+    """
 
     def __init__(self,
                  classifier_class: Union[Any,None] = TabularPredictor,
@@ -352,12 +345,12 @@ class XShiftDetector(AbstractAnalysis):
             label = None
         tst = C2STShiftDetector(classifier_class=self.classifier_class,
                                 label=label,
+                                compute_fi=self.compute_fi,
                                 classifier_kwargs=self.classifier_kwargs)
         assert 'train_data' in args, 'train_data required as arg'
         assert 'test_data' in args, 'test_data required as arg'
         tst.fit(X=args['train_data'],
                 X_test=args['test_data'],
-                compute_fi=self.compute_fi,
                 verbosity=0)
         state.xshift_results = tst.results()
         pass
