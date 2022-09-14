@@ -1,16 +1,18 @@
 """
 This file implements TrivialAugment.(https://arxiv.org/abs/2103.10158) We extend it for multi-modality setting. 
 
-Code is partically adapted from its official implementation https://github.com/automl/trivialaugment
+Code is partially adapted from its official implementation https://github.com/automl/trivialaugment
 """
 
-import random
 import logging
-from PIL import ImageOps, ImageEnhance, Image
+import random
+
 import nlpaug.augmenter.word as naw
-from .utils import InsertPunctuation
 import nltk
-from ..constants import IMAGE, TEXT, AUTOMM
+from PIL import Image, ImageEnhance, ImageOps
+
+from ..constants import AUTOMM, IMAGE, TEXT
+from .utils import InsertPunctuation
 
 logger = logging.getLogger(AUTOMM)
 
@@ -278,7 +280,7 @@ class TrivialAugment:
     def augment_text(self, data):
         op = random.choice(self.all_transform)
 
-        # use specified operation magnitude if avalible
+        # use specified operation magnitude if available
         if isinstance(op, tuple):
             op, scale = op
         else:

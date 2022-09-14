@@ -4,11 +4,11 @@ from sagemaker import image_uris
 from sagemaker.model import FrameworkModel
 from sagemaker.predictor import Predictor
 from sagemaker.mxnet import MXNetModel
-from sagemaker.serializers import CSVSerializer
+from sagemaker.serializers import CSVSerializer, NumpySerializer
 from sagemaker.fw_utils import (
     model_code_key_prefix,
 )
-from .serializers import ParquetSerializer, JsonLineSerializer
+from .serializers import ParquetSerializer, MultiModalSerializer, JsonLineSerializer
 from .deserializers import PandasDeserializer
 from .sagemaker_utils import retrieve_latest_framework_version
 
@@ -81,8 +81,28 @@ class AutoGluonRealtimePredictor(Predictor):
         )
 
 
+class AutoGluonImageRealtimePredictor(Predictor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            *args,
+            serializer=NumpySerializer(),
+            deserializer=PandasDeserializer(),
+            **kwargs
+        )
+
+
+class AutoGluonMultiModalRealtimePredictor(Predictor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            *args,
+            serializer=MultiModalSerializer(),
+            deserializer=PandasDeserializer(),
+            **kwargs
+        )
+
+
 # Predictor documentation: https://sagemaker.readthedocs.io/en/stable/api/inference/predictors.html
-# SageMaker can only take in csv format for batch transformation because files need to be easily splitable to  be batch processed.
+# SageMaker can only take in csv format for batch transformation because files need to be easily splitable to be batch processed.
 class AutoGluonBatchPredictor(Predictor):
     def __init__(self, *args, **kwargs):
         super().__init__(

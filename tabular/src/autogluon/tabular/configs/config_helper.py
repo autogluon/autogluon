@@ -353,7 +353,7 @@ class ConfigBuilder:
         If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
         (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
         If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
-        (which may improve the prediction interval coverage, and bagging could futher improve it) and will compute a set of scalar parameters on the validation set.
+        (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
         """
         self.config['calibrate'] = calibrate
         return self

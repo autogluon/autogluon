@@ -2,6 +2,8 @@ function setup_build_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install flake8
     python3 -m pip install black>=22.3
+    python3 -m pip install isort>=5.10
+    python3 -m pip install bandit
 }
 
 function setup_build_contrib_env {
@@ -56,6 +58,9 @@ function install_multimodal {
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     python3 -m pip install --upgrade -e multimodal/[tests]
+    mim install mmcv-full
+    python3 -m pip install --upgrade mmdet
+    python3 -m pip install --upgrade mmocr
 }
 
 function install_text {
@@ -69,6 +74,11 @@ function install_vision {
 
 function install_timeseries {
     python3 -m pip install --upgrade -e timeseries/[all,tests]
+}
+
+function install_cloud {
+    python3 -m pip install --upgrade pytest-xdist # Enable running tests in parallel for speedup
+    python3 -m pip install --upgrade -e cloud/
 }
 
 function install_autogluon {

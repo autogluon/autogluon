@@ -1,11 +1,13 @@
 import logging
+from typing import List, Optional
+
 import torch
 from torch import nn
-from typing import List, Optional
-from .utils import init_weights
-from ..constants import LABEL, LOGITS, FEATURES, WEIGHT, AUTOMM
+
+from ..constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
+from .ft_transformer import CLSToken, FT_Transformer
 from .mlp import MLP
-from .ft_transformer import FT_Transformer, CLSToken
+from .utils import init_weights
 
 logger = logging.getLogger(AUTOMM)
 
@@ -61,7 +63,7 @@ class MultimodalFusionMLP(nn.Module):
         loss_weight
             The weight of individual models. For example, if we fuse the features of ViT, CLIP, and BERT,
             The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
-            Basically, it supports adding an auxilliary loss for each individual model.
+            Basically, it supports adding an auxiliary loss for each individual model.
         """
         super().__init__()
         logger.debug("initializing MultimodalFusionMLP")
@@ -69,6 +71,7 @@ class MultimodalFusionMLP(nn.Module):
             assert loss_weight > 0
         self.loss_weight = loss_weight
         self.model = nn.ModuleList(models)
+        self.num_classes = num_classes
 
         raw_in_features = [per_model.out_features for per_model in models]
         if adapt_in_features is not None:
@@ -109,6 +112,8 @@ class MultimodalFusionMLP(nn.Module):
         self.adapter.apply(init_weights)
         self.fusion_mlp.apply(init_weights)
         self.head.apply(init_weights)
+
+        self.out_features = in_features
 
         self.prefix = prefix
 
@@ -298,6 +303,8 @@ class MultimodalFusionTransformer(nn.Module):
             d_token=in_features,
             initialization="uniform",
         )
+
+        self.out_features = in_features
 
         # init weights
         self.adapter.apply(init_weights)

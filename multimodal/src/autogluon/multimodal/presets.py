@@ -1,11 +1,6 @@
 from typing import Optional
-from .constants import (
-    MODEL,
-    DATA,
-    OPTIMIZATION,
-    ENVIRONMENT,
-    DISTILLER,
-)
+
+from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -14,6 +9,7 @@ automm_presets = Registry("automm_presets")
 @automm_presets.register()
 def default():
     return {
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -22,6 +18,7 @@ def default():
 @automm_presets.register()
 def medium_quality_faster_train():
     return {
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
         "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
         "optimization.learning_rate": 4e-4,
@@ -31,6 +28,7 @@ def medium_quality_faster_train():
 @automm_presets.register()
 def high_quality():
     return {
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
         "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
     }
@@ -39,6 +37,7 @@ def high_quality():
 @automm_presets.register()
 def best_quality():
     return {
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "microsoft/deberta-v3-base",
         "model.timm_image.checkpoint_name": "swin_large_patch4_window7_224",
         "env.per_gpu_batch_size": 1,
@@ -48,6 +47,7 @@ def best_quality():
 @automm_presets.register()
 def multilingual():
     return {
+        "model.names": ["categorical_mlp", "numerical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
         "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
         "optimization.top_k": 1,
         "env.precision": "bf16",
@@ -56,10 +56,75 @@ def multilingual():
 
 
 @automm_presets.register()
-def zero_shot():
+def few_shot_text_classification():
     return {
+        "model.names": ["t_few"],
+        "model.t_few.checkpoint_name": "bigscience/T0_3B",
+        "model.t_few.gradient_checkpointing": False,  # Currently instable.
+        "optimization.learning_rate": 3e-3,
+        "optimization.lr_decay": 1.0,
+        "optimization.efficient_finetune": "ia3",
+        "optimization.max_steps": 1000,  # Find better solution to train for long
+        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
+        "optimization.val_check_interval": 1.0,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.06,
+        "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
+        "optimization.lora.filter": ["k|v|wi_1.*"],
+        "optimization.top_k": 1,
+        "optimization.max_epochs": -1,
+        "env.batch_size": 8,
+        "env.per_gpu_batch_size": 1,
+        "env.precision": "bf16",
+        "data.templates.turn_on": True,
+    }
+
+
+@automm_presets.register()
+def zero_shot_classification():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "cross-encoder/ms-marco-MiniLM-L-12-v2",
+        "env.eval_batch_size_ratio": 1,
+    }
+
+
+@automm_presets.register()
+def zero_shot_image_classification():
+    return {
+        "model.names": ["clip"],
         "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
         "model.clip.max_text_len": 0,
+        "env.eval_batch_size_ratio": 1,
+    }
+
+
+@automm_presets.register()
+def object_detection():
+    return {
+        "model.names": ["mmdet_image"],
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+        "env.eval_batch_size_ratio": 1,
+        "env.precision": 32,
+    }
+
+
+@automm_presets.register()
+def ocr_text_detection():
+    return {
+        "model.names": ["mmocr_text_detection"],
+        "model.mmdet_image.checkpoint_name": "TextSnake",
+        "env.eval_batch_size_ratio": 1,
+        "env.num_gpus": 1,
+        "env.precision": 32,
+    }
+
+
+def feature_extraction():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
+        "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
     }
 

@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from timm.data.mixup import Mixup, mixup_target, cutmix_bbox_and_lam
+from timm.data.mixup import Mixup, cutmix_bbox_and_lam, mixup_target
 
 
 class MixupModule(Mixup):
@@ -137,7 +137,7 @@ class MixupModule(Mixup):
 
 def mixup_others(x, lam):
     """
-    Mixup special types of data, espcially for tuple.
+    Mixup special types of data, especially for tuple.
     It is the simplest way of mixup for non image data.
     If lam >=0.5: choose the origin, else: choose the other one.
 

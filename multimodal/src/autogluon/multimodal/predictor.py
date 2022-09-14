@@ -1,110 +1,116 @@
 from __future__ import annotations
-import logging
-import os
-import numpy as np
-import json
-import warnings
-import sys
-import shutil
-from datetime import timedelta
-import pandas as pd
-import pickle
+
 import copy
-import yaml
-import torch
-from torch import nn
-from omegaconf import OmegaConf, DictConfig
+import json
+import logging
+import math
 import operator
+import os
+import pickle
+import shutil
+import sys
+import warnings
+from datetime import timedelta
+from typing import Callable, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
-from typing import Optional, List, Dict, Union, Callable
+import torch
+import yaml
+from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
-from autogluon.core.utils.try_import import try_import_ray_lightning
-from autogluon.core.utils.utils import default_holdout_frac
+from torch import nn
+
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.core.utils.try_import import try_import_ray_lightning
+from autogluon.core.utils.utils import default_holdout_frac
 
+from . import version as ag_version
 from .constants import (
-    LABEL,
+    AUTOMM,
+    AUTOMM_TUTORIAL_MODE,
+    BBOX,
+    BEST,
+    BEST_K_MODELS_FILE,
     BINARY,
-    MULTICLASS,
     CLASSIFICATION,
+    COLUMN_FEATURES,
+    DATA,
+    DEPRECATED_ZERO_SHOT,
+    FEATURE_EXTRACTION,
+    FEATURES,
+    FEW_SHOT,
+    GREEDY_SOUP,
+    LABEL,
+    LAST_CHECKPOINT,
+    LOGITS,
+    MASKS,
+    MATCHER,
+    MAX,
+    MIN,
+    MODEL,
+    MODEL_CHECKPOINT,
+    MULTICLASS,
+    OBJECT_DETECTION,
+    OCR_TEXT_DETECTION,
+    PROBABILITY,
+    RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    TEXT,
+    UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    LOGITS,
-    FEATURES,
-    AUTOMM,
-    AUTOMM_TUTORIAL_MODE,
-    UNIFORM_SOUP,
-    GREEDY_SOUP,
-    BEST,
-    MIN,
-    MAX,
-    TEXT,
-    RAY_TUNE_CHECKPOINT,
-    BEST_K_MODELS_FILE,
-    LAST_CHECKPOINT,
-    MODEL_CHECKPOINT,
-    MODEL,
-    DATA,
-    PROBABILITY,
-    MATCHER,
-    COLUMN_FEATURES,
-    MASKS,
-    ZERO_SHOT,
+    ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
-
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
-
-
-from .utils import (
-    create_model,
-    init_df_preprocessor,
-    init_data_processors,
-    select_model,
-    compute_score,
-    average_checkpoints,
-    infer_metrics,
-    get_minmax_mode,
-    filter_search_space,
-    get_config,
-    LogFilter,
-    apply_log_filter,
-    save_pretrained_models,
-    convert_checkpoint_name,
-    save_text_tokenizers,
-    load_text_tokenizers,
-    modify_duplicate_model_names,
-    assign_feature_column_names,
-    turn_on_off_feature_column_info,
-    try_to_infer_pos_label,
-    get_mixup,
-    CustomUnpickler,
-    is_interactive,
-    AutoMMModelCheckpoint,
-    data_to_df,
-    logits_to_prob,
-    extract_from_output,
-    init_zero_shot,
-    tensor_to_ndarray,
-    infer_dtypes_by_model_names,
-    update_config_by_rules,
-)
-from .optimization.utils import (
-    get_metric,
-    get_loss_func,
-)
-from .optimization.lit_module import LitModule
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
-
-from . import version as ag_version
+from .optimization.lit_module import LitModule
+from .optimization.rkd_loss import RKDLoss
+from .optimization.utils import get_loss_func, get_metric
+from .utils import (
+    AutoMMModelCheckpoint,
+    CustomUnpickler,
+    LogFilter,
+    apply_log_filter,
+    assign_feature_column_names,
+    average_checkpoints,
+    compute_num_gpus,
+    compute_score,
+    create_model,
+    data_to_df,
+    extract_from_output,
+    filter_search_space,
+    get_config,
+    get_local_pretrained_config_paths,
+    get_minmax_mode,
+    get_mixup,
+    infer_dtypes_by_model_names,
+    infer_metrics,
+    infer_scarcity_mode_by_data_size,
+    init_data_processors,
+    init_df_preprocessor,
+    init_pretrained,
+    load_text_tokenizers,
+    logits_to_prob,
+    modify_duplicate_model_names,
+    process_save_path,
+    save_pretrained_model_configs,
+    save_text_tokenizers,
+    select_model,
+    tensor_to_ndarray,
+    try_to_infer_pos_label,
+    turn_on_off_feature_column_info,
+    update_config_by_rules,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -124,6 +130,7 @@ class MultiModalPredictor:
         self,
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
+        pipeline: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
@@ -141,6 +148,9 @@ class MultiModalPredictor:
             (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
+        pipeline
+            This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
+            TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
@@ -196,8 +206,12 @@ class MultiModalPredictor:
         if verbosity is not None:
             set_logger_verbosity(verbosity, logger=logger)
 
+        if path is not None:
+            path = process_save_path(path=path)
+
         self._label_column = label
         self._problem_type = problem_type.lower() if problem_type is not None else None
+        self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
         self._output_shape = None
@@ -215,8 +229,19 @@ class MultiModalPredictor:
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
-        if problem_type is not None and problem_type.lower() == ZERO_SHOT:
-            self._config, self._model, self._data_processors = init_zero_shot(hyperparameters=hyperparameters)
+        if problem_type is not None and problem_type.lower() == DEPRECATED_ZERO_SHOT:
+            warnings.warn(
+                f'problem_type="{problem_type}" is deprecated. For inference with CLIP model, '
+                f'use pipeline="zero_shot_image_classification" instead.',
+                DeprecationWarning,
+            )
+            self._problem_type = None
+            self._pipeline = ZERO_SHOT_IMAGE_CLASSIFICATION
+
+        if self._pipeline is not None:
+            self._config, self._model, self._data_processors = init_pretrained(
+                pipeline=self._pipeline, hyperparameters=hyperparameters
+            )
 
     @property
     def path(self):
@@ -229,6 +254,10 @@ class MultiModalPredictor:
     @property
     def problem_type(self):
         return self._problem_type
+
+    @property
+    def column_types(self):
+        return self._column_types
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -246,7 +275,7 @@ class MultiModalPredictor:
     def fit(
         self,
         train_data: pd.DataFrame,
-        presets: str = None,
+        presets: Optional[str] = None,
         config: Optional[dict] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -343,7 +372,7 @@ class MultiModalPredictor:
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
                     num_trials: int
-                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs t o be specified.
+                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
                     scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
                         If str is passed, AutoGluon will create the scheduler for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
@@ -381,19 +410,21 @@ class MultiModalPredictor:
 
         pl.seed_everything(seed, workers=True)
 
-        if self._resume or save_path is None:
-            save_path = self._save_path
-        else:
-            save_path = os.path.expanduser(save_path)
+        if self._resume:
+            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
+            save_path = process_save_path(path=self._save_path, resume=True)
+        elif save_path is not None:
+            save_path = process_save_path(path=save_path)
+        elif self._save_path is not None:
+            save_path = process_save_path(path=self._save_path, raise_if_exist=False)
 
         if not self._resume:
             save_path = setup_outputdir(
                 path=save_path,
                 warn_if_exist=self._warn_if_exist,
             )
-        else:
-            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
-        save_path = os.path.abspath(save_path)
+
+        save_path = os.path.abspath(os.path.expanduser(save_path))
         logger.debug(f"save path: {save_path}")
 
         # Generate general info that's not config specific
@@ -432,6 +463,15 @@ class MultiModalPredictor:
             data=train_data,
             provided_problem_type=self._problem_type,
         )
+
+        # Determine data scarcity mode, i.e. a few-shot scenario
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=train_data, scarcity_threshold=50
+        )  # Add as separate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset 'few_shot_text_classification' for better performance."
+            )
 
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
@@ -513,12 +553,12 @@ class MultiModalPredictor:
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
         from autogluon.core.hpo.ray_hpo import (
-            run,
-            cleanup_trials,
-            cleanup_checkpoints,
-            EmptySearchSpace,
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
+            EmptySearchSpace,
+            cleanup_checkpoints,
+            cleanup_trials,
+            run,
         )
 
         ray_tune_adapter = AutommRayTuneAdapter()
@@ -652,6 +692,12 @@ class MultiModalPredictor:
             The baseline functions used in computing mutual information loss.
         soft_label_loss_func
             The loss function using teacher's logits as labels.
+        output_feature_adaptor
+            The adaptor used to adapt student output feature to the shape of teacher's.
+        output_feature_loss_func
+            The loss function using minimize distance between output_feature of teacher and student.
+        rkd_loss_func
+            The loss function using rkd distance and angle loss between output_feature of teacher and student.
         df_preprocessor
             The teacher predictor's dataframe preprocessor.
         data_processors
@@ -691,6 +737,42 @@ class MultiModalPredictor:
         else:
             raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
 
+        if not self._config.distiller.softmax_regression_loss_type:
+            # automatically infer loss func based on problem type if not specified
+            if self._problem_type == "regression":
+                softmax_regression_loss_func = nn.MSELoss()
+            else:
+                assert self._output_shape > 1
+                softmax_regression_loss_func = nn.CrossEntropyLoss()
+        elif self._config.distiller.softmax_regression_loss_type == "mse":
+            softmax_regression_loss_func = nn.MSELoss()
+        elif self._config.distiller.softmax_regression_loss_type == "cross_entropy":
+            softmax_regression_loss_func = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.softmax_regression_loss_type}")
+
+        output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
+        if output_feature_loss_type == "cosine":
+            output_feature_loss_func = nn.CosineEmbeddingLoss()
+        elif output_feature_loss_type == "mse":
+            output_feature_loss_func = nn.MSELoss()
+        else:
+            raise ValueError(f"Unknown output_feature_loss_type: {output_feature_loss_type}")
+
+        # Adapt student's output_feature feature to teacher's
+        # Refer to FitNet: https://arxiv.org/abs/1412.6550
+        teacher_model_dim = teacher_predictor._model.out_features
+        student_model_dim = self._model.out_features
+        output_feature_adaptor = (
+            nn.Linear(student_model_dim, teacher_model_dim)
+            if teacher_model_dim != student_model_dim
+            else nn.Identity()
+        )
+
+        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.0)
+        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.0)
+        rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
+
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
@@ -724,6 +806,10 @@ class MultiModalPredictor:
             critics,
             baseline_funcs,
             soft_label_loss_func,
+            softmax_regression_loss_func,
+            output_feature_adaptor,
+            output_feature_loss_func,
+            rkd_loss_func,
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
@@ -829,9 +915,6 @@ class MultiModalPredictor:
         self._model = model
         self._loss_func = loss_func
 
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
-
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
             match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
@@ -862,6 +945,10 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
             ) = self._setup_distillation(
@@ -873,9 +960,13 @@ class MultiModalPredictor:
                 critics,
                 baseline_funcs,
                 soft_label_loss_func,
+                softmax_regression_loss_func,
+                output_feature_adaptor,
+                output_feature_loss_func,
+                rkd_loss_func,
                 teacher_df_preprocessor,
                 teacher_data_processors,
-            ) = (None, None, None, None, None, None)
+            ) = (None, None, None, None, None, None, None, None, None, None)
 
         if teacher_df_preprocessor is not None:
             df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
@@ -910,6 +1001,9 @@ class MultiModalPredictor:
         is_match = hasattr(config, MATCHER)
         assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
+            output_feature_loss_weight = OmegaConf.select(
+                self._config, "distiller.output_feature_loss_weight", default=0.01
+            )
             task = DistillerLitModule(
                 student_model=model,
                 teacher_model=teacher_model,
@@ -918,9 +1012,15 @@ class MultiModalPredictor:
                 baseline_funcs=baseline_funcs,
                 hard_label_weight=config.distiller.hard_label_weight,
                 soft_label_weight=config.distiller.soft_label_weight,
+                softmax_regression_weight=config.distiller.softmax_regression_weight,
                 temperature=config.distiller.temperature,
+                output_feature_loss_weight=output_feature_loss_weight,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
+                softmax_regression_loss_func=softmax_regression_loss_func,
+                output_feature_adaptor=output_feature_adaptor,
+                output_feature_loss_func=output_feature_loss_func,
+                rkd_loss_func=rkd_loss_func,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -939,6 +1039,7 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -991,19 +1092,7 @@ class MultiModalPredictor:
             version="",
         )
 
-        num_gpus = config.env.num_gpus if isinstance(config.env.num_gpus, int) else len(config.env.num_gpus)
-        if num_gpus < 0:  # In case config.env.num_gpus is -1, meaning using all gpus.
-            num_gpus = torch.cuda.device_count()
-
-        if is_interactive() and num_gpus > 1:
-            warnings.warn(
-                "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
-                "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-                "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-                "MultiModalPredictor in a script.",
-                UserWarning,
-            )
-            num_gpus = 1
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
         if num_gpus == 0:  # CPU only training
             warnings.warn(
@@ -1049,6 +1138,13 @@ class MultiModalPredictor:
                 strategy = None
                 num_gpus = min(num_gpus, 1)
 
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy
+        self._config = config
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(save_path)
+
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1075,6 +1171,9 @@ class MultiModalPredictor:
                 fast_dev_run=config.env.fast_dev_run,
                 track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
                 val_check_interval=config.optimization.val_check_interval,
+                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
+                if hasattr(config.optimization, "check_val_every_n_epoch")
+                else 1,
             )
 
         with warnings.catch_warnings():
@@ -1121,7 +1220,8 @@ class MultiModalPredictor:
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
-                best_k_models = yaml.load(f, Loader=yaml.Loader)
+                best_k_models = yaml.safe_load(f)
+
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -1152,30 +1252,32 @@ class MultiModalPredictor:
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
                     monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
-
-                    logger.info(f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm.")
-
                     ingredients = [top_k_model_paths[0]]
-                    self._model = self._load_state_dict(
-                        model=model,
-                        path=top_k_model_paths[0],
-                        prefix=prefix,
-                    )
-                    best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                    for i in range(1, len(top_k_model_paths)):
-                        cand_avg_state_dict = average_checkpoints(
-                            checkpoint_paths=ingredients + [top_k_model_paths[i]],
+                    if len(top_k_model_paths) > 1:
+                        logger.info(
+                            f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm."
                         )
+
                         self._model = self._load_state_dict(
-                            model=self._model,
-                            state_dict=cand_avg_state_dict,
+                            model=model,
+                            path=top_k_model_paths[0],
                             prefix=prefix,
                         )
-                        cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
-                        if monitor_op(cand_score, best_score):
-                            # Add new ingredient
-                            ingredients.append(top_k_model_paths[i])
-                            best_score = cand_score
+                        best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                        for i in range(1, len(top_k_model_paths)):
+                            cand_avg_state_dict = average_checkpoints(
+                                checkpoint_paths=ingredients + [top_k_model_paths[i]],
+                            )
+                            self._model = self._load_state_dict(
+                                model=self._model,
+                                state_dict=cand_avg_state_dict,
+                                prefix=prefix,
+                            )
+                            cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                            if monitor_op(cand_score, best_score):
+                                # Add new ingredient
+                                ingredients.append(top_k_model_paths[i])
+                                best_score = cand_score
                 elif top_k_average_method == BEST:
                     ingredients = [top_k_model_paths[0]]
                 else:
@@ -1209,6 +1311,7 @@ class MultiModalPredictor:
                 old_prefix="student_model",
                 new_prefix="model",
             )
+
         checkpoint = {"state_dict": avg_state_dict}
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
@@ -1235,11 +1338,7 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        num_gpus = (
-            self._config.env.num_gpus if isinstance(self._config.env.num_gpus, int) else len(self._config.env.num_gpus)
-        )
-        if num_gpus < 0:
-            num_gpus = torch.cuda.device_count()
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
@@ -1510,6 +1609,9 @@ class MultiModalPredictor:
         else:
             ret_type = LOGITS
 
+        if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
+            ret_type = BBOX
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1528,7 +1630,7 @@ class MultiModalPredictor:
                     y_pred=logits_or_prob,
                 )
             else:
-                if logits_or_prob.ndim == 2:
+                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
                     pred = logits_or_prob.argmax(axis=1)
                 else:
                     pred = logits_or_prob
@@ -1646,7 +1748,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=False,
         )
-        if self._problem_type in [ZERO_SHOT]:
+        if self._pipeline in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
             if return_masks:
                 masks = extract_from_output(outputs=outputs, ret_type=MASKS, as_ndarray=as_tensor is False)
@@ -1702,7 +1804,7 @@ class MultiModalPredictor:
         }
         return state_dict_processed
 
-    def save(self, path: str, standalone: Optional[bool] = False):
+    def save(self, path: str, standalone: Optional[bool] = True):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -1717,11 +1819,12 @@ class MultiModalPredictor:
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
 
+        config = copy.deepcopy(self._config)
         if standalone:
-            self._config = save_pretrained_models(model=self._model, config=self._config, path=path)
+            config = save_pretrained_model_configs(model=self._model, config=config, path=path)
 
         os.makedirs(path, exist_ok=True)
-        OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
+        OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._df_preprocessor, fp)
@@ -1773,13 +1876,13 @@ class MultiModalPredictor:
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
-        config = convert_checkpoint_name(
+        config = get_local_pretrained_config_paths(
             config=config, path=path
-        )  # check the config for loading offline pretrained models
+        )  # check the config to load offline pretrained model configs
 
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
@@ -1853,7 +1956,7 @@ class MultiModalPredictor:
         -------
         The loaded predictor object.
         """
-        path = os.path.expanduser(path)
+        path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         predictor = cls(label="dummy_label")
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)

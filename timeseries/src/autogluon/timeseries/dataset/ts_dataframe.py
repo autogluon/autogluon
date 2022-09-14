@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import copy
 import itertools
-from typing import Any, Tuple, Type, Optional
+import warnings
 from collections.abc import Iterable
+from typing import Any, Optional, Tuple, Type, Union
 
+import numpy as np
 import pandas as pd
 from pandas.core.internals import ArrayManager, BlockManager
 
+from autogluon.common.utils.deprecated import deprecated
+
 ITEMID = "item_id"
 TIMESTAMP = "timestamp"
+
+IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
@@ -60,6 +67,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
                         2019-01-02       7
                         2019-01-03       8
 
+    static_features: Optional[pd.DataFrame]
+        An optional data frame describing the metadata attributes of individual items in the item index. These
+        may be categorical or real valued attributes for each item. For example, if the item index refers to
+        time series data of individual households, static features may refer to time-independent demographic
+        features. When provided during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available
+        during prediction time. When provided, the index of the ``static_features`` index must match the item index
+        of the ``TimeSeriesDataFrame``.
+
+        ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization,
+        copy and slice operations although these features should be considered experimental.
+
     Attributes
     ----------
     freq: str
@@ -70,9 +88,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Number of items (time series) in the data set.
     """
 
+    DUMMY_INDEX_START_TIME = pd.Timestamp("1900-01-01 00:00:00")
     index: pd.MultiIndex
+    _metadata = ["_static_features", "_cached_freq"]
 
-    def __init__(self, data: Any, *args, **kwargs):
+    def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
             # necessary for copy constructor to work. see _constructor
             # and pandas.DataFrame
@@ -85,38 +105,86 @@ class TimeSeriesDataFrame(pd.DataFrame):
         elif isinstance(data, Iterable):
             data = self._construct_pandas_frame_from_iterable_dataset(data)
         else:
-            raise ValueError(
-                "Data input type not recognized, must be DataFrame or iterable."
-            )
+            raise ValueError("Data input type not recognized, must be DataFrame or iterable.")
         super().__init__(data=data, *args, **kwargs)
+        self._static_features: Optional[pd.DataFrame] = None
+        if static_features is not None:
+            self.static_features = static_features
+
+        # internal value for cached frequency values that are inferred. corresponds to either a
+        # pandas-compatible frequency string, the value IRREGULAR_TIME_INDEX_FREQSTR that signals
+        # the time series have irregular timestamps (in which case tsdf.freq returns None), or None
+        # if inference was not yet performed.
+        self._cached_freq: Optional[str] = None
 
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
         return TimeSeriesDataFrame
 
     @property
+    def item_ids(self) -> pd.Index:
+        return self.index.unique(level=ITEMID)
+
+    @property
+    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.", version_removed="0.7")
+    def _item_index(self):
+        return self.index.unique(level=ITEMID)
+
+    @property
+    def static_features(self):
+        return self._static_features
+
+    @static_features.setter
+    def static_features(self, value: Optional[pd.DataFrame]):
+        # if the current item index is not a multiindex, then we are dealing with a single
+        # item slice. this should only happen when the user explicitly requests only a
+        # single item or during `slice_by_timestep`. In this case we do not set static features
+        if not isinstance(self.index, pd.MultiIndex):
+            return
+
+        if value is not None and not set(value.index).issuperset(set(self.item_ids)):
+            raise ValueError("Static features index should match item index")
+
+        # if static features being set are a strict superset of the item index, we take a
+        # subset to ensure consistency
+        if value is not None and len(set(value.index) - set(self.item_ids)) > 0:
+            value = value.loc[self.item_ids].copy()
+
+        self._static_features = value
+
+    @property
     def freq(self):
-        ts_index = self.index.levels[1]  # noqa
-        freq = (
-            ts_index.freq
-            or ts_index.inferred_freq
-            or self.loc[0].index.freq  # fall back to freq of first item
-            or self.loc[0].index.inferred_freq
-        )
-        if freq is None:
-            raise ValueError("Frequency not provided and cannot be inferred")
-        if isinstance(freq, str):
-            return freq
-        elif isinstance(freq, pd._libs.tslibs.BaseOffset):
-            return freq.freqstr
+        if self._cached_freq is not None and self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+            return None  # irregularly sampled time series
+        elif self._cached_freq:
+            return self._cached_freq
+
+        def get_freq(series):
+            return series.index.freq or series.index.inferred_freq
+
+        # check the frequencies of the first 100 items to see if frequencies are consistent and
+        # can be inferred
+        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.item_ids[:100]]
+        freq = freq_for_each_series[0]
+        if len(set(freq_for_each_series)) > 1 or freq is None:
+            self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
+            return None
+
+        freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
+        self._cached_freq = freq
         return freq
 
+    @deprecated("Please use `TimeSeriesDataFrame.item_ids` instead.", version_removed="0.7")
     def iter_items(self) -> Iterable[Any]:
-        return iter(self.index.levels[0])
+        return iter(self.item_ids)
 
     @property
     def num_items(self):
-        return len(self.index.levels[0])
+        return len(self.item_ids)
+
+    def num_timesteps_per_item(self) -> pd.Series:
+        """Length of each time series in the dataframe."""
+        return self.groupby(level=ITEMID, sort=False).size()
 
     @classmethod
     def _validate_iterable(cls, data: Iterable):
@@ -129,13 +197,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         for i, ts in enumerate(itertools.chain([first], data)):
             if not isinstance(ts, dict):
-                raise ValueError(
-                    f"{i}'th time-series in data must be a dict, got{type(ts)}"
-                )
+                raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
             if not ("target" in ts and "start" in ts):
-                raise ValueError(
-                    f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}"
-                )
+                raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
             if not isinstance(ts["start"], pd.Timestamp) or ts["start"].freq is None:
                 raise ValueError(
                     f"{i}'th time-series must have timestamp as 'start' with freq specified, got {ts['start']}"
@@ -154,13 +218,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if df[TIMESTAMP].isnull().any():
             raise ValueError(f"`{TIMESTAMP}` column can not have nan")
         if not df[TIMESTAMP].dtype == "datetime64[ns]":
-            raise ValueError(
-                f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
-            )
-
-        # TODO: check if time series are irregularly sampled. this check was removed as
-        # TODO: pandas is inconsistent in identifying freq when period-end timestamps
-        # TODO: are provided.
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64[ns]`.")
+        item_id_column = df[ITEMID]
+        # workaround for pd.api.types.is_string_dtype issue https://github.com/pandas-dev/pandas/issues/15585
+        item_id_is_string = (item_id_column == item_id_column.astype(str)).all()
+        item_id_is_int = pd.api.types.is_integer_dtype(item_id_column)
+        if not (item_id_is_string or item_id_is_int):
+            raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
     def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
@@ -177,32 +241,26 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not isinstance(data.index, pd.MultiIndex):
             raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
         if not data.index.dtypes.array[1] == "datetime64[ns]":
-            raise ValueError(
-                f"for {TIMESTAMP}, the only pandas dtype allowed is ‘datetime64[ns]’."
-            )
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64[ns]`.")
         if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
-            raise ValueError(
-                f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}"
-            )
+            raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
+        item_id_index = data.index.get_level_values(level=ITEMID)
+        # workaround for pd.api.types.is_string_dtype issue https://github.com/pandas-dev/pandas/issues/15585
+        item_id_is_string = (item_id_index == item_id_index.astype(str)).all()
+        item_id_is_int = pd.api.types.is_integer_dtype(item_id_index)
+        if not (item_id_is_string or item_id_is_int):
+            raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
-    def _construct_pandas_frame_from_iterable_dataset(
-        cls, iterable_dataset: Iterable
-    ) -> pd.DataFrame:
+    def _construct_pandas_frame_from_iterable_dataset(cls, iterable_dataset: Iterable) -> pd.DataFrame:
         cls._validate_iterable(iterable_dataset)
 
         all_ts = []
         for i, ts in enumerate(iterable_dataset):
             start_timestamp = ts["start"]
             target = ts["target"]
-            datetime_index = tuple(
-                pd.date_range(
-                    start_timestamp, periods=len(target), freq=start_timestamp.freq
-                )
-            )
-            idx = pd.MultiIndex.from_product(
-                [(i,), datetime_index], names=[ITEMID, TIMESTAMP]
-            )
+            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=start_timestamp.freq))
+            idx = pd.MultiIndex.from_product([(i,), datetime_index], names=[ITEMID, TIMESTAMP])
             ts_df = pd.Series(target, name="target", index=idx).to_frame()
             all_ts.append(ts_df)
         return pd.concat(all_ts)
@@ -249,9 +307,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             df.rename(columns={id_column: ITEMID}, inplace=True)
 
         if timestamp_column is not None:
-            assert (
-                timestamp_column in df.columns
-            ), f"Column {timestamp_column} not found!"
+            assert timestamp_column in df.columns, f"Column {timestamp_column} not found!"
             df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
 
         cls._validate_data_frame(df)
@@ -294,16 +350,32 @@ class TimeSeriesDataFrame(pd.DataFrame):
             A data frame in TimeSeriesDataFrame format.
         """
         return cls(
-            cls._construct_pandas_frame_from_data_frame(
-                df, id_column=id_column, timestamp_column=timestamp_column
-            )
+            cls._construct_pandas_frame_from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
         )
 
-    def split_by_time(
-        self, cutoff_time: pd.Timestamp
-    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        """Split dataframe to two different ``TimeSeriesDataFrame`` s before and after a certain
-        ``cutoff_time``.
+    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
+        obj = super().copy(deep=deep)
+
+        # also perform a deep copy for static features
+        if deep:
+            for k in obj._metadata:
+                setattr(obj, k, copy.deepcopy(getattr(obj, k)))
+        return obj
+
+    def __finalize__(  # noqa
+        self: TimeSeriesDataFrame, other, method: Optional[str] = None, **kwargs
+    ) -> TimeSeriesDataFrame:
+        super().__finalize__(other=other, method=method, **kwargs)
+        # when finalizing the copy/slice operation, we use the property setter to stay consistent
+        # with the item index
+        if hasattr(other, "_static_features"):
+            self.static_features = other._static_features
+        if hasattr(other, "_cached_freq"):
+            self._cached_freq = other._cached_freq
+        return self
+
+    def split_by_time(self, cutoff_time: pd.Timestamp) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
+        """Split dataframe to two different ``TimeSeriesDataFrame`` s before and after a certain ``cutoff_time``.
 
         Parameters
         ----------
@@ -321,107 +393,164 @@ class TimeSeriesDataFrame(pd.DataFrame):
         nanosecond_before_cutoff = cutoff_time - pd.Timedelta(nanoseconds=1)
         data_before = self.loc[(slice(None), slice(None, nanosecond_before_cutoff)), :]
         data_after = self.loc[(slice(None), slice(cutoff_time, None)), :]
-        return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
-
-    def split_by_item(
-        self, cutoff_item: int
-    ) -> Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]:
-        """Split dataframe to two data frames containing items before and after a ``cutoff_item``.
-
-        Parameters
-        ----------
-        cutoff_item: int
-            The item_id to split the current data frame into two data frames.
-
-        Returns
-        -------
-        data_before: TimeSeriesDataFrame
-            Data frame containing time-series before the ``cutoff_item`` (exclude ``cutoff_item``).
-        data_after: TimeSeriesDataFrame
-            Data frame containing time-series after the ``cutoff_item`` (include ``cutoff_item``).
-        """
-
-        data_before = self.loc[(slice(None, cutoff_item - 1), slice(None)), :]
-        data_after = self.loc[(slice(cutoff_item, None), slice(None)), :]
-        return TimeSeriesDataFrame(data_before), TimeSeriesDataFrame(data_after)
-
-    def slice_by_timestep(self, time_step_slice: slice) -> TimeSeriesDataFrame:
-        """Return a slice of time steps (with no regards to the actual timestamp) from within
-        each item in a time series data frame. For example, if a data frame is constructed as::
-
-            item_id  timestamp  target
-                  0 2019-01-01       0
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-02       3
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-03       6
-                  2 2019-01-04       7
-                  2 2019-01-05       8
-
-        then :code:`df.slice_by_timestep(time_step_slice=slice(-2, None))` would return the last two
-        time steps from each item::
-
-            item_id  timestamp  target
-                  0 2019-01-02       1
-                  0 2019-01-03       2
-                  1 2019-01-03       4
-                  1 2019-01-04       5
-                  2 2019-01-04       7
-                  2 2019-01-05       8
-
-        Note that this function returns a copy of the original data. This function is useful for
-        constructing holdout sets for validation.
-
-        Parameters
-        ----------
-        time_step_slice: slice
-            A python slice object representing the slices to return from each item
-
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            Data frame containing only the time steps of each ``item_id`` sliced according to the
-            input ``time_step_slice``.
-        """
-        slice_gen = (
-            (i, self.loc[i].iloc[time_step_slice]) for i in self.index.levels[0]
+        before, after = TimeSeriesDataFrame(data_before, static_features=self.static_features), TimeSeriesDataFrame(
+            data_after, static_features=self.static_features
         )
-        slices = []
-        for ix, data_slice in slice_gen:
-            idx = pd.MultiIndex.from_product(
-                [(ix,), data_slice.index], names=[ITEMID, TIMESTAMP]
-            )
-            data_slice.set_index(idx, inplace=True)
-            slices.append(data_slice)
-        return self.__class__(pd.concat(slices))
+        before._cached_freq = self._cached_freq
+        after._cached_freq = self._cached_freq
+        return before, after
 
-    def subsequence(
-        self, start: pd.Timestamp, end: pd.Timestamp
+    def slice_by_timestep(
+        self, start_index: Optional[int] = None, end_index: Optional[int] = None
     ) -> TimeSeriesDataFrame:
-        """Extract time-series between start (inclusive) and end (exclusive) time.
+        """Select a subsequence from each time series between start (inclusive) and end (exclusive) indices.
+
+        This operation is equivalent to selecting a slice ``[start_index : end_index]`` from each time series, and then
+        combining these slices into a new ``TimeSeriesDataFrame``. See examples below.
+
+        Returns a copy of the original data. This is useful for constructing holdout sets for validation.
 
         Parameters
         ----------
-        start: pd.Timestamp
-            The start time (inclusive) of a time range that will be used for subsequence.
-        end: pd.Timestamp
-            The end time (exclusive) of a time range that will be used for subsequence.
+        start_index : int or None
+            Start index (inclusive) of the slice for each time series.
+            Negative values are counted from the end of each time series.
+            When set to None, the slice starts from the beginning of each time series.
+        end_index : int or None
+            End index (exclusive) of the slice for each time series.
+            Negative values are counted from the end of each time series.
+            When set to None, the slice includes the end of each time series.
+
+        Returns
+        -------
+        ts_df : TimeSeriesDataFrame
+            A new time series dataframe containing entries of the original time series between start and end indices.
+
+        Example
+        -------
+        .. code-block:: python
+
+            >>> print(ts_dataframe)
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+                    2019-01-02       1
+                    2019-01-03       2
+            1       2019-01-02       3
+                    2019-01-03       4
+                    2019-01-04       5
+            2       2019-01-03       6
+                    2019-01-04       7
+                    2019-01-05       8
+
+            >>> df.slice_by_timestep(0, 1)  # select the first entry of each time series
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+            1       2019-01-02       3
+            2       2019-01-03       6
+
+            >>> df.slice_by_timestep(-2, None)  # select the last 2 entries of each time series
+                                target
+            item_id timestamp
+            0       2019-01-02       1
+                    2019-01-03       2
+            1       2019-01-03       4
+                    2019-01-04       5
+            2       2019-01-04       7
+                    2019-01-05       8
+
+            >>> df.slice_by_timestep(None, -1)  # select all except the last entry of each time series
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+                    2019-01-02       1
+            1       2019-01-02       3
+                    2019-01-03       4
+            2       2019-01-03       6
+                    2019-01-04       7
+
+            >>> df.slice_by_timestep(None, None)  # copy the entire dataframe
+                                target
+            item_id timestamp
+            0       2019-01-01       0
+                    2019-01-02       1
+                    2019-01-03       2
+            1       2019-01-02       3
+                    2019-01-03       4
+                    2019-01-04       5
+            2       2019-01-03       6
+                    2019-01-04       7
+                    2019-01-05       8
+
+        """
+
+        if isinstance(start_index, slice):
+            time_step_slice = start_index
+            warnings.warn(
+                f"Calling function slice_by_timestep with a `slice` argument is deprecated and won't be supported "
+                f"in v0.7. Please call the method as `slice_by_timestep(start_index, end_index)",
+                DeprecationWarning,
+            )
+            if time_step_slice.step is not None and time_step_slice.step != 1:
+                raise ValueError("Upsampling via slicing with step sizes is not supported with `slice_by_timestep`.")
+            start_index = time_step_slice.start
+            end_index = time_step_slice.stop
+
+        num_timesteps_per_item = self.num_timesteps_per_item()
+        # Create a boolean index that selects the correct slice in each timeseries
+        boolean_indicators = []
+        for length in num_timesteps_per_item:
+            indicator = np.zeros(length, dtype=bool)
+            indicator[start_index:end_index] = True
+            boolean_indicators.append(indicator)
+        index = np.concatenate(boolean_indicators)
+        result = TimeSeriesDataFrame(self[index].copy(), static_features=self.static_features)
+        result._cached_freq = self._cached_freq
+        return result
+
+    @deprecated("Please use `TimeSeriesDataFrame.slice_by_time` instead.", version_removed="0.7")
+    def subsequence(self, start: pd.Timestamp, end: pd.Timestamp) -> TimeSeriesDataFrame:
+        """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
+
+        Parameters
+        ----------
+        start_time: pd.Timestamp
+            Start time (inclusive) of the slice for each time series.
+        end_time: pd.Timestamp
+            End time (exclusive) of the slice for each time series.
 
         Returns
         -------
         ts_df: TimeSeriesDataFrame
-            A new data frame in ``TimeSeriesDataFrame`` format contains time-series in a time range
-            defined between start and end time.
+            A new time series dataframe containing entries of the original time series between start and end timestamps.
         """
 
-        if end < start:
-            raise ValueError(f"end time {end} is earlier than stat time {start}")
+        return self.slice_by_time(start_time=start, end_time=end)
 
-        nanosecond_before_end = end - pd.Timedelta(nanoseconds=1)
+    def slice_by_time(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> TimeSeriesDataFrame:
+        """Select a subsequence from each time series between start (inclusive) and end (exclusive) timestamps.
+
+        Parameters
+        ----------
+        start_time: pd.Timestamp
+            Start time (inclusive) of the slice for each time series.
+        end_time: pd.Timestamp
+            End time (exclusive) of the slice for each time series.
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A new time series dataframe containing entries of the original time series between start and end timestamps.
+        """
+
+        if end_time < start_time:
+            raise ValueError(f"end_time {end_time} is earlier than start_time {start_time}")
+
+        nanosecond_before_end_time = end_time - pd.Timedelta(nanoseconds=1)
         return TimeSeriesDataFrame(
-            self.loc[(slice(None), slice(start, nanosecond_before_end)), :]
+            self.loc[(slice(None), slice(start_time, nanosecond_before_end_time)), :],
+            static_features=self.static_features,
         )
 
     @classmethod
@@ -444,3 +573,36 @@ class TimeSeriesDataFrame(pd.DataFrame):
             return data if isinstance(data, cls) else cls(data)
         except Exception as err:  # noqa
             raise IOError(f"Could not load pickled data set due to error: {str(err)}")
+
+    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
+        """Returns a new TimeSeriesDataFrame object with the same underlying data and
+        static features as the current data frame, except the time index is replaced by
+        a new "dummy" time series index with the given frequency. This is useful when
+        suggesting AutoGluon-TimeSeries to "ignore" the time information, for example when
+        dealing with irregularly sampled time series or sequences (e.g., financial time
+        series).
+
+        Parameters
+        ----------
+        freq: str
+            Frequency string of the new time series data index.
+
+        Returns
+            TimeSeriesDataFrame: the new view object with replaced index, but the same underlying
+            data. Note that the underlying data is not copied.
+        """
+        df_view = self.iloc[:]  # return a view without copying data
+
+        # build the surrogate index
+        indexes = []
+        for i in self.item_ids:
+            idx = pd.MultiIndex.from_product(
+                [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)]
+            )
+            indexes.append(idx)
+
+        new_index = pd.MultiIndex.from_tuples(np.concatenate(indexes), names=[ITEMID, TIMESTAMP])
+        df_view.set_index(new_index, inplace=True)
+        df_view._cached_freq = freq
+
+        return df_view

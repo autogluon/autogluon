@@ -170,6 +170,13 @@ To solely use custom data preprocessing and automatically apply your custom tran
 
 You can specify the `sample_weight` and `weight_evaluation` [arguments](../../api/autogluon.predictor.html#autogluon.tabular.TabularPredictor) when initializing a `TabularPredictor`.
 
+### How does missing value imputation work in AutoGluon?
+
+AutoGluon does not perform generic missing value imputation, instead it sends the missing values to each model,
+and each model has different custom handling of missing values.
+This improves model diversity and thus the final strength of the ensemble.
+Refer to the model source code to learn how missing values are handled.
+
 ### I'm receiving C++ warning spam during training or inference
 
 ```

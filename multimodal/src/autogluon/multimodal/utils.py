@@ -1,91 +1,104 @@
-import pytz
-import datetime
-import os
-import functools
-import logging
-import pandas as pd
-import pickle
 import copy
+import datetime
+import functools
+import hashlib
+import logging
+import math
+import os
+import pickle
 import sys
-import torch
-from torch import nn
+import uuid
 import warnings
 from contextlib import contextmanager
-from typing import Optional, List, Dict, Tuple, Union
-import numpy as np
-import uuid
-import hashlib
-import requests
+from typing import Dict, List, Optional, Tuple, Union
+
 import boto3
-import tqdm
-from scipy.special import softmax
-from omegaconf import OmegaConf, DictConfig
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import f1_score
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
+import pytz
+import requests
+import torch
+import tqdm
+from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.utilities.types import _METRIC
+from scipy.special import softmax
+from sklearn.metrics import f1_score
+from sklearn.preprocessing import LabelEncoder
+from torch import nn
+
 from autogluon.core.metrics import get_metric
 from autogluon.core.utils.loaders import load_pd
 
-from .models.utils import inject_lora_to_linear_layer
-from .models import (
-    HFAutoModelForTextPrediction,
-    TimmAutoModelForImagePrediction,
-    CLIPForImageText,
-    CategoricalMLP,
-    NumericalMLP,
-    MultimodalFusionMLP,
-    NumericalTransformer,
-    CategoricalTransformer,
-    MultimodalFusionTransformer,
-)
-from .data import (
-    ImageProcessor,
-    TextProcessor,
-    CategoricalProcessor,
-    NumericalProcessor,
-    LabelProcessor,
-    MultiModalFeaturePreprocessor,
-    MixupModule,
-)
 from .constants import (
     ACCURACY,
-    RMSE,
     ALL_MODALITIES,
-    IMAGE,
-    TEXT,
-    CATEGORICAL,
-    NUMERICAL,
-    LABEL,
-    MULTICLASS,
-    BINARY,
-    REGRESSION,
-    Y_PRED_PROB,
-    Y_PRED,
-    Y_TRUE,
     AUTOMM,
-    CLIP,
-    TIMM_IMAGE,
-    HF_TEXT,
-    NUMERICAL_MLP,
-    CATEGORICAL_MLP,
-    FUSION_MLP,
-    NUMERICAL_TRANSFORMER,
-    CATEGORICAL_TRANSFORMER,
-    FUSION_TRANSFORMER,
-    ROC_AUC,
     AVERAGE_PRECISION,
-    F1,
-    METRIC_MODE_MAP,
-    VALID_METRICS,
-    VALID_CONFIG_KEYS,
-    LOGITS,
-    PROBABILITY,
+    BBOX,
+    BINARY,
+    CATEGORICAL,
+    CATEGORICAL_MLP,
+    CATEGORICAL_TRANSFORMER,
+    CLIP,
     COLUMN_FEATURES,
+    DEFAULT_SHOT,
+    F1,
     FEATURES,
+    FEW_SHOT,
+    FUSION_MLP,
+    FUSION_TRANSFORMER,
+    HF_TEXT,
+    IMAGE,
+    LABEL,
+    LAST_CHECKPOINT,
+    LOGITS,
     MASKS,
+    METRIC_MODE_MAP,
+    MMDET_IMAGE,
+    MMOCR_TEXT_DET,
+    MULTICLASS,
+    NUMERICAL,
+    NUMERICAL_MLP,
+    NUMERICAL_TRANSFORMER,
+    PROBABILITY,
+    REGRESSION,
+    RMSE,
+    ROC_AUC,
     S3_PREFIX,
+    T_FEW,
+    TEXT,
+    TIMM_IMAGE,
+    VALID_CONFIG_KEYS,
+    VALID_METRICS,
+    Y_PRED,
+    Y_PRED_PROB,
+    Y_TRUE,
 )
+from .data import (
+    CategoricalProcessor,
+    ImageProcessor,
+    LabelProcessor,
+    MixupModule,
+    MultiModalFeaturePreprocessor,
+    NumericalProcessor,
+    TextProcessor,
+)
+from .models import (
+    CategoricalMLP,
+    CategoricalTransformer,
+    CLIPForImageText,
+    HFAutoModelForTextPrediction,
+    MMDetAutoModelForObjectDetection,
+    MMOCRAutoModelForTextDetection,
+    MultimodalFusionMLP,
+    MultimodalFusionTransformer,
+    NumericalMLP,
+    NumericalTransformer,
+    TFewModel,
+    TimmAutoModelForImagePrediction,
+)
+from .models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
 from .presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -197,8 +210,9 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     assert any(
         key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
-    from autogluon.core.space import Space
     from ray.tune.sample import Domain
+
+    from autogluon.core.space import Space
 
     hyperparameters = copy.deepcopy(hyperparameters)
     if isinstance(keys_to_filter, str):
@@ -278,6 +292,9 @@ def get_config(
     if config is None:
         config = {}
 
+    if not config and not presets:
+        presets = "default"
+
     if not isinstance(config, DictConfig):
         basic_config = get_basic_automm_config(is_distill=is_distill)
         if presets is None:
@@ -344,6 +361,9 @@ def verify_model_names(config: DictConfig):
     """
     # must have attribute `names`
     assert hasattr(config, "names")
+    # return if no names available
+    if not config.names:
+        return
     # assure no duplicate names
     assert len(config.names) == len(set(config.names))
     # verify that strings in `config.names` match the keys of `config`.
@@ -565,6 +585,7 @@ def init_df_preprocessor(
 
 def init_data_processors(
     config: DictConfig,
+    model: Optional[nn.Module] = None,
 ):
     """
     Create the data processors according to the model config. This function creates one processor for
@@ -579,6 +600,8 @@ def init_data_processors(
     ----------
     config
         A DictConfig object. The model config should be accessible by "config.model".
+    model
+        The model object.
 
     Returns
     -------
@@ -614,6 +637,7 @@ def init_data_processors(
                         size=model_config.image_size,
                         max_img_num_per_col=model_config.max_img_num_per_col,
                         missing_value_strategy=config.data.image.missing_value_strategy,
+                        model=model,
                     )
                 )
             elif d_type == TEXT:
@@ -629,6 +653,7 @@ def init_data_processors(
                         text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
                         text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
                         train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
+                        template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
                     )
                 )
             elif d_type == CATEGORICAL:
@@ -697,6 +722,7 @@ def create_model(
                 prefix=model_name,
                 checkpoint_name=model_config.checkpoint_name,
                 num_classes=num_classes,
+                pretrained=pretrained,
             )
         elif model_name.lower().startswith(TIMM_IMAGE):
             model = TimmAutoModelForImagePrediction(
@@ -713,6 +739,18 @@ def create_model(
                 num_classes=num_classes,
                 pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
                 gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+                pretrained=pretrained,
+            )
+        elif model_name.lower().startswith(T_FEW):
+            model = TFewModel(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+                length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
+                unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
+                mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
+                num_classes=num_classes,
+                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+                pretrained=pretrained,
             )
         elif model_name.lower().startswith(NUMERICAL_MLP):
             model = NumericalMLP(
@@ -747,6 +785,7 @@ def create_model(
                 cls_token=True if len(names) == 1 else False,
                 embedding_arch=model_config.embedding_arch,
                 num_classes=num_classes,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
             )
         elif model_name.lower().startswith(CATEGORICAL_MLP):
             model = CategoricalMLP(
@@ -775,8 +814,19 @@ def create_model(
                 head_normalization=model_config.normalization,
                 ffn_activation=model_config.ffn_activation,
                 head_activation=model_config.head_activation,
+                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
                 num_classes=num_classes,
                 cls_token=True if len(names) == 1 else False,
+            )
+        elif model_name.lower().startswith(MMDET_IMAGE):
+            model = MMDetAutoModelForObjectDetection(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
+            )
+        elif model_name.lower().startswith(MMOCR_TEXT_DET):
+            model = MMOCRAutoModelForTextDetection(
+                prefix=model_name,
+                checkpoint_name=model_config.checkpoint_name,
             )
         elif model_name.lower().startswith(FUSION_MLP):
             fusion_model = functools.partial(
@@ -849,6 +899,13 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
             model=model,
             lora_r=config.optimization.lora.r,
             lora_alpha=config.optimization.lora.alpha,
+            module_filter=config.optimization.lora.module_filter,
+            filter=config.optimization.lora.filter,
+        )
+    elif "ia3" in OmegaConf.select(config, "optimization.efficient_finetune"):
+        model = inject_ia3_to_linear_layer(
+            model=model,
+            module_filter=config.optimization.lora.module_filter,
             filter=config.optimization.lora.filter,
         )
 
@@ -857,15 +914,14 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     return model
 
 
-def save_pretrained_models(
+def save_pretrained_model_configs(
     model: nn.Module,
     config: DictConfig,
     path: str,
 ) -> DictConfig:
     """
-    Save the pretrained models and configs to local to make future loading not dependent on Internet access.
-    By loading local checkpoints, Huggingface doesn't need to download pretrained checkpoints from Internet.
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
+    Save the pretrained model configs to local to make future loading not dependent on Internet access.
+    By initializing models with local configs, Huggingface doesn't need to download pretrained weights from Internet.
 
     Parameters
     ----------
@@ -874,47 +930,48 @@ def save_pretrained_models(
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The path to save pretrained checkpoints.
+        The path to save pretrained model configs.
     """
-    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT)) for model_name in config.model.names])
+    # TODO? Fix hardcoded model names.
+    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)) for model_name in config.model.names])
     if not requires_saving:
         return config
 
-    if len(config.model.names) == 1:
+    if (
+        len(config.model.names) == 1
+    ):  # TODO: Not sure this is a sufficient check. Hyperparameter "model.names" : ["hf_text", "fusion_mlp"] fails here.
         model = nn.ModuleList([model])
     else:  # assumes the fusion model has a model attribute, a nn.ModuleList
         model = model.model
     for per_model in model:
-        if per_model.prefix.lower().startswith((CLIP, HF_TEXT)):
-            per_model.model.save_pretrained(os.path.join(path, per_model.prefix))
+        if per_model.prefix.lower().startswith((CLIP, HF_TEXT, T_FEW)):
+            per_model.config.save_pretrained(os.path.join(path, per_model.prefix))
             model_config = getattr(config.model, per_model.prefix)
             model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
 
     return config
 
 
-def convert_checkpoint_name(config: DictConfig, path: str) -> DictConfig:
+def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConfig:
     """
-    Convert the checkpoint name from relative path to absolute path for
-    loading the pretrained weights in offline deployment.
-    It is called by setting "standalone=True" in "AutoMMPredictor.load()".
+    Get the local config paths of hugginface pretrained models. With a local config,
+    Hugginface can initialize a model without having to download its pretrained weights.
 
     Parameters
     ----------
     config
         A DictConfig object. The model config should be accessible by "config.model".
     path
-        The saving path to the pretrained Huggingface models.
+        The saving path to the pretrained model configs.
     """
     for model_name in config.model.names:
-        if model_name.lower().startswith((CLIP, HF_TEXT)):
+        if model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
                 assert os.path.exists(
                     os.path.join(model_config.checkpoint_name, "config.json")
                 )  # guarantee the existence of local configs
-                assert os.path.exists(os.path.join(model_config.checkpoint_name, "pytorch_model.bin"))
 
     return config
 
@@ -1614,6 +1671,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         feature_masks = [ele[COLUMN_FEATURES][MASKS] for ele in outputs]  # a list of dicts
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
+    elif ret_type == BBOX:
+        return [ele[BBOX] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
@@ -1627,7 +1686,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     return ret
 
 
-def init_zero_shot(
+def init_pretrained(
+    pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
 ):
     """
@@ -1648,7 +1708,7 @@ def init_zero_shot(
     data_processors
         The data processors associated with the pre-trained model.
     """
-    config = get_config(presets="zero_shot", overrides=hyperparameters)
+    config = get_config(presets=pipeline, overrides=hyperparameters)
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
@@ -1656,6 +1716,7 @@ def init_zero_shot(
 
     data_processors = init_data_processors(
         config=config,
+        model=model,
     )
 
     return config, model, data_processors
@@ -1803,7 +1864,9 @@ def download(
             The sha1sum
         """
         with open(filename, mode="rb") as f:
-            d = hashlib.sha1()
+            # Disable bandit check because we are using sha1sum for evaluating the checksums.
+            # It is not used for hosting credentials.
+            d = hashlib.new("sha1", usedforsecurity=False)  # nosec(sxjscience)
             for buf in iter(functools.partial(f.read, 1024 * 100), b""):
                 d.update(buf)
         return d.hexdigest()
@@ -1917,6 +1980,28 @@ def download(
     return fname
 
 
+def infer_scarcity_mode_by_data_size(df_train: pd.DataFrame, scarcity_threshold: int = 50):
+    """
+    Infer based on the number of training sample the data scarsity. Select mode accordingly from [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT].
+
+    Parameters
+    ---------------
+    df_train
+        Training dataframe
+    scarcity_threshold
+        Threshold number of samples when to select FEW_SHOT mode
+
+    Returns
+    --------
+    Mode in  [DEFAULT_SHOT, FEW_SHOT, ZERO_SHOT]
+    """
+    row_num = len(df_train)
+    if row_num < scarcity_threshold:
+        return FEW_SHOT
+    else:
+        return DEFAULT_SHOT
+
+
 def infer_dtypes_by_model_names(model_config: DictConfig):
     """
     Get data types according to model types.
@@ -1976,3 +2061,84 @@ def update_config_by_rules(
                 UserWarning,
             )
     return config
+
+
+def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Optional[bool] = True):
+    """
+    Convert the provided path to an absolute path and check whether it is valid.
+    If a path exists, either raise error or return None.
+    A None path can be identified by the `setup_outputdir` to generate a random path.
+
+    Parameters
+    ----------
+    path
+        A provided path.
+    resume
+        Whether this is a path to resume training.
+    raise_if_exist
+        Whether to raise error if the path exists.
+
+    Returns
+    -------
+    A complete and verified path or None.
+    """
+    path = os.path.abspath(os.path.expanduser(path))
+    if resume:
+        assert os.path.isfile(os.path.join(path, LAST_CHECKPOINT)), (
+            f"Trying to resume training from '{path}'. "
+            f"However, it does not contain the last checkpoint file: '{LAST_CHECKPOINT}'. "
+            "Are you using a correct path?"
+        )
+    elif os.path.isdir(path):
+        if raise_if_exist:
+            raise ValueError(
+                f"Path {path} already exists."
+                "Specify a new path to avoid accidentally overwriting a saved predictor."
+            )
+        else:
+            path = None
+
+    return path
+
+
+def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
+    """
+    Compute the gpu number to initialize the lightning trainer.
+
+    Parameters
+    ----------
+    config_num_gpus
+        The gpu number provided by config.
+    strategy
+        A lightning trainer's strategy such as "ddp", "ddp_spawn", and "dp".
+
+    Returns
+    -------
+    A valid gpu number for the current environment and config.
+    """
+    config_num_gpus = (
+        math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
+    )
+    detected_num_gpus = torch.cuda.device_count()
+
+    if config_num_gpus < 0:  # In case config_num_gpus is -1, meaning using all gpus.
+        num_gpus = detected_num_gpus
+    else:
+        num_gpus = min(config_num_gpus, detected_num_gpus)
+        warnings.warn(
+            f"Using the detected GPU number {detected_num_gpus}, "
+            f"smaller than the GPU number {config_num_gpus} in the config.",
+            UserWarning,
+        )
+
+    if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
+        warnings.warn(
+            "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
+            "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
+            "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
+            "MultiModalPredictor in a script.",
+            UserWarning,
+        )
+        num_gpus = 1
+
+    return num_gpus

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Union, Optional, Any
+from typing import Any, Dict, Optional, Union
 
 from ..models.presets import get_preset_models
 from .abstract_trainer import AbstractTimeSeriesTrainer, TimeSeriesDataFrame

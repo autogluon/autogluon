@@ -112,7 +112,6 @@ ENV/
 # mypy
 .mypy_cache/
 
-*.png*
 *.jpg*
 *.jpeg*
 .idea/*

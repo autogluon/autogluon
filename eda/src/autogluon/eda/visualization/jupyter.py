@@ -1,5 +1,6 @@
 from IPython.display import display, HTML, Markdown
 
+
 class JupyterMixin:
 
     def display_obj(self, obj):
@@ -20,4 +21,3 @@ class JupyterMixin:
 
     def render_markdown(self, md):
         display(Markdown(md))
-

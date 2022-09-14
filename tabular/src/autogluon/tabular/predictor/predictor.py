@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import pprint
+import shutil
 import time
 from typing import Union
 
@@ -11,9 +12,12 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from autogluon.common.loaders import load_json
+from autogluon.common.savers import save_json
+from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
 from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
@@ -82,7 +86,7 @@ class TabularPredictor:
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
         For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
-    path : str, default = None
+    path : Union[str, pathlib.Path], default = None
         Path to directory where models and intermediate outputs should be saved.
         If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
         Note: To call `fit()` twice and save all results of each fit, you must specify different `path` locations or don't specify `path` at all.
@@ -183,6 +187,7 @@ class TabularPredictor:
     Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
     _predictor_version_file_name = '__version__'
+    _predictor_metadata_file_name = 'metadata.json'
 
     def __init__(
             self,
@@ -684,7 +689,7 @@ class TabularPredictor:
                 If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
-                (which may improve the prediction interval coverage, and bagging could futher improve it) and will compute a set of scalar parameters on the validation set.
+                (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
 
         Returns
         -------
@@ -2129,7 +2134,7 @@ class TabularPredictor:
                 return self._trainer.model_best
         return self._trainer.get_model_best(can_infer=can_infer)
 
-    def set_model_best(self, model: str):
+    def set_model_best(self, model: str, save_trainer: bool = False):
         """
         Sets the model to be used by default when calling `predictor.predict(data)`.
         By default, this is the model with the best validation score, but this is not always the case.
@@ -2139,6 +2144,8 @@ class TabularPredictor:
         ----------
         model : str
             Name of model to set to best. If model does not exist or cannot infer, raises an AssertionError.
+        save_trainer : bool, default = False
+            If True, self._trainer is saved with the new model_best value, such that it is reflected when predictor is loaded in future from disk.
         """
         self._assert_is_fit('set_model_best')
         models = self._trainer.get_model_names(can_infer=True)
@@ -2146,6 +2153,8 @@ class TabularPredictor:
             self._trainer.model_best = model
         else:
             raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
+        if save_trainer:
+            self._trainer.save()
 
     def get_model_full_dict(self, inverse=False):
         """
@@ -2554,6 +2563,41 @@ class TabularPredictor:
                                     allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
                                     dry_run=dry_run)
 
+    def get_size_disk(self) -> int:
+        """
+        Returns the combined size of all files under the `predictor.path` directory in bytes.
+        """
+        return get_directory_size(self.path)
+
+    def get_size_disk_per_file(self,
+                               *,
+                               sort_by: str = "size",
+                               include_path_in_name: bool = False) -> pd.Series:
+        """
+        Returns the size of each file under the `predictor.path` directory in bytes.
+
+        Parameters
+        ----------
+        sort_by : str, default = "size"
+            If None, output files will be ordered based on order of search in os.walk(path).
+            If "size", output files will be ordered in descending order of file size.
+            If "name", output files will be ordered by name in ascending alphabetical order.
+        include_path_in_name : bool, default = False
+            If True, includes the full path of the file including the input `path` as part of the index in the output pd.Series.
+            If False, removes the `path` prefix of the file path in the index of the output pd.Series.
+
+            For example, for a file located at `foo/bar/model.pkl`, with path='foo/'
+                If True, index will be `foo/bar/model.pkl`
+                If False, index will be `bar/model.pkl`
+
+        Returns
+        -------
+        pd.Series with index file path and value file size in bytes.
+        """
+        return get_directory_size_per_file(self.path,
+                                           sort_by=sort_by,
+                                           include_path_in_name=include_path_in_name)
+
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
         """Returns the list of model names trained in this `predictor` object."""
@@ -2793,11 +2837,29 @@ class TabularPredictor:
         version = load_str.load(path=version_file_path)
         return version
 
+    @classmethod
+    def _load_metadata_file(cls, path: str, silent=True):
+        metadata_file_path = path + cls._predictor_metadata_file_name
+        return load_json.load(path=metadata_file_path, verbose=not silent)
+
     def _save_version_file(self, silent=False):
         from ..version import __version__
         version_file_contents = f'{__version__}'
         version_file_path = self.path + self._predictor_version_file_name
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
+
+    def _save_metadata_file(self, silent=False):
+        """
+        Save metadata json file to disk containing information such as
+        python version, autogluon version, installed packages, operating system, etc.
+        """
+        metadata_file_path = self.path + self._predictor_metadata_file_name
+
+        metadata = get_autogluon_metadata()
+
+        save_json.save(path=metadata_file_path, obj=metadata)
+        if not silent:
+            logger.log(15, f'Saving {metadata_file_path}')
 
     def save(self, silent=False):
         """
@@ -2820,6 +2882,10 @@ class TabularPredictor:
         self._learner = tmp_learner
         self._trainer = tmp_trainer
         self._save_version_file(silent=silent)
+        try:
+            self._save_metadata_file(silent=silent)
+        except Exception as e:
+            logger.log(30, f'Failed to save metadata file due to exception {e}, skipping...')
         if not silent:
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
@@ -2834,7 +2900,7 @@ class TabularPredictor:
         return predictor
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True):
+    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True, require_py_version_match: bool = True, check_packages: bool = False):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -2851,6 +2917,13 @@ class TabularPredictor:
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the `autogluon.tabular` version of the loaded predictor does not match the installed version of `autogluon.tabular`.
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
+        require_py_version_match : bool, default = True
+            If True, will raise an AssertionError if the Python version of the loaded predictor does not match the installed Python version.
+                Micro version differences such as 3.9.2 and 3.9.7 will log a warning but will not raise an exception.
+            If False, will allow loading of models trained on incompatible python versions, but is NOT recommended. Users may run into numerous issues if attempting this.
+        check_packages : bool, default = False
+            If True, checks package versions of the loaded predictor against the package versions of the current environment.
+            Warnings will be logged for each mismatch of package version.
         """
         if verbosity is not None:
             set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
@@ -2896,6 +2969,28 @@ class TabularPredictor:
                     f'Predictor was created on version {version_init} but is being loaded with version {version_load}. '
                     f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
                     f'this error can be bypassed by specifying `require_version_match=False`.')
+
+        try:
+            metadata_init = cls._load_metadata_file(path=path)
+        except:
+            logger.warning(f'WARNING: Could not find metadata file at "{path + cls._predictor_metadata_file_name}".\n'
+                           f'This could mean that the predictor was fit in a version `<=0.5.2`.')
+            metadata_init = None
+
+        metadata_load = get_autogluon_metadata()
+
+        if metadata_init is not None:
+            try:
+                compare_autogluon_metadata(original=metadata_init, current=metadata_load, check_packages=check_packages)
+            except:
+                logger.log(30, 'WARNING: Exception raised while comparing metadata files, skipping comparison...')
+            if require_py_version_match:
+                if metadata_init['py_version'] != metadata_load['py_version']:
+                    raise AssertionError(
+                        f'Predictor was created on Python version {metadata_init["py_version"]} '
+                        f'but is being loaded with Python version {metadata_load["py_version"]}. '
+                        f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
+                        f'this error can be bypassed by specifying `require_py_version_match=False`.')
 
         if predictor is None:
             predictor = cls._load(path=path)
@@ -3244,6 +3339,99 @@ class TabularPredictor:
         labels = data[self.label]
         cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
         return cls
+
+    # TODO: Add .delete() method to easily clean-up clones?
+    #  Would need to be careful that user doesn't delete important things accidentally.
+    # TODO: Add .save_zip() and load_zip() methods to pack and unpack artifacts into a single file to simplify deployment code?
+    def clone(self,
+              path: str,
+              *,
+              return_clone: bool = False,
+              dirs_exist_ok: bool = False):
+        """
+        Clone the predictor and all of its artifacts to a new location on local disk.
+        This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
+        more advanced operations (such as fit_extra and refit_full).
+
+        Parameters
+        ----------
+        path : str
+            Directory path the cloned predictor will be saved to.
+        return_clone : bool, default = False
+            If True, returns the loaded cloned TabularPredictor object.
+            If False, returns the local path to the cloned TabularPredictor object.
+        dirs_exist_ok : bool, default = False
+            If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
+            If False, will raise an exception if the path directory already exists and avoid performing the copy.
+
+        Returns
+        -------
+        If return_clone == True, returns the loaded cloned TabularPredictor object.
+        If return_clone == False, returns the local path to the cloned TabularPredictor object.
+
+        """
+        assert path != self.path, f"Cannot clone into the same directory as the original predictor! (path='{path}')"
+        path_clone = shutil.copytree(src=self.path, dst=path, dirs_exist_ok=dirs_exist_ok)
+        logger.log(30, f"Cloned {self.__class__.__name__} located in '{self.path}' to '{path_clone}'.\n"
+                       f"\tTo load the cloned predictor: predictor_clone = {self.__class__.__name__}.load(path=\"{path_clone}\")")
+        return self.__class__.load(path=path_clone) if return_clone else path_clone
+
+    def clone_for_deployment(self,
+                             path: str,
+                             *,
+                             model: str = 'best',
+                             return_clone: bool = False,
+                             dirs_exist_ok: bool = False):
+        """
+        Clone the predictor and all of its artifacts to a new location on local disk,
+        then delete the clones artifacts unnecessary during prediction.
+        This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
+        more advanced operations (such as fit_extra and refit_full).
+
+        Note that the clone can no longer fit new models,
+        and most functionality except for predict and predict_proba will no longer work.
+
+        Identical to performing the following operations in order:
+
+        predictor_clone = predictor.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
+        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        predictor_clone.set_model_best(model=model, save_trainer=True)
+        predictor_clone.save_space()
+
+        Parameters
+        ----------
+        path : str
+            Directory path the cloned predictor will be saved to.
+        model : str, default = 'best'
+            The model to use in the optimized predictor clone.
+            All other unrelated models will be deleted to save disk space.
+            Refer to the `models_to_keep` argument of `predictor.delete_models` for available options.
+            Internally calls `predictor_clone.delete_models(models_to_keep=model, dry_run=False)`
+        return_clone : bool, default = False
+            If True, returns the loaded cloned TabularPredictor object.
+            If False, returns the local path to the cloned TabularPredictor object.
+        dirs_exist_ok : bool, default = False
+            If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
+            If False, will raise an exception if the path directory already exists and avoids performing the copy.
+
+        Returns
+        -------
+        If return_clone == True, returns the loaded cloned TabularPredictor object.
+        If return_clone == False, returns the local path to the cloned TabularPredictor object.
+        """
+        predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
+        if model == 'best':
+            model = predictor_clone.get_model_best()
+            logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
+        else:
+            logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
+        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        if isinstance(model, str) and model in predictor_clone.get_model_names(can_infer=True):
+            predictor_clone.set_model_best(model=model, save_trainer=True)
+        logger.log(30, f"Clone: Removing artifacts unnecessary for prediction. "
+                       f"NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work")
+        predictor_clone.save_space()
+        return predictor_clone if return_clone else predictor_clone.path
 
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:

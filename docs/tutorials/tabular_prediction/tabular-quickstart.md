@@ -1,4 +1,5 @@
 # Predicting Columns in a Table - Quick Start
+
 :label:`sec_tabularquick`
 
 Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predict the values in one column of a data table based on the rest of the columns' values. Use AutoGluon with tabular data for both classification and regression problems. This tutorial demonstrates how to use AutoGluon to produce a classification model that predicts whether or not a person's income exceeds $50,000.
@@ -55,6 +56,7 @@ perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_me
 ```
 
 We can also evaluate the performance of each individual trained model on our (labeled) test data:
+
 ```{.python .input}
 predictor.leaderboard(test_data, silent=True)
 ```
@@ -73,9 +75,9 @@ predictor = TabularPredictor(label=<variable-name>).fit(train_data=<file-name>)
 
 Here we discuss what happened during `fit()`.
 
-Since there are only two possible values of the `class` variable, this was a binary classification problem, for which an appropriate performance metric is *accuracy*. AutoGluon automatically infers this as well as the type of each feature (i.e., which columns contain continuous numbers vs. discrete categories). AutoGluon can also automatically handle common issues like missing data and rescaling feature values.
+Since there are only two possible values of the `class` variable, this was a binary classification problem, for which an appropriate performance metric is _accuracy_. AutoGluon automatically infers this as well as the type of each feature (i.e., which columns contain continuous numbers vs. discrete categories). AutoGluon can also automatically handle common issues like missing data and rescaling feature values.
 
-We did not specify separate validation data and so AutoGluon automatically choses a random training/validation split of the data. The data used for validation is seperated from the training data and is used to determine the models and hyperparameter-values that produce the best results.  Rather than just a single model, AutoGluon trains multiple models and ensembles them together to ensure superior predictive performance.
+We did not specify separate validation data and so AutoGluon automatically choses a random training/validation split of the data. The data used for validation is separated from the training data and is used to determine the models and hyperparameter-values that produce the best results. Rather than just a single model, AutoGluon trains multiple models and ensembles them together to ensure superior predictive performance.
 
 By default, AutoGluon tries to fit various types of models including neural networks and tree ensembles. Each type of model has various hyperparameters, which traditionally, the user would have to specify.
 AutoGluon automates this process.
@@ -95,7 +97,7 @@ Besides inference, this object can also summarize what happened during fit.
 results = predictor.fit_summary(show_plot=True)
 ```
 
-From this summary, we can see that AutoGluon trained many different types of models as well as an ensemble of the best-performing models.  The summary also describes the actual models that were trained during fit and how well each model performed on the held-out validation data.  We can view what properties AutoGluon automatically inferred about our prediction task:
+From this summary, we can see that AutoGluon trained many different types of models as well as an ensemble of the best-performing models. The summary also describes the actual models that were trained during fit and how well each model performed on the held-out validation data. We can view what properties AutoGluon automatically inferred about our prediction task:
 
 ```{.python .input}
 print("AutoGluon infers problem type is: ", predictor.problem_type)
@@ -103,14 +105,16 @@ print("AutoGluon identified the following types of features:")
 print(predictor.feature_metadata)
 ```
 
-AutoGluon correctly recognized our prediction problem to be a **binary classification** task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects. The `feature_metadata` attribute allows you to see the inferred data type of each predictive variable after preprocessing (this is its *raw* dtype; some features may also be associated with additional *special* dtypes if produced via feature-engineering, e.g. numerical representations of a datetime/text column).
+AutoGluon correctly recognized our prediction problem to be a **binary classification** task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects. The `feature_metadata` attribute allows you to see the inferred data type of each predictive variable after preprocessing (this is its _raw_ dtype; some features may also be associated with additional _special_ dtypes if produced via feature-engineering, e.g. numerical representations of a datetime/text column).
 
 We can evaluate the performance of each individual trained model on our (labeled) test data:
+
 ```{.python .input}
 predictor.leaderboard(test_data, silent=True)
 ```
 
 When we call `predict()`, AutoGluon automatically predicts with the model that displayed the best performance on validation data (i.e. the weighted-ensemble). We can instead specify which model to use for predictions like this:
+
 ```
 predictor.predict(test_data, model='LightGBM')
 ```
@@ -121,12 +125,12 @@ Above the scores of predictive performance were based on a default evaluation me
 
 AutoGluon comes with a variety of presets that can be specified in the call to `.fit` via the `presets` argument. `medium_quality` is used by default to encourage initial prototyping, but for serious usage, the other presets should be used instead.
 
-| Preset                            | Model Quality                                          | Use Cases                                                                                                                                               | Fit Time (Ideal) | Inference Time (Relative to medium_quality) | Disk Usage |
-|:----------------------------------|:-------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------|:--------------------------------------------|:-----------|
-| best_quality                      | State-of-the-art (SOTA), much better than high_quality | When accuracy is what matters                                                                                                                           | 16x+             | 32x+                                        | 16x+       |
-| high_quality                      | Better than good_quality                               | When a very powerful, portable solution with fast inference is required: Large-scale batch inference                                                    | 16x              | 4x                                          | 2x         |
-| good_quality                      | Significantly better than medium_quality               | When a powerful, highly portable solution with very fast inference is required: Billion-scale batch inference, sub-100ms online-inference, edge-devices | 16x              | 2x                                          | 0.1x       |
-| medium_quality                    | Competitive with other top AutoML Frameworks           | Initial prototyping, establishing a performance baseline                                                                                                | 1x               | 1x                                          | 1x         |
+| Preset         | Model Quality                                          | Use Cases                                                                                                                                               | Fit Time (Ideal) | Inference Time (Relative to medium_quality) | Disk Usage |
+| :------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------- | :------------------------------------------ | :--------- |
+| best_quality   | State-of-the-art (SOTA), much better than high_quality | When accuracy is what matters                                                                                                                           | 16x+             | 32x+                                        | 16x+       |
+| high_quality   | Better than good_quality                               | When a very powerful, portable solution with fast inference is required: Large-scale batch inference                                                    | 16x              | 4x                                          | 2x         |
+| good_quality   | Significantly better than medium_quality               | When a powerful, highly portable solution with very fast inference is required: Billion-scale batch inference, sub-100ms online-inference, edge-devices | 16x              | 2x                                          | 0.1x       |
+| medium_quality | Competitive with other top AutoML Frameworks           | Initial prototyping, establishing a performance baseline                                                                                                | 1x               | 1x                                          | 1x         |
 
 We recommend users to start with `medium_quality` to get a sense of the problem and identify any data related issues. If `medium_quality` is taking too long to train, consider subsampling the training data during this prototyping phase.  
 Once you are comfortable, next try `best_quality`. Make sure to specify at least 16x the `time_limit` value as used in `medium_quality`. Once finished, you should have a very powerful solution that is often stronger than `medium_quality`.  
@@ -148,9 +152,9 @@ predictor.leaderboard(test_data, silent=True)
 
 This command implements the following strategy to maximize accuracy:
 
-- Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality', 'optimize_for_deployment']`.
+- Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality'`, which produces _less_ accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality', 'optimize_for_deployment']`.
 
-- Provide the parameter `eval_metric` to `TabularPredictor()` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function.  For more information refer to :ref:`sec_tabularcustommetric`
+- Provide the parameter `eval_metric` to `TabularPredictor()` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression). You can also define your own custom metric function. For more information refer to :ref:`sec_tabularcustommetric`
 
 - Include all your data in `train_data` and do not provide `tuning_data` (AutoGluon will split the data more intelligently to fit its needs).
 
@@ -159,7 +163,6 @@ This command implements the following strategy to maximize accuracy:
 - Do not specify `hyperparameters` argument (allow AutoGluon to adaptively select which models/hyperparameters to use).
 
 - Set `time_limit` to the longest amount of time (in seconds) that you are willing to wait. AutoGluon's predictive performance improves the longer `fit()` is allowed to run.
-
 
 ## Regression (predicting numeric table columns):
 
@@ -192,3 +195,5 @@ Refer to the [TabularPredictor documentation](../../api/autogluon.predictor.html
 ## Advanced Usage
 
 For more advanced usage examples of AutoGluon, refer to :ref:`sec_tabularadvanced`
+
+If you are interested in deployment optimization, refer to the :ref:`sec_tabulardeployment` tutorial.

@@ -24,7 +24,7 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "AutoETS": {}},
+    {"DeepAR": {"epochs": 1}, "ETS": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
@@ -81,7 +81,8 @@ def test_given_hyperparameters_when_trainer_called_then_leaderboard_is_correct(
     )
     leaderboard = trainer.leaderboard()
 
-    expected_board_length += int(trainer.enable_ensemble)
+    if len(hyperparameters) > 1:
+        expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -97,7 +98,9 @@ def test_given_test_data_when_trainer_called_then_leaderboard_is_correct(
     test_data = get_data_frame_with_item_index(["A", "B", "C"])
 
     leaderboard = trainer.leaderboard(test_data)
-    expected_board_length += int(trainer.enable_ensemble)
+
+    if len(hyperparameters) > 1:
+        expected_board_length += int(trainer.enable_ensemble)
 
     assert len(leaderboard) == expected_board_length
     assert not np.any(np.isnan(leaderboard["score_test"]))
@@ -116,8 +119,8 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
-    predicted_item_index = predictions.index.levels[0]
-    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+    predicted_item_index = predictions.item_ids
+    assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
 
@@ -189,7 +192,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
         leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == 2 + 1  # include ensemble
-    
+
     config_history = next(iter(trainer.hpo_results.values()))["config_history"]
     assert len(config_history) == 2
     assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
@@ -261,9 +264,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
         leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == 2 + 1  # include ensemble
-    assert all(
-        [1 <= v["params"]["epochs"] < 5 for k, v in trainer.model_graph.nodes.items()]
-    )
+    assert all([1 <= v["params"]["epochs"] < 5 for k, v in trainer.model_graph.nodes.items()])
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
@@ -291,7 +292,8 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     )
     leaderboard = trainer.leaderboard()
 
-    expected_board_length += int(trainer.enable_ensemble)
+    if len(hyperparameters) > 1:  # account for ensemble
+        expected_board_length += int(trainer.enable_ensemble)
     assert len(leaderboard) == expected_board_length
     assert np.all(leaderboard["score_val"] < 0)  # all MAPEs should be negative
 
@@ -415,8 +417,9 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 
     model_names = trainer.get_model_names()
 
-    if trainer.enable_ensemble:
-        expected_number_of_unique_names += 1
+    # account for the ensemble if it should be fitted, and drop ensemble names
+    if trainer.enable_ensemble and sum(len(hp) for hp in hyperparameter_list) > 1:
+        model_names = [n for n in model_names if "WeightedEnsemble" not in n]
     assert len(model_names) == expected_number_of_unique_names
     for suffix in expected_suffixes:
         assert any(name.endswith(suffix) for name in model_names)
@@ -526,7 +529,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
 
         assert isinstance(predictions, TimeSeriesDataFrame)
 
-        predicted_item_index = predictions.index.levels[0]
-        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.index.levels[0])  # noqa
+        predicted_item_index = predictions.item_ids
+        assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
         assert all(len(predictions.loc[i]) == 2 for i in predicted_item_index)
         assert not np.any(np.isnan(predictions))

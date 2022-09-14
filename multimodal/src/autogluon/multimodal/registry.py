@@ -1,6 +1,6 @@
-from typing import List
 import json
 from json import JSONDecodeError
+from typing import List
 
 
 class Registry:

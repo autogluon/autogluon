@@ -20,6 +20,12 @@ Tabular Prediction
       In-depth tutorial on controlling various aspects of model fitting.
 
    .. card::
+      :title: Deployment Optimization
+      :link: tabular_prediction/tabular-deployment.html
+
+      Tutorial on optimizing the predictor artifact for production deployment.
+
+   .. card::
       :title: Kaggle Tutorial
       :link: tabular_prediction/tabular-kaggle.html
 

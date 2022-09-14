@@ -1,26 +1,23 @@
-import torch
 import logging
+from typing import Optional
+
+import torch
 from torch import nn
-from transformers import CLIPModel
-from .utils import (
-    assign_layer_ids,
-    init_weights,
-    get_column_features,
-)
+
 from ..constants import (
-    IMAGE,
-    IMAGE_VALID_NUM,
-    TEXT_TOKEN_IDS,
-    TEXT_VALID_LENGTH,
-    LABEL,
-    LOGITS,
-    FEATURES,
     AUTOMM,
     COLUMN,
     COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
     MASKS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
 )
-from typing import Optional
+from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 logger = logging.getLogger(AUTOMM)
 
@@ -36,6 +33,7 @@ class CLIPForImageText(nn.Module):
         prefix: str,
         checkpoint_name: str,
         num_classes: Optional[int] = None,
+        pretrained: Optional[bool] = True,
     ):
         """
         Load the pretrained CLIP from huggingface transformers.
@@ -48,12 +46,16 @@ class CLIPForImageText(nn.Module):
             Name of the checkpoint.
         num_classes
             The number of classes. 1 for a regression task.
+        pretrained
+            Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.num_classes = num_classes
-        self.model = CLIPModel.from_pretrained(checkpoint_name)
+
+        self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
+
         self.out_features = self.model.config.projection_dim
 
         self.head = nn.Linear(self.out_features, num_classes) if num_classes else nn.Identity()

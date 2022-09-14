@@ -1,25 +1,27 @@
 import logging
-import torch
-from torch import nn
+from typing import Callable, Dict, List, Optional, Union
+
 import pytorch_lightning as pl
+import torch
+import torchmetrics
+from omegaconf import DictConfig
+from torch import nn
+from torch.nn.modules.loss import _Loss
+from torchmetrics.aggregation import BaseAggregator
+
+from ..constants import AUTOMM, PROBABILITY
 from .utils import (
-    get_optimizer,
-    get_lr_scheduler,
-    apply_two_stages_lr,
     apply_layerwise_lr_decay,
     apply_single_lr,
-    get_metric_learning_loss_funcs,
-    get_metric_learning_miner_funcs,
+    apply_two_stages_lr,
+    compute_probability,
     gather_column_features,
     generate_metric_learning_labels,
-    compute_probability,
+    get_lr_scheduler,
+    get_metric_learning_loss_funcs,
+    get_metric_learning_miner_funcs,
+    get_optimizer,
 )
-from omegaconf import DictConfig
-from ..constants import PROBABILITY, AUTOMM
-from typing import Union, Optional, List, Dict, Callable
-import torchmetrics
-from torchmetrics.aggregation import BaseAggregator
-from torch.nn.modules.loss import _Loss
 
 logger = logging.getLogger(AUTOMM)
 
@@ -115,6 +117,8 @@ class MatcherLitModule(pl.LightningModule):
 
             - bit_fit (only finetune the bias terms)
             - norm_fit (only finetune the weights in norm layers / bias layer)
+            - lora, lora_bias, lora_norm (only finetunes decomposition matrices inserted into model, in combination with either bit_fit or norm_fit)
+            - ia3, ia3_bias, ia3_norm (adds vector that scales activations by learned vectors, in combination with either bit_fit or norm_fit)
             - None (do not use efficient finetuning strategies)
         """
         super().__init__()
@@ -386,6 +390,7 @@ class MatcherLitModule(pl.LightningModule):
             grouped_parameters = apply_layerwise_lr_decay(
                 lr_decay=self.hparams.lr_decay,
                 efficient_finetune=self.hparams.efficient_finetune,
+                trainable_param_names=self.hparams.trainable_param_names,
                 **kwargs,
             )
         else:

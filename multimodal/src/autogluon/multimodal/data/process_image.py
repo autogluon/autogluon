@@ -1,12 +1,11 @@
-import logging
-import torch
-import warnings
-from typing import Optional, List, Dict
-from torchvision import transforms
-import PIL
-import numpy as np
 import ast
-from .randaug import RandAugment
+import logging
+import warnings
+from typing import Dict, List, Optional
+
+import numpy as np
+import PIL
+import torch
 from timm import create_model
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -14,7 +13,29 @@ from timm.data.constants import (
     IMAGENET_INCEPTION_MEAN,
     IMAGENET_INCEPTION_STD,
 )
+from torch import nn
+from torchvision import transforms
 from transformers import AutoConfig
+
+from .randaug import RandAugment
+
+try:
+    import mmcv
+    from mmcv.parallel import collate
+except ImportError:
+    mmcv = None
+
+try:
+    import mmdet
+    from mmdet.datasets import replace_ImageToTensor
+    from mmdet.datasets.pipelines import Compose
+except ImportError:
+    mmdet = None
+
+try:
+    import mmocr
+except ImportError:
+    mmocr = None
 
 try:
     from torchvision.transforms import InterpolationMode
@@ -24,16 +45,20 @@ except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
 from ..constants import (
-    IMAGE,
-    IMAGE_VALID_NUM,
+    AUTOMM,
+    CLIP,
     CLIP_IMAGE_MEAN,
     CLIP_IMAGE_STD,
-    AUTOMM,
     COLUMN,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    MMDET_IMAGE,
+    MMOCR_TEXT_DET,
+    TIMM_IMAGE,
 )
-from .collator import Stack, Pad
-from .utils import extract_value_from_config
+from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment
+from .utils import extract_value_from_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -55,6 +80,7 @@ class ImageProcessor:
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
+        model: Optional[nn.Module] = None,
     ):
         """
         Parameters
@@ -90,9 +116,11 @@ class ImageProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         trivial_augment_maxscale
-            Used in trival augment as the maximum scale that can be random generated
+            Used in trivial augment as the maximum scale that can be random generated
             A value of 0 means turn off trivial augment
             https://arxiv.org/pdf/2103.10158.pdf
+        model
+            The model using this data processor.
         """
         self.checkpoint_name = checkpoint_name
         self.prefix = prefix
@@ -108,7 +136,10 @@ class ImageProcessor:
         self.std = None
 
         if checkpoint_name is not None:
-            self.size, self.mean, self.std = self.extract_default(checkpoint_name)
+            if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name, cfg=model.model.cfg)
+            else:
+                self.size, self.mean, self.std = self.extract_default(checkpoint_name)
         if self.size is None:
             if size is not None:
                 self.size = size
@@ -133,8 +164,18 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = self.construct_processor(self.train_transform_types)
-        self.val_processor = self.construct_processor(self.val_transform_types)
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+            if self.prefix == MMDET_IMAGE:
+                assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
+            else:
+                assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
+            cfg = model.model.cfg
+            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
+            self.val_processor = Compose(cfg.data.test.pipeline)
+            self.train_processor = Compose(cfg.data.test.pipeline)
+        else:
+            self.train_processor = self.construct_processor(self.train_transform_types)
+            self.val_processor = self.construct_processor(self.val_transform_types)
 
     @property
     def image_key(self):
@@ -165,12 +206,20 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        fn.update(
-            {
-                self.image_key: Pad(pad_val=0),
-                self.image_valid_num_key: Stack(),
-            }
-        )
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+            assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+            fn.update(
+                {
+                    self.image_key: collate,
+                }
+            )
+        else:
+            fn.update(
+                {
+                    self.image_key: Pad(pad_val=0),
+                    self.image_valid_num_key: Stack(),
+                }
+            )
 
         return fn
 
@@ -197,8 +246,7 @@ class ImageProcessor:
         else:
             raise ValueError(f"unknown image normalization: {norm_type}")
 
-    @staticmethod
-    def extract_default(checkpoint_name):
+    def extract_default(self, checkpoint_name, cfg=None):
         """
         Extract some default hyper-parameters, e.g., image size, mean, and std,
         from a pre-trained (timm or huggingface) checkpoint.
@@ -217,7 +265,15 @@ class ImageProcessor:
         std
             Image normalizaiton std.
         """
-        try:  # timm checkpoint
+        if self.prefix.lower().startswith(MMDET_IMAGE):
+            image_size = cfg.test_pipeline[1]["img_scale"][0]
+            mean = cfg.test_pipeline[1]["transforms"][2]["mean"]
+            std = cfg.test_pipeline[1]["transforms"][2]["std"]
+        elif self.prefix.lower().startswith(MMOCR_TEXT_DET):
+            image_size = cfg.data.test.pipeline[1]["img_scale"][0]
+            mean = cfg.data.test.pipeline[1]["transforms"][1]["mean"]
+            std = cfg.data.test.pipeline[1]["transforms"][1]["std"]
+        elif self.prefix.lower().startswith(TIMM_IMAGE):
             model = create_model(
                 checkpoint_name,
                 pretrained=True,
@@ -226,26 +282,24 @@ class ImageProcessor:
             image_size = model.default_cfg["input_size"][-1]
             mean = model.default_cfg["mean"]
             std = model.default_cfg["std"]
-        except Exception as exp1:
-            try:  # huggingface checkpoint
-                config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-                extracted = extract_value_from_config(
-                    config=config,
-                    keys=("image_size",),
-                )
-                if len(extracted) == 0:
-                    image_size = None
-                elif len(extracted) >= 1:
-                    image_size = extracted[0]
-                    if isinstance(image_size, tuple):
-                        image_size = image_size[-1]
-                else:
-                    raise ValueError(f" more than one image_size values are detected: {extracted}")
-                mean = None
-                std = None
-            except Exception as exp2:
-                raise ValueError(f"cann't load checkpoint_name {checkpoint_name}") from exp2
-
+        elif self.prefix.lower().startswith(CLIP):
+            config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
+            extracted = extract_value_from_config(
+                config=config,
+                keys=("image_size",),
+            )
+            if len(extracted) == 0:
+                image_size = None
+            elif len(extracted) >= 1:
+                image_size = extracted[0]
+                if isinstance(image_size, tuple):
+                    image_size = image_size[-1]
+            else:
+                raise ValueError(f" more than one image_size values are detected: {extracted}")
+            mean = None
+            std = None
+        else:
+            raise ValueError(f"Unknown image processor prefix: {self.prefix}")
         return image_size, mean, std
 
     def construct_processor(
@@ -344,33 +398,37 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message=(
-                            "Palette images with Transparency expressed in bytes should be converted to RGBA images"
-                        ),
-                    )
-                    is_zero_img = False
-                    try:
-                        img = PIL.Image.open(img_path).convert("RGB")
-                    except Exception as e:
-                        if self.missing_value_strategy.lower() == "zero":
-                            logger.debug(f"Using a zero image due to '{e}'")
-                            img = PIL.Image.new("RGB", (self.size, self.size), color=0)
-                            is_zero_img = True
-                        else:
-                            raise e
-
-                if is_training:
-                    img = self.train_processor(img)
+                if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+                    data = dict(img_info=dict(filename=img_path), img_prefix=None)
+                    images.append(self.val_processor(data))
                 else:
-                    img = self.val_processor(img)
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            "ignore",
+                            message=(
+                                "Palette images with Transparency expressed in bytes should be converted to RGBA images"
+                            ),
+                        )
+                        is_zero_img = False
+                        try:
+                            img = PIL.Image.open(img_path).convert("RGB")
+                        except Exception as e:
+                            if self.missing_value_strategy.lower() == "zero":
+                                logger.debug(f"Using a zero image due to '{e}'")
+                                img = PIL.Image.new("RGB", (self.size, self.size), color=0)
+                                is_zero_img = True
+                            else:
+                                raise e
 
-                if is_zero_img:
-                    zero_images.append(img)
-                else:
-                    images.append(img)
+                    if is_training:
+                        img = self.train_processor(img)
+                    else:
+                        img = self.val_processor(img)
+
+                    if is_zero_img:
+                        zero_images.append(img)
+                    else:
+                        images.append(img)
 
             if self.requires_column_info:
                 # only count the valid images since they are put ahead of the zero images in the below returning
@@ -378,15 +436,17 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-
-        ret.update(
-            {
-                self.image_key: torch.tensor([])
-                if len(images + zero_images) == 0
-                else torch.stack(images + zero_images, dim=0),
-                self.image_valid_num_key: len(images),
-            }
-        )
+        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+            ret.update({self.image_key: images[0]})
+        else:
+            ret.update(
+                {
+                    self.image_key: torch.tensor([])
+                    if len(images + zero_images) == 0
+                    else torch.stack(images + zero_images, dim=0),
+                    self.image_valid_num_key: len(images),
+                }
+            )
         return ret
 
     def __call__(

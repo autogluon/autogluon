@@ -1,23 +1,21 @@
-import os
-import logging
-from typing import Optional, List, Any, Dict
-import numpy as np
-from nptyping import NDArray
-import warnings
-from transformers import (
-    BertTokenizer,
-    CLIPTokenizer,
-    ElectraTokenizer,
-    AutoTokenizer,
-    AutoConfig,
-)
-from ..constants import TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, TEXT_SEGMENT_IDS, AUTOMM, COLUMN, TEXT
-from .collator import Stack, Pad
-from .utils import extract_value_from_config
 import ast
+import logging
+import os
+import warnings
 from copy import deepcopy
-from .trivial_augmenter import TrivialAugment
+from typing import Any, Dict, List, Optional
 
+import numpy as np
+import torch
+from nptyping import NDArray
+from omegaconf import DictConfig
+from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
+
+from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
+from .collator import Pad, Stack
+from .template_engine import TemplateEngine
+from .trivial_augmenter import TrivialAugment
+from .utils import extract_value_from_config
 
 logger = logging.getLogger(AUTOMM)
 
@@ -91,6 +89,7 @@ class TextProcessor:
         text_detection_length: Optional[int] = None,
         text_trivial_aug_maxscale: Optional[float] = 0.0,
         train_augment_types: Optional[List[str]] = None,
+        template_config: Optional[DictConfig] = None,
     ):
         """
         Parameters
@@ -114,7 +113,7 @@ class TextProcessor:
         text_detection_length
             A naive way to detect text column versus tabular column that were treated as text
         text_trivial_aug_maxscale
-            Used in trival augment as the maximum scale that can be random generated
+            Used in trivial augment as the maximum scale that can be random generated
             A value of 0 means turn off trivial augment
             https://arxiv.org/pdf/2103.10158.pdf
         train_augment_types
@@ -176,6 +175,8 @@ class TextProcessor:
         self.text_detection_length = text_detection_length
         self.text_trivial_aug_maxscale = text_trivial_aug_maxscale
         self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
+        self.template_config = template_config
+        self.template_engine = TemplateEngine(self.template_config)
 
     @property
     def text_token_ids_key(self):
@@ -184,6 +185,10 @@ class TextProcessor:
     @property
     def text_segment_ids_key(self):
         return f"{self.prefix}_{TEXT_SEGMENT_IDS}"
+
+    @property
+    def choices_ids_key(self):
+        return f"{self.prefix}_{CHOICES_IDS}"
 
     @property
     def text_valid_length_key(self):
@@ -213,6 +218,7 @@ class TextProcessor:
                 self.text_token_ids_key: Pad(pad_val=self.tokenizer.pad_token_id),
                 self.text_valid_length_key: Stack(),
                 self.text_segment_ids_key: Pad(pad_val=0),
+                self.choices_ids_key: Pad(pad_val=0),
             }
         )
 
@@ -257,9 +263,15 @@ class TextProcessor:
             token_ids = []
         else:
             token_ids = [self.cls_token_id]
+
+        choices_ids = []
         segment_ids = [seg]
         ret = {}
+
         for (col_name, txt_token), trim_length in zip(text_tokens.items(), trimmed_lengths):
+            if col_name == CHOICES_IDS:
+                choices_ids = txt_token
+                continue
             segment_start = len(token_ids)
             if self.stochastic_chunk:
                 start_ptr = np.random.randint(0, len(txt_token) - trim_length + 1)
@@ -290,6 +302,7 @@ class TextProcessor:
                 self.text_token_ids_key: np.array(token_ids, dtype=np.int32),
                 self.text_valid_length_key: len(token_ids),
                 self.text_segment_ids_key: np.array(segment_ids, dtype=np.int32),
+                self.choices_ids_key: np.array(choices_ids, dtype=np.int32),
             }
         )
 
@@ -320,13 +333,28 @@ class TextProcessor:
         tokens = {}
         warnings.filterwarnings("ignore", "Token indices sequence length is longer than.*result in indexing errors")
 
+        if self.template_config.turn_on:
+            template, applied_template = self.template_engine.sample_and_apply_template(text)
+            if template:
+                answer_choices = template.get_answer_choices_list(text)
+                text = {}
+                text[TEXT_TOKEN_IDS] = applied_template[0]
+                text[CHOICES_IDS] = answer_choices
+
         for col_name, col_text in text.items():
             if is_training:
                 if self.train_augmenter is not None:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
                         col_text = self.train_augmenter(col_text)
-
+            if col_name == CHOICES_IDS:
+                answer_ids = self.tokenizer(
+                    col_text,
+                    return_tensors="pt",
+                    padding=True,
+                )["input_ids"]
+                tokens[col_name] = answer_ids
+                continue
             col_tokens = self.tokenizer.encode(
                 col_text,
                 add_special_tokens=False,
@@ -476,7 +504,7 @@ class TextProcessor:
         for k, v in self.__dict__.items():
             if k != "train_augmenter":
                 setattr(result, k, deepcopy(v, memo))
-        # manual recontruct augmenter
+        # manual reconstruct augmenter
         result.train_augmenter = construct_text_augmenter(result.text_trivial_aug_maxscale, result.train_augment_types)
         return result
 

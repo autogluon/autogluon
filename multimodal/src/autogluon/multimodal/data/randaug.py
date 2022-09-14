@@ -1,9 +1,12 @@
-# code in this file is adpated from rpmcruz/autoaugment
+# code in this file is adapted from rpmcruz/autoaugment
 # https://github.com/rpmcruz/autoaugment/blob/master/transformations.py
 import random
 
-import PIL, PIL.ImageOps, PIL.ImageEnhance, PIL.ImageDraw
 import numpy as np
+import PIL
+import PIL.ImageDraw
+import PIL.ImageEnhance
+import PIL.ImageOps
 import torch
 from PIL import Image
 

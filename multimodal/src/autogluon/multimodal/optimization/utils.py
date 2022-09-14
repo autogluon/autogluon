@@ -1,50 +1,56 @@
-import logging
-from typing import Optional, Union, Tuple, List, Dict, Any
 import functools
+import logging
+import re
+import warnings
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
-from torch import nn
-from torch import optim
-from torch.nn import functional as F
-from transformers.trainer_pt_utils import get_parameter_names
 import torchmetrics
-from omegaconf import OmegaConf, DictConfig
-from pytorch_metric_learning import losses, miners, distances
-from .lr_scheduler import (
-    get_cosine_schedule_with_warmup,
-    get_polynomial_decay_schedule_with_warmup,
-    get_linear_schedule_with_warmup,
-)
+from omegaconf import DictConfig, OmegaConf
+from pytorch_metric_learning import distances, losses, miners
+from torch import nn, optim
+from torch.nn import functional as F
+from transformers import Adafactor
+from transformers.trainer_pt_utils import get_parameter_names
+
 from ..constants import (
-    BINARY,
-    MULTICLASS,
-    REGRESSION,
-    NORM_FIT,
-    BIT_FIT,
     ACC,
     ACCURACY,
-    RMSE,
-    ROOT_MEAN_SQUARED_ERROR,
-    R2,
-    QUADRATIC_KAPPA,
-    ROC_AUC,
-    AVERAGE_PRECISION,
-    LOG_LOSS,
-    CROSS_ENTROPY,
-    PEARSONR,
-    SPEARMANR,
-    F1,
-    CONTRASTIVE_LOSS,
-    COSINE_SIMILARITY,
-    PAIR_MARGIN_MINER,
-    COLUMN_FEATURES,
-    FEATURES,
     AUTOMM,
+    AVERAGE_PRECISION,
+    BINARY,
+    BIT_FIT,
+    COLUMN_FEATURES,
+    CONTRASTIVE_LOSS,
     COSINE_EMBEDDING_LOSS,
+    COSINE_SIMILARITY,
+    CROSS_ENTROPY,
+    F1,
+    FEATURES,
+    IA3,
+    IA3_BIAS,
+    IA3_NORM,
+    LOG_LOSS,
     LORA,
     LORA_BIAS,
     LORA_NORM,
+    MULTICLASS,
+    NORM_FIT,
+    PAIR_MARGIN_MINER,
+    PEARSONR,
+    QUADRATIC_KAPPA,
+    R2,
+    REGRESSION,
+    RMSE,
+    ROC_AUC,
+    ROOT_MEAN_SQUARED_ERROR,
+    SPEARMANR,
 )
-import warnings
+from .lr_scheduler import (
+    get_cosine_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+    get_polynomial_decay_schedule_with_warmup,
+)
 from .soft_target_crossentropy import SoftTargetCrossEntropy
 
 logger = logging.getLogger(AUTOMM)
@@ -240,6 +246,15 @@ def get_optimizer(
             lr=lr,
             weight_decay=weight_decay,
             momentum=momentum,
+        )
+    elif optim_type == "adafactor":
+        optimizer = Adafactor(
+            optimizer_grouped_parameters,
+            lr=lr,
+            weight_decay=weight_decay,
+            scale_parameter=True,  # Generally recommended to enable scaling
+            relative_step=False,
+            warmup_init=False,
         )
     else:
         raise ValueError(f"unknown optimizer: {optim_type}")
@@ -468,12 +483,59 @@ def apply_two_stages_lr(
     return optimizer_grouped_parameters
 
 
+def get_trainable_params_efficient_finetune(
+    norm_param_names: List[str],
+    efficient_finetune: Optional[str] = None,
+):
+    """
+     Get the list of trainable parameters according to the provided efficient finetuning method.
+
+    Parameters
+    ----------
+    norm_param_names
+        The parameters associated with the normalization layers
+    efficient_finetune
+        Efficient finetuning strategy. Trainable parameters will be adjusted according to the method.
+    trainable_param_names
+        Initial specification of layers that should be trained.
+
+    Returns
+    -------
+    Get list of trainable parameter names according to the provided efficient finetuning method.
+    """
+    trainable_param_names = []
+
+    if efficient_finetune == BIT_FIT:
+        trainable_param_names.append(".*bias*.")
+    elif efficient_finetune == NORM_FIT:
+        trainable_param_names.append(".*bias*.")
+        trainable_param_names += norm_param_names
+    elif efficient_finetune in [LORA, IA3]:
+        trainable_param_names.append(".*lora_*.")
+    elif efficient_finetune in [LORA_BIAS, IA3_BIAS]:
+        trainable_param_names.append(".*lora_*.")
+        trainable_param_names.append(".*bias*.")
+    elif efficient_finetune in [LORA_NORM, IA3_NORM]:
+        trainable_param_names.append(".*lora_*.")
+        trainable_param_names.append(".*bias*.")
+        trainable_param_names += norm_param_names
+    elif efficient_finetune is not None and efficient_finetune != "None":
+        raise NotImplementedError(
+            f"The efficient finetuning strategy '{efficient_finetune}'"
+            f" is not supported. We only support"
+            f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}', '{IA3}', '{IA3_BIAS}', '{IA3_NORM}'."
+        )
+
+    return trainable_param_names
+
+
 def apply_layerwise_lr_decay(
     model: nn.Module,
     lr: float,
     lr_decay: float,
     weight_decay: float,
     efficient_finetune: Optional[str] = None,
+    trainable_param_names: Optional[List[str]] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -494,7 +556,7 @@ def apply_layerwise_lr_decay(
     weight_decay
         Weight decay.
     efficient_finetune
-        Efficient finetuning strategy. Can be "bit_fit", "norm_fit". It will only finetune part of the parameters
+        Efficient finetuning strategy. It will only finetune part of the parameters
 
     Returns
     -------
@@ -504,47 +566,22 @@ def apply_layerwise_lr_decay(
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
     norm_param_names = get_norm_layer_param_names(model)
-    # Patterns that detect if the layer is a custom layer (not loaded from a pretraining network)
-    # TODO(?) Currently it is a workaround. We need to fix it in the future, i.e., supporting tabular encoders
-    automm_custom_layer_patterns = ["head", "fusion_mlp", "adapter"]
+
+    trainable_param_names = get_trainable_params_efficient_finetune(
+        norm_param_names,
+        efficient_finetune=efficient_finetune,
+    )
 
     for name, param in model.named_parameters():
-        within_automm_custom_layer = False
-        name_split = name.split(".")
-        for ele_name in name_split[:3]:
-            for pattern in automm_custom_layer_patterns:
-                if pattern in ele_name:
-                    within_automm_custom_layer = True
-                    break
-        if within_automm_custom_layer:
+        layer_id = model.name_to_id[name]
+        if layer_id == 0:  # Set top layer (e.g. head, fusion_mlp, adapter) as being trainable.
             param.requires_grad = True
-        else:
-            if efficient_finetune == BIT_FIT:
-                # For bit_fit, we disable tuning everything except the bias terms
-                if "bias" not in name:
-                    param.requires_grad = False
-            elif efficient_finetune == NORM_FIT:
-                # For norm-fit, we finetune all the normalization layers and bias layers
-                if name not in norm_param_names and "bias" not in name:
-                    param.requires_grad = False
-            elif efficient_finetune == LORA:
-                # For LoRA adaptation we only fine-tune LoRA weights
-                if "lora_" not in name:
-                    param.requires_grad = False
-            elif efficient_finetune == LORA_BIAS:
-                # For LoRA adapation we fine-tune LoRA and all bias weights
-                if "lora_" not in name and "bias" not in name:
-                    param.requires_grad = False
-            elif efficient_finetune == LORA_NORM:
-                # For LoRA adapation we fine-tune LoRA and normalization and bias layers
-                if "lora_" not in name and name not in norm_param_names and "bias" not in name:
-                    param.requires_grad = False
-            elif efficient_finetune is not None and efficient_finetune != "None":
-                raise NotImplementedError(
-                    f"The efficient finetuning strategy '{efficient_finetune}'"
-                    f" is not supported. We only support"
-                    f" '{BIT_FIT}', '{NORM_FIT}', '{LORA}', '{LORA_NORM}', '{LORA_BIAS}'."
-                )
+        elif (
+            efficient_finetune is not None
+            and efficient_finetune != "None"
+            and not any([re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names])
+        ):
+            param.requires_grad = False
 
         if not param.requires_grad:
             continue  # frozen weights

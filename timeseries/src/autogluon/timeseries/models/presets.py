@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Union, Dict, List
+from typing import Dict, List, Union
 
 import autogluon.core as ag
 
@@ -13,10 +13,11 @@ from .gluonts import (
     MQRNNModel,
     ProphetModel,
     SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
     TransformerModel,
 )
-from .sktime import AutoARIMAModel, AutoETSModel, ARIMAModel
-
+from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
+from .statsmodels import ARIMAModel, ETSModel
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,12 @@ MODEL_TYPES = dict(
     AutoTabular=AutoTabularModel,
     Prophet=ProphetModel,
     Transformer=TransformerModel,
+    TemporalFusionTransformer=TemporalFusionTransformerModel,
+    SktimeARIMA=SktimeARIMAModel,
+    SktimeAutoARIMA=SktimeAutoARIMAModel,
+    SktimeAutoETS=SktimeAutoETSModel,
+    ETS=ETSModel,
     ARIMA=ARIMAModel,
-    AutoARIMA=AutoARIMAModel,
-    AutoETS=AutoETSModel
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -39,17 +43,23 @@ DEFAULT_MODEL_PRIORITY = dict(
     MQRNN=40,
     SimpleFeedForward=50,
     Transformer=40,
+    TemporalFusionTransformer=45,
     DeepAR=50,
     Prophet=10,
     AutoTabular=10,
-    AutoARIMA=20,
+    SktimeAutoARIMA=20,
+    SktimeARIMA=50,
+    SktimeAutoETS=60,
     ARIMA=50,
-    AutoETS=60,
+    ETS=60,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
+MINIMUM_CONTEXT_LENGTH = 10
 
 
+# TODO: Should we include TBATS to the presets?
 def get_default_hps(key, prediction_length):
+    context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
         "toy": {
             "SimpleFeedForward": {
@@ -59,34 +69,32 @@ def get_default_hps(key, prediction_length):
             },
             "Transformer": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
             "DeepAR": {"epochs": 10, "num_batches_per_epoch": 10, "context_length": 5},
-            "AutoETS": {"maxiter": 20},
+            "ETS": {"maxiter": 20, "seasonal": None},
             "ARIMA": {
                 "maxiter": 10,
                 "order": (1, 0, 0),
-                "suppress_warnings": True,
+                "seasonal_order": (0, 0, 0),
             },
         },
         "default": {
-            "AutoETS": {
+            "ETS": {
                 "maxiter": 200,
                 "trend": "add",
-                "auto": False,
-                "initialization_method": "estimated",
+                "seasonal": "add",
             },
             "ARIMA": {
                 "maxiter": 50,
                 "order": (1, 1, 1),
-                "seasonal_order": (0, 0, 0, 0),
-                "suppress_warnings": True,
+                "seasonal_order": (0, 0, 0),
             },
             "SimpleFeedForward": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "Transformer": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "DeepAR": {
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
         },
         "default_hpo": {
@@ -94,28 +102,26 @@ def get_default_hps(key, prediction_length):
                 "cell_type": ag.Categorical("gru", "lstm"),
                 "num_layers": ag.Int(1, 4),
                 "num_cells": ag.Categorical(20, 30, 40, 50),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "SimpleFeedForward": {
                 "batch_normalization": ag.Categorical(True, False),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
             "Transformer": {
                 "model_dim": ag.Categorical(8, 16, 32),
-                "context_length": prediction_length * 2,
+                "context_length": context_length,
             },
-            "AutoETS": {
-                "error": ag.Categorical("add", "mul"),
-                "trend": ag.Categorical("add", "mul"),
-                "auto": False,
-                "initialization_method": "estimated",
+            "ETS": {
                 "maxiter": 200,
+                "error": ag.Categorical("add", "mul"),
+                "trend": ag.Categorical("add", "mul", None),
+                "seasonal": ag.Categorical("add", None),
             },
             "ARIMA": {
-                "maxiter": ag.Categorical(50),
-                "order": (1, 1, 1),
-                "seasonal_order": (0, 0, 0, 0),
-                "suppress_warnings": True,
+                "maxiter": 50,
+                "order": ag.Categorical((2, 0, 1), (2, 1, 1), (1, 1, 1)),
+                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 1)),
             },
         },
     }
@@ -138,18 +144,14 @@ def get_preset_models(
     """
     models = []
     if isinstance(hyperparameters, str):
-        hyperparameters = copy.deepcopy(
-            get_default_hps(hyperparameters, prediction_length)
-        )
+        hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
     else:
         hp_str = "default" if not hyperparameter_tune else "default_hpo"
         default_hps = copy.deepcopy(get_default_hps(hp_str, prediction_length))
 
         if hyperparameters is not None:
             # filter only default_hps for models with hyperparameters provided
-            default_hps = {
-                model: default_hps.get(model, {}) for model in hyperparameters
-            }
+            default_hps = {model: default_hps.get(model, {}) for model in hyperparameters}
             for model in hyperparameters:
                 default_hps[model].update(hyperparameters[model])
         hyperparameters = copy.deepcopy(default_hps)
@@ -162,11 +164,7 @@ def get_preset_models(
     invalid_model_names = set(invalid_model_names)
     all_assigned_names = set(invalid_model_names)
 
-    model_priority_list = sorted(
-        hyperparameters.keys(),
-        key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0),
-        reverse=True
-    )
+    model_priority_list = sorted(hyperparameters.keys(), key=lambda x: DEFAULT_MODEL_PRIORITY.get(x, 0), reverse=True)
 
     for model in model_priority_list:
         model_hps = hyperparameters[model]
@@ -177,9 +175,7 @@ def get_preset_models(
         elif isinstance(model, AbstractTimeSeriesModelFactory):
             model_type = model
         elif not issubclass(model, AbstractTimeSeriesModel):
-            logger.warning(
-                f"Customized model {model} does not inherit from {AbstractTimeSeriesModel}"
-            )
+            logger.warning(f"Customized model {model} does not inherit from {AbstractTimeSeriesModel}")
             model_type = model
         else:
             logger.log(20, f"Custom Model Type Detected: {model}")

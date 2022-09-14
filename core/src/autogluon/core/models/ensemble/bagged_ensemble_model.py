@@ -339,7 +339,7 @@ class BaggedEnsembleModel(AbstractModel):
             )
             # Sample at most 500 rows to estimate prediction time of all rows
             # TODO: Consider moving this into end of abstract model fit for all models.
-            #  Currently this only fixes problem when in bagged mode, if not bagging, then inference could still be problamatic
+            #  Currently this only fixes problem when in bagged mode, if not bagging, then inference could still be problematic
             n_sample = min(500, round(X_len * 0.1))
             frac = n_sample / X_len
             X_sample = X.sample(n=n_sample)
@@ -616,7 +616,7 @@ class BaggedEnsembleModel(AbstractModel):
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             if is_oof:
                 if self._child_oof or not self._bagged_mode:
-                    raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
+                    raise AssertionError('Model trained with no validation data cannot get feature importance on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
                 kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
                 cur_kfolds = kfolds[n_repeat * k:(n_repeat + 1) * k]
             else:

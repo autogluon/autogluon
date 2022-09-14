@@ -55,7 +55,7 @@ class LocalReporter:
 
 class LocalSequentialScheduler(object):
     """ Simple scheduler which schedules all HPO jobs in sequence without any parallelism.
-    The next trial scheduling will be decided based on the available time left withing `time_out` setting
+    The next trial scheduling will be decided based on the available time left within `time_out` setting
     and average time required for a trial to complete multiplied by the fill_factor (0.95) by default to
     accommodate variance in runtimes per HPO run.
 

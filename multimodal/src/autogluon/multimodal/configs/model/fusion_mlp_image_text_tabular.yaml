@@ -1,11 +1,5 @@
 model:
   names:
-    - "categorical_mlp"
-    - "numerical_mlp"
-    - "hf_text"
-    - "timm_image"
-    - "clip"
-    - "fusion_mlp"
   categorical_mlp:
     hidden_size: 64
     activation: "leaky_relu"
@@ -17,6 +11,7 @@ model:
   categorical_transformer:
     out_features: 192
     d_token: 192
+    ffn_d_hidden: 192 
     num_trans_blocks: 0
     num_attn_heads: 8
     residual_dropout: 0.0
@@ -41,6 +36,7 @@ model:
   numerical_transformer:
     out_features: 192
     d_token: 192
+    ffn_d_hidden: 192 
     num_trans_blocks: 0
     num_attn_heads: 8
     residual_dropout: 0.0
@@ -48,7 +44,7 @@ model:
     ffn_dropout: 0.1
     normalization: "layer_norm"
     ffn_activation: "reglu"
-    head_activation: "relu" 
+    head_activation: "relu"
     data_types:
       - "numerical"
     embedding_arch:
@@ -67,13 +63,27 @@ model:
     text_segment_num: 2
     stochastic_chunk: False
     text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
-    text_trivial_aug_maxscale: 0.0            # augmentation magnititude randomly drawn from [0, text_trivial_aug_maxscale]
+    text_trivial_aug_maxscale: 0.0            # augmentation magnitude randomly drawn from [0, text_trivial_aug_maxscale]
     text_train_augment_types:        # specify augmentation space manually, will randomly select one from the following and identity
       # - "random_swap(0.05)"          # less than 0.1 based on eda paper
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
-
+  t_few:
+    checkpoint_name: "t5-small" #"bigscience/T0_3B"
+    gradient_checkpointing: False
+    data_types:
+      - "text"
+    tokenizer_name: "hf_auto"
+    length_norm: 1.0 # Normalizes length to adjust for length bias in target template
+    unlikely_loss: 1.0 # Adds loss term that lowers probability of incorrect outputs
+    mc_loss: 1.0 # Adds multiple choice cross entropy loss
+    max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
+    text_segment_num: 2
+    insert_sep: True
+    stochastic_chunk: False
+    text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
+    text_trivial_aug_maxscale: 0.0            # augmentation magnititude randomly drawn from [0, text_trivial_aug_maxscale]
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
@@ -89,6 +99,37 @@ model:
     image_norm: "imagenet"
     image_size: 224
     max_img_num_per_col: 2
+
+  mmdet_image:
+    checkpoint_name: "yolov3_mobilenetv2_320_300e_coco"
+    data_types:
+      - "image"
+    train_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+      - "trivial_augment"
+    val_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    max_img_num_per_col: 2
+
+  mmocr_text_detection:
+    checkpoint_name: "TextSnake"
+    data_types:
+      - "image"
+    train_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+      - "trivial_augment"
+    val_transform_types:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    max_img_num_per_col: 2
+
   clip:
     checkpoint_name: "openai/clip-vit-base-patch32"
     data_types:
@@ -132,9 +173,9 @@ model:
     adapt_in_features: "max"
     attention_dropout: 0.2
     residual_dropout: 0.0
-    ffn_dropout: 0.1 
-    ffn_d_hidden: 192 
+    ffn_dropout: 0.1
+    ffn_d_hidden: 192
     normalization: "layer_norm"
     ffn_activation: "geglu"
-    head_activation: "relu" 
+    head_activation: "relu"
     data_types:
