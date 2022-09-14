@@ -1,12 +1,13 @@
+import base64
+import os
+import pandas as pd
+import numpy as np
+
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.vision import ImagePredictor
 from io import BytesIO
 from PIL import Image
-
-import os
-import pandas as pd
-import numpy as np
 
 
 def _cleanup_images():
@@ -29,11 +30,12 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = BytesIO(request_body)
         data = np.load(buf, allow_pickle=True)
         image_paths = []
-        for i, image in enumerate(data):
-            im = Image.fromarray(image)
+        for i, bytes in enumerate(data):
+            im = Image.open(BytesIO(base64.b85decode(bytes)))
             im_name = f'{i}.png'
             im.save(im_name)
             image_paths.append(im_name)
+
     elif input_content_type == "application/x-image":
         buf = BytesIO(request_body)
         im = Image.open(buf)
@@ -41,6 +43,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         im_name = 'test.png'
         im.save(im_name)
         image_paths.append(im_name)
+
     else:
         raise ValueError(
             f'{input_content_type} input content type not supported.'
