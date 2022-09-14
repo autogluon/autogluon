@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Union
 
 from nptyping import NDArray
+from torch import nn
 
 from ..constants import LABEL
 from .collator import Stack
@@ -15,7 +16,7 @@ class LabelProcessor:
 
     def __init__(
         self,
-        prefix: str,
+        model: nn.Module,
     ):
         """
         Parameters
@@ -23,7 +24,7 @@ class LabelProcessor:
         prefix
             The prefix connecting a processor to its corresponding model.
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
 
     @property
     def label_key(self):

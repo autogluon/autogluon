@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from nptyping import NDArray
+from torch import nn
 
 from ..constants import COLUMN, NUMERICAL
 from .collator import Stack
@@ -16,7 +17,7 @@ class NumericalProcessor:
 
     def __init__(
         self,
-        prefix: str,
+        model: nn.Module,
         merge: Optional[str] = "concat",
         requires_column_info: bool = False,
     ):
@@ -33,7 +34,7 @@ class NumericalProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
         self.merge = merge
         self.requires_column_info = requires_column_info
 

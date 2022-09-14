@@ -508,7 +508,7 @@ def select_model(
     fusion_model_name = []
     for model_name in names:
         model_config = getattr(config.model, model_name)
-        if model_config.data_types is None:
+        if not model_config.data_types:
             fusion_model_name.append(model_name)
             continue
         model_data_status = [data_status[d_type] for d_type in model_config.data_types]
@@ -520,15 +520,15 @@ def select_model(
     if len(selected_model_names) == 0:
         raise ValueError("No model is available for this dataset.")
     # only allow no more than 1 fusion model
-    assert len(fusion_model_name) <= 1
+    if len(fusion_model_name) > 1:
+        raise ValueError(f"More than one fusion models `{fusion_model_name}` are detected, but only one is allowed.")
 
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
     elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
-        if data_status[CATEGORICAL] or data_status[NUMERICAL]:
-            # retain the fusion model for uni-modal tabular data.
-            assert len(fusion_model_name) == 1
+        # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
+        if selected_model_names[0].startswith((CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER)):
             selected_model_names.extend(fusion_model_name)
         else:
             # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
@@ -583,12 +583,78 @@ def init_df_preprocessor(
     return df_preprocessor
 
 
-def init_data_processors(
+def create_data_processor(
+    data_type: str,
     config: DictConfig,
-    model: Optional[nn.Module] = None,
+    model: nn.Module,
 ):
     """
-    Create the data processors according to the model config. This function creates one processor for
+    Create one data processor based on the data type and model.
+
+    Parameters
+    ----------
+    data_type
+        Data type.
+    config
+        The config may contain information required by creating a data processor.
+        In future, we may move the required config information into the model.config
+        to make the data processor conditioned only on the model itself.
+    model
+        The model.
+
+    Returns
+    -------
+    One data processor.
+    """
+    model_config = getattr(config.model, model.prefix)
+    if data_type == IMAGE:
+        data_processor = ImageProcessor(
+            model=model,
+            train_transform_types=model_config.train_transform_types,
+            val_transform_types=model_config.val_transform_types,
+            norm_type=model_config.image_norm,
+            size=model_config.image_size,
+            max_img_num_per_col=model_config.max_img_num_per_col,
+            missing_value_strategy=config.data.image.missing_value_strategy,
+        )
+    elif data_type == TEXT:
+        data_processor = TextProcessor(
+            model=model,
+            tokenizer_name=model_config.tokenizer_name,
+            max_len=model_config.max_text_len,
+            insert_sep=model_config.insert_sep,
+            text_segment_num=model_config.text_segment_num,
+            stochastic_chunk=model_config.stochastic_chunk,
+            text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
+            text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
+            train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
+            template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
+        )
+    elif data_type == CATEGORICAL:
+        data_processor = CategoricalProcessor(
+            model=model,
+        )
+    elif data_type == NUMERICAL:
+        data_processor = NumericalProcessor(
+            model=model,
+            merge=model_config.merge,
+        )
+    elif data_type == LABEL:
+        data_processor = LabelProcessor(model=model)
+    else:
+        raise ValueError(f"unknown data type: {data_type}")
+
+    return data_processor
+
+
+def create_fusion_data_processors(
+    config: DictConfig,
+    model: nn.Module,
+    requires_label: Optional[bool] = True,
+    requires_data: Optional[bool] = True,
+):
+    """
+    Create the data processors for late-fusion models. This function creates one processor for
     each modality of each model. For example, if one model config contains BERT, ViT, and CLIP, then
     BERT would have its own text processor, ViT would have its own image processor, and CLIP would have
     its own text and image processors. This is to support training arbitrary combinations of single-modal
@@ -608,10 +674,6 @@ def init_data_processors(
     A dictionary with modalities as the keys. Each modality has a list of processors.
     Note that "label" is also treated as a modality for convenience.
     """
-    names = config.model.names
-    if isinstance(names, str):
-        names = [names]
-
     data_processors = {
         IMAGE: [],
         TEXT: [],
@@ -619,60 +681,33 @@ def init_data_processors(
         NUMERICAL: [],
         LABEL: [],
     }
-    for model_name in names:
-        model_config = getattr(config.model, model_name)
-        # each model has its own label processor
-        data_processors[LABEL].append(LabelProcessor(prefix=model_name))
-        if model_config.data_types is None:
-            continue
-        for d_type in model_config.data_types:
-            if d_type == IMAGE:
-                data_processors[IMAGE].append(
-                    ImageProcessor(
-                        prefix=model_name,
-                        checkpoint_name=model_config.checkpoint_name,
-                        train_transform_types=model_config.train_transform_types,
-                        val_transform_types=model_config.val_transform_types,
-                        norm_type=model_config.image_norm,
-                        size=model_config.image_size,
-                        max_img_num_per_col=model_config.max_img_num_per_col,
-                        missing_value_strategy=config.data.image.missing_value_strategy,
-                        model=model,
-                    )
-                )
-            elif d_type == TEXT:
-                data_processors[TEXT].append(
-                    TextProcessor(
-                        prefix=model_name,
-                        tokenizer_name=model_config.tokenizer_name,
-                        checkpoint_name=model_config.checkpoint_name,
-                        max_len=model_config.max_text_len,
-                        insert_sep=model_config.insert_sep,
-                        text_segment_num=model_config.text_segment_num,
-                        stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
-                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
-                        train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
-                        template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
-                    )
-                )
-            elif d_type == CATEGORICAL:
-                data_processors[CATEGORICAL].append(
-                    CategoricalProcessor(
-                        prefix=model_name,
-                    )
-                )
-            elif d_type == NUMERICAL:
-                data_processors[NUMERICAL].append(
-                    NumericalProcessor(
-                        prefix=model_name,
-                        merge=model_config.merge,
-                    )
-                )
-            else:
-                raise ValueError(f"unknown data type: {d_type}")
 
-    assert len(data_processors[LABEL]) > 0
+    model_dict = {model.prefix: model}
+
+    if model.prefix.lower().startswith("fusion"):
+        for per_model in model.model:
+            model_dict[per_model.prefix] = per_model
+
+    assert sorted(list(model_dict.keys())) == sorted(config.model.names)
+
+    for per_name, per_model in model_dict.items():
+        if requires_label:
+            # each model has its own label processor
+            label_processor = create_data_processor(
+                data_type=LABEL,
+                config=config,
+                model=per_model,
+            )
+            data_processors[LABEL].append(label_processor)
+        model_config = getattr(config.model, per_model.prefix)
+        if requires_data and model_config.data_types:
+            for data_type in model_config.data_types:
+                per_data_processor = create_data_processor(
+                    data_type=data_type,
+                    model=per_model,
+                    config=config,
+                )
+                data_processors[data_type].append(per_data_processor)
 
     # Only keep the modalities with non-empty processors.
     data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
@@ -715,6 +750,8 @@ def create_model(
     assert len(names) == len(set(names))
     logger.debug(f"output_shape: {num_classes}")
     all_models = []
+    names = sorted(names)
+    config.model.names = names
     for model_name in names:
         model_config = getattr(config.model, model_name)
         if model_name.lower().startswith(CLIP):
@@ -1714,7 +1751,7 @@ def init_pretrained(
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
     model = create_model(config=config, pretrained=True)
 
-    data_processors = init_data_processors(
+    data_processors = create_fusion_data_processors(
         config=config,
         model=model,
     )

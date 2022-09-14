@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from nptyping import NDArray
+from torch import nn
 
 from ..constants import CATEGORICAL, COLUMN
 from .collator import Stack, Tuple
@@ -16,7 +17,7 @@ class CategoricalProcessor:
 
     def __init__(
         self,
-        prefix: str,
+        model: nn.Module,
         requires_column_info: bool = False,
     ):
         """
@@ -27,7 +28,7 @@ class CategoricalProcessor:
         requires_column_info
             Whether to require feature column information in dataloader.
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
         self.requires_column_info = requires_column_info
 
     @property

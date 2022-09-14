@@ -6,9 +6,9 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import torch
 from nptyping import NDArray
 from omegaconf import DictConfig
+from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
 from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
@@ -78,8 +78,7 @@ class TextProcessor:
 
     def __init__(
         self,
-        prefix: str,
-        checkpoint_name: str,
+        model: nn.Module,
         tokenizer_name: Optional[str] = "hf_auto",
         max_len: Optional[int] = None,
         insert_sep: Optional[bool] = True,
@@ -119,13 +118,12 @@ class TextProcessor:
         train_augment_types
             All possible augmentation operations
         """
-        self.prefix = prefix
+        self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
-        self.checkpoint_name = checkpoint_name
         self.requires_column_info = requires_column_info
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
-            checkpoint_name=checkpoint_name,
+            checkpoint_name=model.checkpoint_name,
         )
         if hasattr(self.tokenizer, "deprecation_warnings"):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
@@ -139,7 +137,7 @@ class TextProcessor:
             if max_len < self.tokenizer.model_max_length:
                 warnings.warn(
                     f"provided max length: {max_len} "
-                    f"is smaller than {checkpoint_name}'s default: {self.tokenizer.model_max_length}"
+                    f"is smaller than {model.checkpoint_name}'s default: {self.tokenizer.model_max_length}"
                 )
             self.max_len = min(max_len, self.tokenizer.model_max_length)
         logger.debug(f"text max length: {self.max_len}")
@@ -147,8 +145,7 @@ class TextProcessor:
         self.insert_sep = insert_sep
         self.eos_only = self.cls_token_id == self.sep_token_id == self.eos_token_id
 
-        config = AutoConfig.from_pretrained(checkpoint_name).to_diff_dict()
-        extracted = extract_value_from_config(config=config, keys=("type_vocab_size",))
+        extracted = extract_value_from_config(config=model.config.to_diff_dict(), keys=("type_vocab_size",))
         if len(extracted) == 0:
             default_segment_num = 1
         elif len(extracted) == 1:
@@ -162,7 +159,7 @@ class TextProcessor:
         if text_segment_num < default_segment_num:
             warnings.warn(
                 f"provided text_segment_num: {text_segment_num} "
-                f"is smaller than {checkpoint_name}'s default: {default_segment_num}"
+                f"is smaller than {model.checkpoint_name}'s default: {default_segment_num}"
             )
         self.text_segment_num = min(text_segment_num, default_segment_num)
         assert self.text_segment_num >= 1
