@@ -528,7 +528,7 @@ def select_model(
         selected_model_names.extend(fusion_model_name)
     elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
         # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
-        if selected_model_names[0].startswith((CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER)):
+        if selected_model_names[0].lower().startswith((CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER)):
             selected_model_names.extend(fusion_model_name)
         else:
             # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
@@ -715,6 +715,185 @@ def create_fusion_data_processors(
 
 
 def create_model(
+    model_name: str,
+    model_config: DictConfig,
+    num_classes: Optional[int] = None,
+    num_numerical_columns: Optional[int] = None,
+    num_categories: Optional[List[int]] = None,
+    pretrained: Optional[bool] = True,
+):
+    """
+    Create a single model.
+
+    Parameters
+    ----------
+    model_name
+        Name of the model.
+    model_config
+        Config of the model.
+    num_classes
+        The class number for a classification task. It should be 1 for a regression task.
+    num_numerical_columns
+        The number of numerical columns in the training dataframe.
+    num_categories
+        The category number for each categorical column in the training dataframe.
+    pretrained
+        Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
+
+    Returns
+    -------
+    A model.
+    """
+    if model_name.lower().startswith(CLIP):
+        model = CLIPForImageText(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pretrained=pretrained,
+        )
+    elif model_name.lower().startswith(TIMM_IMAGE):
+        model = TimmAutoModelForImagePrediction(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            mix_choice=model_config.mix_choice,
+            pretrained=pretrained,
+        )
+    elif model_name.lower().startswith(HF_TEXT):
+        model = HFAutoModelForTextPrediction(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+            gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            pretrained=pretrained,
+        )
+    elif model_name.lower().startswith(T_FEW):
+        model = TFewModel(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
+            unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
+            mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
+            num_classes=num_classes,
+            gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            pretrained=pretrained,
+        )
+    elif model_name.lower().startswith(NUMERICAL_MLP):
+        model = NumericalMLP(
+            prefix=model_name,
+            in_features=num_numerical_columns,
+            hidden_features=model_config.hidden_size,
+            out_features=model_config.hidden_size,
+            num_layers=model_config.num_layers,
+            activation=model_config.activation,
+            dropout_prob=model_config.drop_rate,
+            normalization=model_config.normalization,
+            d_token=OmegaConf.select(model_config, "d_token"),
+            embedding_arch=OmegaConf.select(model_config, "embedding_arch"),
+            num_classes=num_classes,
+        )
+    elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
+        model = NumericalTransformer(
+            prefix=model_name,
+            in_features=num_numerical_columns,
+            out_features=model_config.out_features,
+            d_token=model_config.d_token,
+            n_blocks=model_config.num_trans_blocks,
+            attention_n_heads=model_config.num_attn_heads,
+            attention_dropout=model_config.attention_dropout,
+            residual_dropout=model_config.residual_dropout,
+            ffn_dropout=model_config.ffn_dropout,
+            attention_normalization=model_config.normalization,
+            ffn_normalization=model_config.normalization,
+            head_normalization=model_config.normalization,
+            ffn_activation=model_config.ffn_activation,
+            head_activation=model_config.head_activation,
+            cls_token=False,
+            embedding_arch=model_config.embedding_arch,
+            num_classes=num_classes,
+            ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
+        )
+    elif model_name.lower().startswith(CATEGORICAL_MLP):
+        model = CategoricalMLP(
+            prefix=model_name,
+            num_categories=num_categories,
+            out_features=model_config.hidden_size,
+            num_layers=model_config.num_layers,
+            activation=model_config.activation,
+            dropout_prob=model_config.drop_rate,
+            normalization=model_config.normalization,
+            num_classes=num_classes,
+        )
+    elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
+        model = CategoricalTransformer(
+            prefix=model_name,
+            num_categories=num_categories,
+            out_features=model_config.out_features,
+            d_token=model_config.d_token,
+            n_blocks=model_config.num_trans_blocks,
+            attention_n_heads=model_config.num_attn_heads,
+            attention_dropout=model_config.attention_dropout,
+            residual_dropout=model_config.residual_dropout,
+            ffn_dropout=model_config.ffn_dropout,
+            attention_normalization=model_config.normalization,
+            ffn_normalization=model_config.normalization,
+            head_normalization=model_config.normalization,
+            ffn_activation=model_config.ffn_activation,
+            head_activation=model_config.head_activation,
+            ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
+            num_classes=num_classes,
+            cls_token=False,
+        )
+    elif model_name.lower().startswith(MMDET_IMAGE):
+        model = MMDetAutoModelForObjectDetection(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+        )
+    elif model_name.lower().startswith(MMOCR_TEXT_DET):
+        model = MMOCRAutoModelForTextDetection(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+        )
+    elif model_name.lower().startswith(FUSION_MLP):
+        model = functools.partial(
+            MultimodalFusionMLP,
+            prefix=model_name,
+            hidden_features=model_config.hidden_sizes,
+            num_classes=num_classes,
+            adapt_in_features=model_config.adapt_in_features,
+            activation=model_config.activation,
+            dropout_prob=model_config.drop_rate,
+            normalization=model_config.normalization,
+            loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+        )
+    elif model_name.lower().startswith(FUSION_TRANSFORMER):
+        model = functools.partial(
+            MultimodalFusionTransformer,
+            prefix=model_name,
+            hidden_features=model_config.hidden_size,
+            num_classes=num_classes,
+            n_blocks=model_config.n_blocks,
+            attention_n_heads=model_config.attention_n_heads,
+            ffn_d_hidden=model_config.ffn_d_hidden,
+            attention_dropout=model_config.attention_dropout,
+            residual_dropout=model_config.residual_dropout,
+            ffn_dropout=model_config.ffn_dropout,
+            attention_normalization=model_config.normalization,
+            ffn_normalization=model_config.normalization,
+            head_normalization=model_config.normalization,
+            ffn_activation=model_config.ffn_activation,
+            head_activation=model_config.head_activation,
+            adapt_in_features=model_config.adapt_in_features,
+            loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+        )
+    else:
+        raise ValueError(f"unknown model name: {model_name}")
+
+    return model
+
+
+def create_fusion_model(
     config: DictConfig,
     num_classes: Optional[int] = None,
     num_numerical_columns: Optional[int] = None,
@@ -749,173 +928,44 @@ def create_model(
     # make sure no duplicate model names
     assert len(names) == len(set(names))
     logger.debug(f"output_shape: {num_classes}")
-    all_models = []
     names = sorted(names)
     config.model.names = names
+    single_models = []
+    fusion_model = None
+
     for model_name in names:
         model_config = getattr(config.model, model_name)
-        if model_name.lower().startswith(CLIP):
-            model = CLIPForImageText(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-                num_classes=num_classes,
-                pretrained=pretrained,
-            )
-        elif model_name.lower().startswith(TIMM_IMAGE):
-            model = TimmAutoModelForImagePrediction(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-                num_classes=num_classes,
-                mix_choice=model_config.mix_choice,
-                pretrained=pretrained,
-            )
-        elif model_name.lower().startswith(HF_TEXT):
-            model = HFAutoModelForTextPrediction(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-                num_classes=num_classes,
-                pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
-                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
-                pretrained=pretrained,
-            )
-        elif model_name.lower().startswith(T_FEW):
-            model = TFewModel(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-                length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
-                unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
-                mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
-                num_classes=num_classes,
-                gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
-                pretrained=pretrained,
-            )
-        elif model_name.lower().startswith(NUMERICAL_MLP):
-            model = NumericalMLP(
-                prefix=model_name,
-                in_features=num_numerical_columns,
-                hidden_features=model_config.hidden_size,
-                out_features=model_config.hidden_size,
-                num_layers=model_config.num_layers,
-                activation=model_config.activation,
-                dropout_prob=model_config.drop_rate,
-                normalization=model_config.normalization,
-                d_token=OmegaConf.select(model_config, "d_token"),
-                embedding_arch=OmegaConf.select(model_config, "embedding_arch"),
-                num_classes=num_classes,
-            )
-        elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
-            model = NumericalTransformer(
-                prefix=model_name,
-                in_features=num_numerical_columns,
-                out_features=model_config.out_features,
-                d_token=model_config.d_token,
-                n_blocks=model_config.num_trans_blocks,
-                attention_n_heads=model_config.num_attn_heads,
-                attention_dropout=model_config.attention_dropout,
-                residual_dropout=model_config.residual_dropout,
-                ffn_dropout=model_config.ffn_dropout,
-                attention_normalization=model_config.normalization,
-                ffn_normalization=model_config.normalization,
-                head_normalization=model_config.normalization,
-                ffn_activation=model_config.ffn_activation,
-                head_activation=model_config.head_activation,
-                cls_token=True if len(names) == 1 else False,
-                embedding_arch=model_config.embedding_arch,
-                num_classes=num_classes,
-                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
-            )
-        elif model_name.lower().startswith(CATEGORICAL_MLP):
-            model = CategoricalMLP(
-                prefix=model_name,
-                num_categories=num_categories,
-                out_features=model_config.hidden_size,
-                num_layers=model_config.num_layers,
-                activation=model_config.activation,
-                dropout_prob=model_config.drop_rate,
-                normalization=model_config.normalization,
-                num_classes=num_classes,
-            )
-        elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
-            model = CategoricalTransformer(
-                prefix=model_name,
-                num_categories=num_categories,
-                out_features=model_config.out_features,
-                d_token=model_config.d_token,
-                n_blocks=model_config.num_trans_blocks,
-                attention_n_heads=model_config.num_attn_heads,
-                attention_dropout=model_config.attention_dropout,
-                residual_dropout=model_config.residual_dropout,
-                ffn_dropout=model_config.ffn_dropout,
-                attention_normalization=model_config.normalization,
-                ffn_normalization=model_config.normalization,
-                head_normalization=model_config.normalization,
-                ffn_activation=model_config.ffn_activation,
-                head_activation=model_config.head_activation,
-                ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
-                num_classes=num_classes,
-                cls_token=True if len(names) == 1 else False,
-            )
-        elif model_name.lower().startswith(MMDET_IMAGE):
-            model = MMDetAutoModelForObjectDetection(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-            )
-        elif model_name.lower().startswith(MMOCR_TEXT_DET):
-            model = MMOCRAutoModelForTextDetection(
-                prefix=model_name,
-                checkpoint_name=model_config.checkpoint_name,
-            )
-        elif model_name.lower().startswith(FUSION_MLP):
-            fusion_model = functools.partial(
-                MultimodalFusionMLP,
-                prefix=model_name,
-                hidden_features=model_config.hidden_sizes,
-                num_classes=num_classes,
-                adapt_in_features=model_config.adapt_in_features,
-                activation=model_config.activation,
-                dropout_prob=model_config.drop_rate,
-                normalization=model_config.normalization,
-                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
-            )
-            continue
-        elif model_name.lower().startswith(FUSION_TRANSFORMER):
-            fusion_model = functools.partial(
-                MultimodalFusionTransformer,
-                prefix=model_name,
-                hidden_features=model_config.hidden_size,
-                num_classes=num_classes,
-                n_blocks=model_config.n_blocks,
-                attention_n_heads=model_config.attention_n_heads,
-                ffn_d_hidden=model_config.ffn_d_hidden,
-                attention_dropout=model_config.attention_dropout,
-                residual_dropout=model_config.residual_dropout,
-                ffn_dropout=model_config.ffn_dropout,
-                attention_normalization=model_config.normalization,
-                ffn_normalization=model_config.normalization,
-                head_normalization=model_config.normalization,
-                ffn_activation=model_config.ffn_activation,
-                head_activation=model_config.head_activation,
-                adapt_in_features=model_config.adapt_in_features,
-                loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
-            )
-            continue
-        else:
-            raise ValueError(f"unknown model name: {model_name}")
+        model = create_model(
+            model_name=model_name,
+            model_config=model_config,
+            num_classes=num_classes,
+            num_numerical_columns=num_numerical_columns,
+            num_categories=num_categories,
+            pretrained=pretrained,
+        )
 
         if OmegaConf.select(config, "optimization.efficient_finetune"):
             model = apply_model_adaptation(model, config)
 
-        all_models.append(model)
-
-    if len(all_models) > 1:
-        # must have one fusion model if there are multiple independent models
-        return fusion_model(models=all_models)
-    elif len(all_models) == 1:
-        if isinstance(all_models[0], NumericalTransformer) or isinstance(all_models[0], CategoricalTransformer):
-            # retain fusion model for uni-modal tabular data
-            return fusion_model(models=all_models)
+        if isinstance(model, functools.partial):
+            if fusion_model is None:
+                fusion_model = model
+            else:
+                raise ValueError(
+                    f"More than one fusion models are detected in {names}. Only one fusion model is allowed."
+                )
         else:
-            return all_models[0]
+            single_models.append(model)
+
+    if len(single_models) > 1:
+        # must have one fusion model if there are multiple independent models
+        return fusion_model(models=single_models)
+    elif len(single_models) == 1:
+        if isinstance(single_models[0], NumericalTransformer) or isinstance(single_models[0], CategoricalTransformer):
+            # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
+            return fusion_model(models=single_models)
+        else:
+            return single_models[0]
     else:
         raise ValueError(f"No available models for {names}")
 
@@ -1114,6 +1164,7 @@ def average_checkpoints(
 ):
     """
     Average a list of checkpoints' state_dicts.
+    Reference: https://github.com/rwightman/pytorch-image-models/blob/master/avg_checkpoints.py
 
     Parameters
     ----------
@@ -1126,18 +1177,25 @@ def average_checkpoints(
     """
     if len(checkpoint_paths) > 1:
         avg_state_dict = {}
+        avg_counts = {}
         for per_path in checkpoint_paths:
             state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
-            for key in state_dict:
-                if key in avg_state_dict:
-                    avg_state_dict[key] += state_dict[key]
+            for k, v in state_dict.items():
+                if k not in avg_state_dict:
+                    avg_state_dict[k] = v.clone().to(dtype=torch.float64)
+                    avg_counts[k] = 1
                 else:
-                    avg_state_dict[key] = state_dict[key]
+                    avg_state_dict[k] += v.to(dtype=torch.float64)
+                    avg_counts[k] += 1
             del state_dict
 
-        num = torch.tensor(len(checkpoint_paths))
-        for key in avg_state_dict:
-            avg_state_dict[key] = avg_state_dict[key] / num.to(avg_state_dict[key])
+        for k, v in avg_state_dict.items():
+            v.div_(avg_counts[k])
+
+        # convert to float32.
+        float32_info = torch.finfo(torch.float32)
+        for k in avg_state_dict:
+            avg_state_dict[k].clamp_(float32_info.min, float32_info.max).to(dtype=torch.float32)
     else:
         avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]
 
