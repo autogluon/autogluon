@@ -1807,7 +1807,7 @@ def init_pretrained(
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
-    model = create_model(config=config, pretrained=True)
+    model = create_fusion_model(config=config, pretrained=True)
 
     data_processors = create_fusion_data_processors(
         config=config,
