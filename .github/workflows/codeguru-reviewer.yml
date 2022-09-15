@@ -20,12 +20,18 @@ jobs:
           role-to-assume: arn:aws:iam::048169001733:role/GuruGitHubCICDRole
           aws-region: us-west-2
 
-      # Only continue if fetching the AWS credentials was successful.
-      - uses: actions/checkout@v2
-        if: steps.iam-role.outcome == 'success'
+      - name: Checkout repository
+        if: steps.iam-role.outcome == 'success' && ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+        uses: actions/checkout@v2
         with:
+          fetch-depth: 0         
+      - name: Checkout repository(Pull Request Target)
+        if: steps.iam-role.outcome == 'success' &&  ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v2
+        with:
+          ref: "refs/pull/${{ github.event.number }}/merge"
           fetch-depth: 0 
-
+          
       - name: CodeGuru Reviewer
         uses: aws-actions/codeguru-reviewer@v1.1
         if: steps.iam-role.outcome == 'success'
