@@ -12,8 +12,6 @@ jobs:
     name: Run CodeGuru Reviewer CLI in CICD
     runs-on: ubuntu-latest
     steps:
-      # To configure this role, use this CDK example:
-      # https://github:com/aws-samples/aws-codeguru-reviewer-cicd-cdk-sample
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         continue-on-error: true
@@ -26,7 +24,7 @@ jobs:
       - uses: actions/checkout@v2
         if: steps.iam-role.outcome == 'success'
         with:
-          fetch-depth: 0 # the fetch depth needs to be provided if we only want to check a certain commit range.
+          fetch-depth: 0 
 
       - name: CodeGuru Reviewer
         uses: aws-actions/codeguru-reviewer@v1.1
