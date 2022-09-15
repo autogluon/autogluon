@@ -35,11 +35,8 @@ jobs:
         with:          
           s3_bucket: codeguru-reviewer-build-artifacts-048169001733-us-west-2
 
-      - name: Store SARIF file
+      - name: Upload review result
         if: steps.iam-role.outcome == 'success'
-        uses: actions/upload-artifact@v2
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          name: SARIF_recommendations
-          path: ./codeguru-results.sarif.json
-
-
+          sarif_file: codeguru-results.sarif.json
