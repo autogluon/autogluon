@@ -23,12 +23,12 @@ jobs:
           aws-region: us-west-2
 
       - name: Checkout repository
-        if: steps.iam-role.outcome == 'success' && ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ steps.iam-role.outcome == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         uses: actions/checkout@v2
         with:
           fetch-depth: 0         
       - name: Checkout repository(Pull Request Target)
-        if: steps.iam-role.outcome == 'success' &&  ${{ github.event_name == 'pull_request_target' }}
+        if: ${{ steps.iam-role.outcome == 'success' && github.event_name == 'pull_request_target' }}
         uses: actions/checkout@v2
         with:
           ref: "refs/pull/${{ github.event.number }}/merge"
