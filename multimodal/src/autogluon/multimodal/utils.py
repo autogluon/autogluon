@@ -944,17 +944,16 @@ def create_fusion_model(
             pretrained=pretrained,
         )
 
-        if OmegaConf.select(config, "optimization.efficient_finetune"):
-            model = apply_model_adaptation(model, config)
-
-        if isinstance(model, functools.partial):
+        if isinstance(model, functools.partial):  # fusion model
             if fusion_model is None:
                 fusion_model = model
             else:
                 raise ValueError(
                     f"More than one fusion models are detected in {names}. Only one fusion model is allowed."
                 )
-        else:
+        else:  # single model
+            if OmegaConf.select(config, "optimization.efficient_finetune"):
+                model = apply_model_adaptation(model, config)
             single_models.append(model)
 
     if len(single_models) > 1:
