@@ -1,8 +1,6 @@
 name: Run CodeGuru Reviewer
 
-# Checkout PR code with pull_request_target in Actions can be risky because the workflow has access to credential info
-# of this repo. For this Action these is no risk because the Action doesn't execute any code or script form the PR.
-on: [ push, pull_request_target, workflow_dispatch ]
+on: [ push, workflow_dispatch ]
 
 permissions:
   id-token: write
@@ -23,16 +21,10 @@ jobs:
           aws-region: us-west-2
 
       - name: Checkout repository
-        if: ${{ steps.iam-role.outcome == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+        if: steps.iam-role.outcome == 'success'
         uses: actions/checkout@v2
         with:
           fetch-depth: 0         
-      - name: Checkout repository(Pull Request Target)
-        if: ${{ steps.iam-role.outcome == 'success' && github.event_name == 'pull_request_target' }}
-        uses: actions/checkout@v2
-        with:
-          ref: "refs/pull/${{ github.event.number }}/merge"
-          fetch-depth: 0 
           
       - name: CodeGuru Reviewer
         uses: aws-actions/codeguru-reviewer@v1.1
