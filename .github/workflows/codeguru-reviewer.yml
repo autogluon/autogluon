@@ -1,7 +1,7 @@
 name: Run CodeGuru Reviewer
 
-# Using pull_request_target in Actions can be risky because it pulls code from the origin of the request rather than
-# this repo. For this Action these is no risk because the Action doesn't execute any code or script form the PR.
+# Checkout PR code with pull_request_target in Actions can be risky because the workflow has access to credential info
+# of this repo. For this Action these is no risk because the Action doesn't execute any code or script form the PR.
 on: [ push, pull_request_target, workflow_dispatch ]
 
 permissions:
