@@ -219,14 +219,14 @@ def run(
     search_space, default_hyperparameters = _convert_search_space(search_space)
 
     searcher = _get_searcher(
-        hyperparameter_tune_kwargs,
-        metric,
-        mode,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        metric=metric,
+        mode=mode,
         default_hyperparameters=default_hyperparameters,
         supported_searchers=ray_tune_adapter.get_supported_searchers()
     )
     scheduler = _get_scheduler(
-        hyperparameter_tune_kwargs,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         supported_schedulers=ray_tune_adapter.get_supported_schedulers()
     )
 
@@ -336,11 +336,17 @@ def _convert_search_space(search_space: dict):
     """Convert the search space to Ray Tune search space if it's AG search space"""
     tune_search_space = search_space.copy()
     default_hyperparameters = dict()
-    for hyperparmaeter, space in search_space.items():
+    for hyperparameters, space in search_space.items():
         if isinstance(space, Space):
-            tune_search_space[hyperparmaeter] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
-            default_hyperparameters[hyperparmaeter] = space.default
-    return tune_search_space, [default_hyperparameters]
+            tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
+            default_hyperparameters[hyperparameters] = space.default
+    default_hyperparameters = default_hyperparameters
+    if len(default_hyperparameters) == 0:
+        # hyperopt + ray have trouble taking in empty default_hyperparameters
+        default_hyperparameters = None
+    else:
+        default_hyperparameters = [default_hyperparameters]
+    return tune_search_space, default_hyperparameters
 
 
 def _get_searcher(
@@ -359,8 +365,6 @@ def _get_searcher(
         if supported_searchers is not None:
             if searcher not in supported_searchers:
                 logger.warning(f'{searcher} is not supported yet. Using it might behave unexpected. Supported options are {supported_searchers}')
-        if default_hyperparameters is None:
-            default_hyperparameters = [dict()]
         searcher = SearcherFactory.get_searcher(
             searcher_name=searcher,
             user_init_args=user_init_args,
