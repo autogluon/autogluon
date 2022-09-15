@@ -1,6 +1,6 @@
 name: Run CodeGuru Reviewer
 
-on: [ push, pull_request, workflow_dispatch ]
+on: [ push, pull_request_target, workflow_dispatch ]
 
 permissions:
   id-token: write
