@@ -5,6 +5,7 @@ on: [ push, pull_request, workflow_dispatch ]
 permissions:
   id-token: write
   contents: read
+  security-events: write 
 
 jobs:
   RunCodeGuru:
