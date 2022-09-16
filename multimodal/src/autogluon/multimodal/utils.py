@@ -2235,7 +2235,7 @@ def from_voc(
             exts = [exts]
         for ext in exts:
             img_list.extend([rp.stem for rp in rpath.glob("JPEGImages/*" + ext)])
-    print(img_list)
+    print(len(img_list))
     d = {"image": [], "rois": [], "image_attr": []}
     for stem in img_list:
         basename = stem + ".xml"
