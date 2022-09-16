@@ -96,6 +96,25 @@ def is_categorical_column(
             return True
         return False
 
+def is_rois_column(data: pd.Series) -> bool:
+    """
+    Identify if a column is one rois column.
+
+    Parameters
+    ----------
+    X
+        One column of a multimodal pd.DataFrame for training.
+
+    Returns
+    -------
+    Whether the column is a rois column.
+    """
+    idx = data.first_valid_index()
+    return isinstance(data[idx], list) and \
+            len(data[idx]) and \
+            isinstance(data[idx][0], dict) and \
+            set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+
 
 def is_rois_column(data: pd.Series) -> bool:
     """
