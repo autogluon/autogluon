@@ -684,59 +684,6 @@ def create_fusion_data_processors(
         NUMERICAL: [],
         LABEL: [],
     }
-    for model_name in names:
-        model_config = getattr(config.model, model_name)
-        # each model has its own label processor
-        data_processors[LABEL].append(LabelProcessor(prefix=model_name))
-        if model_config.data_types is None:
-            continue
-        for d_type in model_config.data_types:
-            if d_type == IMAGE:
-                data_processors[IMAGE].append(
-                    ImageProcessor(
-                        prefix=model_name,
-                        checkpoint_name=model_config.checkpoint_name,
-                        train_transform_types=model_config.train_transform_types,
-                        val_transform_types=model_config.val_transform_types,
-                        samples_per_gpu=config.env.per_gpu_batch_size,  # TODO: should be different in MMDET eval, now we force eval_batch_size_ratio in MMDET to be 1
-                        norm_type=model_config.image_norm,
-                        size=model_config.image_size,
-                        max_img_num_per_col=model_config.max_img_num_per_col,
-                        missing_value_strategy=config.data.image.missing_value_strategy,
-                        model=model,
-                    )
-                )
-            elif d_type == TEXT:
-                data_processors[TEXT].append(
-                    TextProcessor(
-                        prefix=model_name,
-                        tokenizer_name=model_config.tokenizer_name,
-                        checkpoint_name=model_config.checkpoint_name,
-                        max_len=model_config.max_text_len,
-                        insert_sep=model_config.insert_sep,
-                        text_segment_num=model_config.text_segment_num,
-                        stochastic_chunk=model_config.stochastic_chunk,
-                        text_detection_length=OmegaConf.select(model_config, "text_aug_detect_length"),
-                        text_trivial_aug_maxscale=OmegaConf.select(model_config, "text_trivial_aug_maxscale"),
-                        train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
-                        template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
-                    )
-                )
-            elif d_type == CATEGORICAL:
-                data_processors[CATEGORICAL].append(
-                    CategoricalProcessor(
-                        prefix=model_name,
-                    )
-                )
-            elif d_type == NUMERICAL:
-                data_processors[NUMERICAL].append(
-                    NumericalProcessor(
-                        prefix=model_name,
-                        merge=model_config.merge,
-                    )
-                )
-            else:
-                raise ValueError(f"unknown data type: {d_type}")
 
     model_dict = {model.prefix: model}
 
