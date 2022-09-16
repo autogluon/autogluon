@@ -3,8 +3,12 @@ import time
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import from_voc
 
-
-def test_voc_inference(checkpoint_name="faster_rcnn_r50_fpn_2x_coco"):
+'''
+VOC configs are not supported in mmcv
+And currently for voc inference,
+we only support checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712"
+'''
+def test_voc_inference(checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712"):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
@@ -20,7 +24,7 @@ def test_voc_inference(checkpoint_name="faster_rcnn_r50_fpn_2x_coco"):
     print("time usage: %.2f" % (time.time() - start))
 
     assert len(pred) == len(df)
-    assert len(pred[0]) == 80  # COCO has 80 classes
+    assert len(pred[0]) == 20  # VOC has 20 classes
     assert pred[0][0].ndim == 2  # two dimensions, (# of proposals, 5)
 
 

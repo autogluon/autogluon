@@ -1,9 +1,9 @@
 import logging
+import os
 import warnings
 from typing import Optional
 
 import torch
-from mim.commands.download import download
 from torch import nn
 
 try:
@@ -22,7 +22,6 @@ except ImportError:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 
@@ -59,12 +58,24 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
 
-        # download config and checkpoint files using openmim
-        checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
+        if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
+            # download voc configs in our s3 bucket
+            from ..utils import download
+            if not os.path.exists("voc_config"):
+                os.makedirs("voc_config")
+            download("s3://autogluon-object-detection/voc0712/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth", "voc_config")
+            download("s3://autogluon-object-detection/voc0712/faster_rcnn_r50_fpn_1x_voc0712.py", "voc_config")
+            download("s3://autogluon-object-detection/voc0712/default_runtime.py", "voc_config")
+            download("s3://autogluon-object-detection/voc0712/faster_rcnn_r50_fpn.py", "voc_config")
+            download("s3://autogluon-object-detection/voc0712/voc0712.py", "voc_config")
+        else:
+            from mim.commands import download
+            # download config and checkpoint files using openmim
+            checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
+            config_file = checkpoint_name + ".py"
 
         # read config files
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        config_file = checkpoint_name + ".py"
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
 
