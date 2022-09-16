@@ -17,7 +17,7 @@ def test_voc_inference(checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712"):
         pipeline="object_detection",
     )
 
-    df = from_voc("VOCdevkit/VOC2007")[:100][["image"]]
+    df = from_voc("VOCdevkit/VOC2007")[:10][["image"]]
 
     start = time.time()
     pred = predictor.predict(df, as_pandas=False)  # TODO: disable as_pandas flag for detection

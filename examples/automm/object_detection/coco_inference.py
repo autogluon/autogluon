@@ -13,7 +13,7 @@ def test_coco_inference(checkpoint_name="faster_rcnn_r50_fpn_2x_coco"):
         pipeline="object_detection",
     )
 
-    df = from_coco("coco17/annotations/instances_val2017.json")[:100][["image"]]
+    df = from_coco("coco17/annotations/instances_val2017.json")[:10][["image"]]
 
     start = time.time()
     pred = predictor.predict(df, as_pandas=False)
