@@ -90,6 +90,25 @@ def is_categorical_column(
             return True
         return False
 
+def is_rois_column(data: pd.Series) -> bool:
+    """
+    Identify if a column is one rois column.
+
+    Parameters
+    ----------
+    X
+        One column of a multimodal pd.DataFrame for training.
+
+    Returns
+    -------
+    Whether the column is a rois column.
+    """
+    idx = data.first_valid_index()
+    return isinstance(data[idx], list) and \
+            len(data[idx]) and \
+            isinstance(data[idx][0], dict) and \
+            set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+
 
 def is_numerical_column(
     data: pd.Series,
@@ -260,16 +279,13 @@ def infer_column_types(
             # No valid index, thus, we will just ignore the column
             column_types[col_name] = NULL
             continue
-        if isinstance(data[col_name][idx], list):
-            # Is a list, we will just ignore the column
-            # TODO: Distinguish ROIS_VOC v.s. ROIS_COCO v.s. others?
-            column_types[col_name] = ROIS
-            continue
-        if len(data[col_name].unique()) == 1 and is_training:
+        if not isinstance(data[col_name][idx], list) and len(data[col_name].unique()) == 1 and is_training:
             column_types[col_name] = NULL
             continue
 
-        if is_categorical_column(
+        if is_rois_column(data[col_name]):
+            column_types[col_name] = ROIS
+        elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
             column_types[col_name] = CATEGORICAL
