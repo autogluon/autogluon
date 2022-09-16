@@ -91,6 +91,7 @@ from .utils import (
     filter_search_space,
     from_coco,
     from_voc,
+    getCOCOCatIDs,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -1502,8 +1503,7 @@ class MultiModalPredictor:
         from pycocotools.coco import COCO
         from pycocotools.cocoeval import COCOeval
 
-        cocoGt = COCO(anno_file)
-        catIDs = cocoGt.getCatIds()
+        catIDs = getCOCOCatIDs()
 
         # Cache prediction results as COCO format
         if not self._save_path:
@@ -1528,8 +1528,10 @@ class MultiModalPredictor:
                         }
                     )
         with open(dt_file, "w") as f:
+            print(f"saving file at {dt_file}")
             json.dump(coco_format_result, f)
 
+        cocoGt = COCO(anno_file)
         cocoDt = cocoGt.loadRes(dt_file)
         annType = "bbox"
 
@@ -1540,7 +1542,7 @@ class MultiModalPredictor:
 
     def evaluate(
         self,
-        data: Union[pd.DataFrame, dict, list],
+        data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
@@ -1550,7 +1552,8 @@ class MultiModalPredictor:
         Parameters
         ----------
         data
-            A dataframe, containing the same columns as the training data
+            A dataframe, containing the same columns as the training data.
+            Or a str, that is a path of the annotation file for detection.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
@@ -1562,6 +1565,9 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        if self._pipeline == OBJECT_DETECTION:
+            return self.evaluate_coco(data)
+
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
         else:

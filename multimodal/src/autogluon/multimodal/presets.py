@@ -119,7 +119,7 @@ def ocr_text_detection():
         "env.precision": 32,
     }
 
-
+@automm_presets.register()
 def feature_extraction():
     return {
         "model.names": ["hf_text"],

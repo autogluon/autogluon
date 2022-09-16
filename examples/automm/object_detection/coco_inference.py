@@ -19,10 +19,17 @@ def test_coco_inference(checkpoint_name="faster_rcnn_r50_fpn_2x_coco"):
     pred = predictor.predict(df, as_pandas=False)
     print("time usage: %.2f" % (time.time() - start))
 
+    #print(len(pred))
+    #print(len(pred[0]))
+    #print(pred[1])
+    #print(len(pred[0][0]))
+    exit()
+
     assert len(pred) == len(df)
     assert len(pred[0]) == 80  # COCO has 80 classes
     assert pred[0][0].ndim == 2  # two dimensions, (# of proposals, 5)
 
 
 if __name__ == "__main__":
-    test_coco_inference()
+    #test_coco_inference()
+    test_coco_inference("mask_rcnn_r50_fpn_2x_coco")

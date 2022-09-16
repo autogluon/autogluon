@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import boto3
+import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -28,11 +29,6 @@ from scipy.special import softmax
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
-
-try:
-    import xml.etree.cElementTree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
 
 from autogluon.core.metrics import get_metric
 from autogluon.core.utils.loaders import load_pd
@@ -1680,7 +1676,11 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
-        return [bbox for ele in outputs for bbox in ele[BBOX]]
+        #outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+        if len(outputs[0]["bbox"][0]) == 2: # additional axis for mask_rcnn
+            return [bbox[0] for ele in outputs for bbox in ele[BBOX]]
+        else:
+            return [bbox for ele in outputs for bbox in ele[BBOX]]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
@@ -2404,7 +2404,7 @@ def bbox_xyxy_to_xywh(xyxy: Optional[Union[list, tuple, np.ndarray]]):
         if not len(xyxy) == 4:
             raise IndexError("Bounding boxes must have 4 elements, given {}".format(len(xyxy)))
         x1, y1 = xyxy[0], xyxy[1]
-        w, h = xyxy[2] - x1 + 1, xyxy[3] - y1 + 1
+        w, h = xyxy[2] - x1, xyxy[3] - y1
         return x1, y1, w, h
     elif isinstance(xyxy, np.ndarray):
         if not xyxy.size % 4 == 0:
@@ -2589,3 +2589,15 @@ def from_coco(
         d["rois"].append(label)
     df = pd.DataFrame(d)
     return df.sort_values("image").reset_index(drop=True)
+
+def getCOCOCatIDs():
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+            11, 13, 14, 15, 16, 17, 18, 19,
+            20, 21, 22, 23, 24, 25, 27, 28,
+            31, 32, 33, 34, 35, 36, 37, 38,
+            39, 40, 41, 42, 43, 44, 46, 47,
+            48, 49, 50, 51, 52, 53, 54, 55,
+            56, 57, 58, 59, 60, 61, 62, 63,
+            64, 65, 67, 70, 72, 73, 74, 75,
+            76, 77, 78, 79, 80, 81, 82, 84,
+            85, 86, 87, 88, 89, 90]

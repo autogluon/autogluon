@@ -12,8 +12,10 @@ def test_coco_evaluation(checkpoint_name = "faster_rcnn_r50_fpn_2x_coco"):
 
     import time
     start = time.time()
-    predictor.evaluate_coco('coco17/annotations/instances_val2017.json')
+    predictor.evaluate('coco17/annotations/instances_val2017.json')
     print("time usage: %.2f" % (time.time() - start))
 
 if __name__ == "__main__":
-    test_coco_evaluation()
+    #test_coco_evaluation()
+    test_coco_evaluation("mask_rcnn_r50_fpn_2x_coco")
+
