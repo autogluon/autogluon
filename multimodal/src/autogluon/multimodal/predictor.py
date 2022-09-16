@@ -85,7 +85,8 @@ from .utils import (
     average_checkpoints,
     compute_num_gpus,
     compute_score,
-    create_model,
+    create_fusion_data_processors,
+    create_fusion_model,
     data_to_df,
     extract_from_output,
     filter_search_space,
@@ -99,7 +100,6 @@ from .utils import (
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_scarcity_mode_by_data_size,
-    init_data_processors,
     init_df_preprocessor,
     init_pretrained,
     load_text_tokenizers,
@@ -619,7 +619,7 @@ class MultiModalPredictor:
             # reload the predictor metadata
             predictor = MultiModalPredictor._load_metadata(predictor=self, path=best_trial_path)
             # construct the model
-            model = create_model(
+            model = create_fusion_model(
                 config=predictor._config,
                 num_classes=predictor._output_shape,
                 num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
@@ -865,18 +865,8 @@ class MultiModalPredictor:
 
         config = select_model(config=config, df_preprocessor=df_preprocessor)
 
-        if self._data_processors is None:
-            data_processors = init_data_processors(
-                config=config,
-            )
-        else:  # continuing training
-            data_processors = self._data_processors
-
-        data_processors_count = {k: len(v) for k, v in data_processors.items()}
-        logger.debug(f"data_processors_count: {data_processors_count}")
-
         if self._model is None:
-            model = create_model(
+            model = create_fusion_model(
                 config=config,
                 num_classes=self._output_shape,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
@@ -884,6 +874,17 @@ class MultiModalPredictor:
             )
         else:  # continuing training
             model = self._model
+
+        if self._data_processors is None:
+            data_processors = create_fusion_data_processors(
+                config=config,
+                model=model,
+            )
+        else:  # continuing training
+            data_processors = self._data_processors
+
+        data_processors_count = {k: len(v) for k, v in data_processors.items()}
+        logger.debug(f"data_processors_count: {data_processors_count}")
 
         pos_label = try_to_infer_pos_label(
             data_config=config.data,
@@ -1984,9 +1985,7 @@ class MultiModalPredictor:
             # Only keep the modalities with non-empty processors.
             data_processors = {k: v for k, v in data_processors.items() if len(v) > 0}
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
-            data_processors = init_data_processors(
-                config=config,
-            )
+            data_processors = None
 
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
@@ -2037,13 +2036,19 @@ class MultiModalPredictor:
         predictor = cls(label="dummy_label")
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
-        model = create_model(
+        model = create_fusion_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
             num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
             pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
+
+        if predictor._data_processors is None:
+            predictor._data_processors = create_fusion_data_processors(
+                config=predictor._config,
+                model=model,
+            )
 
         resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
         final_ckpt_path = os.path.join(path, MODEL_CHECKPOINT)

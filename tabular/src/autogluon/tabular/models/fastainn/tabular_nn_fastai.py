@@ -177,7 +177,6 @@ class NNFastAiTabularModel(AbstractModel):
 
         import torch
         torch.set_num_threads(num_cpus)
-
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
