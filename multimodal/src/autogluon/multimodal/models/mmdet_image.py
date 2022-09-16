@@ -61,17 +61,32 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
             # download voc configs in our s3 bucket
             from ..utils import download
+
             if not os.path.exists("voc_config"):
                 os.makedirs("voc_config")
-            download("s3://autogluon-object-detection/voc0712/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth", "voc_config")
-            download("s3://autogluon-object-detection/voc0712/faster_rcnn_r50_fpn_1x_voc0712.py", "voc_config")
-            download("s3://autogluon-object-detection/voc0712/default_runtime.py", "voc_config")
-            download("s3://autogluon-object-detection/voc0712/faster_rcnn_r50_fpn.py", "voc_config")
-            download("s3://autogluon-object-detection/voc0712/voc0712.py", "voc_config")
+            checkpoint = download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
+            )
+            config_file = download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712.py",
+            )
+            download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/default_runtime.py",
+                path="voc_config",
+            )
+            download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn.py",
+                path="voc_config",
+            )
+            download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/voc0712.py",
+                path="voc_config",
+            )
         else:
             from mim.commands import download
+
             # download config and checkpoint files using openmim
-            checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
+            checkpoint = download(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
             config_file = checkpoint_name + ".py"
 
         # read config files
@@ -83,7 +98,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        checkpoint = checkpoints[0]
         if checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
         if "CLASSES" in checkpoint.get("meta", {}):
