@@ -121,6 +121,7 @@ class BaseDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
+            shuffle=True,
             pin_memory=False,
             collate_fn=self.get_collate_fn(),
         )
