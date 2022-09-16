@@ -2388,6 +2388,7 @@ def import_try_install(package: str, extern_url: Optional[str] = None):
         The imported python module.
     """
     import tempfile
+
     import portalocker
 
     lockfile = os.path.join(tempfile.gettempdir(), package + "_install.lck")
@@ -2398,8 +2399,9 @@ def import_try_install(package: str, extern_url: Optional[str] = None):
             try:
                 from pip import main as pipmain
             except ImportError:
-                from pip._internal import main as pipmain
                 from types import ModuleType
+
+                from pip._internal import main as pipmain
 
                 # fix for pip 19.3
                 if isinstance(pipmain, ModuleType):
@@ -2413,8 +2415,8 @@ def import_try_install(package: str, extern_url: Optional[str] = None):
             try:
                 return __import__(package)
             except ImportError:
-                import sys
                 import site
+                import sys
 
                 user_site = site.getusersitepackages()
                 if user_site not in sys.path:

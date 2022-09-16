@@ -83,6 +83,7 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    bbox_xyxy_to_xywh,
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
@@ -92,11 +93,11 @@ from .utils import (
     filter_search_space,
     from_coco,
     from_voc,
-    getCOCOCatIDs,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
+    getCOCOCatIDs,
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_scarcity_mode_by_data_size,
@@ -113,7 +114,6 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
-    bbox_xyxy_to_xywh,
 )
 
 logger = logging.getLogger(AUTOMM)
