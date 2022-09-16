@@ -1025,7 +1025,6 @@ class MultiModalPredictor:
                 softmax_regression_weight=softmax_regression_weight,
                 temperature=config.distiller.temperature,
                 output_feature_loss_weight=output_feature_loss_weight,
-                use_raw_features=use_raw_features,
                 hard_label_loss_func=loss_func,
                 soft_label_loss_func=soft_label_loss_func,
                 softmax_regression_loss_func=softmax_regression_loss_func,
