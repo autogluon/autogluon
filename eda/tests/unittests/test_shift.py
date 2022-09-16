@@ -39,16 +39,34 @@ def test_xsd_cs():
     # assert xsd.decision() == 'detected'
     pass
 
-def test_xsd():
+def test_shift_analysis():
+    train, test = load_adult_data()
+    analysis_args = dict(
+        train_data=train,
+        test_data=test,
+        label='class',
+        classifier_kwargs={'path': 'AutogluonModels'}
+    )
+    shft_ana = eda.shift.XShiftDetector(**analysis_args)
+    shft_ana.fit()
+    res = shft_ana.state.xshift_results
+    assert all(res[k] is not None for k in ['detection_status', 'pvalue', 'pvalue_threshold', 'eval_metric',
+                                  'feature_importance'])
+    assert res['detection_status'] == 'not_detected'
+
+def test_shift_auto():
     train, test = load_adult_data()
     analysis_args = dict(
         train_data=train,
         test_data=test,
         label='class',
     )
+    shft_args = dict(
+        classifier_kwargs={'path': 'AutogluonModels'},
+    )
     viz_args = dict(headers=True)
     auto.analyze(**analysis_args, anlz_facets=[
-        eda.shift.XShiftDetector()
+        eda.shift.XShiftDetector(**shft_args)
     ],
     viz_facets=[
          viz.shift.XShiftSummary(**viz_args)

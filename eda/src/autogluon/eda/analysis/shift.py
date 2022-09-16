@@ -100,15 +100,6 @@ class Classifier2ST:
                                  num_permutations=1000):
         """The half permutation method for computing p-values.
         See Section 9.1 of https://arxiv.org/pdf/1602.02210.pdf
-
-        Parameters
-        ----------
-        num_permutations: int, default = 1000
-            The number of permutations for the permutation test
-
-        Returns
-        -------
-        float of the p-value for the 2-sample test
         """
         perm_stats = [self.test_stat]
         yhat = self.classifier.predict(self._test)
@@ -164,6 +155,10 @@ class C2STShiftDetector:
         The predictor that will be fit on training set and predict the test set
     label : str, default = None
         The Y variable that is to be predicted (if it appears in the train/test data then it will be removed)
+    compute_fi : bool, default = True
+        To compute the feature importances set to True, this can be computationally intensive
+    pvalue_thresh : float, default = 0.01
+        The threshold for the pvalue
     eval_metric : str, default = 'balanced_accuracy'
         The metric used for the C2ST, it must be one of the binary metrics from autogluon.core.metrics
     sample_label : str, default = 'i2vkyc0p64'
@@ -175,12 +170,12 @@ class C2STShiftDetector:
     Methods
     -------
     fit : fits the detector on training and test covariate data
-    results, summary : outputs the results of XShift detection
+    results: outputs the results of XShift detection
         - test statistic
         - detection status
         - p-value
         - detector feature importances
-    anomaly_scores : computes anomaly scores for test samples
+    decision: decision function ('detected' or 'not detected')
     pvalue: a p-value for the two sample test
 
     Usage
@@ -190,14 +185,15 @@ class C2STShiftDetector:
     >>> xshiftd.fit(X, X_test)
     Output the decision...
     >>> xshiftd.decision()
-    Output the summary...
-    >>> xshiftd.summary()
+    Output the results...
+    >>> xshiftd.results()
     """
 
     def __init__(self,
                  classifier_class: Any,
                  label: Optional[str]=None,
                  compute_fi: bool = True,
+                 pvalue_thresh : float = 0.01,
                  eval_metric: str='balanced_accuracy',
                  sample_label: str='i2vkyc0p64',
                  classifier_kwargs: dict={}):
@@ -217,10 +213,29 @@ class C2STShiftDetector:
         self._is_fit = False
         self.fi_scores = None
         self.compute_fi = compute_fi
+        self.pvalue_thresh = pvalue_thresh
+
+    @post_fit
+    def _calculate_pvalue(self,
+                          num_permutations: int=1000) -> float:
+        """Compute the p-value which measures the significance level for the test statistic
+
+        Parameters
+        ----------
+        num_permutations: int, default=1000
+            The number of permutations used for any permutation based method
+
+        Returns
+        -------
+        float of the p-value for the 2-sample test
+        """
+        return self.C2ST.pvalue(num_permutations=num_permutations)
+
 
     def fit(self,
             X: pd.DataFrame,
             X_test: pd.DataFrame,
+            pvalue_permutations: int=1000,
             **kwargs):
         """Fit the XShift detector.
 
@@ -230,8 +245,8 @@ class C2STShiftDetector:
             Training dataframe
         X_test : pd.DataFrame
             Test dataframe
-        compute_fi : bool, default = True
-            True to compute the feature importances, this may be computationally intensive
+        pvalue_permutations: int, default=1000
+            The number of permutations used for pvalue calculation
         **kwargs (optional): keyword arguments to .fit() for the classifier_class
         """
         assert self.C2ST.sample_label not in X.columns, \
@@ -251,33 +266,25 @@ class C2STShiftDetector:
 
         self._is_fit = True
         self._X_test = X_test
+        self.pvalue = self._calculate_pvalue(num_permutations=pvalue_permutations)
 
     @post_fit
-    def decision(self,
-                 pvalue_thresh: float=0.01,
-                 pvalue_kwargs: dict = {}) -> str:
-        """Decision function for testing XShift.  Uncertainty quantification is currently not supported.
-
-        Parameters
-        ----------
-        teststat_thresh : float, default = 0.55
-            the threshold for the test statistic
+    def decision(self) -> str:
+        """Decision function for testing XShift.  Uncertainty quantification is currently not supported.  Fit must be
+        called prior to running.
 
         Returns
         -------
         One of ['detected', 'not detected']
         """
         # default teststat_thresh by metric
-        p_value = self.pvalue(**pvalue_kwargs)
-        if p_value < pvalue_thresh:
-            return 'detected', p_value
+        if self.p_value < self.pvalue_thresh:
+            return 'detected'
         else:
-            return 'not_detected', p_value
+            return 'not_detected'
 
     @post_fit
-    def results(self,
-                pvalue_thresh: float=0.01,
-                pvalue_kwargs: dict={}) -> dict:
+    def results(self) -> dict:
         """Output the results of the C2ST in dictionary
 
         Returns
@@ -285,37 +292,21 @@ class C2STShiftDetector:
         dict of
             - `detection_status`: One of ['detected', 'not detected']
             - `test_statistic`: the C2ST statistic
-            - 'pvalue'
-            - 'pvalue_threshold'
+            - 'pvalue': the p-value using permutation test
+            - 'pvalue_threshold': the decision p-value threshold
             - `feature_importance`: the feature importance dataframe, if computed
         """
-        det_status, pvalue = self.decision(pvalue_thresh=pvalue_thresh, pvalue_kwargs=pvalue_kwargs)
+        det_status = self.decision()
         res_json = {
             'detection_status': det_status,
             'test_statistic': self.C2ST.test_stat,
-            'pvalue': pvalue,
-            'pvalue_threshold': pvalue_thresh,
+            'pvalue': self.pvalue,
+            'pvalue_threshold': self.pvalue_thresh,
             'eval_metric': self.eval_metric.name,
         }
         if self.fi_scores is not None:
             res_json['feature_importance'] = self.fi_scores
         return res_json
-
-    @post_fit
-    def pvalue(self,
-               num_permutations: int=1000) -> float:
-        """Compute the p-value which measures the significance level for the test statistic
-
-        Parameters
-        ----------
-        num_permutations: int, default = 1000
-            The number of permutations used for any permutation based method
-
-        Returns
-        -------
-        float of the p-value for the 2-sample test
-        """
-        return self.C2ST.pvalue(num_permutations=num_permutations)
 
 
 class XShiftDetector(AbstractAnalysis):
