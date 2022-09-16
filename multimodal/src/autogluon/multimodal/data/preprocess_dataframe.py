@@ -454,7 +454,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
-            y = y_df # Do nothing. TODO: Shall we transform this?
+            y = y_df  # Do nothing. TODO: Shall we transform this?
         else:
             raise NotImplementedError
 
