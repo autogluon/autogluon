@@ -23,6 +23,6 @@ def test_sentence_transformer_embedding(model_name):
     outputs_case2_from_df = predictor.extract_embedding(pd.DataFrame(case2))
     outputs_case2_from_dict = predictor.extract_embedding(case2)
     npt.assert_allclose(outputs_case2_from_df["sentence"],
-                        outputs_case2_from_dict["sentence"])
+                        outputs_case2_from_dict["sentence"], 1E-3, 1E-3)
     npt.assert_allclose(outputs_case2_from_df["sentence"][:1],
-                        outputs_case1_from_df["sentence"])
+                        outputs_case1_from_df["sentence"], 1E-3, 1E-3)
