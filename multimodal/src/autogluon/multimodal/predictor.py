@@ -1339,7 +1339,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=requires_label,
         )
-        print('data_processors=', data_processors)
+
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
         if num_gpus == 0:  # CPU only prediction
