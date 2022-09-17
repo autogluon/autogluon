@@ -700,7 +700,6 @@ def create_fusion_data_processors(
             )
             data_processors[LABEL].append(label_processor)
         model_config = getattr(config.model, per_model.prefix)
-        print("model_config=", model_config)
         if requires_data and model_config.data_types:
             for data_type in model_config.data_types:
                 per_data_processor = create_data_processor(
