@@ -48,6 +48,7 @@ class BaseDataset(torch.utils.data.Dataset):
         for i, (per_preprocessor, per_processors_group) in enumerate(zip(preprocessor, processors)):
             for per_modality in per_processors_group:
                 per_modality_features = getattr(per_preprocessor, f"transform_{per_modality}")(data)
+                print("data=", data)
                 print(f"transform_{per_modality}")
                 print("per_modality_feature=", per_modality_features)
                 setattr(self, f"{per_modality}_{i}", per_modality_features)
