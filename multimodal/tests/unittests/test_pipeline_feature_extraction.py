@@ -4,9 +4,9 @@ import numpy.testing as npt
 from autogluon.multimodal import MultiModalPredictor
 
 
-@pytest.mark.parametrize("model_name",
-                         ["sentence-transformers/all-MiniLM-L6-v2",
-                          "sentence-transformers/all-mpnet-base-v2"])
+@pytest.mark.parametrize(
+    "model_name", ["sentence-transformers/all-MiniLM-L6-v2", "sentence-transformers/all-mpnet-base-v2"]
+)
 def test_sentence_transformer_embedding(model_name):
     predictor = MultiModalPredictor(
         pipeline="feature_extraction", hyperparameters={"model.hf_text.checkpoint_name": model_name}
