@@ -115,6 +115,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._label_column
 
     @property
+    def column_types(self):
+        return self._column_types
+
+    @property
     def image_path_names(self):
         return self._image_path_names
 
