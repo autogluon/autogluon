@@ -320,10 +320,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._fit_called or self._fit_x_called
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_text."
         text_features = {}
-        print("in transform_text, df=", df)
-        print("self._text_feature_names=", self._text_feature_names)
-        print("self._column_types=", self._column_types)
-        ch = input()
         for col_name in self._text_feature_names:
             col_value = df[col_name]
             col_type = self._column_types[col_name]

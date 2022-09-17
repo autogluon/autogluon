@@ -1448,8 +1448,6 @@ class MultiModalPredictor:
 
         if self._column_types is None:
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
-            print("allowable_dtype=", allowable_dtypes)
-            print("fallback_dtype=", fallback_dtype)
             column_types = infer_column_types(
                 data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
             )
