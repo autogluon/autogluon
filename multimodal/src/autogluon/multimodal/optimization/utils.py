@@ -51,7 +51,7 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-from .soft_target_crossentropy import SoftTargetCrossEntropy
+from .losses import SoftTargetCrossEntropy
 
 logger = logging.getLogger(AUTOMM)
 

@@ -74,6 +74,7 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    HF_MODELS,
 )
 from .data import (
     CategoricalProcessor,
@@ -1019,7 +1020,7 @@ def save_pretrained_model_configs(
         The path to save pretrained model configs.
     """
     # TODO? Fix hardcoded model names.
-    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)) for model_name in config.model.names])
+    requires_saving = any([model_name.lower().startswith(HF_MODELS) for model_name in config.model.names])
     if not requires_saving:
         return config
 
@@ -1030,7 +1031,7 @@ def save_pretrained_model_configs(
     else:  # assumes the fusion model has a model attribute, a nn.ModuleList
         model = model.model
     for per_model in model:
-        if per_model.prefix.lower().startswith((CLIP, HF_TEXT, T_FEW)):
+        if per_model.prefix.lower().startswith(HF_MODELS):
             per_model.config.save_pretrained(os.path.join(path, per_model.prefix))
             model_config = getattr(config.model, per_model.prefix)
             model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
@@ -1051,7 +1052,7 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
         The saving path to the pretrained model configs.
     """
     for model_name in config.model.names:
-        if model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)):
+        if model_name.lower().startswith(HF_MODELS):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
@@ -2219,11 +2220,12 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
         num_gpus = detected_num_gpus
     else:
         num_gpus = min(config_num_gpus, detected_num_gpus)
-        warnings.warn(
-            f"Using the detected GPU number {detected_num_gpus}, "
-            f"smaller than the GPU number {config_num_gpus} in the config.",
-            UserWarning,
-        )
+        if detected_num_gpus < config_num_gpus:
+            warnings.warn(
+                f"Using the detected GPU number {detected_num_gpus}, "
+                f"smaller than the GPU number {config_num_gpus} in the config.",
+                UserWarning,
+            )
 
     if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
         warnings.warn(
