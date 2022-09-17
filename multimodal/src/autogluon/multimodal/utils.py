@@ -48,6 +48,7 @@ from .constants import (
     FEW_SHOT,
     FUSION_MLP,
     FUSION_TRANSFORMER,
+    HF_MODELS,
     HF_TEXT,
     IMAGE,
     LABEL,
@@ -74,7 +75,6 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    HF_MODELS,
 )
 from .data import (
     CategoricalProcessor,
