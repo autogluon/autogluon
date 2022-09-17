@@ -229,6 +229,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             "wpe",
             "shared.weight",
             "encoder.conv.conv",
+            "relative_attention_bias",
             "dummy_layer",
         )
         post_encoder_patterns = ("head", "pooler", "ln_f", "final_layer_norm")
