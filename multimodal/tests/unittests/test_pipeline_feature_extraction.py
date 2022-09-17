@@ -1,6 +1,7 @@
-import pytest
-import pandas as pd
 import numpy.testing as npt
+import pandas as pd
+import pytest
+
 from autogluon.multimodal import MultiModalPredictor
 
 
