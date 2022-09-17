@@ -2117,8 +2117,10 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
             allowable_dtypes.extend(per_model_dtypes)
 
     allowable_dtypes = set(allowable_dtypes)
-    if allowable_dtypes == set([IMAGE, TEXT]):
+    if allowable_dtypes == {IMAGE, TEXT}:
         fallback_dtype = TEXT
+    elif len(allowable_dtypes) == 1:
+        fallback_dtype = list(allowable_dtypes)[0]
 
     return allowable_dtypes, fallback_dtype
 
