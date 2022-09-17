@@ -1175,6 +1175,7 @@ class MultiModalPredictor:
                 check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
+                reload_dataloaders_every_n_epochs=1,
             )
 
         with warnings.catch_warnings():
