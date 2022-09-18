@@ -30,11 +30,12 @@ def test_mmdet_object_detection_inference(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": 1, # currently mmdet only support single gpu inference
         },
         pipeline="object_detection",
     )
 
-    pred = predictor.predict({"image": [mmdet_image_name] * 100})  # test batch inference
-    assert len(pred) == 100  # test data size is 100
+    pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
+    assert len(pred) == 10  # test data size is 100
     assert len(pred[0]) == 80  # COCO has 80 classes
     assert pred[0][0].ndim == 2  # two dimensions, (# of proposals, 5)
