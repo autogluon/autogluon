@@ -30,7 +30,7 @@ def test_mmdet_object_detection_inference(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1, # currently mmdet only support single gpu inference
+            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
         },
         pipeline="object_detection",
     )
