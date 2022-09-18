@@ -120,6 +120,7 @@ def ocr_text_detection():
     }
 
 
+@automm_presets.register()
 def feature_extraction():
     return {
         "model.names": ["hf_text"],
