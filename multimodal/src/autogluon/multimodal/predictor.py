@@ -74,7 +74,7 @@ from .data.infer_types import (
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
-from .optimization.rkd_loss import RKDLoss
+from .optimization.losses import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
 from .utils import (
     AutoMMModelCheckpoint,
