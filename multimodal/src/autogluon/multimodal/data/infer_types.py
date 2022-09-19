@@ -1,4 +1,5 @@
 import collections
+import json
 import logging
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
@@ -105,12 +106,24 @@ def is_rois_column(data: pd.Series) -> bool:
     Whether the column is a rois column.
     """
     idx = data.first_valid_index()
-    return (
-        isinstance(data[idx], list)
-        and len(data[idx])
-        and isinstance(data[idx][0], dict)
-        and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
-    )
+    if isinstance(data[idx], list):
+        return (
+            len(data[idx])
+            and isinstance(data[idx][0], dict)
+            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+        )
+    else:
+        isinstance(data[idx], str)
+        rois = {}
+        try:
+            rois = json.loads(data[idx][0])
+        except:
+            pass
+        return (
+            rois
+            and isinstance(rois, dict)
+            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+        )
 
 
 def is_numerical_column(

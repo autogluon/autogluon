@@ -64,6 +64,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
             if not os.path.exists("voc_config"):
                 os.makedirs("voc_config")
+            #TODO: add sha1_hash
             checkpoint = download(
                 url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
             )

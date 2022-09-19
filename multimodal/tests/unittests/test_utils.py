@@ -11,6 +11,7 @@ from autogluon.multimodal.utils import (
     data_to_df,
     filter_search_space,
     get_config,
+    is_url,
     parse_dotlist_conf,
     try_to_infer_pos_label,
 )
@@ -136,3 +137,17 @@ def test_data_to_df(data, required_columns, all_columns, is_valid_input):
     else:
         with pytest.raises(ValueError):
             df = data_to_df(data=data, required_columns=required_columns, all_columns=all_columns)
+
+
+@pytest.mark.parametrize(
+    "path,is_valid_url",
+    [
+        ("/media/data/coco17/annotations/instances_val2017.json", False),
+        ("This is a test.", False),
+        ("http://images.cocodataset.org/annotations/annotations_trainval2017.zip", True),
+        ("http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar", True),
+        ("https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth", True),
+    ],
+)
+def test_is_url(path, is_valid_url):
+    assert is_url(path) == is_valid_url
