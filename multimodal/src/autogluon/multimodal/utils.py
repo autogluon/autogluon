@@ -863,6 +863,11 @@ def create_model(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
         )
+    elif model_name.lower().startswith(MMOCR_TEXT_RECOG):
+        model = MMOCRAutoModelForTextRecognition(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+        )
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(
             MultimodalFusionMLP,

@@ -272,9 +272,18 @@ class ImageProcessor:
             mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
             std = config.data.test.pipeline[1]["transforms"][1]["std"]
         elif self.prefix.lower().startswith(MMOCR_TEXT_RECOG):
-            image_size = config.data.test.pipeline[1]["transforms"][0]["min_width"]
-            mean = config.data.test.pipeline[1]["transforms"][2]["mean"]
-            std = config.data.test.pipeline[1]["transforms"][2]["std"]
+            tmp_config_dict = {}
+            for d in config.data.test.pipeline:
+                for k, v in d.items():
+                    tmp_config_dict[k] = v
+            if "transforms" in tmp_config_dict:
+                image_size = tmp_config_dict["transforms"][0]["min_width"]
+                mean = tmp_config_dict["transforms"][2]["mean"]
+                std = tmp_config_dict["transforms"][2]["std"]
+            else:
+                image_size = tmp_config_dict["min_width"]
+                mean = tmp_config_dict["mean"]
+                std = tmp_config_dict["std"]
         elif self.prefix.lower().startswith(TIMM_IMAGE):
             image_size = config["input_size"][-1]
             mean = config["mean"]
