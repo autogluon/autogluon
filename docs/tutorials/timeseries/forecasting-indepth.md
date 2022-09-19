@@ -24,9 +24,43 @@ The goal in this case can be to predict the demand for each of the next 14 days 
 
 FIGURE:
 
-More abstractly, we can represent the past observations of the time series as a vector $(y_1, y_2, ..., y_T)$ of arbitrary length $T$.
-The goal of forecasting is to predict the future values of the time series $(y_{T+1}, y_{T+2}, ..., y_{T+H})$, where $H$ is the length of the forecast horizon.
+<!-- More abstractly, we can represent the past observations of the time series as a vector $(y_1, y_2, ..., y_T)$ of arbitrary length $T$.
+The goal of forecasting is to predict the future values of the time series $(y_{T+1}, y_{T+2}, ..., y_{T+H})$, where $H$ is the length of the forecast horizon. -->
 
+In AutoGluon, a `TimeSeriesPredictor` trains forecasting models
+
+
+use a `TimeSeriesDataFrame` to store a dataset consisting a multiple related time series.
+
+```
+data = TimeSeriesDataFrame(...)
+predictor = TimeSeriesPredictor(prediction_length=...)
+
+predictor.fit(train_data=data)
+
+forecast = predictor.predict(data)
+```
+
+### How does training work?
+
+After we finished training, AutoGluon outputs the list of available models
+
+
+When we call `predictor.predict`, it makes prediction using the model that had the best validation loss
+
+Can also override to make predictions
+
+
+A `TimeSeriesPredictor` in AutoGluon is trained to predict multiple related time series simultaneously.
+
+
+(for example, demand for different item categories)
+
+
+AutoGluon provides two types of forecasts:
+
+- mean forecast
+- quantile forecast represents the range of possible outcomes
 
 <!-- In language of AutoGluon `prediction_length` defines the length of the forecast horizon.
 
@@ -45,13 +79,18 @@ The name comes from the fact that the prediction for each time step can be viewe
 
 In many practical applications, however, a point forecast is not enough — what we really care about is the _range of possible outcomes_, not just a single prediction for each future time step.
 Back to our demand forecasting example, to plan the inventory we rather need predictions such as "With probability 90%, the number of purchases 14 days into the future will lie between 100 and 150 units".
-To make such predictions, we need to model the _probability distribution_ of the future time series values given the past.
 
-All forecasting algorithms in AutoGluon model the distribution of future time series values given the past.
+To reason about the range of possible outcomes, we need to model the _probability distribution_ of the future time series values given the past.
+For example, a distribution of the value $y_{T+1}$
 
-Let's have a look at the distribution of the value $y_{T+1}$
+There exist multiple ways to summarize this distribution.
+A point forecast
 
-The expected value
+To reason about the range of possible outcomes, we can look at the quantiles of the distribution.
+
+
+
+### What predictions does it make?
 
 
 A `TimeSeriesPredictor` in AutoGluon produces both point and quantile forecasts.
@@ -113,6 +152,7 @@ predictor.fit(train_data=train_data)
 # Evaluate a predictor on test data
 predictor.leaderboard(data=test_data)
 ```
+# TODO: example leaderboard output
 For each time series in the test dataset and for each trained model, the predictor does the following:
 
 1. Hide the last `prediction_length` values of the time series.
@@ -129,47 +169,77 @@ For example, if we set `eval_metric="MASE"`, the predictor will actually report 
 
 
 ### How are validation scores computed?
-`predictor.evaluate(data)`
+When we fit the predictor with `predictor.fit(train_data=train_data)`, under the hood AutoGluon splits the original dataset `train_data` into train and validation parts.
 
-Internally, the predictor
-1. "hides" the last `prediction_length` steps in each time series in data
-2. generates a forecast for the last
-3. computes how well the forecast matches the observed data
+
+
+
+You can provide a custom validation dataset to the predictor using the `tuning_data` argument: `predictor.fit(..., tuning_data=tuning_data)`.
+
 
 Important point - when a `TimeSeriesDataFrame` is used for validation, only the last `prediction_length` timesteps are used for computing the validation score
 
 
 ## What functionality does `TimeSeriesPredictor` offer?
+AutoGluon offers multiple ways to configure the behavior of a `TimeSeriesPredictor` that are suitable for both beginners and expert users.
 
-### Choosing the presets
-The simplest way to is using the `presets` argument of the `fit` method
+### Basic configuration with `presets` and `time_limit`
+We can fit `TimeSeriesPredictor` with different pre-defined configurations using the `presets` argument of the `fit` method.
 
 ```python
 predictor = TimeSeriesPredictor()
 predictor.fit(train_data=train_data, presets="medium_quality")
 ```
 
-### Manually specifying what models should be trained
+Higher quality presets, in general, result in better forecasts but take longer to train.
+The following presets are available:
+
+**TODO: These will be significantly changed by 0.6.0**
+
+- `"low_quality"`: quickly train a few toy models. This setting should only be used as a sanity check.
+- `"medium_quality"`: train several selected models (`"ETS"`, `"ARIMA"`, `"DeepAR"`, `"SimpleFeedForward"`) without hyperparameter optimization. A good baseline setting.
+- `"high_quality"`: same as `"medium_quality"`, but with an extended model zoo (+ `"MQRNN"`, `"Transformer"`, `"TemporalFusionTransformer"`).
+- `"best_quality"`: Train all available models with hyperparameter optimization.
+
+Another way to control the training time is using the `time_limit` argument.
 
 ```python
-predictor = TimeSeriesPredictor()
 predictor.fit(
     train_data=train_data,
-    hyperparameters={
-        "ETS": {
-            "seasonal": "add",
-            "seasonal_period": 7,
-        },
-        "ARIMA": {
-            "order": (1, 2, 1),
-        }
-        "DeepAR": {},  # train with default hyperparameters
-    }
-    time_limit=60*60,
+    time_limit=60 * 60,  # total training time in seconds
 )
 ```
 
+If no `time_limit` is provided, the predictor will train until all models have been fit.
+
+
+### Manually specifying what models should be trained
+Advanced users can override the presets and manually specify what models should be trained by the predictor using the `hyperparameters` argument.
+
+
+```python
+predictor = TimeSeriesPredictor()
+
+predictor.fit(
+    train_data=train_data,
+    hyperparameters={
+        "DeepAR": {},
+        "ETS": {
+            "seasonality": "add",
+            "seasonal_period": 7,
+        }
+    }
+)
+```
+The code above will only train two models:
+
+- `DeepAR` (with default hyperparameters)
+- `ETS` (with given `seasonality` and `seasonal_period`, remaining parameters set to their defaults).
+
+For the full list of available models and the respective hyperparameters, see [Model zoo](#TODO).
+
 ### Hyperparameter tuning
+Advanced users can define search spaces for model hyperparameters and let AutoGluon automatically determine the best configuration for the model.
 
 ```python
 import autogluon.core as ag
@@ -183,10 +253,21 @@ predictor.fit(
             "num_layers": ag.Categorical(2, 3, 4),
             "num_cells": ag.Int(10, 30),
         }
-    }
-    hyperparameter_tune_kwargs="random",
-    time_limit=60*60,
+    },
 )
 ```
+This code will train multiple versions of the `DeepAR` model with different hyperparameter configurations.
+AutGluon will automatically select the best model configuration that achieves the highest validation score.
+
 
 ### Forecasting irregularly-sampled time series
+By default, `TimeSeriesPredictor` expects the time series data to be regularly sampled (e.g., measurements done every day).
+However, in some applications, like finance, data often comes with irregular measurements (e.g., no stock price is available for weekends or holidays).
+
+To train on such irregularly-sampled time series, we can set the `ignore_time_index` flag in the predictor.
+```python
+predictor = TimeSeriesPredictor(..., ignore_time_index=True)
+predictor.fit(train_data=train_data)
+```
+In this case, the predictor will completely ignore the timestamps in `train_data`, and the predictions made by the model will have a dummy `timestamp` index with frequency equal to 1 second.
+Also, the seasonality will be disabled for models like as `ETS` and `ARIMA`.
