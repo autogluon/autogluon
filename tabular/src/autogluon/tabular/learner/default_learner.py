@@ -72,6 +72,8 @@ class DefaultLearner(AbstractTabularLearner):
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         self._pre_X_rows = len(X)
+        self._original_features = list(X)
+        self._original_features.remove(self.label)
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(y=X[self.label])
         if self.groups is not None:

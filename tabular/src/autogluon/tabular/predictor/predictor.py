@@ -246,6 +246,10 @@ class TabularPredictor:
     @property
     def eval_metric(self):
         return self._learner.eval_metric
+    
+    @property
+    def original_features(self):
+        return self._learner.original_features
 
     @property
     def problem_type(self):
