@@ -1,4 +1,4 @@
-from IPython.display import display, HTML
+from IPython.display import display, HTML, Markdown
 
 
 class JupyterMixin:
@@ -18,3 +18,6 @@ class JupyterMixin:
             sample_info = '' if sample_size is None else f' (sample size: {sample_size})'
             header = f'{header_text}{sample_info}'
             self.render_text(header, text_type='h3')
+
+    def render_markdown(self, md):
+        display(Markdown(md))

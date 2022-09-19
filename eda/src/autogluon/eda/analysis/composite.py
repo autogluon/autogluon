@@ -14,5 +14,8 @@ class BaseAnalysis(AbstractAnalysis):
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         pass

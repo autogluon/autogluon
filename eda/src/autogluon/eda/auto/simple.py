@@ -2,7 +2,7 @@ from ..analysis import BaseAnalysis, Sampler, RawTypesAnalysis, FeatureInteracti
 from ..visualization import SimpleLinearLayout, FeatureInteractionVisualization
 
 
-def analyze(train_data=None, test_data=None, val_data=None, model=None, label=None, sample=None, anlz_facets=[], viz_facets=[]):
+def analyze(train_data=None, test_data=None, val_data=None, model=None, label=None, sample=None, anlz_facets=[], viz_facets=[], return_state=False, state=None):
     a = BaseAnalysis(
         train_data=train_data,
         test_data=test_data,
@@ -14,12 +14,18 @@ def analyze(train_data=None, test_data=None, val_data=None, model=None, label=No
         ]
     )
 
+    if state is not None:
+        a.state = state
+
     state = a.fit()
 
     SimpleLinearLayout(
         state=state,
         facets=viz_facets,
     ).render()
+
+    if return_state:
+        return state
 
 
 def analyze_interaction(x=None, y=None, hue=None, viz_args={}, fig_args={}, **analysis_args):

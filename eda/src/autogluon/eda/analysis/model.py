@@ -18,6 +18,9 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         super().__init__(parent, children, **kwargs)
         self.normalize = normalize
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         if 'model' in args and 'val_data' in args:
             predictor: TabularPredictor = args.model

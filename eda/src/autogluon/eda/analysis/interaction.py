@@ -18,6 +18,9 @@ class FeatureInteraction(AbstractAnalysis):
         self.y = y
         self.hue = hue
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         cols = {
             'x': self.x,
@@ -42,28 +45,52 @@ class FeatureInteraction(AbstractAnalysis):
 
 class Correlation(AbstractAnalysis):
 
-    def __init__(self, method='spearman', significance=False, parent: Union[None, AbstractAnalysis] = None, children: List[AbstractAnalysis] = [], **kwargs) -> None:
+    def __init__(self, method='spearman',
+                 significance=False,
+                 focus_field: Union[None, str] = None,
+                 focus_field_threshold: float = 0.5,
+                 parent: Union[None, AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
+                 **kwargs) -> None:
         self.method = method
         self.significance = significance
+        self.focus_field = focus_field
+        self.focus_field_threshold = focus_field_threshold
         super().__init__(parent, children, **kwargs)
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.correlations = {}
-        state.significance_matrix = {}
+        if self.significance:
+            state.significance_matrix = {}
         state.correlations_method = self.method
         if self.significance:
             state.significance_matrix = {}
         for (ds, df) in self.available_datasets(args):
             if self.method == 'phik':
-                import phik  # required
                 state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
-                if self.significance:
-                    state.significance_matrix[ds] = df.significance_matrix(**self.args, verbose=False)
-
             else:
                 args = {}
                 if self.method is not None:
                     args['method'] = self.method
                 state.correlations[ds] = df.corr(**args, **self.args)
-                if self.significance:
+
+            if self.focus_field is not None and self.focus_field in state.correlations[ds].columns:
+                state.correlations_focus_field = self.focus_field
+                state.correlations_focus_field_threshold = self.focus_field_threshold
+                state.correlations_focus_high_corr = {}
+                df_corr = state.correlations[ds]
+                df_corr = df_corr[df_corr[self.focus_field] >= self.focus_field_threshold]
+                keep_cols = df_corr.index.values
+                state.correlations[ds] = df_corr[keep_cols]
+
+                high_corr = state.correlations[ds][[self.focus_field]].sort_values(self.focus_field, ascending=False).drop(self.focus_field)
+                state.correlations_focus_high_corr[ds] = high_corr
+
+            if self.significance:
+                if self.method == 'phik':
+                    state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)
+                else:
                     state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)
