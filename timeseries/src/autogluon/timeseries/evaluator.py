@@ -121,10 +121,6 @@ class TimeSeriesEvaluator:
     def higher_is_better(self) -> bool:
         return self.coefficient > 0
 
-    def _safemean(self, data: pd.Series):
-        data_filled = data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        return data_filled.mean()
-
     def _mse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         y_pred = predictions["mean"]
         return mse_per_item(y_true=y_true, y_pred=y_pred).mean()
@@ -132,9 +128,7 @@ class TimeSeriesEvaluator:
     def _rmse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         return np.sqrt(self._mse(y_true=y_true, predictions=predictions))
 
-    def _mase(
-        self, y_true: pd.Series, predictions: TimeSeriesDataFrame, y_history: pd.Series
-    ) -> float:
+    def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, y_history: pd.Series) -> float:
         y_pred = self._get_median_forecast(predictions)
         mae = mae_per_item(y_true=y_true, y_pred=y_pred)
         naive_1_error = in_sample_naive_1_error(y_history=y_history)
