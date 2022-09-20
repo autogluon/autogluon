@@ -1,12 +1,16 @@
 import copy
-import cv2
 import pandas as pd
 
 from autogluon.common.loaders import load_pd
+from autogluon.common.utils.s3_utils import is_s3_url
 
 from .cloud_predictor import CloudPredictor
 from ..utils.ag_sagemaker import AutoGluonImageRealtimePredictor
 from ..utils.constants import VALID_ACCEPT
+from ..utils.utils import (
+    read_image_bytes_and_encode,
+    is_image_file,
+)
 
 
 class ImageCloudPredictor(CloudPredictor):
@@ -77,22 +81,22 @@ class ImageCloudPredictor(CloudPredictor):
         import numpy as np
 
         if isinstance(test_data, str):
-            image = cv2.imread(test_data)
-            if image is None:  # not an image
+            if is_s3_url(test_data):
                 test_data = load_pd.load(test_data)
             else:
-                test_data = image
+                if is_image_file(test_data):
+                    test_data = np.array([read_image_bytes_and_encode(test_data)], dtype='object')
+                else:
+                    test_data = load_pd.load(test_data)
         if isinstance(test_data, list):
             images = []
-            for image in test_data:
-                images.append(cv2.imread(image))
-            test_data = np.array(images, dtype=object)
+            test_data = np.array([read_image_bytes_and_encode(image) for image in images], dtype='object')
         if isinstance(test_data, pd.DataFrame):
             assert test_data_image_column is not None, 'Please specify an image column name'
             assert test_data_image_column in test_data, 'Please specify a valid image column name'
 
             # Convert test data to be numpy array for network transfer
-            test_data = np.asarray([cv2.imread(path) for path in test_data[test_data_image_column]])
+            test_data = np.asarray([read_image_bytes_and_encode(image_path) for image_path in test_data[test_data_image_column]])
         assert isinstance(test_data, np.ndarray), f'Invalid test data format {type(test_data)}'
 
         return self._predict_real_time(test_data=test_data, accept=accept)
