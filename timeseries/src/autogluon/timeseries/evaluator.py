@@ -125,30 +125,30 @@ class TimeSeriesEvaluator:
         data_filled = data.replace([np.inf, -np.inf], np.nan, inplace=True)
         return data_filled.mean()
 
-    def _mse(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _mse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         y_pred = predictions["mean"]
         return mse_per_item(y_true=y_true, y_pred=y_pred).mean()
 
-    def _rmse(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _rmse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         return np.sqrt(self._mse(y_true=y_true, predictions=predictions))
 
     def _mase(
-        self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, y_history: TimeSeriesDataFrame
+        self, y_true: pd.Series, predictions: TimeSeriesDataFrame, y_history: pd.Series
     ) -> float:
         y_pred = self._get_median_forecast(predictions)
         mae = mae_per_item(y_true=y_true, y_pred=y_pred)
         naive_1_error = in_sample_naive_1_error(y_history=y_history)
         return (mae / naive_1_error).mean()
 
-    def _mape(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _mape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         y_pred = self._get_median_forecast(predictions)
         return mape_per_item(y_true=y_true, y_pred=y_pred).mean()
 
-    def _smape(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _smape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         y_pred = self._get_median_forecast(predictions)
         return symmetric_mape_per_item(y_true=y_true, y_pred=y_pred).mean()
 
-    def _mean_wquantileloss(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+    def _mean_wquantileloss(self, y_true: pd.Series, predictions: TimeSeriesDataFrame, **kwargs) -> float:
         loss_values = []
         abs_target_sum = y_true.abs().sum()
         for col in predictions.columns:
