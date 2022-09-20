@@ -130,8 +130,7 @@ class TimeSeriesEvaluator:
         return mse_per_item(y_true=y_true, y_pred=y_pred).mean()
 
     def _rmse(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
-        y_pred = predictions["mean"]
-        return mse_per_item(y_true=y_true, y_pred=y_pred).pow(0.5).mean()
+        return np.sqrt(self._mse(y_true=y_true, predictions=predictions))
 
     def _mase(
         self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, y_history: TimeSeriesDataFrame
