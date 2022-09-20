@@ -25,6 +25,11 @@ def in_sample_naive_1_error(*, y_history: pd.Series) -> pd.Series:
     return diff.abs().groupby(ITEMID, sort=False).mean()
 
 
+def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
+    """Compute Mean Squared Error for each item (time series)."""
+    return (y_true - y_pred).pow(2.0).groupby(ITEMID, sort=False).mean()
+
+
 def mae_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Absolute Error for each item (time series)."""
     return (y_true - y_pred).abs().groupby(ITEMID, sort=False).mean()
@@ -75,6 +80,8 @@ class TimeSeriesEvaluator:
         * ``sMAPE``: "symmetric" mean absolute percentage error. See https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error
         * ``mean_wQuantileLoss``: mean weighted quantile loss, i.e., average quantile loss scaled
          by the total absolute values of the time series. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL
+        * ``MSE``: mean squared error
+        * ``RMSE``: root mean squared error
 
     prediction_length: int
         Length of the forecast horizon
@@ -93,8 +100,8 @@ class TimeSeriesEvaluator:
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
-    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1}
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
+    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
     def __init__(self, eval_metric: str, prediction_length: int, target_column: str = "target"):
@@ -117,6 +124,14 @@ class TimeSeriesEvaluator:
     def _safemean(self, data: pd.Series):
         data_filled = data.replace([np.inf, -np.inf], np.nan, inplace=True)
         return data_filled.mean()
+
+    def _mse(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+        y_pred = predictions["mean"]
+        return mse_per_item(y_true=y_true, y_pred=y_pred).mean()
+
+    def _rmse(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+        y_pred = predictions["mean"]
+        return mse_per_item(y_true=y_true, y_pred=y_pred).pow(0.5).mean()
 
     def _mase(
         self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, y_history: TimeSeriesDataFrame
