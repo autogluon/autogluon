@@ -57,7 +57,8 @@ Each row of the data frame contains a single observation (timestep) of a single 
 - timestamp of the observation (`"Date"`)
 - value of the time series (`"ConfirmedCases"`)
 
-The names of these columns can be arbitrary, but it's important that we provide these names when constructing a `TimeSeriesDataFrame` that is used by AutoGluon
+The raw dataset should always follow this format (3 columns: unique ID, timestamp, value), but the names of these columns can be arbitrary.
+It is important, however, that we provide the names of the columns when constructing a `TimeSeriesDataFrame` that is used by AutoGluon
 ```{.python .input}
 ts_dataframe = TimeSeriesDataFrame.from_data_frame(
     df,
@@ -66,10 +67,14 @@ ts_dataframe = TimeSeriesDataFrame.from_data_frame(
 )
 ts_dataframe
 ```
+AutoGluon will raise an exception if the data doesn't match the expected format.
+
 We refer to each individual time series stored in a `TimeSeriesDataFrame` as an _item_.
 In our case, each item corresponds to a country.
 As another example, items might correspond to different products in demand forecasting.
 This setting is also sometimes referred to as a "panel" of time series.
+Note that this is *not* the same as multivariate forecasting — AutoGluon generates forecasts for each time series individually, without modeling interactions between different items (time series).
+
 
 `TimeSeriesDataFrame` inherits from [pandas.DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html), so all attributes and methods of `pandas.DataFrame` are also available in a `TimeSeriesDataFrame`.
 
