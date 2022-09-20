@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 
+import mmcv
 from mmcv.parallel import scatter
 from mmdet.core import get_classes
 from mmocr.utils.model import revert_sync_batchnorm

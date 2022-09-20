@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+import mmcv
 from mmcv.parallel import scatter
 from mmocr.utils.model import revert_sync_batchnorm
 from torch import nn
