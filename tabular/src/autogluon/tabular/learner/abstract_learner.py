@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
+from typing import List
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
@@ -76,7 +77,7 @@ class AbstractTabularLearner(AbstractLearner):
             raise ValueError('groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data.')
 
     @property
-    def original_features(self):
+    def original_features(self) -> List[str]:
         """Original features user passed in before autogluon doing any processing"""
         return self._original_features
 
