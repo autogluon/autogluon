@@ -25,7 +25,7 @@ The goal in this case can be to predict the demand for each of the next 14 days 
 In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
 determines the length of the forecast horizon.
 
-![](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth1.png)
+![ ](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth1.png)
 :width:`600px`
 
 
@@ -39,7 +39,7 @@ The quantiles can be used to reason about the range of possible outcomes.
 For instance, by the definition of the quantiles, the time series is predicted to be between the P10 and P90 values with 80% probability.
 
 
-![](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth2.png)
+![ ](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth2.png)
 :width:`600px`
 
 By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
@@ -113,7 +113,7 @@ predictor.evaluate(test_data_multi_window)
 The new test set `test_data_multi_window` will now contain `num_windows` time series for each original time series in `test_data`.
 The score will be computed on the last `prediction_length` time steps of each time series (marked in orange).
 
-![](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth3.png)
+![ ](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth3.png)
 :width:`450px`
 
 ### How to choose and interpret the evaluation metric?
