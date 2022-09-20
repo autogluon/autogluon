@@ -25,70 +25,27 @@ The goal in this case can be to predict the demand for each of the next 14 days 
 In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
 determines the length of the forecast horizon.
 
-<!-- ![](../../img/forecasting-indepth1.png) -->
-<p style="text-align:center;">
-<img src="../../img/forecasting-indepth1.png" class="center" width="75%"/>
-</p>
+![](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth1.png)
+:width:`600px`
 
 
-The [`predict`](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor.predict) method of a `TimeSeriesPredictor` generates two types of forecasts:
+The [predict](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor.predict) method of a `TimeSeriesPredictor` generates two types of forecasts:
 
 - **mean forecast** represents the expected value of the time series at each time step in the forecast horizon.
 - **quantile forecast** represents the quantiles of the forecast distribution.
-For example, if the `0.1` quantile (also known as P10) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time.
+For example, if the `0.1` quantile (also known as P10) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time. As another example, the `0.5` quantile (P50) corresponds to the median forecast.
 
 The quantiles can be used to reason about the range of possible outcomes.
 For instance, by the definition of the quantiles, the time series is predicted to be between the P10 and P90 values with 80% probability.
 
 
-<!-- ![](../../img/forecasting-indepth2.png) -->
-<p style="text-align:center;">
-<img src="../../img/forecasting-indepth2.png" class="center" width="75%"/>
-</p>
+![](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth2.png)
+:width:`600px`
 
 By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
 ```python
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
-
-
-<!-- More abstractly, we can represent the past observations of the time series as a vector $(y_1, y_2, ..., y_T)$ of arbitrary length $T$.
-The goal of forecasting is to predict the future values of the time series $(y_{T+1}, y_{T+2}, ..., y_{T+H})$.
-Here $H$ is the length of the forecast horizon that we call `prediction_length` in AutoGluon.
-
-... which means that all models ... *probability distribution*
-
-$$p(y_{T+1}, y_{T+2}, ..., y_{T+H} | y_1, y_2, ..., y_T)$$ -->
-
-
-<!-- ### How does training work?
-
-After we finished training, AutoGluon outputs the list of available models
-
-
-When we call `predictor.predict`, it makes prediction using the model that had the best validation loss
-
-Can also override to make predictions
-
-
-A `TimeSeriesPredictor` in AutoGluon is trained to predict multiple related time series simultaneously.
-
-
-(for example, demand for different item categories) -->
-
-
-<!-- AutoGluon provides two types of forecasts:
-
-- mean forecast
-- quantile forecast represents the range of possible outcomes -->
-
-<!-- In language of AutoGluon `prediction_length` defines the length of the forecast horizon.
-
-
-Predicting multiple time series --- predicting demand for different product categories.
-
-Univariate - we model each time series independently. -->
-
 
 ## What forecasting models are available in AutoGluon?
 Forecasting models in AutoGluon can be divided into three broad categories: local, global, and ensemble models.
@@ -121,7 +78,7 @@ This can be disabled by setting `enable_ensemble=False` when creating the predic
 For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](#TODO).
 
 ## How does AutoGluon evaluate performance of time series models?
-AutoGluon evaluates the performance of a forecasting model by measuring how well its forecast aligns with the actually observed time series.
+AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
 We can evaluate the performance of a trained predictor on `test_data` using the `evaluate` method
 ```python
 # Fit a predictor to training data
@@ -148,7 +105,7 @@ This can be done using a `MultiWindowSplitter`.
 ```python
 from autogluon.timeseries.spitter import MultiWindowSplitter
 
-splitter = MultiWindowSplitter(num_windows=3)
+splitter = MultiWindowSplitter(num_windows=5)
 _, test_data_multi_window = splitter.split(test_data, prediction_length)
 
 predictor.evaluate(test_data_multi_window)
@@ -156,9 +113,8 @@ predictor.evaluate(test_data_multi_window)
 The new test set `test_data_multi_window` will now contain `num_windows` time series for each original time series in `test_data`.
 The score will be computed on the last `prediction_length` time steps of each time series (marked in orange).
 
-<p style="text-align:center;">
-<img src="../../img/forecasting-indepth3.png" class="center" width="60%"/>
-</p>
+![](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth3.png)
+:width:`450px`
 
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
@@ -192,7 +148,7 @@ splitter = MultiWindowSplitter(num_windows=5)
 predictor = TimeSeriesPredictor(..., validation_splitter=splitter)
 ```
 
-Alternatively, a user can provide their own validation set to the `fit` method and forego using the splitter completely.
+Alternatively, a user can provide their own validation set to the `fit` method and forego using the splitter completely. In this case it's important to remember that the validation score is computed on the last `prediction_length` time steps of each time series.
 ```
 predictor = TimeSeriesPredictor(...)
 predictor.fit(train_data=train_data, tuning_data=my_validation_dataset)
