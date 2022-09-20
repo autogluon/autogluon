@@ -1,5 +1,6 @@
-from typing import Union, List, Any, Optional, Callable
-from PyOD.models import hbos, iforest
+from typing import Union, List, Callable
+from pyod.models import hbos, iforest
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from .. import AnalysisState
 from .base import AbstractAnalysis
 
@@ -27,13 +28,18 @@ class AnomalyDetector(AbstractAnalysis):
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         if self.OD_method is None:
             if self.preset == 'high_quality':
-                self.OD_method = iforest
+                self.OD_method = iforest.IForest
             if self.preset == 'medium_quality':
-                self.OD_method = hbos
-        clf = self.OD_method(**OD_kwargs)
+                self.OD_method = hbos.HBOS
+        clf = self.OD_method(**self.OD_kwargs)
         feature_generator = AutoMLPipelineFeatureGenerator()
-        train_trans = feature_generator.fit_transform(X=train_cs)
-        test_trans = feature_generator.transform(test_cs)
+        if args['label'] is not None:
+            if args['label'] in args['train_data'].columns:
+                X_train = args['train_data'].drop(columns=[args['label']])
+            if args['label'] in args['test_data'].columns:
+                X_test = args['test_data'].drop(columns=[args['label']])
+        train_trans = feature_generator.fit_transform(X=X_train)
+        test_trans = feature_generator.transform(X_test)
         clf.fit(train_trans, **fit_kwargs)
         state.test_ano_scores = clf.decision_function(test_trans)
         state.test_ano_pred = clf.predict(test_trans)
