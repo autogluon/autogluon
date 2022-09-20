@@ -12,7 +12,7 @@ This tutorial provides an in-depth overview of the time series forecasting capab
     - Hyperparameter tuning
     - Forecasting irregularly-sampled time series
 
-This tutorial assumes that you are familiar with the contents of the basic tutorial.
+This tutorial assumes that you are familiar with the contents of the [basic tutorial](forecasting-quickstart.md).
 
 ## What is probabilistic time series forecasting?
 A time series is a sequence of measurement made at regular intervals.
@@ -22,26 +22,40 @@ A typical example of this task is demand forecasting.
 We can represent the number of daily purchases of a certain product as a time series.
 The goal in this case can be to predict the demand for each of the next 14 days given the historical purchase data.
 
-FIGURE:
+In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
+determines the length of the forecast horizon.
+
+![](../../img/forecasting-indepth1.png)
+
+
+The [`predict`](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor.predict) method of a `TimeSeriesPredictor` generates two types of forecasts:
+
+- **mean forecast** represents the expected value of the time series at each time step in the forecast horizon.
+- **quantile forecast** represents the quantiles of the forecast distribution.
+For example, if the `0.1` quantile (also known as P10) is equal to `x`, it means that the time series value is predicted to be below `x` 10% of the time.
+
+The quantiles can be used to reason about the range of possible outcomes.
+For instance, by the definition of the quantiles, the time series is predicted to be between the P10 and P90 values with 80% probability.
+
+
+![](../../img/forecasting-indepth2.png)
+
+By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
+```python
+predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
+```
+
 
 <!-- More abstractly, we can represent the past observations of the time series as a vector $(y_1, y_2, ..., y_T)$ of arbitrary length $T$.
-The goal of forecasting is to predict the future values of the time series $(y_{T+1}, y_{T+2}, ..., y_{T+H})$, where $H$ is the length of the forecast horizon. -->
+The goal of forecasting is to predict the future values of the time series $(y_{T+1}, y_{T+2}, ..., y_{T+H})$.
+Here $H$ is the length of the forecast horizon that we call `prediction_length` in AutoGluon.
 
-In AutoGluon, a `TimeSeriesPredictor` trains forecasting models
+... which means that all models ... *probability distribution*
+
+$$p(y_{T+1}, y_{T+2}, ..., y_{T+H} | y_1, y_2, ..., y_T)$$ -->
 
 
-use a `TimeSeriesDataFrame` to store a dataset consisting a multiple related time series.
-
-```
-data = TimeSeriesDataFrame(...)
-predictor = TimeSeriesPredictor(prediction_length=...)
-
-predictor.fit(train_data=data)
-
-forecast = predictor.predict(data)
-```
-
-### How does training work?
+<!-- ### How does training work?
 
 After we finished training, AutoGluon outputs the list of available models
 
@@ -54,13 +68,13 @@ Can also override to make predictions
 A `TimeSeriesPredictor` in AutoGluon is trained to predict multiple related time series simultaneously.
 
 
-(for example, demand for different item categories)
+(for example, demand for different item categories) -->
 
 
-AutoGluon provides two types of forecasts:
+<!-- AutoGluon provides two types of forecasts:
 
 - mean forecast
-- quantile forecast represents the range of possible outcomes
+- quantile forecast represents the range of possible outcomes -->
 
 <!-- In language of AutoGluon `prediction_length` defines the length of the forecast horizon.
 
@@ -69,48 +83,6 @@ Predicting multiple time series --- predicting demand for different product cate
 
 Univariate - we model each time series independently. -->
 
-
-### Point forecast vs. probabilistic forecast
-One way to approach forecasting is to train a model that directly predicts the value $\hat{y}_{T+t}$ of the time series at each future time step $t = 1, ..., H$ in the forecast horizon.
-This is similar to multivariate regression in traditional machine learning — the past observations $(y_1, ..., y_T)$ serve as a feature vector and the future time series values $(y_{T+1}, ..., y_{T+H})$ are the unknown targets that the forecasting model predicts as $(\hat{y}_{T+1}, ..., \hat{y}_{T+H})$.
-
-Such forecast that consists of a single predicted value $\hat{y}_{T+t}$ for each of the future time steps is known as a _point forecast_.
-The name comes from the fact that the prediction for each time step can be viewed as a single point on the $y$ axis.
-
-In many practical applications, however, a point forecast is not enough — what we really care about is the _range of possible outcomes_, not just a single prediction for each future time step.
-Back to our demand forecasting example, to plan the inventory we rather need predictions such as "With probability 90%, the number of purchases 14 days into the future will lie between 100 and 150 units".
-
-To reason about the range of possible outcomes, we need to model the _probability distribution_ of the future time series values given the past.
-For example, a distribution of the value $y_{T+1}$
-
-There exist multiple ways to summarize this distribution.
-A point forecast
-
-To reason about the range of possible outcomes, we can look at the quantiles of the distribution.
-
-
-
-### What predictions does it make?
-
-
-A `TimeSeriesPredictor` in AutoGluon produces both point and quantile forecasts.
-
-In AutoGluon, we can specify what quantiles we care about using the
-`quantile_levels` argument to the `TimeSeriesPredictor`.
-
-Median corresponds to the 0.5 quantile
-
-For example, if we are looking for the 90% interval, we can specify
-`quantile_levels=[0.05, 0.5, 0.95]`
-
-histogram
-
-
-
-Important caveat
-
-
-conditional expectation of the future given the past
 
 ## What forecasting models are available in AutoGluon?
 Forecasting models in AutoGluon can be divided into three broad categories: local, global, and ensemble models.
@@ -143,21 +115,63 @@ This can be disabled by setting `enable_ensemble=False` when creating the predic
 For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](#TODO).
 
 ## How does AutoGluon evaluate performance of time series models?
-AutoGluon evaluates the performance of different models by measuring how well their forecasts align with the actually observed time series.
-For example, let's look at how the `test_score` is computed when we call the `leaderboard` method of a trained predictor
+AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
+
+
+This is important,
+
+
+We can evaluate the performance of a single trained model (in this case, ETS) on `test_data` using the `evaluate` method
 ```python
 # Fit a predictor to training data
-predictor = TimeSeriesPredictor(prediction_length=prediction_length, eval_metric=eval_metric)
+predictor = TimeSeriesPredictor(prediction_length=7, eval_metric="MAPE")
 predictor.fit(train_data=train_data)
-# Evaluate a predictor on test data
-predictor.leaderboard(data=test_data)
+# Evaluate the predictor on test data
+predictor.evaluate(data=test_data, model="ETS")
 ```
-# TODO: example leaderboard output
-For each time series in the test dataset and for each trained model, the predictor does the following:
+<!-- |    | model             |   score_test |   score_val |   pred_time_test |   pred_time_val |   fit_time_marginal |   fit_order |
+|---:|:------------------|-------------:|------------:|-----------------:|----------------:|--------------------:|------------:|
+|  0 | ETS               |       -0.186 |      -0.313 |            1.882 |           1.233 |               8.094 |           1 |
+|  1 | WeightedEnsemble  |       -0.187 |      -0.309 |            3.535 |           3.396 |             200.562 |           6 |
+|  2 | SimpleFeedForward |       -0.28  |      -0.664 |            1.34  |           1.372 |              11.073 |           2 |
+|  3 | ARIMA             |       -0.367 |      -0.491 |            2.37  |           1.36  |               1.002 |           4 |
+|  4 | DeepAR            |       -0.39  |      -0.83  |            2.118 |           2.163 |              14.721 |           3 |
+|  5 | Transformer       |       -0.615 |      -1.19  |            2.135 |           2.226 |              11.405 |           5 | -->
+For each time series in `test_data`, the predictor does the following:
 
 1. Hide the last `prediction_length` values of the time series.
 2. Generate a forecast for the hidden part of the time series using the model.
 3. Quantify how well the model's forecast matches the actually observed (hidden) values of the time series using the `eval_metric`.
+
+Finally, the scores are averaged over all time series.
+
+The crucial detail here is that `evaluate` always computes the score on the last `prediction_length` time steps of each time series.
+The beginning of each time series (except the last `prediction_length` time steps) is only used to initialize the models.
+
+To more accurately estimate the forecasting performance, we can
+This technique is called multi-window backtesting.
+
+To evaluate forecasting performance on multiple , we need to generate a new dataset consisting of multiple.
+
+
+
+```python
+from autogluon.timeseries.spitter import MultiWindowSplitter
+
+splitter = MultiWindowSplitter(num_windows=3)
+_, test_data_multi_window = splitter.split(test_data, prediction_length)
+```
+
+
+To evaluate performance of a single model on the test set, we can use the `evaluate` method
+```python
+predictor.evaluate(data=test_data, model="ETS")
+```
+
+
+
+let's look at how the `test_score` is computed when we call the `leaderboard` method of a trained predictor
+
 
 Different metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
@@ -171,7 +185,7 @@ For example, if we set `eval_metric="MASE"`, the predictor will actually report 
 ### How are validation scores computed?
 When we fit the predictor with `predictor.fit(train_data=train_data)`, under the hood AutoGluon splits the original dataset `train_data` into train and validation parts.
 
-
+The validation part of the data is used
 
 
 You can provide a custom validation dataset to the predictor using the `tuning_data` argument: `predictor.fit(..., tuning_data=tuning_data)`.
@@ -234,7 +248,7 @@ predictor.fit(
 The code above will only train two models:
 
 - `DeepAR` (with default hyperparameters)
-- `ETS` (with given `seasonality` and `seasonal_period`, remaining parameters set to their defaults).
+- `ETS` (with the given `seasonality` and `seasonal_period`; all other parameters set to their defaults).
 
 For the full list of available models and the respective hyperparameters, see [Model zoo](#TODO).
 
@@ -254,10 +268,11 @@ predictor.fit(
             "num_cells": ag.Int(10, 30),
         }
     },
+    enable_ensemble=False,
 )
 ```
 This code will train multiple versions of the `DeepAR` model with different hyperparameter configurations.
-AutGluon will automatically select the best model configuration that achieves the highest validation score.
+AutGluon will automatically select the best model configuration that achieves the highest validation score and use it for prediction.
 
 
 ### Forecasting irregularly-sampled time series
