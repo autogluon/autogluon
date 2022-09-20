@@ -1,9 +1,9 @@
 import logging
+import os
 import warnings
 from typing import Optional
 
 import torch
-from mim.commands.download import download
 from torch import nn
 
 try:
@@ -22,7 +22,6 @@ except ImportError:
     mmdet = None
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 
@@ -59,12 +58,40 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
 
-        # download config and checkpoint files using openmim
-        checkpoints = download(package="mmdet", configs=[checkpoint_name], dest_root=".")
+        if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
+            # download voc configs in our s3 bucket
+            from ..utils import download
+
+            if not os.path.exists("voc_config"):
+                os.makedirs("voc_config")
+            # TODO: add sha1_hash
+            checkpoint = download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712_20220320_192712-54bef0f3.pth",
+            )
+            config_file = download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn_1x_voc0712.py",
+            )
+            download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/default_runtime.py",
+                path="voc_config",
+            )
+            download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/faster_rcnn_r50_fpn.py",
+                path="voc_config",
+            )
+            download(
+                url="https://automl-mm-bench.s3.amazonaws.com/voc_script/voc0712.py",
+                path="voc_config",
+            )
+        else:
+            from mim.commands import download
+
+            # download config and checkpoint files using openmim
+            checkpoint = download(package="mmdet", configs=[checkpoint_name], dest_root=".")[0]
+            config_file = checkpoint_name + ".py"
 
         # read config files
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        config_file = checkpoint_name + ".py"
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
 
@@ -72,7 +99,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        checkpoint = checkpoints[0]
         if checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
         if "CLASSES" in checkpoint.get("meta", {}):
@@ -121,6 +147,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             A dictionary with bounding boxes.
         """
         data = batch[self.image_key]
+
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
 

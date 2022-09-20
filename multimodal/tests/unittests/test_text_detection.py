@@ -42,10 +42,10 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
 
     # compare the outputs of original model's output and our model
-    assert len(pred[0]) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
+    assert len(pred) == len(MMOCR_res[0]["boundary_result"])  # num of text lines
 
-    for i in range(len(pred[0])):
-        p = pred[0][i]
+    for i in range(len(pred)):
+        p = pred[i]
         m = MMOCR_res[0]["boundary_result"][i]
         assert len(p) == len(m)  # 2 * num of coordinate points
 
