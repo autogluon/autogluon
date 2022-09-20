@@ -1,4 +1,3 @@
-
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from .. import AnalysisState
@@ -6,7 +5,7 @@ from .. import AnalysisState
 class XShiftSummary(AbstractVisualization, JupyterMixin):
     """
     Summarize the results of the XShiftDetector.  It will render the results as markdown in jupyter.
-    This will contain the detection status (detected/not detected), the details of the hypothesis test (test
+    This will contain the detection status (True if detected), the details of the hypothesis test (test
     statistic, pvalue), and the feature importances for the detection.
     """
 
@@ -18,7 +17,7 @@ class XShiftSummary(AbstractVisualization, JupyterMixin):
                 results: dict) -> str:
         """Output the results of C2ST in a human readable format
         """
-        if results['detection_status'] == 'not_detected':
+        if not results['detection_status']:
             ret_md = (
                 f"We did not detect a substantial difference between the training and test X distributions."
             )

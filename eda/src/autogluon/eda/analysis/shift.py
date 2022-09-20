@@ -3,6 +3,8 @@ import warnings
 import pandas as pd
 import numpy as np
 from autogluon.core.metrics import balanced_accuracy, BINARY_METRICS
+from autogluon.core.constants import BINARY
+from autogluon.core.utils import generate_train_test_split
 from autogluon.tabular import TabularPredictor
 from .. import AnalysisState
 from .base import AbstractAnalysis
@@ -30,7 +32,10 @@ class Classifier2ST:
     sample_label : str, default = 'xshift_label'
         The label that will be used to indicate if the sample is from training or test
     eval_metric : callable, default = autogluon.core.metrics.balanced_accuracy
-        Binary classification metric to use for the classifier 2 sample test
+        Binary classification metric to use for the classifier 2 sample test, currently only metrics that accept binary
+        predictions are supported, such as balanced_accuracy
+    compute_fi : bool, default = True
+        To compute the feature importances set to True, this can be computationally intensive
     split : float, default = 0.5
         Training/test split proportion for classifier 2 sample test
     classifier_kwargs : dict, default = {}
@@ -42,7 +47,7 @@ class Classifier2ST:
                  eval_metric=balanced_accuracy,
                  split=0.5,
                  compute_fi = True,
-                 classifier_kwargs = {}
+                 classifier_kwargs = {},
                  ):
         classifier_kwargs.update({'label': sample_label, 'eval_metric': eval_metric})
         self.classifier = classifier_class(**classifier_kwargs)
@@ -62,7 +67,7 @@ class Classifier2ST:
         source, target = data[0].copy(), data[1].copy()
         source.loc[:,sample_label] = 0
         target.loc[:,sample_label] = 1
-        data = pd.concat((source, target))
+        data = pd.concat((source, target), ignore_index=True)
         return data
 
     def fit(self, data, **kwargs):
@@ -84,9 +89,12 @@ class Classifier2ST:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
             data = self._make_source_target_label(data, self.sample_label) # makes a copy
         if data.index.has_duplicates:
-            data.index = pd.RangeIndex(data.shape[0])
-        train = data.sample(frac=self.split)
-        test = data.drop(train.index)
+            data = data.reset_index(drop=True)
+        train, test, y_train, y_test = generate_train_test_split(data.drop(columns=[self.sample_label]),
+                                                data[self.sample_label],
+                                                BINARY)
+        train[self.sample_label] = y_train
+        test[self.sample_label] = y_test
         self.classifier.fit(train, **kwargs)
         yhat = self.classifier.predict(test)
         self.test_stat = self.eval_metric(test[self.sample_label], yhat)
@@ -99,7 +107,7 @@ class Classifier2ST:
     def _pvalue_half_permutation(self,
                                  num_permutations=1000):
         """The half permutation method for computing p-values.
-        See Section 9.1 of https://arxiv.org/pdf/1602.02210.pdf
+        See Section 9.2 of https://arxiv.org/pdf/1602.02210.pdf
         """
         perm_stats = [self.test_stat]
         yhat = self.classifier.predict(self._test)
@@ -175,7 +183,7 @@ class C2STShiftDetector:
         - detection status
         - p-value
         - detector feature importances
-    decision: decision function ('detected' or 'not detected')
+    decision: decision function
     pvalue: a p-value for the two sample test
 
     Usage
@@ -275,13 +283,9 @@ class C2STShiftDetector:
 
         Returns
         -------
-        One of ['detected', 'not detected']
+        True if detected, False otherwise
         """
-        # default teststat_thresh by metric
-        if self.p_value < self.pvalue_thresh:
-            return 'detected'
-        else:
-            return 'not_detected'
+        return self.pvalue <= self.pvalue_thresh
 
     @post_fit
     def results(self) -> dict:
@@ -290,7 +294,7 @@ class C2STShiftDetector:
         Returns
         -------
         dict of
-            - `detection_status`: One of ['detected', 'not detected']
+            - `detection_status`: True if detected
             - `test_statistic`: the C2ST statistic
             - 'pvalue': the p-value using permutation test
             - 'pvalue_threshold': the decision p-value threshold
