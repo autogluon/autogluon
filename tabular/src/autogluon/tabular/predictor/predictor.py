@@ -298,6 +298,7 @@ class TabularPredictor:
             feature_metadata='infer',
             infer_limit=None,
             infer_limit_batch_size=None,
+            fit_weighted_ensemble=True,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -531,6 +532,10 @@ class TabularPredictor:
             Small values, especially `infer_limit_batch_size=1`, will result in much larger per-row inference times and should be avoided if possible.
             Refer to `infer_limit` for more details on how this is used.
             If specified when `infer_limit=None`, the inference time will be logged during training but will not be limited.
+        fit_weighted_ensemble : bool, default = True
+            If True, a WeightedEnsembleModel will be fit in each stack layer.
+            A weighted ensemble will often be stronger than an individual model while being very fast to train.
+            It is recommended to keep this value set to True to maximize predictive quality.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -832,11 +837,14 @@ class TabularPredictor:
             'excluded_model_types': excluded_model_types,
             'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
+        aux_kwargs = {}
+        if fit_weighted_ensemble is False:
+            aux_kwargs['fit_weighted_ensemble'] = False
         self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
                           num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, aux_kwargs=aux_kwargs,
                           time_limit=time_limit, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
                           verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
@@ -975,7 +983,12 @@ class TabularPredictor:
                 model.save()
 
     # TODO: Consider adding infer_limit to fit_extra
-    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
+    def fit_extra(self,
+                  hyperparameters,
+                  time_limit=None,
+                  base_model_names=None,
+                  fit_weighted_ensemble=True,
+                  **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
         The original train_data and tuning_data will be used to train the models.
@@ -995,6 +1008,10 @@ class TabularPredictor:
             If specified, all models trained will be stack ensembles.
             If None, models will be trained as if they were specified in :meth:`TabularPredictor.fit`, without depending on existing models.
             Only valid if bagging is enabled.
+        fit_weighted_ensemble : bool, default = True
+            If True, a WeightedEnsembleModel will be fit in each stack layer.
+            A weighted ensemble will often be stronger than an individual model while being very fast to train.
+            It is recommended to keep this value set to True to maximize predictive quality.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
@@ -1059,7 +1076,9 @@ class TabularPredictor:
                                                                   time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = None  # TODO: Add as option
+        aux_kwargs = {}
+        if fit_weighted_ensemble is False:
+            aux_kwargs = {'fit_weighted_ensemble': False}
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -3016,7 +3035,7 @@ class TabularPredictor:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
         #  Valid aux_kwargs values:
-        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
+        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble, fit_weighted_ensemble
 
         # TODO: Remove features from models option for fit_extra
         # TODO: Constructor?
