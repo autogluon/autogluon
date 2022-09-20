@@ -170,17 +170,33 @@ For this purpose, some metrics are multiplied by -1.
 For example, if we set `eval_metric="MASE"`, the predictor will actually report `-MASE` (i.e., MASE score multiplied by -1). This means the `test_score` will be between 0 (best possible forecast) and $-\infty$ (worst possible forecast).
 
 
-### How does AutoGluon select the best model?
-When we fit the predictor with `predictor.fit(train_data=train_data)`, under the hood AutoGluon splits the original dataset `train_data` into train and validation parts.
+### How does AutoGluon perform validation?
+When we fit the predictor with `predictor.fit(train_data=train_data)`, under the hood AutoGluon further splits the original dataset `train_data` into train and validation parts.
 
-The validation part of the data is used
+Performance of different models on the validation set is evaluated using the `evaluate` method, just like described [above](#how-does-autogluon-evaluate-performance-of-time-series-models).
+The model that achieves the best validation score will be used for prediction in the end.
 
+**TODO: Multi-window backtesting as default in 0.6.0?**
 
-You can provide a custom validation dataset to the predictor using the `tuning_data` argument: `predictor.fit(..., tuning_data=tuning_data)`.
+By default, the internal validation set uses the last `prediction_length` time steps of each time series (i.e., single-window backtesting).
+To use multi-window backtesting instead, set the `validation_splitter` argument to `"multi_window"`
+```python
+# Defaults to 3 windows
+predictor = TimeSeriesPredictor(..., validation_splitter="multi_window")
+```
+or pass a `MultiWindowSplitter` object
+```python
+from autogluon.timeseries.splitter import MultiWindowSplitter
 
+splitter = MultiWindowSplitter(num_windows=5)
+predictor = TimeSeriesPredictor(..., validation_splitter=splitter)
+```
 
-Important point - when a `TimeSeriesDataFrame` is used for validation, only the last `prediction_length` timesteps are used for computing the validation score
-
+Alternatively, a user can provide their own validation set to the `fit` method and forego using the splitter completely.
+```
+predictor = TimeSeriesPredictor(...)
+predictor.fit(train_data=train_data, tuning_data=my_validation_dataset)
+```
 
 ## What functionality does `TimeSeriesPredictor` offer?
 AutoGluon offers multiple ways to configure the behavior of a `TimeSeriesPredictor` that are suitable for both beginners and expert users.
