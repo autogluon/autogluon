@@ -25,7 +25,10 @@ The goal in this case can be to predict the demand for each of the next 14 days 
 In AutoGluon, the `prediction_length` argument of the `TimeSeriesPredictor`
 determines the length of the forecast horizon.
 
-![](../../img/forecasting-indepth1.png)
+<!-- ![](../../img/forecasting-indepth1.png) -->
+<p style="text-align:center;">
+<img src="../../img/forecasting-indepth1.png" class="center" width="75%"/>
+</p>
 
 
 The [`predict`](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor.predict) method of a `TimeSeriesPredictor` generates two types of forecasts:
@@ -38,7 +41,10 @@ The quantiles can be used to reason about the range of possible outcomes.
 For instance, by the definition of the quantiles, the time series is predicted to be between the P10 and P90 values with 80% probability.
 
 
-![](../../img/forecasting-indepth2.png)
+<!-- ![](../../img/forecasting-indepth2.png) -->
+<p style="text-align:center;">
+<img src="../../img/forecasting-indepth2.png" class="center" width="75%"/>
+</p>
 
 By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]`. You can train the predictor with custom quantiles using the `quantile_levels` argument
 ```python
@@ -115,65 +121,47 @@ This can be disabled by setting `enable_ensemble=False` when creating the predic
 For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](#TODO).
 
 ## How does AutoGluon evaluate performance of time series models?
-AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
-
-
-This is important,
-
-
-We can evaluate the performance of a single trained model (in this case, ETS) on `test_data` using the `evaluate` method
+AutoGluon evaluates the performance of a forecasting model by measuring how well its forecast aligns with the actually observed time series.
+We can evaluate the performance of a trained predictor on `test_data` using the `evaluate` method
 ```python
 # Fit a predictor to training data
-predictor = TimeSeriesPredictor(prediction_length=7, eval_metric="MAPE")
+predictor = TimeSeriesPredictor(prediction_length=3, eval_metric="MAPE")
 predictor.fit(train_data=train_data)
 # Evaluate the predictor on test data
-predictor.evaluate(data=test_data, model="ETS")
+predictor.evaluate(test_data)
 ```
-<!-- |    | model             |   score_test |   score_val |   pred_time_test |   pred_time_val |   fit_time_marginal |   fit_order |
-|---:|:------------------|-------------:|------------:|-----------------:|----------------:|--------------------:|------------:|
-|  0 | ETS               |       -0.186 |      -0.313 |            1.882 |           1.233 |               8.094 |           1 |
-|  1 | WeightedEnsemble  |       -0.187 |      -0.309 |            3.535 |           3.396 |             200.562 |           6 |
-|  2 | SimpleFeedForward |       -0.28  |      -0.664 |            1.34  |           1.372 |              11.073 |           2 |
-|  3 | ARIMA             |       -0.367 |      -0.491 |            2.37  |           1.36  |               1.002 |           4 |
-|  4 | DeepAR            |       -0.39  |      -0.83  |            2.118 |           2.163 |              14.721 |           3 |
-|  5 | Transformer       |       -0.615 |      -1.19  |            2.135 |           2.226 |              11.405 |           5 | -->
 For each time series in `test_data`, the predictor does the following:
 
 1. Hide the last `prediction_length` values of the time series.
 2. Generate a forecast for the hidden part of the time series using the model.
 3. Quantify how well the model's forecast matches the actually observed (hidden) values of the time series using the `eval_metric`.
 
-Finally, the scores are averaged over all time series.
+Finally, the scores are averaged over all time series in the dataset.
 
 The crucial detail here is that `evaluate` always computes the score on the last `prediction_length` time steps of each time series.
-The beginning of each time series (except the last `prediction_length` time steps) is only used to initialize the models.
+The beginning of each time series (except the last `prediction_length` time steps) is only used to initialize the models before forecasting.
 
-To more accurately estimate the forecasting performance, we can
-This technique is called multi-window backtesting.
+### Multi-window backtesting
 
-To evaluate forecasting performance on multiple , we need to generate a new dataset consisting of multiple.
-
-
-
+If we want to perform _multi-window backtesting_ (i.e., evaluate performance on multiple forecast horizons generated from the same time series), we need to generate a new test set with multiple copies for each original time series.
+This can be done using a `MultiWindowSplitter`.
 ```python
 from autogluon.timeseries.spitter import MultiWindowSplitter
 
 splitter = MultiWindowSplitter(num_windows=3)
 _, test_data_multi_window = splitter.split(test_data, prediction_length)
+
+predictor.evaluate(test_data_multi_window)
 ```
+The new test set `test_data_multi_window` will now contain `num_windows` time series for each original time series in `test_data`.
+The score will be computed on the last `prediction_length` time steps of each time series (marked in orange).
 
+<p style="text-align:center;">
+<img src="../../img/forecasting-indepth3.png" class="center" width="60%"/>
+</p>
 
-To evaluate performance of a single model on the test set, we can use the `evaluate` method
-```python
-predictor.evaluate(data=test_data, model="ETS")
-```
-
-
-
-let's look at how the `test_score` is computed when we call the `leaderboard` method of a trained predictor
-
-
-Different metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
+### How to choose and interpret the evaluation metric?
+Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
 For more details about the available metrics, see [Metrics overview](#TODO).
 
@@ -182,7 +170,7 @@ For this purpose, some metrics are multiplied by -1.
 For example, if we set `eval_metric="MASE"`, the predictor will actually report `-MASE` (i.e., MASE score multiplied by -1). This means the `test_score` will be between 0 (best possible forecast) and $-\infty$ (worst possible forecast).
 
 
-### How are validation scores computed?
+### How does AutoGluon select the best model?
 When we fit the predictor with `predictor.fit(train_data=train_data)`, under the hood AutoGluon splits the original dataset `train_data` into train and validation parts.
 
 The validation part of the data is used
