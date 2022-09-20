@@ -1,6 +1,10 @@
 AutoGluon: AutoML for Text, Image, and Tabular Data
 ====================================================
 
+.. note::
+
+   `New! Explore the new managed AutoGluon experience on Amazon SageMaker Autopilot. Get started > <https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-ei[…]-faster-with-new-ensemble-training-mode-powered-by-autogluon/>`_
+
 .. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.5.2-blue
     :target: https://auto.gluon.ai/dev/versions.html
     :scale: 100%
@@ -101,6 +105,12 @@ Tutorials
       :link: tutorials/timeseries/index.html
 
       How to train time series models for forecasting.
+
+Managed Solutions Featuring AutoGluon
+-------------------------------------
+
+.. raw:: html
+   :file: static/managed_solutions.html
 
 Launch Tutorial Notebooks
 -------------------------
