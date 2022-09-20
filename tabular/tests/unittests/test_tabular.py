@@ -380,6 +380,9 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
             predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
             results = predictor.fit_summary(verbosity=4)
+            original_features = list(train_data)
+            original_features.remove(label)
+            assert original_features == predictor.original_features
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
             predictor = TabularPredictor.load(savedir)  # Test loading previously-trained predictor from file

@@ -214,7 +214,6 @@ class DefaultLearner(AbstractTabularLearner):
             w_val = None
 
         self._original_features = list(X)
-        self._original_features.remove(self.label)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
