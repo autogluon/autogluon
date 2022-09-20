@@ -216,9 +216,19 @@ def run(
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
     if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
-    searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=ray_tune_adapter.get_supported_searchers())
-    scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
-    search_space = _convert_search_space(search_space)
+    search_space, default_hyperparameters = _convert_search_space(search_space)
+
+    searcher = _get_searcher(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        metric=metric,
+        mode=mode,
+        default_hyperparameters=default_hyperparameters,
+        supported_searchers=ray_tune_adapter.get_supported_searchers()
+    )
+    scheduler = _get_scheduler(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        supported_schedulers=ray_tune_adapter.get_supported_schedulers()
+    )
 
     if not ray.is_initialized():
         ray.init(log_to_driver=False, **total_resources)
@@ -325,13 +335,27 @@ def _validate_resources_per_trial(resources_per_trial):
 def _convert_search_space(search_space: dict):
     """Convert the search space to Ray Tune search space if it's AG search space"""
     tune_search_space = search_space.copy()
-    for hyperparmaeter, space in search_space.items():
+    default_hyperparameters = dict()
+    for hyperparameters, space in search_space.items():
         if isinstance(space, Space):
-            tune_search_space[hyperparmaeter] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
-    return tune_search_space
+            tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
+            default_hyperparameters[hyperparameters] = space.default
+    default_hyperparameters = default_hyperparameters
+    if len(default_hyperparameters) == 0:
+        # hyperopt + ray have trouble taking in empty default_hyperparameters
+        default_hyperparameters = None
+    else:
+        default_hyperparameters = [default_hyperparameters]
+    return tune_search_space, default_hyperparameters
 
 
-def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_searchers: Optional[List[str]]=None):
+def _get_searcher(
+    hyperparameter_tune_kwargs: dict,
+    metric: str,
+    mode: str,
+    default_hyperparameters: Optional[List[dict]] = None,
+    supported_searchers: Optional[List[str]]=None
+):
     """Initialize searcher object"""
     searcher = hyperparameter_tune_kwargs.get('searcher')
     user_init_args = hyperparameter_tune_kwargs.get('searcher_init_args', dict())
@@ -345,7 +369,8 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
             searcher_name=searcher,
             user_init_args=user_init_args,
             metric=metric,
-            mode=mode
+            mode=mode,
+            points_to_evaluate=default_hyperparameters,
         )
     assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in SEARCHER_PRESETS.values()
     # Check supported schedulers for obj input

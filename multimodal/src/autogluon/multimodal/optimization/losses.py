@@ -1,5 +1,3 @@
-# Reference: https://github.com/lenscloth/RKD/blob/master/metric/loss.py
-
 from typing import Optional
 
 import torch
@@ -12,6 +10,7 @@ class RKDLoss(nn.Module):
     Compute RKD Distance Loss.
     Paper Refer to: Relational Knowledge Disitllation, CVPR2019. https://arxiv.org/abs/1904.05068
     Code Refer to: https://github.com/HobbitLong/RepDistiller/blob/master/distiller_zoo/RKD.py
+    and https://github.com/lenscloth/RKD/blob/master/metric/loss.py
     """
 
     def __init__(self, distance_loss_weight: Optional[float] = 25.0, angle_loss_weight: Optional[float] = 50.0):
@@ -102,3 +101,19 @@ class RKDLoss(nn.Module):
         res[range(len(embeddings)), range(len(embeddings))] = 0
 
         return res
+
+
+class SoftTargetCrossEntropy(nn.Module):
+    """
+    The soft target CrossEntropy from timm.
+    https://github.com/rwightman/pytorch-image-models/blob/e4360e6125bb0bb4279785810c8eb33b40af3ebd/timm/loss/cross_entropy.py
+    It works under the mixup.
+    It can calculate the crossentropy of input and label with one-hot.
+    """
+
+    def __init__(self):
+        super(SoftTargetCrossEntropy, self).__init__()
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        loss = torch.sum(-target * F.log_softmax(input, dim=-1), dim=-1)
+        return loss.mean()

@@ -149,6 +149,7 @@ FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
+HF_MODELS = (HF_TEXT, T_FEW, CLIP)
 
 # metric learning loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

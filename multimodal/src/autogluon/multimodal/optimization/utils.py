@@ -46,12 +46,12 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
+from .losses import SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-from .soft_target_crossentropy import SoftTargetCrossEntropy
 
 logger = logging.getLogger(AUTOMM)
 

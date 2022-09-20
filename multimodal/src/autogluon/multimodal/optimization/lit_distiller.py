@@ -11,7 +11,6 @@ from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import AUTOMM, FEATURES, LOGITS, WEIGHT
-from .rkd_loss import RKDLoss
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)

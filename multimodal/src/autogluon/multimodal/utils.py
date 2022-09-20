@@ -51,6 +51,7 @@ from .constants import (
     FEW_SHOT,
     FUSION_MLP,
     FUSION_TRANSFORMER,
+    HF_MODELS,
     HF_TEXT,
     IMAGE,
     LABEL,
@@ -1023,7 +1024,7 @@ def save_pretrained_model_configs(
         The path to save pretrained model configs.
     """
     # TODO? Fix hardcoded model names.
-    requires_saving = any([model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)) for model_name in config.model.names])
+    requires_saving = any([model_name.lower().startswith(HF_MODELS) for model_name in config.model.names])
     if not requires_saving:
         return config
 
@@ -1034,7 +1035,7 @@ def save_pretrained_model_configs(
     else:  # assumes the fusion model has a model attribute, a nn.ModuleList
         model = model.model
     for per_model in model:
-        if per_model.prefix.lower().startswith((CLIP, HF_TEXT, T_FEW)):
+        if per_model.prefix.lower().startswith(HF_MODELS):
             per_model.config.save_pretrained(os.path.join(path, per_model.prefix))
             model_config = getattr(config.model, per_model.prefix)
             model_config.checkpoint_name = os.path.join("local://", per_model.prefix)
@@ -1055,7 +1056,7 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
         The saving path to the pretrained model configs.
     """
     for model_name in config.model.names:
-        if model_name.lower().startswith((CLIP, HF_TEXT, T_FEW)):
+        if model_name.lower().startswith(HF_MODELS):
             model_config = getattr(config.model, model_name)
             if model_config.checkpoint_name.startswith("local://"):
                 model_config.checkpoint_name = os.path.join(path, model_config.checkpoint_name[len("local://") :])
@@ -2125,8 +2126,10 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
             allowable_dtypes.extend(per_model_dtypes)
 
     allowable_dtypes = set(allowable_dtypes)
-    if allowable_dtypes == set([IMAGE, TEXT]):
+    if allowable_dtypes == {IMAGE, TEXT}:
         fallback_dtype = TEXT
+    elif len(allowable_dtypes) == 1:
+        fallback_dtype = list(allowable_dtypes)[0]
 
     return allowable_dtypes, fallback_dtype
 
@@ -2227,11 +2230,12 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
         num_gpus = detected_num_gpus
     else:
         num_gpus = min(config_num_gpus, detected_num_gpus)
-        warnings.warn(
-            f"Using the detected GPU number {detected_num_gpus}, "
-            f"smaller than the GPU number {config_num_gpus} in the config.",
-            UserWarning,
-        )
+        if detected_num_gpus < config_num_gpus:
+            warnings.warn(
+                f"Using the detected GPU number {detected_num_gpus}, "
+                f"smaller than the GPU number {config_num_gpus} in the config.",
+                UserWarning,
+            )
 
     if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
         warnings.warn(

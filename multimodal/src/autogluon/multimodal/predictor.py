@@ -74,7 +74,7 @@ from .data.infer_types import (
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
-from .optimization.rkd_loss import RKDLoss
+from .optimization.losses import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
 from .utils import (
     AutoMMModelCheckpoint,
@@ -1184,6 +1184,7 @@ class MultiModalPredictor:
                 check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
+                reload_dataloaders_every_n_epochs=1,
             )
 
         with warnings.catch_warnings():
