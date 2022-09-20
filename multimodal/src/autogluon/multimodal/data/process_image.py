@@ -73,7 +73,6 @@ class ImageProcessor:
         train_transform_types: List[str],
         val_transform_types: List[str],
         samples_per_gpu: Optional[int] = None,
-        checkpoint_name: Optional[str] = None,
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
@@ -91,9 +90,6 @@ class ImageProcessor:
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
         samples_per_gpu
             Number of samples per gpu, used in MMDET to group data in each batch.
-        checkpoint_name
-            Name of a pre-trained checkpoint, which can be from either timm or huggingface.
-            It is required to extract some default hyper-parameters.
         norm_type
             How to normalize an image. We now support:
             - inception
