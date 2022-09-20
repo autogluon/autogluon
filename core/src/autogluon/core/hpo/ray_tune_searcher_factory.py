@@ -11,8 +11,8 @@ class SearcherFactory:
     # These needs to be provided explicitly as searcher init args
     # These should be experiment specified required args
     searcher_required_args = {
-        'random': [],
-        'bayes': ['metric', 'mode'],
+        'random': ['points_to_evaluate'],
+        'bayes': ['metric', 'mode', 'points_to_evaluate'],
     }
     
     # These are the default values if user not specified
