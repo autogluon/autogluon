@@ -3,59 +3,46 @@ See also, https://ts.gluon.ai/api/gluonts/gluonts.evaluation.html
 """
 import logging
 import warnings
-from typing import Any, Callable, List, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID
 from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 
 logger = logging.getLogger(__name__)
 
 
-# unit metric callables -- compute an error or summary statistic of a single
-# time series against a forecast
+def in_sample_naive_1_error(*, y_history: pd.Series) -> pd.Series:
+    """Compute the error of naive forecast (predict previous value) for each time series."""
+    diff = y_history.diff()
+    # We ignore the differences between the last value of prev item and the first value of the next item
+    length_per_item = y_history.groupby(ITEMID, sort=False).size()
+    first_index_for_each_item = length_per_item.cumsum().values[:-1]
+    diff.iloc[first_index_for_each_item] = np.nan
+    return diff.abs().groupby(ITEMID, sort=False).mean()
 
 
-def mean_square_error(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
-    return np.mean(np.square(target - forecast))  # noqa
+def mae_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
+    """Compute Mean Absolute Error for each item (time series)."""
+    return (y_true - y_pred).abs().groupby(ITEMID, sort=False).mean()
 
 
-def abs_error(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
-    return np.sum(np.abs(target - forecast))  # noqa
+def mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
+    """Compute Mean Absolute Percentage Error for each item (time series)."""
+    return ((y_true - y_pred) / y_true).abs().groupby(ITEMID, sort=False).mean()
 
 
-def mean_abs_error(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
-    return np.mean(np.abs(target - forecast))  # noqa
+def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
+    """Compute symmetric Mean Absolute Percentage Error for each item (time series)."""
+    return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(ITEMID, sort=False).mean()
 
 
-def quantile_loss(*, target: np.ndarray, forecast: np.ndarray, q: float, **kwargs) -> float:  # noqa: F841
-    return 2 * np.sum(np.abs((forecast - target) * ((target <= forecast) - q)))
-
-
-def coverage(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
-    return np.mean(target < forecast)  # noqa
-
-
-def mape(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
-    return np.mean(np.abs(target - forecast) / np.abs(target))  # noqa
-
-
-def symmetric_mape(*, target: np.ndarray, forecast: np.ndarray, **kwargs) -> float:  # noqa: F841
-    return 2 * np.mean(np.abs(target - forecast) / (np.abs(target) + np.abs(forecast)))
-
-
-def abs_target_sum(*, target: np.ndarray, **kwargs):  # noqa: F841
-    return np.sum(np.abs(target))
-
-
-def abs_target_mean(*, target: np.ndarray, **kwargs):  # noqa: F841
-    return np.mean(np.abs(target))
-
-
-def in_sample_naive_1_error(*, target_history: np.ndarray, **kwargs):  # noqa: F841
-    return np.nanmean(np.abs(np.diff(target_history)))
+def quantile_loss(*, y_true: pd.Series, y_pred: pd.Series, q: float) -> float:
+    """Compute total quantile loss across all timesteps of all time series."""
+    return 2 * ((y_true - y_pred) * ((y_true <= y_pred) - q)).abs().sum()
 
 
 class TimeSeriesEvaluator:
@@ -83,13 +70,11 @@ class TimeSeriesEvaluator:
     eval_metric: str
         Name of the metric to be computed. Available metrics are
 
-        * ``MASE``: mean absolute scaled error. See also, https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
-        * ``MAPE``: mean absolute percentage error
-        * ``sMAPE``: "symmetric" mean absolute percentage error
+        * ``MASE``: mean absolute scaled error. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
+        * ``MAPE``: mean absolute percentage error. See https://en.wikipedia.org/wiki/Mean_absolute_percentage_error
+        * ``sMAPE``: "symmetric" mean absolute percentage error. See https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error
         * ``mean_wQuantileLoss``: mean weighted quantile loss, i.e., average quantile loss scaled
-         by the total absolute values of the time series.
-        * ``MSE``: mean squared error
-        * ``RMSE``: root mean squared error
+         by the total absolute values of the time series. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL
 
     prediction_length: int
         Length of the forecast horizon
@@ -108,8 +93,8 @@ class TimeSeriesEvaluator:
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
-    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss"]
+    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1}
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
     def __init__(self, eval_metric: str, prediction_length: int, target_column: str = "target"):
@@ -129,101 +114,44 @@ class TimeSeriesEvaluator:
     def higher_is_better(self) -> bool:
         return self.coefficient > 0
 
-    def _safemean(self, data: Any):
-        data_filled = np.nan_to_num(data, neginf=np.nan, posinf=np.nan, nan=np.nan)
-        return np.nanmean(data_filled)
+    def _safemean(self, data: pd.Series):
+        data_filled = data.replace([np.inf, -np.inf], np.nan, inplace=True)
+        return data_filled.mean()
 
-    def _mase(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
-        metric_callables = [mean_abs_error, in_sample_naive_1_error]
-        df = self.get_metrics_per_ts(data, predictions, metric_callables=metric_callables)
-        return float(self._safemean(df["mean_abs_error"] / df["in_sample_naive_1_error"]))
+    def _mase(
+        self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, y_history: TimeSeriesDataFrame
+    ) -> float:
+        y_pred = self._get_median_forecast(predictions)
+        mae = mae_per_item(y_true=y_true, y_pred=y_pred)
+        naive_1_error = in_sample_naive_1_error(y_history=y_history)
+        return (mae / naive_1_error).mean()
 
-    def _mape(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
-        df = self.get_metrics_per_ts(data, predictions, metric_callables=[mape])
-        return float(self._safemean(df["mape"]))
+    def _mape(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+        y_pred = self._get_median_forecast(predictions)
+        return mape_per_item(y_true=y_true, y_pred=y_pred).mean()
 
-    def _smape(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
-        df = self.get_metrics_per_ts(data, predictions, metric_callables=[symmetric_mape])
-        return float(self._safemean(df["symmetric_mape"]))
+    def _smape(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+        y_pred = self._get_median_forecast(predictions)
+        return symmetric_mape_per_item(y_true=y_true, y_pred=y_pred).mean()
 
-    def _mse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
-        df = self.get_metrics_per_ts(data, predictions, metric_callables=[mean_square_error])
-        return float(np.mean(df["mean_square_error"]))
+    def _mean_wquantileloss(self, y_true: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, **kwargs) -> float:
+        loss_values = []
+        abs_target_sum = y_true.abs().sum()
+        for col in predictions.columns:
+            if col != "mean":
+                q = float(col)
+                assert 0 <= q <= 1
+                y_pred = predictions[col]
+                loss_values.append(quantile_loss(y_true=y_true, y_pred=y_pred, q=q) / abs_target_sum)
+        return np.mean(loss_values)
 
-    def _rmse(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame):
-        return np.sqrt(self._mse(data, predictions))
-
-    def _mean_wquantileloss(
-        self,
-        data: TimeSeriesDataFrame,
-        predictions: TimeSeriesDataFrame,
-        quantiles: List[float] = None,
-    ):
-        if not quantiles:
-            quantiles = [float(col) for col in predictions.columns if col != "mean"]
-            assert all(0 <= q <= 1 for q in quantiles)
-
-        df = self.get_metrics_per_ts(
-            data=data,
-            predictions=predictions,
-            metric_callables=[quantile_loss, abs_target_sum],
-            quantiles=quantiles,
-        )
-
-        w_quantile_losses = []
-        total_abs_target = df["abs_target_sum"].sum()
-        for q in quantiles:
-            w_quantile_losses.append(df[f"quantile_loss[{str(q)}]"].sum() / total_abs_target)
-
-        return float(np.mean(w_quantile_losses))
-
-    def _get_minimizing_forecast(self, predictions: TimeSeriesDataFrame, metric_callable: Callable) -> np.ndarray:
-        """get field from among predictions that minimizes the given metric"""
-        if "0.5" in predictions.columns and metric_callable is not mean_square_error:
-            return np.array(predictions["0.5"])
-        elif metric_callable is not mean_square_error:
+    def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
+        # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses
+        if "0.5" in predictions.columns:
+            return predictions["0.5"]
+        else:
             logger.warning("Median forecast not found. Defaulting to mean forecasts.")
-
-        if "mean" not in predictions.columns:
-            ValueError(f"Mean forecast not found. Cannot evaluate metric {metric_callable.__name__}")
-        return np.array(predictions["mean"])
-
-    def get_metrics_per_ts(
-        self,
-        data: TimeSeriesDataFrame,
-        predictions: TimeSeriesDataFrame,
-        metric_callables: List[Callable],
-        quantiles: Optional[List[float]] = None,
-    ) -> pd.DataFrame:
-        metrics = []
-        for item_id in data.item_ids:
-            y_true_w_hist = data.loc[item_id][self.target_column]
-
-            target = np.array(y_true_w_hist[-self.prediction_length :])  # noqa: E203
-            target_history = np.array(y_true_w_hist[: -self.prediction_length])
-
-            item_metrics = {}
-            for metric_callable in metric_callables:
-                if metric_callable is quantile_loss:
-                    assert all(0 <= q <= 1 for q in quantiles)
-                    for q in quantiles:
-                        assert str(q) in predictions.columns, f"Quantile {q} not found in predictions"
-                        item_metrics[f"quantile_loss[{str(q)}]"] = quantile_loss(
-                            target=target,
-                            forecast=np.array(predictions.loc[item_id][str(q)]),
-                            q=q,
-                        )
-                else:
-                    forecast = self._get_minimizing_forecast(predictions.loc[item_id], metric_callable=metric_callable)
-                    item_metrics[metric_callable.__name__] = metric_callable(
-                        target=target,
-                        forecast=forecast,
-                        target_history=target_history,
-                    )
-
-            metrics.append(item_metrics)
-
-        return pd.DataFrame(metrics)
+            return predictions["mean"]
 
     @staticmethod
     def check_get_evaluation_metric(
@@ -257,11 +185,18 @@ class TimeSeriesEvaluator:
         return metric
 
     def __call__(self, data: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame) -> float:
-        assert all(len(predictions.loc[i]) == self.prediction_length for i in predictions.item_ids)
-        assert set(predictions.item_ids) == set(data.item_ids), "Prediction and data indices do not match."
+        assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
+        # Select entries in `data` that correspond to the forecast horizon
+        data_history = data.slice_by_timestep(None, -self.prediction_length)
+        data_future = data.slice_by_timestep(-self.prediction_length, None)
+        assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             warnings.simplefilter("ignore", category=RuntimeWarning)
             warnings.simplefilter("ignore", category=FutureWarning)
-            return self.metric_method(data, predictions)
+            return self.metric_method(
+                y_true=data_future[self.target_column],
+                predictions=predictions,
+                y_history=data_history[self.target_column],
+            )
