@@ -6,7 +6,7 @@ import os
 import pprint
 import shutil
 import time
-from typing import Union
+from typing import Union, List
 
 import networkx as nx
 import numpy as np
@@ -246,6 +246,12 @@ class TabularPredictor:
     @property
     def eval_metric(self):
         return self._learner.eval_metric
+    
+    @property
+    def original_features(self) -> List[str]:
+        """Original features user passed in to fit before processing"""
+        self._assert_is_fit()
+        return self._learner.original_features
 
     @property
     def problem_type(self):

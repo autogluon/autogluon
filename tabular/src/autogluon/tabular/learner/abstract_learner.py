@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
+from typing import List
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
@@ -61,6 +62,7 @@ class AbstractTabularLearner(AbstractLearner):
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
 
+        self._original_features = None
         self._pre_X_rows = None
         self._post_X_rows = None
         self._positive_class = positive_class
@@ -73,6 +75,11 @@ class AbstractTabularLearner(AbstractLearner):
             raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
         if groups is not None and not isinstance(groups, str):
             raise ValueError('groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data.')
+
+    @property
+    def original_features(self) -> List[str]:
+        """Original features user passed in before autogluon doing any processing"""
+        return self._original_features
 
     # TODO: Possibly rename to features_in or consider refactoring all feature_generators features_in -> features
     @property
