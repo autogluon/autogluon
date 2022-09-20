@@ -1,30 +1,10 @@
 import logging
-import warnings
 from typing import List, Optional
 
-import torch
-from mim.commands.download import download
+from mmcv.parallel import scatter
+from mmdet.core import get_classes
+from mmocr.utils.model import revert_sync_batchnorm
 from torch import nn
-
-try:
-    import mmcv
-    from mmcv.parallel import scatter
-    from mmcv.runner import load_checkpoint
-except ImportError:
-    mmcv = None
-
-try:
-    import mmocr
-    from mmocr.models import build_detector
-    from mmocr.utils.model import revert_sync_batchnorm
-except ImportError:
-    mmocr = None
-
-try:
-    import mmdet
-    from mmdet.core import get_classes
-except ImportError:
-    mmdet = None
 
 from ..constants import (
     AUTOMM,
@@ -76,27 +56,6 @@ class MMOCRAutoModelForTextRecognition(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
 
-        # # TODO: the logic here (line69 ~ line75) could be shared across multiple mmlab code, consider wrap them in utils.py.
-        # # download config and checkpoint files using openmim
-        # checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
-
-        # # read config files
-        # assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
-        # config_file = checkpoint_name + ".py"
-        # if isinstance(config_file, str):
-        #     self.config = mmcv.Config.fromfile(config_file)
-
-        # # build model and load pretrained weights
-        # assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
-
-        # checkpoint = checkpoints[0]
-        # self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
-        # if checkpoint is not None:
-        #     checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
-
-        # self.model = revert_sync_batchnorm(self.model)
-        # self.model.cfg = self.config
-        # self.prefix = prefix
         self.model, self.config = get_mmocr_models(checkpoint_name)
         self.model = revert_sync_batchnorm(self.model)
         self.model.cfg = self.config

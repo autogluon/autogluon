@@ -72,6 +72,7 @@ from .constants import (
     RMSE,
     ROC_AUC,
     S3_PREFIX,
+    SCORE,
     T_FEW,
     TEXT,
     TIMM_IMAGE,
@@ -1741,7 +1742,7 @@ def tensor_to_ndarray(tensor: torch.Tensor):
     return tensor.detach().cpu().float().numpy()
 
 
-def extract_from_output(outputs: List[Dict], ret_type: Union[str, List[str]], as_ndarray: Optional[bool] = True):
+def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):
     """
     Extract desired information, e.g., logits or features, from a list of model outputs.
     Support returning a concatenated tensor/ndarray or a dictionary of tensors/ndarrays.
@@ -1784,8 +1785,10 @@ def extract_from_output(outputs: List[Dict], ret_type: Union[str, List[str]], as
             return [bbox[0] for ele in outputs for bbox in ele[BBOX]]
         else:
             return [bbox for ele in outputs for bbox in ele[BBOX]]
-    elif isinstance(ret_type, List):
-        return outputs
+    elif ret_type == TEXT:
+        return [ele[TEXT] for ele in outputs]
+    elif ret_type == SCORE:
+        return [ele[SCORE] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
