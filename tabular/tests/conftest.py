@@ -123,7 +123,13 @@ class DatasetLoaderHelper:
 
 class FitHelper:
     @staticmethod
-    def fit_and_validate_dataset(dataset_name, fit_args, sample_size=1000, refit_full=True, delete_directory=True, extra_metrics=None):
+    def fit_and_validate_dataset(dataset_name,
+                                 fit_args,
+                                 sample_size=1000,
+                                 refit_full=True,
+                                 delete_directory=True,
+                                 extra_metrics=None,
+                                 expected_model_count=2):
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
@@ -142,10 +148,10 @@ class FitHelper:
 
         model_names = predictor.get_model_names()
         model_name = model_names[0]
-        assert len(model_names) == 2
+        assert len(model_names) == expected_model_count
         if refit_full:
             refit_model_names = predictor.refit_full()
-            assert len(refit_model_names) == 2
+            assert len(refit_model_names) == expected_model_count
             refit_model_name = refit_model_names[model_name]
             assert '_FULL' in refit_model_name
             predictor.predict(test_data, model=refit_model_name)

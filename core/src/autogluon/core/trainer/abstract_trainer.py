@@ -300,6 +300,8 @@ class AbstractTrainer:
                 infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
             )
             model_names_fit += base_model_names + aux_models
+        if self.model_best is None and len(model_names_fit) != 0:
+            self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit)
         self._time_limit = None
         self.save()
         return model_names_fit
@@ -507,12 +509,15 @@ class AbstractTrainer:
     # TODO: X can be optional because it isn't needed if fit=True
     def stack_new_level_aux(self, X, y, base_model_names: List[str], level,
                             fit=True, stack_name='aux1', time_limit=None, name_suffix: str = None, get_models_func=None, check_if_best=True,
-                            infer_limit=None, infer_limit_batch_size=None, use_val_cache=True) -> List[str]:
+                            infer_limit=None, infer_limit_batch_size=None, use_val_cache=True, fit_weighted_ensemble=True) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
+        if fit_weighted_ensemble is False:
+            # Skip fitting of aux models
+            return []
         base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
         if len(base_model_names) == 0:
             logger.log(20, f'No base models to train on, skipping auxiliary stack level {level}...')
