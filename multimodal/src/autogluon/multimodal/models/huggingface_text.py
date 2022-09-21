@@ -14,6 +14,7 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
+    RAW_FEATURES,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
@@ -201,6 +202,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             {
                 LOGITS: logits,
                 FEATURES: pooled_features,
+                RAW_FEATURES: outputs.last_hidden_state * text_masks.unsqueeze(-1), #features without pooling
             }
         )
 
