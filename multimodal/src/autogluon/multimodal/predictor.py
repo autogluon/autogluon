@@ -107,6 +107,7 @@ from .utils import (
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
+    move_to_device,
     process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -115,7 +116,6 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
-    move_to_device,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1534,16 +1534,24 @@ class MultiModalPredictor:
             for per_modality, per_modality_processors in data_processors.items():
                 for per_model_processor in per_modality_processors:
                     if modality_features[per_modality]:
-                        per_item_features.update(per_model_processor(modality_features[per_modality], idx=i, is_training=False))
+                        per_item_features.update(
+                            per_model_processor(modality_features[per_modality], idx=i, is_training=False)
+                        )
             processed_features.append(per_item_features)
 
         collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
         batch = collate_fn(processed_features)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._model.to(device)
+        precision = infer_precision(num_gpus=1, precision=self._config.env.precision, as_torch=True)
+        device_type = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device(device_type)
+        model = self._model
+        if 1 < torch.cuda.device_count() <= sample_num:
+            model = nn.DataParallel(model)
+        model.to(device).eval()
         batch = move_to_device(batch, device=device)
-        with torch.autocast(device_type="cuda", dtype=torch.float32):
-            output = self._model(batch)[self._model.prefix]
+        with torch.autocast(device_type=device_type, dtype=precision):
+            with torch.no_grad():
+                output = self._model(batch)[self._model.prefix]
         return [output]
 
     def _predict(
@@ -1585,6 +1593,8 @@ class MultiModalPredictor:
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
+        realtime
+            Whether to do realtime inference, which is efficient for small data.
 
         Returns
         -------
@@ -1701,6 +1711,8 @@ class MultiModalPredictor:
             The candidate data from which to search the query data's matches.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+        realtime
+            Whether to do realtime inference, which is efficient for small data.
 
         Returns
         -------
@@ -1769,6 +1781,8 @@ class MultiModalPredictor:
         as_multiclass
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
+        realtime
+            Whether to do realtime inference, which is efficient for small data.
 
         Returns
         -------
@@ -1841,6 +1855,8 @@ class MultiModalPredictor:
             Whether to return a Pytorch tensor.
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
+        realtime
+            Whether to do realtime inference, which is efficient for small data.
 
         Returns
         -------

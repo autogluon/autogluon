@@ -1,11 +1,11 @@
 import random
-from typing import Tuple, Union, List
+from typing import List, Tuple, Union
 
 from nlpaug import Augmenter
 from nlpaug.util import Method
 
-from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .collator import Dict
+from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
 
 def extract_value_from_config(
