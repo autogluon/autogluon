@@ -116,6 +116,10 @@ The score will be computed on the last `prediction_length` time steps of each ti
 ![ ](https://autogluon-timeseries-datasets.s3.us-west-2.amazonaws.com/public/figures/forecasting-indepth3.png)
 :width:`450px`
 
+Multi-window backtesting typically results in more accurate estimation of the forecast quality on unseen data.
+However, this strategy decreases the amount of training data available for fitting models, so we should stick to single-window backtesting if the training time series are short.
+
+
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
@@ -147,9 +151,6 @@ from autogluon.timeseries.splitter import MultiWindowSplitter
 splitter = MultiWindowSplitter(num_windows=5)
 predictor = TimeSeriesPredictor(..., validation_splitter=splitter)
 ```
-Multi-window backtesting typically results in more accurate estimation of the forecast quality on unseen data.
-However, this validation strategy decreases the amount of training data used to fit models, so we should stick to single-window backtesting if the training time series are short.
-
 Alternatively, a user can provide their own validation set to the `fit` method and forego using the splitter completely. In this case it's important to remember that the validation score is computed on the last `prediction_length` time steps of each time series.
 ```
 predictor = TimeSeriesPredictor(...)
