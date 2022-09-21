@@ -71,6 +71,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
+from .data.utils import get_collate_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
@@ -114,6 +115,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    move_to_device,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1319,7 +1321,7 @@ class MultiModalPredictor:
         if os.path.isfile(last_ckpt_path):
             os.remove(last_ckpt_path)
 
-    def _predict(
+    def _default_predict(
         self,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
@@ -1505,11 +1507,70 @@ class MultiModalPredictor:
         cocoEval.accumulate()
         cocoEval.summarize()
 
+    def _realtime_predict(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+    ) -> List[Dict]:
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
+            data=data,
+            requires_label=requires_label,
+        )
+
+        lengths = []
+        modality_features = {}
+        for per_modality in data_processors:
+            per_modality_features = getattr(df_preprocessor, f"transform_{per_modality}")(data)
+            modality_features[per_modality] = per_modality_features
+            if per_modality_features:
+                lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
+        assert len(set(lengths)) == 1  # make sure each modality has the same sample num
+        sample_num = lengths[0]
+
+        processed_features = []
+        for i in range(sample_num):
+            per_item_features = {}
+            for per_modality, per_modality_processors in data_processors.items():
+                for per_model_processor in per_modality_processors:
+                    if modality_features[per_modality]:
+                        per_item_features.update(per_model_processor(modality_features[per_modality], idx=i, is_training=False))
+            processed_features.append(per_item_features)
+
+        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
+        batch = collate_fn(processed_features)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._model.to(device)
+        batch = move_to_device(batch, device=device)
+        with torch.autocast(device_type="cuda", dtype=torch.float32):
+            output = self._model(batch)[self._model.prefix]
+        return [output]
+
+    def _predict(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+        realtime: Optional[bool] = False,
+    ) -> List[Dict]:
+        if realtime:
+            outputs = self._realtime_predict(
+                data=data,
+                requires_label=requires_label,
+            )
+        else:
+            outputs = self._default_predict(
+                data=data,
+                requires_label=requires_label,
+            )
+
+        return outputs
+
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
+        realtime: Optional[bool] = False,
     ):
         """
         Evaluate model on a test dataset.
@@ -1541,6 +1602,7 @@ class MultiModalPredictor:
         outputs = self._predict(
             data=data,
             requires_label=True,
+            realtime=realtime,
         )
         logits_or_prob = extract_from_output(ret_type=ret_type, outputs=outputs)
 
@@ -1625,6 +1687,7 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         """
         Predict values for the label column of new data.
@@ -1663,6 +1726,7 @@ class MultiModalPredictor:
             outputs = self._predict(
                 data=data,
                 requires_label=False,
+                realtime=realtime,
             )
             logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
 
@@ -1687,6 +1751,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
+        realtime: Optional[bool] = False,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1730,6 +1795,7 @@ class MultiModalPredictor:
             outputs = self._predict(
                 data=data,
                 requires_label=False,
+                realtime=realtime,
             )
             logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
 
@@ -1758,6 +1824,7 @@ class MultiModalPredictor:
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
+        realtime: Optional[bool] = False,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1788,6 +1855,7 @@ class MultiModalPredictor:
         outputs = self._predict(
             data=data,
             requires_label=False,
+            realtime=realtime,
         )
         if self._pipeline in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
