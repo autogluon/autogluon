@@ -26,15 +26,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Lint Check on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -46,15 +46,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Common on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -66,15 +66,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Core on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -86,15 +86,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Features on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
@@ -106,15 +106,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Tabular on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -126,15 +126,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Text on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -146,15 +146,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Multimodal on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -166,15 +166,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Vision on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -186,15 +186,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Timeseries on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -206,15 +206,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Check if doc changes only
+      - name: Check if changes beside docs
         uses: dorny/paths-filter@v2
         id: changes
         with:
           filters: |
-            docs:
-              - 'docs/**'
+            other_than_docs:
+              - '!(docs/**)**'
       - name: Test Install on AWS Batch
-        if: steps.changes.outputs.docs == 'false'
+        if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-CPU
