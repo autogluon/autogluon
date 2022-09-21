@@ -18,14 +18,20 @@ class Sampler(AbstractAnalysis):
         super().__init__(parent, children, **kwargs)
         self.sample = sample
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.sample_size = self.sample
         if self.sample is not None:
             for (ds, df) in self.available_datasets(args):
-                self.args[ds] = df.sample(self.sample)
+                self.args[ds] = df.sample(self.sample, random_state=0)
 
 
 class DatasetSummary(AbstractAnalysis):
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
@@ -41,6 +47,9 @@ class DatasetSummary(AbstractAnalysis):
 
 class RawTypesAnalysis(AbstractAnalysis):
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.raw_types = {}
         for (ds, df) in self.available_datasets(args):
@@ -48,6 +57,9 @@ class RawTypesAnalysis(AbstractAnalysis):
 
 
 class SpecialTypesAnalysis(AbstractAnalysis):
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.special_types = {}
@@ -67,6 +79,10 @@ class SpecialTypesAnalysis(AbstractAnalysis):
 
 
 class MissingValuesAnalysis(AbstractAnalysis):
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         s = {}
         for (ds, df) in self.available_datasets(args):

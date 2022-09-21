@@ -25,7 +25,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self._all_keys_must_be_present(state, ['interactions', 'raw_types'])
+        return self.all_keys_must_be_present(state, ['interactions', 'raw_types'])
 
     def _render(self, state: AnalysisState) -> None:
         for i in state.interactions:
@@ -134,7 +134,7 @@ class CorrelationVisualization(AbstractVisualization, JupyterMixin):
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self._all_keys_must_be_present(state, ['correlations'])
+        return self.all_keys_must_be_present(state, ['correlations'])
 
     def _render(self, state: AnalysisState) -> None:
         for ds, corr in state.correlations.items():
