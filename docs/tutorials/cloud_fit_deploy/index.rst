@@ -7,7 +7,7 @@ This section provides an overview on how AutoGluon can be trained and deployed o
 
    .. card::
       :title: AutoGluon on Amazon SageMaker Autopilot
-      :link:  https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-ei[…]-faster-with-new-ensemble-training-mode-powered-by-autogluon/
+      :link:  https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/
 
       Checkout managed AutoGluon experience on Amazon SageMaker Autopilot
 
