@@ -372,7 +372,7 @@ def get_column_features(
         joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
     for key in batch:
         if key.startswith(column_name_prefix):
-            per_col_features = (features*batch[key].unsqueeze(2)).mean(dim=0)
+            per_col_features = (features * batch[key].unsqueeze(2)).mean(dim=0)
             per_col_masks = batch[key].sum(axis=1) > 1e-2
 
             column_name = key[cut_idx:]
