@@ -133,3 +133,4 @@ Launch Tutorial Notebooks
    api/autogluon.predictor
    api/autogluon.features
    api/autogluon.tabular.models
+   tutorials/cloud_fit_deploy/autopilot-autogluon
