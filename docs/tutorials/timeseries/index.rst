@@ -14,7 +14,7 @@ Allowed to contain missing values and additional (non-time-varying) static featu
 the data can be loaded from: a CSV file
 or the `GluonTS format <https://ts.gluon.ai/api/gluonts/gluonts.dataset.html>`_.
 AutoGluon-TimeSeries also supports simpler time series models such as exponential
-smoothing or ARIMA, through the `sktime library <https://www.sktime.org/en/stable/>`_.
+smoothing or ARIMA, through the `statsmodels library <https://www.statsmodels.org/stable/index.html>`_.
 
 
 
@@ -24,7 +24,13 @@ smoothing or ARIMA, through the `sktime library <https://www.sktime.org/en/stabl
       :title: Quick Start
       :link: forecasting-quickstart.html
 
-      Quick start tutorial on fitting models with time-series datasets.
+      Quick start tutorial on fitting models with time series datasets.
+
+   .. card::
+      :title: In-depth Tutorial
+      :link: forecasting-indepth.html
+
+      Detailed discussion of the time series forecasting capabilities in AutoGluon.
 
    .. card::
       :title: FAQ
@@ -37,4 +43,5 @@ smoothing or ARIMA, through the `sktime library <https://www.sktime.org/en/stabl
    :hidden:
 
    forecasting-quickstart
+   forecasting-indepth
    forecasting-faq

@@ -147,6 +147,8 @@ from autogluon.timeseries.splitter import MultiWindowSplitter
 splitter = MultiWindowSplitter(num_windows=5)
 predictor = TimeSeriesPredictor(..., validation_splitter=splitter)
 ```
+Multi-window backtesting typically results in more accurate estimation of the forecast quality on unseen data.
+However, this validation strategy decreases the amount of training data used to fit models, so we should stick to single-window backtesting if the training time series are short.
 
 Alternatively, a user can provide their own validation set to the `fit` method and forego using the splitter completely. In this case it's important to remember that the validation score is computed on the last `prediction_length` time steps of each time series.
 ```
@@ -172,7 +174,7 @@ The following presets are available:
 
 - `"low_quality"`: quickly train a few toy models. This setting should only be used as a sanity check.
 - `"medium_quality"`: train several selected models (`"ETS"`, `"ARIMA"`, `"DeepAR"`, `"SimpleFeedForward"`) without hyperparameter optimization. A good baseline setting.
-- `"high_quality"`: same as `"medium_quality"`, but with an extended model zoo (+ `"MQRNN"`, `"Transformer"`, `"TemporalFusionTransformer"`).
+<!-- - `"high_quality"`: same as `"medium_quality"`, but with an extended model zoo (+ `"MQRNN"`, `"Transformer"`, `"TemporalFusionTransformer"`). -->
 - `"best_quality"`: Train all available models with hyperparameter optimization.
 
 Another way to control the training time is using the `time_limit` argument.
@@ -224,8 +226,8 @@ predictor.fit(
     train_data=train_data,
     hyperparameters={
         "DeepAR": {
-            "num_layers": ag.Categorical(2, 3, 4),
-            "num_cells": ag.Int(10, 30),
+            "num_layers": ag.space.Categorical(2, 3, 4),
+            "num_cells": ag.space.Int(10, 30),
         }
     },
     enable_ensemble=False,
