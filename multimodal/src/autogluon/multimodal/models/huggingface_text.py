@@ -202,7 +202,7 @@ class HFAutoModelForTextPrediction(nn.Module):
             {
                 LOGITS: logits,
                 FEATURES: pooled_features,
-                RAW_FEATURES: outputs.last_hidden_state * text_masks.unsqueeze(-1), #features without pooling
+                RAW_FEATURES: outputs.last_hidden_state * text_masks.unsqueeze(-1),  # features without pooling
             }
         )
 
