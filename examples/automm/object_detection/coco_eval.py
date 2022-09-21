@@ -1,6 +1,6 @@
 from autogluon.multimodal import MultiModalPredictor
 
-def test_coco_evaluation(checkpoint_name = "faster_rcnn_r50_fpn_2x_coco"):
+def test_coco_evaluation(checkpoint_name="faster_rcnn_r50_fpn_2x_coco"):
     predictor = MultiModalPredictor(
         label="rois",
         hyperparameters={
@@ -16,6 +16,5 @@ def test_coco_evaluation(checkpoint_name = "faster_rcnn_r50_fpn_2x_coco"):
     print("time usage: %.2f" % (time.time() - start))
 
 if __name__ == "__main__":
-    #test_coco_evaluation()
-    test_coco_evaluation("mask_rcnn_r50_fpn_2x_coco")
+    test_coco_evaluation("yolov3_mobilenetv2_320_300e_coco")
 
