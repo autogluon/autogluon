@@ -245,7 +245,7 @@ class TextProcessor:
         if self.requires_column_info:
             assert text_column_names, "Empty text column names."
             for col_name in text_column_names:
-                fn[f"{self.text_column_prefix}_{col_name}"] = Stack()
+                fn[f"{self.text_column_prefix}_{col_name}"] = Pad(pad_val=0)
 
         fn.update(
             {
@@ -323,8 +323,11 @@ class TextProcessor:
             segment_ids.extend([seg] * trim_length)
             if self.requires_column_info:
                 # np.int64 corresponds to torch.LongTensor
-                col_token_idxs = np.array([segment_start, segment_start + trim_length], dtype=np.int64)
-                ret[f"{self.text_column_prefix}_{col_name}"] = col_token_idxs
+                col_token_masks = np.ones(segment_start + trim_length + 1, dtype=np.int64)
+                col_token_masks[-1] = 0
+                if segment_start:
+                    col_token_masks[0] = 0
+                ret[f"{self.text_column_prefix}_{col_name}"] = col_token_masks
             if self.insert_sep:
                 token_ids.append(self.sep_token_id)
                 segment_ids.append(seg)
