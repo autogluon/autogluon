@@ -2697,7 +2697,7 @@ def getCOCOCatIDs():
 
 def infer_precision(num_gpus: int, precision: Union[int, str]):
     """
-    Infer the precision based on the provided and the environment.
+    Infer the proper precision based on the environment setup and the provided precision.
 
     Parameters
     ----------
@@ -2714,8 +2714,8 @@ def infer_precision(num_gpus: int, precision: Union[int, str]):
         warnings.warn(
             "Only CPU is detected in the instance. "
             "MultiModalPredictor will predict with CPU only. "
-            "This may results in slow speed. "
-            "Consider to switch to an instance with GPU support.",
+            "This may result in slow speed. "
+            "Consider using an instance with GPU support.",
             UserWarning,
         )
         precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
@@ -2723,8 +2723,8 @@ def infer_precision(num_gpus: int, precision: Union[int, str]):
         if precision == "bf16" and not torch.cuda.is_bf16_supported():
             warnings.warn(
                 "bf16 is not supported by the GPU device / cuda version. "
-                "Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. "
-                "Currently, AutoGluon will downgrade the precision to 32.",
+                "Consider using GPU devices with versions after Amphere or upgrading cuda to be >=11.0. "
+                "AutoGluon is switching precision from bf16 to 32.",
                 UserWarning,
             )
             precision = 32
