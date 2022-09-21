@@ -2713,8 +2713,7 @@ def infer_precision(num_gpus: int, precision: Union[int, str]):
     if num_gpus == 0:  # CPU only prediction
         warnings.warn(
             "Only CPU is detected in the instance. "
-            "MultiModalPredictor will predict with CPU only. "
-            "This may result in slow speed. "
+            "This may result in slow speed for MultiModalPredictor. "
             "Consider using an instance with GPU support.",
             UserWarning,
         )
@@ -2724,7 +2723,7 @@ def infer_precision(num_gpus: int, precision: Union[int, str]):
             warnings.warn(
                 "bf16 is not supported by the GPU device / cuda version. "
                 "Consider using GPU devices with versions after Amphere or upgrading cuda to be >=11.0. "
-                "AutoGluon is switching precision from bf16 to 32.",
+                "MultiModalPredictor is switching precision from bf16 to 32.",
                 UserWarning,
             )
             precision = 32
