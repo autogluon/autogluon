@@ -92,7 +92,6 @@ from .utils import (
     extract_from_output,
     filter_search_space,
     from_coco,
-    from_voc,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -100,6 +99,7 @@ from .utils import (
     getCOCOCatIDs,
     infer_dtypes_by_model_names,
     infer_metrics,
+    infer_precision,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
     init_pretrained,
@@ -1104,36 +1104,18 @@ class MultiModalPredictor:
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
+        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+
         if num_gpus == 0:  # CPU only training
-            warnings.warn(
-                "Only CPU is detected in the instance. "
-                "MultiModalPredictor will be trained with CPU only. "
-                "This may results in slow training speed. "
-                "Consider to switch to an instance with GPU support.",
-                UserWarning,
-            )
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
                 1,
             )
-            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU.
-            # Try to check the status of bf16 training later.
         else:
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
                 1,
             )
-            precision = config.env.precision
-
-            if precision == "bf16" and not torch.cuda.is_bf16_supported():
-                warnings.warn(
-                    "bf16 is not supported by the GPU device / cuda version. "
-                    "Consider to use GPU devices with version after Amphere (e.g., available as AWS P4 instances) "
-                    "and upgrade cuda to be >=11.0. "
-                    "Currently, AutoGluon will downgrade the precision to 32.",
-                    UserWarning,
-                )
-                precision = 32
 
         if not hpo_mode:
             if num_gpus <= 1:
@@ -1351,25 +1333,7 @@ class MultiModalPredictor:
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
-        if num_gpus == 0:  # CPU only prediction
-            warnings.warn(
-                "Only CPU is detected in the instance. "
-                "MultiModalPredictor will predict with CPU only. "
-                "This may results in slow prediction speed. "
-                "Consider to switch to an instance with GPU support.",
-                UserWarning,
-            )
-            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
-        else:
-            precision = self._config.env.precision
-            if precision == "bf16" and not torch.cuda.is_bf16_supported():
-                warnings.warn(
-                    "bf16 is not supported by the GPU device / cuda version. "
-                    "Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. "
-                    "Currently, AutoGluon will downgrade the precision to 32.",
-                    UserWarning,
-                )
-                precision = 32
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
 
         if self._config.env.per_gpu_batch_size_evaluation:
             batch_size = self._config.env.per_gpu_batch_size_evaluation
