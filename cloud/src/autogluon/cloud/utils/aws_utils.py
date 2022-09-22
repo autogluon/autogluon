@@ -130,7 +130,8 @@ def setup_sagemaker_session(
         config = Config(
             connect_timeout=connect_timeout,
             read_timeout=60,
-            retries={'max_attempts': 20}
+            retries={'max_attempts': 20},
+            **kwargs
         )
     sm_boto = boto3.client('sagemaker', config=config)
     return sagemaker.Session(sagemaker_client=sm_boto)
