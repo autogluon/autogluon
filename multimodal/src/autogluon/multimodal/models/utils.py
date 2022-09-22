@@ -372,10 +372,7 @@ def get_column_features(
         if key.startswith(column_name_prefix):
             per_col_features = []
             per_col_masks = torch.zeros(features.shape[0]).to(features)  # (b,)
-            if isinstance(batch[key],list):
-                assert isinstance(batch[key][0],list) and len(batch[key][0]) == 2
-            else:
-                assert batch[key].ndim == 2 and batch[key].shape[1] == 2
+            assert batch[key].ndim == 2 and batch[key].shape[1] == 2
             for i, per_sample_col_idx in enumerate(batch[key]):
                 start_idx = per_sample_col_idx[0]
                 end_idx = per_sample_col_idx[1]

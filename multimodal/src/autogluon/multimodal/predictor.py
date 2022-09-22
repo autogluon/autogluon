@@ -1951,6 +1951,7 @@ class MultiModalPredictor:
         batch: Optional[dict] = None,
         onnx_path: Optional[str] = "exported_from_autogluon.onnx",
         verbose: Optional[bool] = True,
+        opset_version: Optional[int] = 13,
     ):
         # TODO: Specify limitations.
         # TODO: Get batch: dataset -> processor -> vectorize (idx to mask) -> onnx_train_batch.
@@ -1969,7 +1970,7 @@ class MultiModalPredictor:
             model,
             batch,
             onnx_path,
-            opset_version=13,
+            opset_version=opset_version,
             verbose=verbose,
             input_names=[
                 "hf_text_text_token_ids",
