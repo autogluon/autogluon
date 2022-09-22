@@ -1,8 +1,11 @@
 import random
-from typing import Tuple
+from typing import List, Tuple, Union
 
 from nlpaug import Augmenter
 from nlpaug.util import Method
+
+from .collator import Dict
+from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
 
 def extract_value_from_config(
@@ -117,3 +120,31 @@ class InsertPunctuation(Augmenter):
             if d == data:
                 return True
         return False
+
+
+def get_collate_fn(
+    df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+    data_processors: Union[dict, List[dict]],
+):
+    """
+    Collect collator functions for each modality input of every model.
+    These collator functions are wrapped by the "Dict" collator function,
+    which can then be used by the Pytorch DataLoader.
+
+    Returns
+    -------
+    A "Dict" collator wrapping other collators.
+    """
+    if isinstance(df_preprocessor, MultiModalFeaturePreprocessor):
+        df_preprocessor = [df_preprocessor]
+    if isinstance(data_processors, dict):
+        data_processors = [data_processors]
+
+    collate_fn = {}
+    for per_preprocessor, per_data_processors_group in zip(df_preprocessor, data_processors):
+        for per_modality in per_data_processors_group:
+            per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
+            if per_modality_column_names:
+                for per_model_processor in per_data_processors_group[per_modality]:
+                    collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
+    return Dict(collate_fn)

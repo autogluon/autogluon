@@ -2695,7 +2695,7 @@ def getCOCOCatIDs():
     return [e for e in range(1, 91) if e not in {12, 26, 29, 30, 45, 66, 68, 69, 71, 83}]
 
 
-def infer_precision(num_gpus: int, precision: Union[int, str]):
+def infer_precision(num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False):
     """
     Infer the proper precision based on the environment setup and the provided precision.
 
@@ -2705,6 +2705,8 @@ def infer_precision(num_gpus: int, precision: Union[int, str]):
         GPU number.
     precision
         The precision provided in config.
+    as_torch
+        Whether to convert the precision to the Pytorch format.
 
     Returns
     -------
@@ -2728,4 +2730,54 @@ def infer_precision(num_gpus: int, precision: Union[int, str]):
             )
             precision = 32
 
+    if as_torch:
+        precision_mapping = {
+            16: torch.float16,
+            "bf16": torch.bfloat16,
+            32: torch.float32,
+            64: torch.float64,
+        }
+        if precision in precision_mapping:
+            precision = precision_mapping[precision]
+        else:
+            raise ValueError(f"Unknown precision: {precision}")
+
     return precision
+
+
+def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torch.device):
+    """
+    Move an object to the given device.
+
+    Parameters
+    ----------
+    obj
+        An object, which can be a tensor, a module, a dict, or a list.
+    device
+        A Pytorch device instance.
+
+    Returns
+    -------
+    The object on the device.
+    """
+    if not isinstance(device, torch.device):
+        raise ValueError(f"Invalid device: {device}. Ensure the device type is `torch.device`.")
+
+    if torch.is_tensor(obj) or isinstance(obj, nn.Module):
+        return obj.to(device)
+    elif isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            res[k] = move_to_device(v, device)
+        return res
+    elif isinstance(obj, list):
+        res = []
+        for v in obj:
+            res.append(move_to_device(v, device))
+        return res
+    else:
+        raise TypeError(
+            f"Invalid type {type(obj)} for move_to_device. "
+            f"Make sure the object is one of these: a Pytorch tensor, a Pytorch module, "
+            f"a dict or list of tensors or modules."
+        )
