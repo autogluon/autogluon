@@ -1552,6 +1552,8 @@ class MultiModalPredictor:
         with torch.autocast(device_type=device_type, dtype=precision):
             with torch.no_grad():
                 output = self._model(batch)[self._model.prefix]
+        if isinstance(self._loss_func, nn.BCEWithLogitsLoss):
+            output[LOGITS] = torch.sigmoid(output[LOGITS].float())
         return [output]
 
     def _predict(
