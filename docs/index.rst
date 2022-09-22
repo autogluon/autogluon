@@ -3,7 +3,7 @@ AutoGluon: AutoML for Text, Image, and Tabular Data
 
 .. note::
 
-   `New! Explore the new managed AutoGluon experience on Amazon SageMaker Autopilot. Get started > <https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/>`_
+   `New! Explore the new managed AutoGluon-Tabular experience on Amazon SageMaker Autopilot. Get started > <https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/>`_
 
 .. |ReleaseVersion| image:: https://img.shields.io/badge/doc%20release-v0.5.2-blue
     :target: https://auto.gluon.ai/dev/versions.html
