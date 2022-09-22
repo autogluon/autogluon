@@ -59,6 +59,22 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             assert embeddings.shape[0] == len(df)
 
 
+def verify_realtime_inference(predictor, df, verify_embedding=True):
+    for i in range(1, 3):
+        df_small = df.head(i)
+        predictions_default = predictor.predict(df_small, as_pandas=False, realtime=False)
+        predictions_realtime = predictor.predict(df_small, as_pandas=False, realtime=True)
+        npt.assert_equal(predictions_default, predictions_realtime)
+        if predictor.problem_type in [BINARY, MULTICLASS]:
+            predictions_prob_default = predictor.predict_proba(df_small, as_pandas=False, realtime=False)
+            predictions_prob_realtime = predictor.predict_proba(df_small, as_pandas=False, realtime=True)
+            npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
+        if verify_embedding:
+            embeddings_default = predictor.extract_embedding(df_small, realtime=False)
+            embeddings_realtime = predictor.extract_embedding(df_small, realtime=True)
+            npt.assert_equal(embeddings_default, embeddings_realtime)
+
+
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
@@ -217,6 +233,7 @@ def test_predictor(
 
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
+    verify_realtime_inference(predictor, dataset.test_df)
 
     # Test for continuous fit
     predictor.fit(
