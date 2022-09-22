@@ -372,11 +372,26 @@ def get_column_features(
         joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
     for key in batch:
         if key.startswith(column_name_prefix):
-            per_col_features = (features * batch[key].unsqueeze(2)).mean(dim=0)
-            per_col_masks = batch[key].sum(axis=1) > 1e-2
-
             column_name = key[cut_idx:]
-            column_features[column_name] = per_col_features
+            if column_name_prefix[:7] != "hf_text": #TODO: attempt to fix, need more formal writing
+                per_col_features = []
+                per_col_masks = torch.zeros(features.shape[0]).to(features)  # (b,)
+                assert batch[key].ndim == 2 and batch[key].shape[1] == 2
+                for i, per_sample_col_idx in enumerate(batch[key]):
+                    start_idx = per_sample_col_idx[0]
+                    end_idx = per_sample_col_idx[1]
+                    if start_idx < end_idx:
+                        assert end_idx <= valid_lengths[i]
+                        per_col_features.append(features[i, start_idx:end_idx].mean(dim=0))
+                        per_col_masks[i] = 1
+                    else:  # the column has no valid image/text.
+                        per_col_features.append(torch.zeros_like(features[0, 0]))
+                        per_col_masks[i] = 0
+                column_features[column_name] = torch.stack(per_col_features, dim=0)  # (b, num_features)
+            else:
+                per_col_features = (features * batch[key].unsqueeze(2)).mean(dim=0)
+                per_col_masks = batch[key].sum(axis=1) > 1e-2
+                column_features[column_name] = per_col_features
             feature_masks[column_name] = per_col_masks  # (b,)
             if cls_feature is not None:
                 all_column_names.append(column_name)
