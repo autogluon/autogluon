@@ -59,7 +59,7 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             assert embeddings.shape[0] == len(df)
 
 
-def test_realtime_inference(predictor, df, verify_embedding=True):
+def verify_realtime_inference(predictor, df, verify_embedding=True):
     for i in range(1, 3):
         df_small = df.head(i)
         predictions_default = predictor.predict(df_small, as_pandas=False, realtime=False)
@@ -233,7 +233,7 @@ def test_predictor(
 
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
-    test_realtime_inference(predictor, dataset.test_df)
+    verify_realtime_inference(predictor, dataset.test_df)
 
     # Test for continuous fit
     predictor.fit(
