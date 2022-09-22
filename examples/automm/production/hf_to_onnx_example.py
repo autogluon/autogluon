@@ -4,10 +4,15 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
+from torch import tensor
+
+NUMPY_INPUT = [
+    "hf_text_text_token_ids_column_sentence1",
+]
 
 
 VALID_INPUT = [
-    "hf_text_text_token_ids_column_sentence1",
+    #"hf_text_text_token_ids_column_sentence1",
     "hf_text_text_token_ids",
     "hf_text_text_valid_length",
     "hf_text_text_segment_ids",
@@ -28,17 +33,11 @@ def export_to_onnx(model, batch, onnx_path="dummy.onnx", verbose=False):
         onnx_path,
         opset_version=13,
         verbose=verbose,
-        input_names=[
-            "hf_text_text_token_ids_column_sentence1",
-            "hf_text_text_token_ids",
-            "hf_text_text_valid_length",
-            "hf_text_text_segment_ids",
-        ],
+        input_names=VALID_INPUT,
         dynamic_axes={
-            "hf_text_text_token_ids_column_sentence1": {
-                0: "batch_size",
-                1: "sentence_length",
-            },
+            #"hf_text_text_token_ids_column_sentence1": {
+            #    0: "batch_size",
+            #},
             "hf_text_text_token_ids": {
                 0: "batch_size",
                 1: "sentence_length",
@@ -68,7 +67,7 @@ def get_onnx_result(onnx_batch, ort_sess):
 
 
 def get_hf_result(hf_batch, model):
-    return model(hf_batch)["hf_text"]["column_features"]["features"]["sentence1"].cpu().detach().numpy()
+    return model(hf_batch)["hf_text"]["features"].cpu().detach().numpy()
 
 
 def compare_result(hf_batch, onnx_batch, model, ort_sess, print_embedding=False):
@@ -94,7 +93,10 @@ def get_hf_batch(
     hf_batch = {}
     for k in raw_batch:
         if k in valid_input:
-            hf_batch[k] = raw_batch[k].to(device).long()
+            if k in NUMPY_INPUT:
+                hf_batch[k] = raw_batch[k].cpu().detach().numpy().tolist()
+            else:
+                hf_batch[k] = raw_batch[k].to(device).long()
     return hf_batch
 
 
@@ -134,7 +136,8 @@ def main(
         valid_input=valid_input,
     )
 
-    export_to_onnx(model, hf_train_batch, verbose=verbose, onnx_path=onnx_path)
+    predictor.export_onnx(batch=hf_train_batch, verbose=verbose, onnx_path=onnx_path)
+    #export_to_onnx(model, hf_train_batch, verbose=verbose, onnx_path=onnx_path)
 
     ort_sess = ort.InferenceSession(onnx_path, providers=["CUDAExecutionProvider"])
 
@@ -157,19 +160,10 @@ def main(
 
 if __name__ == "__main__":
     train_batch = {
-        "hf_text_text_token_ids_column_sentence1": torch.tensor(
-            [
-                [0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-            ],
+        "hf_text_text_token_ids_column_sentence1": tensor(
+            [[1, 7], [1, 8], [1, 8], [1, 8], [1, 6], [1, 9], [1, 8], [1, 8]], device="cuda:1"
         ),
-        "hf_text_text_token_ids": torch.tensor(
+        "hf_text_text_token_ids": tensor(
             [
                 [101, 1037, 2158, 2003, 2652, 2858, 1012, 102, 0, 0, 0, 0, 0, 0],
                 [101, 1037, 2158, 2003, 2652, 1037, 2858, 1012, 102, 0, 0, 0, 0, 0],
@@ -180,9 +174,11 @@ if __name__ == "__main__":
                 [101, 1037, 2158, 2003, 26514, 1037, 20856, 1012, 102, 0, 0, 0, 0, 0],
                 [101, 1037, 2158, 2003, 2652, 1037, 2858, 1012, 102, 0, 0, 0, 0, 0],
             ],
+            device="cuda:1",
+            dtype=torch.int32,
         ),
-        "hf_text_text_valid_length": torch.tensor([8, 9, 9, 9, 7, 10, 9, 9]),
-        "hf_text_text_segment_ids": torch.tensor(
+        "hf_text_text_valid_length": tensor([8, 9, 9, 9, 7, 10, 9, 9], device="cuda:1"),
+        "hf_text_text_segment_ids": tensor(
             [
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -193,24 +189,17 @@ if __name__ == "__main__":
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
+            device="cuda:1",
+            dtype=torch.int32,
         ),
     }
 
     test_batches = [
         {
-            "hf_text_text_token_ids_column_sentence1": torch.tensor(
-                [
-                    [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                ],
+            "hf_text_text_token_ids_column_sentence1": tensor(
+                [[1, 9], [1, 10], [1, 7], [1, 8], [1, 8], [1, 8], [1, 10], [1, 8]], device="cuda:2"
             ),
-            "hf_text_text_token_ids": torch.tensor(
+            "hf_text_text_token_ids": tensor(
                 [
                     [101, 1037, 3336, 25462, 3632, 2091, 1037, 7358, 1012, 102, 0, 0, 0, 0],
                     [101, 1037, 2158, 2003, 4823, 1998, 2652, 1037, 2858, 1012, 102, 0, 0, 0],
@@ -221,9 +210,11 @@ if __name__ == "__main__":
                     [101, 2048, 29145, 2015, 2377, 1999, 2019, 2330, 2492, 1012, 102, 0, 0, 0],
                     [101, 1037, 2158, 2003, 6276, 1037, 14557, 1012, 102, 0, 0, 0, 0, 0],
                 ],
+                device="cuda:2",
+                dtype=torch.int32,
             ),
-            "hf_text_text_valid_length": torch.tensor([10, 11, 8, 9, 9, 9, 11, 9]),
-            "hf_text_text_segment_ids": torch.tensor(
+            "hf_text_text_valid_length": tensor([10, 11, 8, 9, 9, 9, 11, 9], device="cuda:2"),
+            "hf_text_text_segment_ids": tensor(
                 [
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -234,8 +225,44 @@ if __name__ == "__main__":
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 ],
+                device="cuda:2",
+                dtype=torch.int32,
             ),
-        }
+        },
+        {
+            "hf_text_text_token_ids_column_sentence1": tensor(
+                [[1, 8], [1, 6], [1, 8], [1, 8], [1, 6], [1, 11], [1, 8], [1, 13]], device="cuda:3"
+            ),
+            "hf_text_text_token_ids": tensor(
+                [
+                    [101, 1037, 2158, 2003, 26514, 2019, 20949, 1012, 102, 0, 0, 0, 0, 0],
+                    [101, 1037, 2158, 2003, 5613, 1012, 102, 0, 0, 0, 0, 0, 0, 0],
+                    [101, 1037, 2158, 2003, 5559, 1037, 9055, 1012, 102, 0, 0, 0, 0, 0],
+                    [101, 1037, 2450, 2003, 26514, 20548, 2015, 1012, 102, 0, 0, 0, 0, 0],
+                    [101, 1037, 2158, 2003, 4092, 1012, 102, 0, 0, 0, 0, 0, 0, 0],
+                    [101, 1037, 2210, 2879, 2003, 4823, 1998, 2652, 1037, 2858, 1012, 102, 0, 0],
+                    [101, 1037, 13170, 2003, 5742, 1999, 2300, 1012, 102, 0, 0, 0, 0, 0],
+                    [101, 1037, 2402, 2450, 2003, 5128, 6293, 2545, 2035, 2058, 2014, 2227, 1012, 102],
+                ],
+                device="cuda:3",
+                dtype=torch.int32,
+            ),
+            "hf_text_text_valid_length": tensor([9, 7, 9, 9, 7, 12, 9, 14], device="cuda:3"),
+            "hf_text_text_segment_ids": tensor(
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                ],
+                device="cuda:3",
+                dtype=torch.int32,
+            ),
+        },
     ]
 
     device = "cpu"

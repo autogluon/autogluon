@@ -1946,6 +1946,48 @@ class MultiModalPredictor:
                     f"removed."
                 )
 
+    def export_onnx(
+        self,
+        batch: Optional[dict] = None,
+        onnx_path: Optional[str] = "exported_from_autogluon.onnx",
+        verbose: Optional[bool] = True,
+    ):
+        # TODO: Specify limitations.
+        # TODO: Get batch: dataset -> processor -> vectorize (idx to mask) -> onnx_train_batch.
+        # TODO: Support CLIP
+        # TODO: Update default export path.
+        # TODO: Remove Input Name Hardcode
+
+        model = self._model
+        model.eval()
+
+        if not batch:
+            #batch = get_onnx_batch(self._pipeline)
+            raise NotImplementedError("need to input batch manually")
+
+        torch.onnx.export(
+            model,
+            batch,
+            onnx_path,
+            opset_version=13,
+            verbose=verbose,
+            input_names=[
+                "hf_text_text_token_ids",
+                "hf_text_text_valid_length",
+                "hf_text_text_segment_ids",
+            ],
+            dynamic_axes={
+                "hf_text_text_token_ids": {
+                    0: "batch_size",
+                    1: "sentence_length",
+                },
+                "hf_text_text_segment_ids": {
+                    0: "batch_size",
+                    1: "sentence_length",
+                },
+            },
+        )
+
     @staticmethod
     def _load_metadata(
         predictor: MultiModalPredictor,
