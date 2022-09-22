@@ -2745,8 +2745,25 @@ def infer_precision(num_gpus: int, precision: Union[int, str], as_torch: Optiona
     return precision
 
 
-def move_to_device(obj, device):
-    if torch.is_tensor(obj):
+def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torch.device):
+    """
+    Move an object to the given device.
+
+    Parameters
+    ----------
+    obj
+        An object, which can be a tensor, a module, a dict, or a list.
+    device
+        A Pytorch device instance.
+
+    Returns
+    -------
+    The object on the device.
+    """
+    if not isinstance(device, torch.device):
+        raise ValueError(f"Invalid device: {device}. Ensure the device type is `torch.device`.")
+
+    if torch.is_tensor(obj) or isinstance(obj, nn.Module):
         return obj.to(device)
     elif isinstance(obj, dict):
         res = {}
@@ -2759,4 +2776,8 @@ def move_to_device(obj, device):
             res.append(move_to_device(v, device))
         return res
     else:
-        raise TypeError("Invalid type for move_to")
+        raise TypeError(
+            f"Invalid type {type(obj)} for move_to_device. "
+            f"Make sure the object is one of these: a Pytorch tensor, a Pytorch module, "
+            f"a dict or list of tensors or modules."
+        )
