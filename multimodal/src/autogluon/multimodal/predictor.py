@@ -71,7 +71,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
-from .data.utils import get_collate_fn
+from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
@@ -98,6 +98,7 @@ from .utils import (
     get_minmax_mode,
     get_mixup,
     getCOCOCatIDs,
+    infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_precision,
@@ -107,7 +108,6 @@ from .utils import (
     load_text_tokenizers,
     logits_to_prob,
     modify_duplicate_model_names,
-    move_to_device,
     process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -1518,42 +1518,30 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
-        lengths = []
-        modality_features = {}
-        for per_modality in data_processors:
-            per_modality_features = getattr(df_preprocessor, f"transform_{per_modality}")(data)
-            modality_features[per_modality] = per_modality_features
-            if per_modality_features:
-                lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
-        assert len(set(lengths)) == 1  # make sure each modality has the same sample num
-        sample_num = lengths[0]
+        modality_features, sample_num = apply_df_preprocessor(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            modalities=data_processors.keys(),
+        )
 
         processed_features = []
         for i in range(sample_num):
-            per_item_features = {}
-            for per_modality, per_modality_processors in data_processors.items():
-                for per_model_processor in per_modality_processors:
-                    if modality_features[per_modality]:
-                        per_item_features.update(
-                            per_model_processor(modality_features[per_modality], idx=i, is_training=False)
-                        )
-            processed_features.append(per_item_features)
+            per_sample_features = apply_data_processor(
+                modality_features=modality_features,
+                data_processors=data_processors,
+                idx=i,
+                is_training=False,
+            )
+            processed_features.append(per_sample_features)
 
         collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
         batch = collate_fn(processed_features)
-        precision = infer_precision(num_gpus=1, precision=self._config.env.precision, as_torch=True)
-        device_type = "cuda" if torch.cuda.is_available() else "cpu"
-        device = torch.device(device_type)
-        model = self._model
-        if 1 < torch.cuda.device_count() <= sample_num:
-            model = nn.DataParallel(model)
-        model.to(device).eval()
-        batch = move_to_device(batch, device=device)
-        with torch.autocast(device_type=device_type, dtype=precision):
-            with torch.no_grad():
-                output = self._model(batch)[self._model.prefix]
-        if isinstance(self._loss_func, nn.BCEWithLogitsLoss):
-            output[LOGITS] = torch.sigmoid(output[LOGITS].float())
+        output = infer_batch(
+            batch=batch,
+            model=self._model,
+            precision=self._config.env.precision,
+            loss_func=self._loss_func,
+        )
         return [output]
 
     def _predict(

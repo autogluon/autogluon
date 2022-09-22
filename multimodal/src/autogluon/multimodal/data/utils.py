@@ -1,6 +1,7 @@
 import random
-from typing import List, Tuple, Union
+from typing import Iterable, List, Tuple, Union
 
+import pandas as pd
 from nlpaug import Augmenter
 from nlpaug.util import Method
 
@@ -148,3 +149,66 @@ def get_collate_fn(
                 for per_model_processor in per_data_processors_group[per_modality]:
                     collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
     return Dict(collate_fn)
+
+
+def apply_df_preprocessor(data: pd.DataFrame, df_preprocessor: MultiModalFeaturePreprocessor, modalities: Iterable):
+    """
+    Preprocess one dataframe with one df_preprocessor.
+
+    Parameters
+    ----------
+    data
+        A pandas dataframe.
+    df_preprocessor
+        One dataframe preprocessor object.
+    modalities
+        A list of data modalities to preprocess.
+
+    Returns
+    -------
+    modality_features
+        Preprocessed features of given modalities.
+    sample_num
+        Number of samples.
+    """
+    lengths = []
+    modality_features = {}
+    for per_modality in modalities:
+        per_modality_features = getattr(df_preprocessor, f"transform_{per_modality}")(data)
+        modality_features[per_modality] = per_modality_features
+        if per_modality_features:
+            lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
+    assert len(set(lengths)) == 1  # make sure each modality has the same sample num
+    sample_num = lengths[0]
+
+    return modality_features, sample_num
+
+
+def apply_data_processor(modality_features: dict, data_processors: dict, idx: int, is_training: bool):
+    """
+    Process one sample's features.
+
+    Parameters
+    ----------
+    modality_features
+        Features of different modalities got from `apply_df_preprocessor`.
+    data_processors
+        A dict of data processors.
+    idx
+        The sample index.
+    is_training
+        Whether is training.
+
+    Returns
+    -------
+    The processed features of one sample.
+    """
+    sample_features = {}
+    for per_modality, per_modality_processors in data_processors.items():
+        for per_model_processor in per_modality_processors:
+            if modality_features[per_modality]:
+                sample_features.update(
+                    per_model_processor(modality_features[per_modality], idx=idx, is_training=is_training)
+                )
+
+    return sample_features
