@@ -2013,7 +2013,7 @@ class MultiModalPredictor:
         model.eval()
 
         if not batch:
-            #batch = get_onnx_batch(self._pipeline)
+            # batch = get_onnx_batch(self._pipeline)
             raise NotImplementedError("need to input batch manually")
 
         torch.onnx.export(
