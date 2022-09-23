@@ -4,11 +4,11 @@ import autogluon.eda.analysis as eda
 import autogluon.eda.auto as auto
 import autogluon.eda.visualization as viz
 
-s3_url = 'https://autogluon.s3.us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/'
+S3_URL = 'https://autogluon.s3.us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/'
 
 def load_adult_data():
-    train_data = s3_url + 'train_data.csv'
-    test_data = s3_url + 'test_data.csv'
+    train_data = S3_URL + 'train_data.csv'
+    test_data = S3_URL + 'test_data.csv'
     train = pd.read_csv(train_data)
     test = pd.read_csv(test_data)
     data = (train, test)
