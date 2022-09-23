@@ -25,7 +25,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self._all_keys_must_be_present(state, ['interactions', 'raw_types'])
+        return self.all_keys_must_be_present(state, ['interactions', 'raw_types'])
 
     def _render(self, state: AnalysisState) -> None:
         for i in state.interactions:
@@ -60,6 +60,11 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     if x_type == 'numeric':
                         data = df[x]
                         chart_args.pop('x')
+                elif x is None and hue is None:
+                    single_var = True
+                    if y_type == 'numeric':
+                        data = df[y]
+                        chart_args.pop('y')
                 self._get_sns_chart_method(chart_type)(ax=ax, data=data, **chart_args)
                 for container in ax.containers:
                     ax.bar_label(container)
@@ -83,6 +88,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
         types = {
             ('numeric', None, None): 'kdeplot',
             ('category', None, None): 'countplot',
+            (None, 'category', None): 'countplot',
 
             ('category', None, 'category'): 'countplot',
             (None, 'category', 'category'): 'countplot',
@@ -128,7 +134,7 @@ class CorrelationVisualization(AbstractVisualization, JupyterMixin):
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self._all_keys_must_be_present(state, ['correlations'])
+        return self.all_keys_must_be_present(state, ['correlations'])
 
     def _render(self, state: AnalysisState) -> None:
         for ds, corr in state.correlations.items():

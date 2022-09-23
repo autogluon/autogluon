@@ -18,6 +18,9 @@ class FeatureInteraction(AbstractAnalysis):
         self.y = y
         self.hue = hue
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         cols = {
             'x': self.x,
@@ -47,6 +50,9 @@ class Correlation(AbstractAnalysis):
         self.significance = significance
         super().__init__(parent, children, **kwargs)
 
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.correlations = {}
         state.significance_matrix = {}
@@ -55,7 +61,6 @@ class Correlation(AbstractAnalysis):
             state.significance_matrix = {}
         for (ds, df) in self.available_datasets(args):
             if self.method == 'phik':
-                import phik  # required
                 state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
                 if self.significance:
                     state.significance_matrix[ds] = df.significance_matrix(**self.args, verbose=False)
