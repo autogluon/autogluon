@@ -2784,7 +2784,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
         )
 
 
-def infer_batch(batch: Dict, model: nn.Module, precision: Union[str, int], loss_func: _Loss):
+def infer_batch(batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, loss_func: _Loss):
     """
     Perform inference for a batch.
 
@@ -2803,19 +2803,19 @@ def infer_batch(batch: Dict, model: nn.Module, precision: Union[str, int], loss_
     -------
     Model output.
     """
-    precision = infer_precision(num_gpus=1, precision=precision, as_torch=True)
+    num_gpus = compute_num_gpus(config_num_gpus=num_gpus, strategy="dp")
+    precision = infer_precision(num_gpus=num_gpus, precision=precision, as_torch=True)
     device_type = "cuda" if torch.cuda.is_available() else "cpu"
     device = torch.device(device_type)
     batch_size = len(batch[next(iter(batch))])
-    if 1 < torch.cuda.device_count() <= batch_size:
+    if 1 < num_gpus <= batch_size:
         model = nn.DataParallel(model)
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
     with torch.autocast(device_type=device_type, dtype=precision):
         with torch.no_grad():
             output = model(batch)[model.prefix]
-
-    if isinstance(loss_func, nn.BCEWithLogitsLoss):
-        output[LOGITS] = torch.sigmoid(output[LOGITS].float())
+            if isinstance(loss_func, nn.BCEWithLogitsLoss):
+                output[LOGITS] = torch.sigmoid(output[LOGITS].float())
 
     return output

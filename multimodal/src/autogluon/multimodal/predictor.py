@@ -1540,6 +1540,7 @@ class MultiModalPredictor:
             batch=batch,
             model=self._model,
             precision=self._config.env.precision,
+            num_gpus=self._config.env.num_gpus,
             loss_func=self._loss_func,
         )
         return [output]
