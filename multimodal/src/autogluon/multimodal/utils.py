@@ -29,6 +29,7 @@ from scipy.special import softmax
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import LabelEncoder
 from torch import nn
+from torch.nn.modules.loss import _Loss
 
 from autogluon.core.metrics import get_metric
 from autogluon.core.utils.loaders import load_pd
@@ -2781,3 +2782,40 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
             f"Make sure the object is one of these: a Pytorch tensor, a Pytorch module, "
             f"a dict or list of tensors or modules."
         )
+
+
+def infer_batch(batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, loss_func: _Loss):
+    """
+    Perform inference for a batch.
+
+    Parameters
+    ----------
+    batch
+        The batch data.
+    model
+        A Pytorch model.
+    precision
+        The desired precision used in inference.
+    loss_func
+        The loss function used in training the model.
+
+    Returns
+    -------
+    Model output.
+    """
+    num_gpus = compute_num_gpus(config_num_gpus=num_gpus, strategy="dp")
+    precision = infer_precision(num_gpus=num_gpus, precision=precision, as_torch=True)
+    device_type = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(device_type)
+    batch_size = len(batch[next(iter(batch))])
+    if 1 < num_gpus <= batch_size:
+        model = nn.DataParallel(model)
+    model.to(device).eval()
+    batch = move_to_device(batch, device=device)
+    with torch.autocast(device_type=device_type, dtype=precision):
+        with torch.no_grad():
+            output = model(batch)[model.prefix]
+            if isinstance(loss_func, nn.BCEWithLogitsLoss):
+                output[LOGITS] = torch.sigmoid(output[LOGITS].float())
+
+    return output
