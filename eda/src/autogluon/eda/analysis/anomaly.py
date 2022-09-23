@@ -9,6 +9,22 @@ class AnomalyDetector(AbstractAnalysis):
     """An anomaly detector for tabular data.  It provides anomaly scores for each row in the test dataframe. The
     default methods are isolation forests (high quality) and histogram based outlier score (medium quality - faster
     computation).
+
+    Parameters
+    ----------
+    preset: str, default = 'high_quality'
+        'high_quality' for more powerful but computationally expensive detector, 'medium_quality' otherwise
+    OD_method: Callable, default = None
+        Custom anomaly detector from pyod.models, if you don't want the defaults - will override preset
+    OD_kwargs: dict, default = {}
+        kwargs for the OD method
+
+    State attributes
+    ---------------
+    state.test_ano_scores: 1D array
+        The anomaly scores from the pyod anomaly detector
+    state.test_ano_pred: 1D array
+        The anomaly predictions (1 = anomaly) from the pyod anomaly detector
     """
 
     def __init__(self,
