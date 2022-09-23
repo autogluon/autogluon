@@ -1,13 +1,12 @@
 import logging
 from typing import Optional
 
-import mmcv
 from mmcv.parallel import scatter
 from mmocr.utils.model import revert_sync_batchnorm
 from torch import nn
 
 from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_mmocr_models, get_model_head
+from .utils import assign_layer_ids, get_column_features, get_mmocr_config_and_model, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 
@@ -44,7 +43,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
 
-        self.model, self.config = get_mmocr_models(checkpoint_name)
+        self.config, self.model = get_mmocr_config_and_model(checkpoint_name)
         self.model = revert_sync_batchnorm(self.model)
         self.model.cfg = self.config
         self.prefix = prefix

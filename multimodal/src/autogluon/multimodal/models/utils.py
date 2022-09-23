@@ -545,7 +545,19 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
     return config, model
 
 
-def get_mmocr_models(checkpoint_name: str):
+def get_mmocr_config_and_model(checkpoint_name: str):
+    """
+    Get an MMOCR config and model based on a checkpoint name.
+
+    Parameters
+    ----------
+    checkpoint_name
+        A model checkpoint name.
+
+    Returns
+    -------
+    An MMOCR config and model.
+    """
     try:
         import mmcv
         from mmcv.runner import load_checkpoint
@@ -573,4 +585,4 @@ def get_mmocr_models(checkpoint_name: str):
     model = build_detector(config.model, test_cfg=config.get("test_cfg"))
     if checkpoint is not None:
         checkpoint = load_checkpoint(model, checkpoint, map_location="cpu")
-    return model, config
+    return config, model
