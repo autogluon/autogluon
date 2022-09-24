@@ -96,18 +96,14 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
                 X = X.drop(columns=[label])
             if label in X_test.columns:
                 X_test = X_test.drop(columns=[label])
-
         self.C2ST.fit((X, X_test), **fit_kwargs)
-
         # Feature importance
         if self.C2ST.has_fi and self.compute_fi:
             fi_scores = self.C2ST.feature_importance()
         else:
             fi_scores = None
-
         pvalue = self.C2ST.pvalue(num_permutations=self.num_permutations)
         det_status = pvalue <= self.pvalue_thresh
-
         state.xshift_results = {
             'detection_status': det_status,
             'test_statistic': self.C2ST.test_stat,
@@ -119,11 +115,9 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
 
 def post_fit(func):
     """decorator for post-fit methods"""
-
     def pff_wrapper(self, *args, **kwargs):
         assert self._is_fit, f'.fit needs to be called prior to .{func.__name__}'
         return func(self, *args, **kwargs)
-
     return pff_wrapper
 
 class Classifier2ST:

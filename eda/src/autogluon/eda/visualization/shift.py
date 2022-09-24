@@ -1,8 +1,9 @@
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from .. import AnalysisState
+from ..state import StateCheckMixin
 
-class XShiftSummary(AbstractVisualization, JupyterMixin):
+class XShiftSummary(AbstractVisualization, JupyterMixin, StateCheckMixin):
     """
     Summarize the results of the XShiftDetector.  It will render the results as markdown in jupyter.
     This will contain the detection status (True if detected), the details of the hypothesis test (test
