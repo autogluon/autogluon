@@ -1987,21 +1987,30 @@ class MultiModalPredictor:
 
     def export_onnx(
         self,
+        data: Union[pd.DataFrame, dict, list] = None,
         batch: Optional[dict] = None,
-        onnx_path: Optional[str] = "exported_from_autogluon.onnx",
+        onnx_path: Optional[str] = None,
         verbose: Optional[bool] = True,
         opset_version: Optional[int] = 13,
     ):
-        # TODO: Specify limitations.
-        # TODO: Get batch: dataset -> processor -> vectorize (idx to mask) -> onnx_train_batch.
         # TODO: Support CLIP
-        # TODO: Update default export path.
-        # TODO: Remove Input Name Hardcode
+        # TODO: Remove Input Column Name Hardcode
+
+        if self._pipeline not in [FEATURE_EXTRACTION]:
+            raise ValueError(f"ONNX export is not supported in current pipeline {self._pipeline}")
+
+        if onnx_path is None:
+            if self._pipeline == FEATURE_EXTRACTION:
+                onnx_path = self._config["model.hf_text.checkpoint_name"].replace("/", "_") + ".onnx"
+            else:
+                onnx_path = "exported_from_autogluon.onnx"
 
         model = self._model
         model.eval()
 
-        if not batch:
+        if data is not None:
+            batch = self.get_processed_batch(data=data, batch_size=2, onnx_training=True)  # TODO: remove hardcode
+        elif not batch:
             # batch = get_onnx_batch(self._pipeline)
             raise NotImplementedError("need to input batch manually")
 
@@ -2021,12 +2030,62 @@ class MultiModalPredictor:
                     0: "batch_size",
                     1: "sentence_length",
                 },
+                "hf_text_text_valid_length": {
+                    0: "batch_size",
+                },
                 "hf_text_text_segment_ids": {
                     0: "batch_size",
                     1: "sentence_length",
                 },
             },
         )
+
+    def get_processed_batch(self, data: Union[pd.DataFrame, dict, list], batch_size: int = None, onnx_training: bool = False):
+        # TODO: add support for data = dict or list
+        if onnx_training:
+            if batch_size:
+                data = data[:batch_size]
+            else:
+                data = data[:2]
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
+            data=data,
+            requires_label=False,
+        )
+        modality_features, sample_num = apply_df_preprocessor(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            modalities=data_processors.keys(),
+        )
+        processed_features = []
+        for i in range(sample_num):
+            per_sample_features = apply_data_processor(
+                modality_features=modality_features,
+                data_processors=data_processors,
+                idx=i,
+                is_training=False,
+            )
+            processed_features.append(per_sample_features)
+        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
+        batch = collate_fn(processed_features)
+
+        ret = {}
+        VALID_INPUT = [
+            "hf_text_text_token_ids",
+            "hf_text_text_valid_length",
+            "hf_text_text_segment_ids",  # comment this line for mpnet
+        ]
+        for k in batch:
+            if k in VALID_INPUT:
+                # TODO: if type is int32
+                if onnx_training:
+                    ret[k] = batch[k].long()
+                if not onnx_training:
+                    ret[k] = batch[k].cpu().detach().numpy().astype(int)
+        if not onnx_training:
+            if batch_size:
+                print("we should split batch here but it's not implemented") # TODO
+        return ret
 
     @staticmethod
     def _load_metadata(

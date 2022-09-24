@@ -1,21 +1,24 @@
 from autogluon.multimodal import MultiModalPredictor
 
+import argparse
 import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
+from datasets import load_dataset
 from torch import tensor
 
-NUMPY_INPUT = [
-    "hf_text_text_token_ids_column_sentence1",
-]
 
-
-VALID_INPUT = [
-    #"hf_text_text_token_ids_column_sentence1",
+VALID_HF_INPUT = [
     "hf_text_text_token_ids",
     "hf_text_text_valid_length",
     "hf_text_text_segment_ids",
+]
+
+VALID_ONNX_INPUT = [
+    "hf_text_text_token_ids",
+    "hf_text_text_valid_length",
+    "hf_text_text_segment_ids",  # comment this line for mpnet
 ]
 
 
@@ -26,18 +29,15 @@ def get_hf_model(predictor, device="cpu"):
     return model
 
 
-def export_to_onnx(model, batch, onnx_path="dummy.onnx", verbose=False):
+def export_to_onnx(model, batch=None, onnx_path="dummy.onnx", verbose=False):
     torch.onnx.export(
         model,
         batch,
         onnx_path,
         opset_version=13,
         verbose=verbose,
-        input_names=VALID_INPUT,
+        input_names=VALID_ONNX_INPUT,
         dynamic_axes={
-            #"hf_text_text_token_ids_column_sentence1": {
-            #    0: "batch_size",
-            #},
             "hf_text_text_token_ids": {
                 0: "batch_size",
                 1: "sentence_length",
@@ -88,15 +88,12 @@ def get_hf_batch(
     valid_input=None,
 ):
     if valid_input is None:
-        valid_input = VALID_INPUT
+        valid_input = VALID_HF_INPUT
 
     hf_batch = {}
     for k in raw_batch:
         if k in valid_input:
-            if k in NUMPY_INPUT:
-                hf_batch[k] = raw_batch[k].cpu().detach().numpy().tolist()
-            else:
-                hf_batch[k] = raw_batch[k].to(device).long()
+            hf_batch[k] = raw_batch[k].to(device).long()
     return hf_batch
 
 
@@ -105,7 +102,7 @@ def get_onnx_batch(
     valid_input=None,
 ):
     if valid_input is None:
-        valid_input = VALID_INPUT
+        valid_input = VALID_ONNX_INPUT
 
     onnx_batch = {}
     for k in raw_batch:
@@ -115,47 +112,53 @@ def get_onnx_batch(
 
 
 def main(
+    data,
     train_batch,
     test_batches,
-    device="cpu",
-    verbose=False,
-    valid_input=None,
-    onnx_path="dummy.onnx",
-    print_embedding=False,
+    args,
+    valid_hf_input=None,
+    valid_onnx_input=None,
 ):
-    predictor = MultiModalPredictor(pipeline="feature_extraction")
-    model = get_hf_model(predictor, device=device)
+    predictor = MultiModalPredictor(
+        pipeline="feature_extraction",
+        hyperparameters={
+            "model.hf_text.checkpoint_name": args.checkpoint_name,
+        },
+    )
+    model = get_hf_model(predictor, device=args.device)
 
     hf_train_batch = get_hf_batch(
         train_batch,
-        device=device,
-        valid_input=valid_input,
+        device=args.device,
+        valid_input=valid_hf_input,
     )
     onnx_train_batch = get_onnx_batch(
         train_batch,
-        valid_input=valid_input,
+        valid_input=valid_onnx_input,
     )
 
-    predictor.export_onnx(batch=hf_train_batch, verbose=verbose, onnx_path=onnx_path)
-    #export_to_onnx(model, hf_train_batch, verbose=verbose, onnx_path=onnx_path)
+    predictor.export_onnx(data=data, batch=hf_train_batch, verbose=args.verbose, onnx_path=args.onnx_path)
+    # export_to_onnx(model, hf_train_batch, verbose=verbose, onnx_path=onnx_path)
 
-    ort_sess = ort.InferenceSession(onnx_path, providers=["CUDAExecutionProvider"])
+    load_onnx(args.onnx_path, True)
+
+    ort_sess = ort.InferenceSession(args.onnx_path, providers=["CUDAExecutionProvider"])
 
     print("TRAIN batch result comparison:")
-    compare_result(hf_train_batch, onnx_train_batch, model, ort_sess, print_embedding=print_embedding)
+    compare_result(hf_train_batch, onnx_train_batch, model, ort_sess, print_embedding=args.print_embedding)
 
     print("TEST batch result comparison:")
     for test_batch in test_batches:
         hf_test_batch = get_hf_batch(
             test_batch,
-            device=device,
-            valid_input=valid_input,
+            device=args.device,
+            valid_input=valid_hf_input,
         )
         onnx_test_batch = get_onnx_batch(
             test_batch,
-            valid_input=valid_input,
+            valid_input=valid_onnx_input,
         )
-        compare_result(hf_test_batch, onnx_test_batch, model, ort_sess, print_embedding=print_embedding)
+        compare_result(hf_test_batch, onnx_test_batch, model, ort_sess, print_embedding=args.print_embedding)
 
 
 if __name__ == "__main__":
@@ -265,18 +268,27 @@ if __name__ == "__main__":
         },
     ]
 
-    device = "cpu"
-    verbose = False
-    valid_input = VALID_INPUT
-    onnx_path = "dummy.onnx"
-    print_embedding = False
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--checkpoint_name", default="sentence-transformers/msmarco-MiniLM-L-12-v3", type=str)
+    parser.add_argument("--onnx_path", default=None, type=str)
+    parser.add_argument("--device", default="cpu", type=str)
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--print_embedding", action="store_true")
+    args = parser.parse_args()
+
+    if not args.onnx_path:
+        args.onnx_path = args.checkpoint_name.replace("/", "_") + ".onnx"
+
+    valid_hf_input = VALID_HF_INPUT
+    valid_onnx_input = VALID_ONNX_INPUT
+
+    data = load_dataset("wietsedv/stsbenchmark", split="test").to_pandas()
 
     main(
+        data,
         train_batch,
         test_batches,
-        device=device,
-        verbose=verbose,
-        valid_input=valid_input,
-        onnx_path=onnx_path,
-        print_embedding=print_embedding,
+        args,
+        valid_hf_input=valid_hf_input,
+        valid_onnx_input=valid_onnx_input,
     )
