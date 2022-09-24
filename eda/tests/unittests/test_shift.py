@@ -5,12 +5,13 @@ import autogluon.eda.auto as auto
 import autogluon.eda.visualization as viz
 
 S3_URL = 'https://autogluon.s3.us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/'
+SAMPLE_SIZE = 200
 
 def load_adult_data():
     train_data = S3_URL + 'train_data.csv'
     test_data = S3_URL + 'test_data.csv'
-    train = pd.read_csv(train_data)
-    test = pd.read_csv(test_data)
+    train = pd.read_csv(train_data).sample(SAMPLE_SIZE)
+    test = pd.read_csv(test_data).sample(SAMPLE_SIZE)
     data = (train, test)
     return data
 
@@ -48,11 +49,11 @@ def test_shift_analysis():
         classifier_kwargs={'path': 'AutogluonModels'}
     )
     shft_ana = eda.shift.XShiftDetector(**analysis_args)
-    shft_ana.fit()
+    shft_ana.fit(hyperparameters={'XGB': {}})
     res = shft_ana.state.xshift_results
     assert all(res[k] is not None for k in ['detection_status', 'pvalue', 'pvalue_threshold', 'eval_metric',
                                   'feature_importance'])
-    assert res['detection_status'] == 'not_detected'
+    assert res['detection_status'] == False
 
 def test_shift_auto():
     train, test = load_adult_data()
