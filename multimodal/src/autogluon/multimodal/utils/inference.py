@@ -9,42 +9,9 @@ from torch.nn.modules.loss import _Loss
 
 from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, PROBABILITY
 from .environment import compute_num_gpus, infer_precision, move_to_device
+from .misc import tensor_to_ndarray
 
 logger = logging.getLogger(AUTOMM)
-
-
-def logits_to_prob(logits: np.ndarray):
-    """
-    Convert logits to probabilities.
-
-    Parameters
-    ----------
-    logits
-        The logits output of a classification head.
-
-    Returns
-    -------
-    Probabilities.
-    """
-    assert logits.ndim == 2
-    prob = softmax(logits, axis=1)
-    return prob
-
-
-def tensor_to_ndarray(tensor: torch.Tensor):
-    """
-    Convert Pytorch tensor to numpy array.
-
-    Parameters
-    ----------
-    tensor
-        A Pytorch tensor.
-
-    Returns
-    -------
-    A ndarray.
-    """
-    return tensor.detach().cpu().float().numpy()
 
 
 def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional[bool] = True):

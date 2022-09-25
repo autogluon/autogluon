@@ -6,20 +6,26 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from ..constants import (
+    ALL_MODALITIES,
     AUTOMM,
+    CATEGORICAL,
     CATEGORICAL_MLP,
     CATEGORICAL_TRANSFORMER,
     CLIP,
     FUSION_MLP,
     FUSION_TRANSFORMER,
     HF_TEXT,
+    IMAGE,
     MMDET_IMAGE,
     MMOCR_TEXT_DET,
+    NUMERICAL,
     NUMERICAL_MLP,
     NUMERICAL_TRANSFORMER,
     T_FEW,
+    TEXT,
     TIMM_IMAGE,
 )
+from ..data import MultiModalFeaturePreprocessor
 from ..models import (
     CategoricalMLP,
     CategoricalTransformer,
@@ -37,6 +43,83 @@ from ..models import (
 from ..models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
 
 logger = logging.getLogger(AUTOMM)
+
+
+def select_model(
+    config: DictConfig,
+    df_preprocessor: MultiModalFeaturePreprocessor,
+):
+    """
+    Filter model config through the detected modalities in the training data.
+    If MultiModalFeaturePreprocessor can't detect some modality,
+    this function will remove the models that use this modality. This function is to
+    maximize the user flexibility in defining the config.
+    For example, if one uses the "fusion_mlp_image_text_tabular" as the model config template
+    but the training data don't have images, this function will filter out all the models
+    using images, such as Swin Transformer and CLIP.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model"
+    df_preprocessor
+        A MultiModalFeaturePreprocessor object, which has called .fit() on the training data.
+        Column names of the same modality are grouped into one list. If a modality's list is empty,
+        it means the training data don't have this modality.
+
+    Returns
+    -------
+    Config with some unused models removed.
+    """
+    data_status = {}
+    for per_modality in ALL_MODALITIES:
+        data_status[per_modality] = False
+    if len(df_preprocessor.image_path_names) > 0:
+        data_status[IMAGE] = True
+    if len(df_preprocessor.text_feature_names) > 0:
+        data_status[TEXT] = True
+    if len(df_preprocessor.categorical_feature_names) > 0:
+        data_status[CATEGORICAL] = True
+    if len(df_preprocessor.numerical_feature_names) > 0:
+        data_status[NUMERICAL] = True
+
+    names = config.model.names
+    if isinstance(names, str):
+        names = [names]
+    selected_model_names = []
+    fusion_model_name = []
+    for model_name in names:
+        model_config = getattr(config.model, model_name)
+        if not model_config.data_types:
+            fusion_model_name.append(model_name)
+            continue
+        model_data_status = [data_status[d_type] for d_type in model_config.data_types]
+        if all(model_data_status):
+            selected_model_names.append(model_name)
+        else:
+            delattr(config.model, model_name)
+
+    if len(selected_model_names) == 0:
+        raise ValueError("No model is available for this dataset.")
+    # only allow no more than 1 fusion model
+    if len(fusion_model_name) > 1:
+        raise ValueError(f"More than one fusion models `{fusion_model_name}` are detected, but only one is allowed.")
+
+    if len(selected_model_names) > 1:
+        assert len(fusion_model_name) == 1
+        selected_model_names.extend(fusion_model_name)
+    elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+        # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
+        if selected_model_names[0].lower().startswith((CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER)):
+            selected_model_names.extend(fusion_model_name)
+        else:
+            # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
+            delattr(config.model, fusion_model_name[0])
+
+    config.model.names = selected_model_names
+    logger.debug(f"selected models: {selected_model_names}")
+
+    return config
 
 
 def create_model(
