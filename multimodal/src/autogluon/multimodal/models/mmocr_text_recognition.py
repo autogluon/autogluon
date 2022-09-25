@@ -5,7 +5,10 @@ try:
     from mmcv.parallel import scatter
 except ImportError:
     mmcv = None
-from mmocr.utils.model import revert_sync_batchnorm
+try:
+    from mmocr.utils.model import revert_sync_batchnorm
+except ImportError:
+    mmocr = None
 from torch import nn
 
 from ..constants import (
