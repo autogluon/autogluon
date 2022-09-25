@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -9,37 +8,9 @@ import numpy as np
 import pandas as pd
 
 from ..constants import AUTOMM
+from .download import download, is_url
 
 logger = logging.getLogger(AUTOMM)
-
-
-_URL_REGEX = re.compile(
-    r"^(?:http|ftp)s?://"  # http:// or https://
-    r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"  # domain...
-    r"localhost|"  # localhost...
-    r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # ...or ip
-    r"(?::\d+)?"  # optional port
-    r"(?:/?|[/?]\S+)$",
-    re.IGNORECASE,
-)
-
-
-def is_url(url_like: str):
-    """
-    Check if a path is url or local.
-
-    Parameters
-    ----------
-    url_like
-        A provided path.
-
-    Returns
-    -------
-    A boolean indicate if the path is an url.
-    """
-    if not isinstance(url_like, str):
-        return False
-    return re.match(_URL_REGEX, url_like) is not None
 
 
 def from_voc(
