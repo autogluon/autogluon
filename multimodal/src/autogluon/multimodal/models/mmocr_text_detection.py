@@ -1,7 +1,10 @@
 import logging
 from typing import Optional
 
-from mmcv.parallel import scatter
+try:
+    from mmcv.parallel import scatter
+except ImportError:
+    mmcv = None
 from mmocr.utils.model import revert_sync_batchnorm
 from torch import nn
 
