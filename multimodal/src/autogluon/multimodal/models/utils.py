@@ -3,8 +3,10 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import nn
+from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
+from ..constants import LOGITS, REGRESSION
 from .adaptation_layers import IA3Linear, LoRALinear
 
 
@@ -543,3 +545,44 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
         model = AutoModel.from_config(config)
 
     return config, model
+
+
+def custom_sigmoid(output: Dict):
+    """
+    Apply the sigmoid to logits.
+
+    Parameters
+    ----------
+    output
+        The model output dict.
+
+    Returns
+    -------
+    The output with logits transformed by sigmoid.
+    """
+    for k, v in output.items():
+        output[k][LOGITS] = torch.sigmoid(v[LOGITS].float())
+    return output
+
+
+def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
+    """
+    Get the postprocessing function for the model outputs.
+
+    Parameters
+    ----------
+    problem_type
+        The problem type, e.g., classification or regression.
+    loss_func
+        The loss function used in training.
+
+    Returns
+    -------
+    The postprocessing function.
+    """
+    postprocess_func = None
+    if problem_type == REGRESSION:
+        if isinstance(loss_func, nn.BCEWithLogitsLoss):
+            postprocess_func = custom_sigmoid
+
+    return postprocess_func

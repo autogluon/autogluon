@@ -12,7 +12,7 @@ import uuid
 import warnings
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import boto3
 import defusedxml.ElementTree as ET
@@ -2784,7 +2784,9 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
         )
 
 
-def infer_batch(batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, loss_func: _Loss):
+def infer_batch(
+    batch: Dict, model: nn.Module, precision: Union[str, int], num_gpus: int, model_postprocess_fn: Callable
+):
     """
     Perform inference for a batch.
 
@@ -2814,8 +2816,8 @@ def infer_batch(batch: Dict, model: nn.Module, precision: Union[str, int], num_g
     batch = move_to_device(batch, device=device)
     with torch.autocast(device_type=device_type, dtype=precision):
         with torch.no_grad():
-            output = model(batch)[model.prefix]
-            if isinstance(loss_func, nn.BCEWithLogitsLoss):
-                output[LOGITS] = torch.sigmoid(output[LOGITS].float())
+            output = model(batch)
+            if model_postprocess_fn:
+                output = model_postprocess_fn(output)
 
-    return output
+    return output[model.prefix]
