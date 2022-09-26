@@ -23,8 +23,13 @@ def eval(predictor, df, onnx_session=None):
         QEmb = predictor.extract_embedding(df[["sentence1"]])["sentence1"]
         AEmb = predictor.extract_embedding(df[["sentence2"]])["sentence2"]
     else:
-        QEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence1"]]))[0]
-        AEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence2"]]))[0]
+        valid_input = [
+            "hf_text_text_token_ids",
+            "hf_text_text_valid_length",
+            "hf_text_text_segment_ids",
+        ]
+        QEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence1"]], valid_input=valid_input))[0]
+        AEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence2"]], valid_input=valid_input))[0]
 
     cosine_scores = 1 - (paired_cosine_distances(QEmb, AEmb))
     eval_pearson_cosine, _ = pearsonr(labels, cosine_scores)

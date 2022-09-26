@@ -1994,7 +1994,7 @@ class MultiModalPredictor:
         opset_version: Optional[int] = 13,
     ):
         # TODO: Support CLIP
-        # TODO: Remove Input Column Name Hardcode
+        # TODO: Move valid_input and dynamic_axes to util, infered by pipeline
 
         if self._pipeline not in [FEATURE_EXTRACTION]:
             raise ValueError(f"ONNX export is not supported in current pipeline {self._pipeline}")
@@ -2008,8 +2008,29 @@ class MultiModalPredictor:
         model = self._model
         model.eval()
 
+        valid_input = [
+            "hf_text_text_token_ids",
+            "hf_text_text_valid_length",
+            "hf_text_text_segment_ids",
+        ]
+        dynamic_axes = {
+            "hf_text_text_token_ids": {
+                0: "batch_size",
+                1: "sentence_length",
+            },
+            "hf_text_text_valid_length": {
+                0: "batch_size",
+            },
+            "hf_text_text_segment_ids": {
+                0: "batch_size",
+                1: "sentence_length",
+            },
+        }
+
         if data is not None:
-            batch = self.get_processed_batch(data=data, batch_size=2, onnx_training=True)  # TODO: remove hardcode
+            batch = self.get_processed_batch(
+                data=data, valid_input=valid_input, batch_size=2, onnx_training=True
+            )  # TODO: remove hardcode
         elif not batch:
             # batch = get_onnx_batch(self._pipeline)
             raise NotImplementedError("need to input batch manually")
@@ -2020,27 +2041,17 @@ class MultiModalPredictor:
             onnx_path,
             opset_version=opset_version,
             verbose=verbose,
-            input_names=[
-                "hf_text_text_token_ids",
-                "hf_text_text_valid_length",
-                "hf_text_text_segment_ids",
-            ],
-            dynamic_axes={
-                "hf_text_text_token_ids": {
-                    0: "batch_size",
-                    1: "sentence_length",
-                },
-                "hf_text_text_valid_length": {
-                    0: "batch_size",
-                },
-                "hf_text_text_segment_ids": {
-                    0: "batch_size",
-                    1: "sentence_length",
-                },
-            },
+            input_names=valid_input,
+            dynamic_axes=dynamic_axes,
         )
 
-    def get_processed_batch(self, data: Union[pd.DataFrame, dict, list], batch_size: int = None, onnx_training: bool = False):
+    def get_processed_batch(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        valid_input: Optional[list] = None,
+        batch_size: int = None,
+        onnx_training: bool = False,
+    ):
         # TODO: add support for data = dict or list
         if onnx_training:
             if batch_size:
@@ -2070,21 +2081,17 @@ class MultiModalPredictor:
         batch = collate_fn(processed_features)
 
         ret = {}
-        VALID_INPUT = [
-            "hf_text_text_token_ids",
-            "hf_text_text_valid_length",
-            "hf_text_text_segment_ids",  # comment this line for mpnet
-        ]
         for k in batch:
-            if k in VALID_INPUT:
-                # TODO: if type is int32
-                if onnx_training:
+            if valid_input and k not in valid_input:
+                continue
+            if onnx_training:
+                if batch[k].type == torch.int32:
                     ret[k] = batch[k].long()
-                if not onnx_training:
-                    ret[k] = batch[k].cpu().detach().numpy().astype(int)
+            if not onnx_training:
+                ret[k] = batch[k].cpu().detach().numpy().astype(int)
         if not onnx_training:
             if batch_size:
-                print("we should split batch here but it's not implemented") # TODO
+                raise NotImplementedError("We should split the batch here.")  # TODO
         return ret
 
     @staticmethod
