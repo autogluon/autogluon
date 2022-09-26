@@ -547,7 +547,7 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
     return config, model
 
 
-def custom_sigmoid(output: Dict):
+def apply_sigmoid(output: Dict):
     """
     Apply the sigmoid to logits.
 
@@ -583,6 +583,6 @@ def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
     postprocess_func = None
     if problem_type == REGRESSION:
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
-            postprocess_func = custom_sigmoid
+            postprocess_func = apply_sigmoid
 
     return postprocess_func
