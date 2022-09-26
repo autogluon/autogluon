@@ -1989,15 +1989,21 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list] = None,
         batch: Optional[dict] = None,
+        batch_size: Optional[int] = None,
         onnx_path: Optional[str] = None,
         verbose: Optional[bool] = True,
         opset_version: Optional[int] = 13,
     ):
         # TODO: Support CLIP
         # TODO: Move valid_input and dynamic_axes to util, infered by pipeline
+        # TODO: Move things to refactored util
+        # TODO: Provide a default batch to export for each pipeline?
 
         if self._pipeline not in [FEATURE_EXTRACTION]:
             raise ValueError(f"ONNX export is not supported in current pipeline {self._pipeline}")
+
+        if not batch_size:
+            batch_size = 2  # batch_size should be a dynamic_axis so use a small value for faster export
 
         if onnx_path is None:
             if self._pipeline == FEATURE_EXTRACTION:
@@ -2029,11 +2035,12 @@ class MultiModalPredictor:
 
         if data is not None:
             batch = self.get_processed_batch(
-                data=data, valid_input=valid_input, batch_size=2, onnx_training=True
-            )  # TODO: remove hardcode
+                data=data, valid_input=valid_input, batch_size=batch_size, onnx_training=True
+            )
         elif not batch:
-            # batch = get_onnx_batch(self._pipeline)
-            raise NotImplementedError("need to input batch manually")
+            raise ValueError(
+                f"Do not have default batch to trace for current pipneline {self._pipeline}. Please provide raw data or processed batch as input."
+            )
 
         torch.onnx.export(
             model,
