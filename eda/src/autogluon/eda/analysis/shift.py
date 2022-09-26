@@ -2,7 +2,7 @@ from typing import Union, List, Any, Optional
 import warnings
 import pandas as pd
 import numpy as np
-from autogluon.core.metrics import balanced_accuracy, BINARY_METRICS
+from autogluon.core.metrics import balanced_accuracy, BINARY_METRICS, roc_auc
 from autogluon.core.constants import BINARY
 from autogluon.core.utils import generate_train_test_split
 from autogluon.tabular import TabularPredictor
@@ -49,18 +49,19 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
                  classifier_class: Any = TabularPredictor,
                  compute_fi: bool = True,
                  pvalue_thresh: float = 0.01,
-                 eval_metric: str = 'balanced_accuracy',
+                 eval_metric: str = 'roc_auc',
                  sample_label: str = 'i2vkyc0p64',
-                 classifier_kwargs: dict = {},
+                 classifier_kwargs: dict = None,
                  num_permutations: int = 1000,
                  parent: Union[None,AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
+        if classifier_kwargs is None:
+            classifier_kwargs = {}
         self.classifier_kwargs = classifier_kwargs
         self.classifier_class = classifier_class
         self.compute_fi = compute_fi
-
         named_metrics = BINARY_METRICS
         assert eval_metric in named_metrics.keys(), \
             'eval_metric must be one of [' + ', '.join(named_metrics.keys()) + ']'
@@ -145,10 +146,10 @@ class Classifier2ST:
     def __init__(self,
                  classifier_class,
                  sample_label='xshift_label',
-                 eval_metric=balanced_accuracy,
+                 eval_metric=roc_auc,
                  split=0.5,
-                 compute_fi = True,
-                 classifier_kwargs = {},
+                 compute_fi=True,
+                 classifier_kwargs={},
                  ):
         classifier_kwargs.update({'label': sample_label, 'eval_metric': eval_metric})
         self.classifier = classifier_class(**classifier_kwargs)
@@ -192,12 +193,12 @@ class Classifier2ST:
         if data.index.has_duplicates:
             data = data.reset_index(drop=True)
         train, test, y_train, y_test = generate_train_test_split(data.drop(columns=[self.sample_label]),
-                                                data[self.sample_label],
-                                                BINARY)
+                                                                 data[self.sample_label],
+                                                                 BINARY)
         train[self.sample_label] = y_train
         test[self.sample_label] = y_test
         self.classifier.fit(train, **kwargs)
-        yhat = self.classifier.predict(test)
+        yhat = self.classifier.predict_proba(test)[1]
         self.test_stat = self.eval_metric(test[self.sample_label], yhat)
         self.has_fi = (getattr(self.classifier, "feature_importance", None) is not None)
         if self.has_fi and self.compute_fi:
@@ -211,7 +212,7 @@ class Classifier2ST:
         See Section 9.2 of https://arxiv.org/pdf/1602.02210.pdf
         """
         perm_stats = [self.test_stat]
-        yhat = self.classifier.predict(self._test)
+        yhat = self.classifier.predict_proba(self._test)[1]
         for i in range(num_permutations):
             perm_yhat = np.random.permutation(yhat)
             perm_test_stat = self.eval_metric(

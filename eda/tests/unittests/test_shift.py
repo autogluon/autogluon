@@ -49,7 +49,7 @@ class TestShift(unittest.TestCase):
         shft_ana.fit(hyperparameters={'XGB': {}})
         res = shft_ana.state.xshift_results
         assert all(res[k] is not None for k in ['detection_status', 'pvalue', 'pvalue_threshold', 'eval_metric',
-                                      'feature_importance'])
+                                                'feature_importance'])
         assert res['detection_status'] == False
 
     def test_shift_auto(self):
