@@ -11,8 +11,8 @@ SAMPLE_SIZE = 200
 def load_adult_data():
     train_data = S3_URL + 'train_data.csv'
     test_data = S3_URL + 'test_data.csv'
-    train = pd.read_csv(train_data).sample(SAMPLE_SIZE)
-    test = pd.read_csv(test_data).sample(SAMPLE_SIZE)
+    train = pd.read_csv(train_data).sample(SAMPLE_SIZE, random_state = 0)
+    test = pd.read_csv(test_data).sample(SAMPLE_SIZE, random_state = 0)
     data = (train, test)
     return data
 
