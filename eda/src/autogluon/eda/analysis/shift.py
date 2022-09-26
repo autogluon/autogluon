@@ -1,5 +1,5 @@
 from typing import Union, List, Any, Optional
-import warnings
+import copy
 import pandas as pd
 import numpy as np
 from autogluon.core.metrics import balanced_accuracy, BINARY_METRICS, roc_auc
@@ -33,6 +33,8 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         The kwargs passed to the classifier, a member of classifier_class
     num_permutations: int, default = 1000
         The number of permutations used for any permutation based method
+    test_size_2st: float, default = 0.3
+        The size of the test set in the training test split in 2ST
 
     State attributes
     ----------------
@@ -53,6 +55,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
                  sample_label: str = 'i2vkyc0p64',
                  classifier_kwargs: dict = None,
                  num_permutations: int = 1000,
+                 test_size_2st: float = 0.3,
                  parent: Union[None,AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
@@ -69,8 +72,9 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         self.C2ST = Classifier2ST(classifier_class,
                                   sample_label=sample_label,
                                   eval_metric=self.eval_metric,
-                                  compute_fi = compute_fi,
-                                  classifier_kwargs=classifier_kwargs)
+                                  compute_fi=compute_fi,
+                                  classifier_kwargs=classifier_kwargs,
+                                  test_size_2st=test_size_2st)
         self.fi_scores = None
         self.compute_fi = compute_fi
         self.pvalue_thresh = pvalue_thresh
@@ -86,7 +90,6 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         - 'label': str, optional
             The Y variable that is to be predicted (if it appears in the train/test data then it will be removed)
         """
-        self.can_handle(state, args)
         X = args['train_data'].copy()
         X_test = args['test_data'].copy()
         assert self.C2ST.sample_label not in X.columns, \
@@ -142,6 +145,8 @@ class Classifier2ST:
         Training/test split proportion for classifier 2 sample test
     classifier_kwargs : dict, default = {}
         The kwargs passed to the classifier, a member of classifier_class
+    test_size_2st: float, default = 0.3
+        The size of the test set in the training test split in 2ST
     """
     def __init__(self,
                  classifier_class,
@@ -150,7 +155,9 @@ class Classifier2ST:
                  split=0.5,
                  compute_fi=True,
                  classifier_kwargs={},
+                 test_size_2st=0.3,
                  ):
+        classifier_kwargs = copy.deepcopy(classifier_kwargs)
         classifier_kwargs.update({'label': sample_label, 'eval_metric': eval_metric})
         self.classifier = classifier_class(**classifier_kwargs)
         self.classifier_class = classifier_class
@@ -162,6 +169,7 @@ class Classifier2ST:
         self.test_stat = None
         self.has_fi = None
         self.compute_fi = compute_fi
+        self.test_size_2st = test_size_2st
 
     @staticmethod
     def _make_source_target_label(data, sample_label):
@@ -194,7 +202,8 @@ class Classifier2ST:
             data = data.reset_index(drop=True)
         train, test, y_train, y_test = generate_train_test_split(data.drop(columns=[self.sample_label]),
                                                                  data[self.sample_label],
-                                                                 BINARY)
+                                                                 BINARY,
+                                                                 test_size=self.test_size_2st)
         train[self.sample_label] = y_train
         test[self.sample_label] = y_test
         self.classifier.fit(train, **kwargs)
