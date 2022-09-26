@@ -1,6 +1,7 @@
 import logging
 import pprint
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
@@ -20,6 +21,8 @@ from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindo
 from .trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
+
+DEPRECATED_PRESETS = ["high_quality", "good_quality"]
 
 
 class TimeSeriesPredictor:
@@ -275,8 +278,6 @@ class TimeSeriesPredictor:
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
-        if presets is not None:
-            logger.info(f"presets is set to {presets}")
 
         fit_args = dict(
             prediction_length=self.prediction_length,
@@ -291,6 +292,13 @@ class TimeSeriesPredictor:
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
+            if presets in DEPRECATED_PRESETS:
+                warnings.warn(
+                    f"Presets {presets} are deprecated as of version 0.6.0. Please see the documentation for "
+                    "TimeSeriesPredictor.fit for the list of available presets. "
+                    "Falling back to presets='medium_quality'."
+                )
+                presets = "medium_quality"
             logger.info(f"Setting presets to: {presets}")
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")
