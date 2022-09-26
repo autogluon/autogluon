@@ -19,6 +19,7 @@ FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
 OCR_TEXT_DETECTION = "ocr_text_detection"
+OCR_TEXT_RECOGNITION = "ocr_text_recognition"
 
 # Input keys
 IMAGE = "image"
@@ -44,7 +45,7 @@ PROBABILITY = "probability"
 COLUMN_FEATURES = "column_features"
 BBOX = "bbox"
 ROIS = "rois"
-
+SCORE = "score"
 
 # Metric
 MAX = "max"
@@ -149,6 +150,7 @@ FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
+MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP)
 
 # metric learning loss type

@@ -51,7 +51,9 @@ from ..constants import (
     IMAGE,
     IMAGE_VALID_NUM,
     MMDET_IMAGE,
+    MMOCR,
     MMOCR_TEXT_DET,
+    MMOCR_TEXT_RECOG,
     TIMM_IMAGE,
 )
 from .collator import Pad, Stack
@@ -156,7 +158,7 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
             if self.prefix == MMDET_IMAGE:
                 assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
             else:
@@ -202,7 +204,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
@@ -269,6 +271,19 @@ class ImageProcessor:
             image_size = config.data.test.pipeline[1]["img_scale"][0]
             mean = config.data.test.pipeline[1]["transforms"][1]["mean"]
             std = config.data.test.pipeline[1]["transforms"][1]["std"]
+        elif self.prefix.lower().startswith(MMOCR_TEXT_RECOG):
+            tmp_config_dict = {}
+            for d in config.data.test.pipeline:
+                for k, v in d.items():
+                    tmp_config_dict[k] = v
+            if "transforms" in tmp_config_dict:
+                image_size = tmp_config_dict["transforms"][0]["min_width"]
+                mean = tmp_config_dict["transforms"][2]["mean"]
+                std = tmp_config_dict["transforms"][2]["std"]
+            else:
+                image_size = tmp_config_dict["min_width"]
+                mean = tmp_config_dict["mean"]
+                std = tmp_config_dict["std"]
         elif self.prefix.lower().startswith(TIMM_IMAGE):
             image_size = config["input_size"][-1]
             mean = config["mean"]
@@ -388,7 +403,7 @@ class ImageProcessor:
         column_start = 0
         for per_col_name, per_col_image_paths in image_paths.items():
             for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+                if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
                     data = dict(img_info=dict(filename=img_path), img_prefix=None)
                     images.append(self.val_processor(data))
                 else:
@@ -426,7 +441,7 @@ class ImageProcessor:
                     [column_start, len(images)], dtype=np.int64
                 )
                 column_start = len(images)
-        if self.prefix == MMDET_IMAGE or self.prefix == MMOCR_TEXT_DET:
+        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
             ret.update({self.image_key: images[0]})
         else:
             ret.update(
