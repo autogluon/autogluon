@@ -230,7 +230,7 @@ class TimeSeriesPredictor:
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
-            Available presets are "best_quality", "high_quality", "good_quality", "medium_quality", and "low_quality".
+            Available presets are "best_quality", "medium_quality", and "low_quality".
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
             ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).
@@ -238,7 +238,7 @@ class TimeSeriesPredictor:
             Determines the hyperparameters used by each model.
 
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
-            "toy", or "toy_hpo", where "toy" settings correspond to models only intended for prototyping.
+            or "toy". The "toy" setting is only intended for prototyping.
 
             If dict is provided, the keys are strings or Types that indicate which model types to train. In this case,
             the predictor will only train the given model types. Stable model options include: "DeepAR", "MQCNN", and
