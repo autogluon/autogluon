@@ -100,6 +100,7 @@ from .utils import (
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
+    get_onnx_input,
     getCOCOCatIDs,
     infer_batch,
     infer_dtypes_by_model_names,
@@ -2014,52 +2015,26 @@ class MultiModalPredictor:
         opset_version: Optional[int] = 13,
     ):
         # TODO: Support CLIP
-        # TODO: Move valid_input and dynamic_axes to util, infered by pipeline
-        # TODO: Move things to refactored util
-        # TODO: Provide a default batch to export for each pipeline?
+        # TODO: Add test
 
-        if self._pipeline not in [FEATURE_EXTRACTION]:
-            raise ValueError(f"ONNX export is not supported in current pipeline {self._pipeline}")
-
-        if not batch_size:
-            batch_size = 2  # batch_size should be a dynamic_axis so use a small value for faster export
-
-        if onnx_path is None:
-            if self._pipeline == FEATURE_EXTRACTION:
-                onnx_path = self._config["model.hf_text.checkpoint_name"].replace("/", "_") + ".onnx"
-            else:
-                onnx_path = "exported_from_autogluon.onnx"
+        valid_input, dynamic_axes, default_onnx_path, default_batch = get_onnx_input(pipeline=self._pipeline, config=self._config)
+        if not onnx_path:
+            onnx_path = default_onnx_path
 
         model = self._model
         model.eval()
-
-        valid_input = [
-            "hf_text_text_token_ids",
-            "hf_text_text_valid_length",
-            "hf_text_text_segment_ids",
-        ]
-        dynamic_axes = {
-            "hf_text_text_token_ids": {
-                0: "batch_size",
-                1: "sentence_length",
-            },
-            "hf_text_text_valid_length": {
-                0: "batch_size",
-            },
-            "hf_text_text_segment_ids": {
-                0: "batch_size",
-                1: "sentence_length",
-            },
-        }
+        if not batch_size:
+            batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
 
         if data is not None:
             batch = self.get_processed_batch(
                 data=data, valid_input=valid_input, batch_size=batch_size, onnx_training=True
             )
         elif not batch:
-            raise ValueError(
-                f"Do not have default batch to trace for current pipneline {self._pipeline}. Please provide raw data or processed batch as input."
-            )
+            if not default_batch:
+                raise ValueError(
+                    f"Do not have default batch to trace for current pipneline {self._pipeline}. Please provide raw data or processed batch as input."
+                )
 
         torch.onnx.export(
             model,
@@ -2073,10 +2048,11 @@ class MultiModalPredictor:
 
     def get_processed_batch(
         self,
-        data: Union[pd.DataFrame, dict, list],
+        data: Union[pd.DataFrame],
         valid_input: Optional[list] = None,
         batch_size: int = None,
         onnx_training: bool = False,
+        to_numpy: bool = True,
     ):
         # TODO: add support for data = dict or list
         if onnx_training:
@@ -2111,9 +2087,8 @@ class MultiModalPredictor:
             if valid_input and k not in valid_input:
                 continue
             if onnx_training:
-                if batch[k].type == torch.int32:
-                    ret[k] = batch[k].long()
-            if not onnx_training:
+                ret[k] = batch[k].long() if isinstance(batch[k], torch.IntTensor) else batch[k]
+            elif to_numpy:
                 ret[k] = batch[k].cpu().detach().numpy().astype(int)
         if not onnx_training:
             if batch_size:

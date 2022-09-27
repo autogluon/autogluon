@@ -31,3 +31,4 @@ from .model import create_fusion_model, create_model, modify_duplicate_model_nam
 from .object_detection import bbox_xyxy_to_xywh, from_coco, getCOCOCatIDs
 from .pipeline import init_pretrained
 from .save import process_save_path, save_pretrained_model_configs, save_text_tokenizers
+from .onnx import get_onnx_input
