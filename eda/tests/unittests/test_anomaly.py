@@ -5,7 +5,8 @@ from autogluon.eda.analysis import AnomalyDetector
 s3_url = 'https://autogluon.s3.us-west-2.amazonaws.com/datasets/ano_test_hep.csv'
 
 def load_data():
-    A = pd.read_csv(s3_url)
+    A = pd.read_csv(s3_url, index_col=0)
+    A.loc[30:50, 'cat'] = 'dog'
     train_data, test_data = A[:40], A[40:]
     return train_data, test_data
 

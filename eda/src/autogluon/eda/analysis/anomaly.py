@@ -1,4 +1,7 @@
 from typing import Union, List, Callable
+
+import pandas as pd
+import shap
 from pyod.models import hbos, iforest
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from .. import AnalysisState
@@ -21,16 +24,19 @@ class AnomalyDetector(AbstractAnalysis):
 
     State attributes
     ---------------
-    state.test_ano_scores: 1D array
+    state.test_ano_scores: pd.Series
         The anomaly scores from the pyod anomaly detector
-    state.test_ano_pred: 1D array
+    state.test_ano_pred: pd.Series
         The anomaly predictions (1 = anomaly) from the pyod anomaly detector
+    state.test_shap_values: pd.DataFrame
+        The shap values for the anomaly detector applied to the test data
     """
 
     def __init__(self,
                  preset: str='high_quality',
                  OD_method: Callable=None,
                  OD_kwargs: dict={},
+                 n_sub_shap: int=40, #fix this!
                  parent: Union[None,AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
@@ -40,6 +46,7 @@ class AnomalyDetector(AbstractAnalysis):
         self.preset = preset
         self.OD_method = OD_method
         self.OD_kwargs = OD_kwargs
+        self.n_sub_shap = n_sub_shap
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         if self.OD_method is None:
@@ -57,5 +64,14 @@ class AnomalyDetector(AbstractAnalysis):
         train_trans = feature_generator.fit_transform(X=X_train)
         test_trans = feature_generator.transform(X_test)
         clf.fit(train_trans, **fit_kwargs)
-        state.test_ano_scores = clf.decision_function(test_trans)
-        state.test_ano_pred = clf.predict(test_trans)
+        state.test_ano_scores = pd.Series(clf.decision_function(test_trans.values),
+                                          index=test_trans.index)
+        state.test_ano_pred = pd.Series(clf.predict(test_trans.values),
+                                        index=test_trans.index)
+        test_sampler = shap.utils.sample(test_trans.values, self.n_sub_shap)
+        explainer = shap.Explainer(clf.decision_function, test_sampler)
+        shap_values = explainer(test_trans.values)
+        shap_val_df = pd.DataFrame(shap_values.values,
+                                   columns=test_trans.columns,
+                                   index=test_trans.index)
+        state.test_shap_values = shap_val_df
