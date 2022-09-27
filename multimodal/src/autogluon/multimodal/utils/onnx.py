@@ -1,13 +1,14 @@
 import logging
-from torch import tensor
 from typing import Dict, List, Optional, Tuple, Union
+
+from torch import tensor
 
 from ..constants import AUTOMM, FEATURE_EXTRACTION
 
 logger = logging.getLogger(AUTOMM)
 
 
-def get_onnx_input(pipeline: str, config: Optional[dict] = None):
+def get_onnx_input(pipeline: str, config: Optional[Dict] = None):
     """
     Get information for a predictor to export its model in onnx format.
 

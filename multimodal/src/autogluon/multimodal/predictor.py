@@ -2008,8 +2008,8 @@ class MultiModalPredictor:
     def export_onnx(
         self,
         onnx_path: Optional[str] = None,
-        data: Union[pd.DataFrame] = None,
-        batch: Optional[dict] = None,
+        data: Optional[pd.DataFrame] = None,
+        batch: Optional[Dict] = None,
         batch_size: Optional[int] = None,
         verbose: Optional[bool] = False,
         opset_version: Optional[int] = 13,
@@ -2071,8 +2071,8 @@ class MultiModalPredictor:
 
     def get_processed_batch(
         self,
-        data: Union[pd.DataFrame],
-        valid_input: Optional[list] = None,
+        data: pd.DataFrame,
+        valid_input: Optional[List] = None,
         onnx_tracing: bool = False,
         batch_size: int = None,
         to_numpy: bool = True,
