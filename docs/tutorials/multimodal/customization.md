@@ -501,6 +501,16 @@ predictor.fit(hyperparameters={"data.image.missing_value_strategy": "skip"})
 predictor.fit(hyperparameters={"data.image.missing_value_strategy": "zero"})
 ```
 
+### data.text.normalize_text
+Whether to normalize text with encoding problems. If True, TextProcessor will run through a series of encoding and decoding for text normalization. Please refer to the [Example](https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize) of Kaggle competition for applying text normalization.
+
+```
+# default used by AutoMM
+predictor.fit(hyperparameters={"data.text.normalize_text": False})
+# turn on text normalization
+predictor.fit(hyperparameters={"data.text.normalize_text": True})
+```
+
 ### data.categorical.convert_to_text
 
 Whether to treat categorical data as text. If True, no categorical models, e.g., `"categorical_mlp"` and `"categorical_transformer"`, would be used.

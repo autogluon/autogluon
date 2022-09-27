@@ -1,9 +1,11 @@
+import codecs
 import random
 from typing import Iterable, List, Tuple, Union
 
 import pandas as pd
 from nlpaug import Augmenter
 from nlpaug.util import Method
+from text_unidecode import unidecode
 
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
@@ -212,3 +214,29 @@ def apply_data_processor(modality_features: dict, data_processors: dict, idx: in
                 )
 
     return sample_features
+
+
+def register_encoding_decoding_error_handlers() -> None:
+    """Register the encoding and decoding error handlers for `utf-8` and `cp1252`."""
+
+    def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
+        return error.object[error.start : error.end].encode("utf-8"), error.end
+
+    def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
+        return error.object[error.start : error.end].decode("cp1252"), error.end
+
+    codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
+    codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
+
+
+def normalize_txt(text: str) -> str:
+    """Resolve the encoding problems and normalize the abnormal characters."""
+
+    text = (
+        text.encode("raw_unicode_escape")
+        .decode("utf-8", errors="replace_decoding_with_cp1252")
+        .encode("cp1252", errors="replace_encoding_with_utf8")
+        .decode("utf-8", errors="replace_decoding_with_cp1252")
+    )
+    text = unidecode(text)
+    return text
