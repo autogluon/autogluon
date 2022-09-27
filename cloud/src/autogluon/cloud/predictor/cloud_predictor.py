@@ -29,7 +29,7 @@ from ..utils.ag_sagemaker import (
     AutoGluonMultiModalRealtimePredictor,
     AutoGluonBatchPredictor
 )
-from ..utils.aws_utils import setup_sagemaker_role_and_policy
+from ..utils.aws_utils import setup_sagemaker_role_and_policy, setup_sagemaker_session
 from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
 from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.sagemaker_utils import (
@@ -96,7 +96,7 @@ class CloudPredictor(ABC):
                 trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
                 policies=SAGEMAKER_POLICIES
             )
-        self.sagemaker_session = sagemaker.session.Session()
+        self.sagemaker_session = setup_sagemaker_session()
         self.local_output_path = self._setup_local_output_path(local_output_path)
         self.cloud_output_path = self._setup_cloud_output_path(cloud_output_path)
         self.endpoint = None
@@ -984,7 +984,7 @@ class CloudPredictor(ABC):
 
         path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
         predictor: CloudPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
-        predictor.sagemaker_session = sagemaker.session.Session()
+        predictor.sagemaker_session = setup_sagemaker_session()
         predictor._region = predictor.sagemaker_session.boto_region_name
         predictor._load_jobs()
         if hasattr(predictor, '_endpoint_saved') and predictor._endpoint_saved:

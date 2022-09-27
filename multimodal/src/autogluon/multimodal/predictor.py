@@ -55,9 +55,11 @@ from .constants import (
     MULTICLASS,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
+    OCR_TEXT_RECOGNITION,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    SCORE,
     TEXT,
     UNIFORM_SOUP,
     Y_PRED,
@@ -72,6 +74,7 @@ from .data.infer_types import (
     infer_problem_type_output_shape,
 )
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
+from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
@@ -228,6 +231,7 @@ class MultiModalPredictor:
         self._df_preprocessor = None
         self._column_types = None
         self._data_processors = None
+        self._model_postprocess_fn = None
         self._model = None
         self._resume = False
         self._continuous_training = False
@@ -917,11 +921,16 @@ class MultiModalPredictor:
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
         )
 
+        model_postprocess_fn = get_model_postprocess_fn(
+            problem_type=self._problem_type,
+            loss_func=loss_func,
+        )
+
         self._config = config
         self._df_preprocessor = df_preprocessor
         self._data_processors = data_processors
         self._model = model
-        self._loss_func = loss_func
+        self._model_postprocess_fn = model_postprocess_fn
 
         if hasattr(config, MATCHER):
             warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
@@ -1052,6 +1061,7 @@ class MultiModalPredictor:
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
+                model_postprocess_fn=model_postprocess_fn,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1372,7 +1382,7 @@ class MultiModalPredictor:
         else:
             task = LitModule(
                 model=self._model,
-                loss_func=self._loss_func if hasattr(self, "_loss_func") else None,
+                model_postprocess_fn=self._model_postprocess_fn,
             )
 
         blacklist_msgs = []
@@ -1541,7 +1551,7 @@ class MultiModalPredictor:
             model=self._model,
             precision=self._config.env.precision,
             num_gpus=self._config.env.num_gpus,
-            loss_func=self._loss_func,
+            model_postprocess_fn=self._model_postprocess_fn,
         )
         return [output]
 
@@ -1719,6 +1729,9 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
 
+        elif self._pipeline == OCR_TEXT_RECOGNITION:
+            ret_type = [TEXT, SCORE]
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1731,7 +1744,13 @@ class MultiModalPredictor:
                 requires_label=False,
                 realtime=realtime,
             )
-            logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+
+            if self._pipeline == OCR_TEXT_RECOGNITION:
+                logits_or_prob = []
+                for r_type in ret_type:
+                    logits_or_prob.append(extract_from_output(outputs=outputs, ret_type=r_type))
+            else:
+                logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
                 pred = self._df_preprocessor.transform_prediction(
@@ -2257,7 +2276,12 @@ class MultiModalPredictor:
             mixup_active=False,
             loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
         )
-        predictor._loss_func = loss_func
+
+        model_postprocess_fn = get_model_postprocess_fn(
+            problem_type=predictor._problem_type,
+            loss_func=loss_func,
+        )
+        predictor._model_postprocess_fn = model_postprocess_fn
 
         return predictor
 

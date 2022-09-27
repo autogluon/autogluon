@@ -3,6 +3,7 @@ import logging
 import os
 import warnings
 from copy import deepcopy
+from lib2to3.pgen2.token import OP
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -15,7 +16,7 @@ from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEX
 from .collator import Pad, Stack
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config
+from .utils import extract_value_from_config, normalize_txt, register_encoding_decoding_error_handlers
 
 logger = logging.getLogger(AUTOMM)
 
@@ -89,6 +90,7 @@ class TextProcessor:
         text_trivial_aug_maxscale: Optional[float] = 0.0,
         train_augment_types: Optional[List[str]] = None,
         template_config: Optional[DictConfig] = None,
+        normalize_text: Optional[bool] = False,
     ):
         """
         Parameters
@@ -117,6 +119,10 @@ class TextProcessor:
             https://arxiv.org/pdf/2103.10158.pdf
         train_augment_types
             All possible augmentation operations
+        normalize_text
+            Whether to normalize text to resolve encoding problems.
+            Examples of normalized texts can be found at
+            https://github.com/awslabs/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
         """
         self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
@@ -166,6 +172,7 @@ class TextProcessor:
         logger.debug(f"text segment num: {self.text_segment_num}")
 
         self.stochastic_chunk = stochastic_chunk
+        self.normalize_text = normalize_text
 
         # construct augmentor
         self.train_augment_types = train_augment_types
@@ -174,6 +181,9 @@ class TextProcessor:
         self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
         self.template_config = template_config
         self.template_engine = TemplateEngine(self.template_config)
+
+        if self.normalize_text:
+            register_encoding_decoding_error_handlers()
 
     @property
     def text_token_ids_key(self):
@@ -486,9 +496,16 @@ class TextProcessor:
         -------
         A dictionary containing one sample's text tokens, valid length, and segment ids.
         """
-        per_sample_text = {
-            per_column_name: per_column_text[idx] for per_column_name, per_column_text in all_text.items()
-        }
+
+        if self.normalize_text:
+            per_sample_text = {
+                per_column_name: normalize_txt(per_column_text[idx])
+                for per_column_name, per_column_text in all_text.items()
+            }
+        else:
+            per_sample_text = {
+                per_column_name: per_column_text[idx] for per_column_name, per_column_text in all_text.items()
+            }
         return self.build_one_token_sequence_from_text(per_sample_text, is_training)
 
     def __deepcopy__(self, memo):

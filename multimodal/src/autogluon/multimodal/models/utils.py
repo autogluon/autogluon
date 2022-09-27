@@ -3,8 +3,10 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import nn
+from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel
 
+from ..constants import LOGITS, REGRESSION
 from .adaptation_layers import IA3Linear, LoRALinear
 
 
@@ -542,4 +544,88 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
     else:
         model = AutoModel.from_config(config)
 
+    return config, model
+
+
+def apply_sigmoid(output: Dict):
+    """
+    Apply the sigmoid to logits.
+
+    Parameters
+    ----------
+    output
+        The model output dict.
+
+    Returns
+    -------
+    The output with logits transformed by sigmoid.
+    """
+    for k, v in output.items():
+        output[k][LOGITS] = torch.sigmoid(v[LOGITS].float())
+    return output
+
+
+def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
+    """
+    Get the postprocessing function for the model outputs.
+
+    Parameters
+    ----------
+    problem_type
+        The problem type, e.g., classification or regression.
+    loss_func
+        The loss function used in training.
+
+    Returns
+    -------
+    The postprocessing function.
+    """
+    postprocess_func = None
+    if problem_type == REGRESSION:
+        if isinstance(loss_func, nn.BCEWithLogitsLoss):
+            postprocess_func = apply_sigmoid
+
+    return postprocess_func
+
+
+def get_mmocr_config_and_model(checkpoint_name: str):
+    """
+    Get an MMOCR config and model based on a checkpoint name.
+
+    Parameters
+    ----------
+    checkpoint_name
+        A model checkpoint name.
+
+    Returns
+    -------
+    An MMOCR config and model.
+    """
+    try:
+        import mmcv
+        from mmcv.runner import load_checkpoint
+    except ImportError:
+        mmcv = None
+    try:
+        import mmocr
+        from mmocr.models import build_detector
+    except ImportError:
+        mmocr = None
+    from mim.commands.download import download
+
+    checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
+
+    # read config files
+    assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+    config_file = checkpoint_name + ".py"
+    if isinstance(config_file, str):
+        config = mmcv.Config.fromfile(config_file)
+
+    # build model and load pretrained weights
+    assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
+
+    checkpoint = checkpoints[0]
+    model = build_detector(config.model, test_cfg=config.get("test_cfg"))
+    if checkpoint is not None:
+        checkpoint = load_checkpoint(model, checkpoint, map_location="cpu")
     return config, model
