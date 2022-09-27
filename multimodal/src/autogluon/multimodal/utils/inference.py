@@ -88,8 +88,10 @@ def infer_batch(
         A Pytorch model.
     precision
         The desired precision used in inference.
-    loss_func
-        The loss function used in training the model.
+    num_gpus
+        Number of GPUs.
+    model_postprocess_fn
+        The post-processing function for the model output.
 
     Returns
     -------
