@@ -62,6 +62,7 @@ from .constants import (
     METRIC_MODE_MAP,
     MMDET_IMAGE,
     MMOCR_TEXT_DET,
+    MMOCR_TEXT_RECOG,
     MULTICLASS,
     NUMERICAL,
     NUMERICAL_MLP,
@@ -71,6 +72,7 @@ from .constants import (
     RMSE,
     ROC_AUC,
     S3_PREFIX,
+    SCORE,
     T_FEW,
     TEXT,
     TIMM_IMAGE,
@@ -96,6 +98,7 @@ from .models import (
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
     MMOCRAutoModelForTextDetection,
+    MMOCRAutoModelForTextRecognition,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
@@ -858,6 +861,11 @@ def create_model(
         )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
         model = MMOCRAutoModelForTextDetection(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+        )
+    elif model_name.lower().startswith(MMOCR_TEXT_RECOG):
+        model = MMOCRAutoModelForTextRecognition(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
         )
@@ -1777,6 +1785,10 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
             return [bbox[0] for ele in outputs for bbox in ele[BBOX]]
         else:
             return [bbox for ele in outputs for bbox in ele[BBOX]]
+    elif ret_type == TEXT:
+        return [ele[TEXT] for ele in outputs]  # single image
+    elif ret_type == SCORE:
+        return [ele[SCORE] for ele in outputs]
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

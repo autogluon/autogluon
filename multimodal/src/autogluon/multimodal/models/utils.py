@@ -586,3 +586,46 @@ def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
             postprocess_func = apply_sigmoid
 
     return postprocess_func
+
+
+def get_mmocr_config_and_model(checkpoint_name: str):
+    """
+    Get an MMOCR config and model based on a checkpoint name.
+
+    Parameters
+    ----------
+    checkpoint_name
+        A model checkpoint name.
+
+    Returns
+    -------
+    An MMOCR config and model.
+    """
+    try:
+        import mmcv
+        from mmcv.runner import load_checkpoint
+    except ImportError:
+        mmcv = None
+    try:
+        import mmocr
+        from mmocr.models import build_detector
+    except ImportError:
+        mmocr = None
+    from mim.commands.download import download
+
+    checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
+
+    # read config files
+    assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+    config_file = checkpoint_name + ".py"
+    if isinstance(config_file, str):
+        config = mmcv.Config.fromfile(config_file)
+
+    # build model and load pretrained weights
+    assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
+
+    checkpoint = checkpoints[0]
+    model = build_detector(config.model, test_cfg=config.get("test_cfg"))
+    if checkpoint is not None:
+        checkpoint = load_checkpoint(model, checkpoint, map_location="cpu")
+    return config, model

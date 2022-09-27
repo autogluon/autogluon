@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 try:
     from mmcv.parallel import scatter
@@ -11,15 +11,27 @@ except ImportError:
     mmocr = None
 from torch import nn
 
-from ..constants import AUTOMM, BBOX, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
+from ..constants import (
+    AUTOMM,
+    COLUMN,
+    COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    IMAGE_VALID_NUM,
+    LABEL,
+    LOGITS,
+    MASKS,
+    SCORE,
+    TEXT,
+)
 from .utils import assign_layer_ids, get_column_features, get_mmocr_config_and_model, get_model_head
 
 logger = logging.getLogger(AUTOMM)
 
 
-class MMOCRAutoModelForTextDetection(nn.Module):
+class MMOCRAutoModelForTextRecognition(nn.Module):
     """
-    Support MMOCR object detection models.
+    Support MMOCR text recognition models.
     Refer to https://github.com/open-mmlab/mmocr
     """
 
@@ -31,18 +43,18 @@ class MMOCRAutoModelForTextDetection(nn.Module):
         pretrained: Optional[bool] = True,
     ):
         """
-        Load a pretrained ocr text detection detector from MMOCR.
+        Load a pretrained ocr text recognition detector from MMOCR.
 
         Parameters
         ----------
         prefix
-            The prefix of the MMdetAutoModelForTextDetection model.
+            The prefix of the MMdetAutoModelForTextRecognition model.
         checkpoint_name
             Name of the mmdet checkpoint.
         num_classes
             The number of classes.
         pretrained
-            Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
+            Whether using the pretrained mmocr models. If pretrained=True, download the pretrained model.
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
@@ -92,8 +104,15 @@ class MMOCRAutoModelForTextDetection(nn.Module):
 
         data = batch[self.image_key]
         # single image
-        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
-        data["img"] = [img.data[0] for img in data["img"]]
+        if isinstance(data["img_metas"], List):
+            data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
+        else:
+            data["img_metas"] = data["img_metas"].data
+
+        if isinstance(data["img"], List):
+            data["img"] = [img.data[0] for img in data["img"]]
+        else:
+            data["img"] = data["img"].data
 
         device = next(self.model.parameters()).device  # model device
         if next(self.model.parameters()).is_cuda:
@@ -102,7 +121,7 @@ class MMOCRAutoModelForTextDetection(nn.Module):
 
         results = self.model(return_loss=False, rescale=True, **data)
 
-        ret = {BBOX: results[0]["boundary_result"]}
+        ret = {TEXT: results[0]["text"], SCORE: results[0]["score"]}
         return {self.prefix: ret}
 
     def get_layer_ids(

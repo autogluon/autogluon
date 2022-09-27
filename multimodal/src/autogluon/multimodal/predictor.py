@@ -55,9 +55,11 @@ from .constants import (
     MULTICLASS,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
+    OCR_TEXT_RECOGNITION,
     PROBABILITY,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
+    SCORE,
     TEXT,
     UNIFORM_SOUP,
     Y_PRED,
@@ -1727,6 +1729,9 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
 
+        elif self._pipeline == OCR_TEXT_RECOGNITION:
+            ret_type = [TEXT, SCORE]
+
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1739,7 +1744,13 @@ class MultiModalPredictor:
                 requires_label=False,
                 realtime=realtime,
             )
-            logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+
+            if self._pipeline == OCR_TEXT_RECOGNITION:
+                logits_or_prob = []
+                for r_type in ret_type:
+                    logits_or_prob.append(extract_from_output(outputs=outputs, ret_type=r_type))
+            else:
+                logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
                 pred = self._df_preprocessor.transform_prediction(

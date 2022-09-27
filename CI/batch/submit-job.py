@@ -7,6 +7,8 @@ from datetime import datetime
 
 import boto3
 from botocore.compat import total_seconds
+from botocore.config import Config
+
 
 job_type_info = {
     'CI-CPU': {
@@ -65,7 +67,12 @@ parser.add_argument('--timeout', help='job timeout in seconds', default=None, ty
 args = parser.parse_args()
 
 session = boto3.Session(profile_name=args.profile, region_name=args.region)
-batch, cloudwatch = [session.client(service_name=sn) for sn in ['batch', 'logs']]
+config = Config(
+    retries = dict(
+        max_attempts = 20
+    )
+)
+batch, cloudwatch = [session.client(service_name=sn, config=config) for sn in ['batch', 'logs']]
 
 
 def printLogs(logGroupName, logStreamName, startTime):
