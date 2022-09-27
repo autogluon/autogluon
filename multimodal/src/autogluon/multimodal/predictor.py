@@ -2017,7 +2017,9 @@ class MultiModalPredictor:
         # TODO: Support CLIP
         # TODO: Add test
 
-        valid_input, dynamic_axes, default_onnx_path, default_batch = get_onnx_input(pipeline=self._pipeline, config=self._config)
+        valid_input, dynamic_axes, default_onnx_path, default_batch = get_onnx_input(
+            pipeline=self._pipeline, config=self._config
+        )
         if not onnx_path:
             onnx_path = default_onnx_path
 

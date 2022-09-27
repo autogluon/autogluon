@@ -46,7 +46,9 @@ def get_onnx_input(pipeline, config=None):
                     [101, 1037, 2158, 2003, 2652, 1037, 2858, 1012, 102, 0, 0, 0, 0, 0],
                 ],
             ),
-            "hf_text_text_valid_length": tensor([8, 9, 9, 9, 7, 10, 9, 9],),
+            "hf_text_text_valid_length": tensor(
+                [8, 9, 9, 9, 7, 10, 9, 9],
+            ),
             "hf_text_text_segment_ids": tensor(
                 [
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
