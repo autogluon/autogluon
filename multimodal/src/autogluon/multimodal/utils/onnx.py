@@ -7,8 +7,37 @@ from ..constants import AUTOMM, FEATURE_EXTRACTION
 logger = logging.getLogger(AUTOMM)
 
 
-def get_onnx_input(pipeline, config=None):
-    onnx_path = None
+def get_onnx_input(pipeline: str, config: Optional[dict] = None):
+    """
+    Get information for a predictor to export its model in onnx format.
+
+    Parameters
+    ----------
+    pipeline
+        The predictor's pipeline.
+    config
+        The predictor's config.
+
+    Returns
+    -------
+    valid_input
+        The valid keys for the input batch.
+    dynamic_axes
+        By default the exported model will have the shapes of all input and output tensors
+        set to exactly match those given in ``args``. To specify axes of tensors as
+        dynamic (i.e. known only at run-time), set ``dynamic_axes`` to a dict with schema:
+            * KEY (str): an input or output name. Each name must also be provided in ``input_names`` or
+              ``output_names``.
+            * VALUE (dict or list): If a dict, keys are axis indices and values are axis names. If a
+              list, each element is an axis index.
+        See torch.onnx.export for more explanations.
+    default_onnx_path
+        The default path of the export onnx model.
+    default_batch
+        The default batch to help trace and export the model.
+
+    """
+    default_onnx_path = None
     if pipeline == FEATURE_EXTRACTION:
         valid_input = [
             "hf_text_text_token_ids",
@@ -29,7 +58,7 @@ def get_onnx_input(pipeline, config=None):
             },
         }
         if config:
-            onnx_path = config["model"]["hf_text"]["checkpoint_name"].replace("/", "_") + ".onnx"
+            default_onnx_path = config["model"]["hf_text"]["checkpoint_name"].replace("/", "_") + ".onnx"
         default_batch = {
             "hf_text_text_token_ids_column_sentence1": tensor(
                 [[1, 7], [1, 8], [1, 8], [1, 8], [1, 6], [1, 9], [1, 8], [1, 8]],
@@ -65,4 +94,4 @@ def get_onnx_input(pipeline, config=None):
     else:
         raise ValueError(f"ONNX export is not supported in current pipeline {pipeline}")
 
-    return valid_input, dynamic_axes, onnx_path, default_batch
+    return valid_input, dynamic_axes, default_onnx_path, default_batch

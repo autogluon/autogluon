@@ -2007,13 +2007,34 @@ class MultiModalPredictor:
 
     def export_onnx(
         self,
-        data: Union[pd.DataFrame, dict, list] = None,
+        onnx_path: Optional[str] = None,
+        data: Union[pd.DataFrame] = None,
         batch: Optional[dict] = None,
         batch_size: Optional[int] = None,
-        onnx_path: Optional[str] = None,
-        verbose: Optional[bool] = True,
+        verbose: Optional[bool] = False,
         opset_version: Optional[int] = 13,
     ):
+        """
+        Export this predictor's model to ONNX file.
+
+        Parameters
+        ----------
+        onnx_path
+            The export path of onnx model.
+        data
+            Raw data used to trace and export the model.
+            If this is None, will check if a processed batch is provided.
+        batch
+            Processed batch used to trace and export the model. It is used if data is None.
+            If this is also None, a default batch will be used.
+        batch_size
+            The batch_size of export model's input.
+            Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
+        verbose
+            verbose flag in torch.onnx.export.
+        opset_version
+            opset_version flag in torch.onnx.export.
+        """
         # TODO: Support CLIP
         # TODO: Add test
 
@@ -2030,7 +2051,7 @@ class MultiModalPredictor:
 
         if data is not None:
             batch = self.get_processed_batch(
-                data=data, valid_input=valid_input, batch_size=batch_size, onnx_training=True
+                data=data, valid_input=valid_input, onnx_tracing=True, batch_size=batch_size
             )
         elif not batch:
             if not default_batch:
@@ -2052,12 +2073,35 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame],
         valid_input: Optional[list] = None,
+        onnx_tracing: bool = False,
         batch_size: int = None,
-        onnx_training: bool = False,
         to_numpy: bool = True,
     ):
+        """
+        Get the processed batch of raw data given.
+
+        Parameters
+        ----------
+        data
+            The raw data to process
+        valid_input
+            Used to filter valid data. No filter happens if it is empty.
+        onnx_tracing
+            If the output is used for onnx tracing.
+        batch_size
+            The batch_size of output batch.
+            If onnx_tracing, it will only output one mini-batch, and all int tensor values will be converted to long.
+        to_numpy
+            Output numpy array if True. Only valid if not onnx_tracing.
+
+        Returns
+        -------
+        Tensor or numpy array.
+        The output processed batch could be used for export/evaluate deployed model.
+        May also be helpful to speed up small batch inference.
+        """
         # TODO: add support for data = dict or list
-        if onnx_training:
+        if onnx_tracing:
             if batch_size:
                 data = data[:batch_size]
             else:
@@ -2088,11 +2132,11 @@ class MultiModalPredictor:
         for k in batch:
             if valid_input and k not in valid_input:
                 continue
-            if onnx_training:
+            if onnx_tracing:
                 ret[k] = batch[k].long() if isinstance(batch[k], torch.IntTensor) else batch[k]
             elif to_numpy:
                 ret[k] = batch[k].cpu().detach().numpy().astype(int)
-        if not onnx_training:
+        if not onnx_tracing:
             if batch_size:
                 raise NotImplementedError("We should split the batch here.")  # TODO
         return ret
