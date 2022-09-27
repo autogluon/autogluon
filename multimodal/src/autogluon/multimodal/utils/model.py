@@ -18,13 +18,13 @@ from ..constants import (
     IMAGE,
     MMDET_IMAGE,
     MMOCR_TEXT_DET,
+    MMOCR_TEXT_RECOG,
     NUMERICAL,
     NUMERICAL_MLP,
     NUMERICAL_TRANSFORMER,
     T_FEW,
     TEXT,
     TIMM_IMAGE,
-    MMOCR_TEXT_RECOG,
 )
 from ..data import MultiModalFeaturePreprocessor
 from ..models import (
@@ -34,13 +34,13 @@ from ..models import (
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
     MMOCRAutoModelForTextDetection,
+    MMOCRAutoModelForTextRecognition,
     MultimodalFusionMLP,
     MultimodalFusionTransformer,
     NumericalMLP,
     NumericalTransformer,
     TFewModel,
     TimmAutoModelForImagePrediction,
-    MMOCRAutoModelForTextRecognition,
 )
 from ..models.utils import inject_ia3_to_linear_layer, inject_lora_to_linear_layer
 

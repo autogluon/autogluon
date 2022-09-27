@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional, Tuple, Union, Callable
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -7,7 +7,7 @@ from scipy.special import softmax
 from torch import nn
 from torch.nn.modules.loss import _Loss
 
-from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, PROBABILITY, TEXT, SCORE
+from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, PROBABILITY, SCORE, TEXT
 from .environment import compute_num_gpus, infer_precision, move_to_device
 from .misc import tensor_to_ndarray
 
