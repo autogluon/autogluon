@@ -6,10 +6,9 @@ distiller:
   hard_label_weight: 0.1
   soft_label_weight: 1.
   # Softmax Regression Paper: https://www.adrianbulat.com/downloads/ICLR2021/knowledge_distillation_via_softmax_regression_representation_learning.pdf
-  softmax_regression_weight: 0.1
-  output_feature_loss_weight: 0.
-  use_raw_features: False
+  softmax_regression_weight: 0.
+  output_feature_loss_weight: 0.01
   # RKD Paper: https://arxiv.org/abs/1904.05068
-  rkd_distance_loss_weight: 1.
-  rkd_angle_loss_weight: 2.
+  rkd_distance_loss_weight: 0.
+  rkd_angle_loss_weight: 0.
   matches:
