@@ -1,10 +1,13 @@
 import logging
+import os
 import sagemaker
 
 from abc import ABC, abstractmethod
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
     AutoGluonSagemakerInferenceModel,
+    AutoGluonRepackInferenceModel,
+    AutoGluonNonRepackInferenceModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -104,6 +107,7 @@ class SageMakerFitJob(SageMakerJob):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._estimator = None
         self._framework_version = None
 
     @classmethod
@@ -182,9 +186,18 @@ class SageMakerFitJob(SageMakerJob):
             )
             self._job_name = job_name
             self._framework_version = framework_version
+            self._estimator = sagemaker_estimator
         except Exception as e:
             logger.error(f'Training failed. Please check sagemaker console training jobs {job_name} for details.')
             raise e
+
+    def __getstate__(self):
+        self._estimator = None
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
 
 class SageMakerBatchTransformationJob(SageMakerJob):
@@ -230,10 +243,66 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         wait,
         autogluon_sagemaker_inference_model_kwargs,
         transformer_kwargs,
+        repack_model=False,
         **kwargs
     ):
-        logger.log(20, 'Creating inference model...')
-        model = AutoGluonSagemakerInferenceModel(
+        if repack_model:
+            model_cls = AutoGluonRepackInferenceModel
+            # model = AutoGluonNonRepackInferenceModel(
+            #     model_data=model_data,
+            #     role=role,
+            #     region=region,
+            #     framework_version=framework_version,
+            #     py_version=py_version,
+            #     instance_type=instance_type,
+            #     entry_point=entry_point,
+            #     predictor_cls=predictor_cls,
+            #     **autogluon_sagemaker_inference_model_kwargs
+            # )
+            # print('creating model')
+            # model = fitted_estimator.create_model(
+            #     region=region,
+            #     instance_type=instance_type,
+            #     framework_version=framework_version,
+            #     py_version=py_version,
+            #     entry_point=entry_point,
+            #     **autogluon_sagemaker_inference_model_kwargs,
+            # )
+            # print('model created')
+            # model.create()
+            # model_name = model.name
+            # from sagemaker.transformer import Transformer
+            # print('creating transformer')
+            # transformer = Transformer(
+            #     model_name=model_name,
+            #     instance_count=instance_count,
+            #     instance_type=instance_type,
+            #     strategy='MultiRecord',
+            #     max_payload=6,  # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
+            #     max_concurrent_transforms=1,  # The maximum number of HTTP requests to be made to each individual transform container at one time.
+            #     accept='application/json',
+            #     assemble_with='Line',
+            #     **transformer_kwargs,
+            # )
+            # print('transformer created')
+            # print('transforming')
+        else:
+            logger.log(20, 'Creating inference model...')
+            model_cls = AutoGluonNonRepackInferenceModel
+            # model = AutoGluonRepackInferenceModel(
+            #     model_data=model_data,
+            #     role=role,
+            #     region=region,
+            #     framework_version=framework_version,
+            #     py_version=py_version,
+            #     instance_type=instance_type,
+            #     entry_point=entry_point,
+            #     predictor_cls=predictor_cls,
+            #     **autogluon_sagemaker_inference_model_kwargs
+            # )
+            logger.log(20, 'Inference model created successfully')
+        print('creating model')
+        model = model_cls(
             model_data=model_data,
             role=role,
             region=region,
@@ -244,8 +313,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
             predictor_cls=predictor_cls,
             **autogluon_sagemaker_inference_model_kwargs
         )
-        logger.log(20, 'Inference model created successfully')
-
+        print('model created successfully')
         logger.log(20, 'Creating transformer...')
         transformer = model.transformer(
             instance_count=instance_count,
@@ -256,6 +324,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         logger.log(20, 'Transformer created successfully')
 
         try:
+            print('transforming')
             transformer.transform(
                 test_input,
                 job_name=job_name,
@@ -265,6 +334,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
                 **kwargs
             )
             self._job_name = job_name
+            print('transform done')
         except Exception as e:
             transformer.delete_model()
             raise e
@@ -272,7 +342,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         self._output_filename = test_input.split('/')[-1] + '.out'
 
         if wait:
-            transformer.delete_model()
+            # transformer.delete_model()
             logger.log(20, f'Predict results have been saved to {self.get_output_path()}')
         else:
             logger.log(20, 'Predict asynchronously. You can use `info()` or `get_job_status()` to check the status.')

@@ -103,6 +103,9 @@ class CloudPredictor(ABC):
 
         self._region = self.sagemaker_session.boto_region_name
         self._fit_job = SageMakerFitJob(session=self.sagemaker_session)
+        # This holds the Model object after training.
+        # After saving or loading, this can only hold a string representing the name of the model in sagemaker model
+        self._fitted_sagemaker_model_entity = None
         self._batch_transform_jobs = MostRecentInsertedOrderedDict()
 
     @property
@@ -253,6 +256,7 @@ class CloudPredictor(ABC):
         train_data,
         tune_data,
         config,
+        serving_script,
         images=None,
     ):
         cloud_bucket, cloud_key_prefix = s3_path_to_bucket_prefix(self.cloud_output_path)
@@ -286,12 +290,18 @@ class CloudPredictor(ABC):
             key_prefix=util_key_prefix
         )
 
+        serving_input = self.sagemaker_session.upload_data(
+            path=serving_script,
+            bucket=cloud_bucket,
+            key_prefix=util_key_prefix
+        )
+
         images_input = self._upload_fit_image_artifact(
             images=images,
             bucket=cloud_bucket,
             key_prefix=util_key_prefix
         )
-        inputs = dict(train=train_input, config=config_input)
+        inputs = dict(train=train_input, config=config_input, serving=serving_input)
         if tune_input is not None:
             inputs['tune'] = tune_input
         if images_input is not None:
@@ -410,6 +420,7 @@ class CloudPredictor(ABC):
             tune_data=tune_data,
             config=config,
             images=image_path,
+            serving_script=ScriptManager.get_serve_script(self.predictor_type, framework_version)  # Training and Inference should have the same framework_version
         )
 
         self._fit_job.run(
@@ -795,6 +806,11 @@ class CloudPredictor(ABC):
         entry_point = self._serve_script_path
         autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
         user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
+        repack_model = False
+        if predictor_path != self._fit_job.get_output_path() or user_entry_point is not None:
+            # Not inference on cloud trained model or not using inference on cloud trained model
+            # Need to repack the code into model. This will slow down batch inference and deployment
+            repack_model = True
         if user_entry_point:
             entry_point = user_entry_point
 
@@ -813,6 +829,40 @@ class CloudPredictor(ABC):
         if not content_type:
             content_type = 'text/csv'
 
+        # print('creating model')
+        # self._sagemaker_model_entity = self._fit_job._estimator.create_model(
+        #     region=self._region,
+        #     instance_type=instance_type,
+        #     framework_version=framework_version,
+        #     py_version=py_version,
+        #     source_dir=os.path.dirname(self._serve_script_path),
+        #     entry_point=self._serve_script_path
+        # )
+        # print('model created')
+        # self._fitted_model.create()
+        # model_name = self._fitted_model.name
+        # from sagemaker.transformer import Transformer
+        # print('creating transformer')
+        # transformer = Transformer(
+        #     model_name=model_name,
+        #     instance_count=instance_count,
+        #     instance_type=instance_type,
+        #     strategy='MultiRecord',
+        #     max_payload=6,  # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
+        #     max_concurrent_transforms=1,  # The maximum number of HTTP requests to be made to each individual transform container at one time.
+        #     accept='application/json',
+        #     assemble_with='Line',
+        # )
+        # print('transformer created')
+        # print('transforming')
+        # transformer.transform(
+        #     data=test_input,
+        #     job_name=job_name,
+        #     split_type=split_type,
+        #     content_type=content_type,
+        #     wait=wait,
+        # )
+        # print('transform done')
         batch_transform_job = SageMakerBatchTransformationJob(session=self.sagemaker_session)
         batch_transform_job.run(
             model_data=predictor_path,
@@ -832,6 +882,7 @@ class CloudPredictor(ABC):
             wait=wait,
             transformer_kwargs=transformer_kwargs,
             autogluon_sagemaker_inference_model_kwargs=autogluon_sagemaker_inference_model_kwargs,
+            repack_model=repack_model,
             **kwargs
         )
         self._batch_transform_jobs[job_name] = batch_transform_job
