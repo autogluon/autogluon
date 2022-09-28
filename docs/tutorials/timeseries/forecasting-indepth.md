@@ -79,7 +79,7 @@ Finally, an **ensemble** model works by combining predictions of all other model
 By default, `TimeSeriesPredictor` always fits a `WeightedEnsemble` on top of other models.
 This can be disabled by setting `enable_ensemble=False` when calling the `fit` method.
 
-For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](forecasting-model-zoo).
+For a list of tunable hyperparameters for each model, their default values, and other details see [Forecasting Time Series - Model Zoo](forecasting-model-zoo.html).
 
 ## How does AutoGluon evaluate performance of time series models?
 AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
@@ -127,7 +127,7 @@ However, this strategy decreases the amount of training data available for fitti
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
-For more details about the available metrics, see [Metrics overview](forecasting-model-zoo).
+For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/awslabs/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
 For this purpose, some metrics are multiplied by -1.
@@ -217,7 +217,7 @@ The code above will only train two models:
 - `DeepAR` (with default hyperparameters)
 - `ETS` (with the given `seasonality` and `seasonal_period`; all other parameters set to their defaults).
 
-For the full list of available models and the respective hyperparameters, see [Model zoo](#TODO).
+For the full list of available models and the respective hyperparameters, see [Forecasting Time Series - Model Zoo](forecasting-model-zoo.html).
 
 ### Hyperparameter tuning
 Advanced users can define search spaces for model hyperparameters and let AutoGluon automatically determine the best configuration for the model.
