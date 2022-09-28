@@ -32,7 +32,7 @@ def test_mmocr_text_detection_inference(checkpoint_name):
     )
 
     # two dimensions, (num of text lines, 2 * num of coordinate points)
-    pred = predictor.predict({"image": [mmocr_image_name]})
+    pred = predictor.predict({"image": [mmocr_image_name]}, realtime=False)
 
     # original MMOCR model's output
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
