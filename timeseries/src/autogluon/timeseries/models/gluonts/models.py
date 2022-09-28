@@ -52,9 +52,19 @@ gluonts.model.deepar._estimator.time_features_from_frequency_str = time_features
 
 
 class DeepARModel(AbstractGluonTSModel):
-    """DeepAR model from Gluon-TS.
+    """DeepAR model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of an encoder (LSTM or GRU recurrent neural network) and a
+    decoder that outputs the distribution of the next target value. Close the model
+    described in [Salinas2020]_.
+
+    .. [Salinas2020] Salinas, David, et al.
+        "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
+        International Journal of Forecasting. 2020.
+
+    Based on `gluonts.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
@@ -65,11 +75,9 @@ class DeepARModel(AbstractGluonTSModel):
         Number of RNN layers
     num_cells : int, default = 40
         Number of RNN cells for each layer
-    epochs : int, default = 100
-        Number of epochs the model will be trained for
     cell_type : str, default = "lstm"
         Type of recurrent cells to use (available: 'lstm' or 'gru')
-    dropoutcell_type : typing.Type, default = ZoneoutCell
+    dropoutcell_type : str, default = 'ZoneoutCell'
         Type of dropout cells to use
         (available: 'ZoneoutCell', 'RNNZoneoutCell', 'VariationalDropoutCell' or
         'VariationalZoneoutCell')
@@ -82,6 +90,14 @@ class DeepARModel(AbstractGluonTSModel):
         Distribution to use to evaluate observations and sample predictions
     scaling: bool, default = True
         Whether to automatically scale the target values
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
@@ -103,10 +119,18 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
 
 
 class MQCNNModel(AbstractGluonTSSeq2SeqModel):
-    """MQCNN model from Gluon-TS. MQCNN is an encoder-decoder model where the encoder is a
-    1D convolutional neural network and the decoder is a multilayer perceptron.
+    """MQCNN model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of a CNN encoder and a decoder that directly predicts the
+    quantiles of the future target values' distribution. As described in [Wen2017]_.
+
+    .. [Wen2017] Wen, Ruofeng, et al.
+        "A multi-horizon quantile recurrent forecaster."
+        arXiv preprint arXiv:1711.11053 (2017)
+
+    Based on `gluonts.model.seq2seq.MQCNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html#gluonts.model.seq2seq.MQCNNEstimator>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
@@ -120,10 +144,6 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     add_age_feature : bool, default = False
         Adds an age feature.
         The age feature starts with a small value at the start of the time series and grows over time.
-    epochs : int, default = 100
-        Number of epochs the model will be trained for
-    seed : int, optional
-        Will set the specified int seed for numpy and MXNet if specified.
     decoder_mlp_dim_seq : List[int], default = [30]
         The dimensionalities of the Multi Layer Perceptron layers of the decoder.
     channels_seq : List[int], default = [30, 30, 30]
@@ -149,34 +169,82 @@ class MQCNNModel(AbstractGluonTSSeq2SeqModel):
     scaling : bool, optional
         Whether to automatically scale the target values. (default: False if quantile_output is used,
         True otherwise)
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
 
 class MQRNNModel(AbstractGluonTSSeq2SeqModel):
-    """MQRNN model from Gluon-TS. MQRNN is an encoder-decoder model where the encoder is a
-    recurrent neural network and the decoder is a multilayer perceptron.
+    """MQRNN model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of an RNN encoder and a decoder that directly predicts the
+    quantiles of the future target values' distribution. As described in [Wen2017]_.
+
+    .. [Wen2017] Wen, Ruofeng, et al.
+        "A multi-horizon quantile recurrent forecaster."
+        arXiv preprint arXiv:1711.11053 (2017)
+
+    Based on `gluonts.model.seq2seq.MQRNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html#gluonts.model.seq2seq.MQRNNEstimator>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    Other Parameters
+    ----------------
+    context_length : int, optional
+        Number of steps to unroll the RNN for before computing predictions
+        (default: None, in which case context_length = prediction_length)
+    embedding_dimension : int, optional
+        Dimension of the embeddings for categorical features. (default: [min(50, (cat+1)//2) for cat in cardinality])
+    decoder_mlp_dim_seq : List[int], default = [30]
+        The dimensionalities of the Multi Layer Perceptron layers of the decoder.
+    quantiles : List[float], default = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        The list of quantiles that will be optimized for, and predicted by, the model.
+        Optimizing for more quantiles than are of direct interest to you can result
+        in improved performance due to a regularizing effect.
+    distr_output : gluonts.mx.DistributionOutput, optional
+        DistributionOutput to use. Only one between `quantile` and `distr_output`
+        can be set.
+    scaling : bool, optional
+        Whether to automatically scale the target values. (default: False if quantile_output is used,
+        True otherwise)
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
 class SimpleFeedForwardModel(AbstractGluonTSModel):
-    """SimpleFeedForward model, i.e. a simple multilayer perceptron for
-     probabilistic forecasts, from GluonTS.
+    """SimpleFeedForward model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of a multilayer perceptron (MLP) that predicts the distribution
+    of the next target value.
+
+    Based on `gluonts.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html?highlight=simplefeedforward>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
-    num_hidden_dimensions : int, default = [40, 40]
-        Number of hidden nodes in each layer
     context_length : int, optional
         Number of time units that condition the predictions
         (default: None, in which case context_length = prediction_length)
+    num_hidden_dimensions : List[int], default = [40, 40]
+        Number of hidden nodes in each layer
     distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
         Distribution to fit
     batch_normalization : bool, default = False
@@ -186,13 +254,19 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         its inverse
     epochs : int, default = 100
         Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSModel):
-    """TemporalFusionTransformer model for forecasting, as described in [Lim2020]_.
+    """TemporalFusionTransformer model for forecasting, as described in [Lim2021]_.
 
     .. [Lim2021] Lim, Bryan, et al.
         "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
