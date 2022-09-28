@@ -12,7 +12,7 @@ from .deserializers import PandasDeserializer
 from .sagemaker_utils import retrieve_latest_framework_version
 
 
-# Framework documentation: https://sagemaker.readthedocs.io/en/stable/api/training/estimators.html#sagemaker.estimator.Framework
+# Estimator documentation: https://sagemaker.readthedocs.io/en/stable/api/training/estimators.html#estimators
 class AutoGluonSagemakerEstimator(Estimator):
     def __init__(
         self,
