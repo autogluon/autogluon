@@ -1518,11 +1518,11 @@ class MultiModalPredictor:
         cocoEval.accumulate()
         cocoEval.summarize()
 
-    def _realtime_predict(
+    def _process_batch(
         self,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
-    ) -> List[Dict]:
+    ):
         data, df_preprocessor, data_processors = self._on_predict_start(
             config=self._config,
             data=data,
@@ -1547,6 +1547,18 @@ class MultiModalPredictor:
 
         collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
         batch = collate_fn(processed_features)
+
+        return batch
+
+    def _realtime_predict(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+    ) -> List[Dict]:
+        batch = self._process_batch(
+            data=data,
+            requires_label=requires_label,
+        )
         output = infer_batch(
             batch=batch,
             model=self._model,
@@ -2009,7 +2021,6 @@ class MultiModalPredictor:
         self,
         onnx_path: Optional[str] = None,
         data: Optional[pd.DataFrame] = None,
-        batch: Optional[Dict] = None,
         batch_size: Optional[int] = None,
         verbose: Optional[bool] = False,
         opset_version: Optional[int] = 13,
@@ -2024,9 +2035,6 @@ class MultiModalPredictor:
         data
             Raw data used to trace and export the model.
             If this is None, will check if a processed batch is provided.
-        batch
-            Processed batch used to trace and export the model. It is used if data is None.
-            If this is also None, a default batch will be used.
         batch_size
             The batch_size of export model's input.
             Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
@@ -2038,29 +2046,22 @@ class MultiModalPredictor:
         # TODO: Support CLIP
         # TODO: Add test
 
-        valid_input, dynamic_axes, default_onnx_path, default_batch = get_onnx_input(
+        valid_input, dynamic_axes, default_onnx_path, batch = get_onnx_input(
             pipeline=self._pipeline, config=self._config
         )
-        if not onnx_path:
-            onnx_path = default_onnx_path
 
-        model = self._model
-        model.eval()
         if not batch_size:
             batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
-
         if data is not None:
             batch = self.get_processed_batch(
                 data=data, valid_input=valid_input, onnx_tracing=True, batch_size=batch_size
             )
-        elif not batch:
-            if not default_batch:
-                raise ValueError(
-                    f"Do not have default batch to trace for current pipneline {self._pipeline}. Please provide raw data or processed batch as input."
-                )
+
+        if not onnx_path:
+            onnx_path = default_onnx_path
 
         torch.onnx.export(
-            model,
+            self._model.eval(),
             batch,
             onnx_path,
             opset_version=opset_version,
@@ -2076,6 +2077,7 @@ class MultiModalPredictor:
         onnx_tracing: bool = False,
         batch_size: int = None,
         to_numpy: bool = True,
+        requires_label: bool = False,
     ):
         """
         Get the processed batch of raw data given.
@@ -2098,7 +2100,6 @@ class MultiModalPredictor:
         -------
         Tensor or numpy array.
         The output processed batch could be used for export/evaluate deployed model.
-        May also be helpful to speed up small batch inference.
         """
         # TODO: add support for data = dict or list
         if onnx_tracing:
@@ -2106,27 +2107,11 @@ class MultiModalPredictor:
                 data = data[:batch_size]
             else:
                 data = data[:2]
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
+
+        batch = self._process_batch(
             data=data,
-            requires_label=False,
+            requires_label=requires_label,
         )
-        modality_features, sample_num = apply_df_preprocessor(
-            data=data,
-            df_preprocessor=df_preprocessor,
-            modalities=data_processors.keys(),
-        )
-        processed_features = []
-        for i in range(sample_num):
-            per_sample_features = apply_data_processor(
-                modality_features=modality_features,
-                data_processors=data_processors,
-                idx=i,
-                is_training=False,
-            )
-            processed_features.append(per_sample_features)
-        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
-        batch = collate_fn(processed_features)
 
         ret = {}
         for k in batch:
@@ -2136,6 +2121,8 @@ class MultiModalPredictor:
                 ret[k] = batch[k].long() if isinstance(batch[k], torch.IntTensor) else batch[k]
             elif to_numpy:
                 ret[k] = batch[k].cpu().detach().numpy().astype(int)
+            else:
+                ret[k] = batch[k]
         if not onnx_tracing:
             if batch_size:
                 raise NotImplementedError("We should split the batch here.")  # TODO

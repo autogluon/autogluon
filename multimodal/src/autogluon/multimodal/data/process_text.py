@@ -239,10 +239,12 @@ class TextProcessor:
         Construct one token sequence based on multiple token sequences coming from different
         text columns in a multimodal pd.DataFrame. The token sequence length and the text segment
         id are upper bounded by "self.max_len" and "self.text_segment_num".
+
         Parameters
         ----------
         text_tokens
             One sample's text token sequences from different text columns in a multimodal pd.DataFrame.
+
         Returns
         -------
         A dictionary containing one sample's text tokens, valid length, and segment ids.
