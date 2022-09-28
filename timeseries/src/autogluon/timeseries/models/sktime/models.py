@@ -15,10 +15,11 @@ class SktimeThetaModel(AbstractSktimeModel):
 
     This is a special case of AutoETS model that can only be applied to positive data.
 
-    See `AbstractSktimeModel` for common parameters.
+    Based on `sktime.forecasting.theta.ThetaForecaster <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.theta.ThetaForecaster.html>`_
 
-    Other Parameters
-    ----------------
+
+    Hyperparameters
+    ---------------
     initial_level : float or None, default = None
         The alpha value of the simple exponential smoothing, if the value is set then
         this will be used, otherwise it will be estimated from the data.
@@ -71,7 +72,15 @@ class SktimeThetaModel(AbstractSktimeModel):
 class SktimeTBATSModel(AbstractSktimeModel):
     """TBATS forecaster with multiple seasonalities.
 
-    See `AbstractSktimeModel` for common parameters.
+    This model automatically tries all combinations of hyperparameters (e.g.,
+    use_box_cox, use_trend, use_arma_errors), and selects the best model
+
+    Based on `sktime.forecasting.tbats.TBATS <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.tbats.TBATS.html>`_
+
+    Caution
+    -------
+    The fitting time for this model can be very long, and the saved model can take up a
+    lot of disk space when applied to large datasets.
 
     Other Parameters
     ----------------
