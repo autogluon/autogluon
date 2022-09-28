@@ -9,12 +9,13 @@ from scipy.stats import pearsonr, spearmanr
 
 import onnxruntime as ort
 
+
 def eval_cosine(predictor, df, onnx_session):
     labels = df["score"].to_numpy()
     valid_input = [
         "hf_text_text_token_ids",
         "hf_text_text_valid_length",
-        "hf_text_text_segment_ids", # Remove for mpnet
+        "hf_text_text_segment_ids",  # Remove for mpnet
     ]
     QEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence1"]], valid_input=valid_input))[0]
     AEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence2"]], valid_input=valid_input))[0]
@@ -25,6 +26,7 @@ def eval_cosine(predictor, df, onnx_session):
 
     print(eval_pearson_cosine)
     print(eval_spearman_cosine)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -48,7 +50,8 @@ if __name__ == "__main__":
     )
 
     # Export ONNX model
-    predictor.export_onnx(data=val_df, verbose=args.verbose, onnx_path=args.onnx_path)
+    # predictor.export_onnx(data=val_df, verbose=args.verbose, onnx_path=args.onnx_path)
+    predictor.export_onnx(verbose=args.verbose, onnx_path=args.onnx_path)
 
     # Load ONNX model
     ort_sess = ort.InferenceSession(args.onnx_path, providers=["CUDAExecutionProvider"])

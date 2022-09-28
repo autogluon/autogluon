@@ -61,9 +61,6 @@ def get_onnx_input(pipeline: str, config: Optional[Dict] = None):
         if config:
             default_onnx_path = config["model"]["hf_text"]["checkpoint_name"].replace("/", "_") + ".onnx"
         default_batch = {
-            "hf_text_text_token_ids_column_sentence1": tensor(
-                [[1, 7], [1, 8], [1, 8], [1, 8], [1, 6], [1, 9], [1, 8], [1, 8]],
-            ),
             "hf_text_text_token_ids": tensor(
                 [
                     [101, 1037, 2158, 2003, 2652, 2858, 1012, 102, 0, 0, 0, 0, 0, 0],
