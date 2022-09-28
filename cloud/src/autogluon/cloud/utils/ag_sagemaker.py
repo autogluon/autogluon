@@ -2,17 +2,12 @@ import copy
 import os
 import sagemaker
 from sagemaker import fw_utils
-from sagemaker.estimator import Framework, Estimator
-from sagemaker.mxnet.estimator import MXNet
+from sagemaker.estimator import Estimator
 from sagemaker import image_uris, vpc_utils
-from sagemaker.model import FrameworkModel, Model, DIR_PARAM_NAME, SCRIPT_PARAM_NAME
+from sagemaker.model import Model, DIR_PARAM_NAME, SCRIPT_PARAM_NAME
 from sagemaker.predictor import Predictor
-from sagemaker.mxnet import MXNetModel
 from sagemaker.serializers import CSVSerializer, NumpySerializer
-from sagemaker.fw_utils import (
-    model_code_key_prefix,
-)
-from .serializers import ParquetSerializer, MultiModalSerializer, JsonLineSerializer
+from .serializers import ParquetSerializer, MultiModalSerializer
 from .deserializers import PandasDeserializer
 from .sagemaker_utils import retrieve_latest_framework_version
 
@@ -64,6 +59,7 @@ class AutoGluonSagemakerEstimator(Estimator):
         image_uri=None,
         predictor_cls=None,
         vpc_config_override=vpc_utils.VPC_CONFIG_DEFAULT,
+        repack=False,
         **kwargs,
     ):
         image_uri = image_uris.retrieve(
@@ -86,7 +82,11 @@ class AutoGluonSagemakerEstimator(Estimator):
         if "enable_network_isolation" not in kwargs:
             kwargs["enable_network_isolation"] = self.enable_network_isolation()
 
-        return AutoGluonNonRepackModel(
+        if repack:
+            model_cls = AutoGluonRepackInferenceModel
+        else:
+            model_cls = AutoGluonNonRepackInferenceModel
+        return model_cls(
             image_uri=image_uri,
             source_dir=source_dir,
             entry_point=entry_point,
@@ -97,12 +97,6 @@ class AutoGluonSagemakerEstimator(Estimator):
             predictor_cls=predictor_cls,
             **kwargs,
         )
-        # return super().create_model(
-        #     image_uri=image_uri,
-        #     source_dir=source_dir,
-        #     entry_point=entry_point,
-        #     **kwargs
-        # )
 
     @classmethod
     def _prepare_init_params_from_job_description(cls, job_details, model_channel_name=None):
@@ -113,7 +107,7 @@ class AutoGluonSagemakerEstimator(Estimator):
         return init_params
 
 
-# Documentation for FrameworkModel: https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel
+# Documentation for Model: https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#model
 class AutoGluonSagemakerInferenceModel(Model):
     def __init__(
         self,
@@ -166,6 +160,9 @@ class AutoGluonSagemakerInferenceModel(Model):
 
 
 class AutoGluonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
+    """
+        Custom implementation to force repack of inference code into model artifacts
+    """
 
     def prepare_container_def(
         self,
@@ -173,26 +170,6 @@ class AutoGluonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
         accelerator_type=None,
         serverless_inference_config=None,
     ):  # pylint: disable=unused-argument
-        """Return a dict created by ``sagemaker.container_def()``.
-
-        It is used for deploying this model to a specified instance type.
-
-        Subclasses can override this to provide custom container definitions
-        for deployment to a specific instance type. Called by ``deploy()``.
-
-        Args:
-            instance_type (str): The EC2 instance type to deploy this Model to.
-                For example, 'ml.p2.xlarge'.
-            accelerator_type (str): The Elastic Inference accelerator type to
-                deploy to the instance for loading and making inferences to the
-                model. For example, 'ml.eia1.medium'.
-            serverless_inference_config (sagemaker.serverless.ServerlessInferenceConfig):
-                Specifies configuration related to serverless endpoint. Instance type is
-                not provided in serverless inference. So this is used to find image URIs.
-
-        Returns:
-            dict: A container definition object usable with the CreateModel API.
-        """
         deploy_key_prefix = fw_utils.model_code_key_prefix(
             self.key_prefix, self.name, self.image_uri
         )
@@ -208,6 +185,10 @@ class AutoGluonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
 
 
 class AutoGluonNonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
+    """
+    Custom implementation to force no repack of inference code into model artifacts.
+    This requires inference code already present in the trained artifacts, which is created during CloudPredictor training.
+    """
 
     def prepare_container_def(
         self,
@@ -215,31 +196,6 @@ class AutoGluonNonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
         accelerator_type=None,
         serverless_inference_config=None,
     ):  # pylint: disable=unused-argument
-        """Return a dict created by ``sagemaker.container_def()``.
-
-        It is used for deploying this model to a specified instance type.
-
-        Subclasses can override this to provide custom container definitions
-        for deployment to a specific instance type. Called by ``deploy()``.
-
-        Args:
-            instance_type (str): The EC2 instance type to deploy this Model to.
-                For example, 'ml.p2.xlarge'.
-            accelerator_type (str): The Elastic Inference accelerator type to
-                deploy to the instance for loading and making inferences to the
-                model. For example, 'ml.eia1.medium'.
-            serverless_inference_config (sagemaker.serverless.ServerlessInferenceConfig):
-                Specifies configuration related to serverless endpoint. Instance type is
-                not provided in serverless inference. So this is used to find image URIs.
-
-        Returns:
-            dict: A container definition object usable with the CreateModel API.
-        """
-        # c_def = super().prepare_container_def(
-        #     instance_type=instance_type,
-        #     accelerator_type=accelerator_type,
-        #     serverless_inference_config=serverless_inference_config
-        # ).copy()
         deploy_env = copy.deepcopy(self.env)
         deploy_env.update(self._script_mode_env_vars())
         deploy_env[SCRIPT_PARAM_NAME.upper()] = os.path.basename(deploy_env[SCRIPT_PARAM_NAME.upper()])
@@ -251,16 +207,6 @@ class AutoGluonNonRepackInferenceModel(AutoGluonSagemakerInferenceModel):
             deploy_env,
             image_config=self.image_config,
         )
-
-        # if 'Environment' in c_def and DIR_PARAM_NAME in c_def['Environment']:
-        #     c_def['Environment'][DIR_PARAM_NAME] = '/opt/ml/model/code'
-        # return sagemaker.container_def(
-        #     image_uri=c_def.get('Image', None),
-        #     model_data_url=c_def.get('ModelDataUrl', None),
-        #     env=c_def.get('Environment', None),
-        #     container_mode=c_def.get('Mode', None),
-        #     image_config=c_def.get('ImageConfig', None)
-        # )
 
 
 # Predictor documentation: https://sagemaker.readthedocs.io/en/stable/api/inference/predictors.html
@@ -303,6 +249,3 @@ class AutoGluonBatchPredictor(Predictor):
             serializer=CSVSerializer(),
             **kwargs
         )
-
-
-

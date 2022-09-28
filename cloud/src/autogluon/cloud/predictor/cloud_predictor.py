@@ -22,11 +22,9 @@ from ..data import FormatConverterFactory
 from ..job import SageMakerFitJob, SageMakerBatchTransformationJob
 from ..scripts import ScriptManager
 from ..utils.ag_sagemaker import (
-    AutoGluonSagemakerEstimator,
-    AutoGluonSagemakerInferenceModel,
+    AutoGluonRepackInferenceModel,
+    AutoGluonNonRepackInferenceModel,
     AutoGluonRealtimePredictor,
-    AutoGluonImageRealtimePredictor,
-    AutoGluonMultiModalRealtimePredictor,
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import setup_sagemaker_role_and_policy, setup_sagemaker_session
@@ -38,7 +36,6 @@ from ..utils.sagemaker_utils import (
     retrieve_latest_framework_version
 )
 from ..utils.utils import (
-    read_image_bytes_and_encode,
     convert_image_path_to_encoded_bytes_in_dataframe,
     zipfolder,
     is_compressed_file,
@@ -538,7 +535,7 @@ class CloudPredictor(ABC):
         instance_type='ml.m5.2xlarge',
         initial_instance_count=1,
         wait=True,
-        autogluon_sagemaker_inference_model_kwargs=dict(),
+        model_kwargs=dict(),
         **kwargs
     ):
         """
@@ -566,9 +563,9 @@ class CloudPredictor(ABC):
         wait: Bool, default = True,
             Whether to wait for the endpoint to be deployed.
             To be noticed, the function won't return immediately because there are some preparations needed prior deployment.
-        autogluon_sagemaker_inference_model_kwargs: dict, default = dict()
-            Any extra arguments needed to initialize AutoGluonSagemakerInferenceModel
-            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel for all options
+        model_kwargs: dict, default = dict()
+            Any extra arguments needed to initialize Sagemaker Model
+            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#model for all options
         **kwargs:
             Any extra arguments needed to pass to deploy.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.Model.deploy for all options
@@ -586,19 +583,28 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
-        autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
-        user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
+        model_kwargs = copy.deepcopy(model_kwargs)
+        user_entry_point = model_kwargs.pop('entry_point', None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the deployment. Please refer to `{entry_point}` for our implementation')
             entry_point = user_entry_point
 
+        repack_model = False
+        if predictor_path != self._fit_job.get_output_path() or user_entry_point is not None:
+            # Not inference on cloud trained model or not using inference on cloud trained model
+            # Need to repack the code into model. This will slow down batch inference and deployment
+            repack_model = True
         predictor_cls = self._realtime_predictor_cls
-        user_predictor_cls = autogluon_sagemaker_inference_model_kwargs.pop('predictor_cls', None)
+        user_predictor_cls = model_kwargs.pop('predictor_cls', None)
         if user_predictor_cls:
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonRealtimePredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
 
-        model = AutoGluonSagemakerInferenceModel(
+        if repack_model:
+            model_cls = AutoGluonRepackInferenceModel
+        else:
+            model_cls = AutoGluonNonRepackInferenceModel
+        model = model_cls(
             model_data=predictor_path,
             role=self.role_arn,
             region=self._region,
@@ -607,7 +613,7 @@ class CloudPredictor(ABC):
             instance_type=instance_type,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
-            **autogluon_sagemaker_inference_model_kwargs
+            **model_kwargs
         )
 
         logger.log(20, 'Deploying model to the endpoint')
@@ -727,7 +733,7 @@ class CloudPredictor(ABC):
         instance_type='ml.m5.2xlarge',
         instance_count=1,
         wait=True,
-        autogluon_sagemaker_inference_model_kwargs=dict(),
+        model_kwargs=dict(),
         transformer_kwargs=dict(),
         **kwargs,
     ):
@@ -763,9 +769,9 @@ class CloudPredictor(ABC):
         wait: bool, default = True
             Whether to wait for batch transform to complete.
             To be noticed, the function won't return immediately because there are some preparations needed prior transform.
-        autogluon_sagemaker_inference_model_kwargs: dict, default = dict()
-            Any extra arguments needed to initialize AutoGluonSagemakerInferenceModel
-            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel for all options
+        model_kwargs: dict, default = dict()
+            Any extra arguments needed to initialize Sagemaker Model
+            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#model for all options
         transformer_kwargs: dict
             Any extra arguments needed to pass to transformer.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer for all options.
@@ -804,8 +810,8 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
-        autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
-        user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
+        model_kwargs = copy.deepcopy(model_kwargs)
+        user_entry_point = model_kwargs.pop('entry_point', None)
         repack_model = False
         if predictor_path != self._fit_job.get_output_path() or user_entry_point is not None:
             # Not inference on cloud trained model or not using inference on cloud trained model
@@ -815,7 +821,7 @@ class CloudPredictor(ABC):
             entry_point = user_entry_point
 
         predictor_cls = AutoGluonBatchPredictor
-        user_predictor_cls = autogluon_sagemaker_inference_model_kwargs.pop('predictor_cls', None)
+        user_predictor_cls = model_kwargs.pop('predictor_cls', None)
         if user_predictor_cls:
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonBatchPredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
@@ -829,40 +835,6 @@ class CloudPredictor(ABC):
         if not content_type:
             content_type = 'text/csv'
 
-        # print('creating model')
-        # self._sagemaker_model_entity = self._fit_job._estimator.create_model(
-        #     region=self._region,
-        #     instance_type=instance_type,
-        #     framework_version=framework_version,
-        #     py_version=py_version,
-        #     source_dir=os.path.dirname(self._serve_script_path),
-        #     entry_point=self._serve_script_path
-        # )
-        # print('model created')
-        # self._fitted_model.create()
-        # model_name = self._fitted_model.name
-        # from sagemaker.transformer import Transformer
-        # print('creating transformer')
-        # transformer = Transformer(
-        #     model_name=model_name,
-        #     instance_count=instance_count,
-        #     instance_type=instance_type,
-        #     strategy='MultiRecord',
-        #     max_payload=6,  # Maximum size of the payload in a single HTTP request to the container in MB. Will split into multiple batches if a request is more than max_payload
-        #     max_concurrent_transforms=1,  # The maximum number of HTTP requests to be made to each individual transform container at one time.
-        #     accept='application/json',
-        #     assemble_with='Line',
-        # )
-        # print('transformer created')
-        # print('transforming')
-        # transformer.transform(
-        #     data=test_input,
-        #     job_name=job_name,
-        #     split_type=split_type,
-        #     content_type=content_type,
-        #     wait=wait,
-        # )
-        # print('transform done')
         batch_transform_job = SageMakerBatchTransformationJob(session=self.sagemaker_session)
         batch_transform_job.run(
             model_data=predictor_path,
@@ -881,7 +853,7 @@ class CloudPredictor(ABC):
             content_type=content_type,
             wait=wait,
             transformer_kwargs=transformer_kwargs,
-            autogluon_sagemaker_inference_model_kwargs=autogluon_sagemaker_inference_model_kwargs,
+            model_kwargs=model_kwargs,
             repack_model=repack_model,
             **kwargs
         )
