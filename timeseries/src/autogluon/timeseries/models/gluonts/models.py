@@ -54,9 +54,8 @@ gluonts.model.deepar._estimator.time_features_from_frequency_str = time_features
 class DeepARModel(AbstractGluonTSModel):
     """DeepAR model from GluonTS.
 
-    The model consists of an encoder (LSTM or GRU recurrent neural network) and a
-    decoder that outputs the distribution of the next target value. Close the model
-    described in [Salinas2020]_.
+    The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
+    distribution of the next target value. Close to the model described in [Salinas2020]_.
 
     .. [Salinas2020] Salinas, David, et al.
         "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
@@ -266,13 +265,16 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSModel):
-    """TemporalFusionTransformer model for forecasting, as described in [Lim2021]_.
+    """TemporalFusionTransformer model from GluonTS.
+
+    As described in [Lim2021]_.
 
     .. [Lim2021] Lim, Bryan, et al.
         "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
         International Journal of Forecasting. 2021.
 
-    See `AbstractGluonTSModel` for common parameters.
+    Based on `gluonts.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.tft.html>`_.
+    See GluonTS documentation for additional hyperparameters.
 
     Other Parameters
     ----------------
@@ -285,10 +287,14 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Number of attention heads in multi-head attention.
     dropout_rate : float, default = 0.1
         Dropout regularization parameter
-    batch_size : int, default = 32
-        Size of the mini-batch during training.
     epochs : int, default = 100
-        Number of epochs the model will be trained for.
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
@@ -319,28 +325,31 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
 
 
 class TransformerModel(AbstractGluonTSModel):
-    """GluonTS Transformer model for forecasting, close to the one described in
-    [Vaswani2017]_.
+    """Autoregressive transformer forecasting model from GluonTS.
+
+    The model consists of an Transformer encoder and a decoder that outputs the
+    distribution of the next target value. The transformer architecture is close to the
+    one described in [Vaswani2017]_.
 
     .. [Vaswani2017] Vaswani, Ashish, et al. "Attention is all you need."
         Advances in neural information processing systems. 2017.
 
-    See `AbstractGluonTSModel` for common parameters.
+    Based on `gluonts.model.transformer.TransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.transformer.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
     context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
-    trainer : Trainer, default = Trainer()
-        Trainer object to be used
+    model_dim : int, default = 32
+        Dimension of the transformer network, i.e., embedding dimension of the
+        input
     dropout_rate : float, default = 0.1
         Dropout regularization parameter
     distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
         Distribution to use to evaluate observations and sample predictions
-    model_dim : int, default = 32
-        Dimension of the transformer network, i.e., embedding dimension of the
-        input
     inner_ff_dim_scale : int, default = 4
         Dimension scale of the inner hidden layer of the transformer's
         feedforward network
@@ -354,6 +363,12 @@ class TransformerModel(AbstractGluonTSModel):
         dropout, 'r' for residual connections and 'n' for normalization
     epochs : int, default = 100
         Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
