@@ -105,7 +105,6 @@ class SageMakerFitJob(SageMakerJob):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._estimator = None
         self._framework_version = None
 
     @classmethod
@@ -184,18 +183,9 @@ class SageMakerFitJob(SageMakerJob):
             )
             self._job_name = job_name
             self._framework_version = framework_version
-            self._estimator = sagemaker_estimator
         except Exception as e:
             logger.error(f'Training failed. Please check sagemaker console training jobs {job_name} for details.')
             raise e
-
-    def __getstate__(self):
-        self._estimator = None
-        state = self.__dict__.copy()
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
 
 
 class SageMakerBatchTransformationJob(SageMakerJob):
