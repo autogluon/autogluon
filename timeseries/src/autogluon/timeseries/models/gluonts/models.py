@@ -267,7 +267,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
 class TemporalFusionTransformerModel(AbstractGluonTSModel):
     """TemporalFusionTransformer model from GluonTS.
 
-    As described in [Lim2021]_.
+    The model combines an LSTM encoder, a transformer decoder, and directly predicts
+    the quantiles of future target values. As described in [Lim2021]_.
 
     .. [Lim2021] Lim, Bryan, et al.
         "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."

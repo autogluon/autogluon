@@ -13,13 +13,11 @@ logger = logging.getLogger(__name__)
 class SktimeThetaModel(AbstractSktimeModel):
     """Theta model for forecasting.
 
-    This is a special case of AutoETS model that can only be applied to positive data.
-
     Based on `sktime.forecasting.theta.ThetaForecaster <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.theta.ThetaForecaster.html>`_
 
 
-    Hyperparameters
-    ---------------
+    Other Parameters
+    ----------------
     initial_level : float or None, default = None
         The alpha value of the simple exponential smoothing, if the value is set then
         this will be used, otherwise it will be estimated from the data.
@@ -77,10 +75,9 @@ class SktimeTBATSModel(AbstractSktimeModel):
 
     Based on `sktime.forecasting.tbats.TBATS <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.tbats.TBATS.html>`_
 
-    Caution
-    -------
-    The fitting time for this model can be very long, and the saved model can take up a
-    lot of disk space when applied to large datasets.
+    Caution: The fitting time for this model can be very long, and the saved model can
+    take up a lot of disk space when applied to large datasets.
+
 
     Other Parameters
     ----------------

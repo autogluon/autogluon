@@ -17,6 +17,9 @@ The available hyperparameters for each model are listed under **Other parameters
 
 This list is useful if you want to `override the default hyperparameters <forecasting-indepth.html#manually-configuring-models>`_ or `define custom hyperparameter search spaces <forecasting-indepth.html#hyperparameter-tuning>`_, as described in the In-depth Tutorial.
 
+Please note that some of the models' hyperparameters have names and default values that
+are different from the original libraries.
+
 .. automodule:: autogluon.timeseries.models
 .. currentmodule:: autogluon.timeseries.models
 
