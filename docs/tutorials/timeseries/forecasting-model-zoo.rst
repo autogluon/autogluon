@@ -1,5 +1,5 @@
-Time Series Forecasting Model Zoo
-=================================
+Forecasting Time Series - Model Zoo
+===================================
 
 .. note::
 
