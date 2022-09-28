@@ -33,6 +33,12 @@ smoothing or ARIMA, through the `statsmodels library <https://www.statsmodels.or
       Detailed discussion of the time series forecasting capabilities in AutoGluon.
 
    .. card::
+      :title: Model Zoo
+      :link: forecasting-model-zoo.html
+
+      List of available forecasting models in AutoGluon-TimeSeries.
+
+   .. card::
       :title: FAQ
       :link: forecasting-faq.html
 
@@ -44,4 +50,5 @@ smoothing or ARIMA, through the `statsmodels library <https://www.statsmodels.or
 
    forecasting-quickstart
    forecasting-indepth
+   forecasting-model-zoo
    forecasting-faq

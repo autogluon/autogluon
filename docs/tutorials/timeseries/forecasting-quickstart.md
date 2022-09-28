@@ -255,4 +255,4 @@ predictor.fit(
 # Generate the forecasts
 predictions = predictor.predict(ts_dataframe)
 ```
-Check out the [in-depth tutorial](forecasting-indepth.md) to learn about the advanced capabilities of AutoGluon for time series forecasting.
+Check out the [in-depth tutorial](forecasting-indepth.html) to learn about the advanced capabilities of AutoGluon for time series forecasting.

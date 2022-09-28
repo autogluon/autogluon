@@ -12,7 +12,7 @@ This tutorial provides an in-depth overview of the time series forecasting capab
     - Hyperparameter tuning
     - Forecasting irregularly-sampled time series
 
-This tutorial assumes that you are familiar with the contents of the [basic tutorial](forecasting-quickstart.md).
+This tutorial assumes that you are familiar with the contents of the [basic tutorial](forecasting-quickstart.html).
 
 ## What is probabilistic time series forecasting?
 A time series is a sequence of measurement made at regular intervals.
@@ -79,7 +79,7 @@ Finally, an **ensemble** model works by combining predictions of all other model
 By default, `TimeSeriesPredictor` always fits a `WeightedEnsemble` on top of other models.
 This can be disabled by setting `enable_ensemble=False` when calling the `fit` method.
 
-For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](#TODO).
+For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](forecasting-model-zoo).
 
 ## How does AutoGluon evaluate performance of time series models?
 AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
@@ -127,7 +127,7 @@ However, this strategy decreases the amount of training data available for fitti
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
-For more details about the available metrics, see [Metrics overview](#TODO).
+For more details about the available metrics, see [Metrics overview](forecasting-model-zoo).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
 For this purpose, some metrics are multiplied by -1.
@@ -193,12 +193,13 @@ predictor.fit(
 If no `time_limit` is provided, the predictor will train until all models have been fit.
 
 
-### Manually configuring the models
+
+### Manually configuring models
 Advanced users can override the presets and manually specify what models should be trained by the predictor using the `hyperparameters` argument.
 
 
 ```python
-predictor = TimeSeriesPredictor()
+predictor = TimeSeriesPredictor(...)
 
 predictor.fit(
     train_data=train_data,
@@ -244,11 +245,15 @@ AutGluon will automatically select the best model configuration that achieves th
 
 We can change the number of random search runs by passing a dictionary as `hyperparameter_tune_kwargs`
 ```python
+predictor.fit(
+    ...
     hyperparameter_tune_kwargs={
         "scheduler": "local",
         "searcher": "random",
         "num_trials": 20,
     },
+    ...
+)
 ```
 
 ### Forecasting irregularly-sampled time series
