@@ -16,6 +16,7 @@ from ..constants import (
     MULTICLASS,
     NULL,
     NUMERICAL,
+    OBJECT_DETECTION,
     REGRESSION,
     ROIS,
     TEXT,
@@ -344,7 +345,7 @@ def infer_label_column_type_by_problem_type(
     problem_type: str,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL),
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, ROIS),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
@@ -391,6 +392,8 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
+        elif problem_type == OBJECT_DETECTION:
+            column_types[col_name] = ROIS
 
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type

@@ -1437,6 +1437,13 @@ class MultiModalPredictor:
             column_types = infer_column_types(
                 data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
             )
+            if self._label_column and self._label_column in data.columns:
+                column_types = infer_label_column_type_by_problem_type(
+                    column_types=column_types,
+                    label_columns=self._label_column,
+                    problem_type=self._problem_type if self._problem_type else self._pipeline,
+                    data=data,
+                )
         else:  # called .fit() or .load()
             column_types = self._column_types
 
