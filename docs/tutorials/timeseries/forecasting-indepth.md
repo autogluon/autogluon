@@ -1,5 +1,5 @@
 # Forecasting Time Series - In Depth
-:label:`sec_forecastingadvanced`
+:label:`sec_forecasting_indepth`
 
 This tutorial provides an in-depth overview of the time series forecasting capabilities in AutoGluon.
 
@@ -12,7 +12,7 @@ This tutorial provides an in-depth overview of the time series forecasting capab
     - Hyperparameter tuning
     - Forecasting irregularly-sampled time series
 
-This tutorial assumes that you are familiar with the contents of the [basic tutorial](forecasting-quickstart.html).
+This tutorial assumes that you are familiar with the contents of :ref:`sec_forecasting_quickstart`.
 
 ## What is probabilistic time series forecasting?
 A time series is a sequence of measurement made at regular intervals.
@@ -29,7 +29,7 @@ determines the length of the forecast horizon.
 :width:`600px`
 
 
-The [predict](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor.predict) method of a `TimeSeriesPredictor` generates two types of forecasts:
+The :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict` method of a `TimeSeriesPredictor` generates two types of forecasts:
 
 - **mean forecast** represents the expected value of the time series at each time step in the forecast horizon.
 - **quantile forecast** represents the quantiles of the forecast distribution.
@@ -79,7 +79,7 @@ Finally, an **ensemble** model works by combining predictions of all other model
 By default, `TimeSeriesPredictor` always fits a `WeightedEnsemble` on top of other models.
 This can be disabled by setting `enable_ensemble=False` when calling the `fit` method.
 
-For a list of tunable hyperparameters for each model, their default values, and other details see [Forecasting Time Series - Model Zoo](forecasting-model-zoo.html).
+For a list of tunable hyperparameters for each model, their default values, and other details see :ref:`forecasting_zoo`.
 
 ## How does AutoGluon evaluate performance of time series models?
 AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
@@ -195,6 +195,8 @@ If no `time_limit` is provided, the predictor will train until all models have b
 
 
 ### Manually configuring models
+:label:`sec_forecasting_indepth_manual_config`
+
 Advanced users can override the presets and manually specify what models should be trained by the predictor using the `hyperparameters` argument.
 
 
@@ -217,9 +219,11 @@ The code above will only train two models:
 - `DeepAR` (with default hyperparameters)
 - `ETS` (with the given `seasonality` and `seasonal_period`; all other parameters set to their defaults).
 
-For the full list of available models and the respective hyperparameters, see [Forecasting Time Series - Model Zoo](forecasting-model-zoo.html).
+For the full list of available models and the respective hyperparameters, see :ref:`forecasting_zoo`.
 
 ### Hyperparameter tuning
+:label:`sec_forecasting_indepth_hpo`
+
 Advanced users can define search spaces for model hyperparameters and let AutoGluon automatically determine the best configuration for the model.
 
 ```python

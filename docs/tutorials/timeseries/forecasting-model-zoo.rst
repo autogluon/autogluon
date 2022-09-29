@@ -1,5 +1,8 @@
+.. _forecasting_zoo:
+
 Forecasting Time Series - Model Zoo
 ===================================
+
 
 .. note::
 
@@ -15,7 +18,10 @@ Models
 This page contains the list of time series forecasting models available in AutoGluon.
 The available hyperparameters for each model are listed under **Other parameters**.
 
-This list is useful if you want to `override the default hyperparameters <forecasting-indepth.html#manually-configuring-models>`_ or `define custom hyperparameter search spaces <forecasting-indepth.html#hyperparameter-tuning>`_, as described in the In-depth Tutorial.
+.. This list is useful if you want to `override the default hyperparameters <forecasting-indepth.html#manually-configuring-models>`_ or `define custom hyperparameter search spaces <forecasting-indepth.html#hyperparameter-tuning>`_, as described in the In-depth Tutorial.
+
+This list is useful if you want to override the default hyperparameters (:ref:`sec_forecasting_indepth_manual_config`)
+or define custom hyperparameter search spaces (:ref:`sec_forecasting_indepth_hpo`), as described in the In-depth Tutorial.
 
 Please note that some of the models' hyperparameters have names and default values that
 are different from the original libraries.
