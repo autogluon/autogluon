@@ -1,5 +1,5 @@
 # Forecasting Time Series - Quick Start
-:label:`sec_forecastingquick`
+:label:`sec_forecasting_quickstart`
 
 Via a simple `fit()` call, AutoGluon can train and tune
 
@@ -162,8 +162,7 @@ These models are three neural network forecasters: DeepAR, Transformer, a feedfo
 AutoGluon also constructs a weighted ensemble on top of these models capable of quantile forecasting.
 
 Here we used the `"low_quality"` presets to quickly obtain the results.
-In realistic scenarios, we can set `presets` to be one of:
-`"medium_quality"`, `"good_quality"`, `"high_quality"`, `"best_quality"`.
+In realistic scenarios, we can set `presets` to be one of `"medium_quality"` or `"best_quality"`.
 Higher quality presets will usually produce more accurate forecasts but take longer to train and may produce less efficient models.
 
 Note that inside `fit()` the last `prediction_length` steps of each time series in `train_data` were automatically used as a tuning (validation) set.
@@ -249,10 +248,10 @@ predictor = TimeSeriesPredictor(
 )
 predictor.fit(
     train_data=ts_dataframe,
-    presets="low_quality",  # other options: "medium_quality", "good_quality", "high_quality", "best_quality"
+    presets="low_quality",  # other options: "medium_quality", "best_quality"
 )
 
 # Generate the forecasts
 predictions = predictor.predict(ts_dataframe)
 ```
-Check out the [in-depth tutorial](forecasting-indepth.md) to learn about the advanced capabilities of AutoGluon for time series forecasting.
+Check out :ref:`sec_forecasting_indepth` to learn about the advanced capabilities of AutoGluon for time series forecasting.
