@@ -16,7 +16,7 @@ To start using the containers, an inference script and the [wrapper classes](htt
 When authoring an inference [scripts](https://github.com/aws/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular-containers/scripts/), 
 please refer to SageMaker [documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/adapt-inference-container.html).
 
-Here is one of the possible inference scripts. 
+Here is one of the possible Tabular inference scripts. 
 
 - the `model_fn` function is responsible for loading your model. It takes a `model_dir` argument that specifies where the model is stored. 
 
@@ -36,6 +36,9 @@ import numpy as np
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TabularPredictor.load(model_dir)
+    # Get original columns for header validation later
+    # Different predictors might have different ways to retrieve this info
+    # Free to remove this check if you know your test data is always valid.
     globals()["column_names"] = model.feature_metadata_in.get_features()
     model.persist_models()
     return model
@@ -47,7 +50,9 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = StringIO(request_body)
         data = pd.read_csv(buf, header=None)
         num_cols = len(data.columns)
-
+        
+        # In case the test payload doesn't have a header, we need to check if the passed test data is valid or not.
+        # Free to remove this check if you know your test data is always valid.
         if num_cols != len(column_names):
             raise Exception(
                 f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}"
@@ -59,10 +64,16 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
 
     pred = model.predict(data)
     pred_proba = model.predict_proba(data)
-    prediction = pd.concat([pred, pred_proba], axis=1).values
+    prediction = pd.concat([pred, pred_proba], axis=1)
 
-    return json.dumps(prediction.tolist()), output_content_type
+    return prediction.to_json(), output_content_type
 ```
+For inference with other types of AutoGluon Predictors, i.e. TextPredictor, the inference script you provided will be quite similar to the one above.
+Mostly, you just need to replace `TabularPredictor` to be `TextPredictor` for example.
+
+### Note on image modality
+To do inference on image modality, you would need to embed the image info, as bytes for example, into a column of the test data.
+Then in the inference container, you would need to store the image into the disk and update the test data with the image paths accordingly.
 
 ## Deployment as an inference endpoint
 
@@ -88,7 +99,9 @@ s3_prefix = f"autogluon_sm/{utils.sagemaker_timestamp()}"
 output_path = f"s3://{bucket}/{s3_prefix}/output/"
 ```
 
-Upload the model archive trained earlier (if you trained AutoGluon model locally, it must be a zip archive of the model output directory):
+Upload the model archive trained earlier (if you trained AutoGluon model locally, it must be a zip archive of the model output directory).
+Remember, you would need to save the model artifacts with `standalone=True` if the model artifact is of type `TextPredictor`/`MultiModalPredictor`.
+Otherwise, you will have trouble loading the model in the container.
 
 ```{.python}
 endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
@@ -101,17 +114,16 @@ model_data = sagemaker_session.upload_data(
 Deploy the model:
 
 ```{.python}
-instance_type = "ml.m5.2xlarge"
+instance_type = "ml.m5.2xlarge"  # You might want to use GPU instances for Text/Image/MultiModal Predictors etc
 
 model = AutoGluonInferenceModel(
     model_data=model_data,
     role=role,
     region=region,
-    framework_version="0.4",
+    framework_version="0.5.2",  # Replace this with the AutoGLuon DLC container version you want to use
     py_version="py38",
     instance_type=instance_type,
-    source_dir="scripts",
-    entry_point="tabular_serve.py",
+    entry_point="YOUR_SERVING_SCRIPT_PATH",
 )
 
 predictor = model.deploy(
@@ -133,7 +145,9 @@ dataset where minimizing latency isn’t a concern, then the batch transform fun
 
 [Read more about Batch Transform.](https://docs.aws.amazon.com/sagemaker/latest/dg/batch-transform.html)
 
-Upload the model archive trained earlier (if you trained AutoGluon model locally, it must be a zip archive of the model output directory):
+Upload the model archive trained earlier (if you trained AutoGluon model locally, it must be a zip archive of the model output directory).
+Remember, you would need to save the model artifacts with `standalone=True` if the model artifact is of type `TextPredictor`/`MultiModalPredictor`.
+Otherwise, you will have trouble loading the model in the container.
 
 ```{.python}
 endpoint_name = sagemaker.utils.unique_name_from_base(
@@ -148,17 +162,16 @@ model_data = sagemaker_session.upload_data(
 Prepare transform job:
 
 ```{.python}
-instance_type = "ml.m5.2xlarge"
+instance_type = "ml.m5.2xlarge"  # You might want to use GPU instances for Text/Image/MultiModal Predictors etc
 
 model = AutoGluonInferenceModel(
     model_data=model_data,
     role=role,
     region=region,
-    framework_version="0.4",
+    framework_version="0.5.2",  # Replace this with the AutoGLuon DLC container version you want to use
     py_version="py38",
     instance_type=instance_type,
-    entry_point="tabular_serve-batch.py",
-    source_dir="scripts",
+    entry_point="YOUR_BATCH_SERVE_SCRIPT",
     predictor_cls=AutoGluonTabularPredictor,
 )
 
@@ -174,19 +187,15 @@ transformer = model.transformer(
 )
 ```
 
-The batch transform job accepts CSV file without header and index column - we need to remove them before sending to the transform job.
+Upload the test data.
 
 ```{.python}
-output_file_name = "test_no_header.csv"
-
-pd.read_csv(f"data/test.csv")[:100].to_csv(f"data/{output_file_name}", header=False, index=False)
-
 test_input = transformer.sagemaker_session.upload_data(
-    path=os.path.join("data", "test_no_header.csv"), key_prefix=s3_prefix
+    path=os.path.join("data", "test.csv"), key_prefix=s3_prefix
 )
 ```
 
-The training script has some differences from the previous example, but follows the same APIs: 
+The inference script would be identical to the one used for deployment:
 
 ```{.python}
 from autogluon.tabular import TabularPredictor
@@ -200,15 +209,23 @@ import numpy as np
 def model_fn(model_dir):
     """loads model from previously saved artifact"""
     model = TabularPredictor.load(model_dir)
+    # Get original columns for header validation later
+    # Different predictors might have different ways to retrieve this info
+    # Free to remove this check if you know your test data is always valid.
     globals()["column_names"] = model.feature_metadata_in.get_features()
+    model.persist_models()
     return model
 
 
 def transform_fn(model, request_body, input_content_type, output_content_type="application/json"):
+
     if input_content_type == "text/csv":
         buf = StringIO(request_body)
         data = pd.read_csv(buf, header=None)
         num_cols = len(data.columns)
+        
+        # In case the test payload doesn't have a header. We need to check if the passed test data is valid or not.
+        # Free to remove this check if you know your test data is always valid.
         if num_cols != len(column_names):
             raise Exception(
                 f"Invalid data format. Input data has {num_cols} while the model expects {len(column_names)}"
