@@ -121,7 +121,7 @@ if __name__ == "__main__":
 For training other types of AutoGluon Predictors, i.e. TextPredictor, the training script you provided will be quite similar to the one above.
 Mostly, you just need to replace `TabularPredictor` to be `TextPredictor` for example.
 Keep in mind that the specific Predictor type you want to train might not support the same feature sets as `TabularPredictor`.
-For example, `leaderboard` does not exists for other Predictors.
+For example, `leaderboard` does not exists for all Predictors.
 
 
 ### Notes for Training
@@ -170,6 +170,8 @@ ag_fit_args:
 
 output_prediction_format: csv  # predictions output format: csv or parquet
 ```
+
+Other predictors would follow similar format as the previous two examples.
 
 ## Training
 
