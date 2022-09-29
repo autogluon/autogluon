@@ -1,7 +1,7 @@
-
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
 from .. import AnalysisState
+
 
 class XShiftSummary(AbstractVisualization, JupyterMixin):
     """

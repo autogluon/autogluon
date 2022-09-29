@@ -21,6 +21,10 @@ class AnomalyDetector(AbstractAnalysis):
         Custom anomaly detector from pyod.models, if you don't want the defaults - will override preset
     OD_kwargs: dict, default = {}
         kwargs for the OD method
+    shap_sub_samp: float or int, default = 0.1
+        The amount of subsampling for shap permutation
+    num_anomalies: int, default = 5
+        The number of top anomalies when returning SHAP features
 
     State attributes
     ---------------
@@ -36,7 +40,8 @@ class AnomalyDetector(AbstractAnalysis):
                  preset: str='high_quality',
                  OD_method: Callable=None,
                  OD_kwargs: dict={},
-                 n_sub_shap: int=40, #fix this!
+                 shap_sub_samp: int=40, #fix this!
+                 num_anomalies: int=5,
                  parent: Union[None,AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
@@ -46,7 +51,8 @@ class AnomalyDetector(AbstractAnalysis):
         self.preset = preset
         self.OD_method = OD_method
         self.OD_kwargs = OD_kwargs
-        self.n_sub_shap = n_sub_shap
+        self.shap_sub_samp = shap_sub_samp
+        self.num_anomalies = num_anomalies
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         if self.OD_method is None:
@@ -56,22 +62,21 @@ class AnomalyDetector(AbstractAnalysis):
                 self.OD_method = hbos.HBOS
         clf = self.OD_method(**self.OD_kwargs)
         feature_generator = AutoMLPipelineFeatureGenerator()
+        X_train = args['train_data'].copy()
+        X_test = args['test_data'].copy()
         if args['label'] is not None:
             if args['label'] in args['train_data'].columns:
-                X_train = args['train_data'].drop(columns=[args['label']])
+                X_train = X_train.drop(columns=[args['label']])
             if args['label'] in args['test_data'].columns:
-                X_test = args['test_data'].drop(columns=[args['label']])
+                X_test = X_test.drop(columns=[args['label']])
         train_trans = feature_generator.fit_transform(X=X_train)
         test_trans = feature_generator.transform(X_test)
         clf.fit(train_trans, **fit_kwargs)
         state.test_ano_scores = pd.Series(clf.decision_function(test_trans.values),
                                           index=test_trans.index)
-        state.test_ano_pred = pd.Series(clf.predict(test_trans.values),
-                                        index=test_trans.index)
-        test_sampler = shap.utils.sample(test_trans.values, self.n_sub_shap)
+        test_sampler = shap.utils.sample(test_trans.values, self.shap_sub_samp)
         explainer = shap.Explainer(clf.decision_function, test_sampler)
-        shap_values = explainer(test_trans.values)
-        shap_val_df = pd.DataFrame(shap_values.values,
-                                   columns=test_trans.columns,
-                                   index=test_trans.index)
-        state.test_shap_values = shap_val_df
+        shap_values = explainer(test_trans.values[:state.top_k_anomalies, :])
+        ano_idsort = state.test_ano_scores.values.argsort()[::-1]
+        state.top_anomalies = [(test_trans.iloc[aid,:], shap_values[aid])
+                               for aid in ano_idsort[:self.num_anomalies]]
