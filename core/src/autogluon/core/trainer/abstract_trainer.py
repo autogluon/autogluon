@@ -775,11 +775,13 @@ class AbstractTrainer:
 
         if cascade:
             num_rows = len(X)
+            # used to keep track of which rows remain unconfident and what their original index was.
             unconfident_idx = np.array([i for i in range(num_rows)])
         else:
             num_rows = None
             unconfident_idx = None
-        cascade_order = []
+        # The order in which models predict in the cascade. Only used when `cascade=True`
+        cascade_order: List[str] = []
 
         # Compute model predictions in topological order
         for model_name in model_pred_order:
@@ -787,13 +789,16 @@ class AbstractTrainer:
                 time_start = time.time()
 
             if cascade:
-                # Keep track of the iloc index of the current model for the rows that are predicted on
+                # Keep track of the iloc index of the current model for the rows that are predicted on.
+                #  iloc is used because it is a very compute efficient way to track the location of rows.
                 iloc_model_dict[model_name] = unconfident_idx
             model = self.load_model(model_name=model_name)
             if isinstance(model, StackerEnsembleModel):
                 if cascade:
-                    # Need to predict only on the unconfident rows that remain
+                    # Need to predict only on the unconfident rows that remain.
                     #  This requires getting the correct indices from the dependent models' prior predictions.
+                    #  Because the length of predictions in prior models differs due to early exiting,
+                    #  this logic fetches the correct indices via the iloc_model_dict.
                     cascade_dict = dict()
                     for m in model_pred_proba_dict_cascade:
                         # TODO: Can probably be done faster, unsure how expensive this is.
@@ -831,6 +836,7 @@ class AbstractTrainer:
                     else:
                         raise AssertionError(f'Invalid cascade problem_type: {self.problem_type}')
                     unconfident_cur = ~confident
+                    # Shrink X to only contain the remaining unconfident rows
                     X = X.iloc[unconfident_cur]
                     unconfident_idx = unconfident_idx[unconfident_cur]
                     # If no rows remain that are unconfident, exit cascade logic early.
@@ -843,6 +849,9 @@ class AbstractTrainer:
                 cascade_pred_proba = np.zeros(num_rows, dtype='float32')
             else:
                 cascade_pred_proba = np.zeros((num_rows, self.num_classes), dtype='float32')
+            # For each model in the cascade early exit logic from first to final, update cascade_pred_proba
+            #  with the pred_proba from that model of the rows it predicted on.
+            #  This will result in the final pred_proba of the cascade at the end of the for-loop.
             for m in cascade_order:
                 cascade_pred_proba[iloc_model_dict[m]] = model_pred_proba_dict[m]
             # FIXME: Temp overwrite, unsure how we want to vend cascade results? In future maybe under its own model name.
