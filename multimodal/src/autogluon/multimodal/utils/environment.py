@@ -150,3 +150,17 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
             f"Make sure the object is one of these: a Pytorch tensor, a Pytorch module, "
             f"a dict or list of tensors or modules."
         )
+
+
+def compute_inference_batch_size(per_gpu_batch_size: int, eval_batch_size_ratio: Union[int, float], per_gpu_batch_size_evaluation: int, num_gpus: int, strategy: str):
+    if per_gpu_batch_size_evaluation:
+        batch_size = per_gpu_batch_size_evaluation
+    else:
+        batch_size = per_gpu_batch_size * eval_batch_size_ratio
+
+    if num_gpus > 1 and strategy == "dp":
+        # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
+        # So, we need to use the GPU number as a multiplier to compute the batch size.
+        batch_size = batch_size * num_gpus
+
+    return batch_size

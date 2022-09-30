@@ -121,6 +121,7 @@ from .utils import (
     turn_on_off_feature_column_info,
     update_config_by_rules,
     use_realtime,
+    compute_inference_batch_size,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1338,24 +1339,11 @@ class MultiModalPredictor:
         data: pd.DataFrame,
         df_preprocessor: MultiModalFeaturePreprocessor,
         data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
+        batch_size: int,
+        strategy: str,
     ) -> List[Dict]:
-
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
-
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
-
-        if self._config.env.per_gpu_batch_size_evaluation:
-            batch_size = self._config.env.per_gpu_batch_size_evaluation
-        else:
-            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
-
-        if num_gpus > 1:
-            strategy = "dp"
-            # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
-            # So, we need to use the GPU number as a multiplier to compute the batch size.
-            batch_size = batch_size * num_gpus
-        else:
-            strategy = None
 
         if hasattr(self._config, MATCHER):
             turn_on_off_feature_column_info(
@@ -1519,6 +1507,8 @@ class MultiModalPredictor:
         data: pd.DataFrame,
         df_preprocessor: MultiModalFeaturePreprocessor,
         data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
     ) -> List[Dict]:
 
         modality_features, sample_num = apply_df_preprocessor(
@@ -1542,8 +1532,8 @@ class MultiModalPredictor:
         output = infer_batch(
             batch=batch,
             model=self._model,
-            precision=self._config.env.precision,
-            num_gpus=self._config.env.num_gpus,
+            precision=precision,
+            num_gpus=num_gpus,
             model_postprocess_fn=self._model_postprocess_fn,
         )
         return [output]
@@ -1561,20 +1551,43 @@ class MultiModalPredictor:
             requires_label=requires_label,
         )
 
+        strategy = "dp"  # default used in inference.
+
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
+        if num_gpus == 1:
+            strategy = None
+
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+
+        if not realtime:
+            batch_size = compute_inference_batch_size(
+                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+                eval_batch_size_ratio=self._config.env.eval_batch_size_ratio,
+                per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
+                num_gpus=num_gpus,
+                strategy=strategy,
+            )
+
         if realtime is None:
-            realtime = use_realtime(data=data, data_processors=data_processors)
+            realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
 
         if realtime:
             outputs = self._realtime_predict(
                 data=data,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
             )
         else:
             outputs = self._default_predict(
                 data=data,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                batch_size=batch_size,
+                strategy=strategy,
             )
 
         return outputs
