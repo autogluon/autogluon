@@ -73,6 +73,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
+from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -119,6 +120,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    use_realtime,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1333,15 +1335,10 @@ class MultiModalPredictor:
 
     def _default_predict(
         self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
     ) -> List[Dict]:
-
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
-            data=data,
-            requires_label=requires_label,
-        )
 
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
 
@@ -1519,14 +1516,10 @@ class MultiModalPredictor:
 
     def _realtime_predict(
         self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
     ) -> List[Dict]:
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
-            data=data,
-            requires_label=requires_label,
-        )
 
         modality_features, sample_num = apply_df_preprocessor(
             data=data,
@@ -1559,17 +1552,29 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ) -> List[Dict]:
+
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
+            data=data,
+            requires_label=requires_label,
+        )
+
+        if realtime is None:
+            realtime = use_realtime(data=data, data_processors=data_processors)
+
         if realtime:
             outputs = self._realtime_predict(
                 data=data,
-                requires_label=requires_label,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
             )
         else:
             outputs = self._default_predict(
                 data=data,
-                requires_label=requires_label,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
             )
 
         return outputs
@@ -1579,7 +1584,7 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1595,7 +1600,9 @@ class MultiModalPredictor:
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1698,7 +1705,7 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -1713,7 +1720,9 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1773,7 +1782,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1792,7 +1801,9 @@ class MultiModalPredictor:
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1848,7 +1859,7 @@ class MultiModalPredictor:
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1866,7 +1877,9 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------

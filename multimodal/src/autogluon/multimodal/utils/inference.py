@@ -1,13 +1,11 @@
 import logging
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-import numpy as np
+import pandas as pd
 import torch
-from scipy.special import softmax
 from torch import nn
-from torch.nn.modules.loss import _Loss
 
-from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, PROBABILITY, SCORE, TEXT
+from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, IMAGE, LOGITS, MASKS, PROBABILITY, SCORE, TEXT
 from .environment import compute_num_gpus, infer_precision, move_to_device
 from .misc import tensor_to_ndarray
 
@@ -113,3 +111,37 @@ def infer_batch(
                 output = model_postprocess_fn(output)
 
     return output[model.prefix]
+
+
+def use_realtime(data: pd.DataFrame, data_processors: Dict):
+    """
+    Determine whether to use the realtime inference based on the sample number
+    and the data modalities. Loading image data requires more time than text.
+    Thus, we set a small threshold for image data. We may also consider the
+    model size in future, but we need to ensure this function is efficient since
+    using this function also costs additional inference time.
+
+    Parameters
+    ----------
+    data
+        A dataframe.
+    data_processors
+        A dict of data processors.
+
+    Returns
+    -------
+    Whether to use the realtime inference.
+    """
+    realtime = False
+    sample_num = len(data)
+    if IMAGE in data_processors and len(data_processors[IMAGE]) > 0:  # has image
+        if sample_num <= 10:
+            realtime = True
+    elif TEXT in data_processors and len(data_processors[TEXT]) > 0:  # has text but no image
+        if sample_num <= 100:
+            realtime = True
+    else:  # only has tabular data
+        if sample_num <= 200:
+            realtime = True
+
+    return realtime
