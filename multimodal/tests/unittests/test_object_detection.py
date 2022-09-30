@@ -35,7 +35,7 @@ def test_mmdet_object_detection_inference(checkpoint_name):
         pipeline="object_detection",
     )
 
-    pred = predictor.predict({"image": [mmdet_image_name] * 10}, realtime=False)  # test batch inference
+    pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
     assert len(pred) == 10  # test data size is 100
     assert len(pred[0]) == 80  # COCO has 80 classes
     assert pred[0][0].ndim == 2  # two dimensions, (# of proposals, 5)

@@ -1527,7 +1527,7 @@ class MultiModalPredictor:
             )
             processed_features.append(per_sample_features)
 
-        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
+        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num)
         batch = collate_fn(processed_features)
         output = infer_batch(
             batch=batch,

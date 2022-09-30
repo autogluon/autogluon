@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, IMAGE, LOGITS, MASKS, PROBABILITY, SCORE, TEXT
-from .environment import compute_num_gpus, infer_precision, move_to_device
+from .environment import move_to_device, get_precision_context
 from .misc import tensor_to_ndarray
 
 logger = logging.getLogger(AUTOMM)
@@ -102,11 +102,11 @@ def infer_batch(
         model = nn.DataParallel(model)
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
-    with torch.autocast(device_type=device_type, dtype=precision):
-        with torch.no_grad():
-            output = model(batch)
-            if model_postprocess_fn:
-                output = model_postprocess_fn(output)
+    precision_context = get_precision_context(precision=precision, device=device)
+    with precision_context, torch.no_grad():
+        output = model(batch)
+        if model_postprocess_fn:
+            output = model_postprocess_fn(output)
 
     return output[model.prefix]
 
