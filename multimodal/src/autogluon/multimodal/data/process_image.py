@@ -50,12 +50,12 @@ from ..constants import (
     COLUMN,
     IMAGE,
     IMAGE_VALID_NUM,
+    MMCV_MODELS,
     MMDET_IMAGE,
     MMOCR,
     MMOCR_TEXT_DET,
     MMOCR_TEXT_RECOG,
     TIMM_IMAGE,
-    MMCV_MODELS,
 )
 from .collator import Pad, Stack
 from .trivial_augmenter import TrivialAugment

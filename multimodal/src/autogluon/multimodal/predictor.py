@@ -89,6 +89,7 @@ from .utils import (
     assign_feature_column_names,
     average_checkpoints,
     bbox_xyxy_to_xywh,
+    compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
@@ -121,7 +122,6 @@ from .utils import (
     turn_on_off_feature_column_info,
     update_config_by_rules,
     use_realtime,
-    compute_inference_batch_size,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1527,7 +1527,9 @@ class MultiModalPredictor:
             )
             processed_features.append(per_sample_features)
 
-        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num)
+        collate_fn = get_collate_fn(
+            df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num
+        )
         batch = collate_fn(processed_features)
         output = infer_batch(
             batch=batch,

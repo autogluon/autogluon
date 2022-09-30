@@ -1,15 +1,15 @@
 import codecs
 import random
-from typing import Iterable, List, Tuple, Union, Optional
+from typing import Iterable, List, Optional, Tuple, Union
 
 import pandas as pd
 from nlpaug import Augmenter
 from nlpaug.util import Method
 from text_unidecode import unidecode
 
+from ..constants import MMCV_MODELS
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
-from ..constants import MMCV_MODELS
 
 
 def extract_value_from_config(
@@ -161,7 +161,11 @@ def get_collate_fn(
             if per_modality_column_names:
                 for per_model_processor in per_data_processors_group[per_modality]:
                     if per_model_processor.prefix.lower().startswith(MMCV_MODELS):
-                        collate_fn.update(per_model_processor.collate_fn(per_modality_column_names, per_gpu_batch_size=per_gpu_batch_size))
+                        collate_fn.update(
+                            per_model_processor.collate_fn(
+                                per_modality_column_names, per_gpu_batch_size=per_gpu_batch_size
+                            )
+                        )
                     else:
                         collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
     return Dict(collate_fn)

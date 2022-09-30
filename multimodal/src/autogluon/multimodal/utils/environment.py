@@ -1,12 +1,13 @@
+import contextlib
 import logging
 import math
 import sys
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
-import contextlib
 
 import torch
 from torch import nn
+
 try:
     from mmcv.parallel import DataContainer
 except:
@@ -159,7 +160,13 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
         )
 
 
-def compute_inference_batch_size(per_gpu_batch_size: int, eval_batch_size_ratio: Union[int, float], per_gpu_batch_size_evaluation: int, num_gpus: int, strategy: str):
+def compute_inference_batch_size(
+    per_gpu_batch_size: int,
+    eval_batch_size_ratio: Union[int, float],
+    per_gpu_batch_size_evaluation: int,
+    num_gpus: int,
+    strategy: str,
+):
     if per_gpu_batch_size_evaluation:
         batch_size = per_gpu_batch_size_evaluation
     else:
@@ -181,12 +188,12 @@ def double_precision_context():
     torch.set_default_dtype(default_dtype)
 
 
-def get_precision_context(precision: Union[int, str], device: Optional[torch.device] = None):
+def get_precision_context(precision: Union[int, str], device_type: Optional[str] = None):
     if precision == 32:
         assert torch.get_default_dtype() == torch.float32
         return contextlib.nullcontext()
     elif precision in [16, "bf16"]:
-        return torch.autocast(device, dtype=torch.bfloat16 if precision == "bf16" else torch.half)
+        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if precision == "bf16" else torch.half)
     elif precision == 64:
         return double_precision_context()
     else:
