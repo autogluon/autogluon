@@ -2149,7 +2149,7 @@ class TabularPredictor:
     # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False,
-                              time_limit=None):
+                              time_limit=None, refit_full=False):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -2171,6 +2171,9 @@ class TabularPredictor:
         time_limit : int, default = None
             Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limit` value is applied to each model.
             If None, the ensemble models train without time restriction.
+        refit_full : bool, default = False
+            If True, will apply refit_full to all weighted ensembles created during this call.
+            Identical to calling `predictor.refit_full(model=predictor.fit_weighted_ensemble(...))`
 
         Returns
         -------
@@ -2193,7 +2196,12 @@ class TabularPredictor:
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_stack_preds = trainer.get_inputs_to_stacker(X=X,
+                                                      base_models=base_models,
+                                                      fit=fit,
+                                                      use_orig_features=False,
+                                                      use_val_cache=True
+                                                      )
 
         models = []
 
@@ -2217,6 +2225,9 @@ class TabularPredictor:
         models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level,
                                                      stack_name=stack_name, base_model_names=base_models,
                                                      name_suffix=name_suffix, time_limit=time_limit)
+
+        if refit_full:
+            models += self.refit_full(model=models)
 
         return models
 
