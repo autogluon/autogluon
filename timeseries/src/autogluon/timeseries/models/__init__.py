@@ -8,7 +8,7 @@ from .gluonts import (
     TransformerModel,
 )
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, SktimeTBATSModel, SktimeThetaModel
-from .statsmodels import ARIMAModel, ETSModel, ThetaModel
+from .statsmodels import ARIMAModel, ETSModel, SeasonalNaiveModel, ThetaModel
 
 __all__ = [
     "AutoTabularModel",
@@ -25,5 +25,6 @@ __all__ = [
     "SktimeThetaModel",
     "ARIMAModel",
     "ETSModel",
+    "SeasonalNaiveModel",
     "ThetaModel",
 ]

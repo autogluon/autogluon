@@ -17,7 +17,7 @@ from .gluonts import (
     TransformerModel,
 )
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel
-from .statsmodels import ARIMAModel, ETSModel, ThetaModel
+from .statsmodels import ARIMAModel, ETSModel, SeasonalNaiveModel, ThetaModel
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ MODEL_TYPES = dict(
     SktimeAutoETS=SktimeAutoETSModel,
     ETS=ETSModel,
     ARIMA=ARIMAModel,
+    SeasonalNaive=SeasonalNaiveModel,
     Theta=ThetaModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
@@ -53,6 +54,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     SktimeAutoETS=60,
     ARIMA=50,
     ETS=60,
+    SeasonalNaive=65,
     Theta=65,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
@@ -77,6 +79,7 @@ def get_default_hps(key, prediction_length):
                 "order": (1, 0, 0),
                 "seasonal_order": (0, 0, 0),
             },
+            "SeasonalNaive": {},
             "Theta": {},
         },
         "default": {
@@ -90,6 +93,7 @@ def get_default_hps(key, prediction_length):
                 "order": (1, 1, 1),
                 "seasonal_order": (0, 0, 0),
             },
+            "SeasonalNaive": {},
             "Theta": {},
             "SimpleFeedForward": {
                 "context_length": context_length,
@@ -126,6 +130,9 @@ def get_default_hps(key, prediction_length):
                 "maxiter": 50,
                 "order": ag.Categorical((2, 0, 1), (2, 1, 1), (1, 1, 1)),
                 "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 1)),
+            },
+            "SeasonalNaive": {
+                "seasonal_period": ag.Categorical(None, 1),
             },
             "Theta": {
                 "deseasonalize": ag.Categorical(True, False),
