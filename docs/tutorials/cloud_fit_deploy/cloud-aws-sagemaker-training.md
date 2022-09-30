@@ -118,14 +118,14 @@ if __name__ == "__main__":
             lb = predictor.leaderboard(silent=False)
             lb.to_csv(f"{args.output_data_dir}/leaderboard.csv")
 ```
-For training other types of AutoGluon Predictors, i.e. TextPredictor, the training script you provided will be quite similar to the one above.
-Mostly, you just need to replace `TabularPredictor` to be `TextPredictor` for example.
+For training other types of AutoGluon Predictors, i.e. MultiModalPredictor, the training script you provided will be quite similar to the one above.
+Mostly, you just need to replace `TabularPredictor` to be `MultiModalPredictor` for example.
 Keep in mind that the specific Predictor type you want to train might not support the same feature sets as `TabularPredictor`.
-For example, `leaderboard` does not exists for all Predictors.
+For example, `leaderboard` does not exist for all Predictors.
 
 
 ### Notes for Training
-1. If your use case involves image modality, you will need to pass the images as a compressed file to the training container(similarly to how you would pass in train data), decompress the file in the training container, and update the training data columns with the updated image path in the container.
+1. If your use case involves image modality, you will need to pass the images as a compressed file to the training container (similarly to how you would pass in train data), decompress the file in the training container, and update the training data columns with the updated image path in the container.
 
 2. If you wish to deploy or do batch inference on the trained TextPredictor/MultiModalPredictor on sagemaker later, you will need to save the model with `standalone` flag, which avoids internet access to load the model later.
 For example, `predictor.save(path='MY_PATH', standalone=True)`.
@@ -135,13 +135,13 @@ Tabular example YAML config:
 
 ```yaml
 # AutoGluon Predictor constructor arguments
-# - see https://github.com/awslabs/autogluon/blob/ef3a5312dc2eaa0c6afde042d671860ac42cbafb/tabular/src/autogluon/tabular/predictor/predictor.py#L51-L159
+# - see https://github.com/awslabs/autogluon/blob/v0.5.2/tabular/src/autogluon/tabular/predictor/predictor.py#L56-L181
 ag_predictor_args:
   eval_metric: roc_auc
   label: class
 
 # AutoGluon Predictor.fit arguments
-# - see https://github.com/awslabs/autogluon/blob/ef3a5312dc2eaa0c6afde042d671860ac42cbafb/tabular/src/autogluon/tabular/predictor/predictor.py#L280-L651
+# - see https://github.com/awslabs/autogluon/blob/v0.5.2/tabular/src/autogluon/tabular/predictor/predictor.py#L286-L711
 ag_fit_args:
   presets: "medium_quality_faster_train"
   num_bag_folds: 2
@@ -153,20 +153,20 @@ feature_importance: true       # calculate and save feature importance if true
 leaderboard: true              # save leaderboard output if true
 ```
 
-Another example, Text example YAML config:
+Another example, MultiModal example YAML config:
 
 ```yaml
 # AutoGluon Predictor constructor arguments
-# - see https://github.com/awslabs/autogluon/blob/ef3a5312dc2eaa0c6afde042d671860ac42cbafb/text/src/autogluon/text/text_prediction/predictor/predictor.py#L23-L67
+# - see https://github.com/awslabs/autogluon/blob/v0.5.2/multimodal/src/autogluon/multimodal/predictor.py#L123-L180
 ag_predictor_args:
   eval_metric: acc
   label: label
 
 # AutoGluon Predictor.fit arguments
-# - see https://github.com/awslabs/autogluon/blob/ef3a5312dc2eaa0c6afde042d671860ac42cbafb/text/src/autogluon/text/text_prediction/predictor/predictor.py#L185-L253
+# - see https://github.com/awslabs/autogluon/blob/v0.5.2/multimodal/src/autogluon/multimodal/predictor.py#L246-L363
 ag_fit_args:
-  presets: "lower_quality_fast_train"
-  time_limit: 60
+  presets: "high_quality"
+  time_limit: 120
 
 output_prediction_format: csv  # predictions output format: csv or parquet
 ```
