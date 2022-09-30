@@ -699,8 +699,30 @@ def get_metric_learning_distance_func(
         raise ValueError(f"Unknown distance measure: {name}")
 
 
-def get_metric_learning_loss_funcs(
-    matches: List[DictConfig],
+def infer_matcher_loss(data_format: str, problem_type: str):
+    if data_format == "pair":
+        if problem_type == BINARY:
+            return["contrastive_loss"]
+        elif problem_type == REGRESSION:
+            return ["cosine_similarity_loss"]
+        else:
+            raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
+    elif data_format == "triplet":
+        if problem_type is None:
+            return ["multi_negatives_softmax_loss"]
+        else:
+            raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
+    else:
+        raise ValueError(f"Unsupported data format: {data_format}")
+
+
+def get_matcher_loss_func(
+    data_format: str,
+    problem_type: str,
+    loss_type: Optional[str] = None,
+    pos_margin: Optional[float] = None,
+    neg_margin: Optional[float] = None,
+    distance_type: Optional[str] = None,
 ):
     """
     Return a list of pytorch metric learning's loss functions based on their names.
@@ -714,24 +736,28 @@ def get_metric_learning_loss_funcs(
     -------
     A list of loss functions from the pytorch metric learning package.
     """
-    metric_learning_loss_funcs = []
-    for per_match in matches:
-        if per_match.loss.type.lower() == CONTRASTIVE_LOSS:
-            metric_learning_loss_funcs.append(
-                losses.ContrastiveLoss(
-                    pos_margin=per_match.loss.pos_margin,
-                    neg_margin=per_match.loss.neg_margin,
-                    distance=get_metric_learning_distance_func(per_match.distance.type),
-                )
+
+    allowable_loss_types = infer_matcher_loss(data_format=data_format, problem_type=problem_type)
+    if loss_type is not None:
+        assert loss_type in allowable_loss_types, f"data format {data_format} can't use loss {loss_type}."
+    else:
+        loss_type = allowable_loss_types[0]
+
+    if loss_type.lower() == CONTRASTIVE_LOSS:
+        return losses.ContrastiveLoss(
+                pos_margin=pos_margin,
+                neg_margin=neg_margin,
+                distance=get_metric_learning_distance_func(distance_type),
             )
-        else:
-            raise ValueError(f"Unknown metric learning loss: {per_match.loss.type}")
-
-    return metric_learning_loss_funcs
+    else:
+        raise ValueError(f"Unknown metric learning loss: {loss_type}")
 
 
-def get_metric_learning_miner_funcs(
-    matches: List[DictConfig],
+def get_matcher_miner_func(
+    miner_type: str,
+    pos_margin: float,
+    neg_margin: float,
+    distance_type: str,
 ):
     """
     Return a list of pytorch metric learning's miner functions based on their names.
@@ -746,20 +772,14 @@ def get_metric_learning_miner_funcs(
     -------
     A list of miner functions from the pytorch metric learning package.
     """
-    metric_learning_miner_funcs = []
-    for per_match in matches:
-        if per_match.miner.type.lower() == PAIR_MARGIN_MINER:
-            metric_learning_miner_funcs.append(
-                miners.PairMarginMiner(
-                    pos_margin=per_match.miner.pos_margin,
-                    neg_margin=per_match.miner.neg_margin,
-                    distance=get_metric_learning_distance_func(per_match.distance.type),
-                )
+    if miner_type.lower() == PAIR_MARGIN_MINER:
+       return miners.PairMarginMiner(
+                pos_margin=pos_margin,
+                neg_margin=neg_margin,
+                distance=get_metric_learning_distance_func(distance_type),
             )
-        else:
-            raise ValueError(f"Unknown metric learning miner: {per_match.miner.type}")
-
-    return metric_learning_miner_funcs
+    else:
+        raise ValueError(f"Unknown metric learning miner: {miner_type}")
 
 
 def generate_metric_learning_labels(

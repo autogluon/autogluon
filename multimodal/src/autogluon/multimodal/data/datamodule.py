@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 import pandas as pd
 from pytorch_lightning import LightningDataModule
@@ -29,6 +29,7 @@ class BaseDataModule(LightningDataModule):
         val_data: Optional[pd.DataFrame] = None,
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
+        corpus: Optional[Dict[str, Dict]] = None,
     ):
         """
         Parameters
@@ -71,6 +72,7 @@ class BaseDataModule(LightningDataModule):
         self.val_data = val_data
         self.test_data = test_data
         self.predict_data = predict_data
+        self.corpus = corpus
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
@@ -78,6 +80,7 @@ class BaseDataModule(LightningDataModule):
             data=data_split,
             preprocessor=self.df_preprocessor,
             processors=self.data_processors,
+            corpus=self.corpus,
             is_training=split == TRAIN,
         )
 

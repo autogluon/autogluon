@@ -1,6 +1,6 @@
 from typing import Optional
 
-from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
+from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION, QUERY, RESPONSE, QUERY_RESPONSE
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -138,6 +138,18 @@ def feature_extraction():
         "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
         "model.hf_text.pooling_mode": "mean",
         "env.eval_batch_size_ratio": 1,
+    }
+
+
+@automm_presets.register()
+def siamese_matcher():
+    return automm_presets.create("default")
+
+
+def non_siamese_matcher():
+    return {
+        QUERY: automm_presets.create("default"),
+        RESPONSE: automm_presets.create("default"),
     }
 
 

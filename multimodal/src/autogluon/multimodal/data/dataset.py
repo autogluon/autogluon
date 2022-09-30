@@ -1,10 +1,10 @@
 import logging
-from typing import List
+from typing import List, Dict, Optional
 
 import pandas as pd
 import torch
 
-from ..constants import AUTOMM, GET_ITEM_ERROR_RETRY
+from ..constants import AUTOMM, GET_ITEM_ERROR_RETRY, INDEX
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import apply_data_processor, apply_df_preprocessor
 
@@ -24,6 +24,7 @@ class BaseDataset(torch.utils.data.Dataset):
         data: pd.DataFrame,
         preprocessor: List[MultiModalFeaturePreprocessor],
         processors: List[dict],
+        corpus: Optional[Dict[str, Dict]] = None,
         is_training: bool = False,
     ):
         """
@@ -47,15 +48,18 @@ class BaseDataset(torch.utils.data.Dataset):
 
         self.lengths = []
         for i, (per_preprocessor, per_processors_group) in enumerate(zip(preprocessor, processors)):
-            modality_features, length = apply_df_preprocessor(
+            modality_features, modality_types, length = apply_df_preprocessor(
                 data=data,
                 df_preprocessor=per_preprocessor,
                 modalities=per_processors_group.keys(),
             )
             self.lengths.append(length)
             setattr(self, f"modality_features_{i}", modality_features)
+            setattr(self, f"modality_types_{i}", modality_types)
 
         assert len(set(self.lengths)) == 1
+
+        self.corpus = corpus
 
     def __len__(self):
         """
@@ -83,11 +87,14 @@ class BaseDataset(torch.utils.data.Dataset):
         """
         ret = dict()
         try:
-            for i, per_processors_group in enumerate(self.processors):
-                per_ret = apply_data_processor(
-                    modality_features=getattr(self, f"modality_features_{i}"),
-                    data_processors=per_processors_group,
+            for group_id, per_processors_group in enumerate(self.processors):
+                per_sample_features = self.get_per_sample_features(
+                    group_id=group_id,
                     idx=idx,
+                )
+                per_ret = apply_data_processor(
+                    per_sample_features=per_sample_features,
+                    data_processors=per_processors_group,
                     is_training=self.is_training,
                 )
                 ret.update(per_ret)
@@ -99,4 +106,18 @@ class BaseDataset(torch.utils.data.Dataset):
             else:
                 raise e
         self._consecutive_errors = 0
+        return ret
+
+    def get_per_sample_features(self, group_id: int, idx: int):
+        modality_features = getattr(self, f"modality_features_{group_id}")
+        modality_types = getattr(self, f"modality_types_{group_id}")
+        ret = {}
+        if modality_features:
+            for per_col_name, per_col_features in modality_features.items():
+                per_sample_features = per_col_features[idx]
+                if modality_types[per_col_name].endswith(INDEX):
+                    per_sample_features = self.corpus[per_col_name][per_sample_features]
+
+                ret[per_col_name] = per_sample_features
+
         return ret

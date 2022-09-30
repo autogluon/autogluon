@@ -12,13 +12,14 @@ from ..constants import (
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
-    IMAGE,
+    IMAGE_PATH,
     MULTICLASS,
     NULL,
     NUMERICAL,
     REGRESSION,
     ROIS,
     TEXT,
+    INDEX,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -207,36 +208,81 @@ def is_imagepath_column(
         return False
 
 
-def is_text_column(X: pd.Series) -> bool:
+def is_text_column(data: pd.Series) -> bool:
     """
     Identify if a column is one text column.
 
     Parameters
     ----------
-    X
+    data
         One column of a multimodal pd.DataFrame for training.
 
     Returns
     -------
     Whether the column is a text column.
     """
-    if len(X) > 5000:
+    if len(data) > 5000:
         # Sample to speed-up type inference
-        X = X.sample(n=5000, random_state=0)
-    X_unique = X.unique()
-    num_unique = len(X_unique)
-    num_rows = len(X)
+        data = data.sample(n=5000, random_state=0)
+    data_unique = data.unique()
+    num_unique = len(data_unique)
+    num_rows = len(data)
     unique_ratio = num_unique / num_rows
     if unique_ratio <= 0.01:
         return False
     try:
-        avg_words = pd.Series(X_unique).str.split().str.len().mean()
+        avg_words = pd.Series(data_unique).str.split().str.len().mean()
     except AttributeError:
         return False
     if avg_words < 3:
         return False
 
     return True
+
+
+def is_index_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> bool:
+    if not corpus:
+        return False
+
+    sample_num = min(len(data), 500)
+    data = data.sample(n=sample_num, random_state=0).tolist()
+    failure_count = 0
+    for index in data:
+        try:
+            per_value = corpus[col_name][index]
+        except:
+            failure_count += 1
+
+    if failure_count == 0:
+        return True
+    elif 0 < failure_count < sample_num:
+        raise warnings.warn(
+            f"Among {sample_num} sampled indexes in column {col_name}, "
+            f"we can't index all their values from the corpus ({failure_count} failures). "
+            f"You may need to assure that all the indexes of column {col_name} exist in your corpus.",
+            UserWarning,
+        )
+    else:
+        return False
+
+
+def infer_corpus_types(corpus: Dict[str, Dict]) -> Dict:
+    corpus_types = collections.OrderedDict()
+    if corpus is None:
+        return corpus_types
+
+    for per_name, per_corpus in corpus.items():
+        per_corpus = pd.Series(per_corpus.values())
+        if is_imagepath_column(per_corpus, col_name=per_name):
+            corpus_types[per_name] = IMAGE_PATH
+        elif is_text_column(per_corpus):
+            corpus_types[per_name] = TEXT
+        else:
+            raise ValueError(
+                f"Corpus {per_name} has an invalid type. "
+                f"Currently, we only support image and text types."
+            )
+    return corpus_types
 
 
 def infer_column_types(
@@ -246,6 +292,7 @@ def infer_column_types(
     provided_column_types: Optional[Dict] = None,
     allowable_column_types: Optional[List[str]] = None,
     fallback_column_type: Optional[str] = None,
+    corpus: Optional[Dict[str, Dict]] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -285,6 +332,8 @@ def infer_column_types(
     else:
         is_training = True
 
+    corpus_types = infer_corpus_types(corpus)
+
     for col_name in data.columns:
         if provided_column_types is not None and col_name in provided_column_types:
             column_types[col_name] = provided_column_types[col_name]
@@ -301,6 +350,8 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
+        if is_index_column(data[col_name], col_name=col_name, corpus=corpus):
+            column_types[col_name] = f"{corpus_types[col_name]}_{INDEX}",
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
@@ -308,7 +359,7 @@ def infer_column_types(
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
-            column_types[col_name] = IMAGE
+            column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
@@ -371,6 +422,9 @@ def infer_label_column_type_by_problem_type(
     -------
     Column types with the label columns' types inferred from the problem type.
     """
+    if label_columns is None:
+        return column_types
+
     if isinstance(label_columns, str):
         label_columns = [label_columns]
 

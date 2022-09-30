@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from nptyping import NDArray
 from torch import nn
 
 from ..constants import CATEGORICAL, COLUMN
@@ -19,6 +18,7 @@ class CategoricalProcessor:
         self,
         model: nn.Module,
         requires_column_info: bool = False,
+        column_names: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -30,6 +30,7 @@ class CategoricalProcessor:
         """
         self.prefix = model.prefix
         self.requires_column_info = requires_column_info
+        self.column_names = column_names
 
     @property
     def categorical_key(self):
@@ -87,8 +88,7 @@ class CategoricalProcessor:
 
     def __call__(
         self,
-        all_categorical_features: Dict[str, NDArray[(Any,), np.int32]],
-        idx: int,
+        categorical_features: Dict[str, int],
         is_training: bool,
     ) -> Dict:
         """
@@ -96,10 +96,8 @@ class CategoricalProcessor:
 
         Parameters
         ----------
-        all_categorical_features
-            All the categorical features in a dataset.
-        idx
-            The sample index in a dataset.
+        categorical_features
+            Categorical features of one sample.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
 
@@ -107,8 +105,7 @@ class CategoricalProcessor:
         -------
         A dictionary containing one sample's processed categorical features.
         """
-        per_sample_features = {
-            per_column_name: per_column_features[idx]
-            for per_column_name, per_column_features in all_categorical_features.items()
-        }
-        return self.process_one_sample(per_sample_features)
+        if hasattr(self, "column_names") and self.column_names:
+            categorical_features = {col_name: categorical_features[col_name] for col_name in self.column_names}
+
+        return self.process_one_sample(categorical_features)

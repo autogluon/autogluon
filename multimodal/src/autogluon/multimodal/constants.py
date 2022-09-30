@@ -4,6 +4,7 @@ CATEGORICAL = "categorical"
 TEXT = "text"
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
+INDEX = "index"
 
 # Problem types
 CLASSIFICATION = "classification"
@@ -153,13 +154,13 @@ MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP)
 
-# metric learning loss type
+# matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"
 
-# metric learning distance type
+# matcher distance type
 COSINE_SIMILARITY = "cosine_similarity"
 
-# metric learning miner type
+# matcher miner type
 PAIR_MARGIN_MINER = "pair_margin_miner"
 
 # checkpoints
@@ -172,3 +173,10 @@ MODEL_CHECKPOINT = "model.ckpt"
 S3_PREFIX = "s3://"
 SOURCEPROMPT_URL = "https://automl-mm-bench.s3.amazonaws.com/few_shot/templates.zip"
 SOURCEPROMPT_SHA1 = "c25cdf3730ff96ab4859b72e18d46ff117b62bd6"
+
+# matcher
+QUERY = "query"
+RESPONSE = "response"
+QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
+PAIR = "pair"
+TRIPLET = "triplet"

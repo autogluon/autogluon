@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, PROBABILITY
+from ..constants import AUTOMM, PROBABILITY, FEATURES, QUERY, RESPONSE
 from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
@@ -18,8 +18,6 @@ from .utils import (
     gather_column_features,
     generate_metric_learning_labels,
     get_lr_scheduler,
-    get_metric_learning_loss_funcs,
-    get_metric_learning_miner_funcs,
     get_optimizer,
 )
 
@@ -35,8 +33,10 @@ class MatcherLitModule(pl.LightningModule):
 
     def __init__(
         self,
-        model: nn.Module,
-        matches: List[DictConfig],
+        query_model: nn.Module,
+        response_model: nn.Module,
+        signature: Optional[str] = None,
+        matches: Optional[List[DictConfig]] = None,
         match_label: Optional[int] = None,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
@@ -48,6 +48,7 @@ class MatcherLitModule(pl.LightningModule):
         weight_decay: Optional[float] = None,
         warmup_steps: Optional[int] = None,
         loss_func: Optional[_Loss] = None,
+        miner_func: Optional[_Loss] = None,
         validation_metric: Optional[torchmetrics.Metric] = None,
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
@@ -124,87 +125,63 @@ class MatcherLitModule(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(
             ignore=[
-                "model",
+                "query_model",
+                "response_model",
                 "validation_metric",
                 "test_metric",
                 "loss_func",
+                "miner_func",
                 "matches",
             ]
         )
-        self.model = model
+        self.query_model = query_model
+        self.response_model = response_model
+        if signature:
+            assert signature in [QUERY, RESPONSE]
+        self.signature = signature
         self.validation_metric = validation_metric
         self.validation_metric_name = f"val_{validation_metric_name}"
-        self.loss_func = loss_func
+
         if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
             raise ValueError(
                 f"validation_metric {validation_metric} is an aggregation metric,"
                 f"which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
-        assert len(matches) > 0
+
         self.matches = matches
         self.match_label = match_label
         self.reverse_prob = match_label == 0
-        logger.debug(f"match num: {len(matches)}")
+
         logger.debug(f"match label: {match_label}")
         logger.debug(f"reverse probability: {self.reverse_prob}")
-        for per_match in matches:
-            logger.debug(f"per_match.pair[0]: {per_match.pair[0]}")
-            logger.debug(f"per_match.pair[1]: {per_match.pair[1]}")
-            # assert no duplicate column names
-            if isinstance(per_match.pair[0], list):
-                assert len(per_match.pair[0]) == len(set(per_match.pair[0]))
-            if isinstance(per_match.pair[1], list):
-                assert len(per_match.pair[1]) == len(set(per_match.pair[1]))
 
-        self.metric_learning_loss_funcs = get_metric_learning_loss_funcs(matches)
-        self.metric_learning_miner_funcs = get_metric_learning_miner_funcs(matches)
-
-        # TODO: support validation metric on multiple matches
-        # TODO: each match should use an independent torchmetric function
-        assert (
-            sum([per_match.use_label for per_match in matches]) == 1
-        ), f"We only support one match to have labels currently."
+        self.loss_func = loss_func
+        self.miner_func = miner_func
 
     def _compute_loss(
         self,
-        output: Dict,
+        query_embeddings: torch.Tensor,
+        response_embeddings: torch.Tensor,
         label: torch.Tensor,
     ):
-        loss = 0
-        for per_match, per_loss_func, per_miner_func in zip(
-            self.matches,
-            self.metric_learning_loss_funcs,
-            self.metric_learning_miner_funcs,
-        ):
+        assert query_embeddings.shape == response_embeddings.shape
+        embeddings = torch.cat([query_embeddings, response_embeddings], dim=0)  # (b*2, d)
 
-            assert len(per_match.pair) == 2
-            embeddings1 = gather_column_features(
-                output=output,
-                column_names=per_match.pair[0],
-            )
-            embeddings2 = gather_column_features(
-                output=output,
-                column_names=per_match.pair[1],
-            )
-            assert embeddings1.shape == embeddings2.shape
-            embeddings = torch.cat([embeddings1, embeddings2], dim=0)  # (b*2, d)
-
-            metric_learning_labels = generate_metric_learning_labels(
-                num_samples=len(embeddings1),
-                match_label=self.match_label if per_match.use_label else None,
-                labels=label if per_match.use_label else None,
-            )
-            indices_tuple = per_miner_func(
-                embeddings=embeddings,
-                labels=metric_learning_labels,
-            )
-            per_loss = per_loss_func(
-                embeddings=embeddings,
-                labels=metric_learning_labels,
-                indices_tuple=indices_tuple,
-            )
-            loss += per_loss * per_match.loss.weight
+        metric_learning_labels = generate_metric_learning_labels(
+            num_samples=len(query_embeddings),
+            match_label=self.match_label,
+            labels=label,
+        )
+        indices_tuple = self.miner_func(
+            embeddings=embeddings,
+            labels=metric_learning_labels,
+        )
+        loss = self.loss_func(
+            embeddings=embeddings,
+            labels=metric_learning_labels,
+            indices_tuple=indices_tuple,
+        )
 
         return loss
 
@@ -213,40 +190,42 @@ class MatcherLitModule(pl.LightningModule):
         metric: torchmetrics.Metric,
         custom_metric_func: Callable,
         label: torch.Tensor,
-        logits: Optional[torch.Tensor] = None,
-        embeddings1: Optional[torch.Tensor] = None,
-        embeddings2: Optional[torch.Tensor] = None,
+        query_embeddings: torch.Tensor,
+        response_embeddings: torch.Tensor,
         reverse_prob: Optional[bool] = False,
     ):
-        if logits is not None:
-            if isinstance(metric, torchmetrics.AUROC):
-                prob = compute_probability(logits=logits)
-                metric.update(preds=prob, target=label)  # only for binary classification
-            elif isinstance(metric, BaseAggregator):
-                metric.update(custom_metric_func(logits, label))
-            else:
-                metric.update(logits.squeeze(dim=1), label)
+
+        if isinstance(metric, BaseAggregator):
+            metric.update(custom_metric_func(query_embeddings, response_embeddings, label))
         else:
-            if isinstance(metric, BaseAggregator):
-                metric.update(custom_metric_func(embeddings1, embeddings2, label))
-            else:
-                metric.update(
-                    compute_probability(
-                        embeddings1=embeddings1,
-                        embeddings2=embeddings2,
-                        reverse_prob=reverse_prob,
-                    ),
-                    label,
-                )
+            metric.update(
+                compute_probability(
+                    embeddings1=query_embeddings,
+                    embeddings2=response_embeddings,
+                    reverse_prob=reverse_prob,
+                ),
+                label,
+            )
+
+    def _get_label(self, batch: Dict):
+        label = None
+        if self.response_model.label_key in batch:
+            label = batch[self.response_model.label_key]
+        return label
 
     def _shared_step(
         self,
         batch: Dict,
     ):
-        output = self.model(batch)
-        label = batch[self.model.label_key]
-        loss = self._compute_loss(output=output, label=label)
-        return output, loss
+        query_embeddings = self.query_model(batch)
+        response_embeddings = self.response_model(batch)
+
+        loss = self._compute_loss(
+            query_embeddings=query_embeddings,
+            response_embeddings=response_embeddings,
+            label=self._get_label(batch),
+        )
+        return query_embeddings, response_embeddings, loss
 
     def training_step(self, batch, batch_idx):
         """
@@ -267,7 +246,7 @@ class MatcherLitModule(pl.LightningModule):
         -------
         Average loss of the mini-batch data.
         """
-        output, loss = self._shared_step(batch)
+        _, _, loss = self._shared_step(batch)
         self.log("train_loss", loss)
         return loss
 
@@ -287,30 +266,18 @@ class MatcherLitModule(pl.LightningModule):
         batch_idx
             Index of mini-batch.
         """
-        output, loss = self._shared_step(batch)
+        query_embeddings, response_embeddings, loss = self._shared_step(batch)
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
-        for per_match in self.matches:
-            if per_match.use_label:
-                embeddings1 = gather_column_features(
-                    output=output,
-                    column_names=per_match.pair[0],
-                )
-                embeddings2 = gather_column_features(
-                    output=output,
-                    column_names=per_match.pair[1],
-                )
-                self._compute_metric_score(
-                    metric=self.validation_metric,
-                    custom_metric_func=self.custom_metric_func,
-                    embeddings1=embeddings1,
-                    embeddings2=embeddings2,
-                    label=batch[self.model.label_key],
-                    reverse_prob=self.reverse_prob,
-                )
-                # TODO: support validation metric on multiple matches
-                # TODO: each match should use an independent torchmetric function
-                break
+
+        self._compute_metric_score(
+            metric=self.validation_metric,
+            custom_metric_func=self.custom_metric_func,
+            query_embeddings=query_embeddings,
+            response_embeddings=response_embeddings,
+            label=self._get_label(batch),
+            reverse_prob=self.reverse_prob,
+        )
 
         self.log(
             self.validation_metric_name,
@@ -339,26 +306,24 @@ class MatcherLitModule(pl.LightningModule):
         -------
         A dictionary with the mini-batch's logits and features.
         """
-        output = self.model(batch)
-        for per_match in self.matches:
-            if per_match.use_label:
-                embeddings1 = gather_column_features(
-                    output=output,
-                    column_names=per_match.pair[0],
-                )
-                embeddings2 = gather_column_features(
-                    output=output,
-                    column_names=per_match.pair[1],
-                )
-                match_prob = compute_probability(
-                    embeddings1=embeddings1,
-                    embeddings2=embeddings2,
-                )
-                if self.match_label == 0:
-                    probability = torch.stack([match_prob, 1 - match_prob]).t()
-                else:
-                    probability = torch.stack([1 - match_prob, match_prob]).t()
-                break
+        if self.signature == QUERY:
+            embeddings = self.query_model(batch)
+            return {FEATURES: embeddings}
+        elif self.signature == RESPONSE:
+            embeddings = self.response_model(batch)
+            return {FEATURES: embeddings}
+        else:
+            query_embeddings = self.query_model(batch)
+            response_embeddings = self.response_model(batch)
+
+        match_prob = compute_probability(
+            embeddings1=query_embeddings,
+            embeddings2=response_embeddings,
+        )
+        if self.match_label == 0:
+            probability = torch.stack([match_prob, 1 - match_prob]).t()
+        else:
+            probability = torch.stack([1 - match_prob, match_prob]).t()
 
         return {PROBABILITY: probability}
 
@@ -373,8 +338,11 @@ class MatcherLitModule(pl.LightningModule):
         [sched]
             Learning rate scheduler.
         """
+        # TODO: need to consider query_model and response_model in the optimizer
+        # TODO: how to avoid pass one parameter multiple times in the optimizer?
+        # TODO: in the late-fusion siamese setting, one shared parameter may have different layer ids in the query and reponse models.
         kwargs = dict(
-            model=self.model,
+            model=self.query_model,
             lr=self.hparams.lr,
             weight_decay=self.hparams.weight_decay,
         )

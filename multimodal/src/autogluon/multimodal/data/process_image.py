@@ -80,6 +80,7 @@ class ImageProcessor:
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
+        column_names: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -128,6 +129,7 @@ class ImageProcessor:
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
+        self.column_names = column_names
         self.size = None
         self.mean = None
         self.std = None
@@ -456,8 +458,7 @@ class ImageProcessor:
 
     def __call__(
         self,
-        all_image_paths: Dict[str, List[List[str]]],
-        idx: int,
+        images: Dict[str, List[str]],
         is_training: bool,
     ) -> Dict:
         """
@@ -465,10 +466,8 @@ class ImageProcessor:
 
         Parameters
         ----------
-        all_image_paths
-            Paths of all the images in a dataset.
-        idx
-            The sample index in a dataset.
+        images
+            Images of one sample.
         is_training
             Whether to process images in the training mode.
 
@@ -476,10 +475,12 @@ class ImageProcessor:
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        per_sample_paths = {
-            per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
-        }
-        return self.process_one_sample(per_sample_paths, is_training)
+        if hasattr(self, "column_names") and self.column_names:
+            images = {col_name: images[col_name] for col_name in self.column_names}
+
+        images = {k: [v] if isinstance(v, str) else v for k, v in images}
+
+        return self.process_one_sample(images, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary
