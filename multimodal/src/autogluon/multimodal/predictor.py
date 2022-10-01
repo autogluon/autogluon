@@ -1564,7 +1564,7 @@ class MultiModalPredictor:
         if not realtime:
             batch_size = compute_inference_batch_size(
                 per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-                eval_batch_size_ratio=self._config.env.eval_batch_size_ratio,
+                eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
                 per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
                 num_gpus=num_gpus,
                 strategy=strategy,
