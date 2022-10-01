@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import math
 import sys
@@ -6,6 +7,11 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 from torch import nn
+
+try:
+    from mmcv.parallel import DataContainer
+except:
+    pass
 
 from ..constants import AUTOMM
 
@@ -144,9 +150,88 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
         for v in obj:
             res.append(move_to_device(v, device))
         return res
+    elif isinstance(obj, DataContainer):
+        return obj
     else:
         raise TypeError(
             f"Invalid type {type(obj)} for move_to_device. "
             f"Make sure the object is one of these: a Pytorch tensor, a Pytorch module, "
             f"a dict or list of tensors or modules."
         )
+
+
+def compute_inference_batch_size(
+    per_gpu_batch_size: int,
+    eval_batch_size_ratio: Union[int, float],
+    per_gpu_batch_size_evaluation: int,
+    num_gpus: int,
+    strategy: str,
+):
+    """
+    Compute the batch size for inference.
+
+    Parameters
+    ----------
+    per_gpu_batch_size
+        Per gpu batch size from the config.
+    eval_batch_size_ratio
+        per_gpu_batch_size_evaluation = per_gpu_batch_size * eval_batch_size_ratio.
+    per_gpu_batch_size_evaluation
+        Per gpu evaluation batch size from the config.
+    num_gpus
+        Number of GPUs.
+    strategy
+        A pytorch lightning strategy.
+
+    Returns
+    -------
+    Batch size for inference.
+    """
+    if per_gpu_batch_size_evaluation:
+        batch_size = per_gpu_batch_size_evaluation
+    else:
+        batch_size = per_gpu_batch_size * eval_batch_size_ratio
+
+    if num_gpus > 1 and strategy == "dp":
+        # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
+        # So, we need to use the GPU number as a multiplier to compute the batch size.
+        batch_size = batch_size * num_gpus
+
+    return batch_size
+
+
+@contextlib.contextmanager
+def double_precision_context():
+    """
+    Double precision context manager.
+    """
+    default_dtype = torch.get_default_dtype()
+    torch.set_default_dtype(torch.float64)
+    yield
+    torch.set_default_dtype(default_dtype)
+
+
+def get_precision_context(precision: Union[int, str], device_type: Optional[str] = None):
+    """
+    Choose the proper context manager based on the precision.
+
+    Parameters
+    ----------
+    precision
+        The precision.
+    device_type
+        gpu or cpu.
+
+    Returns
+    -------
+    A precision context manager.
+    """
+    if precision == 32:
+        assert torch.get_default_dtype() == torch.float32
+        return contextlib.nullcontext()
+    elif precision in [16, "bf16"]:
+        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if precision == "bf16" else torch.half)
+    elif precision == 64:
+        return double_precision_context()
+    else:
+        raise ValueError(f"Unknown precision: {precision}")

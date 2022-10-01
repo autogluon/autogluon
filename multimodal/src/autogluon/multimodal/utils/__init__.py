@@ -21,7 +21,13 @@ from .data import (
     turn_on_off_feature_column_info,
 )
 from .download import download, is_url
-from .environment import compute_num_gpus, infer_precision, is_interactive, move_to_device
+from .environment import (
+    compute_inference_batch_size,
+    compute_num_gpus,
+    infer_precision,
+    is_interactive,
+    move_to_device,
+)
 from .inference import extract_from_output, infer_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter

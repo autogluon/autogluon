@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, IMAGE, LOGITS, MASKS, PROBABILITY, SCORE, TEXT
-from .environment import compute_num_gpus, infer_precision, move_to_device
+from .environment import get_precision_context, move_to_device
 from .misc import tensor_to_ndarray
 
 logger = logging.getLogger(AUTOMM)
@@ -95,8 +95,6 @@ def infer_batch(
     -------
     Model output.
     """
-    num_gpus = compute_num_gpus(config_num_gpus=num_gpus, strategy="dp")
-    precision = infer_precision(num_gpus=num_gpus, precision=precision, as_torch=True)
     device_type = "cuda" if torch.cuda.is_available() else "cpu"
     device = torch.device(device_type)
     batch_size = len(batch[next(iter(batch))])
@@ -104,16 +102,16 @@ def infer_batch(
         model = nn.DataParallel(model)
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
-    with torch.autocast(device_type=device_type, dtype=precision):
-        with torch.no_grad():
-            output = model(batch)
-            if model_postprocess_fn:
-                output = model_postprocess_fn(output)
+    precision_context = get_precision_context(precision=precision, device_type=device_type)
+    with precision_context, torch.no_grad():
+        output = model(batch)
+        if model_postprocess_fn:
+            output = model_postprocess_fn(output)
 
     return output[model.prefix]
 
 
-def use_realtime(data: pd.DataFrame, data_processors: Dict):
+def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
     """
     Determine whether to use the realtime inference based on the sample number
     and the data modalities. Loading image data requires more time than text.
@@ -127,6 +125,8 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict):
         A dataframe.
     data_processors
         A dict of data processors.
+    batch_size
+        The batch size from config.
 
     Returns
     -------
@@ -135,13 +135,13 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict):
     realtime = False
     sample_num = len(data)
     if IMAGE in data_processors and len(data_processors[IMAGE]) > 0:  # has image
-        if sample_num <= 10:
+        if sample_num <= min(10, batch_size):
             realtime = True
     elif TEXT in data_processors and len(data_processors[TEXT]) > 0:  # has text but no image
-        if sample_num <= 100:
+        if sample_num <= min(100, batch_size):
             realtime = True
     else:  # only has tabular data
-        if sample_num <= 200:
+        if sample_num <= min(200, batch_size):
             realtime = True
 
     return realtime

@@ -37,7 +37,7 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
         pipeline="ocr_text_recognition",
     )
 
-    pred = predictor.predict({"image": [mmocr_image_name]}, realtime=False)
+    pred = predictor.predict({"image": [mmocr_image_name]})
 
     # original MMOCR model's output
     checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
