@@ -167,6 +167,26 @@ def compute_inference_batch_size(
     num_gpus: int,
     strategy: str,
 ):
+    """
+    Compute the batch size for inference.
+
+    Parameters
+    ----------
+    per_gpu_batch_size
+        Per gpu batch size from the config.
+    eval_batch_size_ratio
+        per_gpu_batch_size_evaluation = per_gpu_batch_size * eval_batch_size_ratio.
+    per_gpu_batch_size_evaluation
+        Per gpu evaluation batch size from the config.
+    num_gpus
+        Number of GPUs.
+    strategy
+        A pytorch lightning strategy.
+
+    Returns
+    -------
+    Batch size for inference.
+    """
     if per_gpu_batch_size_evaluation:
         batch_size = per_gpu_batch_size_evaluation
     else:
@@ -182,6 +202,9 @@ def compute_inference_batch_size(
 
 @contextlib.contextmanager
 def double_precision_context():
+    """
+    Double precision context manager.
+    """
     default_dtype = torch.get_default_dtype()
     torch.set_default_dtype(torch.float64)
     yield
@@ -189,6 +212,20 @@ def double_precision_context():
 
 
 def get_precision_context(precision: Union[int, str], device_type: Optional[str] = None):
+    """
+    Choose the proper context manager based on the precision.
+
+    Parameters
+    ----------
+    precision
+        The precision.
+    device_type
+        gpu or cpu.
+
+    Returns
+    -------
+    A precision context manager.
+    """
     if precision == 32:
         assert torch.get_default_dtype() == torch.float32
         return contextlib.nullcontext()
