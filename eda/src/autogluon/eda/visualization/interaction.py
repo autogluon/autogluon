@@ -41,13 +41,18 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
             x, y, hue = [i['features'].get(k, None) for k in ['x', 'y', 'hue']]
             x_type, y_type, hue_type = [map_raw_type_to_feature_type(var, state.raw_type[ds].get(var, None), df, self.numeric_as_categorical_threshold)
                                         for var in [x, y, hue]]
+
+            # swap y <-> hue when category vs category to enable charting
+            if (x_type is not None) and y_type == 'category' and hue is None:
+                hue, hue_type = y, y_type
+                y, y_type = None, None
+
             chart_type = self._get_chart_type(x_type, y_type, hue_type)
             if chart_type is not None:
                 chart_args = {
                     'x': x,
                     'y': y,
                     'hue': hue,
-                    **self._kwargs,
                     **self.chart_args.get(idx, {}),
                 }
                 chart_args = {k: v for k, v in chart_args.items() if v is not None}
@@ -157,6 +162,8 @@ class CorrelationVisualization(AbstractVisualization, JupyterMixin):
 
     def _render(self, state: AnalysisState) -> None:
         for ds, corr in state.correlations.items():
+            if len(state.correlations.train_data) <= 1:
+                continue
             if state.correlations_focus_field is not None:
                 focus_field_header = f'; focus: {state.correlations_focus_field} >= {state.correlations_focus_field_threshold}'
             else:

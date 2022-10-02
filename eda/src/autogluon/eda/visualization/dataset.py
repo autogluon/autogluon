@@ -1,10 +1,6 @@
-from typing import Any, Dict, Union, List
+from typing import Union, List
 
-import ipywidgets as wgts
-import matplotlib.pyplot as plt
-import missingno as msno
 import pandas as pd
-from IPython.display import display
 from pandas import DataFrame
 
 from .base import AbstractVisualization
@@ -85,32 +81,3 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
 
         self.render_header_if_needed(state, 'Types warnings summary')
         self.display_obj(df)
-
-
-class MissingValues(AbstractVisualization, JupyterMixin):
-
-    def __init__(self,
-                 headers: bool = False,
-                 fig_args: Union[None, Dict[str, Any]] = {},
-                 namespace: str = None,
-                 **kwargs) -> None:
-        super().__init__(namespace, **kwargs)
-        self.headers = headers
-        self.fig_args = fig_args
-
-    def can_handle(self, state: AnalysisState) -> bool:
-        return 'missing_statistics' in state
-
-    def _render(self, state: AnalysisState) -> None:
-        for ds, data in state.missing_statistics.items():
-            self.render_header_if_needed(state, f'{ds} missing values analysis')
-            widgets = [msno.matrix, msno.bar, msno.heatmap, msno.dendrogram]
-            outs = [wgts.Output() for _ in widgets]
-            tab = wgts.Tab(children=outs)
-            for i, c in enumerate([w.__name__ for w in widgets]):
-                tab.set_title(i, c)
-            display(tab)
-            for widget, out in zip(widgets, outs):
-                with out:
-                    ax = widget(data.data, **self._kwargs)
-                    plt.show(ax)

@@ -127,8 +127,9 @@ class AbstractAnalysis(ABC, StateCheckMixin):
 
         """
         self.state = self._get_state_from_parent()
-        if self.can_handle(self.state, self.args):
-            self._fit(self.state, self._gather_args(), **kwargs)
+        _args = self._gather_args()
+        if self.can_handle(self.state, _args):
+            self._fit(self.state, _args, **kwargs)
             for c in self.children:
                 c.fit(**kwargs)
         return self.state

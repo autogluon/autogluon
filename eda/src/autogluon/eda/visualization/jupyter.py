@@ -21,3 +21,19 @@ class JupyterMixin:
 
     def render_markdown(self, md):
         display(Markdown(md))
+
+    def fix_tabs_scrolling(self):
+        style = """
+            <style>
+               .jupyter-widgets-output-area .output_scroll {
+                    height: unset !important;
+                    border-radius: unset !important;
+                    -webkit-box-shadow: unset !important;
+                    box-shadow: unset !important;
+                }
+                .jupyter-widgets-output-area  {
+                    height: auto !important;
+                }
+            </style>
+            """
+        display(HTML(style))

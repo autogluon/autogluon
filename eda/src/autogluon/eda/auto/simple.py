@@ -1,5 +1,5 @@
 from ..analysis import BaseAnalysis, Sampler, RawTypesAnalysis, FeatureInteraction
-from ..visualization import SimpleLinearLayout, FeatureInteractionVisualization
+from ..visualization import SimpleVerticalLinearLayout, FeatureInteractionVisualization
 
 
 def analyze(train_data=None, test_data=None, val_data=None, model=None, label=None, sample=None, anlz_facets=[], viz_facets=[], return_state=False, state=None):
@@ -19,10 +19,9 @@ def analyze(train_data=None, test_data=None, val_data=None, model=None, label=No
 
     state = a.fit()
 
-    SimpleLinearLayout(
-        state=state,
+    SimpleVerticalLinearLayout(
         facets=viz_facets,
-    ).render()
+    ).render(state)
 
     if return_state:
         return state
