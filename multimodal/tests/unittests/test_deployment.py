@@ -67,7 +67,3 @@ def test_onnx_export(checkpoint_name):
     print(onnx_spearman)
     assert pytest.approx(onnx_pearson, 1e-2) == ag_pearson
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
-
-
-if __name__ == "__main__":
-    test_onnx_export("sentence-transformers/all-MiniLM-L6-v2")
