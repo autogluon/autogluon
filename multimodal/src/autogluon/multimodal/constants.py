@@ -52,6 +52,7 @@ MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
 ACC = "acc"
+NER_METRIC = "overall_accuracy"
 RMSE = "rmse"
 ROOT_MEAN_SQUARED_ERROR = "root_mean_squared_error"
 R2 = "r2"
@@ -77,6 +78,7 @@ METRIC_MODE_MAP = {
     PEARSONR: MAX,
     SPEARMANR: MAX,
     F1: MAX,
+    NER_METRIC: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -173,3 +175,12 @@ MODEL_CHECKPOINT = "model.ckpt"
 S3_PREFIX = "s3://"
 SOURCEPROMPT_URL = "https://automl-mm-bench.s3.amazonaws.com/few_shot/templates.zip"
 SOURCEPROMPT_SHA1 = "c25cdf3730ff96ab4859b72e18d46ff117b62bd6"
+
+# ner 
+ENTITY_GROUP = "entity_group"
+START_OFFSET = "start"
+END_OFFSET = "end"
+TOKEN_WORD_MAPPING = "token_word_mapping"
+WORD_OFFSETS = "word_offsets"
+NER = "ner"
+NER_ANNOTATION = "ner_annotation"

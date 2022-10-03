@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
+from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT, NER, NER_ANNOTATION
 
 logger = logging.getLogger(AUTOMM)
 
@@ -29,7 +29,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         config: DictConfig,
         column_types: Dict,
         label_column: Optional[str] = None,
-        label_generator: Optional[LabelEncoder] = None,
+        label_generator: Optional[object] = None,
     ):
         """
         Parameters
@@ -41,7 +41,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         label_column
             Name of the label column in pd.DataFrame. Can be None to support zero-short learning.
         label_generator
-            A sklearn LabelEncoder instance.
+            A sklearn LabelEncoder instance, or a customized encoder, e.g. NerPreprocessor.
         """
         self._column_types = column_types
         self._label_column = label_column
@@ -53,7 +53,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_generator = label_generator
 
         # Scaler used for numerical labels
-        numerical_label_preprocessing = OmegaConf.select(config, "label.numerical_label_preprocessing")
+        numerical_label_preprocessing = OmegaConf.select(self._config.data, "label.numerical_label_preprocessing")
         if numerical_label_preprocessing == "minmaxscaler":
             self._label_scaler = MinMaxScaler()
         elif numerical_label_preprocessing == "standardscaler":
@@ -73,8 +73,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
                     cat_order="count",
-                    minimum_cat_count=config.categorical.minimum_cat_count,
-                    maximum_num_cat=config.categorical.maximum_num_cat,
+                    minimum_cat_count=self._config.categorical.minimum_cat_count,
+                    maximum_num_cat=self._config.categorical.maximum_num_cat,
                     verbosity=0,
                 )
                 self._feature_generators[col_name] = generator
@@ -85,8 +85,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                         (
                             "scaler",
                             StandardScaler(
-                                with_mean=config.numerical.scaler_with_mean,
-                                with_std=config.numerical.scaler_with_std,
+                                with_mean=self._config.numerical.scaler_with_mean,
+                                with_std=self._config.numerical.scaler_with_std,
                             ),
                         ),
                     ]
@@ -222,7 +222,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == TEXT:
                 self._text_feature_names.append(col_name)
             elif col_type == CATEGORICAL:
-                if self._config.categorical.convert_to_text:
+                if self._config.data.categorical.convert_to_text:
                     # Convert categorical column as text column
                     col_value = col_value.astype("object")
                     processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
@@ -248,7 +248,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 if len(processed_data.unique()) == 1:
                     self._ignore_columns_set.add(col_name)
                     continue
-                if self._config.numerical.convert_to_text:
+                if self._config.data.numerical.convert_to_text:
                     self._text_feature_names.append(col_name)
                 else:
                     generator = self._feature_generators[col_name]
@@ -261,7 +261,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
                 )
 
-    def _fit_y(self, y: pd.Series):
+    def _fit_y(self, y: pd.Series, X: Optional[pd.DataFrame] = None):
         """
         Fit the label column data to initialize the label encoder or scalar.
 
@@ -281,6 +281,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
         elif self.label_type == ROIS:
             pass  # Do nothing. TODO: Shall we call fit here?
+        elif self.label_type == NER_ANNOTATION:
+            self._label_generator.fit(y, X[self._text_feature_names[0]], self._config)
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
 
@@ -298,7 +300,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if X is not None:
             self._fit_x(X=X)
         if y is not None:
-            self._fit_y(y=y)
+            self._fit_y(y=y, X=X)
 
     def transform_text(
         self,
@@ -432,7 +434,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_label(
         self,
         df: pd.DataFrame,
-    ) -> Dict[str, NDArray[(Any,), Any]]:
+    ) -> Dict[str, Union[NDArray[(Any,), Any], list]]:
         """
         Preprocess ground-truth labels by using LabelEncoder to generate class labels for
         classification tasks or using StandardScaler to standardize numerical values
@@ -459,6 +461,17 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
             y = y_df  # Do nothing. TODO: Shall we transform this?
+        elif self.label_type == NER_ANNOTATION:
+            text_column_index = 0 # Currently, we only support one text column.
+            x_df = df[self._text_feature_names[text_column_index]]
+            y = self._label_generator.transform(y_df)
+            x = self.transform_text(df)
+            # Labelprocessor needs both ner annotations and text.
+            ret = {
+                NER_ANNOTATION: y,
+                TEXT: x[self._text_feature_names[text_column_index]],
+            }
+            return ret
         else:
             raise NotImplementedError
 
@@ -467,6 +480,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_label_for_metric(
         self,
         df: pd.DataFrame,
+        tokenizer: Optional[Any]=None,
     ) -> NDArray[(Any,), Any]:
         """
         Prepare ground-truth labels to compute metric scores in evaluation. Note that
@@ -492,6 +506,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             # need to compute the metric on the raw numerical values (no normalization)
             y = pd.to_numeric(y_df).to_numpy()
+        elif self.label_type == NER_ANNOTATION:
+            x_df = df[self._text_feature_names[0]]
+            y = self._label_generator.transform_label_for_metric(y_df, x_df, tokenizer)
         else:
             raise NotImplementedError
 
@@ -499,7 +516,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     def transform_prediction(
         self,
-        y_pred: np.ndarray,
+        y_pred: Union[np.ndarray, dict],
         inverse_categorical: bool = True,
     ) -> NDArray[(Any,), Any]:
         """
@@ -534,6 +551,13 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y_pred = np.squeeze(y_pred)
             # Convert nan to 0
             y_pred = np.nan_to_num(y_pred)
+        elif self.label_type == NER_ANNOTATION: 
+            y_pred = self._label_generator.inverse_transform(y_pred)
+            if inverse_categorical:
+                # Return annotations and offsets
+                y_pred = y_pred[1]
+            else:
+                y_pred = y_pred[0]
         else:
             raise NotImplementedError
 

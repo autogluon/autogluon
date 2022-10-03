@@ -3,6 +3,7 @@ from .datamodule import BaseDataModule
 from .dataset import BaseDataset
 from .mixup import MixupModule
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+from .labelencoder_ner import NerLabelEncoder
 from .process_categorical import CategoricalProcessor
 from .process_image import ImageProcessor
 from .process_label import LabelProcessor
