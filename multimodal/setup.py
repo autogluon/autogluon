@@ -53,6 +53,7 @@ install_requires = [
     "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
     "datasets>=2.3.2,<=2.3.2",
+    "onnxruntime-gpu>=1.12.1,<=1.12.1",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
