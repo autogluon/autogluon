@@ -2053,7 +2053,7 @@ class MultiModalPredictor:
         if not batch_size:
             batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
         if data is not None:
-            batch = self.get_processed_batch(
+            batch = self.get_processed_batch_for_deployment(
                 data=data, valid_input=valid_input, onnx_tracing=True, batch_size=batch_size
             )
 
@@ -2070,7 +2070,7 @@ class MultiModalPredictor:
             dynamic_axes=dynamic_axes,
         )
 
-    def get_processed_batch(
+    def get_processed_batch_for_deployment(
         self,
         data: pd.DataFrame,
         valid_input: Optional[List] = None,

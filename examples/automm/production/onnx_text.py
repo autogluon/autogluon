@@ -17,8 +17,8 @@ def eval_cosine(predictor, df, onnx_session):
         "hf_text_text_valid_length",
         "hf_text_text_segment_ids",  # Remove for mpnet
     ]
-    QEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence1"]], valid_input=valid_input))[0]
-    AEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence2"]], valid_input=valid_input))[0]
+    QEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]], valid_input=valid_input))[0]
+    AEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]], valid_input=valid_input))[0]
 
     cosine_scores = 1 - (paired_cosine_distances(QEmb, AEmb))
     eval_pearson_cosine, _ = pearsonr(labels, cosine_scores)

@@ -29,14 +29,14 @@ def eval(predictor, df, onnx_session=None):
             "hf_text_text_valid_length",
             "hf_text_text_segment_ids",
         ]
-        QEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence1"]], valid_input=valid_input))[
+        QEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]], valid_input=valid_input))[
             0
         ]
-        AEmb = onnx_session.run(None, predictor.get_processed_batch(data=df[["sentence2"]], valid_input=valid_input))[
+        AEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]], valid_input=valid_input))[
             0
         ]
 
-    cosine_scores = 1 - (paired_cosine_distances(QEmb, AEmb))
+    cosine_scores = 1 - paired_cosine_distances(QEmb, AEmb)
     eval_pearson_cosine, _ = pearsonr(labels, cosine_scores)
     eval_spearman_cosine, _ = spearmanr(labels, cosine_scores)
 
