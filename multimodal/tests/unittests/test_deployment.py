@@ -47,23 +47,17 @@ def test_onnx_export(checkpoint_name):
         },
     )
     ag_pearson, ag_spearman = eval(predictor, test_df)
-    print(ag_pearson)
-    print(ag_spearman)
 
     onnx_path = checkpoint_name.replace("/", "_") + ".onnx"
 
     predictor.export_onnx(onnx_path=onnx_path)
     ort_sess = ort.InferenceSession(onnx_path, providers=["CUDAExecutionProvider"])
     onnx_pearson, onnx_spearman = eval(predictor, test_df, ort_sess)
-    print(onnx_pearson)
-    print(onnx_spearman)
     assert pytest.approx(onnx_pearson, 1e-2) == ag_pearson
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
 
     predictor.export_onnx(onnx_path=onnx_path, data=test_df)
     ort_sess = ort.InferenceSession(onnx_path, providers=["CUDAExecutionProvider"])
     onnx_pearson, onnx_spearman = eval(predictor, test_df, ort_sess)
-    print(onnx_pearson)
-    print(onnx_spearman)
     assert pytest.approx(onnx_pearson, 1e-2) == ag_pearson
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
