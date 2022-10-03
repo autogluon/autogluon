@@ -1,14 +1,15 @@
-from typing import Any, Dict, List, Optional, Union
+import json
 import logging
+import re
+from typing import Any, Dict, List, Optional, Union
+
+import jsonschema
+import numpy as np
+import pandas as pd
 from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
-import pandas as pd
-import json
-import re
-import numpy as np
-import jsonschema
 
-from ..constants import AUTOMM, ENTITY_GROUP, START_OFFSET, END_OFFSET, NER_ANNOTATION
+from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, START_OFFSET
 from .utils import process_ner_annotations
 
 logger = logging.getLogger(AUTOMM)
@@ -106,7 +107,7 @@ class NerLabelEncoder:
 
     def transform_label_for_metric(self, y: pd.Series, x: pd.Series, tokenizer):
         """
-        Transform raw JSON annotations to word level annotations which can be used 
+        Transform raw JSON annotations to word level annotations which can be used
         as references of seqeval evaluation.
         For more information: https://huggingface.co/spaces/evaluate-metric/seqeval
 
@@ -133,7 +134,7 @@ class NerLabelEncoder:
 
     def inverse_transform(self, y: List):
         """
-        Inverse Transform NER model predictions into human readable dictionary annotations 
+        Inverse Transform NER model predictions into human readable dictionary annotations
         which have the same format as the original annotations.
 
         Parameters

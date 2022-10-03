@@ -3,9 +3,10 @@ from typing import Any, Dict, List, Optional, Union
 from nptyping import NDArray
 from torch import nn
 
-from ..constants import LABEL, NER, TEXT, NER_ANNOTATION
+from ..constants import LABEL, NER, NER_ANNOTATION, TEXT
 from .collator import Stack
 from .utils import process_ner_annotations
+
 
 class LabelProcessor:
     """
@@ -65,7 +66,7 @@ class LabelProcessor:
         if self.prefix == NER:
             ner_annotation = labels[NER_ANNOTATION]
             ner_text = labels[TEXT]
-            # online label generation 
+            # online label generation
             return {
                 self.label_key: process_ner_annotations(ner_annotation, ner_text, self.tokenizer),
             }

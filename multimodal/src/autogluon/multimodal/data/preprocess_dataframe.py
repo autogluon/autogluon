@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT, NER, NER_ANNOTATION
+from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NER, NER_ANNOTATION, NULL, NUMERICAL, ROIS, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
@@ -462,7 +462,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == ROIS:
             y = y_df  # Do nothing. TODO: Shall we transform this?
         elif self.label_type == NER_ANNOTATION:
-            text_column_index = 0 # Currently, we only support one text column.
+            text_column_index = 0  # Currently, we only support one text column.
             x_df = df[self._text_feature_names[text_column_index]]
             y = self._label_generator.transform(y_df)
             x = self.transform_text(df)
@@ -480,7 +480,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_label_for_metric(
         self,
         df: pd.DataFrame,
-        tokenizer: Optional[Any]=None,
+        tokenizer: Optional[Any] = None,
     ) -> NDArray[(Any,), Any]:
         """
         Prepare ground-truth labels to compute metric scores in evaluation. Note that
@@ -551,7 +551,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y_pred = np.squeeze(y_pred)
             # Convert nan to 0
             y_pred = np.nan_to_num(y_pred)
-        elif self.label_type == NER_ANNOTATION: 
+        elif self.label_type == NER_ANNOTATION:
             y_pred = self._label_generator.inverse_transform(y_pred)
             if inverse_categorical:
                 # Return annotations and offsets

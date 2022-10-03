@@ -4,11 +4,9 @@ from typing import List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
+from transformers import AutoTokenizer, T5TokenizerFast
 from transformers import logging as hf_logging
 from transformers.models.t5 import T5PreTrainedModel
-from transformers import AutoTokenizer, T5TokenizerFast
-
-from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 from ..constants import (
     AUTOMM,
@@ -18,13 +16,14 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASKS,
+    NER_ANNOTATION,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
-    NER_ANNOTATION,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
 )
+from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 hf_logging.set_verbosity_error()
 
@@ -72,7 +71,7 @@ class HFAutoModelForNER(nn.Module):
 
         self.num_classes = num_classes
         self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
-        
+
         if self.config.model_type in {"gpt2", "roberta"}:
             # Refer to this PR: https://github.com/huggingface/transformers/pull/12116
             self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name, add_prefix_space=True)
@@ -194,7 +193,7 @@ class HFAutoModelForNER(nn.Module):
         pooled_features = outputs.last_hidden_state[:, 0, :]
 
         logits = self.classifier(sequence_output)
-       
+
         logits_label = torch.argmax(F.log_softmax(logits, dim=-1), dim=-1)
 
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
@@ -245,8 +244,8 @@ class HFAutoModelForNER(nn.Module):
             "encoder.conv.conv",
             "relative_attention_bias",
             "dummy_layer",
-            'mask_emb',
-            'word_embedding.weight'
+            "mask_emb",
+            "word_embedding.weight",
         )
         post_encoder_patterns = ("head", "pooler", "ln_f", "final_layer_norm")
         names = [n for n, _ in self.named_parameters()]

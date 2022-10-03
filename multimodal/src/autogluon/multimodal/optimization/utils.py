@@ -35,6 +35,8 @@ from ..constants import (
     LORA_BIAS,
     LORA_NORM,
     MULTICLASS,
+    NER,
+    NER_METRIC,
     NORM_FIT,
     PAIR_MARGIN_MINER,
     PEARSONR,
@@ -45,8 +47,6 @@ from ..constants import (
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
-    NER,
-    NER_METRIC,
 )
 from .losses import SoftTargetCrossEntropy
 from .lr_scheduler import (

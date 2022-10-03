@@ -5,7 +5,22 @@ import pandas as pd
 import torch
 from torch import nn
 
-from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, IMAGE, LOGITS, MASKS, PROBABILITY, SCORE, TEXT, NER, NER_ANNOTATION, TOKEN_WORD_MAPPING, WORD_OFFSETS
+from ..constants import (
+    AUTOMM,
+    BBOX,
+    COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    LOGITS,
+    MASKS,
+    NER,
+    NER_ANNOTATION,
+    PROBABILITY,
+    SCORE,
+    TEXT,
+    TOKEN_WORD_MAPPING,
+    WORD_OFFSETS,
+)
 from .environment import get_precision_context, move_to_device
 from .misc import tensor_to_ndarray
 

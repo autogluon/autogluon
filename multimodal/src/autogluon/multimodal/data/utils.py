@@ -259,6 +259,7 @@ def normalize_txt(text: str) -> str:
     text = unidecode(text)
     return text
 
+
 def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False):
     """
     Generate token-level/word-level labels with given text and NER annotations.
@@ -285,7 +286,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
             custom_label = annot[1]
             if word_offset[0] == custom_offset[0]:
                 word_label[idx] = custom_label
-    
+
     token_label = [0] * len(col_tokens.input_ids)
     temp = set()
     counter = 0
@@ -293,11 +294,12 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
         if token_to_word != -1 and token_to_word not in temp:
             temp.add(token_to_word)
             token_label[idx] = word_label[counter]
-            counter += 1        
+            counter += 1
     if not is_eval:
-        return token_label # return token-level labels for 
+        return token_label  # return token-level labels for
     else:
-        return word_label # return word-level labels for evaluation
+        return word_label  # return word-level labels for evaluation
+
 
 def tokenize_ner_text(text, tokenizer):
     """
@@ -324,9 +326,9 @@ def tokenize_ner_text(text, tokenizer):
         padding="max_length",
         truncation=True,
         max_length=tokenizer.model_max_length,
-        return_token_type_ids=True 
+        return_token_type_ids=True,
     )
-    # token to word mappings: it will tell us which token belongs to which word. 
+    # token to word mappings: it will tell us which token belongs to which word.
     token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
     assert len(set(token_to_word_mappings)) == len(words) + 1, "The token to word mappings are incorrect!"
     offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)

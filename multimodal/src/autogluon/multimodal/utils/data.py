@@ -10,16 +10,27 @@ from torch import nn
 
 from autogluon.core.utils.loaders import load_pd
 
-from ..constants import AUTOMM, BINARY, CATEGORICAL, DEFAULT_SHOT, FEW_SHOT, IMAGE, LABEL, NUMERICAL, TEXT, NER_ANNOTATION
+from ..constants import (
+    AUTOMM,
+    BINARY,
+    CATEGORICAL,
+    DEFAULT_SHOT,
+    FEW_SHOT,
+    IMAGE,
+    LABEL,
+    NER_ANNOTATION,
+    NUMERICAL,
+    TEXT,
+)
 from ..data import (
     CategoricalProcessor,
     ImageProcessor,
     LabelProcessor,
     MixupModule,
     MultiModalFeaturePreprocessor,
+    NerLabelEncoder,
     NumericalProcessor,
     TextProcessor,
-    NerLabelEncoder,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -57,7 +68,7 @@ def init_df_preprocessor(
     """
     if column_types[label_column] == NER_ANNOTATION:
         label_generator = NerLabelEncoder()
-    else: 
+    else:
         label_generator = None
 
     df_preprocessor = MultiModalFeaturePreprocessor(

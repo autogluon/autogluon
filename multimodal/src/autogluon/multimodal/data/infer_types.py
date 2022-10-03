@@ -6,23 +6,22 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import PIL
-import json
 
 from ..constants import (
     AUTOMM,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    ENTITY_GROUP,
     IMAGE,
     MULTICLASS,
+    NER,
+    NER_ANNOTATION,
     NULL,
     NUMERICAL,
     REGRESSION,
     ROIS,
     TEXT,
-    NER,
-    NER_ANNOTATION,
-    ENTITY_GROUP,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -459,9 +458,12 @@ def infer_problem_type_output_shape(
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
         elif provided_problem_type == NER:
-            unique_entity_groups = [annot[ENTITY_GROUP] for annotation in data[label_column].iteritems() \
-                                for annot in json.loads(annotation[-1])]
-            return provided_problem_type, len(set(unique_entity_groups)) 
+            unique_entity_groups = [
+                annot[ENTITY_GROUP]
+                for annotation in data[label_column].iteritems()
+                for annot in json.loads(annotation[-1])
+            ]
+            return provided_problem_type, len(set(unique_entity_groups))
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "

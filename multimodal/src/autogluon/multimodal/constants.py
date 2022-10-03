@@ -176,7 +176,7 @@ S3_PREFIX = "s3://"
 SOURCEPROMPT_URL = "https://automl-mm-bench.s3.amazonaws.com/few_shot/templates.zip"
 SOURCEPROMPT_SHA1 = "c25cdf3730ff96ab4859b72e18d46ff117b62bd6"
 
-# ner 
+# ner
 ENTITY_GROUP = "entity_group"
 START_OFFSET = "start"
 END_OFFSET = "end"

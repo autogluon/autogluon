@@ -7,8 +7,8 @@ from .huggingface_text import HFAutoModelForTextPrediction
 from .mmdet_image import MMDetAutoModelForObjectDetection
 from .mmocr_text_detection import MMOCRAutoModelForTextDetection
 from .mmocr_text_recognition import MMOCRAutoModelForTextRecognition
+from .ner import HFAutoModelForNER
 from .numerical_mlp import NumericalMLP
 from .numerical_transformer import NumericalTransformer
 from .t_few import TFewModel
 from .timm_image import TimmAutoModelForImagePrediction
-from .ner import HFAutoModelForNER

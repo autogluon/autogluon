@@ -12,11 +12,27 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH, NER, TOKEN_WORD_MAPPING, WORD_OFFSETS
+from ..constants import (
+    AUTOMM,
+    CHOICES_IDS,
+    COLUMN,
+    NER,
+    TEXT,
+    TEXT_SEGMENT_IDS,
+    TEXT_TOKEN_IDS,
+    TEXT_VALID_LENGTH,
+    TOKEN_WORD_MAPPING,
+    WORD_OFFSETS,
+)
 from .collator import Pad, Stack
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
-from .utils import extract_value_from_config, normalize_txt, register_encoding_decoding_error_handlers, tokenize_ner_text
+from .utils import (
+    extract_value_from_config,
+    normalize_txt,
+    register_encoding_decoding_error_handlers,
+    tokenize_ner_text,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -128,7 +144,7 @@ class TextProcessor:
         self.tokenizer_name = tokenizer_name
         self.requires_column_info = requires_column_info
         # Use the model's tokenizer if it exists.
-        if hasattr(model, 'tokenizer'):
+        if hasattr(model, "tokenizer"):
             self.tokenizer = model.tokenizer
         else:
             self.tokenizer = self.get_pretrained_tokenizer(
@@ -496,7 +512,10 @@ class TextProcessor:
         else:
             return np.minimum(lengths, max_length)
 
-    def process_ner_text(self, text: Dict[str, str],):
+    def process_ner_text(
+        self,
+        text: Dict[str, str],
+    ):
         """
         Process the NER text data.
         Parameters

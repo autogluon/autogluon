@@ -53,6 +53,7 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    NER,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
@@ -66,7 +67,6 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
-    NER,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -79,8 +79,8 @@ from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
-from .optimization.lit_ner import NerLitModule
 from .optimization.lit_module import LitModule
+from .optimization.lit_ner import NerLitModule
 from .optimization.losses import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
 from .utils import (
@@ -1712,7 +1712,7 @@ class MultiModalPredictor:
             if metrics_is_none:
                 results = score
             else:
-                results.update({per_metric:score[per_metric] for per_metric in metrics})
+                results.update({per_metric: score[per_metric] for per_metric in metrics})
         else:
             for per_metric in metrics:
                 pos_label = try_to_infer_pos_label(
@@ -1985,7 +1985,9 @@ class MultiModalPredictor:
             index = data.index
         else:
             index = None
-        if isinstance(to_be_converted, list) or (isinstance(to_be_converted, np.ndarray) and to_be_converted.ndim == 1):
+        if isinstance(to_be_converted, list) or (
+            isinstance(to_be_converted, np.ndarray) and to_be_converted.ndim == 1
+        ):
             return pd.Series(to_be_converted, index=index, name=self._label_column)
         else:
             return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)

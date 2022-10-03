@@ -1,8 +1,8 @@
 import logging
 import warnings
-import evaluate
 from typing import Dict, List, Optional, Tuple, Union
 
+import evaluate
 from sklearn.metrics import f1_score
 
 from autogluon.core.metrics import get_metric
@@ -15,6 +15,8 @@ from ..constants import (
     F1,
     METRIC_MODE_MAP,
     MULTICLASS,
+    NER,
+    NER_METRIC,
     REGRESSION,
     RMSE,
     ROC_AUC,
@@ -22,8 +24,6 @@ from ..constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    NER,
-    NER_METRIC,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -133,7 +133,7 @@ def compute_score(
     Computed score.
     """
     if metric_name == NER_METRIC:
-        metric = evaluate.load('seqeval')
+        metric = evaluate.load("seqeval")
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric_name)
