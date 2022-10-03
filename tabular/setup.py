@@ -54,7 +54,7 @@ extras_require = {
         'vowpalwabbit>=8.10,<8.11'
     ],
     'pecos': [
-        'libpecos>=0.4.0'
+        'libpecos>=0.4.0,<0.5.0'
     ]
 }
 
