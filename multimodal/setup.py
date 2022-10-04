@@ -52,8 +52,6 @@ install_requires = [
     "openmim>0.1.5,<=0.2.1",
     "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
-    "datasets>=2.3.2,<=2.3.2",
-    "onnxruntime-gpu>=1.12.1,<=1.12.1",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -62,6 +60,8 @@ extras_require = {
     "tests": [
         "black~=22.0,>=22.3",
         "isort>=5.10",
+        "datasets>=2.3.2,<=2.3.2",
+        "onnxruntime-gpu>=1.12.1,<=1.12.1",
     ]
 }
 
