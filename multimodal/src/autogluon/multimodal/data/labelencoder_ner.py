@@ -17,7 +17,7 @@ logger = logging.getLogger(AUTOMM)
 
 class NerLabelEncoder:
     """
-    Label Encoder for the named entity recognition task.
+    Label Encoder for the named entity recognition task. 
     """
 
     def __init__(self, entity_map: Optional[dict] = None):
