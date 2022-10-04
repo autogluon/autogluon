@@ -1451,7 +1451,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config.data,
+                config=config,
                 column_types=column_types,
                 label_column=self._label_column,
                 train_df_x=data,
