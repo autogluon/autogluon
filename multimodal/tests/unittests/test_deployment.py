@@ -37,6 +37,7 @@ def eval(predictor, df, onnx_session=None):
     "checkpoint_name",
     ["sentence-transformers/msmarco-MiniLM-L-12-v3", "sentence-transformers/all-MiniLM-L6-v2"],
 )
+@pytest.mark.skip(reason="onnx export currently requires torchtext<=0.12.0")
 def test_onnx_export(checkpoint_name):
     test_df = load_dataset("wietsedv/stsbenchmark", split="test").to_pandas()
 
