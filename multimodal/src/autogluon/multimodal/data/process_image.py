@@ -51,6 +51,7 @@ from ..constants import (
     COLUMN,
     IMAGE,
     IMAGE_VALID_NUM,
+    MMCV_MODELS,
     MMDET_IMAGE,
     MMOCR,
     MMOCR_TEXT_DET,
@@ -159,8 +160,8 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
-            if self.prefix == MMDET_IMAGE:
+        if self.prefix.lower().startswith(MMCV_MODELS):
+            if self.prefix.lower().startswith(MMDET_IMAGE):
                 assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
             else:
                 assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
@@ -201,7 +202,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
+        if self.prefix.lower().startswith(MMCV_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {

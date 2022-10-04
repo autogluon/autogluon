@@ -126,7 +126,11 @@ class BaseDataModule(LightningDataModule):
             num_workers=self.num_workers,
             shuffle=True,
             pin_memory=False,
-            collate_fn=get_collate_fn(df_preprocessor=self.df_preprocessor, data_processors=self.data_processors),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -145,7 +149,11 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=get_collate_fn(df_preprocessor=self.df_preprocessor, data_processors=self.data_processors),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -164,7 +172,11 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=get_collate_fn(df_preprocessor=self.df_preprocessor, data_processors=self.data_processors),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -183,6 +195,10 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=get_collate_fn(df_preprocessor=self.df_preprocessor, data_processors=self.data_processors),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
