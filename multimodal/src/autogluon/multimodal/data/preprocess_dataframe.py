@@ -73,8 +73,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
                     cat_order="count",
-                    minimum_cat_count=self._config.categorical.minimum_cat_count,
-                    maximum_num_cat=self._config.categorical.maximum_num_cat,
+                    minimum_cat_count=self._config.data.categorical.minimum_cat_count,
+                    maximum_num_cat=self._config.data.categorical.maximum_num_cat,
                     verbosity=0,
                 )
                 self._feature_generators[col_name] = generator
@@ -85,8 +85,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                         (
                             "scaler",
                             StandardScaler(
-                                with_mean=self._config.numerical.scaler_with_mean,
-                                with_std=self._config.numerical.scaler_with_std,
+                                with_mean=self._config.data.numerical.scaler_with_mean,
+                                with_std=self._config.data.numerical.scaler_with_std,
                             ),
                         ),
                     ]
