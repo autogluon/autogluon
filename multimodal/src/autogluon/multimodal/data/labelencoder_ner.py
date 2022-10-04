@@ -17,7 +17,7 @@ logger = logging.getLogger(AUTOMM)
 
 class NerLabelEncoder:
     """
-    Label Encoder for the named entity recognition task. 
+    Label Encoder for the named entity recognition task.
     """
 
     def __init__(self, entity_map: Optional[dict] = None):
@@ -34,7 +34,6 @@ class NerLabelEncoder:
         self.unique_entity_groups = self.ner_special_tags + entity_groups
         self.entity_map = {entity: index for index, entity in enumerate(self.unique_entity_groups)}
         self.inverse_entity_map = {index: entity for index, entity in enumerate(self.unique_entity_groups)}
-
         logger.debug(f"Unique entity groups in the data: {entity_groups}")
 
     def extract_ner_annotations(self, y: pd.Series):
