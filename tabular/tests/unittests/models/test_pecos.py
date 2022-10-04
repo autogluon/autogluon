@@ -1,5 +1,5 @@
 
-from autogluon.tabular.models.pecos.pecos_model import PecosModel
+from autogluon.tabular.models.pecos_tabular.pecos_model import PecosModel
 
 
 def test_pecos_binary(fit_helper):
