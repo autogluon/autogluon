@@ -10,6 +10,7 @@ def clean_str(s):
     """
     return re.sub('\W+', '_', str(s))
 
+
 def read_pred_outfile(pred_outfile, k = 1):
     """
     Reads predictions output from PECOS
@@ -24,16 +25,18 @@ def read_pred_outfile(pred_outfile, k = 1):
                 tuple(t[0] for t in r['data'][:k]),
                 tuple(t[1] for t in r['data'][:k])
             )
-            for r in load_json_multi(fn)
+            for r in load_json_multi(pred_outfile)
         ],
         columns=['labels', 'scores']
     )
     return df_pred 
 
+
 def load_json_multi(fn):
     with open(fn) as f:
         for ln in f:
             yield json.loads(ln)
+
 
 def format_predictions(df_pred):
     """

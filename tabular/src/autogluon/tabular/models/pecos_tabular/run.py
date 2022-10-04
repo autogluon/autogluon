@@ -1,6 +1,6 @@
 # Run PECOS with AutoGluon. Testing file provided for convenience
 from autogluon.tabular import TabularDataset
-from pecos_model import PecosModel
+from .pecos_model import PecosModel
 import pandas as pd
 
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
@@ -43,20 +43,14 @@ print(X_clean.head(5))
 
 # Fit model
 
-cat_features = ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'native-country']
-text_features = None
-num_features = ['age', 'fnlwgt', 'education-num', 'sex', 'capital-gain', 'capital-loss', 'hours-per-week']
-
-print(X)
-kwargs = {'cat_features':cat_features, 'text_features': text_features, 'num_features': num_features, 'model_type': "XRLinear"}
-custom_model = PecosModel(**kwargs)
-custom_model.fit(X=X_clean, y=y_clean)  # Fit custom model
+model = PecosModel()
+model.fit(X=X_clean, y=y_clean)
 
 # To save to disk and load the model, do the following:
-# load_path = custom_model.path
-# custom_model.save()
-# del custom_model
-# custom_model = CustomRandomForestModel.load(path=load_path)
+# load_path = model.path
+# model.save()
+# del model
+# model = PecosModel.load(path=load_path)
 
 # Test
 
@@ -66,7 +60,7 @@ X_test_clean = feature_generator.transform(X_test)
 
 print(X_test_clean.head(5))
 
-y_pred = custom_model.predict(X_test_clean)
+y_pred = model.predict(X_test_clean)
 y_pred = pd.Series(y_pred)
 print(y_pred.head(5))
 
@@ -77,35 +71,31 @@ y_pred_orig = label_cleaner.inverse_transform(y_pred)
 print(y_pred_orig.head(5))
 
 
-score = custom_model.score(X_test_clean, y_test_clean)
-print(f'Test score ({custom_model.eval_metric.name}) = {score}')
+score = model.score(X_test_clean, y_test_clean)
+print(f'Test score ({model.eval_metric.name}) = {score}')
 
-run_bagged = False
+run_bagged = True
 if run_bagged:
     from autogluon.core.models import BaggedEnsembleModel
-    bagged_custom_model = BaggedEnsembleModel(PecosModel())
-    bagged_custom_model.params['fold_fitting_strategy'] = 'sequential_local'
-    bagged_custom_model.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
-    bagged_score = bagged_custom_model.score(X_test_clean, y_test_clean)
-    print(f'Test score ({bagged_custom_model.eval_metric.name}) = {bagged_score} (bagged)')
+    bagged_model = BaggedEnsembleModel(PecosModel())
+    bagged_model.params['fold_fitting_strategy'] = 'sequential_local'
+    bagged_model.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
+    bagged_score = bagged_model.score(X_test_clean, y_test_clean)
+    print(f'Test score ({bagged_model.eval_metric.name}) = {bagged_score} (bagged)')
     print(f'Bagging increased model accuracy by {round(bagged_score - score, 4) * 100}%!')
 
 
 from autogluon.tabular import TabularPredictor
 
-run_with_defined_hyperparameters = False
+run_with_defined_hyperparameters = True
 if run_with_defined_hyperparameters:
-    kwargs = {'cat_features':cat_features, 'text_features': text_features, 'num_features': num_features}
-    custom_hyperparameters = {PecosModel: [kwargs]}#[{'cat_features': cat_features, 'text_features': text_features, 'num_features': num_features}]}#, {'seed': 10}, {'seed': 20}]}
+    custom_hyperparameters = {PecosModel: [{}]}
     predictor = TabularPredictor(label=label).fit(train_data, hyperparameters=custom_hyperparameters)
     predictor.leaderboard(test_data, silent=True)
 
 
 from autogluon.core.space import Categorical, Int, Real, Bool
 custom_hyperparameters_hpo = {PecosModel: {
-    'cat_features': cat_features,
-    'text_features': text_features,
-    'num_features': num_features,
     'max_leaf_size': Int(lower=50, upper=200),
     'nr_splits': Categorical(2, 4, 8, 16, 32, 64, 128),
     'spherical': Bool(),

@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import random
 
-from pecos_utils import read_pred_outfile, format_predictions 
+from .pecos_utils import read_pred_outfile, format_predictions 
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,6 @@ class PecosInterface():
         model_type = "XRLinear",
         workdir = None,
         model_dir = None,
-        cat_features = None,
-        text_features = None,
-        num_features = None,
-        seed = None,
         max_leaf_size = None,
         nr_splits = None,
         spherical = None,
@@ -42,14 +38,7 @@ class PecosInterface():
         self.data_file_test = self.workdir / 'test-data.txt'
         self.label_dict_file = self.workdir / 'labels.txt'
         
-        # Define features
-        self.cat_features = cat_features
-        self.text_features = text_features
-        self.num_features = num_features
-
         # Configure hyperparameters
-        if seed is not None:
-            random.seed(seed)
         self.max_leaf_size = max_leaf_size
         self.nr_splits = nr_splits
         self.spherical = spherical
@@ -61,7 +50,7 @@ class PecosInterface():
         self.negative_sampling = negative_sampling
         self.sparsity_threshold = sparsity_threshold
 
-    def fit(self, X: pd.DataFrame, y: pd.Series):
+    def fit(self, X: pd.DataFrame, y: pd.Series, timeout=None):
         # Save X to a file
         with self.data_file_train.open(mode='w') as f:
             for row in X:
@@ -86,7 +75,7 @@ python3 -m pecos.apps.text2text.train  \
         
         # Validate output
         try:
-            out = subprocess.check_output(cmd, shell=True)
+            out = subprocess.check_output(cmd, shell=True, timeout=timeout)
         except subprocess.CalledProcessError as e:
             logger.error(e)
             raise
