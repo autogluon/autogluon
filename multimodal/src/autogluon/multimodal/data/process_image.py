@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import PIL
+from PIL import ImageFile
 import torch
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
@@ -61,6 +62,7 @@ from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
 
 logger = logging.getLogger(AUTOMM)
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ImageProcessor:
@@ -74,7 +76,6 @@ class ImageProcessor:
         model: nn.Module,
         train_transform_types: List[str],
         val_transform_types: List[str],
-        samples_per_gpu: Optional[int] = None,
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
@@ -91,8 +92,6 @@ class ImageProcessor:
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
-        samples_per_gpu
-            Number of samples per gpu, used in MMDET to group data in each batch.
         norm_type
             How to normalize an image. We now support:
             - inception
@@ -169,10 +168,6 @@ class ImageProcessor:
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
             self.val_processor = Compose(cfg.data.test.pipeline)
             self.train_processor = Compose(cfg.data.test.pipeline)
-            if isinstance(samples_per_gpu, int) and samples_per_gpu > 0:
-                self.samples_per_gpu = samples_per_gpu
-            else:
-                raise ValueError(f"invalid samples_per_gpu value: {samples_per_gpu}")
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
@@ -189,7 +184,7 @@ class ImageProcessor:
     def image_column_prefix(self):
         return f"{self.image_key}_{COLUMN}"
 
-    def collate_fn(self, image_column_names: Optional[List] = None) -> Dict:
+    def collate_fn(self, image_column_names: Optional[List] = None, per_gpu_batch_size: Optional[int] = None) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
         vary from sample to sample. Samples with less images will be padded zeros.
@@ -210,7 +205,7 @@ class ImageProcessor:
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
-                    self.image_key: lambda x: collate(x, samples_per_gpu=self.samples_per_gpu),
+                    self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
                 }
             )
         else:
@@ -478,7 +473,7 @@ class ImageProcessor:
         if hasattr(self, "column_names") and self.column_names:
             images = {col_name: images[col_name] for col_name in self.column_names}
 
-        images = {k: [v] if isinstance(v, str) else v for k, v in images}
+        images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
 
         return self.process_one_sample(images, is_training)
 

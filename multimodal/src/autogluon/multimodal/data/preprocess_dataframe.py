@@ -47,23 +47,25 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._label_column = label_column
         self._config = config
         self._feature_generators = dict()
-        if label_generator is None:
-            self._label_generator = LabelEncoder()
-        else:
-            self._label_generator = label_generator
 
-        # Scaler used for numerical labels
-        numerical_label_preprocessing = OmegaConf.select(config, "label.numerical_label_preprocessing")
-        if numerical_label_preprocessing == "minmaxscaler":
-            self._label_scaler = MinMaxScaler()
-        elif numerical_label_preprocessing == "standardscaler":
-            self._label_scaler = StandardScaler()
-        elif numerical_label_preprocessing is None or numerical_label_preprocessing.lower() == "none":
-            self._label_scaler = StandardScaler(with_mean=False, with_std=False)
-        else:
-            raise ValueError(
-                f"The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported"
-            )
+        if label_column:
+            if label_generator is None:
+                self._label_generator = LabelEncoder()
+            else:
+                self._label_generator = label_generator
+
+            # Scaler used for numerical labels
+            numerical_label_preprocessing = OmegaConf.select(config, "label.numerical_label_preprocessing")
+            if numerical_label_preprocessing == "minmaxscaler":
+                self._label_scaler = MinMaxScaler()
+            elif numerical_label_preprocessing == "standardscaler":
+                self._label_scaler = StandardScaler()
+            elif numerical_label_preprocessing is None or numerical_label_preprocessing.lower() == "none":
+                self._label_scaler = StandardScaler(with_mean=False, with_std=False)
+            else:
+                raise ValueError(
+                    f"The numerical_label_preprocessing={numerical_label_preprocessing} is currently not supported"
+                )
 
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
@@ -287,7 +289,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if self._fit_y_called:
             raise RuntimeError("fit_y() has been called. Please create a new preprocessor and call it again!")
         self._fit_y_called = True
-
+        logger.debug(f'Process col "{self._label_column}" with type label')
         if self.label_type == CATEGORICAL:
             self._label_generator.fit(y)
         elif self.label_type == NUMERICAL:
@@ -461,7 +463,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_label(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray[(Any,), Any]], None]:
+    ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
         """
         Preprocess ground-truth labels by using LabelEncoder to generate class labels for
         classification tasks or using StandardScaler to standardize numerical values
@@ -491,7 +493,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         else:
             raise NotImplementedError
 
-        return {self._label_column: y}, None
+        return {self._label_column: y}, {self._label_column: self.label_type}
 
     def transform_label_for_metric(
         self,

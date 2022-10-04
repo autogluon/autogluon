@@ -7,6 +7,8 @@ from .config import (
     parse_dotlist_conf,
     save_pretrained_model_configs,
     update_config_by_rules,
+    customize_model_names,
+    parse_dotlist_conf,
 )
 from .data import (
     assign_feature_column_names,
@@ -24,7 +26,7 @@ from .download import download, is_url
 from .environment import compute_num_gpus, infer_precision, is_interactive, move_to_device
 from .inference import extract_from_output, infer_batch
 from .load import CustomUnpickler, load_text_tokenizers
-from .log import LogFilter, apply_log_filter
+from .log import LogFilter, apply_log_filter, make_exp_dir
 from .metric import compute_score, get_minmax_mode, infer_metrics
 from .misc import logits_to_prob, tensor_to_ndarray
 from .model import create_fusion_model, create_model, modify_duplicate_model_names, select_model

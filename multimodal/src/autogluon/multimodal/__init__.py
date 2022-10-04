@@ -6,3 +6,4 @@ except ImportError:
 from . import constants, data, models, optimization, predictor, utils
 from .predictor import AutoMMPredictor, MultiModalPredictor
 from .utils import download
+from .matcher import MultiModalMatcher

@@ -12,6 +12,7 @@ import sys
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
+import functools
 
 import numpy as np
 import pandas as pd
@@ -38,10 +39,8 @@ from .constants import (
     CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
-    FUSION_MODELS,
     FEATURE_EXTRACTION,
     FEATURES,
-    FEW_SHOT,
     GREEDY_SOUP,
     LABEL,
     LAST_CHECKPOINT,
@@ -53,20 +52,19 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
-    OBJECT_DETECTION,
     PROBABILITY,
-    RAY_TUNE_CHECKPOINT,
     REGRESSION,
     TEXT,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    ZERO_SHOT_IMAGE_CLASSIFICATION,
     PAIR,
     TRIPLET,
     QUERY,
     RESPONSE,
+    OPTIMIZATION,
+    ENVIRONMENT,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -74,16 +72,13 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
-from .models.bi_encoder import BiEncoderModel
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
-from .optimization.rkd_loss import RKDLoss
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
 from .utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
-    customize_model_names,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -115,16 +110,18 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    customize_model_names,
+    parse_dotlist_conf,
 )
 
 logger = logging.getLogger(AUTOMM)
 
 
-class MultiModalPredictor:
+class MultiModalMatcher:
     """
     MultiModalMatcher is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
     are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
-    and the MultiModalPredictor can predict the values of one column conditioned on the features from the other columns.
+    and the MultiModalMatcher can predict the values of one column conditioned on the features from the other columns.
 
     The prediction can be either classification or regression. The feature columns can contain
     image paths, text, numerical, and categorical values.
@@ -239,9 +236,9 @@ class MultiModalPredictor:
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
-        self._config = None
-        self._query_config = None
-        self._response_config = None
+        self._config = {OPTIMIZATION: "adamw", ENVIRONMENT: "default", MATCHER: "default", DATA: "default"}
+        self._query_config = {MODEL: "fusion_mlp_image_text_tabular", DATA: "default"}
+        self._response_config = {MODEL: "fusion_mlp_image_text_tabular", DATA: "default"}
         self._query_df_preprocessor = None
         self._response_df_preprocessor = None
         self._negative_df_preprocessor = None
@@ -305,21 +302,19 @@ class MultiModalPredictor:
     def fit(
         self,
         train_data: pd.DataFrame,
-        corpus: Dict[str, Dict],
-        presets: str = None,
-        config: Optional[dict] = None,
+        corpus: Optional[Dict[str, Dict]] = None,
+        presets: Optional[str] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
         hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
-        Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
+        Fit MultiModalMatcher predict label column of a dataframe based on the other columns,
         which may contain image path, text, numeric, or categorical features.
 
         Parameters
@@ -394,9 +389,6 @@ class MultiModalPredictor:
             early stopping (ignored unless `tuning_data = None`).
             Default value (if None) is selected based on the number of rows in the training data
             and whether hyper-parameter-tuning is utilized.
-        teacher_predictor
-            The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
-            knowledge to a student predictor, i.e., the current predictor.
         seed
             The random seed to use for this training run.
         hyperparameter_tune_kwargs
@@ -419,7 +411,7 @@ class MultiModalPredictor:
 
         Returns
         -------
-        An "MultiModalPredictor" object (itself).
+        An "MultiModalMatcher" object (itself).
         """
 
         pl.seed_everything(seed, workers=True)
@@ -542,9 +534,7 @@ class MultiModalPredictor:
             resume=False if hyperparameter_tune_kwargs is not None else self._resume,
             enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
             presets=presets,
-            config=config,
             hyperparameters=hyperparameters,
-            teacher_predictor=teacher_predictor,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
         )
 
@@ -558,9 +548,9 @@ class MultiModalPredictor:
     ):
         if not single_models:
             single_models = {}
-        fusion_model = {}
+        fusion_model = None
         if model.prefix.startswith("fusion"):  # fusion model
-            fusion_model[model.prefix] = model
+            fusion_model = model
             models = model.model
             model.model = None
         else:
@@ -568,9 +558,9 @@ class MultiModalPredictor:
 
         for per_model in models:
             if per_model.prefix.endswith(QUERY):
-                model_name = per_model.prefix[:-5]  # cut off query
+                model_name = per_model.prefix[:-6]  # cut off query
             elif per_model.prefix.endswith(RESPONSE):
-                model_name = per_model.prefix[:-8]
+                model_name = per_model.prefix[:-9]
             else:
                 raise ValueError(f"Model prefix {per_model.prefix} doesn't end with {QUERY} or {RESPONSE}.")
 
@@ -586,17 +576,25 @@ class MultiModalPredictor:
     ):
         if not single_models:
             single_models = {}
-        fusion_model = {}
+        fusion_model = None
         for model_name in config.model.names:
-            if model_name in single_models:
-                continue
             model_config = getattr(config.model, model_name)
+            if not model_name.lower().startswith("fusion"):
+                if model_name.endswith(QUERY):
+                    model_name = model_name[:-6]  # cut off query
+                elif model_name.endswith(RESPONSE):
+                    model_name = model_name[:-9]
+                else:
+                    raise ValueError(f"Model name {model_name} doesn't end with {QUERY} or {RESPONSE}.")
+
+                if model_name in single_models:
+                    continue
             model = create_model(
                 model_name=model_name,
                 model_config=model_config,
             )
             if model_name.lower().startswith("fusion"):
-                fusion_model[model_name] = model
+                fusion_model = model
             else:
                 single_models[model_name] = model
 
@@ -607,25 +605,37 @@ class MultiModalPredictor:
         query_config: DictConfig,
         response_config: DictConfig,
         single_models: Dict,
-        query_fusion_model: Union[nn.Module, partial],
-        response_fusion_model: Union[nn.Module, partial],
+        query_fusion_model: Union[nn.Module, functools.partial],
+        response_fusion_model: Union[nn.Module, functools.partial],
         share_fusion: bool,
         initialized: Optional[bool] = False,
     ):
         query_model_names = [n for n in query_config.model.names if not n.lower().startswith("fusion")]
+        query_fusion_model_name = [n for n in query_config.model.names if n.lower().startswith("fusion")]
+        assert len(query_fusion_model_name) <= 1
+        if len(query_fusion_model_name) == 1:
+            query_fusion_model_name = query_fusion_model_name[0]
         response_model_names = [n for n in response_config.model.names if not n.lower().startswith("fusion")]
+        response_fusion_model_name = [n for n in response_config.model.names if n.lower().startswith("fusion")]
+        assert len(response_fusion_model_name) <= 1
+        if len(response_fusion_model_name) == 1:
+            response_fusion_model_name = response_fusion_model_name[0]
+
+        print(f"single model names: {list(single_models.keys())}")
+        print(f"query fusion model name: {query_fusion_model_name}")
+        print(f"response fusion model name: {response_fusion_model_name}")
 
         # use shallow copy to create query single models
         query_single_models = []
         for model_name in query_model_names:
-            model = copy.copy(single_models[model_name[:-5]])  # cut off query
+            model = copy.copy(single_models[model_name[:-6]])  # cut off _query
             model.prefix = model_name
             query_single_models.append(model)
 
         # use shallow copy to create response single models
         response_single_models = []
         for model_name in response_model_names:
-            model = copy.copy(single_models[model_name[:-8]])  # cut off response
+            model = copy.copy(single_models[model_name[:-9]])  # cut off _response
             model.prefix = model_name
             response_single_models.append(model)
 
@@ -637,6 +647,8 @@ class MultiModalPredictor:
                 query_model.model = nn.ModuleList(query_single_models)
             else:
                 query_model = query_fusion_model(models=query_single_models)
+
+            query_model.prefix = query_fusion_model_name
 
         if len(response_single_models) == 1:
             response_model = response_single_models[0]
@@ -650,6 +662,8 @@ class MultiModalPredictor:
                     response_model.model = nn.ModuleList(response_single_models)
                 else:
                     response_model = response_fusion_model(models=response_single_models)
+
+            response_model.prefix = response_fusion_model_name
 
         return query_model, response_model
 
@@ -715,7 +729,7 @@ class MultiModalPredictor:
         if self._query_df_preprocessor is None:
             query_df_preprocessor = init_df_preprocessor(
                 config=query_config.data,
-                column_types=column_types,
+                column_types={k: column_types[k] for k in self._query},
                 train_df_x=data[self._query],
             )
         else:  # continuing training
@@ -724,17 +738,16 @@ class MultiModalPredictor:
         if self._response_df_preprocessor is None:
             response_df_preprocessor = init_df_preprocessor(
                 config=response_config.data,
-                column_types=column_types,
+                column_types={k: column_types[k] for k in self._response},
                 train_df_x=data[self._response],
             )
         else:  # continuing training
             response_df_preprocessor = self._response_df_preprocessor
 
-        # TODO: do we need to a config for label?
         if self._label_df_preprocessor is None:
             label_df_preprocessor = init_df_preprocessor(
                 config=response_config.data,
-                column_types=column_types,
+                column_types={self._label_column: column_types[self._label_column]},
                 label_column=self._label_column,
                 train_df_y=data[self._label_column],
             )
@@ -775,8 +788,8 @@ class MultiModalPredictor:
             label_processors = create_fusion_data_processors(
                 model=response_model,
                 config=response_config,
-                requires_label=False,
-                requires_data=True,
+                requires_label=True,
+                requires_data=False,
             )
         else:  # continuing training
             label_processors = self._label_processors
@@ -796,14 +809,13 @@ class MultiModalPredictor:
         resume: bool,
         enable_progress_bar: bool,
         presets: Optional[str] = None,
-        config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
-        if self._config is not None:  # continuous training
-            config = self._config
+        config = self._config
+        query_config = self._query_config
+        response_config = self._response_config
 
         if presets == None:
             presets = "siamese_network"
@@ -862,9 +874,11 @@ class MultiModalPredictor:
         logger.debug(f"query_processors_count: {query_processors_count}")
         response_processors_count = {k: len(v) for k, v in response_processors.items()}
         logger.debug(f"response_processors_count: {response_processors_count}")
+        label_processors_count = {k: len(v) for k, v in label_processors.items()}
+        logger.debug(f"label_processors_count: {label_processors_count}")
 
         pos_label = try_to_infer_pos_label(
-            data_config=config.data,
+            data_config=response_config.data,
             label_encoder=label_df_preprocessor.label_generator,
             problem_type=self._problem_type,
         )
@@ -928,8 +942,8 @@ class MultiModalPredictor:
             custom_metric_func=custom_metric_func,
         )
 
-        if config.matcher.match_label:
-            match_label = self._df_preprocessor.label_generator.transform([config.matcher.match_label]).item()
+        if self._match_label is not None:
+            match_label = self._label_df_preprocessor.label_generator.transform([self._match_label]).item()
         else:
             match_label = None
 
@@ -979,7 +993,7 @@ class MultiModalPredictor:
         if num_gpus == 0:  # CPU only training
             warnings.warn(
                 "Only CPU is detected in the instance. "
-                "MultiModalPredictor will be trained with CPU only. "
+                "MultiModalMatcher will be trained with CPU only. "
                 "This may results in slow training speed. "
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
@@ -1133,7 +1147,7 @@ class MultiModalPredictor:
                         response_model=response_model,
                         path=top_k_model_paths[0],
                     )
-                    best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                    best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1143,7 +1157,7 @@ class MultiModalPredictor:
                             response_model=response_model,
                             state_dict=cand_avg_state_dict,
                         )
-                        cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
+                        cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
                             ingredients.append(top_k_model_paths[i])
@@ -1182,7 +1196,12 @@ class MultiModalPredictor:
             response_model=self._response_model,
         )
 
-        checkpoint = {"state_dict": avg_state_dict}
+        task = MatcherLitModule(
+            query_model=self._query_model,
+            response_model=self._response_model,
+        )
+
+        checkpoint = {"state_dict": task.state_dict()}
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
         # clean old checkpoints + the intermediate files stored
@@ -1237,7 +1256,7 @@ class MultiModalPredictor:
         if num_gpus == 0:  # CPU only prediction
             warnings.warn(
                 "Only CPU is detected in the instance. "
-                "MultiModalPredictor will predict with CPU only. "
+                "MultiModalMatcher will predict with CPU only. "
                 "This may results in slow prediction speed. "
                 "Consider to switch to an instance with GPU support.",
                 UserWarning,
@@ -1275,13 +1294,15 @@ class MultiModalPredictor:
             predict_data=data,
             corpus=corpus,
         )
+        if self._match_label is not None:
+            match_label = label_df_preprocessor.label_generator.transform([self._match_label]).item()
+        else:
+            match_label = None
 
-        match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
         task = MatcherLitModule(
             query_model=self._query_model,
             response_model=self._response_model,
             signature=signature,
-            matches=self._config.matcher.matches,
             match_label=match_label,
         )
 
@@ -1326,7 +1347,7 @@ class MultiModalPredictor:
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Dict[str, Dict],
+        corpus: Optional[Dict[str, Dict]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
@@ -1380,13 +1401,13 @@ class MultiModalPredictor:
         if isinstance(metrics, str):
             metrics = [metrics]
 
+        pos_label = try_to_infer_pos_label(
+            data_config=self._response_config.data,
+            label_encoder=self._label_df_preprocessor.label_generator,
+            problem_type=self._problem_type,
+        )
         results = {}
         for per_metric in metrics:
-            pos_label = try_to_infer_pos_label(
-                data_config=self._response_config.data,
-                label_encoder=self._label_df_preprocessor.label_generator,
-                problem_type=self._problem_type,
-            )
             score = compute_score(
                 metric_data=metric_data,
                 metric_name=per_metric.lower(),
@@ -1399,12 +1420,13 @@ class MultiModalPredictor:
         else:
             return results
 
-    def _semantic_search(
+    def semantic_search(
         self,
         query_data: Union[pd.DataFrame, dict, list],
         response_data: Union[pd.DataFrame, dict, list],
         corpus: Dict[str, Dict],
         return_prob: Optional[bool] = False,
+        as_pandas: Optional[bool] = None,
     ):
         query_embeddings = self.extract_embedding(query_data, corpus=corpus, as_tensor=True)
         assert (
@@ -1425,13 +1447,15 @@ class MultiModalPredictor:
 
         ret = tensor_to_ndarray(ret)
 
+        if (as_pandas is None and isinstance(query_data, pd.DataFrame) and isinstance(response_data, pd.DataFrame)) or as_pandas is True:
+            ret = self._as_pandas(data=query_data, to_be_converted=ret)
+
         return ret
 
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Dict[str, Dict],
-        response_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        corpus: Optional[Dict[str, Dict]] = None,
         as_pandas: Optional[bool] = None,
     ):
         """
@@ -1451,30 +1475,22 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if response_data:
-            pred = self._semantic_search(
-                query_data=data,
-                response_data=response_data,
-                corpus=corpus,
-                return_prob=False,
+        outputs = self._predict(
+            data=data,
+            corpus=corpus,
+            requires_label=False,
+        )
+        prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
+
+        if self._label_df_preprocessor:
+            pred = self._label_df_preprocessor.transform_prediction(
+                y_pred=prob,
             )
         else:
-            outputs = self._predict(
-                data=data,
-                corpus=corpus,
-                requires_label=False,
-            )
-            prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
-
-            if self._label_df_preprocessor:
-                pred = self._label_df_preprocessor.transform_prediction(
-                    y_pred=prob,
-                )
+            if isinstance(prob, (torch.Tensor, np.ndarray)) and prob.ndim == 2:
+                pred = prob.argmax(axis=1)
             else:
-                if isinstance(prob, (torch.Tensor, np.ndarray)) and prob.ndim == 2:
-                    pred = prob.argmax(axis=1)
-                else:
-                    pred = prob
+                pred = prob
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
@@ -1484,8 +1500,7 @@ class MultiModalPredictor:
     def predict_proba(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Dict[str, Dict],
-        response_data: Optional[Union[pd.DataFrame, dict, list]] = None,
+        corpus: Optional[Dict[str, Dict]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
     ):
@@ -1512,20 +1527,12 @@ class MultiModalPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        if response_data:
-            prob = self._semantic_search(
-                query_data=data,
-                response_data=response_data,
-                corpus=corpus,
-                return_prob=True,
-            )
-        else:
-            outputs = self._predict(
-                data=data,
-                corpus=corpus,
-                requires_label=False,
-            )
-            prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
+        outputs = self._predict(
+            data=data,
+            corpus=corpus,
+            requires_label=False,
+        )
+        prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
         if not as_multiclass:
             if self._problem_type == BINARY:
@@ -1544,8 +1551,8 @@ class MultiModalPredictor:
     def extract_embedding(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Dict[str, Dict],
         signature: str,
+        corpus: Optional[Dict[str, Dict]] = None,
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
@@ -1659,12 +1666,16 @@ class MultiModalPredictor:
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(config=query_config, f=os.path.join(path, "query_config.yaml"))
         OmegaConf.save(config=response_config, f=os.path.join(path, "response_config.yaml"))
+        OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
 
         with open(os.path.join(path, "query_df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._query_df_preprocessor, fp)
 
         with open(os.path.join(path, "response_df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(self._response_df_preprocessor, fp)
+
+        with open(os.path.join(path, "label_df_preprocessor.pkl"), "wb") as fp:
+            pickle.dump(self._label_df_preprocessor, fp)
 
         # Save text tokenizers before saving data processors
         query_processors = copy.deepcopy(self._query_processors)
@@ -1687,6 +1698,9 @@ class MultiModalPredictor:
 
         with open(os.path.join(path, "response_processors.pkl"), "wb") as fp:
             pickle.dump(response_processors, fp)
+
+        with open(os.path.join(path, "label_processors.pkl"), "wb") as fp:
+            pickle.dump(self._label_processors, fp)
 
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
@@ -1719,7 +1733,7 @@ class MultiModalPredictor:
 
     @staticmethod
     def _load_metadata(
-        predictor: MultiModalPredictor,
+        predictor: MultiModalMatcher,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -1728,6 +1742,7 @@ class MultiModalPredictor:
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
         query_config = OmegaConf.load(os.path.join(path, "query_config.yaml"))
         response_config = OmegaConf.load(os.path.join(path, "response_config.yaml"))
+        config = OmegaConf.load(os.path.join(path, "config.yaml"))
 
         query_config = get_local_pretrained_config_paths(
             config=query_config, path=path
@@ -1745,6 +1760,9 @@ class MultiModalPredictor:
 
         with open(os.path.join(path, "response_df_preprocessor.pkl"), "rb") as fp:
             response_df_preprocessor = CustomUnpickler(fp).load()
+
+        with open(os.path.join(path, "label_df_preprocessor.pkl"), "rb") as fp:
+            label_df_preprocessor = CustomUnpickler(fp).load()
 
         try:
             with open(os.path.join(path, "query_processors.pkl"), "rb") as fp:
@@ -1786,6 +1804,9 @@ class MultiModalPredictor:
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             response_processors = None
 
+        with open(os.path.join(path, "label_processors.pkl"), "rb") as fp:
+            label_processors = CustomUnpickler(fp).load()
+
         predictor._label_column = assets["label_column"]
         predictor._problem_type = assets["problem_type"]
         predictor._eval_metric_name = assets["eval_metric_name"]
@@ -1793,6 +1814,7 @@ class MultiModalPredictor:
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
         predictor._pretrain_path = path
+        predictor._config = config
         predictor._query_config = query_config
         predictor._response_config = response_config
         predictor._output_shape = assets["output_shape"]
@@ -1800,8 +1822,10 @@ class MultiModalPredictor:
         predictor._validation_metric_name = assets["validation_metric_name"]
         predictor._query_df_preprocessor = query_df_preprocessor
         predictor._response_df_preprocessor = response_df_preprocessor
+        predictor._label_df_preprocessor = label_df_preprocessor
         predictor._query_processors = query_processors
         predictor._response_processors = response_processors
+        predictor._label_processors = label_processors
 
         return predictor
 

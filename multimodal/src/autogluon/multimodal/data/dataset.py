@@ -47,7 +47,10 @@ class BaseDataset(torch.utils.data.Dataset):
         self._consecutive_errors = 0
 
         self.lengths = []
+        print(f"preprocessor group num: {len(preprocessor)}")
+        print(f"processors group num: {len(processors)}")
         for i, (per_preprocessor, per_processors_group) in enumerate(zip(preprocessor, processors)):
+            print(f"preprocess group i: {i}")
             modality_features, modality_types, length = apply_df_preprocessor(
                 data=data,
                 df_preprocessor=per_preprocessor,
@@ -87,7 +90,10 @@ class BaseDataset(torch.utils.data.Dataset):
         """
         ret = dict()
         try:
+            # print(f"\nget item: {idx}")
+            # print(f"processors group num: {len(self.processors)}")
             for group_id, per_processors_group in enumerate(self.processors):
+                # print(f"group_id : {group_id}")
                 per_sample_features = self.get_per_sample_features(
                     group_id=group_id,
                     idx=idx,
@@ -111,13 +117,19 @@ class BaseDataset(torch.utils.data.Dataset):
     def get_per_sample_features(self, group_id: int, idx: int):
         modality_features = getattr(self, f"modality_features_{group_id}")
         modality_types = getattr(self, f"modality_types_{group_id}")
-        ret = {}
-        if modality_features:
-            for per_col_name, per_col_features in modality_features.items():
-                per_sample_features = per_col_features[idx]
-                if modality_types[per_col_name].endswith(INDEX):
-                    per_sample_features = self.corpus[per_col_name][per_sample_features]
+        # print(f"modality_types: {modality_types}")
+        ret = dict()
+        for per_modality, per_modality_features in modality_features.items():
+            # print(f"per_modality: {per_modality}")
+            if per_modality_features:
+                per_modality_ret = dict()
+                for per_col_name, per_col_features in per_modality_features.items():
+                    # print(f"per_col_name: {per_col_name}")
+                    per_sample_features = per_col_features[idx]
+                    if modality_types[per_modality][per_col_name].endswith(INDEX):
+                        per_sample_features = self.corpus[per_col_name][per_sample_features]
 
-                ret[per_col_name] = per_sample_features
+                    per_modality_ret[per_col_name] = per_sample_features
+                ret[per_modality] = per_modality_ret
 
         return ret

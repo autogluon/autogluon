@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, List
 
-from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION, QUERY, RESPONSE, QUERY_RESPONSE
+from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION, QUERY, RESPONSE, MATCHER
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -142,11 +142,12 @@ def feature_extraction():
 
 
 @automm_presets.register()
-def siamese_matcher():
+def siamese_network():
     return automm_presets.create("default")
 
 
-def non_siamese_matcher():
+@automm_presets.register()
+def non_siamese_network():
     return {
         QUERY: automm_presets.create("default"),
         RESPONSE: automm_presets.create("default"),
@@ -172,14 +173,14 @@ def list_automm_presets(verbose: bool = False):
     return preset_details
 
 
-def get_basic_automm_config(is_distill: Optional[bool] = False):
+def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     Get the basic config of AutoMM.
 
     Parameters
     ----------
-    is_distill
-        Whether in the distillation mode.
+    extra
+        A list of extra config keys.
 
     Returns
     -------
@@ -191,8 +192,30 @@ def get_basic_automm_config(is_distill: Optional[bool] = False):
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
-    if is_distill:
-        config[DISTILLER] = "default"
+    if extra:
+        for k in extra:
+            config[k] = "default"
+
+    return config
+
+
+def get_basic_config(keys: List[str]):
+    config = dict()
+    for k in keys:
+        if k == MODEL:
+            config[MODEL] = "fusion_mlp_image_text_tabular"
+        elif k == DATA:
+            config[DATA] = "default"
+        elif k == OPTIMIZATION:
+            config[OPTIMIZATION] = "adamw"
+        elif k == ENVIRONMENT:
+            config[ENVIRONMENT] = "default"
+        elif k == DISTILLER:
+            config[DISTILLER] = "default"
+        elif k == MATCHER:
+            config[MATCHER] = "default"
+        else:
+            raise ValueError(f"Unknown config key: {k}")
 
     return config
 

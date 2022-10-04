@@ -241,7 +241,7 @@ def is_text_column(data: pd.Series) -> bool:
 
 
 def is_index_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> bool:
-    if not corpus:
+    if not corpus or col_name not in corpus:
         return False
 
     sample_num = min(len(data), 500)

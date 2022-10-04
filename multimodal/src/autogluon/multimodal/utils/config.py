@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import AUTOMM, HF_MODELS, REGRESSION, VALID_CONFIG_KEYS
+from ..constants import AUTOMM, HF_MODELS, REGRESSION, VALID_CONFIG_KEYS, MODEL, DATA, OPTIMIZATION, ENVIRONMENT
 from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -52,7 +52,7 @@ def get_config(
     presets: Optional[str] = None,
     config: Optional[Union[dict, DictConfig]] = None,
     overrides: Optional[Union[str, List[str], Dict]] = None,
-    is_distill: Optional[bool] = False,
+    extra: Optional[List[str]] = None,
 ):
     """
     Construct configurations for model, data, optimization, and environment.
@@ -104,8 +104,8 @@ def get_config(
                             "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
                             "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
                         }
-    is_distill
-        Whether in the distillation mode.
+    extra
+        A list of extra config keys.
 
     Returns
     -------
@@ -118,7 +118,7 @@ def get_config(
         presets = "default"
 
     if not isinstance(config, DictConfig):
-        basic_config = get_basic_automm_config(is_distill=is_distill)
+        basic_config = get_basic_automm_config(extra=extra)
         if presets is None:
             preset_overrides = None
         else:
@@ -150,23 +150,23 @@ def get_config(
         # apply the preset's overrides
         if preset_overrides:
             config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
-
-    verify_model_names(config.model)
-    logger.debug(f"overrides: {overrides}")
-    if overrides is not None:
-        # avoid manipulating the user-provided overrides
-        overrides = copy.deepcopy(overrides)
-        # apply customized model names
-        overrides = parse_dotlist_conf(overrides)  # convert to a dict
-        config.model = customize_model_names(
-            config=config.model,
-            customized_names=overrides.get("model.names", None),
-        )
-        # remove `model.names` from overrides since it's already applied.
-        overrides.pop("model.names", None)
-        # apply the user-provided overrides
-        config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
-    verify_model_names(config.model)
+    if hasattr(config, "model"):
+        verify_model_names(config.model)
+        logger.debug(f"overrides: {overrides}")
+        if overrides is not None:
+            # avoid manipulating the user-provided overrides
+            overrides = copy.deepcopy(overrides)
+            # apply customized model names
+            overrides = parse_dotlist_conf(overrides)  # convert to a dict
+            config.model = customize_model_names(
+                config=config.model,
+                customized_names=overrides.get("model.names", None),
+            )
+            # remove `model.names` from overrides since it's already applied.
+            overrides.pop("model.names", None)
+            # apply the user-provided overrides
+            config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
+        verify_model_names(config.model)
     return config
 
 

@@ -217,8 +217,8 @@ class MatcherLitModule(pl.LightningModule):
         self,
         batch: Dict,
     ):
-        query_embeddings = self.query_model(batch)
-        response_embeddings = self.response_model(batch)
+        query_embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
+        response_embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
 
         loss = self._compute_loss(
             query_embeddings=query_embeddings,
@@ -307,14 +307,14 @@ class MatcherLitModule(pl.LightningModule):
         A dictionary with the mini-batch's logits and features.
         """
         if self.signature == QUERY:
-            embeddings = self.query_model(batch)
+            embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
             return {FEATURES: embeddings}
         elif self.signature == RESPONSE:
-            embeddings = self.response_model(batch)
+            embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
             return {FEATURES: embeddings}
         else:
-            query_embeddings = self.query_model(batch)
-            response_embeddings = self.response_model(batch)
+            query_embeddings = self.query_model(batch)[self.query_model.prefix][FEATURES]
+            response_embeddings = self.response_model(batch)[self.response_model.prefix][FEATURES]
 
         match_prob = compute_probability(
             embeddings1=query_embeddings,
@@ -358,7 +358,6 @@ class MatcherLitModule(pl.LightningModule):
             grouped_parameters = apply_layerwise_lr_decay(
                 lr_decay=self.hparams.lr_decay,
                 efficient_finetune=self.hparams.efficient_finetune,
-                trainable_param_names=self.hparams.trainable_param_names,
                 **kwargs,
             )
         else:

@@ -850,7 +850,7 @@ class MultiModalPredictor:
             presets=presets,
             config=config,
             overrides=hyperparameters,
-            is_distill=teacher_predictor is not None,
+            extra=["distiller"] if teacher_predictor is not None else None,
         )
 
         config = update_config_by_rules(
@@ -1060,7 +1060,6 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 model_postprocess_fn=model_postprocess_fn,
                 **metrics_kwargs,
                 **optimization_kwargs,

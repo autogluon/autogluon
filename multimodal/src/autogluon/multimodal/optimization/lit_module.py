@@ -41,7 +41,6 @@ class LitModule(pl.LightningModule):
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
         efficient_finetune: Optional[str] = None,
-        trainable_param_names: Optional[List[str]] = None,
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
@@ -319,7 +318,6 @@ class LitModule(pl.LightningModule):
             grouped_parameters = apply_layerwise_lr_decay(
                 lr_decay=self.hparams.lr_decay,
                 efficient_finetune=self.hparams.efficient_finetune,
-                trainable_param_names=self.hparams.trainable_param_names,
                 **kwargs,
             )
         else:
