@@ -74,7 +74,7 @@ from .data.infer_types import (
     infer_problem_type_output_shape,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
+from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
@@ -797,24 +797,6 @@ class MultiModalPredictor:
             flag=True,
         )
 
-        logger.debug(
-            f"teacher preprocessor text_feature_names: {teacher_predictor._df_preprocessor._text_feature_names}"
-        )
-        logger.debug(f"teacher preprocessor image_path_names: {teacher_predictor._df_preprocessor._image_path_names}")
-        logger.debug(
-            f"teacher preprocessor categorical_feature_names: {teacher_predictor._df_preprocessor._categorical_feature_names}"
-        )
-        logger.debug(
-            f"teacher preprocessor numerical_feature_names: {teacher_predictor._df_preprocessor._numerical_feature_names}"
-        )
-
-        logger.debug(f"student preprocessor text_feature_names: {self._df_preprocessor._text_feature_names}")
-        logger.debug(f"student preprocessor image_path_names: {self._df_preprocessor._image_path_names}")
-        logger.debug(
-            f"student preprocessor categorical_feature_names: {self._df_preprocessor._categorical_feature_names}"
-        )
-        logger.debug(f"student preprocessor numerical_feature_names: {self._df_preprocessor._numerical_feature_names}")
-
         return (
             teacher_predictor._model,
             critics,
@@ -1510,7 +1492,7 @@ class MultiModalPredictor:
         precision: Union[int, str],
     ) -> List[Dict]:
 
-        modality_features, sample_num = apply_df_preprocessor(
+        modality_features, modality_types, sample_num = apply_df_preprocessor(
             data=data,
             df_preprocessor=df_preprocessor,
             modalities=data_processors.keys(),
@@ -1518,10 +1500,14 @@ class MultiModalPredictor:
 
         processed_features = []
         for i in range(sample_num):
-            per_sample_features = apply_data_processor(
+            per_sample_features = get_per_sample_features(
                 modality_features=modality_features,
-                data_processors=data_processors,
+                modality_types=modality_types,
                 idx=i,
+            )
+            per_sample_features = apply_data_processor(
+                per_sample_features=per_sample_features,
+                data_processors=data_processors,
                 is_training=False,
             )
             processed_features.append(per_sample_features)

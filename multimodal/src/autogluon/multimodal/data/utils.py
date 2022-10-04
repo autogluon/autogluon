@@ -7,7 +7,7 @@ from nlpaug import Augmenter
 from nlpaug.util import Method
 from text_unidecode import unidecode
 
-from ..constants import MMCV_MODELS
+from ..constants import MMCV_MODELS, INDEX
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -238,6 +238,26 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
                 )
 
     return sample_features
+
+
+def get_per_sample_features(modality_features: dict, modality_types: dict, idx: int, corpus: Optional[dict] = None):
+
+    # print(f"modality_types: {modality_types}")
+    ret = dict()
+    for per_modality, per_modality_features in modality_features.items():
+        # print(f"per_modality: {per_modality}")
+        if per_modality_features:
+            per_modality_ret = dict()
+            for per_col_name, per_col_features in per_modality_features.items():
+                # print(f"per_col_name: {per_col_name}")
+                per_sample_features = per_col_features[idx]
+                if modality_types and modality_types[per_modality] and modality_types[per_modality][per_col_name].endswith(INDEX):
+                    per_sample_features = corpus[per_col_name][per_sample_features]
+
+                per_modality_ret[per_col_name] = per_sample_features
+            ret[per_modality] = per_modality_ret
+
+    return ret
 
 
 def register_encoding_decoding_error_handlers() -> None:
