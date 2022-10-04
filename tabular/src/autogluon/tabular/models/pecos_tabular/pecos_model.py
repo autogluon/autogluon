@@ -27,23 +27,8 @@ class PecosModel(AbstractModel):
 
     SUPPORTED_MODEL_TYPES = ["XRLinear"]
 
-    def __init__(self, workdir = None, model_dir = None, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # Create directory to house model artifacts
-        run_id = str(uuid.uuid4())[:10]
-        if model_dir is None:
-            self.model_dir = pathlib.Path(f'./pecos-workdir/{run_id}/model')
-        else:
-            self.model_dir = pathlib.Path(model_dir)
-        self.model_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create working directory to house input data and model output
-        if workdir is None:
-            self.workdir = pathlib.Path(f'./pecos-workdir/{run_id}/')
-        else:
-            self.workdir = pathlib.Path(workdir + f'{run_id}/')
-        self.workdir.mkdir(parents=True, exist_ok=True)
 
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> np.ndarray:
         """
@@ -90,6 +75,8 @@ class PecosModel(AbstractModel):
              y_val: Optional[pd.Series]=None,
              time_limit=None,
              model_type="XRLinear",
+             workdir = None,
+             model_dir = None,
              **kwargs):
         """
         Fit model on X and y
@@ -100,15 +87,31 @@ class PecosModel(AbstractModel):
             raise f"model_type {model_type} not supported. model_type should be one of the following: {self.SUPPORTED_MODEL_TYPES}"
         if X_val is not None or y_val is not None:
             logger.warn("We do not utilize X_val or y_val in the current PECOS implementation")
-        # Dict numbering each unique label
+        
+        # Create directory to house model artifacts
+        run_id = str(uuid.uuid4())[:10]
+        if model_dir is None:
+            model_dir = pathlib.Path(f'./pecos-workdir/{run_id}/model')
+        else:
+            model_dir = pathlib.Path(model_dir)
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create working directory to house input data and model output
+        if workdir is None:
+            workdir = pathlib.Path(f'./pecos-workdir/{run_id}/')
+        else:
+            workdir = pathlib.Path(workdir + f'{run_id}/')
+        workdir.mkdir(parents=True, exist_ok=True)
+        
+        # Preprocess training data
         X = self.preprocess(X, is_train=True)
         X_input = self._format_input_with_labels(X, y, is_train=True)
 
         params = self._get_model_params()
         print(f'Hyperparameters: {params}')
-       
+        # Fit model
         self.model = PecosInterface(**params)
-        self.model.fit(X_input, y, time_limit)
+        self.model.fit(X_input, y, time_limit, workdir, model_dir)
         print('Exiting the `_fit` method')
 
     def _format_input_with_labels(self, X, y, is_train=False):
@@ -137,8 +140,6 @@ class PecosModel(AbstractModel):
     def _set_default_params(self):
         default_params = {
                 "model_type": 'XRLinear',
-                "workdir": self.workdir,
-                "model_dir": self.model_dir,
                 "max_leaf_size": 100,  # The max size of the leaf nodes of hierarchical 2-means clustering
                 "nr_splits": 16,  # number of splits used to construct hierarchy (a power of 2 is recommended)
                 "spherical": True,  # If true, do l2-normalize cluster centers while clustering

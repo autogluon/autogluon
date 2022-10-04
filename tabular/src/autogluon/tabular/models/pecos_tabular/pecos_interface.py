@@ -17,8 +17,6 @@ class PecosInterface():
     def __init__(
         self, 
         model_type = "XRLinear",
-        workdir = None,
-        model_dir = None,
         max_leaf_size = None,
         nr_splits = None,
         spherical = None,
@@ -30,13 +28,7 @@ class PecosInterface():
         negative_sampling = None,
         sparsity_threshold = None):
  
-        # Set up directories
-        self.workdir = workdir
-        self.model_dir = model_dir
         self.model_type = model_type
-        self.data_file_train = self.workdir / 'data.txt'
-        self.data_file_test = self.workdir / 'test-data.txt'
-        self.label_dict_file = self.workdir / 'labels.txt'
         
         # Configure hyperparameters
         self.max_leaf_size = max_leaf_size
@@ -50,7 +42,15 @@ class PecosInterface():
         self.negative_sampling = negative_sampling
         self.sparsity_threshold = sparsity_threshold
 
-    def fit(self, X: pd.DataFrame, y: pd.Series, timeout=None):
+    def fit(self, X: pd.DataFrame, y: pd.Series, timeout=None, workdir=None, model_dir=None):
+        
+        # Set up directories
+        self.workdir = workdir
+        self.model_dir = model_dir
+        self.data_file_train = self.workdir / 'data.txt'
+        self.data_file_test = self.workdir / 'test-data.txt'
+        self.label_dict_file = self.workdir / 'labels.txt'
+        
         # Save X to a file
         with self.data_file_train.open(mode='w') as f:
             for row in X:
