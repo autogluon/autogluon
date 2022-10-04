@@ -7,7 +7,7 @@ from sklearn.metrics.pairwise import paired_cosine_distances
 from autogluon.multimodal import MultiModalPredictor
 
 
-def eval(predictor, df, onnx_session=None):
+def evaluate(predictor, df, onnx_session=None):
     labels = df["score"].to_numpy()
 
     if not onnx_session:
@@ -47,12 +47,12 @@ def test_onnx_export(checkpoint_name):
             "model.hf_text.checkpoint_name": checkpoint_name,
         },
     )
-    ag_pearson, ag_spearman = eval(predictor, test_df)
+    ag_pearson, ag_spearman = evaluate(predictor, test_df)
 
     onnx_path = checkpoint_name.replace("/", "_") + ".onnx"
 
     predictor.export_onnx(onnx_path=onnx_path, data=test_df)
     ort_sess = ort.InferenceSession(onnx_path, providers=["CUDAExecutionProvider"])
-    onnx_pearson, onnx_spearman = eval(predictor, test_df, ort_sess)
+    onnx_pearson, onnx_spearman = evaluate(predictor, test_df, ort_sess)
     assert pytest.approx(onnx_pearson, 1e-2) == ag_pearson
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
