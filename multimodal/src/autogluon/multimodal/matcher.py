@@ -1644,12 +1644,12 @@ class MultiModalMatcher:
 
     def save(self, path: str, standalone: Optional[bool] = True):
         """
-        Save this predictor to file in directory specified by `path`.
+        Save this matcher to file in directory specified by `path`.
 
         Parameters
         ----------
         path
-            The directory to save this predictor.
+            The directory to save this matcher.
         standalone
             Whether to save the downloaded model for offline deployment.
             When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
@@ -1664,18 +1664,16 @@ class MultiModalMatcher:
             response_config = save_pretrained_model_configs(model=self._response_model, config=response_config, path=path)
 
         os.makedirs(path, exist_ok=True)
-        OmegaConf.save(config=query_config, f=os.path.join(path, "query_config.yaml"))
-        OmegaConf.save(config=response_config, f=os.path.join(path, "response_config.yaml"))
-        OmegaConf.save(config=self._config, f=os.path.join(path, "config.yaml"))
+        config = {"generic": self._config, QUERY: query_config, RESPONSE: response_config}
+        OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
-        with open(os.path.join(path, "query_df_preprocessor.pkl"), "wb") as fp:
-            pickle.dump(self._query_df_preprocessor, fp)
-
-        with open(os.path.join(path, "response_df_preprocessor.pkl"), "wb") as fp:
-            pickle.dump(self._response_df_preprocessor, fp)
-
-        with open(os.path.join(path, "label_df_preprocessor.pkl"), "wb") as fp:
-            pickle.dump(self._label_df_preprocessor, fp)
+        df_preprocessor = {
+            QUERY: self._query_df_preprocessor,
+            RESPONSE: self._response_df_preprocessor,
+            LABEL: self._label_df_preprocessor,
+        }
+        with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
+            pickle.dump(df_preprocessor, fp)
 
         # Save text tokenizers before saving data processors
         query_processors = copy.deepcopy(self._query_processors)
@@ -1685,9 +1683,6 @@ class MultiModalMatcher:
                 path=path,
             )
 
-        with open(os.path.join(path, "query_processors.pkl"), "wb") as fp:
-            pickle.dump(query_processors, fp)
-
         # Save text tokenizers before saving data processors
         response_processors = copy.deepcopy(self._response_processors)
         if TEXT in response_processors:
@@ -1696,11 +1691,13 @@ class MultiModalMatcher:
                 path=path,
             )
 
-        with open(os.path.join(path, "response_processors.pkl"), "wb") as fp:
-            pickle.dump(response_processors, fp)
-
-        with open(os.path.join(path, "label_processors.pkl"), "wb") as fp:
-            pickle.dump(self._label_processors, fp)
+        data_processors = {
+            QUERY: query_processors,
+            RESPONSE: response_processors,
+            LABEL: self._label_processors,
+        }
+        with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
+            pickle.dump(data_processors, fp)
 
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
@@ -1733,16 +1730,17 @@ class MultiModalMatcher:
 
     @staticmethod
     def _load_metadata(
-        predictor: MultiModalMatcher,
+        matcher: MultiModalMatcher,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        query_config = OmegaConf.load(os.path.join(path, "query_config.yaml"))
-        response_config = OmegaConf.load(os.path.join(path, "response_config.yaml"))
         config = OmegaConf.load(os.path.join(path, "config.yaml"))
+        query_config = config[QUERY]
+        response_config = config[RESPONSE]
+        config = config["generic"]
 
         query_config = get_local_pretrained_config_paths(
             config=query_config, path=path
@@ -1755,18 +1753,21 @@ class MultiModalMatcher:
         with open(os.path.join(path, "assets.json"), "r") as fp:
             assets = json.load(fp)
 
-        with open(os.path.join(path, "query_df_preprocessor.pkl"), "rb") as fp:
-            query_df_preprocessor = CustomUnpickler(fp).load()
+        with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
+            df_preprocessor = CustomUnpickler(fp).load()
 
-        with open(os.path.join(path, "response_df_preprocessor.pkl"), "rb") as fp:
-            response_df_preprocessor = CustomUnpickler(fp).load()
-
-        with open(os.path.join(path, "label_df_preprocessor.pkl"), "rb") as fp:
-            label_df_preprocessor = CustomUnpickler(fp).load()
+        query_df_preprocessor = df_preprocessor[QUERY]
+        response_df_preprocessor = df_preprocessor[RESPONSE]
+        label_df_preprocessor = df_preprocessor[LABEL]
 
         try:
-            with open(os.path.join(path, "query_processors.pkl"), "rb") as fp:
-                query_processors = CustomUnpickler(fp).load()
+            with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
+                data_processors = CustomUnpickler(fp).load()
+
+            query_processors = data_processors[QUERY]
+            response_processors = data_processors[RESPONSE]
+            label_processors = data_processors[LABEL]
+
             # Load text tokenizers after loading data processors.
             if TEXT in query_processors:
                 query_processors[TEXT] = load_text_tokenizers(
@@ -1778,15 +1779,9 @@ class MultiModalMatcher:
                 data_processors=query_processors,
                 df_preprocessor=query_df_preprocessor,
             )
-
             # Only keep the modalities with non-empty processors.
             query_processors = {k: v for k, v in query_processors.items() if len(v) > 0}
-        except:  # backward compatibility. reconstruct the data processor in case something went wrong.
-            query_processors = None
 
-        try:
-            with open(os.path.join(path, "response_processors.pkl"), "rb") as fp:
-                response_processors = CustomUnpickler(fp).load()
             # Load text tokenizers after loading data processors.
             if TEXT in response_processors:
                 response_processors[TEXT] = load_text_tokenizers(
@@ -1796,38 +1791,36 @@ class MultiModalMatcher:
             # backward compatibility. Add feature column names in each data processor.
             response_processors = assign_feature_column_names(
                 data_processors=response_processors,
-                df_preprocessor=query_df_preprocessor,
+                df_preprocessor=response_df_preprocessor,
             )
-
             # Only keep the modalities with non-empty processors.
             response_processors = {k: v for k, v in response_processors.items() if len(v) > 0}
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
+            query_processors = None
             response_processors = None
+            label_processors = None
 
-        with open(os.path.join(path, "label_processors.pkl"), "rb") as fp:
-            label_processors = CustomUnpickler(fp).load()
+        matcher._label_column = assets["label_column"]
+        matcher._problem_type = assets["problem_type"]
+        matcher._eval_metric_name = assets["eval_metric_name"]
+        matcher._verbosity = verbosity
+        matcher._resume = resume
+        matcher._save_path = path  # in case the original exp dir is copied to somewhere else
+        matcher._pretrain_path = path
+        matcher._config = config
+        matcher._query_config = query_config
+        matcher._response_config = response_config
+        matcher._output_shape = assets["output_shape"]
+        matcher._column_types = assets["column_types"]
+        matcher._validation_metric_name = assets["validation_metric_name"]
+        matcher._query_df_preprocessor = query_df_preprocessor
+        matcher._response_df_preprocessor = response_df_preprocessor
+        matcher._label_df_preprocessor = label_df_preprocessor
+        matcher._query_processors = query_processors
+        matcher._response_processors = response_processors
+        matcher._label_processors = label_processors
 
-        predictor._label_column = assets["label_column"]
-        predictor._problem_type = assets["problem_type"]
-        predictor._eval_metric_name = assets["eval_metric_name"]
-        predictor._verbosity = verbosity
-        predictor._resume = resume
-        predictor._save_path = path  # in case the original exp dir is copied to somewhere else
-        predictor._pretrain_path = path
-        predictor._config = config
-        predictor._query_config = query_config
-        predictor._response_config = response_config
-        predictor._output_shape = assets["output_shape"]
-        predictor._column_types = assets["column_types"]
-        predictor._validation_metric_name = assets["validation_metric_name"]
-        predictor._query_df_preprocessor = query_df_preprocessor
-        predictor._response_df_preprocessor = response_df_preprocessor
-        predictor._label_df_preprocessor = label_df_preprocessor
-        predictor._query_processors = query_processors
-        predictor._response_processors = response_processors
-        predictor._label_processors = label_processors
-
-        return predictor
+        return matcher
 
     @classmethod
     def load(
@@ -1837,7 +1830,7 @@ class MultiModalMatcher:
         verbosity: Optional[int] = 3,
     ):
         """
-        Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
+        Load a matcher object from a directory specified by `path`. The to-be-loaded matcher
         can be completely or partially trained by .fit(). If a previous training has completed,
         it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
         collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
@@ -1845,7 +1838,7 @@ class MultiModalMatcher:
         Parameters
         ----------
         path
-            The directory to load the predictor object.
+            The directory to load the matcher object.
         resume
             Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
             broken during the middle and we want to resume the training from the last saved checkpoint.
@@ -1855,16 +1848,16 @@ class MultiModalMatcher:
 
         Returns
         -------
-        The loaded predictor object.
+        The loaded matcher object.
         """
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        predictor = cls(query="", response="")
-        predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
+        matcher = cls(query="", response="")
+        matcher = cls._load_metadata(matcher=matcher, path=path, resume=resume, verbosity=verbosity)
 
-        query_model, response_model = predictor._create_siamese_model(
-            query_config=predictor._query_config,
-            response_config=predictor._response_config,
+        query_model, response_model = matcher._create_siamese_model(
+            query_config=matcher._query_config,
+            response_config=matcher._response_config,
         )
 
         resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
@@ -1910,12 +1903,12 @@ class MultiModalMatcher:
             path=load_path,
         )
 
-        predictor._ckpt_path = ckpt_path
-        predictor._query_model = query_model
-        predictor._response_model = response_model
+        matcher._ckpt_path = ckpt_path
+        matcher._query_model = query_model
+        matcher._response_model = response_model
 
         if not resume:
-            predictor._continuous_training = True
+            matcher._continuous_training = True
 
-        return predictor
+        return matcher
 
