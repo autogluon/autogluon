@@ -146,14 +146,6 @@ def siamese_network():
     return automm_presets.create("default")
 
 
-@automm_presets.register()
-def non_siamese_network():
-    return {
-        QUERY: automm_presets.create("default"),
-        RESPONSE: automm_presets.create("default"),
-    }
-
-
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
@@ -195,27 +187,6 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     if extra:
         for k in extra:
             config[k] = "default"
-
-    return config
-
-
-def get_basic_config(keys: List[str]):
-    config = dict()
-    for k in keys:
-        if k == MODEL:
-            config[MODEL] = "fusion_mlp_image_text_tabular"
-        elif k == DATA:
-            config[DATA] = "default"
-        elif k == OPTIMIZATION:
-            config[OPTIMIZATION] = "adamw"
-        elif k == ENVIRONMENT:
-            config[ENVIRONMENT] = "default"
-        elif k == DISTILLER:
-            config[DISTILLER] = "default"
-        elif k == MATCHER:
-            config[MATCHER] = "default"
-        else:
-            raise ValueError(f"Unknown config key: {k}")
 
     return config
 

@@ -700,7 +700,9 @@ def get_metric_learning_distance_func(
 
 def infer_matcher_loss(data_format: str, problem_type: str):
     if data_format == "pair":
-        if problem_type == BINARY:
+        if problem_type is None:
+            return ["multi_negatives_softmax_loss"]
+        elif problem_type == BINARY:
             return ["contrastive_loss"]
         elif problem_type == REGRESSION:
             return ["cosine_similarity_loss"]

@@ -232,7 +232,7 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
     sample_features = {}
     for per_modality, per_modality_processors in data_processors.items():
         for per_model_processor in per_modality_processors:
-            if per_sample_features[per_modality]:
+            if per_modality in per_sample_features and per_sample_features[per_modality]:
                 sample_features.update(per_model_processor(per_sample_features[per_modality], is_training=is_training))
 
     return sample_features

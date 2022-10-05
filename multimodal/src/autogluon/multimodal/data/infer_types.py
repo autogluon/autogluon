@@ -480,6 +480,9 @@ def infer_problem_type_output_shape(
     output_shape
         Shape of output.
     """
+    if label_column is None:
+        return None, None
+
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
             class_num = len(data[label_column].unique())
@@ -547,7 +550,7 @@ def set_fallback_column_type(column_types: Dict, allowable_column_types: List[st
     The filtered column types.
     """
     for col_name, col_type in column_types.items():
-        if col_type not in allowable_column_types:
+        if not col_type.startswith(tuple(allowable_column_types)):
             column_types[col_name] = fallback_column_type
 
     return column_types
