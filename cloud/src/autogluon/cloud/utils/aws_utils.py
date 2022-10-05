@@ -6,14 +6,42 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 from dataclasses import dataclass
 from typing import List, Union, Optional
+
+from .constants import (
+    TRUST_RELATIONSHIP_ACCOUNT_PLACE_HOLDER,
+    POLICY_ACCOUNT_PLACE_HOLDER,
+    POLICY_BUCKET_PLACE_HOLDER
+)
 from ..version import __version__
 
 
 @dataclass
 class CustomIamPolicy:
     name: str
-    document: str
+    document: dict
     description: str
+
+    @property
+    def document_str(self):
+        return json.dumps(self.document)
+
+    def replace_place_holder(self, account_id=None, bucket=None):
+        """Replace placeholder inside template with given values"""
+        statements = self.document.get('Statement', [])
+        for statement in statements:
+            resources = statement.get('Resource', None)
+            if resources is not None:
+                if account_id is not None:
+                    statement['Resource'] = [resource.replace(POLICY_ACCOUNT_PLACE_HOLDER, account_id) for resource in statement['Resource']]
+                if bucket is not None:
+                    statement['Resource'] = [resource.replace(POLICY_BUCKET_PLACE_HOLDER, bucket) for resource in statement['Resource']]
+
+
+def replace_trust_relationship_place_holder(trust_relationship, account_id):
+    statements = trust_relationship.get('Statement', [])
+    for statement in statements:
+        for principal in statement['Principal'].keys():
+            statement['Principal'][principal] = statement['Principal'][principal].replace(TRUST_RELATIONSHIP_ACCOUNT_PLACE_HOLDER, account_id)
 
 
 def create_iam_role(role_name: str, trust_relationship: str, description: str, **kwargs):
@@ -48,25 +76,36 @@ def create_iam_policy(policy_name: str, policy_document: str, policy_description
     return policy_arn
 
 
-def setup_sagemaker_role_and_policy(role_name: str, trust_relationship: dict, policies: List[Union[str, CustomIamPolicy]]):
+def setup_sagemaker_role_and_policy(
+        role_name: str,
+        trust_relationship: dict,
+        policies: List[Union[str, CustomIamPolicy]],
+        account_id: str,
+        bucket: str,
+):
     iam = boto3.client('iam')
     role_arn = None
     # create policies based on cloud module version if passed in a CustomIamPolicy
     policies_to_attach = list()  # this list holds all policies in ARN
     for policy in policies:
-        if type(policy) == CustomIamPolicy:
+        if isinstance(policy, CustomIamPolicy):
             try:
-                policy = create_iam_policy(policy.name, policy.document, policy.description)
+                policy.replace_place_holder(account_id, bucket)
+                print(policy.document)
+                policy = create_iam_policy(policy.name, policy.document_str, policy.description)
             except ClientError as e:
                 if not e.response['Error']['Code'] == 'EntityAlreadyExists':
                     raise e
+                
         policies_to_attach.append(policy)
+    # setup trust relationship
+    replace_trust_relationship_place_holder(trust_relationship, account_id)
     # create IAM role
     try:
         create_iam_role(
             role_name=role_name,
             trust_relationship=json.dumps(trust_relationship),
-            description='AutoGluon CloudPredictor role'
+            description='AutoGluon SageMaker CloudPredictor role'
         )
     except ClientError as e:
         if not e.response['Error']['Code'] == 'EntityAlreadyExists':

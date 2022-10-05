@@ -27,8 +27,18 @@ from ..utils.ag_sagemaker import (
     AutoGluonRealtimePredictor,
     AutoGluonBatchPredictor
 )
-from ..utils.aws_utils import setup_sagemaker_role_and_policy, setup_sagemaker_session
-from ..utils.constants import SAGEMAKER_TRUST_REPLATIONSHIP, SAGEMAKER_POLICIES, VALID_ACCEPT
+from ..utils.aws_utils import (
+    CustomIamPolicy,
+    setup_sagemaker_role_and_policy,
+    setup_sagemaker_session
+)
+from ..utils.constants import (
+    SAGEMAKER_CLOUD_POLICY_NAME,
+    SAGEMAKER_CLOUD_POLICY,
+    SAGEMAKER_CLOUD_POLICY_DESCRIPTION,
+    SAGEMAKER_TRUST_RELATIONSHIP,
+    VALID_ACCEPT
+)
 from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.sagemaker_utils import (
     retrieve_available_framework_versions,
@@ -70,9 +80,10 @@ class CloudPredictor(ABC):
             you must either specify different `cloud_output_path` locations or only provide the bucket but not the subfolder.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
         role_arn: str
-            The role_arn you want to use to grant cloud predictor necessary permission. 
-            This role must have permission on AmazonS3FullAccess and AmazonSageMakerFullAccess.
-            If None, CloudPredictor will create one with name "ag_cloud_predictor_role".
+            The role_arn you want to use to grant cloud predictor necessary permission.
+            This permission required `SAGEMAKER_CLOUD_POLICY` can be find under `autogluon/cloud/utils/constants`.
+            You can use `CloudPredictor.setup_sagemaker_role_and_policy()` to create the role and policies for you.
+            If None, CloudPredictor will get the execution role of your current cli session.
         local_output_path: str
             Path to directory where downloaded trained predictor, batch transform results, and intermediate outputs should be saved
             If unspecified, a time-stamped folder called "AutogluonCloudPredictor/ag-[TIMESTAMP]" will be created in the working directory to store all downloaded trained predictor, batch transform results, and intermediate outputs.
@@ -88,11 +99,15 @@ class CloudPredictor(ABC):
         set_logger_verbosity(self.verbosity, logger=logger)
         self.role_arn = role_arn
         if not self.role_arn:
-            self.role_arn = setup_sagemaker_role_and_policy(
-                role_name='ag_cloud_predictor_role',
-                trust_relationship=SAGEMAKER_TRUST_REPLATIONSHIP,
-                policies=SAGEMAKER_POLICIES
-            )
+            try:
+                self.role_arn = sagemaker.get_execution_role()
+            except ClientError as e:
+                logger.warning(
+                    'Failed to get IAM role. Did you configure and authenticate the IAM role?',
+                    'For more information, https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html',
+                    'You can also use `CloudPredictor.setup_sagemaker_role_and_policy()` to create the role and policies for you.'
+                )
+                raise e
         self.sagemaker_session = setup_sagemaker_session()
         self.local_output_path = self._setup_local_output_path(local_output_path)
         self.cloud_output_path = self._setup_cloud_output_path(cloud_output_path)
@@ -126,6 +141,47 @@ class CloudPredictor(ABC):
         if self.endpoint:
             return self.endpoint.endpoint_name
         return None
+
+    @staticmethod
+    def setup_sagemaker_role_and_policy(
+        account_id: str,
+        cloud_output_path: str,
+        role_name: str = 'ag_sagemaker_cloud_predictor_role'
+    ) -> str:
+        """
+        Create an IAM role and attach required policies for CloudPredictor wit SageMaker backend.
+        Your current authenticated IAM user/role needs to have required permission to create IAM policies and IAM roles
+        This only create the role for you and you'll need to authenticate the role yourselves before using CloudPredictor
+        For how to authenticate the role: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html
+
+        Parameters
+        ----------
+        account_id: str
+            The AWS account ID you plan to use for CloudPredictor.
+        cloud_output_path: str
+            Path to s3 location where intermediate artifacts will be uploaded and trained models should be saved.
+            You need to create this bucket beforehand and we would put this bucket in the policy being created.
+        role_name: str
+            The role name. If not specified, will use ag_sagemaker_cloud_predictor_role
+
+        Return
+        ------
+        role_arn: str
+            The role arn being created
+        """
+        sagemaker_cloud_predictor_policy = CustomIamPolicy(
+            name=SAGEMAKER_CLOUD_POLICY_NAME,
+            document=SAGEMAKER_CLOUD_POLICY,
+            description=SAGEMAKER_CLOUD_POLICY_DESCRIPTION,
+        )
+        role_arn = setup_sagemaker_role_and_policy(
+            role_name=role_name,
+            trust_relationship=SAGEMAKER_TRUST_RELATIONSHIP,
+            policies=[sagemaker_cloud_predictor_policy],
+            account_id=account_id,
+            bucket=cloud_output_path,
+        )
+        return role_arn
 
     def info(self):
         """
