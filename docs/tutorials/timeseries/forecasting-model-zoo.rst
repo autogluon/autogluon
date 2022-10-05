@@ -32,6 +32,7 @@ are different from the original libraries.
 
    ARIMAModel
    ETSModel
+   ThetaModel
    DeepARModel
    SimpleFeedForwardModel
    MQCNNModel
@@ -52,6 +53,13 @@ are different from the original libraries.
 ~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: ETSModel
+   :members: init
+
+
+:hidden:`ThetaModel`
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ThetaModel
    :members: init
 
 
