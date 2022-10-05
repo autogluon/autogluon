@@ -28,7 +28,7 @@ config_2 = {
 
 
 if __name__ == "__main__":
-    test_df = kaggle_feedback_prize_preprocess.read_and_process_data_with_norm(data_path, "test.csv", is_train=False)
+    test_df = kaggle_feedback_prize_preprocess.read_and_process_data(data_path, "test.csv", is_train=False)
 
     configs = [config_1, config_2]
     weights = [0.6, 0.4]

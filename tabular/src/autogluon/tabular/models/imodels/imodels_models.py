@@ -12,6 +12,10 @@ class _IModelsModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
+        self._ohe = None
+        self._ohe_columns = None
+        self._categorical_featnames = None
+        self._other_featnames = None
 
     @abstractmethod
     def get_model(self):
@@ -32,7 +36,7 @@ class _IModelsModel(AbstractModel):
                 self._ohe.fit(X=X[self._categorical_featnames])
                 self._ohe_columns = self._ohe.get_feature_names_out()
             else:
-                self._ohe=None # otherwise no model is fitted when there are not self._categorical_featnames
+                self._ohe = None  # otherwise no model is fitted when there are not self._categorical_featnames
 
         if self._ohe is not None:
             X_index = X.index

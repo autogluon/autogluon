@@ -2,6 +2,7 @@ data:
   image:
     missing_value_strategy: "skip"  # How to deal with missing images. By default, we skip a sample with missing images. We also support choice "zero", i.e., using a zero image to replace a missing image.
   text:
+    normalize_text: False  # Whether to normalize text
   categorical:
     minimum_cat_count: 100  # The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
     maximum_num_cat: 20  # The maximum amount of categories that can be considered non-rare.

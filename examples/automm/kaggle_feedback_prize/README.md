@@ -9,37 +9,38 @@ It is an up-stream task necessary to enable the subsequent direct employment of 
 with strong regional variation and no written standard. 
 Even though the competition dataset is composed of English only, we found that applying text normalization can reduce `log loss`, the metrics that this competition is evaluating on. 
 
-### 1.1 Define error handlers for codecs
-    def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
-        return error.object[error.start : error.end].encode("utf-8"), error.end
+### 1.1 Applying normalization to text columns by enabling hyperparameter configuration
+    hyperparameters={
+        "data.text.normalize_text": True,
+    }
 
-    def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
-    return error.object[error.start : error.end].decode("cp1252"), error.end
+Under the hood, the following process is done when `data.text.normalize_text` is enabled:
+    
+    #### 1.1.1 Define error handlers for codecs
+        def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
+            return error.object[error.start : error.end].encode("utf-8"), error.end
+
+        def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
+        return error.object[error.start : error.end].decode("cp1252"), error.end
 
 
-### 1.2 Register error handlers for codecs
-    codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
-    codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
+    #### 1.1.2 Register error handlers for codecs
+        codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
+        codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
 
 
-### 1.3 Applying a series of decoding and encoding for normalization
-    def resolve_encodings_and_normalize(text: str) -> str:
-        text = (
-            text.encode("raw_unicode_escape")
-            .decode("utf-8", errors="replace_decoding_with_cp1252")
-            .encode("cp1252", errors="replace_encoding_with_utf8")
-            .decode("utf-8", errors="replace_decoding_with_cp1252")
-        )
-        text = unidecode(text)
-        return text
+    #### 1.1.3 Applying a series of decoding and encoding for normalization
+        def resolve_encodings_and_normalize(text: str) -> str:
+            text = (
+                text.encode("raw_unicode_escape")
+                .decode("utf-8", errors="replace_decoding_with_cp1252")
+                .encode("cp1252", errors="replace_encoding_with_utf8")
+                .decode("utf-8", errors="replace_decoding_with_cp1252")
+            )
+            text = unidecode(text)
+            return text
 
-### 1.4 Applying normalization to feature columns
-    def read_and_process_data_with_norm(path: str, file: str, is_train: bool) -> pd.DataFrame:
-        df = pd.read_csv(os.path.join(path, file))
-        df["discourse_text"] = df["discourse_text"].apply(resolve_encodings_and_normalize)
-        return df
-
-### 1.5 A few examples of normalized texts
+### 1.2 A few examples of normalized texts
 
     # Example-1 pre-normalization
     'The same technology can make computer-animated faces more expressive\x97for video games or video surgery. \x93Most human communication is nonverbal, including emotional communication,\x94 notes Dr. Huang. \x93So computers need to understand that, too.\x94Eckman has classified six basic emotions\x97happiness, surprise, anger, disgust, fear, and sadness\x97and then associated each with characteristic movements of the facial muscles. For example, your frontalis pars lateralis muscle (above your eyes) raises your eyebrows when you\x92re surprised; your orbicularis oris (around your mouth) tightens your lips to show anger. '
@@ -90,6 +91,7 @@ Then, you can train the MultiModalPredictor with `.fit()`.
         presets="best_quality",
         hyperparameters={
             "model.hf_text.checkpoint_name": "microsoft/deberta-v3-large",
+            "data.text.normalize_text": True,
             "optimization.learning_rate": 5e-5,
             "optimization.max_epochs": 7,
         },

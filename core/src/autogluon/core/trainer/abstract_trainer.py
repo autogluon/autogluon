@@ -17,13 +17,17 @@ from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
-from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..calibrate.conformity_score import compute_conformity_score
+from ..calibrate.temperature_scaling import tune_temperature_scaling
+from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, extract_column, compute_weighted_metric
 from ..utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures, NoGPUError, NotEnoughCudaMemoryError
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from ..utils.feature_selection import FeatureSelector
+from ..utils.try_import import try_import_torch
 
 logger = logging.getLogger(__name__)
 
@@ -541,18 +545,31 @@ class AbstractTrainer:
     def predict(self, X, model=None):
         if model is None:
             model = self._get_best()
-        return self._predict_model(X, model)
+        cascade = isinstance(model, list)
+        return self._predict_model(X, model, cascade=cascade)
 
     def predict_proba(self, X, model=None):
         if model is None:
             model = self._get_best()
-        return self._predict_proba_model(X, model)
+        cascade = isinstance(model, list)
+        return self._predict_proba_model(X, model, cascade=cascade)
 
     def _get_best(self):
         if self.model_best is not None:
             return self.model_best
         else:
             return self.get_model_best()
+
+    def get_pred_proba_from_model(self, model, X, model_pred_proba_dict=None, cascade=False):
+        if isinstance(model, list):
+            models = model
+            model = models[-1]
+        else:
+            models = [model]
+        model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=models, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
+        if not isinstance(model, str):
+            model = model.name
+        return model_pred_proba_dict[model]
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
     def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess_nonadaptive=False):
@@ -571,7 +588,7 @@ class AbstractTrainer:
             else:
                 model_set = self.get_minimum_model_set(model)
                 model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
-                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict, fit=fit)
+                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict)
             X = model.preprocess(X=X, preprocess_nonadaptive=preprocess_nonadaptive, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
         elif preprocess_nonadaptive:
             X = model.preprocess(X=X, preprocess_stateful=False)
@@ -593,86 +610,266 @@ class AbstractTrainer:
         return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation,
                                        quantile_levels=self.quantile_levels)
 
+    # TODO: Slow if large ensemble with many models, could cache output result to speed up cascades during inference
+    def _construct_model_pred_order(self, models: List[str]) -> List[str]:
+        """
+        Constructs a list of model names in order of inference calls required to infer on all the models.
+
+        Parameters
+        ----------
+        models : List[str]
+            The list of models to construct the prediction order from.
+            If a model has dependencies, the dependency models will be put earlier in the output list.
+            Models explicitly mentioned in the `models` input will be placed as early as possible in the output list.
+            Models earlier in `models` will attempt to be placed earlier in the output list than those later in `models`.
+                It is recommended that earlier elements do not have dependency models that are listed later in `models`.
+
+        Returns
+        -------
+        Returns list of models in inference call order, including dependency models of those specified in the input.
+        """
+        model_set = set()
+        model_order = []
+        for model in models:
+            if model in model_set:
+                continue
+            min_models_set = set(self.get_minimum_model_set(model))
+            models_to_load = list(min_models_set.difference(model_set))
+            subgraph = nx.subgraph(self.model_graph, models_to_load)
+            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+            model_order += [m for m in model_pred_order if m not in model_set]
+            model_set = set(model_order)
+        return model_order
+
+    def _construct_model_pred_order_with_pred_dict(self, models: List[str], models_to_ignore: List[str] = None) -> List[str]:
+        """
+        Constructs a list of model names in order of inference calls required to infer on all the models.
+        Unlike `_construct_model_pred_order`, this method's output is in undefined order when multiple models are valid to infer at the same time.
+            This makes it unsuitable for cascade ensembles.
+
+        Parameters
+        ----------
+        models : List[str]
+            The list of models to construct the prediction order from.
+            If a model has dependencies, the dependency models will be put earlier in the output list.
+        models_to_ignore : List[str], optional
+            A list of models that have already been computed and can be ignored.
+            Models in this list and their dependencies (if not depended on by other models in `models`) will be pruned from the final output.
+
+        Returns
+        -------
+        Returns list of models in inference call order, including dependency models of those specified in the input.
+        """
+        model_set = set()
+        for model in models:
+            if model in model_set:
+                continue
+            min_model_set = set(self.get_minimum_model_set(model))
+            model_set = model_set.union(min_model_set)
+        if models_to_ignore is not None:
+            model_set = model_set.difference(set(models_to_ignore))
+        models_to_load = list(model_set)
+        subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
+        # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
+        models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
+        while models_to_ignore:
+            model = models_to_ignore[0]
+            predecessors = list(subgraph.predecessors(model))
+            subgraph.remove_node(model)
+            models_to_ignore = models_to_ignore[1:]
+            for predecessor in predecessors:
+                if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
+                    models_to_ignore.append(predecessor)
+
+        # Get model prediction order
+        return list(nx.lexicographical_topological_sort(subgraph))
+
     # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
     #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
     #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
     # TODO: Add memory optimal topological ordering -> Minimize amount of pred_probas in memory at a time, delete pred probas that are no longer required
-    # Optimally computes pred_probas for each model in `models`. Will compute each necessary model only once and store its predictions in a dictionary.
-    # Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
-    # fit = get oof pred proba
-    # if record_pred_time is `True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
     def get_model_pred_proba_dict(self,
-                                  X,
-                                  models,
-                                  model_pred_proba_dict=None,
-                                  model_pred_time_dict=None,
-                                  fit=False,
-                                  record_pred_time=False,
-                                  use_val_cache: bool = False):
+                                  X: pd.DataFrame,
+                                  models: List[str],
+                                  model_pred_proba_dict: dict = None,
+                                  model_pred_time_dict: dict = None,
+                                  record_pred_time: bool = False,
+                                  use_val_cache: bool = False,
+                                  cascade: bool = False,
+                                  cascade_threshold: float = 0.9):
+        """
+        Optimally computes pred_probas (or predictions if regression) for each model in `models`.
+        Will compute each necessary model only once and store predictions in a `model_pred_proba_dict` dictionary.
+        Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Input data to predict on.
+        models : List[str]
+            The list of models to predict with.
+            Note that if models have dependency models, their dependencies will also be predicted with and included in the output.
+        model_pred_proba_dict : dict, optional
+            A dict of predict_probas that could have been computed by a prior call to `get_model_pred_proba_dict` to avoid redundant computations.
+            Models already present in model_pred_proba_dict will not be predicted on.
+            get_model_pred_proba_dict(X, models=['A', 'B', 'C']) is equivalent to
+            get_model_pred_proba_dict(X, models=['C'], model_pred_proba_dict=get_model_pred_proba_dict(X, models=['A', 'B']))
+            Note: Mutated in-place to minimize memory usage
+        model_pred_time_dict : dict, optional
+            If `record_pred_time==True`, this is a dict of model name to marginal time taken in seconds for the prediction of X.
+            Must be specified alongside `model_pred_proba_dict` if `record_pred_time=True` and `model_pred_proba_dict != None`.
+            Ignored if `record_pred_time=False`.
+            Note: Mutated in-place to minimize memory usage
+        record_pred_time : bool, default = False
+            Whether to store marginal inference times of each model as an extra output `model_pred_time_dict`.
+        use_val_cache : bool, default = False
+            Whether to fetch cached val prediction probabilities for models instead of predicting on the data.
+            Only set to True if X is equal to the validation data and you want to skip live predictions.
+        cascade : bool, default = False
+            [Experimental] Whether to perform an ensemble cascade.
+            If True, the cascade is performed from left to right on the models specified in `models`.
+            For each row of input data in X:
+                After a model in `models` predicts on it:
+                    If the prediction probability is confident (determined by `cascade_threshold`) then use that prediction probability as final result and don't predict on that row with further models.
+                    Else continue predicting with later models (unless the model is the final model, in which case use that prediction probability).
+            This process should speed up prediction compared to predicting on the last model for all rows, assuming earlier models are part of the dependency graph of the final model.
+            Only valid for binary and multiclass classification.
+            Note: When True, only the output of the final model in `models` in `model_pred_proba_dict` should be used.
+        cascade_threshold : float, default = 0.9
+            # TODO: Placeholder logic, replace with more complex option
+            Threshold to use for determining if a row should exit the cascaded prediction early.
+            If any one class has pred_proba>=cascade_threshold, then it exits early.
+            Ignored if `cascade=False`.
+
+        Returns
+        -------
+        If `record_pred_time==True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
+        """
         if model_pred_proba_dict is None:
             model_pred_proba_dict = {}
         if model_pred_time_dict is None:
             model_pred_time_dict = {}
+        if cascade and len(models) <= 1:
+            cascade = False
+        if cascade and model_pred_proba_dict:
+            # Technically doesn't have to be an error, but logic gets extremely complicated if we allow this.
+            raise AssertionError('Cascade is not valid when model_pred_proba_dict is specified.')
+        if cascade and self.problem_type not in [BINARY, MULTICLASS]:
+            raise AssertionError(f'Ensemble Cascade not implemented for problem_type=={self.problem_type}')
+        if cascade and use_val_cache:
+            raise AssertionError('cascade and use_val_cache cannot both be True.')
 
-        if fit:
-            model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
+        if use_val_cache:
+            _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
+        if not model_pred_proba_dict:
+            # TODO: Pre-construct order if cascade, otherwise this will slow down prediction having to recompute each inference call.
+            model_pred_order = self._construct_model_pred_order(models)
         else:
-            if use_val_cache:
-                _, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(models), model_pred_proba_dict=model_pred_proba_dict)
-            model_set = set()
-            for model in models:
-                if model in model_set or model in model_pred_proba_dict:
-                    continue
-                min_model_set = set(self.get_minimum_model_set(model))
-                model_set = model_set.union(min_model_set)
-            model_set = model_set.difference(set(model_pred_proba_dict.keys()))
-            if use_val_cache:
-                model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=model_set, model_pred_proba_dict=model_pred_proba_dict)
-            models_to_load = list(model_set)
-            subgraph = nx.subgraph(self.model_graph, models_to_load)
+            model_pred_order = self._construct_model_pred_order_with_pred_dict(models, models_to_ignore=list(model_pred_proba_dict.keys()))
+        if use_val_cache:
+            model_set, model_pred_proba_dict = self._update_pred_proba_dict_with_val_cache(model_set=set(model_pred_order), model_pred_proba_dict=model_pred_proba_dict)
+            model_pred_order = [model for model in model_pred_order if model in model_set]
 
-            # For model in model_pred_proba_dict, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
-            models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
-            while models_to_ignore:
-                model = models_to_ignore[0]
-                predecessors = list(subgraph.predecessors(model))
-                subgraph.remove_node(model)
-                models_to_ignore = models_to_ignore[1:]
-                for predecessor in predecessors:
-                    if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
-                        models_to_ignore.append(predecessor)
+        iloc_model_dict = dict()
+        model_pred_proba_dict_cascade = dict()
 
-            # Get model prediction order
-            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+        if cascade:
+            num_rows = len(X)
+            # used to keep track of which rows remain unconfident and what their original index was.
+            unconfident_idx = np.array([i for i in range(num_rows)])
+        else:
+            num_rows = None
+            unconfident_idx = None
+        # The order in which models predict in the cascade. Only used when `cascade=True`
+        cascade_order: List[str] = []
 
         # Compute model predictions in topological order
         for model_name in model_pred_order:
             if record_pred_time:
                 time_start = time.time()
 
-            if fit:
-                model_type = self.get_model_attribute(model=model_name, attribute='type')
-                if issubclass(model_type, BaggedEnsembleModel):
-                    model_path = self.get_model_attribute(model=model_name, attribute='path')
-                    model_pred_proba_dict[model_name] = model_type.load_oof(path=model_path)
+            if cascade:
+                # Keep track of the iloc index of the current model for the rows that are predicted on.
+                #  iloc is used because it is a very compute efficient way to track the location of rows.
+                iloc_model_dict[model_name] = unconfident_idx
+            model = self.load_model(model_name=model_name)
+            if isinstance(model, StackerEnsembleModel):
+                if cascade:
+                    # Need to predict only on the unconfident rows that remain.
+                    #  This requires getting the correct indices from the dependent models' prior predictions.
+                    #  Because the length of predictions in prior models differs due to early exiting,
+                    #  this logic fetches the correct indices via the iloc_model_dict.
+                    cascade_dict = dict()
+                    for m in model_pred_proba_dict_cascade:
+                        # TODO: Can probably be done faster, unsure how expensive this is.
+                        cascade_dict[m] = model_pred_proba_dict_cascade[m][iloc_model_dict[model_name]]
+                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=cascade_dict)
                 else:
-                    raise AssertionError(f'Model {model_name} must be a BaggedEnsembleModel to return oof_pred_proba')
-            else:
-                model = self.load_model(model_name=model_name)
-                if isinstance(model, StackerEnsembleModel):
                     preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
-                    model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
-                else:
-                    model_pred_proba_dict[model_name] = model.predict_proba(X)
+                model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
+            else:
+                model_pred_proba_dict[model_name] = model.predict_proba(X)
 
             if record_pred_time:
                 time_end = time.time()
                 model_pred_time_dict[model_name] = time_end - time_start
 
+            if cascade:
+                if model_name in models:
+                    cascade_order.append(model_name)
+                if self.problem_type == BINARY:
+                    tmp = np.zeros(num_rows, dtype='float32')
+                else:
+                    tmp = np.zeros((num_rows, self.num_classes), dtype='float32')
+                tmp[iloc_model_dict[model_name]] = model_pred_proba_dict[model_name]
+                model_pred_proba_dict_cascade[model_name] = tmp
+                # If model is part of cascade, keep the predictions that are confident and don't predict on these rows with further models.
+                if model_name in models and model_name != models[-1]:
+                    pred_proba = model_pred_proba_dict[model_name]
+                    # Calculate confident predictions based on cascade threshold
+                    # TODO: Support more sophisticated methods of calculating whether to keep a prediction
+                    # TODO: Support per-model confidence specification
+                    if self.problem_type == BINARY:
+                        confident = (pred_proba >= cascade_threshold) | (pred_proba <= (1-cascade_threshold))
+                    elif self.problem_type == MULTICLASS:
+                        confident = (pred_proba >= cascade_threshold).any(axis=1)
+                    else:
+                        raise AssertionError(f'Invalid cascade problem_type: {self.problem_type}')
+                    unconfident_cur = ~confident
+                    # Shrink X to only contain the remaining unconfident rows
+                    X = X.iloc[unconfident_cur]
+                    unconfident_idx = unconfident_idx[unconfident_cur]
+                    # If no rows remain that are unconfident, exit cascade logic early.
+                    if len(X) == 0:
+                        break
+
+        if cascade:
+            # TODO: How should this be output?
+            if self.problem_type == BINARY:
+                cascade_pred_proba = np.zeros(num_rows, dtype='float32')
+            else:
+                cascade_pred_proba = np.zeros((num_rows, self.num_classes), dtype='float32')
+            # For each model in the cascade early exit logic from first to final, update cascade_pred_proba
+            #  with the pred_proba from that model of the rows it predicted on.
+            #  This will result in the final pred_proba of the cascade at the end of the for-loop.
+            for m in cascade_order:
+                cascade_pred_proba[iloc_model_dict[m]] = model_pred_proba_dict[m]
+            # FIXME: Temp overwrite, unsure how we want to vend cascade results? In future maybe under its own model name.
+            model_pred_proba_dict[models[-1]] = cascade_pred_proba
+
         if record_pred_time:
             return model_pred_proba_dict, model_pred_time_dict
         else:
             return model_pred_proba_dict
+
+    def get_model_oof(self, model: str) -> np.ndarray:
+        """Gets the out of fold prediction probabilities for a bagged ensemble model"""
+        model_type = self.get_model_attribute(model=model, attribute='type')
+        if issubclass(model_type, BaggedEnsembleModel):
+            model_path = self.get_model_attribute(model=model, attribute='path')
+            return model_type.load_oof(path=model_path)
+        else:
+            raise AssertionError(f'Model {model} must be a BaggedEnsembleModel to return oof_pred_proba')
 
     def _update_pred_proba_dict_with_val_cache(self, model_set: set, model_pred_proba_dict):
         """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
@@ -841,6 +1038,8 @@ class AbstractTrainer:
     def refit_ensemble_full(self, model='all') -> dict:
         if model == 'all':
             ensemble_set = self.get_model_names()
+        elif isinstance(model, list):
+            ensemble_set = self.get_minimum_models_set(model)
         else:
             if model == 'best':
                 model = self.get_model_best()
@@ -1081,7 +1280,7 @@ class AbstractTrainer:
                 else:
                     best_score = self.get_model_attribute(self.model_best, 'val_score')
                     cur_score = self.get_model_attribute(weighted_ensemble_model_name, 'val_score')
-                    if cur_score > best_score:
+                    if best_score is not None and cur_score > best_score:
                         # new best model
                         self.model_best = weighted_ensemble_model_name
         return models
@@ -1677,24 +1876,12 @@ class AbstractTrainer:
             raise ValueError('AutoGluon did not successfully train any models')
         return model_names_fit
 
-    def _predict_model(self, X, model, model_pred_proba_dict=None):
-        if isinstance(model, str):
-            model = self.load_model(model)
-        X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        y_pred = model.predict(X=X)
-        if self._regress_preds_asprobas and model.problem_type == REGRESSION:  # Convert regression preds to classes (during distillation)
-            if (len(y_pred.shape) > 1) and (y_pred.shape[1] > 1):
-                problem_type = MULTICLASS
-            else:
-                problem_type = BINARY
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred, problem_type=problem_type)
-        return y_pred
+    def _predict_model(self, X, model, model_pred_proba_dict=None, cascade=False):
+        y_pred_proba = self._predict_proba_model(X=X, model=model, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
-    def _predict_proba_model(self, X, model, model_pred_proba_dict=None):
-        if isinstance(model, str):
-            model = self.load_model(model)
-        X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        return model.predict_proba(X=X)
+    def _predict_proba_model(self, X, model, model_pred_proba_dict=None, cascade=False):
+        return self.get_pred_proba_from_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, cascade=cascade)
 
     def _get_dummy_stacker(self, level: int, model_levels: dict, use_orig_features=True) -> StackerEnsembleModel:
         model_names = model_levels[level - 1]
@@ -2607,3 +2794,76 @@ class AbstractTrainer:
             return proxy_model
         best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows['score_val'] == candidate_model_rows['score_val'].max()]
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows['fit_time'].idxmin()]['model'])
+
+    def calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
+        """
+        Applies temperature scaling to a model.
+        Applies inverse softmax to predicted probs then trains temperature scalar
+        on validation data to maximize negative log likelihood.
+        Inversed softmaxes are divided by temperature scalar
+        then softmaxed to return predicted probs.
+
+        Parameters:
+        -----------
+        model_name: str: default = None
+            model name to tune temperature scaling on.
+            If None, will tune best model only. Best model chosen by validation score
+        lr: float: default = 0.01
+            The learning rate for temperature scaling algorithm
+        max_iter: int: default = 1000
+            Number of iterations optimizer should take for
+            tuning temperature scaler
+        init_val: float: default = 1.0
+            The initial value for temperature scalar term
+        """
+        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
+        try:
+            # FIXME: Avoid depending on torch for temp scaling
+            try_import_torch()
+        except ImportError:
+            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
+            return
+
+        if model_name is None:
+            if self.model_best is not None:
+                models = self.get_model_names(can_infer=True)
+                if self.model_best in models:
+                    model_name = self.model_best
+            if model_name is None:
+                self.get_model_best(can_infer=True)
+
+        model_full_dict = self.get_model_full_dict()
+        model_name_og = model_name
+        for m, m_full in model_full_dict.items():
+            if m_full == model_name:
+                model_name_og = m
+                break
+        if self.bagged_mode:
+            y_val_probs = self.get_model_oof(model_name_og)
+            y_val = self.load_y().to_numpy()
+        else:
+            X_val = self.load_X_val()
+            y_val_probs = self.predict_proba(X_val, model_name_og)
+            y_val = self.load_y_val().to_numpy()
+
+            if self.problem_type == BINARY:
+                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+
+        model = self.load_model(model_name=model_name)
+        if self.problem_type == QUANTILE:
+            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
+            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
+                                                    quantile_levels=self.quantile_levels)
+            model.conformalize = conformalize
+            model.save()
+        else:
+            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+                                                   init_val=init_val, max_iter=max_iter, lr=lr)
+            if temp_scalar is None:
+                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
+                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
+            else:
+                logger.log(15, f'Temperature term found is: {temp_scalar}')
+                model.params_aux["temperature_scalar"] = temp_scalar
+                model.save()

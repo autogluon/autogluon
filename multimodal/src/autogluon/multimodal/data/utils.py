@@ -1,10 +1,13 @@
+import codecs
 import random
-from typing import Iterable, List, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
 import pandas as pd
 from nlpaug import Augmenter
 from nlpaug.util import Method
+from text_unidecode import unidecode
 
+from ..constants import MMCV_MODELS
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -126,11 +129,21 @@ class InsertPunctuation(Augmenter):
 def get_collate_fn(
     df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
     data_processors: Union[dict, List[dict]],
+    per_gpu_batch_size: Optional[int] = None,
 ):
     """
     Collect collator functions for each modality input of every model.
     These collator functions are wrapped by the "Dict" collator function,
     which can then be used by the Pytorch DataLoader.
+
+    Parameters
+    ----------
+    df_preprocessor
+        One or a list of dataframe preprocessors.
+    data_processors
+        One or a list of data processor dicts.
+    per_gpu_batch_size
+        Mini-batch size for each GPU.
 
     Returns
     -------
@@ -147,7 +160,14 @@ def get_collate_fn(
             per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
             if per_modality_column_names:
                 for per_model_processor in per_data_processors_group[per_modality]:
-                    collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
+                    if per_model_processor.prefix.lower().startswith(MMCV_MODELS):
+                        collate_fn.update(
+                            per_model_processor.collate_fn(
+                                per_modality_column_names, per_gpu_batch_size=per_gpu_batch_size
+                            )
+                        )
+                    else:
+                        collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
     return Dict(collate_fn)
 
 
@@ -212,3 +232,29 @@ def apply_data_processor(modality_features: dict, data_processors: dict, idx: in
                 )
 
     return sample_features
+
+
+def register_encoding_decoding_error_handlers() -> None:
+    """Register the encoding and decoding error handlers for `utf-8` and `cp1252`."""
+
+    def replace_encoding_with_utf8(error: UnicodeError) -> Tuple[bytes, int]:
+        return error.object[error.start : error.end].encode("utf-8"), error.end
+
+    def replace_decoding_with_cp1252(error: UnicodeError) -> Tuple[str, int]:
+        return error.object[error.start : error.end].decode("cp1252"), error.end
+
+    codecs.register_error("replace_encoding_with_utf8", replace_encoding_with_utf8)
+    codecs.register_error("replace_decoding_with_cp1252", replace_decoding_with_cp1252)
+
+
+def normalize_txt(text: str) -> str:
+    """Resolve the encoding problems and normalize the abnormal characters."""
+
+    text = (
+        text.encode("raw_unicode_escape")
+        .decode("utf-8", errors="replace_decoding_with_cp1252")
+        .encode("cp1252", errors="replace_encoding_with_utf8")
+        .decode("utf-8", errors="replace_decoding_with_cp1252")
+    )
+    text = unidecode(text)
+    return text
