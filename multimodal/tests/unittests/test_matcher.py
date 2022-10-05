@@ -10,13 +10,7 @@ from unittest_datasets import IDChangeDetectionDataset
 from utils import get_home_dir
 
 from autogluon.multimodal import MultiModalMatcher
-from autogluon.multimodal.constants import (
-    BINARY,
-    MULTICLASS,
-    QUERY,
-    RESPONSE,
-    UNIFORM_SOUP,
-)
+from autogluon.multimodal.constants import BINARY, MULTICLASS, QUERY, RESPONSE, UNIFORM_SOUP
 
 ALL_DATASETS = {
     "id_change_detection": IDChangeDetectionDataset,
