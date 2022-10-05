@@ -163,8 +163,9 @@ def get_preset_models(
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
     elif isinstance(hyperparameters, dict):
         default_hps = copy.deepcopy(get_default_hps("default", prediction_length))
-        updated_hyperparameters = {model: default_hps.get(model, {}) for model in hyperparameters}
+        updated_hyperparameters = {}
         for model, hps in hyperparameters.items():
+            updated_hyperparameters[model] = default_hps.get(model, {})
             updated_hyperparameters[model].update(hps)
         hyperparameters = copy.deepcopy(updated_hyperparameters)
     else:
