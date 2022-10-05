@@ -3,14 +3,13 @@ import logging
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.statsmodels import ARIMAModel, ETSModel, SeasonalNaiveModel, ThetaModel
+from autogluon.timeseries.models.statsmodels import ARIMAModel, ETSModel, ThetaModel
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_item_index
 
 TESTABLE_MODELS = [
     ARIMAModel,
     ETSModel,
-    SeasonalNaiveModel,
     ThetaModel,
 ]
 
@@ -83,8 +82,6 @@ def get_seasonal_period_from_fitted_local_model(model, model_name):
         return model.sm_model_init_args["seasonal_periods"]
     elif model_name == "Theta":
         return model.sm_model_init_args["period"]
-    elif model_name == "SeasonalNaive":
-        return model.sm_model_init_args["seasonal_period"]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

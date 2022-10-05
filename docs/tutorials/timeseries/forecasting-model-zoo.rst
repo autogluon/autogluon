@@ -32,7 +32,6 @@ are different from the original libraries.
 
    ARIMAModel
    ETSModel
-   SeasonalNaiveModel
    ThetaModel
    DeepARModel
    SimpleFeedForwardModel
@@ -54,13 +53,6 @@ are different from the original libraries.
 ~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: ETSModel
-   :members: init
-
-
-:hidden:`SeasonalNaiveModel`
-~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: SeasonalNaiveModel
    :members: init
 
 
