@@ -2,15 +2,12 @@
 
 ### 1. Introduction to semantic embedding
 
-Semantic embedding (e.g., CLIP or SentenceTransformer) is one of the main workhorses behind the modern search technology. Instead of directly matching the query to candidates by text similarities (e.g., BM25), a semantic search algorithm matches them by first converting the text $x$ into a feature vector $\phi(x)$ then comparing the similarities using a distance metric defined in that vector space. These feature vectors, known as a "vector embedding" of the query, are often trained end-to-end on large text corpus, so that they encode the *semantic* meaning of the text. For example, synonyms are embedded to a similar region of the vector space and relationships between words are often revealed by algebraic operations (see Figure 1 for an example). For these reasons, a vector embedding of text are also known as a **semantic embedding**. With a semantic embedding of the query and the search candidates, a search algorithm can often be reduced to finding most similar vectors. This new approach to search is known as **semantic search**.
+Semantic embedding (e.g., [CLIP](https://openai.com/blog/clip/) or [SentenceTransformer](https://www.sbert.net/)) is one of the main workhorses behind the modern search technology. Instead of directly matching the query to candidates by term frequency (e.g., BM25), a semantic search algorithm matches them by first converting the text $x$ into a feature vector $\phi(x)$ then comparing the similarities using a distance metric defined in that vector space. These feature vectors, known as a "vector embedding", are often trained end-to-end on large text corpus, so that they encode the *semantic* meaning of the text. For example, synonyms are embedded to a similar region of the vector space and relationships between words are often revealed by algebraic operations (see Figure 1 for an example). For these reasons, a vector embedding of text are also known as a **semantic embedding**. With a semantic embedding of the query and the search candidate documents, a search algorithm can often be reduced to finding most similar vectors. This new approach to search is known as **semantic search**.
 
-<center>
-    <img src="https://miro.medium.com/max/1400/0*esMqhzu9WhLiP3bD.jpg" width="500"/>
-    <l>Similar sentences have similar embeddings. Image from <a href="https://medium.com/towards-data-science/fine-grained-analysis-of-sentence-embeddings-a3ff0a42cce5">Medium</a></l>
-</center>
+![Similar sentences have similar embeddings. Image from [Medium](https://medium.com/towards-data-science/fine-grained-analysis-of-sentence-embeddings-a3ff0a42cce5)](https://miro.medium.com/max/1400/0*esMqhzu9WhLiP3bD.jpg)
+:width:`500px`
 
-
-There are three main advantages of using semantic embeddings for a search problem over classical information-retrieval methods (e.g., bag-of-words or TF/IDF).  First, it returns candidates that are related according to the meaning of the text, rather than similar word usage.  This helps to discover paraphrased text and similar concepts described in very different ways. Secondly, semantic search is often more computationally efficient. Vector embeddings of the candidates can be pre-computed and stored in data structures. Highly scalable sketching techniques such as locality-sensitive hashing (LSH) and max-inner product search (MIPS) are available for efficiently finding similar vectors in the embedding space. Last but not least, the semantic embedding approach allows us to straightforwardly generalize the same search algorithm beyond text. For example, can we use a text query to search for images without textual annotations?  Can we search for a website using an image query?  With semantic search, one can simply use the most appropriate vector embedding of these multi-modal objects and jointly train the embeddings using datasets with both text and images.
+There are three main advantages of using semantic embeddings for a search problem over classical information-retrieval methods (e.g., bag-of-words or TF/IDF).  First, it returns candidates that are related according to the meaning of the text, rather than similar word usage.  This helps to discover paraphrased text and similar concepts described in very different ways. Secondly, semantic search is often more computationally efficient. Vector embeddings of the candidates can be pre-computed and stored in data structures. Highly scalable sketching techniques such as locality-sensitive hashing (LSH) and max-inner product search (MIPS) are available for efficiently finding similar vectors in the embedding space. Last but not least, the semantic embedding approach allows us to straightforwardly generalize the same search algorithm beyond text, such as multi-modality search. For example, can we use a text query to search for images without textual annotations?  Can we search for a website using an image query?  With semantic search, one can simply use the most appropriate vector embedding of these multi-modal objects and jointly train the embeddings using datasets with both text and images.
 
 This tutorial provides you a gentle entry point in learning and deploying state-of-the-art semantic embedding and semantic search.
 
@@ -19,22 +16,25 @@ This tutorial provides you a gentle entry point in learning and deploying state-
 
 We will be using the **Financial Question Qnswering (FiQA)** dataset throughout this tutorial for demonstration purpose. Here is an example from the dataset:
 
-```
+<ul>
 Q: Is it smarter to buy a small amount of an ETF every 2 or 3 months, instead of monthly?
 
 A: By not timing the market and being a passive investor, the best time to invest is the moment you have extra money (usually when wages are received). The market trends up.  $10 fee on $2000 represents 0.5% transaction cost, which is borderline prohibitive.  I would suggest running simulations, but I suspect that 1 month is the best because average historical monthly total return is more than 0.5%.
-```
+</ul>
 
 The dataset is available to load from the `ir_datasets` package.
 
 
-```python
+```{.python .input}
+%%capture
+!pip3 install ir_datasets
 import ir_datasets
 import pandas as pd
 ```
 
 
-```python
+```{.python .input}
+%%capture
 def map_id_content(ids, contents):
     res = {}
     for id, content in zip(ids, contents):
@@ -59,7 +59,7 @@ There are about **57600 documents** and **500 queries** in the dataset.
 Here are some more sample questions from the dataset:
 
 
-```python
+```{.python .input}
 pd.set_option('display.max_colwidth', None)
 
 queries_df.sample(n=5, random_state=23)
@@ -67,7 +67,7 @@ queries_df.sample(n=5, random_state=23)
 
 As you can tell, financial QA can be sometimes hard to interpret by machine because of many domain specific vocabularies, such as CD (Certificate of Deposit) and ETF (Exchange Traded Fund). Searching for relevant documents for open questions like the above can be challenging with TF/IDF based algorithms (e.g., BM25). In the following sections, we will demonstrate how to perform search rankings based on the BM25 scores and the cosine similarity of semantic embeddings. We will also compare the search quality using different methods with the FiQA dataset.
 
-### 3. NDCG@10 Evaluation
+### 3. `NDCG@10` Evaluation
 
 Users pay the most attention to the first result, then the second, and etc. As a result, precision matters the most for the top-ranked results. In this tutorial, we use **Normalized Discounted Cumulative Gain (NDCG)** for measuring the quality of the top 10 ranked results (a.k.a., **NDCG@10**).
 
@@ -78,7 +78,7 @@ In order to understand the NDCG metric, we must first understand CG (Cumulative 
 1. Highly relevant documents are more useful when appearing earlier in the search engine results list.
 2. Highly relevant documents are more useful than marginally relevant documents, which are more useful than non-relevant documents
 
-First, the primitive **Cumulative Gain (CG)**, which adds the relevance score ($ rel $) up to a specified rank position $ p $:
+First, the primitive **Cumulative Gain (CG)**, which adds the relevance score ($rel$) up to a specified rank position $p$:
 $$ \mathrm{CG}_p = \sum_{i=1}^p \mathrm{rel}_i. $$
 
 Then, the **Discounted Cumulative Gain (DCG)**, which penalizes each relevance score logarithmically based on its position in the results:
@@ -87,19 +87,21 @@ $$ \mathrm{DCG}_p = \sum_{i=1}^p \frac{\mathrm{rel}_i}{\log_2(i + 1)}. $$
 Next, the **Ideal DCG (IDCG)**, which is the DCG of the best possible results based on the given ratings:
 $$ \mathrm{IDCG}_p = \sum_{i=1}^{|\mathrm{REL}_p|} \frac{\mathrm{rel}_i}{\log_2(i + 1)}. $$
 
-where $ |REL_p| $ is the list of relevant documents (ordered by their relevance) in the corpus up to the position $ p $.
+where $|mathrm{REL}_p|$ is the list of relevant documents (ordered by their relevance) in the corpus up to the position $p$.
 
 And finally, the **NDCG**:
 $$ \mathrm{NDCG}_p = \frac{\mathrm{DCG}_p}{\mathrm{IDCG}_p}. $$
 
-In this tutorial, we will be using the python package `pytrec_eval` for evaluating NDCG@10.
+In this tutorial, we will be using the python package `pytrec_eval` for evaluating `NDCG@10`.
 
 #### 3.2 Defining functions
 
 
-```python
+```{.python .input}
+%%capture
 from collections import defaultdict
 
+!pip3 install pytrec_eval
 import pytrec_eval
 
 def ir_metrics(qrel_dict, results, cutoff=[10]):
@@ -146,32 +148,37 @@ def get_qrels(dataset):
 
 ### 4. Use BM25
 
-BM25 (or Okapi BM25) is a popular ranking algorithm currently used by OpenSearch for scoring document relevancy to a query. We will use the NDCG@10 score for BM25 as a baseline in this tutorial.
+BM25 (or Okapi BM25) is a popular ranking algorithm currently used by OpenSearch for scoring document relevancy to a query. We will use the `NDCG@10` score for BM25 as a baseline in this tutorial.
 
 #### 4.1 Defining the formula
 
 $$ score_{BM25} = \sum_i^n \mathrm{IDF}(q_i) \frac{f(q_i, D) \cdot (k1 + 1)}{f(q_i, D) + k1 \cdot (1 - b + b \cdot \frac{fieldLen}{avgFieldLen})}$$
 
-where $ \mathrm{IDF}(q_i) $ is the inverse document frequency of the $ i^{th} $ query term, and the actual formula used by BM25 for this part is:
+where $\mathrm{IDF}(q_i)$ is the inverse document frequency of the $i^{th}$ query term, and the actual formula used by BM25 for this part is:
 
 $$ \log(1 + \frac{docCount - f(q_i) + 0.5)}{f(q_i) + 0.5}). $$
 
-$ k1 $ is a tunable variable that limits how much a single query term can affect the score of a given document. In ElasticSearch, it is [default](https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html) to be 1.2.
+$k1$ is a tunable hyperparameter that limits how much a single query term can affect the score of a given document. In ElasticSearch, it is [default](https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html) to be 1.2.
 
-$ b $ is another tunable variable that determines the effect of document length compared to the average document length in the corpus. In ElasticSearch, it is [default](https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html) to be 0.75. 
+$b$ is another hyperparameter variable that determines the effect of document length compared to the average document length in the corpus. In ElasticSearch, it is [default](https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html) to be 0.75. 
 
 In this tutorial, we will be using the package `rank_bm25` to avoid the complexity of implementing the algorithm from scratch.
 
 #### 4.2 Defining functions
 
 
-```python
+```{.python .input}
+%%capture
+!pip3 install rank_bm25
 import string
 import nltk
 import numpy as np
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from rank_bm25 import BM25Okapi
+
+nltk.download('stopwords')
+nltk.download('punkt')
 
 def tokenize_corpus(corpus):
     stop_words = set(stopwords.words("english") + list(string.punctuation))
@@ -206,23 +213,24 @@ def evaluate_bm25(docs_text, queries_text, docs_id, queries_id, qrel_dict, top_k
 ```
 
 
-```python
+```{.python .input}
 qrel_dict = get_qrels(dataset)
 evaluate_bm25(docs_text, queries_text, docs_id, queries_id, qrel_dict, 10)
 ```
 
-The NDCG@10 when using BM25 is 0.2231.
+The `NDCG@10` when using BM25 is 0.2231.
 
 ### 5. Use Sementic Embedding
 
-We rank the documents according to cosine similarities between the query embedding and the document embeddings. NDCG@10 is evaluated based on all the queries in the dataset.
+We rank the documents according to cosine similarities between the query embedding and the document embeddings. `NDCG@10` is evaluated based on all the queries in the dataset.
 
 #### 5.1 Extracting Embedding
 
 AutoGluon's `MultiModalPredictor` provides a nice interface for extracting embeddings with a pretrained model by using the `feature_extraction` pipeline. It extracts the hidden states from the base model, which then can be used to extract embeddings for queries and documents.
 
 
-```python
+```{.python .input}
+%%capture
 from autogluon.multimodal import MultiModalPredictor
 
 model_name = "sentence-transformers/all-MiniLM-L6-v2"
@@ -239,8 +247,9 @@ Then we use `predictor.extract_embedding(docs_df)` to get the embeddings.
 
 #### 5.2 Defining functions
 
+For illustration purpose, we use `torch.topk` with [linear complexity](https://github.com/pytorch/pytorch/blob/4262c8913c2bddb8d91565888b4871790301faba/aten/src/ATen/native/cuda/TensorTopK.cu#L92-L121) (O(n+k)) to get the k most similar vector embeddings to the query embedding. However, in practice, more efficient methods for similarity search are often used, e.g. [Faiss](https://github.com/facebookresearch/faiss).
 
-```python
+```{.python .input}
 from collections import defaultdict
 
 import torch
@@ -290,16 +299,20 @@ def evaluate_semantic_embedding(docs_embeddings, queries_embeddings, docs_id, qu
 ```
 
 
-```python
+```{.python .input}
+%%capture
+# extract embeddings for corpus and queries
 queries_embeddings = extract_embedding(queries_text, predictor)
 docs_embeddings = extract_embedding(docs_text, predictor)
 queries_embeddings = queries_embeddings if isinstance(queries_embeddings, torch.Tensor) else torch.from_numpy(queries_embeddings)
 docs_embeddings = docs_embeddings if isinstance(docs_embeddings, torch.Tensor) else torch.from_numpy(docs_embeddings)
+```
 
+```{.python .input}
 evaluate_semantic_embedding(docs_embeddings, queries_embeddings, docs_id, queries_id, qrel_dict, 10)
 ```
 
-The NDCG@10 when using semantic embedding is 0.38057. There is already a significant improvement over the NDCG@10 when we used BM25 as the scoring function.
+The `NDCG@10` when using semantic embedding is 0.38061. There is already a significant improvement over the `NDCG@10` when we used BM25 as the scoring function.
 
 ### 6. Hybrid BM25
 
@@ -308,13 +321,15 @@ We are proposing a new method of search ranking called *Hybrid BM25*, which comb
 We then rerank the retrieved documents with the score calculated as:
 $$ score = \beta * normalized\_BM25 + ( 1 - \beta) * score\_of\_plm $$
 where 
+
 $$ normalized\_BM25(q_i, D_j) = \frac{\textsf{BM25}(q_i,D_j) - \min_{a\in \mathcal{Q},b\in\mathcal{D}}(\textsf{BM25}(a,b))}{\max_{a\in \mathcal{Q},b\in\mathcal{D}}(\textsf{BM25}(a,b)) - \min_{a\in \mathcal{Q},b\in\mathcal{D}}(\textsf{BM25}(a,b))},$$
-and $ \beta $ is a tunable parameter, which we will default to $0.3$ in our tutorial.
+
+and $\beta$ is a tunable parameter, which we will default to $0.3$ in our tutorial.
 
 #### 6.1 Defining functions
 
 
-```python
+```{.python .input}
 def hybridBM25(docs_text, queries_text, docs_id, queries_id, recall_num, top_k, beta):
     # Recall documents with BM25 scores
     tokenized_corpus = tokenize_corpus(docs_text)
@@ -356,15 +371,15 @@ def evaluate_hybridBM25(recall_num, beta, top_k):
 ```
 
 
-```python
+```{.python .input}
 recall_num = 1000
 beta = 0.3
 top_k = 10
 evaluate_hybridBM25(recall_num, beta, top_k)
 ```
 
-We were able to improve the NDCG@10 score from 0.38057 to 0.38439 by tuning `beta` and `recall_num`.
+We were able to improve the `NDCG@10` score from 0.38061 to 0.38439 by tuning `beta` and `recall_num`.
 
 #### 7. Summary
 
-In this tutorial, we have demonstrated in details how different search ranking methods are implemented, and showcased the drastic improvement of semantic embedding over the classical BM25 algorithm. We further improved the NDCG@10 score by combining BM25 and semantic embedding (Hybrid BM25) and tuning the hyperparameters.
+In this tutorial, we have demonstrated in details how different search ranking methods are implemented, and showcased the drastic improvement of semantic embedding over the classical BM25 algorithm. We further improved the `NDCG@10` score by combining BM25 and semantic embedding (Hybrid BM25) and tuning the hyperparameters.
