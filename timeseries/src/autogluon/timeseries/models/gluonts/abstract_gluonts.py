@@ -3,7 +3,7 @@ import logging
 import re
 from packaging.version import parse as vparse
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import gluonts
 import numpy as np
@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
 gluonts_env.use_tqdm = False
 
+GLUONTS_GE_v010 = vparse(gluonts.__version__) >= vparse("0.10")
+
 
 class SimpleGluonTSDataset(GluonTSDataset):
     """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
@@ -43,12 +45,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
-        
+
         # GluonTS v0.10 and above prefer pd.Period as the main timestamp type
         self.time_type_constructor: Type = (
-            lambda t: pd.Period(t, freq=self.freq) 
-            if vparse(gluonts.__version__) > vparse("0.9") else 
-            pd.Timestamp
+            lambda t: pd.Period(t, freq=self.freq) if GLUONTS_GE_v010 else pd.Timestamp(t, freq=self.freq)
         )
 
     @property
@@ -269,54 +269,55 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         return list(self.gts_predictor.predict(**predictor_kwargs))
 
+    @staticmethod
+    def _sample_to_quantile_forecast(forecast: np.ndarray, quantile_levels: List[float]) -> QuantileForecast:
+        forecast_arrays = []
+
+        quantile_keys = [str(q) for q in quantile_levels]
+        for q in quantile_keys:
+            forecast_arrays.append(forecast.quantile(q))
+
+        forecast_init_args = dict(
+            forecast_arrays=np.array(forecast_arrays),
+            start_date=forecast.start_date,
+            forecast_keys=quantile_keys,
+            item_id=forecast.item_id,
+        )
+        if isinstance(forecast.start_date, pd.Timestamp):  # GluonTS version is <0.10
+            forecast_init_args.update({"freq": forecast.freq})
+        return QuantileForecast(**forecast_init_args)
+
     def _gluonts_forecasts_to_data_frame(
         self, forecasts: List[Forecast], quantile_levels: List[float]
     ) -> TimeSeriesDataFrame:
-        # if predictions are gluonts SampleForecasts, convert them to quantile forecasts
-        # but save the means
-        forecast_means = []
-        quantiles = [str(q) for q in quantile_levels]
+        forecast_means = [f.mean for f in forecasts]
 
+        # if predictions are gluonts SampleForecasts, convert to quantile forecasts
         if isinstance(forecasts[0], SampleForecast):
-            transformed_targets = []
-            for forecast in forecasts:
-                tmp = []
-                for quantile in quantiles:
-                    tmp.append(forecast.quantile(quantile))
-                transformed_targets.append(
-                    QuantileForecast(
-                        forecast_arrays=np.array(tmp),
-                        start_date=forecast.start_date,
-                        forecast_keys=quantiles,
-                        item_id=forecast.item_id,
-                        # freq=forecast.freq,
-                    )
-                )
-                forecast_means.append(forecast.mean)
-
-            forecasts = copy.deepcopy(transformed_targets)
+            forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
 
         # sanity check to ensure all quantiles are accounted for
-        assert all(q in forecasts[0].forecast_keys for q in quantiles), (
+        assert all(str(q) in forecasts[0].forecast_keys for q in quantile_levels), (
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
+        
         result_dfs = []
-        item_ids = (d.item_id for d in forecasts)
-
-        for i, item_id in enumerate(item_ids):
+        for i, forecast in enumerate(forecasts):
             item_forecast_dict = dict(
                 mean=forecast_means[i]
-                if forecast_means
-                else (forecasts[i].quantile(0.5))  # assign P50 to mean if mean is missing
             )
-            for quantile in quantiles:
-                item_forecast_dict[quantile] = forecasts[i].quantile(str(quantile))
+            for quantile in quantile_levels:
+                item_forecast_dict[quantile] = forecast.quantile(str(quantile))
 
             df = pd.DataFrame(item_forecast_dict)
-            df[ITEMID] = item_id
+            df[ITEMID] = forecast.item_id
             df[TIMESTAMP] = pd.date_range(
-                start=forecasts[i].start_date.to_timestamp(),
+                start=(
+                    forecasts[i].start_date.to_timestamp(how="S")
+                    if isinstance(forecasts[i].start_date, pd.Period)  # GluonTS version is >=0.10
+                    else forecasts[i].start_date
+                ),
                 periods=self.prediction_length,
                 freq=self.freq,
             )
