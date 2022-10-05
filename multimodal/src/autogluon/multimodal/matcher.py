@@ -77,7 +77,7 @@ from .utils import (
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
-    create_model,
+    create_siamese_model,
     customize_model_names,
     data_to_df,
     extract_from_output,
@@ -219,16 +219,14 @@ class MultiModalMatcher:
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
-        self._config = {OPTIMIZATION: "adamw", ENVIRONMENT: "default", MATCHER: "default", DATA: "default"}
-        self._query_config = {MODEL: "fusion_mlp_image_text_tabular", DATA: "default"}
-        self._response_config = {MODEL: "fusion_mlp_image_text_tabular", DATA: "default"}
+        self._config = None
+        self._query_config = None
+        self._response_config = None
         self._query_df_preprocessor = None
         self._response_df_preprocessor = None
         self._negative_df_preprocessor = None
         self._label_df_preprocessor = None
         self._column_types = None
-        self._query_column_types = None
-        self._response_column_types = None
         self._query_processors = None
         self._response_processors = None
         self._negative_processors = None
@@ -454,9 +452,6 @@ class MultiModalMatcher:
             provided_problem_type=self._problem_type,
         )
 
-        query_column_types = {k: column_types[k] for k in self._query}
-        response_column_types = {k: column_types[k] for k in self._response}
-
         logger.debug(f"column_types: {column_types}")
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
 
@@ -502,8 +497,6 @@ class MultiModalMatcher:
         self._save_path = save_path
         self._output_shape = output_shape
         self._column_types = column_types
-        self._query_column_types = query_column_types
-        self._response_column_types = response_column_types
 
         _fit_args = dict(
             train_df=train_data,
@@ -524,185 +517,7 @@ class MultiModalMatcher:
         self._fit(**_fit_args)
         return self
 
-    def _get_fusion_model_dict(
-        self,
-        model,
-        single_models: Optional[Dict] = None,
-    ):
-        if not single_models:
-            single_models = {}
-        fusion_model = None
-        if model.prefix.startswith("fusion"):  # fusion model
-            fusion_model = model
-            models = model.model
-            model.model = None
-        else:
-            models = [model]
-
-        for per_model in models:
-            if per_model.prefix.endswith(QUERY):
-                model_name = per_model.prefix[:-6]  # cut off query
-            elif per_model.prefix.endswith(RESPONSE):
-                model_name = per_model.prefix[:-9]
-            else:
-                raise ValueError(f"Model prefix {per_model.prefix} doesn't end with {QUERY} or {RESPONSE}.")
-
-            if model_name not in single_models:
-                single_models[model_name] = per_model
-
-        return single_models, fusion_model
-
-    def _create_fusion_model_dict(
-        self,
-        config: DictConfig,
-        single_models: Optional[Dict] = None,
-    ):
-        if not single_models:
-            single_models = {}
-        fusion_model = None
-        for model_name in config.model.names:
-            model_config = getattr(config.model, model_name)
-            if not model_name.lower().startswith("fusion"):
-                if model_name.endswith(QUERY):
-                    model_name = model_name[:-6]  # cut off query
-                elif model_name.endswith(RESPONSE):
-                    model_name = model_name[:-9]
-                else:
-                    raise ValueError(f"Model name {model_name} doesn't end with {QUERY} or {RESPONSE}.")
-
-                if model_name in single_models:
-                    continue
-            model = create_model(
-                model_name=model_name,
-                model_config=model_config,
-            )
-            if model_name.lower().startswith("fusion"):
-                fusion_model = model
-            else:
-                single_models[model_name] = model
-
-        return single_models, fusion_model
-
-    def _build_siamese_network(
-        self,
-        query_config: DictConfig,
-        response_config: DictConfig,
-        single_models: Dict,
-        query_fusion_model: Union[nn.Module, functools.partial],
-        response_fusion_model: Union[nn.Module, functools.partial],
-        share_fusion: bool,
-        initialized: Optional[bool] = False,
-    ):
-        query_model_names = [n for n in query_config.model.names if not n.lower().startswith("fusion")]
-        query_fusion_model_name = [n for n in query_config.model.names if n.lower().startswith("fusion")]
-        assert len(query_fusion_model_name) <= 1
-        if len(query_fusion_model_name) == 1:
-            query_fusion_model_name = query_fusion_model_name[0]
-        response_model_names = [n for n in response_config.model.names if not n.lower().startswith("fusion")]
-        response_fusion_model_name = [n for n in response_config.model.names if n.lower().startswith("fusion")]
-        assert len(response_fusion_model_name) <= 1
-        if len(response_fusion_model_name) == 1:
-            response_fusion_model_name = response_fusion_model_name[0]
-
-        print(f"single model names: {list(single_models.keys())}")
-        print(f"query fusion model name: {query_fusion_model_name}")
-        print(f"response fusion model name: {response_fusion_model_name}")
-
-        # use shallow copy to create query single models
-        query_single_models = []
-        for model_name in query_model_names:
-            model = copy.copy(single_models[model_name[:-6]])  # cut off _query
-            model.prefix = model_name
-            query_single_models.append(model)
-
-        # use shallow copy to create response single models
-        response_single_models = []
-        for model_name in response_model_names:
-            model = copy.copy(single_models[model_name[:-9]])  # cut off _response
-            model.prefix = model_name
-            response_single_models.append(model)
-
-        if len(query_single_models) == 1:
-            query_model = query_single_models[0]
-        else:
-            if initialized:
-                query_model = query_fusion_model
-                query_model.model = nn.ModuleList(query_single_models)
-            else:
-                query_model = query_fusion_model(models=query_single_models)
-
-            query_model.prefix = query_fusion_model_name
-
-        if len(response_single_models) == 1:
-            response_model = response_single_models[0]
-        else:
-            if share_fusion:
-                response_model = copy.copy(query_model)  # copy query_model rather than query_fusion_model
-                response_model.model = nn.ModuleList(response_single_models)
-            else:
-                if initialized:
-                    response_model = response_fusion_model
-                    response_model.model = nn.ModuleList(response_single_models)
-                else:
-                    response_model = response_fusion_model(models=response_single_models)
-
-            response_model.prefix = response_fusion_model_name
-
-        return query_model, response_model
-
-    def _is_share_fusion(
-        self,
-        query_model_names: List[str],
-        response_model_names: List[str],
-    ):
-        query_model_names = [n for n in query_model_names if not n.lower().startswith("fusion")]
-        response_model_names = [n for n in response_model_names if not n.lower().startswith("fusion")]
-        return sorted(query_model_names) == sorted(response_model_names)
-
-    def _create_siamese_model(
-        self,
-        query_config: DictConfig,
-        response_config: DictConfig,
-        query_model: Optional[nn.Module] = None,
-        response_model: Optional[nn.Module] = None,
-    ):
-        if query_model is None:
-            single_models, query_fusion_model = self._create_fusion_model_dict(
-                config=query_config,
-            )
-        else:
-            single_models, query_fusion_model = self._get_fusion_model_dict(
-                model=query_model,
-            )
-
-        if response_model is None:
-            single_models, response_fusion_model = self._create_fusion_model_dict(
-                config=response_config,
-                single_models=single_models,
-            )
-        else:
-            single_models, response_fusion_model = self._get_fusion_model_dict(
-                model=response_model,
-                single_models=single_models,
-            )
-
-        share_fusion = self._is_share_fusion(
-            query_model_names=query_config.model.names,
-            response_model_names=response_config.model.names,
-        )
-        query_model, response_model = self._build_siamese_network(
-            query_config=query_config,
-            response_config=response_config,
-            single_models=single_models,
-            query_fusion_model=query_fusion_model,
-            response_fusion_model=response_fusion_model,
-            share_fusion=share_fusion,
-            initialized=False,
-        )
-
-        return query_model, response_model
-
-    def _create_matcher_df_preprocessor(
+    def _get_matcher_df_preprocessor(
         self,
         query_config: DictConfig,
         response_config: DictConfig,
@@ -739,7 +554,7 @@ class MultiModalMatcher:
 
         return query_df_preprocessor, response_df_preprocessor, label_df_preprocessor
 
-    def _create_matcher_data_processors(
+    def _get_matcher_data_processors(
         self,
         query_model: nn.Module,
         query_config: DictConfig,
@@ -796,33 +611,41 @@ class MultiModalMatcher:
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
-        config = self._config
-        query_config = self._query_config
-        response_config = self._response_config
-
         if presets == None:
             presets = "siamese_network"
 
         if presets == "siamese_network":
-            config = get_config(
-                presets=presets,
-                config=config,
-                overrides=hyperparameters,
-                extra=["matcher"],
-            )
-            query_config = copy.deepcopy(config)
-            response_config = copy.deepcopy(config)
-            # customize config model names to make them consistent with model prefixes.
-            query_config.model = customize_model_names(
-                config=query_config.model, customized_names=[f"{n}_query" for n in query_config.model.names]
-            )
-            response_config.model = customize_model_names(
-                config=response_config.model, customized_names=[f"{n}_response" for n in response_config.model.names]
-            )
+            if self._config is None:
+                config = get_config(
+                    presets=presets,
+                    overrides=hyperparameters,
+                    extra=["matcher"],
+                )
+            else:
+                config = self._config
+
+            if self._query_config is None:
+                query_config = copy.deepcopy(config)
+                # customize config model names to make them consistent with model prefixes.
+                query_config.model = customize_model_names(
+                    config=query_config.model, customized_names=[f"{n}_query" for n in query_config.model.names]
+                )
+            else:
+                query_config = self._query_config
+
+            if self._response_config is None:
+                response_config = copy.deepcopy(config)
+                # customize config model names to make them consistent with model prefixes.
+                response_config.model = customize_model_names(
+                    config=response_config.model,
+                    customized_names=[f"{n}_response" for n in response_config.model.names],
+                )
+            else:
+                response_config = self._response_config
         else:
             raise ValueError("Currently only support presets: siamese_network.")
 
-        query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._create_matcher_df_preprocessor(
+        query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             query_config=query_config,
             response_config=response_config,
             data=train_df,
@@ -834,7 +657,7 @@ class MultiModalMatcher:
 
         if self._query_model is None or self._response_model is None:
             if presets == "siamese_network":
-                query_model, response_model = self._create_siamese_model(
+                query_model, response_model = create_siamese_model(
                     query_config=query_config,
                     response_config=response_config,
                 )
@@ -844,7 +667,7 @@ class MultiModalMatcher:
             query_model = self._query_model
             response_model = self._response_model
 
-        query_processors, response_processors, label_processors = self._create_matcher_data_processors(
+        query_processors, response_processors, label_processors = self._get_matcher_data_processors(
             query_model=query_model,
             query_config=query_config,
             response_model=response_model,
@@ -924,7 +747,7 @@ class MultiModalMatcher:
         )
 
         if self._match_label is not None:
-            match_label = self._label_df_preprocessor.label_generator.transform([self._match_label]).item()
+            match_label = label_df_preprocessor.label_generator.transform([self._match_label]).item()
         else:
             match_label = None
 
@@ -1153,7 +976,7 @@ class MultiModalMatcher:
             state_dict=avg_state_dict,
         )
 
-        self._query_model, self._response_model = self._create_siamese_model(
+        self._query_model, self._response_model = create_siamese_model(
             query_config=self._query_config,
             response_config=self._response_config,
             query_model=self._query_model,
@@ -1207,19 +1030,26 @@ class MultiModalMatcher:
         else:  # called .fit() or .load()
             column_types = self._column_types
 
-        query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._create_matcher_df_preprocessor(
+        query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             query_config=self._query_config,
             response_config=self._response_config,
             data=data,
             column_types=column_types,
         )
 
+        query_processors, response_processors, label_processors = self._get_matcher_data_processors(
+            query_model=self._query_model,
+            query_config=self._query_config,
+            response_model=self._response_model,
+            response_config=self._response_config,
+        )
+
         # For prediction data with no labels provided.
         df_preprocessors = [query_df_preprocessor, response_df_preprocessor]
-        data_processors = [self._query_processors, self._response_processors]
+        data_processors = [query_processors, response_processors]
         if requires_label:
             df_preprocessors.append(label_df_preprocessor)
-            data_processors.append(self._label_processors)
+            data_processors.append(label_processors)
 
         strategy = "dp"  # default used in inference.
 
@@ -1655,6 +1485,9 @@ class MultiModalMatcher:
         with open(os.path.join(path, f"assets.json"), "w") as fp:
             json.dump(
                 {
+                    "query": self._query,
+                    "response": self._response,
+                    "match_label": self._match_label,
                     "column_types": self._column_types,
                     "label_column": self._label_column,
                     "problem_type": self._problem_type,
@@ -1753,6 +1586,9 @@ class MultiModalMatcher:
             response_processors = None
             label_processors = None
 
+        matcher._query = assets["query"]
+        matcher._response = assets["response"]
+        matcher._match_label = assets["match_label"]
         matcher._label_column = assets["label_column"]
         matcher._problem_type = assets["problem_type"]
         matcher._eval_metric_name = assets["eval_metric_name"]
@@ -1808,7 +1644,7 @@ class MultiModalMatcher:
         matcher = cls(query="", response="")
         matcher = cls._load_metadata(matcher=matcher, path=path, resume=resume, verbosity=verbosity)
 
-        query_model, response_model = matcher._create_siamese_model(
+        query_model, response_model = create_siamese_model(
             query_config=matcher._query_config,
             response_config=matcher._response_config,
         )
@@ -1864,3 +1700,22 @@ class MultiModalMatcher:
             matcher._continuous_training = True
 
         return matcher
+
+    @property
+    def class_labels(self):
+        """
+        The original name of the class labels.
+        For example, the tabular data may contain classes equal to
+        "entailment", "contradiction", "neutral". Internally, these will be converted to
+        0, 1, 2, ...
+        This function returns the original names of these raw labels.
+
+        Returns
+        -------
+        List that contain the class names. It will be None if it's not a classification problem.
+        """
+        if self._problem_type == MULTICLASS or self._problem_type == BINARY:
+            return self._label_df_preprocessor.label_generator.classes_
+        else:
+            warnings.warn("Accessing class names for a non-classification problem. Return None.")
+            return None
