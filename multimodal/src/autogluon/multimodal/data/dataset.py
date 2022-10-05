@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 import torch
@@ -90,10 +90,7 @@ class BaseDataset(torch.utils.data.Dataset):
         """
         ret = dict()
         try:
-            # print(f"\nget item: {idx}")
-            # print(f"processors group num: {len(self.processors)}")
             for group_id, per_processors_group in enumerate(self.processors):
-                # print(f"group_id : {group_id}")
                 per_sample_features = get_per_sample_features(
                     modality_features=getattr(self, f"modality_features_{group_id}"),
                     modality_types=getattr(self, f"modality_types_{group_id}"),
@@ -114,4 +111,3 @@ class BaseDataset(torch.utils.data.Dataset):
                 raise e
         self._consecutive_errors = 0
         return ret
-

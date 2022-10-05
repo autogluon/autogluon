@@ -500,10 +500,7 @@ class TextProcessor:
             texts = {col_name: texts[col_name] for col_name in self.column_names}
 
         if self.normalize_text:
-            texts = {
-                col_name: normalize_txt(col_text)
-                for col_name, col_text in texts.items()
-            }
+            texts = {col_name: normalize_txt(col_text) for col_name, col_text in texts.items()}
 
         return self.build_one_token_sequence_from_text(texts, is_training)
 

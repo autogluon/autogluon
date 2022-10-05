@@ -13,13 +13,13 @@ from ..constants import (
     CATEGORICAL,
     CLASSIFICATION,
     IMAGE_PATH,
+    INDEX,
     MULTICLASS,
     NULL,
     NUMERICAL,
     REGRESSION,
     ROIS,
     TEXT,
-    INDEX,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -279,8 +279,7 @@ def infer_corpus_types(corpus: Dict[str, Dict]) -> Dict:
             corpus_types[per_name] = TEXT
         else:
             raise ValueError(
-                f"Corpus {per_name} has an invalid type. "
-                f"Currently, we only support image and text types."
+                f"Corpus {per_name} has an invalid type. " f"Currently, we only support image and text types."
             )
     return corpus_types
 
@@ -351,7 +350,7 @@ def infer_column_types(
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
         if is_index_column(data[col_name], col_name=col_name, corpus=corpus):
-            column_types[col_name] = f"{corpus_types[col_name]}_{INDEX}",
+            column_types[col_name] = (f"{corpus_types[col_name]}_{INDEX}",)
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column

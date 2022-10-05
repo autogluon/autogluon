@@ -9,13 +9,12 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, PROBABILITY, FEATURES, QUERY, RESPONSE
+from ..constants import AUTOMM, FEATURES, PROBABILITY, QUERY, RESPONSE
 from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
     apply_two_stages_lr,
     compute_probability,
-    gather_column_features,
     generate_metric_learning_labels,
     get_lr_scheduler,
     get_optimizer,

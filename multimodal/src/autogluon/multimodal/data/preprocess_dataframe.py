@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT, INDEX
+from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, INDEX, LABEL, NULL, NUMERICAL, ROIS, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
@@ -150,7 +150,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def required_feature_names(self):
 
-        image_feature_names = self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
+        image_feature_names = (
+            self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
+        )
 
         return (
             image_feature_names

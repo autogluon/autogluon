@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import AUTOMM, HF_MODELS, REGRESSION, VALID_CONFIG_KEYS, MODEL, DATA, OPTIMIZATION, ENVIRONMENT
+from ..constants import AUTOMM, HF_MODELS, REGRESSION, VALID_CONFIG_KEYS
 from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)

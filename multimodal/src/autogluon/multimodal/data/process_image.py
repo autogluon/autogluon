@@ -5,8 +5,8 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import PIL
-from PIL import ImageFile
 import torch
+from PIL import ImageFile
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
     IMAGENET_DEFAULT_STD,

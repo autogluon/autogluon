@@ -1,6 +1,6 @@
-from typing import Optional, List
+from typing import List, Optional
 
-from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION, QUERY, RESPONSE, MATCHER
+from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATION, QUERY, RESPONSE
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")

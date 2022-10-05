@@ -701,7 +701,7 @@ def get_metric_learning_distance_func(
 def infer_matcher_loss(data_format: str, problem_type: str):
     if data_format == "pair":
         if problem_type == BINARY:
-            return["contrastive_loss"]
+            return ["contrastive_loss"]
         elif problem_type == REGRESSION:
             return ["cosine_similarity_loss"]
         else:
@@ -744,10 +744,10 @@ def get_matcher_loss_func(
 
     if loss_type.lower() == CONTRASTIVE_LOSS:
         return losses.ContrastiveLoss(
-                pos_margin=pos_margin,
-                neg_margin=neg_margin,
-                distance=get_metric_learning_distance_func(distance_type),
-            )
+            pos_margin=pos_margin,
+            neg_margin=neg_margin,
+            distance=get_metric_learning_distance_func(distance_type),
+        )
     else:
         raise ValueError(f"Unknown metric learning loss: {loss_type}")
 
@@ -772,11 +772,11 @@ def get_matcher_miner_func(
     A list of miner functions from the pytorch metric learning package.
     """
     if miner_type.lower() == PAIR_MARGIN_MINER:
-       return miners.PairMarginMiner(
-                pos_margin=pos_margin,
-                neg_margin=neg_margin,
-                distance=get_metric_learning_distance_func(distance_type),
-            )
+        return miners.PairMarginMiner(
+            pos_margin=pos_margin,
+            neg_margin=neg_margin,
+            distance=get_metric_learning_distance_func(distance_type),
+        )
     else:
         raise ValueError(f"Unknown metric learning miner: {miner_type}")
 

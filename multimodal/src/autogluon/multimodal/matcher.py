@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import logging
-import math
 import operator
 import os
 import pickle
@@ -12,7 +12,6 @@ import sys
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
-import functools
 
 import numpy as np
 import pandas as pd
@@ -25,46 +24,39 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.utils.try_import import try_import_ray_lightning
 from autogluon.core.utils.utils import default_holdout_frac
 
 from . import version as ag_version
 from .constants import (
     AUTOMM,
     AUTOMM_TUTORIAL_MODE,
-    BBOX,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
     CLASSIFICATION,
-    COLUMN_FEATURES,
     DATA,
-    FEATURE_EXTRACTION,
+    ENVIRONMENT,
     FEATURES,
     GREEDY_SOUP,
     LABEL,
     LAST_CHECKPOINT,
-    LOGITS,
-    MASKS,
     MATCHER,
     MAX,
     MIN,
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    OPTIMIZATION,
+    PAIR,
     PROBABILITY,
-    REGRESSION,
+    QUERY,
+    RESPONSE,
     TEXT,
+    TRIPLET,
     UNIFORM_SOUP,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    PAIR,
-    TRIPLET,
-    QUERY,
-    RESPONSE,
-    OPTIMIZATION,
-    ENVIRONMENT,
 )
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
@@ -72,9 +64,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
-from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
-from .optimization.lit_module import LitModule
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
 from .utils import (
     AutoMMModelCheckpoint,
@@ -83,35 +73,28 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
+    create_fusion_data_processors,
     create_model,
+    customize_model_names,
     data_to_df,
     extract_from_output,
-    filter_search_space,
     get_config,
     get_local_pretrained_config_paths,
     get_minmax_mode,
-    get_mixup,
     infer_dtypes_by_model_names,
     infer_metrics,
-    infer_scarcity_mode_by_data_size,
-    create_fusion_data_processors,
+    infer_precision,
     init_df_preprocessor,
-    init_pretrained,
     load_text_tokenizers,
-    logits_to_prob,
-    modify_duplicate_model_names,
     process_save_path,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
     tensor_to_ndarray,
     try_to_infer_pos_label,
-    turn_on_off_feature_column_info,
-    update_config_by_rules,
-    customize_model_names,
-    parse_dotlist_conf,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -831,12 +814,10 @@ class MultiModalMatcher:
             response_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
             query_config.model = customize_model_names(
-                config=query_config.model,
-                customized_names=[f"{n}_query" for n in query_config.model.names]
+                config=query_config.model, customized_names=[f"{n}_query" for n in query_config.model.names]
             )
             response_config.model = customize_model_names(
-                config=response_config.model,
-                customized_names=[f"{n}_response" for n in response_config.model.names]
+                config=response_config.model, customized_names=[f"{n}_response" for n in response_config.model.names]
             )
         else:
             raise ValueError("Currently only support presets: siamese_network.")
@@ -990,36 +971,18 @@ class MultiModalMatcher:
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
 
+        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+
         if num_gpus == 0:  # CPU only training
-            warnings.warn(
-                "Only CPU is detected in the instance. "
-                "MultiModalMatcher will be trained with CPU only. "
-                "This may results in slow training speed. "
-                "Consider to switch to an instance with GPU support.",
-                UserWarning,
-            )
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
                 1,
             )
-            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU.
-            # Try to check the status of bf16 training later.
         else:
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
                 1,
             )
-            precision = config.env.precision
-
-            if precision == "bf16" and not torch.cuda.is_bf16_supported():
-                warnings.warn(
-                    "bf16 is not supported by the GPU device / cuda version. "
-                    "Consider to use GPU devices with version after Amphere (e.g., available as AWS P4 instances) "
-                    "and upgrade cuda to be >=11.0. "
-                    "Currently, AutoGluon will downgrade the precision to 32.",
-                    UserWarning,
-                )
-                precision = 32
 
         if not hpo_mode:
             if num_gpus <= 1:
@@ -1066,6 +1029,7 @@ class MultiModalMatcher:
                 check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
+                reload_dataloaders_every_n_epochs=1,
             )
 
         with warnings.catch_warnings():
@@ -1226,13 +1190,19 @@ class MultiModalMatcher:
         data = data_to_df(data=data)
 
         if self._column_types is None:
-            allowable_query_dtypes, fallback_query_dtype = infer_dtypes_by_model_names(model_config=self._query_config.model)
-            allowable_response_dtypes, fallback_response_dtype = infer_dtypes_by_model_names(model_config=self._response_config.model)
+            allowable_query_dtypes, fallback_query_dtype = infer_dtypes_by_model_names(
+                model_config=self._query_config.model
+            )
+            allowable_response_dtypes, fallback_response_dtype = infer_dtypes_by_model_names(
+                model_config=self._response_config.model
+            )
             # TODO: consider that query and response have different modalities.
             assert sorted(allowable_query_dtypes) == sorted(allowable_response_dtypes)
             assert fallback_query_dtype == fallback_response_dtype
             column_types = infer_column_types(
-                data=data, allowable_column_types=allowable_query_dtypes, fallback_column_type=fallback_query_dtype,
+                data=data,
+                allowable_column_types=allowable_query_dtypes,
+                fallback_column_type=fallback_query_dtype,
             )
         else:  # called .fit() or .load()
             column_types = self._column_types
@@ -1251,40 +1221,21 @@ class MultiModalMatcher:
             df_preprocessors.append(label_df_preprocessor)
             data_processors.append(self._label_processors)
 
+        strategy = "dp"  # default used in inference.
+
         num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
-
-        if num_gpus == 0:  # CPU only prediction
-            warnings.warn(
-                "Only CPU is detected in the instance. "
-                "MultiModalMatcher will predict with CPU only. "
-                "This may results in slow prediction speed. "
-                "Consider to switch to an instance with GPU support.",
-                UserWarning,
-            )
-            precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
-        else:
-            precision = self._config.env.precision
-            if precision == "bf16" and not torch.cuda.is_bf16_supported():
-                warnings.warn(
-                    "bf16 is not supported by the GPU device / cuda version. "
-                    "Consider to use GPU devices with version after Amphere or upgrade cuda to be >=11.0. "
-                    "Currently, AutoGluon will downgrade the precision to 32.",
-                    UserWarning,
-                )
-                precision = 32
-
-        if self._config.env.per_gpu_batch_size_evaluation:
-            batch_size = self._config.env.per_gpu_batch_size_evaluation
-        else:
-            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
-
-        if num_gpus > 1:
-            strategy = "dp"
-            # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
-            # So, we need to use the GPU number as a multiplier to compute the batch size.
-            batch_size = batch_size * num_gpus
-        else:
+        if num_gpus == 1:
             strategy = None
+
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+
+        batch_size = compute_inference_batch_size(
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
 
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessors,
@@ -1447,7 +1398,9 @@ class MultiModalMatcher:
 
         ret = tensor_to_ndarray(ret)
 
-        if (as_pandas is None and isinstance(query_data, pd.DataFrame) and isinstance(response_data, pd.DataFrame)) or as_pandas is True:
+        if (
+            as_pandas is None and isinstance(query_data, pd.DataFrame) and isinstance(response_data, pd.DataFrame)
+        ) or as_pandas is True:
             ret = self._as_pandas(data=query_data, to_be_converted=ret)
 
         return ret
@@ -1618,14 +1571,12 @@ class MultiModalMatcher:
         if state_dict is None:
             state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         query_state_dict = {
-            k.partition(query_prefix)[2]: v for k, v in state_dict.items()
-            if k.startswith(query_prefix)
+            k.partition(query_prefix)[2]: v for k, v in state_dict.items() if k.startswith(query_prefix)
         }
         query_model.load_state_dict(query_state_dict)
 
         response_state_dict = {
-            k.partition(response_prefix)[2]: v for k, v in state_dict.items()
-            if k.startswith(response_prefix)
+            k.partition(response_prefix)[2]: v for k, v in state_dict.items() if k.startswith(response_prefix)
         }
         response_model.load_state_dict(response_state_dict)
         return query_model, response_model
@@ -1661,7 +1612,9 @@ class MultiModalMatcher:
         response_config = copy.deepcopy(self._response_config)
         if standalone:
             query_config = save_pretrained_model_configs(model=self._query_model, config=query_config, path=path)
-            response_config = save_pretrained_model_configs(model=self._response_model, config=response_config, path=path)
+            response_config = save_pretrained_model_configs(
+                model=self._response_model, config=response_config, path=path
+            )
 
         os.makedirs(path, exist_ok=True)
         config = {"generic": self._config, QUERY: query_config, RESPONSE: response_config}
@@ -1911,4 +1864,3 @@ class MultiModalMatcher:
             matcher._continuous_training = True
 
         return matcher
-

@@ -1,14 +1,13 @@
 from .checkpoint import AutoMMModelCheckpoint, average_checkpoints
 from .config import (
     apply_omegaconf_overrides,
+    customize_model_names,
     filter_search_space,
     get_config,
     get_local_pretrained_config_paths,
     parse_dotlist_conf,
     save_pretrained_model_configs,
     update_config_by_rules,
-    customize_model_names,
-    parse_dotlist_conf,
 )
 from .data import (
     assign_feature_column_names,

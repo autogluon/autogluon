@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Dict
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from pytorch_lightning import LightningDataModule
