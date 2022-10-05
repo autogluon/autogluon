@@ -1,31 +1,23 @@
-import copy
 import logging
 import re
-from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Type, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-import gluonts
 import numpy as np
 import pandas as pd
-from joblib import delayed, Parallel
-
-from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str, TimeFeature
+from gluonts.time_feature import TimeFeature, get_lags_for_frequency, time_features_from_frequency_str
+from joblib import Parallel, delayed
 
 import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.core.utils import warning_filter
-from autogluon.core.utils.savers import save_pkl
 from autogluon.tabular import TabularPredictor
-
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame, ITEMID, TIMESTAMP
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-
 
 TS_METRIC_TO_TABULAR_METRIC = {
     "mean_wQuantileLoss": "pinball_loss",
     "MAPE": "mean_absolute_percentage_error",
     "sMAPE": "mean_absolute_percentage_error",
-    "MASE": "root_mean_squared_error",
+    "MASE": "mean_absolute_error",
     "RMSE": "root_mean_squared_error",
     "MSE": "mean_squared_error",
 }
@@ -33,7 +25,15 @@ TS_METRIC_TO_TABULAR_METRIC = {
 logger = logging.getLogger(__name__)
 
 
-class AutoTabularModel(AbstractTimeSeriesModel):
+class TabularModel(AbstractTimeSeriesModel):
+    """Uses TabularPredictor to forecast future time series values one step at a time.
+
+    The forecasting is converted to a tabular problem using the following features:
+
+    - lag features (observed time series values) based on ``freq`` of the data
+    - time features (e.g., day of the week) based on the timestamp of the measurement
+    """
+
     def __init__(
         self,
         freq: Optional[str] = None,
@@ -58,9 +58,10 @@ class AutoTabularModel(AbstractTimeSeriesModel):
         self._time_features: List[TimeFeature] = None
         self._available_features: pd.Index = None
         self._drop_median_prediction = False
+
         # TODO: Should we always produce quantiles here?
         if self.eval_metric == "mean_wQuantileLoss":
-            # Make sure that median is included in the quantiles
+            # Make sure that median is included in the quantiles - used for autoregressive generation
             if 0.5 not in self.quantile_levels:
                 self._drop_median_prediction = True
                 self.quantile_levels = sorted(self.quantile_levels + [0.5])
@@ -81,12 +82,14 @@ class AutoTabularModel(AbstractTimeSeriesModel):
         data: TimeSeriesDataFrame,
         last_k_values: Optional[int] = None,
     ) -> pd.DataFrame:
-        """Generate a feature matrix for the TabularPredictor.
+        """Generate a feature matrix used by TabularPredictor.
 
         Parameters
         ----------
         data : TimeSeriesDataFrame
-
+            Dataframe containing features derived from time index & past time series values, as well as the target.
+        last_k_values: int, optional
+            If provided, features will be generated only for the last `last_k_values` timesteps of each time series.
         """
         dataframe_per_item = []
         if last_k_values is None:
@@ -114,6 +117,8 @@ class AutoTabularModel(AbstractTimeSeriesModel):
         time_limit: int = None,
         **kwargs,
     ) -> None:
+        if self.tabular_predictor._learner.is_fit:
+            raise AssertionError(f"{self.name} has already been fit!")
         self._lag_indices = get_lags_for_frequency(train_data.freq)
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
@@ -134,6 +139,8 @@ class AutoTabularModel(AbstractTimeSeriesModel):
             )
             val_df = None
 
+        # TODO: Select suitable presets for TabularPredictor
+        # TODO: Set verbosity
         self.tabular_predictor.fit(
             train_data=train_df,
             tuning_data=val_df,
@@ -162,22 +169,25 @@ class AutoTabularModel(AbstractTimeSeriesModel):
             preds = self.tabular_predictor.predict(features[self._available_features])
             if self.eval_metric == "mean_wQuantileLoss":
                 next_values = preds[0.5].values
-                if self._drop_median_prediction:
-                    preds.drop(0.5, axis=1, inplace=True)
+                preds.rename(str, axis=1, inplace=True)
+                preds.insert(0, "mean", next_values)
             else:
                 next_values = preds.values
-            preds_with_index = pd.DataFrame(next_values, index=next_index, columns=[self.target])
+                preds = preds.to_frame(name="mean")
+                for q in self.quantile_levels:
+                    preds[str(q)] = np.nan
+
+            preds.index = next_index
+            predictions_list.append(preds)
 
             # Use predictions for the next timestep as if they were actually observed
-            full_df = pd.concat([full_df, preds_with_index])
-            predictions_list.append(preds_with_index)
-            data = pd.concat([data, preds_with_index])
+            next_values_with_index = pd.DataFrame(next_values, index=next_index, columns=[self.target])
+            full_df = pd.concat([full_df, next_values_with_index])
+            data = pd.concat([data, next_values_with_index])
 
         predictions = pd.concat(predictions_list).sort_index()
-        # FIXME: Currently no quantile forecast is made, we set all quantiles to the mean
-        predictions.rename({self.target: "mean"}, axis=1, inplace=True)
-        for q in self.quantile_levels:
-            predictions[str(q)] = predictions["mean"]
+        if self._drop_median_prediction:
+            predictions.drop("0.5", axis=1, inplace=True)
         predictions = self._rescale_targets(predictions, scale_per_item)
         return predictions
 
@@ -195,8 +205,3 @@ class AutoTabularModel(AbstractTimeSeriesModel):
         for col in data.columns:
             data[col] = data[col] * scale_per_item
         return data
-
-
-def apply_parallel(df_grouped, func):
-    results = Parallel(n_jobs=mp.cpu_count())(delayed(func)(group) for name, group in df_grouped)
-    return pd.concat(results)

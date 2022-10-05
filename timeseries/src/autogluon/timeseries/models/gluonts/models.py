@@ -475,36 +475,3 @@ class ProphetModel(AbstractGluonTSModel):
             prediction_length=model_init_params["prediction_length"],
             prophet_params={k: v for k, v in model_init_params.items() if k in self.allowed_prophet_parameters},
         )
-
-
-# TODO: AutoGluon Tabular will be removed from GluonTS to avoid circular dependencies
-class AutoTabularModel(AbstractGluonTSModel):
-    """Autotabular model from Gluon-TS, which in turn uses autogluon.tabular
-    predictors for fitting a forecast model.
-
-    See `AbstractGluonTSModel` for common parameters.
-
-    Other Parameters
-    ----------------
-    lag_indices : List[int], optional
-        List of indices of the lagged observations to use as features. If
-        None, this will be set automatically based on the frequency.
-    scaling : Callable[[pd.Series], Tuple[pd.Series, float]], optional
-        Function to be used to scale time series. This should take a pd.Series object
-        as input, and return a scaled pd.Series and the scale (float). By default,
-        this divides a series by the mean of its absolute value.
-    disable_auto_regression : bool, default = False
-        Weather to forcefully disable auto-regression in the model. If ``True``,
-        this will remove any lag index which is smaller than ``prediction_length``.
-        This will make predictions more efficient, but may impact their accuracy.
-    """
-
-    # TODO: AutoTabular model is experimental, may need its own logic for
-    # TODO: handling time limit and training data. See PR #1538.
-    def _get_estimator(self):
-        return TabularEstimator(
-            freq=self.freq,
-            prediction_length=self.prediction_length,
-            time_limit=self.params_aux["time_limit"],
-            last_k_for_val=self.prediction_length,
-        )
