@@ -163,9 +163,10 @@ def get_preset_models(
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
     elif isinstance(hyperparameters, dict):
         default_hps = copy.deepcopy(get_default_hps("default", prediction_length))
+        updated_hyperparameters = {model: default_hps.get(model, {}) for model in hyperparameters}
         for model, hps in hyperparameters.items():
-            default_hps[model].update(hps)
-        hyperparameters = copy.deepcopy(default_hps)
+            updated_hyperparameters[model].update(hps)
+        hyperparameters = copy.deepcopy(updated_hyperparameters)
     else:
         raise ValueError(
             f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
