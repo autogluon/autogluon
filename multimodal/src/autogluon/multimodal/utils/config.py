@@ -150,23 +150,23 @@ def get_config(
         # apply the preset's overrides
         if preset_overrides:
             config = apply_omegaconf_overrides(config, overrides=preset_overrides, check_key_exist=True)
-    if hasattr(config, "model"):
-        verify_model_names(config.model)
-        logger.debug(f"overrides: {overrides}")
-        if overrides is not None:
-            # avoid manipulating the user-provided overrides
-            overrides = copy.deepcopy(overrides)
-            # apply customized model names
-            overrides = parse_dotlist_conf(overrides)  # convert to a dict
-            config.model = customize_model_names(
-                config=config.model,
-                customized_names=overrides.get("model.names", None),
-            )
-            # remove `model.names` from overrides since it's already applied.
-            overrides.pop("model.names", None)
-            # apply the user-provided overrides
-            config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
-        verify_model_names(config.model)
+
+    verify_model_names(config.model)
+    logger.debug(f"overrides: {overrides}")
+    if overrides is not None:
+        # avoid manipulating the user-provided overrides
+        overrides = copy.deepcopy(overrides)
+        # apply customized model names
+        overrides = parse_dotlist_conf(overrides)  # convert to a dict
+        config.model = customize_model_names(
+            config=config.model,
+            customized_names=overrides.get("model.names", None),
+        )
+        # remove `model.names` from overrides since it's already applied.
+        overrides.pop("model.names", None)
+        # apply the user-provided overrides
+        config = apply_omegaconf_overrides(config, overrides=overrides, check_key_exist=True)
+    verify_model_names(config.model)
     return config
 
 

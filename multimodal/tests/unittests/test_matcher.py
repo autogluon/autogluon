@@ -11,21 +11,8 @@ from utils import get_home_dir
 
 from autogluon.multimodal import MultiModalMatcher
 from autogluon.multimodal.constants import (
-    BEST,
     BINARY,
-    BIT_FIT,
-    DATA,
-    DISTILLER,
-    ENVIRONMENT,
-    GREEDY_SOUP,
-    IA3,
-    LORA,
-    LORA_BIAS,
-    LORA_NORM,
-    MODEL,
     MULTICLASS,
-    NORM_FIT,
-    OPTIMIZATION,
     QUERY,
     RESPONSE,
     UNIFORM_SOUP,

@@ -90,7 +90,6 @@ class TextProcessor:
         train_augment_types: Optional[List[str]] = None,
         template_config: Optional[DictConfig] = None,
         normalize_text: Optional[bool] = False,
-        column_names: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -127,7 +126,6 @@ class TextProcessor:
         self.prefix = model.prefix
         self.tokenizer_name = tokenizer_name
         self.requires_column_info = requires_column_info
-        self.column_names = column_names
         self.tokenizer = self.get_pretrained_tokenizer(
             tokenizer_name=tokenizer_name,
             checkpoint_name=model.checkpoint_name,
@@ -496,9 +494,6 @@ class TextProcessor:
         -------
         A dictionary containing one sample's text tokens, valid length, and segment ids.
         """
-        if hasattr(self, "column_names") and self.column_names:
-            texts = {col_name: texts[col_name] for col_name in self.column_names}
-
         if self.normalize_text:
             texts = {col_name: normalize_txt(col_text) for col_name, col_text in texts.items()}
 

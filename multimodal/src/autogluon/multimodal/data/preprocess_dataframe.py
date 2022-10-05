@@ -125,11 +125,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if hasattr(self, "_image_path_names"):
             return self._image_path_names
         else:
-            image_path_names = []
-            for per_image_col_name in self._image_feature_names:
-                if self._column_types[per_image_col_name] == IMAGE_PATH:
-                    image_path_names.append(per_image_col_name)
-            return image_path_names
+            return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_PATH]
 
     @property
     def image_feature_names(self):

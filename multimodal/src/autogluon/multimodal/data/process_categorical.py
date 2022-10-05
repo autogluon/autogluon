@@ -18,7 +18,6 @@ class CategoricalProcessor:
         self,
         model: nn.Module,
         requires_column_info: bool = False,
-        column_names: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -30,7 +29,6 @@ class CategoricalProcessor:
         """
         self.prefix = model.prefix
         self.requires_column_info = requires_column_info
-        self.column_names = column_names
 
     @property
     def categorical_key(self):
@@ -105,7 +103,4 @@ class CategoricalProcessor:
         -------
         A dictionary containing one sample's processed categorical features.
         """
-        if hasattr(self, "column_names") and self.column_names:
-            categorical_features = {col_name: categorical_features[col_name] for col_name in self.column_names}
-
         return self.process_one_sample(categorical_features)

@@ -47,10 +47,7 @@ class BaseDataset(torch.utils.data.Dataset):
         self._consecutive_errors = 0
 
         self.lengths = []
-        print(f"preprocessor group num: {len(preprocessor)}")
-        print(f"processors group num: {len(processors)}")
         for i, (per_preprocessor, per_processors_group) in enumerate(zip(preprocessor, processors)):
-            print(f"preprocess group i: {i}")
             modality_features, modality_types, length = apply_df_preprocessor(
                 data=data,
                 df_preprocessor=per_preprocessor,

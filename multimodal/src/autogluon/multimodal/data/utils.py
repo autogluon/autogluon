@@ -198,10 +198,8 @@ def apply_df_preprocessor(
     lengths = []
     modality_features = {}
     modality_types = {}
-    # print(f"modalities: {modalities}")
     for per_modality in modalities:
         per_modality_features, per_modality_types = getattr(df_preprocessor, f"transform_{per_modality}")(data)
-        # print(f"per modality column names: {list(per_modality_types.keys())}")
         modality_features[per_modality] = per_modality_features
         modality_types[per_modality] = per_modality_types
         if per_modality_features:

@@ -16,7 +16,6 @@ class LabelProcessor:
     def __init__(
         self,
         model: nn.Module,
-        column_names: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -25,7 +24,6 @@ class LabelProcessor:
             The prefix connecting a processor to its corresponding model.
         """
         self.prefix = model.prefix
-        self.column_names = column_names
 
     @property
     def label_key(self):
@@ -82,7 +80,4 @@ class LabelProcessor:
         -------
         A dictionary containing one sample's processed label.
         """
-        if hasattr(self, "column_names") and self.column_names:
-            labels = {col_name: labels[col_name] for col_name in self.column_names}
-
         return self.process_one_sample(labels)

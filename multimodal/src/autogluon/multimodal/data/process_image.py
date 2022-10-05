@@ -82,7 +82,6 @@ class ImageProcessor:
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
-        column_names: Optional[List[str]] = None,
     ):
         """
         Parameters
@@ -129,7 +128,6 @@ class ImageProcessor:
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
-        self.column_names = column_names
         self.size = None
         self.mean = None
         self.std = None
@@ -471,9 +469,6 @@ class ImageProcessor:
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        if hasattr(self, "column_names") and self.column_names:
-            images = {col_name: images[col_name] for col_name in self.column_names}
-
         images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
 
         return self.process_one_sample(images, is_training)
