@@ -162,6 +162,7 @@ class RayHpoExecutor(HpoExecutor):
     }
     
     def __init__(self):
+        super().__init__()
         self.resources = None
         self.hyperparameter_tune_kwargs = None
         self.analysis = None
@@ -210,6 +211,7 @@ class RayHpoExecutor(HpoExecutor):
             minimum_gpu_per_trial: float,
             model_estimate_memory_usage: float,
             adapter_type: str,
+            trainable_is_parallel: bool = False,
         ):
         """
         Execute ray hpo experiment
@@ -234,11 +236,16 @@ class RayHpoExecutor(HpoExecutor):
             Adapters are used to provide custom info or behavior that's module specific to the ray hpo experiment.
             For more info, please refer to `autogluon/core/hpo/ray_hpo`
             Valid values are ['tabular', 'timeseries', 'automm', 'automm_ray_lightning']
+        trainable_is_parallel
+            Whether the trainable itself will use ray to run parallel job or not.
         """
         from .ray_hpo import (
             run,
             RayTuneAdapterFactory
         )
+        # Disable tensorboard logging to avoid layer warning
+        # TODO: remove this when ray tune fix ray tune pass tuple to hyperopt issue
+        os.environ['TUNE_DISABLE_AUTO_CALLBACK_LOGGERS'] = '1'
         analysis = run(
             trainable=model_trial,
             trainable_args=train_fn_kwargs,
@@ -248,6 +255,7 @@ class RayHpoExecutor(HpoExecutor):
             mode='max',
             save_dir=directory,
             ray_tune_adapter=RayTuneAdapterFactory.get_adapter(adapter_type)(),
+            trainable_is_parallel=trainable_is_parallel,
             total_resources=self.resources,
             minimum_cpu_per_trial=minimum_cpu_per_trial,
             minimum_gpu_per_trial=minimum_gpu_per_trial,
@@ -255,6 +263,7 @@ class RayHpoExecutor(HpoExecutor):
             time_budget_s=self.time_limit,
             verbose=0,
         )
+        os.environ.pop('TUNE_DISABLE_AUTO_CALLBACK_LOGGERS', None)
         self.analysis = analysis
         
     def report(self, reporter, **kwargs):
@@ -291,6 +300,7 @@ class CustomHpoExecutor(HpoExecutor):
     """Implementation of HpoExecutor Interface, where our custom logic is used as the backend"""
     
     def __init__(self):
+        super().__init__()
         self.scheduler_options = None
         self.scheduler = None
         
@@ -377,7 +387,8 @@ class CustomHpoExecutor(HpoExecutor):
             trial_model_name = model_name + os.path.sep + file_id
             trial_model_path = model_path_root + trial_model_name + os.path.sep
             trial_reward = self.scheduler.searcher.get_reward(hpo_results['config_history'][trial])
-
+            if trial_reward is None or trial_reward == float('-inf'):
+                continue
             hpo_models[trial_model_name] = dict(
                 path=trial_model_path,
                 val_score=trial_reward,

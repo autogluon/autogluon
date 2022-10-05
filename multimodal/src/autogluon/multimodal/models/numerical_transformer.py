@@ -26,9 +26,9 @@ class Periodic(nn.Module):
         trainable
             Determine whether the coefficients needed to be updated.
         initialization
-            Initalization scheme.
+            Initialization scheme.
         sigma
-            Standard deviation used for initalization='normal'
+            Standard deviation used for initialization='normal'
 
         Reference:
         ----------
@@ -106,7 +106,7 @@ class NumericalFeatureTokenizer(nn.Module):
     Numerical tokenizer for numerical features in tabular data.
     It transforms the input numerical features to tokens (embeddings).
 
-    The numerical features usually refers to continous features.
+    The numerical features usually refers to continuous features.
 
     It consists of two steps:
         1. each feature is multiplied by a trainable vector i.e., weights,
@@ -400,16 +400,16 @@ class NumericalTransformer(nn.Module):
             Number of classes. 1 for a regression task.
         token_bias
             If `True`, for each feature, an additional trainable vector will be added in `_CategoricalFeatureTokenizer`
-            to the embedding regardless of feature value. Notablly, the bias are not shared between features.
+            to the embedding regardless of feature value. Notably, the bias are not shared between features.
         token_initialization
             Initialization policy for parameters in `_CategoricalFeatureTokenizer` and `_CLSToke`.
             Must be one of `['uniform', 'normal']`.
         n_blocks
             Number of the `FT_Transformer` blocks, which should be non-negative.
         attention_n_heads
-            Number of attention heads in each `FT_Transformer` block, which should be postive.
+            Number of attention heads in each `FT_Transformer` block, which should be positive.
         attention_initialization
-            Weights initalization scheme for Multi Headed Attention module.
+            Weights initialization scheme for Multi Headed Attention module.
         attention_dropout
             Dropout ratio for the Multi Headed Attention module.
         residual_dropout
@@ -419,11 +419,11 @@ class NumericalTransformer(nn.Module):
         ffn_normalization
             Normalization scheme of the Feed-Forward Network module.
         ffn_d_hidden
-            Number of the hidden nodes of the linaer layers in the Feed-Forward Network module.
+            Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
         ffn_dropout
-            Dropout ratio of the hidden nodes of the linaer layers in the Feed-Forward Network module.
+            Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
         prenormalization, first_prenormalization
-            Prenormalization to stablize the training.
+            Prenormalization to stabilize the training.
         kv_compression_ratio
             The compression ration to reduce the input sequence length.
         kv_compression_sharing
@@ -450,7 +450,7 @@ class NumericalTransformer(nn.Module):
 
         assert d_token > 0, "d_token must be positive"
         assert n_blocks >= 0, "n_blocks must be non-negative"
-        assert attention_n_heads > 0, "attention_n_heads must be postive"
+        assert attention_n_heads > 0, "attention_n_heads must be positive"
         assert token_initialization in ["uniform", "normal"], "initialization must be uniform or normal"
 
         self.prefix = prefix

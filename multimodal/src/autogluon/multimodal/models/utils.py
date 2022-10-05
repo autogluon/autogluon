@@ -3,8 +3,25 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import nn
+from torch.nn.modules.loss import _Loss
+from transformers import AutoConfig, AutoModel
 
-from .lora_layers import LoRALinear
+from ..constants import LOGITS, REGRESSION
+from .adaptation_layers import IA3Linear, LoRALinear
+
+
+class DummyLayer(nn.Module):
+    """
+    DummyLayer to ensure that the gradient checkpointing will assign output layer as require_grad=True.
+    Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
+
+    def forward(self, x):
+        return x + self.dummy_bias - self.dummy_bias
 
 
 def init_weights(module: nn.Module):
@@ -351,7 +368,7 @@ def get_column_features(
     cut_idx = len(column_name_prefix) + 1
     if cls_feature is not None:
         all_column_names = []
-        # creat a zero mask to do logical_or with each column's mask
+        # create a zero mask to do logical_or with each column's mask
         joint_mask = torch.zeros(features.shape[0]).to(features)  # (b,)
     for key in batch:
         if key.startswith(column_name_prefix):
@@ -392,8 +409,51 @@ def get_column_features(
     return column_features, feature_masks
 
 
+def inject_ia3_to_linear_layer(
+    model: nn.Module,
+    filter: Optional[List[str]] = None,
+    module_filter: Optional[List[str]] = None,
+) -> nn.Module:
+    """
+    Injects trainable adapters that inihibit and amplify activations, called (IA)^3.
+    Used for efficient fine-tuning of large pre-trained models.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    filter
+        Apply (IA)^3 only to linear layers filtered by name.
+        If None, (IA)^3 is applied to all linear Layers in module.
+    module_filter
+        Apply (IA)^3 only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
+        If None, (IA)^3 is considered for all modules
+
+    Returns
+    -------
+    Model with injected (IA)3 modules.
+    """
+    for m_name, module in dict(model.named_modules()).items():
+        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
+            for c_name, layer in dict(module.named_children()).items():
+                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
+                    assert isinstance(
+                        layer, nn.Linear
+                    ), f"(IA)3 can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    lora_layer = IA3Linear(layer.in_features, layer.out_features)
+                    lora_layer.weight = layer.weight
+                    lora_layer.bias = layer.bias
+                    setattr(module, c_name, lora_layer)
+
+    return model  # return model to enable method chaining
+
+
 def inject_lora_to_linear_layer(
-    model: nn.Module, lora_r: int, lora_alpha: int, filter: Optional[List[str]] = None
+    model: nn.Module,
+    lora_r: int,
+    lora_alpha: int,
+    filter: Optional[List[str]] = None,
+    module_filter: Optional[List[str]] = None,
 ) -> nn.Module:
     """
     Injects trainable Low-Rank decomposition matrices (LoRA) into linear
@@ -410,23 +470,29 @@ def inject_lora_to_linear_layer(
         The scaling factor. Can be set to same value as r in
         most cases, as initialization is scaled already.
     filter
-        Apply LoRa only to linear layers filtered by name.
-        If None, LoRA is applied to all linear Layers in Model.
+        Apply loRA only to linear layers filtered by name (e.g. "query.").
+        If None, loRA is applied to all linear Layers in module.
+    module_filter
+        Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
+        If None, loRA is considered for all modules
+
     Returns
     -------
     Model with injected LoRA modules.
     """
-    for n, module in model.named_children():
-        if len(list(module.children())) > 0:
-            inject_lora_to_linear_layer(module, lora_r, lora_alpha, filter)  # algorithm is in-place
-
-        if isinstance(module, nn.Linear) and (not filter or any(re.match(x, n) for x in filter)):
-            lora_layer = LoRALinear(
-                module.in_features, module.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
-            )
-            lora_layer.weight = module.weight
-            lora_layer.bias = module.bias
-            setattr(model, n, lora_layer)
+    for m_name, module in dict(model.named_modules()).items():
+        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
+            for c_name, layer in dict(module.named_children()).items():
+                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
+                    assert isinstance(
+                        layer, nn.Linear
+                    ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    lora_layer = LoRALinear(
+                        layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
+                    )
+                    lora_layer.weight = layer.weight
+                    lora_layer.bias = layer.bias
+                    setattr(module, c_name, lora_layer)
 
     return model  # return model to enable method chaining
 
@@ -454,3 +520,112 @@ def get_model_head(model: nn.Module):
         raise ValueError(f"Model {type(model)} doesn't have head. Need to check its implementation.")
 
     return head
+
+
+def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = True):
+    """
+    Get a Huggingface config and model based on a checkpoint name.
+
+    Parameters
+    ----------
+    checkpoint_name
+        A model checkpoint name.
+    pretrained
+         Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+
+    Returns
+    -------
+    A Huggingface config and model.
+    """
+    config = AutoConfig.from_pretrained(checkpoint_name)
+
+    if pretrained:
+        model = AutoModel.from_pretrained(checkpoint_name)
+    else:
+        model = AutoModel.from_config(config)
+
+    return config, model
+
+
+def apply_sigmoid(output: Dict):
+    """
+    Apply the sigmoid to logits.
+
+    Parameters
+    ----------
+    output
+        The model output dict.
+
+    Returns
+    -------
+    The output with logits transformed by sigmoid.
+    """
+    for k, v in output.items():
+        output[k][LOGITS] = torch.sigmoid(v[LOGITS].float())
+    return output
+
+
+def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
+    """
+    Get the postprocessing function for the model outputs.
+
+    Parameters
+    ----------
+    problem_type
+        The problem type, e.g., classification or regression.
+    loss_func
+        The loss function used in training.
+
+    Returns
+    -------
+    The postprocessing function.
+    """
+    postprocess_func = None
+    if problem_type == REGRESSION:
+        if isinstance(loss_func, nn.BCEWithLogitsLoss):
+            postprocess_func = apply_sigmoid
+
+    return postprocess_func
+
+
+def get_mmocr_config_and_model(checkpoint_name: str):
+    """
+    Get an MMOCR config and model based on a checkpoint name.
+
+    Parameters
+    ----------
+    checkpoint_name
+        A model checkpoint name.
+
+    Returns
+    -------
+    An MMOCR config and model.
+    """
+    try:
+        import mmcv
+        from mmcv.runner import load_checkpoint
+    except ImportError:
+        mmcv = None
+    try:
+        import mmocr
+        from mmocr.models import build_detector
+    except ImportError:
+        mmocr = None
+    from mim.commands.download import download
+
+    checkpoints = download(package="mmocr", configs=[checkpoint_name], dest_root=".")
+
+    # read config files
+    assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
+    config_file = checkpoint_name + ".py"
+    if isinstance(config_file, str):
+        config = mmcv.Config.fromfile(config_file)
+
+    # build model and load pretrained weights
+    assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
+
+    checkpoint = checkpoints[0]
+    model = build_detector(config.model, test_cfg=config.get("test_cfg"))
+    if checkpoint is not None:
+        checkpoint = load_checkpoint(model, checkpoint, map_location="cpu")
+    return config, model

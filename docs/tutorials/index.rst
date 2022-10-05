@@ -20,6 +20,12 @@ Tabular Prediction
       In-depth tutorial on controlling various aspects of model fitting.
 
    .. card::
+      :title: Deployment Optimization
+      :link: tabular_prediction/tabular-deployment.html
+
+      Tutorial on optimizing the predictor artifact for production deployment.
+
+   .. card::
       :title: Kaggle Tutorial
       :link: tabular_prediction/tabular-kaggle.html
 
@@ -147,6 +153,30 @@ Text Prediction
 
       In-depth tutorial on learning how to customize the search space and try different
       HPO algorithms.
+
+
+Time Series Forecasting
+-----------------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start
+      :link: forecasting-quickstart.html
+
+      Quick start tutorial on fitting models with time series datasets.
+
+   .. card::
+      :title: In-depth Tutorial
+      :link: forecasting-indepth.html
+
+      Detailed discussion of the time series forecasting capabilities in AutoGluon.
+
+   .. card::
+      :title: FAQ
+      :link: forecasting-faq.html
+
+      Frequently asked questions about AutoGluon-TimeSeries.
+
 
 Cloud Training and Deployment
 -----------------------------

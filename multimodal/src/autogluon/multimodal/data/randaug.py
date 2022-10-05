@@ -1,4 +1,4 @@
-# code in this file is adpated from rpmcruz/autoaugment
+# code in this file is adapted from rpmcruz/autoaugment
 # https://github.com/rpmcruz/autoaugment/blob/master/transformations.py
 import random
 

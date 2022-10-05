@@ -1,5 +1,4 @@
 import logging
-from typing import Any, Dict
 
 from sktime.forecasting.arima import ARIMA, AutoARIMA
 from sktime.forecasting.ets import AutoETS
@@ -11,12 +10,11 @@ from . import AbstractSktimeModel
 logger = logging.getLogger(__name__)
 
 
-class ThetaModel(AbstractSktimeModel):
+class SktimeThetaModel(AbstractSktimeModel):
     """Theta model for forecasting.
 
-    This is a special case of AutoETS model that can only be applied to positive data.
+    Based on `sktime.forecasting.theta.ThetaForecaster <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.theta.ThetaForecaster.html>`_
 
-    See `AbstractSktimeModel` for common parameters.
 
     Other Parameters
     ----------------
@@ -69,25 +67,32 @@ class ThetaModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class TBATSModel(AbstractSktimeModel):
+class SktimeTBATSModel(AbstractSktimeModel):
     """TBATS forecaster with multiple seasonalities.
 
-    See `AbstractSktimeModel` for common parameters.
+    This model automatically tries all combinations of hyperparameters (e.g.,
+    use_box_cox, use_trend, use_arma_errors), and selects the best model
+
+    Based on `sktime.forecasting.tbats.TBATS <https://www.sktime.org/en/stable/api_reference/auto_generated/sktime.forecasting.tbats.TBATS.html>`_
+
+    Caution: The fitting time for this model can be very long, and the saved model can
+    take up a lot of disk space when applied to large datasets.
+
 
     Other Parameters
     ----------------
     use_box_cox: bool or None, default = None
         Whether to use the Box-Cox transform of the data.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     use_trend: bool or None, default = None
         Whether to use a trend component.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     use_damped_trend: bool or None, default = None
         Whether to damp the trend component.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     use_arma_erros: bool or None, default = None
         Whether to model the residuals with ARMA.
-        When None, both options are considered and the best one is chosed based on AIC.
+        When None, both options are considered and the best one is chosen based on AIC.
     seasonal_period: int, float, array or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For
         example, 4 for quarterly data with an annual cycle, or 7 for daily data with a
@@ -128,7 +133,7 @@ class TBATSModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class AutoETSModel(AbstractSktimeModel):
+class SktimeAutoETSModel(AbstractSktimeModel):
     """AutoETS model from sktime.
 
     See `AbstractSktimeModel` for common parameters.
@@ -238,7 +243,7 @@ class AutoETSModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class ARIMAModel(AbstractSktimeModel):
+class SktimeARIMAModel(AbstractSktimeModel):
     """ARIMA model from sktime.
 
     See `AbstractSktimeModel` for common parameters.
@@ -323,7 +328,7 @@ class ARIMAModel(AbstractSktimeModel):
         return sktime_init_args
 
 
-class AutoARIMAModel(AbstractSktimeModel):
+class SktimeAutoARIMAModel(AbstractSktimeModel):
     """AutoARIMA model from sktime.
 
     This model automatically selects the (p, d, q) and (P, D, Q) parameters of ARIMA by

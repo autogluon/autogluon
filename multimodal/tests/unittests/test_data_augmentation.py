@@ -42,15 +42,10 @@ def test_mixup():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "optimization.top_k_average_method": BEST,
+        "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
@@ -63,7 +58,6 @@ def test_mixup():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
@@ -82,18 +76,13 @@ def test_textagumentor_deepcopy():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
+        "model.t_few.checkpoint_name": "t5-small",
         "model.hf_text.text_trivial_aug_maxscale": 0.05,
         "model.hf_text.text_train_augment_types": ["identity"],
         "optimization.top_k_average_method": "uniform_soup",
@@ -104,7 +93,6 @@ def test_textagumentor_deepcopy():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,
@@ -116,7 +104,6 @@ def test_textagumentor_deepcopy():
     # Test copied data processors
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=10,
     )
@@ -127,7 +114,6 @@ def test_textagumentor_deepcopy():
     # Test copied data processors
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=10,
     )
@@ -142,12 +128,6 @@ def test_trivialaugment():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "optimization.top_k_average_method": BEST,
@@ -156,6 +136,7 @@ def test_trivialaugment():
         "data.categorical.convert_to_text": False,
         "data.numerical.convert_to_text": False,
         "data.mixup.turn_on": True,
+        "model.t_few.checkpoint_name": "t5-small",
         "model.hf_text.text_trivial_aug_maxscale": 0.1,
         "model.hf_text.text_aug_detect_length": 10,
         "model.timm_image.train_transform_types": ["resize_shorter_side", "center_crop", "trivial_augment"],
@@ -166,7 +147,6 @@ def test_trivialaugment():
             shutil.rmtree(save_path)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             time_limit=10,
             save_path=save_path,
             hyperparameters=hyperparameters,

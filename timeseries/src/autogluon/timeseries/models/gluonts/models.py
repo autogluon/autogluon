@@ -1,11 +1,11 @@
 import re
-from typing import Type
+from typing import List, Type
 
 import mxnet as mx
 
 from autogluon.core.utils import warning_filter
-
-from ..abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
     import gluonts.model.deepar
@@ -15,6 +15,7 @@ with warning_filter():
     from gluonts.model.seq2seq import MQCNNEstimator, MQRNNEstimator
     from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
     from gluonts.model.transformer import TransformerEstimator
+    from gluonts.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.context import get_mxnet_context
     from gluonts.nursery.autogluon_tabular import TabularEstimator
 
@@ -51,36 +52,51 @@ gluonts.model.deepar._estimator.time_features_from_frequency_str = time_features
 
 
 class DeepARModel(AbstractGluonTSModel):
-    """DeepAR model from Gluon-TS.
+    """DeepAR model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of an RNN encoder (LSTM or GRU) and a decoder that outputs the
+    distribution of the next target value. Close to the model described in [Salinas2020]_.
+
+    .. [Salinas2020] Salinas, David, et al.
+        "DeepAR: Probabilistic forecasting with autoregressive recurrent networks."
+        International Journal of Forecasting. 2020.
+
+    Based on `gluonts.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
-    context_length
+    context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
-    num_layers: int
-        Number of RNN layers (default: 2)
-    num_cells: int
-        Number of RNN cells for each layer (default: 40)
-    cell_type: str
-        Type of recurrent cells to use (available: 'lstm' or 'gru';
-        default: 'lstm')
-    dropoutcell_type: typing.Type
+    num_layers : int, default = 2
+        Number of RNN layers
+    num_cells : int, default = 40
+        Number of RNN cells for each layer
+    cell_type : str, default = "lstm"
+        Type of recurrent cells to use (available: 'lstm' or 'gru')
+    dropoutcell_type : str, default = 'ZoneoutCell'
         Type of dropout cells to use
         (available: 'ZoneoutCell', 'RNNZoneoutCell', 'VariationalDropoutCell' or
-        'VariationalZoneoutCell', default: 'ZoneoutCell')
-    dropout_rate: float
-        Dropout regularization parameter (default: 0.1)
-    embedding_dimension: int
+        'VariationalZoneoutCell')
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    embedding_dimension : int, optional
         Dimension of the embeddings for categorical features
-        (default: [min(50, (cat+1)//2) for cat in cardinality])
-    distr_output: gluonts.mx.DistributionOutput()
+        (if None, defaults to [min(50, (cat+1)//2) for cat in cardinality])
+    distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
         Distribution to use to evaluate observations and sample predictions
-        (default: StudentTOutput())
-    scaling: bool
-        Whether to automatically scale the target values (default: true)
+    scaling: bool, default = True
+        Whether to automatically scale the target values
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
@@ -102,131 +118,258 @@ class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):
 
 
 class MQCNNModel(AbstractGluonTSSeq2SeqModel):
-    """MQCNN model from Gluon-TS. MQCNN is an encoder-decoder model where the encoder is a
-    1D convolutional neural network and the decoder is a multilayer perceptron.
+    """MQCNN model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of a CNN encoder and a decoder that directly predicts the
+    quantiles of the future target values' distribution. As described in [Wen2017]_.
+
+    .. [Wen2017] Wen, Ruofeng, et al.
+        "A multi-horizon quantile recurrent forecaster."
+        arXiv preprint arXiv:1711.11053 (2017)
+
+    Based on `gluonts.model.seq2seq.MQCNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html#gluonts.model.seq2seq.MQCNNEstimator>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
-    context_length
+    context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
-    embedding_dimension: int
+    embedding_dimension : int, optional
         Dimension of the embeddings for categorical features. (default: [min(50, (cat+1)//2) for cat in cardinality])
-    add_time_feature: bool
-        Adds a set of time features. (default: True)
-    add_age_feature: bool
-        Adds an age feature. (default: False)
+    add_time_feature : bool, default = True
+        Adds a set of time features.
+    add_age_feature : bool, default = False
+        Adds an age feature.
         The age feature starts with a small value at the start of the time series and grows over time.
-    seed: int
-        Will set the specified int seed for numpy and MXNet if specified. (default: None)
-    decoder_mlp_dim_seq: List[int]
+    decoder_mlp_dim_seq : List[int], default = [30]
         The dimensionalities of the Multi Layer Perceptron layers of the decoder.
-        (default: [30])
-    channels_seq: List[int]
+    channels_seq : List[int], default = [30, 30, 30]
         The number of channels (i.e. filters or convolutions) for each layer of the HierarchicalCausalConv1DEncoder.
         More channels usually correspond to better performance and larger network size.
-        (default: [30, 30, 30])
-    dilation_seq: List[int]
+    dilation_seq : List[int], default = [1, 3, 5]
         The dilation of the convolutions in each layer of the HierarchicalCausalConv1DEncoder.
         Greater numbers correspond to a greater receptive field of the network, which is usually
-        better with longer context_length. (Same length as channels_seq) (default: [1, 3, 5])
-    kernel_size_seq: List[int]
+        better with longer context_length. (Same length as channels_seq)
+    kernel_size_seq : List[int], default = [7, 3, 3]
         The kernel sizes (i.e. window size) of the convolutions in each layer of the HierarchicalCausalConv1DEncoder.
-        (Same length as channels_seq) (default: [7, 3, 3])
-    use_residual: bool
+        (Same length as channels_seq)
+    use_residual : bool, default = True
         Whether the hierarchical encoder should additionally pass the unaltered
-        past target to the decoder. (default: True)
-    quantiles: List[float]
+        past target to the decoder.
+    quantiles : List[float], default = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         The list of quantiles that will be optimized for, and predicted by, the model.
         Optimizing for more quantiles than are of direct interest to you can result
         in improved performance due to a regularizing effect.
-        (default: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-    distr_output: gluonts.mx.DistributionOutput()
+    distr_output : gluonts.mx.DistributionOutput, optional
         DistributionOutput to use. Only one between `quantile` and `distr_output`
-        can be set. (Default: None)
-    scaling: bool
-        Whether to automatically scale the target values. (default: False if quantile_output is used, True otherwise)
+        can be set.
+    scaling : bool, optional
+        Whether to automatically scale the target values. (default: False if quantile_output is used,
+        True otherwise)
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQCNNEstimator
 
 
 class MQRNNModel(AbstractGluonTSSeq2SeqModel):
-    """MQRNN model from Gluon-TS. MQRNN is an encoder-decoder model where the encoder is a
-    recurrent neural network and the decoder is a multilayer perceptron.
+    """MQRNN model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of an RNN encoder and a decoder that directly predicts the
+    quantiles of the future target values' distribution. As described in [Wen2017]_.
+
+    .. [Wen2017] Wen, Ruofeng, et al.
+        "A multi-horizon quantile recurrent forecaster."
+        arXiv preprint arXiv:1711.11053 (2017)
+
+    Based on `gluonts.model.seq2seq.MQRNNEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html#gluonts.model.seq2seq.MQRNNEstimator>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
+    context_length : int, optional
+        Number of steps to unroll the RNN for before computing predictions
+        (default: None, in which case context_length = prediction_length)
+    embedding_dimension : int, optional
+        Dimension of the embeddings for categorical features. (default: [min(50, (cat+1)//2) for cat in cardinality])
+    decoder_mlp_dim_seq : List[int], default = [30]
+        The dimensionalities of the Multi Layer Perceptron layers of the decoder.
+    quantiles : List[float], default = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        The list of quantiles that will be optimized for, and predicted by, the model.
+        Optimizing for more quantiles than are of direct interest to you can result
+        in improved performance due to a regularizing effect.
+    distr_output : gluonts.mx.DistributionOutput, optional
+        DistributionOutput to use. Only one between `quantile` and `distr_output`
+        can be set.
+    scaling : bool, optional
+        Whether to automatically scale the target values. (default: False if quantile_output is used,
+        True otherwise)
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = MQRNNEstimator
 
 
 class SimpleFeedForwardModel(AbstractGluonTSModel):
-    """SimpleFeedForward model, i.e. a simple multilayer perceptron for
-     probabilistic forecasts, from GluonTS.
+    """SimpleFeedForward model from GluonTS.
 
-    See `AbstractGluonTSModel` for common parameters.
+    The model consists of a multilayer perceptron (MLP) that predicts the distribution
+    of the next target value.
+
+    Based on `gluonts.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html?highlight=simplefeedforward>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
-    num_hidden_dimensions: int
-        Number of hidden nodes in each layer (default: [40, 40])
-    context_length: int
+    context_length : int, optional
         Number of time units that condition the predictions
         (default: None, in which case context_length = prediction_length)
-    distr_output: gluonts.mx.DistributionOutput
-        Distribution to fit (default: StudentTOutput())
-    batch_normalization: bool
-        Whether to use batch normalization (default: False)
-    mean_scaling: bool
+    num_hidden_dimensions : List[int], default = [40, 40]
+        Number of hidden nodes in each layer
+    distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
+        Distribution to fit
+    batch_normalization : bool, default = False
+        Whether to use batch normalization
+    mean_scaling : bool, default = True
         Scale the network input by the data mean and the network output by
-        its inverse (default: True)
+        its inverse
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
 
 
+class TemporalFusionTransformerModel(AbstractGluonTSModel):
+    """TemporalFusionTransformer model from GluonTS.
+
+    The model combines an LSTM encoder, a transformer decoder, and directly predicts
+    the quantiles of future target values. As described in [Lim2021]_.
+
+    .. [Lim2021] Lim, Bryan, et al.
+        "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
+        International Journal of Forecasting. 2021.
+
+    Based on `gluonts.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.tft.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+    Other Parameters
+    ----------------
+    context_length : int or None, default = None
+        Number of past values used for prediction.
+        (default: None, in which case context_length = prediction_length)
+    hidden_dim : int, default = 32
+        Size of the hidden layer.
+    num_heads : int, default = 4
+        Number of attention heads in multi-head attention.
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    """
+
+    gluonts_estimator_class: Type[GluonTSEstimator] = TemporalFusionTransformerEstimator
+    supported_quantiles: set = set([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+
+    def _get_estimator(self) -> GluonTSEstimator:
+        """Return the GluonTS Estimator object for the model"""
+        hyperparameters = self._get_estimator_init_args()
+        # Turning off hybridization prevents MXNet errors when training on GPU
+        hyperparameters["hybridize"] = False
+        # TFT cannot handle arbitrary quantiles, this is a workaround
+        hyperparameters["num_outputs"] = 9
+        if not set(self.quantile_levels).issubset(self.supported_quantiles):
+            raise ValueError(
+                f"{self.name} requires that quantile_levels are a subset of "
+                f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
+            )
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
+
+    def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
+        if quantile_levels is not None and not set(quantile_levels).issubset(self.supported_quantiles):
+            raise ValueError(
+                f"{self.name} requires that quantile_levels are a subset of "
+                f"{self.supported_quantiles} (received quantile_levels = {self.quantile_levels})"
+            )
+        return super().predict(data=data, quantile_levels=quantile_levels, **kwargs)
+
+
 class TransformerModel(AbstractGluonTSModel):
-    """GluonTS Transformer model for forecasting, close to the one described in
-    [Vaswani2017]_.
+    """Autoregressive transformer forecasting model from GluonTS.
+
+    The model consists of an Transformer encoder and a decoder that outputs the
+    distribution of the next target value. The transformer architecture is close to the
+    one described in [Vaswani2017]_.
 
     .. [Vaswani2017] Vaswani, Ashish, et al. "Attention is all you need."
         Advances in neural information processing systems. 2017.
 
-    See `AbstractGluonTSModel` for common parameters.
+    Based on `gluonts.model.transformer.TransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.transformer.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
 
     Other Parameters
     ----------------
-    context_length
+    context_length : int, optional
         Number of steps to unroll the RNN for before computing predictions
         (default: None, in which case context_length = prediction_length)
-    trainer
-        Trainer object to be used (default: Trainer())
-    dropout_rate
-        Dropout regularization parameter (default: 0.1)
-    distr_output
-        Distribution to use to evaluate observations and sample predictions
-        (default: StudentTOutput())
-    model_dim
+    model_dim : int, default = 32
         Dimension of the transformer network, i.e., embedding dimension of the
-        input (default: 32)
-    inner_ff_dim_scale
+        input
+    dropout_rate : float, default = 0.1
+        Dropout regularization parameter
+    distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
+        Distribution to use to evaluate observations and sample predictions
+    inner_ff_dim_scale : int, default = 4
         Dimension scale of the inner hidden layer of the transformer's
-        feedforward network (default: 4)
-    pre_seq
+        feedforward network
+    pre_seq : str, default = "dn"
         Sequence that defined operations of the processing block before the
         main transformer network. Available operations: 'd' for dropout, 'r'
-        for residual connections and 'n' for normalization (default: 'dn')
-    post_seq
+        for residual connections and 'n' for normalization
+    post_seq : str, default = "drn"
         Sequence that defined operations of the processing block in and after
         the main transformer network. Available operations: 'd' for
         dropout, 'r' for residual connections and 'n' for normalization
-        (default: 'drn').
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 32
+        Size of batches used during training
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = TransformerEstimator
@@ -243,7 +386,7 @@ class GenericGluonTSModel(AbstractGluonTSModel):
 
     Parameters
     ----------
-    gluonts_estimator_class:
+    gluonts_estimator_class : Type[gluonts.model.estimator.Estimator]
         The class object of the GluonTS estimator to be used.
     """
 
@@ -299,7 +442,7 @@ class ProphetModel(AbstractGluonTSModel):
 
     Other Parameters
     ----------------
-    hyperparameters
+    hyperparameters : Dict[str, Any]
         Model hyperparameters that will be passed directly to the `Prophet`
         class. See Prophet documentation for available parameters.
     """
@@ -343,14 +486,14 @@ class AutoTabularModel(AbstractGluonTSModel):
 
     Other Parameters
     ----------------
-    lag_indices: List[int]
+    lag_indices : List[int], optional
         List of indices of the lagged observations to use as features. If
         None, this will be set automatically based on the frequency.
-    scaling: bool
+    scaling : Callable[[pd.Series], Tuple[pd.Series, float]], optional
         Function to be used to scale time series. This should take a pd.Series object
         as input, and return a scaled pd.Series and the scale (float). By default,
         this divides a series by the mean of its absolute value.
-    disable_auto_regression: bool
+    disable_auto_regression : bool, default = False
         Weather to forcefully disable auto-regression in the model. If ``True``,
         this will remove any lag index which is smaller than ``prediction_length``.
         This will make predictions more efficient, but may impact their accuracy.

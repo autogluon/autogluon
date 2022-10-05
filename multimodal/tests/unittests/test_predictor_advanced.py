@@ -43,10 +43,13 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     train_data = dataset.train_df.sample(200)
     test_data = dataset.test_df.sample(50)
     save_path = f"gradient_checkpointing_{backbone}_{efficient_finetuning}_{pooling_mode}_{precision}"
+    if os.path.isdir(save_path):
+        shutil.rmtree(save_path)
     predictor = MultiModalPredictor(label=dataset.label_columns[0], path=save_path)
     predictor.fit(
         train_data,
         hyperparameters={
+            "model.names": ["hf_text"],
             "model.hf_text.checkpoint_name": backbone,
             "model.hf_text.pooling_mode": pooling_mode,
             "model.hf_text.gradient_checkpointing": True,
@@ -62,10 +65,11 @@ def test_predictor_gradient_checkpointing(backbone, efficient_finetuning, poolin
     )
     predictions = predictor.predict(test_data, as_pandas=False)
     tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
-    npt.assert_allclose(tunable_ratio, expected_ratio, 1e-05, 1e-05)
-    predictor.save(save_path + "_new")
-    new_predictor = MultiModalPredictor.load(save_path + "_new")
+    npt.assert_allclose(tunable_ratio, expected_ratio, 2e-05, 2e-05)
+    save_path = save_path + "_new"
+    if os.path.isdir(save_path):
+        shutil.rmtree(save_path)
+    predictor.save(save_path)
+    new_predictor = MultiModalPredictor.load(save_path)
     new_predictions = new_predictor.predict(test_data, as_pandas=False)
     npt.assert_allclose(new_predictions, predictions)
-    shutil.rmtree(save_path)
-    shutil.rmtree(save_path + "_new")

@@ -2,7 +2,7 @@ import copy
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import autogluon.core as ag
 from autogluon.common.savers import save_pkl
@@ -225,7 +225,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         if not all(0 < q < 1 for q in quantiles):
             raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
-    def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
+    def predict(
+        self, data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]], **kwargs
+    ) -> TimeSeriesDataFrame:
         """Given a dataset, predict the next `self.prediction_length` time steps.
         This method produces predictions for the forecast horizon *after* the individual time series.
 
@@ -235,8 +237,9 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         Parameters
         ----------
-        data: TimeSeriesDataFrame
-            The dataset where each time series is the "context" for predictions.
+        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
+            The dataset where each time series is the "context" for predictions. For ensemble models that depend on
+            the predictions of other models, this method may accept a dictionary of previous models' predictions.
 
         Other Parameters
         ----------------
@@ -278,7 +281,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        return self.predict(data.slice_by_timestep(slice(None, -self.prediction_length)), **kwargs)
+        return self.predict(data.slice_by_timestep(None, -self.prediction_length), **kwargs)
 
     def score(self, data: TimeSeriesDataFrame, metric: str = None, **kwargs) -> float:
         """Return the evaluation scores for given metric and dataset. The last
@@ -315,7 +318,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         predictions = self.predict_for_scoring(data)
         metric_value = evaluator(data, predictions)
 
-        return metric_value * TimeSeriesEvaluator.METRIC_COEFFICIENTS[metric]
+        return metric_value * evaluator.coefficient
 
     def _hyperparameter_tune(
         self,

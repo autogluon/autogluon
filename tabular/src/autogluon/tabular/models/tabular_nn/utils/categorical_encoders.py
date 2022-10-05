@@ -743,7 +743,7 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
 
     infrequent_indices_: list of arrays of shape(n_infrequent_categories)
         ``infrequent_indices_[i]`` contains a list of indices in
-        ``categories_[i]`` corresponsing to the infrequent categories.
+        ``categories_[i]`` corresponding to the infrequent categories.
     
     """
     

@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
+from typing import List
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
@@ -61,6 +62,7 @@ class AbstractTabularLearner(AbstractLearner):
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
 
+        self._original_features = None
         self._pre_X_rows = None
         self._post_X_rows = None
         self._positive_class = positive_class
@@ -73,6 +75,11 @@ class AbstractTabularLearner(AbstractLearner):
             raise ValueError("Must specify sample_weight column if you specify weight_evaluation=True")
         if groups is not None and not isinstance(groups, str):
             raise ValueError('groups must be a string indicating the name of the column that contains the split groups. If you have a vector of split groups, first add these as an extra column to your data.')
+
+    @property
+    def original_features(self) -> List[str]:
+        """Original features user passed in before autogluon doing any processing"""
+        return self._original_features
 
     # TODO: Possibly rename to features_in or consider refactoring all feature_generators features_in -> features
     @property
@@ -296,7 +303,7 @@ class AbstractTabularLearner(AbstractLearner):
         all_trained_models = trainer.get_model_names()
         all_trained_models_can_infer = trainer.get_model_names(can_infer=True)
         all_trained_models_original = all_trained_models.copy()
-        model_pred_proba_dict, pred_time_test_marginal = trainer.get_model_pred_proba_dict(X=X, models=all_trained_models_can_infer, fit=False, record_pred_time=True)
+        model_pred_proba_dict, pred_time_test_marginal = trainer.get_model_pred_proba_dict(X=X, models=all_trained_models_can_infer, record_pred_time=True)
 
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())

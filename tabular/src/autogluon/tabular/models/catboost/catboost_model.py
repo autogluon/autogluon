@@ -92,7 +92,7 @@ class CatBoostModel(AbstractModel):
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         num_rows_train = len(X)
         num_cols_train = len(X.columns)
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initalization if it's a regression problem
+        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
 
         X = self.preprocess(X)
         cat_features = list(X.select_dtypes(include='category').columns)

@@ -57,6 +57,13 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use CLIP to extract embeddings for retrieval problem.
 
    .. card::
+      :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
+      :link: efficient_finetuning_basic.html
+
+      How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
+      In the tutorial, we will use the combination of IA^3 and BitFit to finetune a multilingual backbone.
+
+   .. card::
       :title: Customize AutoMM
       :link: customization.html
 
@@ -72,6 +79,7 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
    multilingual_text
    multimodal_text_tabular
    beginner_multimodal
+   efficient_finetuning_basic
    clip_zeroshot
    clip_embedding
    customization

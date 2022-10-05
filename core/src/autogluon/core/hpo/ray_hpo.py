@@ -147,6 +147,7 @@ def run(
     mode: str,
     save_dir: str,
     ray_tune_adapter: RayTuneAdapter,
+    trainable_is_parallel: bool = False,
     total_resources: Optional[dict] = dict(),
     minimum_cpu_per_trial: int = 1,
     minimum_gpu_per_trial: float = 0.0,
@@ -186,6 +187,8 @@ def run(
         For example of creating the custom function, refer to `_trial_dirname_creator`.
     ray_tune_adapter
         Adapter to provide necessary custom info to ray tune.
+    trainable_is_parallel
+        Whether the trainable itself will use ray to run parallel job or not.
     total_resources
         Total resources can be used for HPO.
         If not specified, will use all the resources by default.
@@ -213,9 +216,19 @@ def run(
         num_samples = 1 if time_budget_s is None else 1000  # if both num_samples and time_budget_s are None, we only run 1 trial
     if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
         raise EmptySearchSpace
-    searcher = _get_searcher(hyperparameter_tune_kwargs, metric, mode, supported_searchers=ray_tune_adapter.get_supported_searchers())
-    scheduler = _get_scheduler(hyperparameter_tune_kwargs, supported_schedulers=ray_tune_adapter.get_supported_schedulers())
-    search_space = _convert_search_space(search_space)
+    search_space, default_hyperparameters = _convert_search_space(search_space)
+
+    searcher = _get_searcher(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        metric=metric,
+        mode=mode,
+        default_hyperparameters=default_hyperparameters,
+        supported_searchers=ray_tune_adapter.get_supported_searchers()
+    )
+    scheduler = _get_scheduler(
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        supported_schedulers=ray_tune_adapter.get_supported_schedulers()
+    )
 
     if not ray.is_initialized():
         ray.init(log_to_driver=False, **total_resources)
@@ -227,7 +240,8 @@ def run(
         resources_per_trial=resources_per_trial,
         minimum_gpu_per_trial=minimum_gpu_per_trial,
         minimum_cpu_per_trial=minimum_cpu_per_trial,
-        model_estimate_memory_usage=model_estimate_memory_usage
+        model_estimate_memory_usage=model_estimate_memory_usage,
+        wrap_resources_per_job_into_placement_group=trainable_is_parallel,
     )
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
     ray_tune_adapter.resources_per_trial = resources_per_trial
@@ -321,13 +335,27 @@ def _validate_resources_per_trial(resources_per_trial):
 def _convert_search_space(search_space: dict):
     """Convert the search space to Ray Tune search space if it's AG search space"""
     tune_search_space = search_space.copy()
-    for hyperparmaeter, space in search_space.items():
+    default_hyperparameters = dict()
+    for hyperparameters, space in search_space.items():
         if isinstance(space, Space):
-            tune_search_space[hyperparmaeter] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
-    return tune_search_space
+            tune_search_space[hyperparameters] = RaySpaceConverterFactory.get_space_converter(space.__class__.__name__).convert(space)
+            default_hyperparameters[hyperparameters] = space.default
+    default_hyperparameters = default_hyperparameters
+    if len(default_hyperparameters) == 0:
+        # hyperopt + ray have trouble taking in empty default_hyperparameters
+        default_hyperparameters = None
+    else:
+        default_hyperparameters = [default_hyperparameters]
+    return tune_search_space, default_hyperparameters
 
 
-def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supported_searchers: Optional[List[str]]=None):
+def _get_searcher(
+    hyperparameter_tune_kwargs: dict,
+    metric: str,
+    mode: str,
+    default_hyperparameters: Optional[List[dict]] = None,
+    supported_searchers: Optional[List[str]]=None
+):
     """Initialize searcher object"""
     searcher = hyperparameter_tune_kwargs.get('searcher')
     user_init_args = hyperparameter_tune_kwargs.get('searcher_init_args', dict())
@@ -341,7 +369,8 @@ def _get_searcher(hyperparameter_tune_kwargs: dict, metric: str, mode: str, supp
             searcher_name=searcher,
             user_init_args=user_init_args,
             metric=metric,
-            mode=mode
+            mode=mode,
+            points_to_evaluate=default_hyperparameters,
         )
     assert isinstance(searcher, (SearchAlgorithm, Searcher)) and searcher.__class__ in SEARCHER_PRESETS.values()
     # Check supported schedulers for obj input
@@ -392,8 +421,13 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         return ResourceCalculatorFactory.get_resource_calculator(calculator_type='cpu' if num_gpus == 0 else 'gpu')
     
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
-        trainable_args['fit_kwargs']['num_cpus'] = self.resources_per_trial.get('cpu', 1)
-        trainable_args['fit_kwargs']['num_gpus'] = self.resources_per_trial.get('gpu', 0)
+        if isinstance(self.resources_per_trial, dict):
+            trainable_args['fit_kwargs']['num_cpus'] = self.resources_per_trial.get('cpu', 1)
+            trainable_args['fit_kwargs']['num_gpus'] = self.resources_per_trial.get('gpu', 0)
+        elif isinstance(self.resources_per_trial, tune.PlacementGroupFactory):
+            required_resources = self.resources_per_trial.required_resources
+            trainable_args['fit_kwargs']['num_cpus'] = required_resources.get('CPU', 1)
+            trainable_args['fit_kwargs']['num_gpus'] = required_resources.get('GPU', 0)
         return trainable_args
     
     

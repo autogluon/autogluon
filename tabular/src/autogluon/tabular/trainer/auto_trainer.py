@@ -44,6 +44,7 @@ class AutoTrainer(AbstractTrainer):
             holdout_frac=0.1,
             num_stack_levels=0,
             core_kwargs: dict = None,
+            aux_kwargs: dict = None,
             time_limit=None,
             infer_limit=None,
             infer_limit_batch_size=None,
@@ -91,6 +92,7 @@ class AutoTrainer(AbstractTrainer):
                                        num_stack_levels=num_stack_levels,
                                        time_limit=time_limit,
                                        core_kwargs=core_kwargs,
+                                       aux_kwargs=aux_kwargs,
                                        infer_limit=infer_limit,
                                        infer_limit_batch_size=infer_limit_batch_size,
                                        groups=groups)

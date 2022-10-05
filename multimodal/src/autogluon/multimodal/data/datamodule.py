@@ -5,9 +5,9 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
 from ..constants import PREDICT, TEST, TRAIN, VAL
-from .collator import Dict
 from .dataset import BaseDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
+from .utils import get_collate_fn
 
 
 class BaseDataModule(LightningDataModule):
@@ -121,8 +121,13 @@ class BaseDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
+            shuffle=True,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -141,7 +146,11 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -160,7 +169,11 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
 
@@ -179,25 +192,10 @@ class BaseDataModule(LightningDataModule):
             batch_size=self.per_gpu_batch_size,
             num_workers=self.num_workers,
             pin_memory=False,
-            collate_fn=self.get_collate_fn(),
+            collate_fn=get_collate_fn(
+                df_preprocessor=self.df_preprocessor,
+                data_processors=self.data_processors,
+                per_gpu_batch_size=self.per_gpu_batch_size,
+            ),
         )
         return loader
-
-    def get_collate_fn(self):
-        """
-        Collect collator functions for each modality input of every model.
-        These collator functions are wrapped by the "Dict" collator function,
-        which can then be used by the Pytorch DataLoader.
-
-        Returns
-        -------
-        A "Dict" collator wrapping other collators.
-        """
-        collate_fn = {}
-        for per_preprocessor, per_data_processors_group in zip(self.df_preprocessor, self.data_processors):
-            for per_modality in per_data_processors_group:
-                per_modality_column_names = per_preprocessor.get_column_names(modality=per_modality)
-                if per_modality_column_names:
-                    for per_model_processor in per_data_processors_group[per_modality]:
-                        collate_fn.update(per_model_processor.collate_fn(per_modality_column_names))
-        return Dict(collate_fn)

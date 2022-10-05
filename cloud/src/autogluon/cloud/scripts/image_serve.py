@@ -1,11 +1,20 @@
+import base64
+import os
+import pandas as pd
+import numpy as np
+
 from autogluon.core.constants import REGRESSION
 from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.vision import ImagePredictor
 from io import BytesIO
 from PIL import Image
 
-import pandas as pd
-import numpy as np
+
+def _cleanup_images():
+    files = os.listdir('.')
+    for file in files:
+        if file.endswith('.png'):
+            os.remove(file)
 
 
 def model_fn(model_dir):
@@ -21,11 +30,12 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         buf = BytesIO(request_body)
         data = np.load(buf, allow_pickle=True)
         image_paths = []
-        for i, image in enumerate(data):
-            im = Image.fromarray(image)
+        for i, bytes in enumerate(data):
+            im = Image.open(BytesIO(base64.b85decode(bytes)))
             im_name = f'{i}.png'
             im.save(im_name)
             image_paths.append(im_name)
+
     elif input_content_type == "application/x-image":
         buf = BytesIO(request_body)
         im = Image.open(buf)
@@ -33,19 +43,20 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         im_name = 'test.png'
         im.save(im_name)
         image_paths.append(im_name)
+
     else:
         raise ValueError(
             f'{input_content_type} input content type not supported.'
         )
 
     if model._problem_type != REGRESSION:
-        pred_proba = model.predict_proba(image_paths)
+        pred_proba = model.predict_proba(image_paths, as_pandas=True)
         pred = get_pred_from_proba_df(pred_proba, problem_type=model._problem_type)
         pred_proba.columns = [str(c) + '_proba' for c in pred_proba.columns]
         pred.name = str(pred.name) + '_pred' if pred.name is not None else 'pred'
         prediction = pd.concat([pred, pred_proba], axis=1)
     else:
-        prediction = model.predict(image_paths)
+        prediction = model.predict(image_paths, as_pandas=True)
     if isinstance(prediction, pd.Series):
         prediction = prediction.to_frame()
 
@@ -58,5 +69,7 @@ def transform_fn(model, request_body, input_content_type, output_content_type="a
         output = prediction.to_csv(index=None)
     else:
         raise ValueError(f"{output_content_type} content type not supported")
+
+    _cleanup_images()
 
     return output, output_content_type

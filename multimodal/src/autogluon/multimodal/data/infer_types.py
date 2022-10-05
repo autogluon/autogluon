@@ -1,4 +1,5 @@
 import collections
+import json
 import logging
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
@@ -16,6 +17,7 @@ from ..constants import (
     NULL,
     NUMERICAL,
     REGRESSION,
+    ROIS,
     TEXT,
 )
 
@@ -88,6 +90,40 @@ def is_categorical_column(
                 return False
             return True
         return False
+
+
+def is_rois_column(data: pd.Series) -> bool:
+    """
+    Identify if a column is one rois column.
+
+    Parameters
+    ----------
+    X
+        One column of a multimodal pd.DataFrame for training.
+
+    Returns
+    -------
+    Whether the column is a rois column.
+    """
+    idx = data.first_valid_index()
+    if isinstance(data[idx], list):
+        return (
+            len(data[idx])
+            and isinstance(data[idx][0], dict)
+            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+        )
+    else:
+        isinstance(data[idx], str)
+        rois = {}
+        try:
+            rois = json.loads(data[idx][0])
+        except:
+            pass
+        return (
+            rois
+            and isinstance(rois, dict)
+            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+        )
 
 
 def is_numerical_column(
@@ -259,11 +295,13 @@ def infer_column_types(
             # No valid index, thus, we will just ignore the column
             column_types[col_name] = NULL
             continue
-        if len(data[col_name].unique()) == 1 and is_training:
+        if not isinstance(data[col_name][idx], list) and len(data[col_name].unique()) == 1 and is_training:
             column_types[col_name] = NULL
             continue
 
-        if is_categorical_column(
+        if is_rois_column(data[col_name]):
+            column_types[col_name] = ROIS
+        elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
             column_types[col_name] = CATEGORICAL

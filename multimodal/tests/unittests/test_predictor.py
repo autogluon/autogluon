@@ -20,6 +20,7 @@ from autogluon.multimodal.constants import (
     DISTILLER,
     ENVIRONMENT,
     GREEDY_SOUP,
+    IA3,
     LORA,
     LORA_BIAS,
     LORA_NORM,
@@ -58,6 +59,22 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             assert embeddings.shape[0] == len(df)
 
 
+def verify_realtime_inference(predictor, df, verify_embedding=True):
+    for i in range(1, 3):
+        df_small = df.head(i)
+        predictions_default = predictor.predict(df_small, as_pandas=False, realtime=False)
+        predictions_realtime = predictor.predict(df_small, as_pandas=False, realtime=True)
+        npt.assert_equal(predictions_default, predictions_realtime)
+        if predictor.problem_type in [BINARY, MULTICLASS]:
+            predictions_prob_default = predictor.predict_proba(df_small, as_pandas=False, realtime=False)
+            predictions_prob_realtime = predictor.predict_proba(df_small, as_pandas=False, realtime=True)
+            npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
+        if verify_embedding:
+            embeddings_default = predictor.extract_embedding(df_small, realtime=False)
+            embeddings_realtime = predictor.extract_embedding(df_small, realtime=True)
+            npt.assert_equal(embeddings_default, embeddings_realtime)
+
+
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
@@ -68,6 +85,24 @@ def verify_predictor_save_load(predictor, df, verify_embedding=True, cls=MultiMo
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
             LORA,
+            "auto",
+        ),
+        (
+            "petfinder",
+            ["t_few"],
+            "t5-small",
+            None,
+            BEST,
+            IA3,
+            "auto",
+        ),
+        (
+            "hateful_memes",
+            ["timm_image", "t_few", "clip", "fusion_mlp"],
+            "t5-small",
+            "swin_tiny_patch4_window7_224",
+            BEST,
+            IA3,
             "auto",
         ),
         (
@@ -152,12 +187,6 @@ def test_predictor(
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters = {
         "optimization.max_epochs": 1,
         "model.names": model_names,
@@ -168,11 +197,19 @@ def test_predictor(
         "optimization.loss_function": loss_function,
     }
     if text_backbone is not None:
-        hyperparameters.update(
-            {
-                "model.hf_text.checkpoint_name": text_backbone,
-            }
-        )
+        if "t_few" in model_names:
+            hyperparameters.update(
+                {
+                    "model.t_few.checkpoint_name": "t5-small",
+                    "model.t_few.gradient_checkpointing": False,
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": text_backbone,
+                }
+            )
     if image_backbone is not None:
         hyperparameters.update(
             {
@@ -189,7 +226,6 @@ def test_predictor(
         shutil.rmtree(save_path)
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=save_path,
@@ -197,11 +233,11 @@ def test_predictor(
 
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
+    verify_realtime_inference(predictor, dataset.test_df)
 
     # Test for continuous fit
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
     )
@@ -213,13 +249,12 @@ def test_predictor(
         predictor = MultiModalPredictor.load(root)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             hyperparameters=hyperparameters,
             time_limit=30,
         )
 
 
-def test_standalone():  # test standalong feature in MultiModalPredictor.save()
+def test_standalone():  # test standalone feature in MultiModalPredictor.save()
     from unittest import mock
 
     import torch
@@ -231,18 +266,12 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
 
     dataset = PetFinderDataset()
 
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
-
     hyperparameters = {
         "optimization.max_epochs": 1,
-        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp"],
+        "model.names": ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "clip", "fusion_mlp", "t_few"],
         "model.hf_text.checkpoint_name": "prajjwal1/bert-tiny",
         "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
+        "model.t_few.checkpoint_name": "t5-small",
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
     }
@@ -259,7 +288,6 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
 
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=save_path,
@@ -279,7 +307,7 @@ def test_standalone():  # test standalong feature in MultiModalPredictor.save()
     online_predictions = loaded_online_predictor.predict(dataset.test_df, as_pandas=False)
     del loaded_online_predictor
 
-    # Check if the predictor can be loaded from an offline enivronment.
+    # Check if the predictor can be loaded from an offline environment.
     with requests_gag:
         # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -331,12 +359,6 @@ def test_customizing_model_names(
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
     hyperparameters.update(
         {
             "env.num_workers": 0,
@@ -352,9 +374,8 @@ def test_customizing_model_names(
         shutil.rmtree(save_path)
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
-        time_limit=10,
+        time_limit=20,
         save_path=save_path,
     )
 
@@ -368,9 +389,8 @@ def test_customizing_model_names(
     # Test for continuous fit
     predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         hyperparameters=hyperparameters,
-        time_limit=10,
+        time_limit=20,
     )
     assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
     for per_name in hyperparameters_gt["model.names"]:
@@ -383,7 +403,6 @@ def test_customizing_model_names(
         predictor = MultiModalPredictor.load(root)
         predictor.fit(
             train_data=dataset.train_df,
-            config=config,
             hyperparameters=hyperparameters,
             time_limit=10,
         )
@@ -439,6 +458,20 @@ def test_model_configs():
                 "data_types": ["numerical"],
                 "embedding_arch": ["linear", "relu"],
                 "merge": "concat",
+            },
+            "t_few": {
+                "checkpoint_name": "t5-small",
+                "gradient_checkpointing": False,
+                "data_types": ["text"],
+                "tokenizer_name": "hf_auto",
+                "length_norm": 1.0,
+                "unlikely_loss": 1.0,
+                "mc_loss": 1.0,
+                "max_text_len": 512,
+                "insert_sep": True,
+                "text_segment_num": 2,
+                "stochastic_chunk": False,
+                "text_aug_detect_length": 10,
             },
             "hf_text": {
                 "checkpoint_name": "google/electra-small-discriminator",
@@ -536,12 +569,6 @@ def test_modifying_duplicate_model_names():
         problem_type=dataset.problem_type,
         eval_metric=metric_name,
     )
-    config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
 
     hyperparameters = {
         "optimization.max_epochs": 1,
@@ -555,7 +582,6 @@ def test_modifying_duplicate_model_names():
     teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        config=config,
         time_limit=1,
     )
     student_predictor = MultiModalPredictor(
@@ -565,7 +591,6 @@ def test_modifying_duplicate_model_names():
     )
     student_predictor.fit(
         train_data=dataset.train_df,
-        config=config,
         time_limit=0,
     )
 

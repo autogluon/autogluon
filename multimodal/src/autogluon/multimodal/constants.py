@@ -10,27 +10,42 @@ CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
-ZERO_SHOT = "zero_shot"
+FEW_SHOT = "few_shot"
+DEFAULT_SHOT = "default_shot"
+DEPRECATED_ZERO_SHOT = "zero_shot"
+
+# Pipelines
+FEATURE_EXTRACTION = "feature_extraction"
+ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
+OBJECT_DETECTION = "object_detection"
+OCR_TEXT_DETECTION = "ocr_text_detection"
+OCR_TEXT_RECOGNITION = "ocr_text_recognition"
 
 # Input keys
 IMAGE = "image"
 IMAGE_VALID_NUM = "image_valid_num"
 LABEL = "label"
 TEXT_TOKEN_IDS = "text_token_ids"
+CHOICES_IDS = "choices_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
 COLUMN = "column"
 
 # Output keys
 LOGITS = "logits"
+TEMPLATE_LOGITS = "template_logits"
+LM_TARGET = "lm_target"
 LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
+RAW_FEATURES = "raw_features"
 MASKS = "masks"
 PROBABILITY = "probability"
 COLUMN_FEATURES = "column_features"
-
+BBOX = "bbox"
+ROIS = "rois"
+SCORE = "score"
 
 # Metric
 MAX = "max"
@@ -74,6 +89,8 @@ PREDICT = "predict"
 # Model sources
 HUGGINGFACE = "huggingface"
 TIMM = "timm"
+MMDET = "mmdet"
+MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
 ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL]
@@ -116,17 +133,26 @@ BIT_FIT = "bit_fit"
 LORA = "lora"
 LORA_BIAS = "lora_bias"
 LORA_NORM = "lora_norm"
+IA3 = "ia3"
+IA3_BIAS = "ia3_bias"
+IA3_NORM = "ia3_norm"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
 TIMM_IMAGE = "timm_image"
 HF_TEXT = "hf_text"
+T_FEW = "t_few"
 NUMERICAL_MLP = "numerical_mlp"
 CATEGORICAL_MLP = "categorical_mlp"
 NUMERICAL_TRANSFORMER = "numerical_transformer"
 CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION_MLP = "fusion_mlp"
 FUSION_TRANSFORMER = "fusion_transformer"
+MMDET_IMAGE = "mmdet_image"
+MMOCR_TEXT_DET = "mmocr_text_detection"
+MMOCR_TEXT_RECOG = "mmocr_text_recognition"
+HF_MODELS = (HF_TEXT, T_FEW, CLIP)
+MMCV_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # metric learning loss type
 CONTRASTIVE_LOSS = "contrastive_loss"
@@ -145,3 +171,5 @@ MODEL_CHECKPOINT = "model.ckpt"
 
 # url
 S3_PREFIX = "s3://"
+SOURCEPROMPT_URL = "https://automl-mm-bench.s3.amazonaws.com/few_shot/templates.zip"
+SOURCEPROMPT_SHA1 = "c25cdf3730ff96ab4859b72e18d46ff117b62bd6"

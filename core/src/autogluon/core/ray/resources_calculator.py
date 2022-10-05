@@ -3,6 +3,7 @@ import math
 import psutil
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from ..utils import get_cpu_count, get_gpu_count_all
 
@@ -10,51 +11,66 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceCalculator(ABC):
-    
+
     @property
     @abstractmethod
     def calc_type(self):
         """Type of the resource calculator"""
         raise NotImplementedError
-    
+
     @staticmethod
-    def get_total_gpu_count(user_specified_num_gpus: int, model_default_num_gpus: int):
+    def get_total_gpu_count(user_specified_num_gpus: int, model_default_num_gpus: int, num_gpus_available: Optional[float] = None):
         if user_specified_num_gpus is not None:
-            num_gpus = min(user_specified_num_gpus, get_gpu_count_all())
+            total_gpu = get_gpu_count_all() if num_gpus_available is None else min(get_gpu_count_all(), num_gpus_available)
+            num_gpus = min(user_specified_num_gpus, total_gpu)
         elif model_default_num_gpus > 0:
-            num_gpus = get_gpu_count_all()
+            num_gpus = get_gpu_count_all() if num_gpus_available is None else min(get_gpu_count_all(), num_gpus_available)
         else:
             num_gpus = 0
         return num_gpus
 
     @staticmethod
-    def get_total_cpu_count(user_specified_num_cpus: int, model_default_num_cpus: int):
+    def get_total_cpu_count(user_specified_num_cpus: int, model_default_num_cpus: int, num_cpus_available: Optional[int] = None):
+        if num_cpus_available is not None:
+            assert num_cpus_available > 0
         if user_specified_num_cpus is not None:
-            num_cpus = min(user_specified_num_cpus, get_cpu_count())
+            total_cpu = get_cpu_count() if num_cpus_available is None else min(get_cpu_count(), num_cpus_available)
+            num_cpus = min(user_specified_num_cpus, total_cpu)
         elif model_default_num_cpus > 0:
-            num_cpus = get_cpu_count()
+            num_cpus = get_cpu_count() if num_cpus_available is None else min(get_cpu_count(), num_cpus_available)
         else:
             num_cpus = 0
         return num_cpus
-    
+
     @abstractmethod
     def get_resources_per_job(self, **kwargs) -> dict:
         """Calculate resources per trial and return additional info"""
         raise NotImplementedError
-    
+
+    def wrap_resources_per_job_into_placement_group(self, resources_per_job):
+        """
+        When doing parallel training inside parallel trials, Ray requires to provide placement group for resource scheduling
+        We wrap a group where the resource requirement is 0 because the trial only spread the task and doesn't require too much resources.
+        """
+        from ray import tune
+        num_cpus = resources_per_job.get('cpu', 0)
+        num_gpus = resources_per_job.get('gpu', 0)
+        return tune.PlacementGroupFactory([{'CPU': 0.0}] + [{'CPU': num_cpus, 'GPU': num_gpus}])
+
 
 class CpuResourceCalculator(ResourceCalculator):
-    
+
     @property
     def calc_type(self):
         return 'cpu'
-    
+
     def get_resources_per_job(
         self,
         total_num_cpus,
         num_jobs,
         minimum_cpu_per_job,
         model_estimate_memory_usage=None,
+        wrap_resources_per_job_into_placement_group=False,
         **kwargs,
     ):
         cpu_per_job = max(minimum_cpu_per_job, int(total_num_cpus // num_jobs))
@@ -78,6 +94,8 @@ class CpuResourceCalculator(ResourceCalculator):
         cpu_per_job = int(total_num_cpus // num_parallel_jobs)  # update cpu_per_job in case memory is not enough and can use more cores for each job
 
         resources_per_job = dict(cpu=cpu_per_job)
+        if wrap_resources_per_job_into_placement_group:
+            resources_per_job = self.wrap_resources_per_job_into_placement_group(resources_per_job)
         batches = math.ceil(num_jobs / num_parallel_jobs)
 
         resources_info = dict(
@@ -87,16 +105,16 @@ class CpuResourceCalculator(ResourceCalculator):
             cpu_per_job=cpu_per_job
         )
         logger.log(10, f'Resources info for {self.__class__.__name__}: {resources_info}')
-        
+
         return resources_info
-    
-    
+
+
 class GpuResourceCalculator(ResourceCalculator):
-    
+
     @property
     def calc_type(self):
         return 'gpu'
-    
+
     def get_resources_per_job(
         self,
         total_num_cpus,
@@ -104,6 +122,7 @@ class GpuResourceCalculator(ResourceCalculator):
         num_jobs,
         minimum_cpu_per_job,
         minimum_gpu_per_job,
+        wrap_resources_per_job_into_placement_group=False,
         **kwargs,
     ):
         cpu_per_job = max(minimum_cpu_per_job, int(total_num_cpus // num_jobs))
@@ -121,8 +140,10 @@ class GpuResourceCalculator(ResourceCalculator):
         gpu_per_job = total_num_gpus / num_parallel_jobs
 
         resources_per_job = dict(cpu=cpu_per_job, gpu=gpu_per_job)
+        if wrap_resources_per_job_into_placement_group:
+            resources_per_job = self.wrap_resources_per_job_into_placement_group(resources_per_job)
         batches = math.ceil(num_jobs / num_parallel_jobs)
-        
+
         resources_info = dict(
             resources_per_job=resources_per_job,
             num_parallel_jobs=num_parallel_jobs,
@@ -133,17 +154,17 @@ class GpuResourceCalculator(ResourceCalculator):
         logger.log(10, f'Resources info for {self.__class__.__name__}: {resources_info}')
 
         return resources_info
-    
-    
+
+
 class NonParallelGpuResourceCalculator(ResourceCalculator):
     """
     This calculator will only assign < 1 gpu to each job because some job cannot be parallelized
     """
-    
+
     @property
     def calc_type(self):
         return 'non_parallel_gpu'
-    
+
     def get_resources_per_job(
         self,
         total_num_cpus,
@@ -151,6 +172,7 @@ class NonParallelGpuResourceCalculator(ResourceCalculator):
         num_jobs,
         minimum_cpu_per_job,
         minimum_gpu_per_job,
+        wrap_resources_per_job_into_placement_group=False,
         **kwargs,
     ):
         assert 0 < minimum_gpu_per_job <= 1, f'{self.__class__.__name__} only supports assigning < 1 gpu to each job' 
@@ -169,6 +191,8 @@ class NonParallelGpuResourceCalculator(ResourceCalculator):
         gpu_per_job = min(1, total_num_gpus / num_parallel_jobs)
 
         resources_per_job = dict(cpu=cpu_per_job, gpu=gpu_per_job)
+        if wrap_resources_per_job_into_placement_group:
+            resources_per_job = self.wrap_resources_per_job_into_placement_group(resources_per_job)
         batches = math.ceil(num_jobs / num_parallel_jobs)
 
         resources_info = dict(
@@ -181,14 +205,14 @@ class NonParallelGpuResourceCalculator(ResourceCalculator):
         logger.log(10, f'Resources info for {self.__class__.__name__}: {resources_info}')
 
         return resources_info
-    
-    
+
+
 class RayLightningCpuResourceCalculator(ResourceCalculator):
-    
+
     @property
     def calc_type(self):
         return 'ray_lightning_cpu'
-    
+
     def get_resources_per_job(
         self,
         total_num_cpus,
@@ -235,14 +259,14 @@ class RayLightningCpuResourceCalculator(ResourceCalculator):
         logger.log(10, f'Resources info for {self.__class__.__name__}: {resources_info}')
 
         return resources_info
-        
-        
+
+
 class RayLightningGpuResourceCalculator(ResourceCalculator):
-    
+
     @property
     def calc_type(self):
         return 'ray_lightning_gpu'
-    
+
     def get_resources_per_job(
         self,
         total_num_cpus,
@@ -291,7 +315,7 @@ class RayLightningGpuResourceCalculator(ResourceCalculator):
 
 
 class ResourceCalculatorFactory:
-    
+
     __supported_calculators = [
         CpuResourceCalculator,
         GpuResourceCalculator,

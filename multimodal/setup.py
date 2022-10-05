@@ -36,6 +36,7 @@ install_requires = [
     "scikit-image>=0.19.1,<0.20.0",
     "smart_open>=5.2.1,<5.3.0",
     "pytorch_lightning>=1.6.0,<1.8.0",
+    "text-unidecode<=1.3",
     "torchmetrics>=0.7.2,<0.8.0",
     "transformers>=4.18.0,<4.21.0",
     "nptyping>=1.4.4,<1.5.0",
@@ -48,6 +49,9 @@ install_requires = [
     "pytorch-metric-learning>=1.3.0,<1.4.0",
     "nlpaug>=1.1.10,<=1.1.10",
     "nltk>=3.4.5,<4.0.0",
+    "openmim>0.1.5,<=0.2.1",
+    "pycocotools>=2.0.4,<=2.0.4",
+    "defusedxml>=0.7.1,<=0.7.1",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)

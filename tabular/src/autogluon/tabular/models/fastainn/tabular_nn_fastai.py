@@ -52,7 +52,7 @@ class NNFastAiTabularModel(AbstractModel):
 
             'layers': list of hidden layers sizes; None - use model's heuristics; default is None
 
-            'emb_drop': embedding layers dropout; defaut is 0.1
+            'emb_drop': embedding layers dropout; default is 0.1
 
             'ps': linear layers dropout - list of values applied to every layer in `layers`; default is [0.1]
 
@@ -177,7 +177,6 @@ class NNFastAiTabularModel(AbstractModel):
 
         import torch
         torch.set_num_threads(num_cpus)
-
         start_time = time.time()
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for NNFastAiTabularModel, this model will ignore them in training.")
@@ -216,6 +215,8 @@ class NNFastAiTabularModel(AbstractModel):
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
         if params.get('layers', None) is not None:
             layers = params['layers']
+            if isinstance(layers, tuple):
+                layers = list(layers)
         elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
         elif self.problem_type == QUANTILE:

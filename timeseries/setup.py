@@ -23,6 +23,7 @@ version = ag.update_version(version)
 submodule = "timeseries"
 install_requires = [
     # version ranges added in ag.get_dependency_version_ranges()
+    "joblib~=1.1",
     "numpy",
     "scipy",
     "pandas",
@@ -46,7 +47,7 @@ except (ImportError, AssertionError):
 
 extras_require = {
     "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black~=22.0,>=22.3"],
-    "sktime": ["sktime~=0.11.4", "pmdarima~=1.8.2", "tbats~=1.1"],
+    "sktime": ["sktime~=0.13,>=0.13.1", "pmdarima~=1.8.2", "tbats~=1.1"],
 }
 
 all_requires = []

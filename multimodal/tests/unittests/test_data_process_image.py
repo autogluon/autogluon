@@ -3,6 +3,7 @@ import pytest
 from unittest_datasets import AEDataset, HatefulMeMesDataset, PetFinderDataset
 
 from autogluon.multimodal.data.process_image import ImageProcessor
+from autogluon.multimodal.models import TimmAutoModelForImagePrediction
 
 ALL_DATASETS = {
     "petfinder": PetFinderDataset,
@@ -83,8 +84,9 @@ def test_data_process_image(augmentations):
     dataset = ALL_DATASETS["petfinder"]()
     image = PIL.Image.open(dataset.train_df.Images[0]).convert("RGB")
 
+    model = TimmAutoModelForImagePrediction(prefix="timm_image", checkpoint_name="swin_base_patch4_window7_224")
     image_processor = ImageProcessor(
-        prefix="timm_image",
+        model=model,
         train_transform_types=augmentations["model.timm_image.train_transform_types"],
         val_transform_types=augmentations["model.timm_image.val_transform_types"],
         size=224,

@@ -4,29 +4,29 @@ import logging
 import math
 import os
 import pprint
+import shutil
 import time
-from typing import Union
+from typing import Union, List
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 
+from autogluon.common.loaders import load_json
+from autogluon.common.savers import save_json
+from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
-from autogluon.core.calibrate.conformity_score import compute_conformity_score
+from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.tabular.models import _IModelsModel
-
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import default_holdout_frac
@@ -183,6 +183,7 @@ class TabularPredictor:
     Dataset = TabularDataset
     predictor_file_name = 'predictor.pkl'
     _predictor_version_file_name = '__version__'
+    _predictor_metadata_file_name = 'metadata.json'
 
     def __init__(
             self,
@@ -241,6 +242,12 @@ class TabularPredictor:
     @property
     def eval_metric(self):
         return self._learner.eval_metric
+    
+    @property
+    def original_features(self) -> List[str]:
+        """Original features user passed in to fit before processing"""
+        self._assert_is_fit()
+        return self._learner.original_features
 
     @property
     def problem_type(self):
@@ -293,6 +300,7 @@ class TabularPredictor:
             feature_metadata='infer',
             infer_limit=None,
             infer_limit_batch_size=None,
+            fit_weighted_ensemble=True,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -526,6 +534,10 @@ class TabularPredictor:
             Small values, especially `infer_limit_batch_size=1`, will result in much larger per-row inference times and should be avoided if possible.
             Refer to `infer_limit` for more details on how this is used.
             If specified when `infer_limit=None`, the inference time will be logged during training but will not be limited.
+        fit_weighted_ensemble : bool, default = True
+            If True, a WeightedEnsembleModel will be fit in each stack layer.
+            A weighted ensemble will often be stronger than an individual model while being very fast to train.
+            It is recommended to keep this value set to True to maximize predictive quality.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -684,7 +696,7 @@ class TabularPredictor:
                 If True and the problem_type is classification, temperature scaling will be used to calibrate the Predictor's estimated class probabilities
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
-                (which may improve the prediction interval coverage, and bagging could futher improve it) and will compute a set of scalar parameters on the validation set.
+                (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
 
         Returns
         -------
@@ -827,11 +839,14 @@ class TabularPredictor:
             'excluded_model_types': excluded_model_types,
             'feature_prune_kwargs': kwargs.get('feature_prune_kwargs', None)
         }
+        aux_kwargs = {}
+        if fit_weighted_ensemble is False:
+            aux_kwargs['fit_weighted_ensemble'] = False
         self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets,
                           num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs,
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, aux_kwargs=aux_kwargs,
                           time_limit=time_limit, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size,
                           verbosity=verbosity, use_bag_holdout=use_bag_holdout)
         self._set_post_fit_vars()
@@ -889,9 +904,9 @@ class TabularPredictor:
 
         if calibrate:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                self._calibrate_model()
+                self._trainer.calibrate_model()
             elif self.problem_type == QUANTILE:
-                self._calibrate_model()
+                self._trainer.calibrate_model()
             else:
                 logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
 
@@ -901,76 +916,13 @@ class TabularPredictor:
         if save_space:
             self.save_space()
 
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
-        """
-        Applies temperature scaling to the AutoGluon model. Applies
-        inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize negative log likelihood. Inversed
-        softmaxes are divided by temperature scalar then softmaxed to return
-        predicted probs.
-
-        Parameters:
-        -----------
-        model_name: str: default=None
-            model name to tune temperature scaling on. If set to None
-            then will tune best model only. Best model chosen by validation score
-        lr: float: default=0.01
-            The learning rate for temperature scaling algorithm
-        max_iter: int: default=1000
-            Number of iterations optimizer should take for
-            tuning temperature scaler
-        init_val: float: default=1.0
-            The initial value for temperature scalar term
-        """
-        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
-        try:
-            # FIXME: Avoid depending on torch for temp scaling
-            try_import_torch
-        except ImportError:
-            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
-            return
-
-        if model_name is None:
-            model_name = self.get_model_best()
-
-        model_full_dict = self._trainer.get_model_full_dict()
-        model_name_og = model_name
-        for m, m_full in model_full_dict.items():
-            if m_full == model_name:
-                model_name_og = m
-                break
-        if self._trainer.bagged_mode:
-            y_val_probs = self.get_oof_pred_proba(model_name_og, transformed=True, internal_oof=True).to_numpy()
-            y_val = self._trainer.load_y().to_numpy()
-        else:
-            X_val = self._trainer.load_X_val()
-            y_val_probs = self._trainer.predict_proba(X_val, model_name_og)
-            y_val = self._trainer.load_y_val().to_numpy()
-
-            if self.problem_type == BINARY:
-                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
-
-        model = self._trainer.load_model(model_name=model_name)
-        if self.problem_type == QUANTILE:
-            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
-            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
-                                                    quantile_levels=self.quantile_levels)
-            model.conformalize = conformalize
-            model.save()
-        else:
-            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                                   init_val=init_val, max_iter=max_iter, lr=lr)
-            if temp_scalar is None:
-                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
-                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
-            else:
-                logger.log(15, f'Temperature term found is: {temp_scalar}')
-                model.temperature_scalar = temp_scalar
-                model.save()
-
     # TODO: Consider adding infer_limit to fit_extra
-    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
+    def fit_extra(self,
+                  hyperparameters,
+                  time_limit=None,
+                  base_model_names=None,
+                  fit_weighted_ensemble=True,
+                  **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
         The original train_data and tuning_data will be used to train the models.
@@ -990,6 +942,10 @@ class TabularPredictor:
             If specified, all models trained will be stack ensembles.
             If None, models will be trained as if they were specified in :meth:`TabularPredictor.fit`, without depending on existing models.
             Only valid if bagging is enabled.
+        fit_weighted_ensemble : bool, default = True
+            If True, a WeightedEnsembleModel will be fit in each stack layer.
+            A weighted ensemble will often be stronger than an individual model while being very fast to train.
+            It is recommended to keep this value set to True to maximize predictive quality.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
@@ -1054,7 +1010,9 @@ class TabularPredictor:
                                                                   time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = None  # TODO: Add as option
+        aux_kwargs = {}
+        if fit_weighted_ensemble is False:
+            aux_kwargs = {'fit_weighted_ensemble': False}
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -2129,7 +2087,7 @@ class TabularPredictor:
                 return self._trainer.model_best
         return self._trainer.get_model_best(can_infer=can_infer)
 
-    def set_model_best(self, model: str):
+    def set_model_best(self, model: str, save_trainer: bool = False):
         """
         Sets the model to be used by default when calling `predictor.predict(data)`.
         By default, this is the model with the best validation score, but this is not always the case.
@@ -2139,6 +2097,8 @@ class TabularPredictor:
         ----------
         model : str
             Name of model to set to best. If model does not exist or cannot infer, raises an AssertionError.
+        save_trainer : bool, default = False
+            If True, self._trainer is saved with the new model_best value, such that it is reflected when predictor is loaded in future from disk.
         """
         self._assert_is_fit('set_model_best')
         models = self._trainer.get_model_names(can_infer=True)
@@ -2146,6 +2106,8 @@ class TabularPredictor:
             self._trainer.model_best = model
         else:
             raise AssertionError(f'Model "{model}" is not a valid model to specify as best! Valid models: {models}')
+        if save_trainer:
+            self._trainer.save()
 
     def get_model_full_dict(self, inverse=False):
         """
@@ -2187,7 +2149,7 @@ class TabularPredictor:
     # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False,
-                              time_limit=None):
+                              time_limit=None, refit_full=False):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -2209,6 +2171,9 @@ class TabularPredictor:
         time_limit : int, default = None
             Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limit` value is applied to each model.
             If None, the ensemble models train without time restriction.
+        refit_full : bool, default = False
+            If True, will apply refit_full to all weighted ensembles created during this call.
+            Identical to calling `predictor.refit_full(model=predictor.fit_weighted_ensemble(...))`
 
         Returns
         -------
@@ -2231,7 +2196,12 @@ class TabularPredictor:
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_stack_preds = trainer.get_inputs_to_stacker(X=X,
+                                                      base_models=base_models,
+                                                      fit=fit,
+                                                      use_orig_features=False,
+                                                      use_val_cache=True
+                                                      )
 
         models = []
 
@@ -2255,6 +2225,9 @@ class TabularPredictor:
         models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level,
                                                      stack_name=stack_name, base_model_names=base_models,
                                                      name_suffix=name_suffix, time_limit=time_limit)
+
+        if refit_full:
+            models += self.refit_full(model=models)
 
         return models
 
@@ -2554,6 +2527,41 @@ class TabularPredictor:
                                     allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk,
                                     dry_run=dry_run)
 
+    def get_size_disk(self) -> int:
+        """
+        Returns the combined size of all files under the `predictor.path` directory in bytes.
+        """
+        return get_directory_size(self.path)
+
+    def get_size_disk_per_file(self,
+                               *,
+                               sort_by: str = "size",
+                               include_path_in_name: bool = False) -> pd.Series:
+        """
+        Returns the size of each file under the `predictor.path` directory in bytes.
+
+        Parameters
+        ----------
+        sort_by : str, default = "size"
+            If None, output files will be ordered based on order of search in os.walk(path).
+            If "size", output files will be ordered in descending order of file size.
+            If "name", output files will be ordered by name in ascending alphabetical order.
+        include_path_in_name : bool, default = False
+            If True, includes the full path of the file including the input `path` as part of the index in the output pd.Series.
+            If False, removes the `path` prefix of the file path in the index of the output pd.Series.
+
+            For example, for a file located at `foo/bar/model.pkl`, with path='foo/'
+                If True, index will be `foo/bar/model.pkl`
+                If False, index will be `bar/model.pkl`
+
+        Returns
+        -------
+        pd.Series with index file path and value file size in bytes.
+        """
+        return get_directory_size_per_file(self.path,
+                                           sort_by=sort_by,
+                                           include_path_in_name=include_path_in_name)
+
     # TODO: v0.1 add documentation for arguments
     def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
         """Returns the list of model names trained in this `predictor` object."""
@@ -2793,11 +2801,29 @@ class TabularPredictor:
         version = load_str.load(path=version_file_path)
         return version
 
+    @classmethod
+    def _load_metadata_file(cls, path: str, silent=True):
+        metadata_file_path = path + cls._predictor_metadata_file_name
+        return load_json.load(path=metadata_file_path, verbose=not silent)
+
     def _save_version_file(self, silent=False):
         from ..version import __version__
         version_file_contents = f'{__version__}'
         version_file_path = self.path + self._predictor_version_file_name
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
+
+    def _save_metadata_file(self, silent=False):
+        """
+        Save metadata json file to disk containing information such as
+        python version, autogluon version, installed packages, operating system, etc.
+        """
+        metadata_file_path = self.path + self._predictor_metadata_file_name
+
+        metadata = get_autogluon_metadata()
+
+        save_json.save(path=metadata_file_path, obj=metadata)
+        if not silent:
+            logger.log(15, f'Saving {metadata_file_path}')
 
     def save(self, silent=False):
         """
@@ -2820,6 +2846,10 @@ class TabularPredictor:
         self._learner = tmp_learner
         self._trainer = tmp_trainer
         self._save_version_file(silent=silent)
+        try:
+            self._save_metadata_file(silent=silent)
+        except Exception as e:
+            logger.log(30, f'Failed to save metadata file due to exception {e}, skipping...')
         if not silent:
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
@@ -2834,7 +2864,7 @@ class TabularPredictor:
         return predictor
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True):
+    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True, require_py_version_match: bool = True, check_packages: bool = False):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -2851,6 +2881,13 @@ class TabularPredictor:
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the `autogluon.tabular` version of the loaded predictor does not match the installed version of `autogluon.tabular`.
             If False, will allow loading of models trained on incompatible versions, but is NOT recommended. Users may run into numerous issues if attempting this.
+        require_py_version_match : bool, default = True
+            If True, will raise an AssertionError if the Python version of the loaded predictor does not match the installed Python version.
+                Micro version differences such as 3.9.2 and 3.9.7 will log a warning but will not raise an exception.
+            If False, will allow loading of models trained on incompatible python versions, but is NOT recommended. Users may run into numerous issues if attempting this.
+        check_packages : bool, default = False
+            If True, checks package versions of the loaded predictor against the package versions of the current environment.
+            Warnings will be logged for each mismatch of package version.
         """
         if verbosity is not None:
             set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
@@ -2897,6 +2934,28 @@ class TabularPredictor:
                     f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
                     f'this error can be bypassed by specifying `require_version_match=False`.')
 
+        try:
+            metadata_init = cls._load_metadata_file(path=path)
+        except:
+            logger.warning(f'WARNING: Could not find metadata file at "{path + cls._predictor_metadata_file_name}".\n'
+                           f'This could mean that the predictor was fit in a version `<=0.5.2`.')
+            metadata_init = None
+
+        metadata_load = get_autogluon_metadata()
+
+        if metadata_init is not None:
+            try:
+                compare_autogluon_metadata(original=metadata_init, current=metadata_load, check_packages=check_packages)
+            except:
+                logger.log(30, 'WARNING: Exception raised while comparing metadata files, skipping comparison...')
+            if require_py_version_match:
+                if metadata_init['py_version'] != metadata_load['py_version']:
+                    raise AssertionError(
+                        f'Predictor was created on Python version {metadata_init["py_version"]} '
+                        f'but is being loaded with Python version {metadata_load["py_version"]}. '
+                        f'Please ensure the versions match to avoid instability. While it is NOT recommended, '
+                        f'this error can be bypassed by specifying `require_py_version_match=False`.')
+
         if predictor is None:
             predictor = cls._load(path=path)
 
@@ -2921,7 +2980,7 @@ class TabularPredictor:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
         #  Valid aux_kwargs values:
-        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble
+        #  name_suffix, time_limit, stack_name, aux_hyperparameters, ag_args, ag_args_ensemble, fit_weighted_ensemble
 
         # TODO: Remove features from models option for fit_extra
         # TODO: Constructor?
@@ -3244,6 +3303,99 @@ class TabularPredictor:
         labels = data[self.label]
         cls, columns = imodels.explain_classification_errors(data, predictions, labels, print_rules=print_rules)
         return cls
+
+    # TODO: Add .delete() method to easily clean-up clones?
+    #  Would need to be careful that user doesn't delete important things accidentally.
+    # TODO: Add .save_zip() and load_zip() methods to pack and unpack artifacts into a single file to simplify deployment code?
+    def clone(self,
+              path: str,
+              *,
+              return_clone: bool = False,
+              dirs_exist_ok: bool = False):
+        """
+        Clone the predictor and all of its artifacts to a new location on local disk.
+        This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
+        more advanced operations (such as fit_extra and refit_full).
+
+        Parameters
+        ----------
+        path : str
+            Directory path the cloned predictor will be saved to.
+        return_clone : bool, default = False
+            If True, returns the loaded cloned TabularPredictor object.
+            If False, returns the local path to the cloned TabularPredictor object.
+        dirs_exist_ok : bool, default = False
+            If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
+            If False, will raise an exception if the path directory already exists and avoid performing the copy.
+
+        Returns
+        -------
+        If return_clone == True, returns the loaded cloned TabularPredictor object.
+        If return_clone == False, returns the local path to the cloned TabularPredictor object.
+
+        """
+        assert path != self.path, f"Cannot clone into the same directory as the original predictor! (path='{path}')"
+        path_clone = shutil.copytree(src=self.path, dst=path, dirs_exist_ok=dirs_exist_ok)
+        logger.log(30, f"Cloned {self.__class__.__name__} located in '{self.path}' to '{path_clone}'.\n"
+                       f"\tTo load the cloned predictor: predictor_clone = {self.__class__.__name__}.load(path=\"{path_clone}\")")
+        return self.__class__.load(path=path_clone) if return_clone else path_clone
+
+    def clone_for_deployment(self,
+                             path: str,
+                             *,
+                             model: str = 'best',
+                             return_clone: bool = False,
+                             dirs_exist_ok: bool = False):
+        """
+        Clone the predictor and all of its artifacts to a new location on local disk,
+        then delete the clones artifacts unnecessary during prediction.
+        This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
+        more advanced operations (such as fit_extra and refit_full).
+
+        Note that the clone can no longer fit new models,
+        and most functionality except for predict and predict_proba will no longer work.
+
+        Identical to performing the following operations in order:
+
+        predictor_clone = predictor.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
+        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        predictor_clone.set_model_best(model=model, save_trainer=True)
+        predictor_clone.save_space()
+
+        Parameters
+        ----------
+        path : str
+            Directory path the cloned predictor will be saved to.
+        model : str, default = 'best'
+            The model to use in the optimized predictor clone.
+            All other unrelated models will be deleted to save disk space.
+            Refer to the `models_to_keep` argument of `predictor.delete_models` for available options.
+            Internally calls `predictor_clone.delete_models(models_to_keep=model, dry_run=False)`
+        return_clone : bool, default = False
+            If True, returns the loaded cloned TabularPredictor object.
+            If False, returns the local path to the cloned TabularPredictor object.
+        dirs_exist_ok : bool, default = False
+            If True, will clone the predictor even if the path directory already exists, potentially overwriting unrelated files.
+            If False, will raise an exception if the path directory already exists and avoids performing the copy.
+
+        Returns
+        -------
+        If return_clone == True, returns the loaded cloned TabularPredictor object.
+        If return_clone == False, returns the local path to the cloned TabularPredictor object.
+        """
+        predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
+        if model == 'best':
+            model = predictor_clone.get_model_best()
+            logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
+        else:
+            logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
+        predictor_clone.delete_models(models_to_keep=model, dry_run=False)
+        if isinstance(model, str) and model in predictor_clone.get_model_names(can_infer=True):
+            predictor_clone.set_model_best(model=model, save_trainer=True)
+        logger.log(30, f"Clone: Removing artifacts unnecessary for prediction. "
+                       f"NOTE: Clone can no longer fit new models, and most functionality except for predict and predict_proba will no longer work")
+        predictor_clone.save_space()
+        return predictor_clone if return_clone else predictor_clone.path
 
     def _assert_is_fit(self, message_suffix: str = None):
         if not self._learner.is_fit:

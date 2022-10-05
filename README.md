@@ -4,7 +4,7 @@
   <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 </div>
 
-## AutoML for Image, Text, and Tabular Data
+## AutoML for Image, Text, Time Series, and Tabular Data
 
 [![Latest Release](https://img.shields.io/github/v/release/awslabs/autogluon)](https://github.com/awslabs/autogluon/releases)
 [![Continuous Integration](https://github.com/awslabs/autogluon/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/awslabs/autogluon/actions/workflows/continuous_integration.yml)
@@ -16,7 +16,7 @@
 
 [Install Instructions](https://auto.gluon.ai/stable/install.html) | Documentation ([Stable](https://auto.gluon.ai/stable/index.html) | [Latest](https://auto.gluon.ai/dev/index.html))
 
-AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, and tabular data.
+AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
 
 ## Example
 
@@ -40,6 +40,7 @@ leaderboard = predictor.leaderboard(test_data)
 | ImagePredictor      | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)       |     [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.vision.ImagePredictor)      |
 | ObjectDetector      | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/object_detection/beginner.html)       |     [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.vision.ObjectDetector)      |
 | MultiModalPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/multimodal/index.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.multimodal.MultiModalPredictor) |
+| TimeSeriesPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quickstart.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor) |
 
 ## Resources
 
@@ -50,6 +51,7 @@ See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for [docume
 
 - [Learning with text data](https://auto.gluon.ai/stable/tutorials/text_prediction/beginner.html)
 - [Learning with image data](https://auto.gluon.ai/stable/tutorials/image_prediction/beginner.html)
+- [Learning with time series data](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quickstart.html)
 
 Refer to the [AutoGluon Roadmap](https://github.com/awslabs/autogluon/blob/master/ROADMAP.md) for details on upcoming features and releases.
 

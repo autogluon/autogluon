@@ -210,8 +210,8 @@ def test_split_by_time(
         ),
     ],
 )
-def test_subsequence(start_timestamp, end_timestamp, item_ids, datetimes, targets):
-    new_tsdf = SAMPLE_TS_DATAFRAME.subsequence(start_timestamp, end_timestamp)
+def test_slice_by_time(start_timestamp, end_timestamp, item_ids, datetimes, targets):
+    new_tsdf = SAMPLE_TS_DATAFRAME.slice_by_time(start_timestamp, end_timestamp)
     ts_df = _build_ts_dataframe(item_ids, datetimes, targets)
     pd.testing.assert_frame_equal(new_tsdf, ts_df)
 
@@ -354,11 +354,12 @@ SAMPLE_ITERABLE_2 = [
 
 
 @pytest.mark.parametrize(
-    "input_iterable, input_slice, expected_times, expected_values",
+    "input_iterable, start_index, end_index, expected_times, expected_values",
     [
         (
             SAMPLE_ITERABLE,
-            slice(None, 2),
+            None,
+            2,
             [
                 "2019-01-01",
                 "2019-01-02",
@@ -371,13 +372,15 @@ SAMPLE_ITERABLE_2 = [
         ),
         (
             SAMPLE_ITERABLE,
-            slice(1, 2),
+            1,
+            2,
             ["2019-01-02", "2019-01-02", "2019-01-02"],
             [1, 4, 7],
         ),
         (
             SAMPLE_ITERABLE_2,
-            slice(None, 2),
+            None,
+            2,
             [
                 "2019-01-01",
                 "2019-01-02",
@@ -390,7 +393,8 @@ SAMPLE_ITERABLE_2 = [
         ),
         (
             SAMPLE_ITERABLE_2,
-            slice(-2, None),
+            -2,
+            None,
             [
                 "2019-01-03",
                 "2019-01-04",
@@ -403,7 +407,8 @@ SAMPLE_ITERABLE_2 = [
         ),
         (
             SAMPLE_ITERABLE_2,
-            slice(-1000, 2),
+            -1000,
+            2,
             [
                 "2019-01-01",
                 "2019-01-02",
@@ -416,17 +421,18 @@ SAMPLE_ITERABLE_2 = [
         ),
         (
             SAMPLE_ITERABLE_2,
-            slice(1000, 1002),
+            1000,
+            1002,
             [],
             [],
         ),
     ],
 )
 def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
-    input_iterable, input_slice, expected_times, expected_values
+    input_iterable, start_index, end_index, expected_times, expected_values
 ):
     df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
-    dfv = df.slice_by_timestep(input_slice)
+    dfv = df.slice_by_timestep(start_index, end_index)
 
     if not expected_times:
         assert len(dfv) == 0
@@ -438,22 +444,22 @@ def test_when_dataset_sliced_by_step_then_output_times_and_values_correct(
 
 
 @pytest.mark.parametrize(
-    "input_iterable, input_slice",
+    "input_iterable, start_index, end_index",
     [
-        (SAMPLE_ITERABLE, slice(None, 2)),
-        (SAMPLE_ITERABLE, slice(1, 2)),
-        (SAMPLE_ITERABLE_2, slice(None, 2)),
-        (SAMPLE_ITERABLE_2, slice(-2, None)),
-        (SAMPLE_ITERABLE_2, slice(-1000, 2)),
+        (SAMPLE_ITERABLE, None, 2),
+        (SAMPLE_ITERABLE, 1, 2),
+        (SAMPLE_ITERABLE_2, None, 2),
+        (SAMPLE_ITERABLE_2, -2, None),
+        (SAMPLE_ITERABLE_2, -1000, 2),
     ],
 )
-def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input_iterable, input_slice):
+def test_when_dataset_sliced_by_step_then_order_of_item_index_is_preserved(input_iterable, start_index, end_index):
     df = TimeSeriesDataFrame.from_iterable_dataset(input_iterable)
-    new_idx = df._item_index[::-1]
+    new_idx = df.item_ids[::-1]
     df.index = df.index.set_levels(new_idx, level=ITEMID)
-    dfv = df.slice_by_timestep(input_slice)
+    dfv = df.slice_by_timestep(start_index, end_index)
 
-    assert dfv._item_index.equals(new_idx)
+    assert dfv.item_ids.equals(new_idx)
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -588,10 +594,10 @@ def test_when_dataframe_instance_rename_called_then_static_features_are_correct(
 
 def test_when_dataset_sliced_by_step_then_static_features_are_correct():
     df = SAMPLE_TS_DATAFRAME_STATIC
-    dfv = df.slice_by_timestep(slice(-2, None))
+    dfv = df.slice_by_timestep(-2, None)
 
     assert isinstance(dfv, TimeSeriesDataFrame)
-    assert len(dfv) == 2 * len(dfv.index.levels[0])
+    assert len(dfv) == 2 * len(dfv.item_ids)
 
     assert dfv.static_features.equals(df.static_features)
 
@@ -601,7 +607,7 @@ def test_when_dataset_subsequenced_then_static_features_are_correct():
     dfv = df.subsequence(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
 
     assert isinstance(dfv, TimeSeriesDataFrame)
-    assert len(dfv) == 1 * len(dfv.index.levels[0])
+    assert len(dfv) == 1 * len(dfv.item_ids)
 
     assert dfv.static_features.equals(df.static_features)
 
@@ -609,8 +615,8 @@ def test_when_dataset_subsequenced_then_static_features_are_correct():
 def test_when_dataset_split_by_time_then_static_features_are_correct():
     left, right = SAMPLE_TS_DATAFRAME_STATIC.split_by_time(START_TIMESTAMP + datetime.timedelta(days=1))
 
-    assert len(left) == 1 * len(SAMPLE_TS_DATAFRAME_STATIC.index.levels[0])
-    assert len(right) == 2 * len(SAMPLE_TS_DATAFRAME_STATIC.index.levels[0])
+    assert len(left) == 1 * len(SAMPLE_TS_DATAFRAME_STATIC.item_ids)
+    assert len(right) == 2 * len(SAMPLE_TS_DATAFRAME_STATIC.item_ids)
 
     assert left.static_features.equals(SAMPLE_TS_DATAFRAME_STATIC.static_features)
     assert right.static_features.equals(SAMPLE_TS_DATAFRAME_STATIC.static_features)
@@ -676,3 +682,25 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
 def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
     view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
     assert view._static_features is SAMPLE_TS_DATAFRAME_STATIC._static_features
+
+
+SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
+    [
+        {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
+        {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-02"), "target": 3.5},
+        {ITEMID: "a", TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
+        {ITEMID: "a", TIMESTAMP: pd.Timestamp("2020-01-02"), "target": 3.5},
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "input_df",
+    [
+        SAMPLE_DATAFRAME_WITH_MIXED_INDEX,
+        SAMPLE_DATAFRAME_WITH_MIXED_INDEX.set_index([ITEMID, TIMESTAMP]),
+    ],
+)
+def test_when_item_id_index_has_mixed_dtype_then_value_error_is_raied(input_df):
+    with pytest.raises(ValueError, match="must be of integer or string dtype"):
+        TimeSeriesDataFrame(input_df)

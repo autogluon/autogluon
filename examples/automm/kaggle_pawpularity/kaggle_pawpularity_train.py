@@ -114,7 +114,7 @@ def load_data(data_path: str):
     train_df.rename(columns={"Id": "Image Path"}, inplace=True)
     train_df["Image Path"] = train_df["Image Path"].apply(lambda s: os.path.join(data_path, "train", s + ".jpg"))
 
-    # Creat the split information of folds.
+    # Create the split information of folds.
     num_bins = int(np.ceil(2 * ((len(train_df)) ** (1. / 3))))
     train_df_bins = pd.cut(train_df["Pawpularity"], bins=num_bins, labels=False)
     train_df_fold = pd.Series([-1] * len(train_df))
