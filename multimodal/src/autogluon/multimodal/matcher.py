@@ -1513,6 +1513,7 @@ class MultiModalMatcher:
                     f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
                     f"removed."
                 )
+            assert os.path.isfile(os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(

@@ -73,6 +73,8 @@ def test_matcher(
 
     hyperparameters = {
         "optimization.max_epochs": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
     }
 
     if text_backbone is not None:
