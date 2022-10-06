@@ -1508,7 +1508,6 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         df_preprocessor: MultiModalFeaturePreprocessor,
         data_processors: Dict,
-        requires_label: bool,
     ):
 
         modality_features, sample_num = apply_df_preprocessor(
