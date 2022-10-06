@@ -9,13 +9,7 @@ import pandas as pd
 from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
 
-from ..constants import (
-    AUTOMM,
-    END_OFFSET,
-    ENTITY_GROUP,
-    NER_ANNOTATION,
-    START_OFFSET,
-)
+from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, START_OFFSET
 from .utils import process_ner_annotations
 
 logger = logging.getLogger(AUTOMM)
