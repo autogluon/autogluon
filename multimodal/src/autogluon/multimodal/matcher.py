@@ -1437,7 +1437,7 @@ class MultiModalMatcher:
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
-
+        path = os.path.abspath(os.path.expanduser(path))
         query_config = copy.deepcopy(self._query_config)
         response_config = copy.deepcopy(self._response_config)
         if standalone:
@@ -1502,10 +1502,10 @@ class MultiModalMatcher:
                 ensure_ascii=True,
             )
         # In case that users save to a path, which is not the original save_path.
-        if os.path.abspath(path) != os.path.abspath(self._save_path):
+        if not os.path.samefile(path, self._save_path):
             model_path = os.path.join(self._save_path, MODEL_CHECKPOINT)
             if os.path.isfile(model_path):
-                shutil.copy(model_path, path)
+                shutil.copy(model_path, os.path.join(path, MODEL_CHECKPOINT))
             else:
                 # FIXME(?) Fix the saving logic
                 RuntimeError(
@@ -1513,7 +1513,7 @@ class MultiModalMatcher:
                     f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
                     f"removed."
                 )
-            assert os.path.isfile(os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+            assert os.path.isfile(os.path.join(path, MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(
