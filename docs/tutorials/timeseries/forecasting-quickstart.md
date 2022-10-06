@@ -154,15 +154,14 @@ predictor = TimeSeriesPredictor(
 
 predictor.fit(
     train_data=train_data,
-    presets="low_quality",
+    presets="local_models",
 )
 ```
-In a short amount of time AutoGluon fits five time series forecasting models on the training data.
-These models are three neural network forecasters: DeepAR, Transformer, a feedforward neural network; and two simple statistical models: ARIMA and ETS.
-AutoGluon also constructs a weighted ensemble on top of these models capable of quantile forecasting.
+Here we used the `"local_models"` presets to quickly obtain the results.
+In a short amount of time AutoGluon fits three statistical models (ARIMA, ETS, Theta), and a weighted ensemble on top of these models.
 
-Here we used the `"low_quality"` presets to quickly obtain the results.
 In realistic scenarios, we can set `presets` to be one of `"medium_quality"` or `"best_quality"`.
+These presets additionally include powerful deep learning models (such as DeepAR, Temporal Fusion Transformer).
 Higher quality presets will usually produce more accurate forecasts but take longer to train and may produce less efficient models.
 
 Note that inside `fit()` the last `prediction_length` steps of each time series in `train_data` were automatically used as a tuning (validation) set.
@@ -248,7 +247,7 @@ predictor = TimeSeriesPredictor(
 )
 predictor.fit(
     train_data=ts_dataframe,
-    presets="low_quality",  # other options: "medium_quality", "best_quality"
+    presets="local_models",  # other options: "medium_quality", "best_quality"
 )
 
 # Generate the forecasts
