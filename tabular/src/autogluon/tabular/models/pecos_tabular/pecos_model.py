@@ -139,7 +139,8 @@ class PecosModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-                "model_type": 'XRLinear',
+                "problem_type": self.problem_type,
+                "model_type": "XRLinear",
                 "max_leaf_size": 100,  # The max size of the leaf nodes of hierarchical 2-means clustering
                 "nr_splits": 16,  # number of splits used to construct hierarchy (a power of 2 is recommended)
                 "spherical": True,  # If true, do l2-normalize cluster centers while clustering

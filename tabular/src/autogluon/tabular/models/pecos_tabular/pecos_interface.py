@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 import random
 
-from .pecos_utils import read_pred_outfile, format_predictions 
+from autogluon.core.constants import BINARY, MULTICLASS
+from .pecos_utils import read_pred_outfile
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class PecosInterface():
     """
     def __init__(
         self, 
+        problem_type = BINARY,
         model_type = "XRLinear",
         max_leaf_size = None,
         nr_splits = None,
@@ -29,6 +31,7 @@ class PecosInterface():
         sparsity_threshold = None):
  
         self.model_type = model_type
+        self.problem_type = problem_type
         
         # Configure hyperparameters
         self.max_leaf_size = max_leaf_size
@@ -62,6 +65,8 @@ class PecosInterface():
             for label in self.label_dict:
                 f.write(f'{label}\n')
         
+        self.max_label_value = y.max() + 1
+
         # Run the model
         if self.model_type == 'XRLinear':
             cmd = f'''
@@ -107,9 +112,6 @@ python3 -m pecos.apps.text2text.train  \
 
     def predict(self,  X: np.ndarray):
         df_pred = self.predict_proba(X, k=1)
-        df_pred.columns = ['label', 'score']
-        df_pred['label'] = df_pred.label.apply(lambda x: x[0])
-        df_pred['score'] = df_pred.score.apply(lambda x: x[0])
         return df_pred
     
     def predict_proba(self, X: pd.DataFrame, k=1):
@@ -138,8 +140,17 @@ python3 -m pecos.apps.text2text.predict  \
         # Read predictions from file
         pred_file = self.workdir / 'pred.json'
         df_pred = read_pred_outfile(pred_file, k=k)
-      
-        # Grab top prediction for autogluon
-        y_pred, _ = format_predictions(df_pred)
-
-        return y_pred
+        
+        if self.problem_type == BINARY:
+            labels = df_pred.labels.apply(lambda x: x[0])
+        elif self.problem_type == MULTICLASS:
+            def get_one_hot(x, length):
+                out = np.zeros((length,))
+                out[int(x)] = 1
+                return out
+            labels = []
+            for x in df_pred['labels']:
+                labels += [get_one_hot(x[0], self.max_label_value)]
+        else:
+            print(f"Problem type not supported: {self.problem_type}")
+        return np.array(labels)
