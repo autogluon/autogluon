@@ -311,6 +311,128 @@ class MultiheadAttention(nn.Module):
         }
 
 
+class AdditiveAttention(nn.Module):
+    """Additive Attention with linear complexity to input sequence length.
+
+    Additive attention was proposed and use in FastFormer.
+    See Ref. [1] for details.
+    This implementation is motivated by: https://github.com/jrzaurin/pytorch-widedeep.git
+
+    References:
+    ----------
+    [1] Wu, Chuhan, et al. "Fastformer: Additive attention can be all you need." arXiv preprint arXiv:2108.09084 (2021).
+    """
+    def __init__(
+        self,
+        *,
+        d_token: int,
+        n_heads: int,
+        dropout: float,
+        bias: bool,
+        share_qv_weights: bool,
+        initialization: str,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        d_token:
+            the token size. Must be a multiple of :code:`n_heads`.
+        n_heads:
+            the number of heads. If greater than 1, then the module will have
+            an addition output layer (so called "mixing" layer).
+        bias:
+            if `True`, then input (and output, if presented) layers also have bias.
+            `True` is a reasonable default choice.
+        dropout:
+            dropout rate for the attention map. The dropout is applied to
+            *probabilities* and do not affect logits.
+        share_qv_weights:
+            if 'True', then value and query transformation parameters are shared.
+        initialization:
+            initialization for input projection layers. Must be one of
+            :code:`['kaiming', 'xavier']`. `kaiming` is a reasonable default choice.
+        """
+        super().__init__()
+
+        assert d_token % n_heads == 0, "d_token must be a multiple of n_heads"
+        assert initialization in ["kaiming", "xavier"]
+
+        self.head_dim = d_token // n_heads
+        self.n_heads = n_heads
+        self.share_qv_weights = share_qv_weights
+        self.dropout = nn.Dropout(dropout)
+
+        trainable = []
+        if share_qv_weights:
+            self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
+            trainable.extend([self.qv_proj])
+        else:
+            self.q_proj = nn.Linear(d_token, d_token, bias=bias)
+            self.v_proj = nn.Linear(d_token, d_token, bias=bias)
+            trainable.extend([self.q_proj, self.v_proj])
+
+        self.k_proj = nn.Linear(d_token, d_token, bias=bias)
+        self.W_q = nn.Linear(d_token, n_heads)
+        self.W_k = nn.Linear(d_token, n_heads)
+        self.r_out = nn.Linear(d_token, d_token)
+        trainable.extend([self.k_proj, self.W_q, self.W_k, self.r_out])
+
+        for m in trainable:
+            # the "xavier" branch tries to follow torch.nn.MultiheadAttention;
+            # the second condition checks if W_v plays the role of W_out; the latter one
+            # is initialized with Kaiming in torch
+            if initialization == "xavier":
+                # gain is needed since W_qkv is represented with 3 separate layers (it
+                # implies different fan_out)
+                nn.init.xavier_uniform_(m.weight, gain=1 / math.sqrt(2))
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+
+
+    def forward(
+            self,
+            x_q: Tensor,
+            x_kv: Tensor,
+            *args,  # Not used. just to make the input consistent with MultiheadAttention.
+        ) -> Tuple[Tensor, Dict[str, Tensor]]:
+
+        batch_size, n_q_tokens, d_token = x_q.shape
+        batch_size, n_k_tokens, d_token = x_kv.shape
+
+        q = self.qv_proj(x_q) if self.share_qv_weights else self.q_proj(x_q)
+        v = self.qv_proj(x_kv) if self.share_qv_weights else self.v_proj(x_kv)
+        k = self.k_proj(x_kv)
+
+        alphas = (self.W_q(q) / math.sqrt(self.head_dim)).softmax(dim=-1)
+        q_r = (
+            q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
+        )
+        global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r)
+        global_query = (
+            global_query.reshape(batch_size, self.n_heads * self.head_dim)
+            .unsqueeze(1)
+        )
+
+        p = k * global_query
+
+        betas = (self.W_k(p) / math.sqrt(self.head_dim)).softmax(dim=-1)
+        p_r = (
+            p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
+        )
+        global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r)
+        global_key = (
+            global_key.reshape(batch_size, self.n_heads * self.head_dim)
+            .unsqueeze(1)
+        )
+
+        u = v * global_key
+        output = q + self.dropout(self.r_out(u))
+
+        return output, {
+            "query_weight": alphas,
+            "key_weight": betas,
+        }
+
 class FT_Transformer(nn.Module):
     """Transformer with extra features.
 
@@ -396,6 +518,8 @@ class FT_Transformer(nn.Module):
         head_normalization: ModuleType,
         d_out: int,
         projection: Optional[bool] = False,
+        additive_attention: Optional[bool] = True,
+        share_qv_weights: Optional[bool] = False,
     ) -> None:
         super().__init__()
         if isinstance(last_layer_query_idx, int):
@@ -411,6 +535,9 @@ class FT_Transformer(nn.Module):
             "If any of the following arguments is (not) None, then all of them must (not) be None: "
             "n_tokens, kv_compression_ratio, kv_compression_sharing"
         )
+        assert (
+            additive_attention or not share_qv_weights
+        ), "If `share_qv_weights` is True, then `additive_attention` must be True"
         assert kv_compression_sharing in [None, "headwise", "key-value", "layerwise"]
         if not prenormalization:
             if self.WARNINGS["prenormalization"]:
@@ -450,7 +577,14 @@ class FT_Transformer(nn.Module):
         for layer_idx in range(n_blocks):
             layer = nn.ModuleDict(
                 {
-                    "attention": MultiheadAttention(
+                    "attention": AdditiveAttention(
+                        d_token=d_token,
+                        n_heads=attention_n_heads,
+                        dropout=attention_dropout,
+                        bias=True,
+                        share_qv_weights=share_qv_weights,
+                        initialization=attention_initialization,
+                    ) if additive_attention else MultiheadAttention(
                         d_token=d_token,
                         n_heads=attention_n_heads,
                         dropout=attention_dropout,
