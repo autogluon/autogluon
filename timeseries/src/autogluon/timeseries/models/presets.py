@@ -135,18 +135,24 @@ def get_preset_models(
     will create models according to presets.
     """
     models = []
-    if isinstance(hyperparameters, str):
+    if hyperparameters is None:
+        hp_string = "default_hpo" if hyperparameter_tune else "default"
+        hyperparameters = copy.deepcopy(get_default_hps(hp_string, prediction_length))
+    elif isinstance(hyperparameters, str):
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
+    elif isinstance(hyperparameters, dict):
+        default_hps = copy.deepcopy(get_default_hps("default", prediction_length))
+        updated_hyperparameters = {}
+        # Only train models from `hyperparameters`, overload default HPs if provided
+        for model, hps in hyperparameters.items():
+            updated_hyperparameters[model] = default_hps.get(model, {})
+            updated_hyperparameters[model].update(hps)
+        hyperparameters = copy.deepcopy(updated_hyperparameters)
     else:
-        hp_str = "default" if not hyperparameter_tune else "default_hpo"
-        default_hps = copy.deepcopy(get_default_hps(hp_str, prediction_length))
-
-        if hyperparameters is not None:
-            # filter only default_hps for models with hyperparameters provided
-            default_hps = {model: default_hps.get(model, {}) for model in hyperparameters}
-            for model in hyperparameters:
-                default_hps[model].update(hyperparameters[model])
-        hyperparameters = copy.deepcopy(default_hps)
+        raise ValueError(
+            f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
+            "Please see the documentation for TimeSeriesPredictor.fit"
+        )
 
     if hyperparameter_tune:
         verify_contains_searchspace(hyperparameters)
