@@ -64,7 +64,6 @@ class CloudPredictor(ABC):
     def __init__(
         self,
         cloud_output_path,
-        role_arn=None,
         local_output_path=None,
         verbosity=2
     ):
@@ -79,11 +78,6 @@ class CloudPredictor(ABC):
             Note: To call `fit()` twice and save all results of each fit,
             you must either specify different `cloud_output_path` locations or only provide the bucket but not the subfolder.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
-        role_arn: str
-            The role_arn you want to use to grant cloud predictor necessary permission.
-            This permission required `SAGEMAKER_CLOUD_POLICY` can be find under `autogluon/cloud/utils/constants`.
-            You can use `CloudPredictor.setup_sagemaker_role_and_policy()` to create the role and policies for you.
-            If None, CloudPredictor will get the execution role of your current cli session.
         local_output_path: str
             Path to directory where downloaded trained predictor, batch transform results, and intermediate outputs should be saved
             If unspecified, a time-stamped folder called "AutogluonCloudPredictor/ag-[TIMESTAMP]" will be created in the working directory to store all downloaded trained predictor, batch transform results, and intermediate outputs.
