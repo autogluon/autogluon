@@ -272,6 +272,14 @@ def create_model(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
         )
+    elif model_name.lower().startswith(NER):
+        model = HFAutoModelForNER(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
+            pretrained=pretrained,
+        )
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(
             MultimodalFusionMLP,
