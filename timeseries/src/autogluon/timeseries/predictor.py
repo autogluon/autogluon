@@ -23,7 +23,7 @@ from .trainer import AbstractTimeSeriesTrainer
 logger = logging.getLogger(__name__)
 
 DEPRECATED_PRESETS_TO_FALLBACK = {
-    "low_quality": "local_models",
+    "low_quality": "fast_training",
     "high_quality": "medium_quality",
     "good_quality": "medium_quality",
 }
@@ -229,12 +229,12 @@ class TimeSeriesPredictor:
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="best_quality"``
-            to get a high-accuracy predictor, or set ``presets="local_models"`` to quickly fit multiple simple
+            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly fit multiple simple
             statistical models.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
-            Available presets are "best_quality", "medium_quality", and "local_models".
+            Available presets are "best_quality", "medium_quality", and "fast_training".
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
             ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).

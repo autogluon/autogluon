@@ -154,13 +154,15 @@ predictor = TimeSeriesPredictor(
 
 predictor.fit(
     train_data=train_data,
-    presets="local_models",
+    presets="fast_training",
 )
 ```
-Here we used the `"local_models"` presets to quickly obtain the results.
-In a short amount of time AutoGluon fits three statistical models (ARIMA, ETS, Theta), and a weighted ensemble on top of these models.
+Here we used the `"fast_training"` presets to quickly obtain the results.
+Under this setting, AutoGluon fits several local statistical models for forecasting (ARIMA, ETS, Theta).
+Moreover, AutoGluon fits a weighted ensemble on top of these models that is capable of predicting the quantiles.
 
-In realistic scenarios, we can set `presets` to be one of `"medium_quality"` or `"best_quality"`.
+The local models used under the `"fast_training"` presets are quick to train, but may be slow when making predictions for new unseen data.
+In practical scenarios, we can set `presets` to be one of `"medium_quality"` or `"best_quality"`.
 These presets additionally include powerful deep learning models (such as DeepAR, Temporal Fusion Transformer).
 Higher quality presets will usually produce more accurate forecasts but take longer to train and may produce less efficient models.
 
@@ -247,7 +249,7 @@ predictor = TimeSeriesPredictor(
 )
 predictor.fit(
     train_data=ts_dataframe,
-    presets="local_models",  # other options: "medium_quality", "best_quality"
+    presets="fast_training",  # other options: "medium_quality", "best_quality"
 )
 
 # Generate the forecasts

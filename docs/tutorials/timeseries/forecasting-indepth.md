@@ -178,7 +178,7 @@ The following presets are available:
 
 <!-- **TODO: These will be significantly changed by 0.6.0** -->
 
-- `"local_models"`: train simple statistical models (`"ETS"`, `"ARIMA"`, `"Theta"`). These model are fast to train but can be slow at prediction time for unseen data.
+- `"fast_training"`: train simple statistical models (`"ETS"`, `"ARIMA"`, `"Theta"`). These model are fast to train but can be slow at prediction time for unseen data.
 - `"medium_quality"`: train several selected models (`"ETS"`, `"ARIMA"`, `"DeepAR"`, `"SimpleFeedForward"`, `"TemporalFusionTransformer"`) without hyperparameter optimization. A good baseline setting.
 - `"best_quality"`: Train all available models with hyperparameter optimization.
 
