@@ -192,6 +192,8 @@ def apply_df_preprocessor(
     -------
     modality_features
         Preprocessed features of given modalities.
+    modality_types
+        Minor modality types of each major modality.
     sample_num
         Number of samples.
     """
@@ -237,7 +239,24 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
 
 
 def get_per_sample_features(modality_features: dict, modality_types: dict, idx: int, corpus: Optional[dict] = None):
+    """
+    Extract the modality features of one sample.
 
+    Parameters
+    ----------
+    modality_features
+        Modality features of all samples.
+    modality_types
+        Data types of all columns.
+    idx
+        The sample index.
+    corpus
+        A multimodal corpus including text, image, etc.
+
+    Returns
+    -------
+    One sample's modality features.
+    """
     ret = dict()
     for per_modality, per_modality_features in modality_features.items():
         if per_modality_features:

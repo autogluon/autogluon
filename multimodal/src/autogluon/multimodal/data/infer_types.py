@@ -241,6 +241,22 @@ def is_text_column(data: pd.Series) -> bool:
 
 
 def is_index_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> bool:
+    """
+    Check if a column is one index column.
+
+    Parameters
+    ----------
+    data
+        One column of multimodal pd.DataFrame.
+    col_name
+        Name of the column.
+    corpus
+        A multimodal corpus including text, image, etc.
+
+    Returns
+    -------
+    Whether the column is an index column.
+    """
     if not corpus or col_name not in corpus:
         return False
 
@@ -267,6 +283,18 @@ def is_index_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> 
 
 
 def infer_corpus_types(corpus: Dict[str, Dict]) -> Dict:
+    """
+    Infer the data types in a corpus.
+
+    Parameters
+    ----------
+    corpus
+        A multimodal corpus including text, image, etc.
+
+    Returns
+    -------
+    A dictionary containing the mappings from corpus names to their data types.
+    """
     corpus_types = collections.OrderedDict()
     if corpus is None:
         return corpus_types

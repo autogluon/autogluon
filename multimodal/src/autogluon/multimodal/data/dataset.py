@@ -36,6 +36,8 @@ class BaseDataset(torch.utils.data.Dataset):
             A list of multimodal feature preprocessors generating model-agnostic features.
         processors
             Data processors customizing data for each modality per model.
+        corpus
+             A multimodal corpus including text, image, etc.
         is_training
             Whether in training mode. Some data processing may be different between training
             and validation/testing/prediction, e.g., image data augmentation is used only in

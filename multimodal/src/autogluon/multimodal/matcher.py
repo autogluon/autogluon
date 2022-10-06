@@ -302,34 +302,10 @@ class MultiModalMatcher:
         ----------
         train_data
             A dataframe containing training data.
+        corpus
+             A multimodal corpus including text, image, etc.
         presets
             Name of the presets. See the available presets in `presets.py`.
-        config
-            A dictionary with four keys "model", "data", "optimization", and "environment".
-            Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
-            Strings should be the file names (DO NOT include the postfix ".yaml") in
-            automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
-            For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
-            config = {
-                        "model": "fusion_mlp_image_text_tabular",
-                        "data": "default",
-                        "optimization": "adamw",
-                        "environment": "default",
-                    }
-            or
-            config = {
-                        "model": "/path/to/model/config.yaml",
-                        "data": "/path/to/data/config.yaml",
-                        "optimization": "/path/to/optimization/config.yaml",
-                        "environment": "/path/to/environment/config.yaml",
-                    }
-            or
-            config = {
-                        "model": OmegaConf.load("/path/to/model/config.yaml"),
-                        "data": OmegaConf.load("/path/to/data/config.yaml"),
-                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
-                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
-                    }
         tuning_data
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
@@ -1139,6 +1115,8 @@ class MultiModalMatcher:
         ----------
         data
             A dataframe, containing the same columns as the training data
+        corpus
+             A multimodal corpus including text, image, etc.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
@@ -1209,13 +1187,33 @@ class MultiModalMatcher:
         return_prob: Optional[bool] = False,
         as_pandas: Optional[bool] = None,
     ):
-        query_embeddings = self.extract_embedding(query_data, corpus=corpus, as_tensor=True)
+        """
+        Perform a cosine similarity search between query data and response data.
+
+        Parameters
+        ----------
+        query_data
+            The query data.
+        response_data
+            The response data.
+        corpus
+            A multimodal corpus including text, image, etc.
+        return_prob
+            Whether to return the probability.
+        as_pandas
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+
+        Returns
+        -------
+        Search results.
+        """
+        query_embeddings = self.extract_embedding(query_data, signature=QUERY, corpus=corpus, as_tensor=True)
         assert (
             len(query_embeddings) == 1
         ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
         query_embeddings = list(query_embeddings.values())[0]
 
-        response_embeddings = self.extract_embedding(response_data, corpus=corpus, as_tensor=True)
+        response_embeddings = self.extract_embedding(response_data, signature=RESPONSE, corpus=corpus, as_tensor=True)
         assert (
             len(response_embeddings) == 1
         ), f"Multiple embedding types `{response_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
@@ -1249,8 +1247,8 @@ class MultiModalMatcher:
         data
              The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
-        response_data
-            The candidate data from which to search the query data's matches.
+        corpus
+             A multimodal corpus including text, image, etc.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
 
@@ -1296,8 +1294,8 @@ class MultiModalMatcher:
         data
             The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
-        response_data
-            The candidate data from which to search the query data's matches.
+        corpus
+             A multimodal corpus including text, image, etc.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -1336,7 +1334,6 @@ class MultiModalMatcher:
         data: Union[pd.DataFrame, dict, list],
         signature: str,
         corpus: Optional[Dict[str, Dict]] = None,
-        return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
     ):
@@ -1348,9 +1345,10 @@ class MultiModalMatcher:
         data
             The data to extract embeddings for. Should contain same column names as training dataset and
             follow same format (except for the `label` column).
-        return_masks
-            If true, returns a mask dictionary, whose keys are the same as those in the features dictionary.
-            If a sample has empty input in feature column `image_0`, the sample will has mask 0 under key `image_0`.
+        signature
+            query or response
+        corpus
+             A multimodal corpus including text, image, etc.
         as_tensor
             Whether to return a Pytorch tensor.
         as_pandas

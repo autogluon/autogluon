@@ -699,6 +699,20 @@ def get_metric_learning_distance_func(
 
 
 def infer_matcher_loss(data_format: str, problem_type: str):
+    """
+    Infer the loss type to train the matcher.
+
+    Parameters
+    ----------
+    data_format
+        The training data format, e.g., pair or triplet.
+    problem_type
+        Type of problem.
+
+    Returns
+    -------
+    The loss name.
+    """
     if data_format == "pair":
         if problem_type is None:
             return ["multi_negatives_softmax_loss"]
@@ -730,12 +744,22 @@ def get_matcher_loss_func(
 
     Parameters
     ----------
-    matches
-        A list of matches from the matcher config.
+    data_format
+        The training data format, e.g., pair or triplet.
+    problem_type
+        Type of problem.
+    loss_type
+        The provided loss type.
+    pos_margin
+        The positive margin in computing the metric learning loss.
+    neg_margin
+        The negative margin in computing the metric learning loss.
+    distance_type
+        The distance function type.
 
     Returns
     -------
-    A list of loss functions from the pytorch metric learning package.
+    A loss function of metric learning.
     """
 
     allowable_loss_types = infer_matcher_loss(data_format=data_format, problem_type=problem_type)
@@ -761,17 +785,23 @@ def get_matcher_miner_func(
     distance_type: str,
 ):
     """
-    Return a list of pytorch metric learning's miner functions based on their names.
+    Return a pytorch metric learning's miner functions based on their names.
     The miners are used to mine the positive and negative examples.
 
     Parameters
     ----------
-    matches
-        A list of matches from the matcher config.
+    miner_type
+        The miner function type.
+    pos_margin
+        The positive margin used by the miner function.
+    neg_margin
+        The negative margin used by the miner function.
+    distance_type
+        The distance function type.
 
     Returns
     -------
-    A list of miner functions from the pytorch metric learning package.
+    A miner function to mine positive and negative samples.
     """
     if miner_type.lower() == PAIR_MARGIN_MINER:
         return miners.PairMarginMiner(

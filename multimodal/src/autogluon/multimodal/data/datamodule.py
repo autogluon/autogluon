@@ -55,6 +55,8 @@ class BaseDataModule(LightningDataModule):
             Test data.
         predict_data
             Prediction data. No labels required in it.
+        corpus
+             A multimodal corpus including text, image, etc.
         """
         super().__init__()
         self.prepare_data_per_node = True

@@ -35,8 +35,8 @@ class MatcherLitModule(pl.LightningModule):
         query_model: nn.Module,
         response_model: nn.Module,
         signature: Optional[str] = None,
-        matches: Optional[List[DictConfig]] = None,
         match_label: Optional[int] = None,
+        matches: Optional[List[DictConfig]] = None,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
         lr_schedule: Optional[str] = None,
@@ -52,18 +52,21 @@ class MatcherLitModule(pl.LightningModule):
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
-        efficient_finetune: Optional[str] = None,
     ):
         """
         Parameters
         ----------
-        model
-            A Pytorch model
+        query_model
+            The query model.
+        response_model
+            The response model.
+        signature
+            query or response.
+        match_label
+            The label of match class.
         matches
             A list of DictConfigs, each of which defines one pair of feature column match and the configs
             to compute the matching loss.
-        match_label
-            The label of match class.
         optim_type
             Optimizer type. We now support:
             - adamw
@@ -111,15 +114,6 @@ class MatcherLitModule(pl.LightningModule):
             Refer to https://github.com/PyTorchLightning/metrics/blob/master/torchmetrics/aggregation.py
         test_metric
             A torchmetrics module used in the test stage, e.g., torchmetrics.Accuracy().
-        efficient_finetune
-            Whether to use efficient finetuning strategies. This will be helpful for fast finetuning of large backbones.
-            We support options such as:
-
-            - bit_fit (only finetune the bias terms)
-            - norm_fit (only finetune the weights in norm layers / bias layer)
-            - lora, lora_bias, lora_norm (only finetunes decomposition matrices inserted into model, in combination with either bit_fit or norm_fit)
-            - ia3, ia3_bias, ia3_norm (adds vector that scales activations by learned vectors, in combination with either bit_fit or norm_fit)
-            - None (do not use efficient finetuning strategies)
         """
         super().__init__()
         self.save_hyperparameters(
