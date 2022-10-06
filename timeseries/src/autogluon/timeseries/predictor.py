@@ -242,7 +242,7 @@ class TimeSeriesPredictor:
             Determines the hyperparameters used by each model.
 
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
-            or "toy". The "toy" setting is only intended for prototyping.
+            or "local_only".
 
             If dict is provided, the keys are strings or Types that indicate which model types to train. In this case,
             the predictor will only train the given model types. Stable model options include: "DeepAR", "MQCNN", and

@@ -194,7 +194,7 @@ def test_given_random_seed_when_learner_called_then_random_seed_set_correctly(te
     learner = TimeSeriesLearner(**init_kwargs)
     learner.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters="toy",
+        hyperparameters="local_only",
         val_data=DUMMY_TS_DATAFRAME,
         time_limit=2,
     )
