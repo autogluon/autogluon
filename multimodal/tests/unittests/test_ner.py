@@ -1,6 +1,7 @@
-from autogluon.multimodal import MultiModalPredictor
-import pytest
 import pandas as pd
+import pytest
+
+from autogluon.multimodal import MultiModalPredictor
 
 
 def get_data():
@@ -40,3 +41,10 @@ def test_ner(checkpoint_name):
         time_limit=30,
         hyperparameters={"model.ner.checkpoint_name": checkpoint_name},
     )
+
+    scores = predictor.evaluate(train_data)
+
+    test_predict = train_data.drop(label_col, axis=1)
+    test_predict = test_predict.head(2)
+    predictions = predictor.predict(test_predict)
+    embeddings = predictor.extract_embedding(test_predict)
