@@ -58,21 +58,10 @@ SAGEMAKER_CLOUD_POLICY = {
             "Sid": "IAM",
             "Effect": "Allow",
             "Action": [
-                "iam:CreatePolicy",
-                "iam:DeletePolicy",
-                "iam:AttachRolePolicy",
-                "iam:DetachRolePolicy",
-                "iam:ListAttachedRolePolicies",
-                "iam:GetRolePolicy",
-                "iam:CreateRole",
-                "iam:DeleteRole",
-                "iam:GetRole",
-                "iam:UpdateRole",
                 "iam:PassRole"
             ],
             "Resource": [
                 f"arn:aws:iam::{POLICY_ACCOUNT_PLACE_HOLDER}:role/*",
-                f"arn:aws:iam::{POLICY_ACCOUNT_PLACE_HOLDER}:policy/*"
             ]
         },
         {
@@ -100,19 +89,43 @@ SAGEMAKER_CLOUD_POLICY = {
             "Effect": "Allow",
             "Action": [
                 "s3:PutObject",
+                "s3:PutObjectAcl",
+                "s3:GetObject",
                 "s3:GetObjectAcl",
-                "s3:GetObject"
+                "s3:AbortMultipartUpload"
             ],
             "Resource": [
                 f"arn:aws:s3:::{POLICY_BUCKET_PLACE_HOLDER}/*",
-                "arn:aws:s3:::sagemaker-*/*"
+                f"arn:aws:s3:::{POLICY_BUCKET_PLACE_HOLDER}",
+                "arn:aws:s3:::*SageMaker*",
+                "arn:aws:s3:::*Sagemaker*",
+                "arn:aws:s3:::*sagemaker*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetBucketAcl",
+                "s3:PutObjectAcl"
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{POLICY_BUCKET_PLACE_HOLDER}/*",
+                f"arn:aws:s3:::{POLICY_BUCKET_PLACE_HOLDER}",
+                "arn:aws:s3:::*SageMaker*",
+                "arn:aws:s3:::*Sagemaker*",
+                "arn:aws:s3:::*sagemaker*"
             ]
         },
         {
             "Sid": "S3Bucket",
             "Effect": "Allow",
             "Action": [
-                "s3:CreateBucket"
+                "s3:CreateBucket",
+                "s3:GetBucketLocation",
+                "s3:ListBucket",
+                "s3:ListAllMyBuckets",
+                "s3:GetBucketCors",
+                "s3:PutBucketCors"
             ],
             "Resource": [
                 "arn:aws:s3:::*"
@@ -131,6 +144,121 @@ SAGEMAKER_CLOUD_POLICY = {
             ],
             "Resource": [
                 "*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "sagemaker:CreatePresignedDomainUrl",
+                "sagemaker:DescribeDomain",
+                "sagemaker:ListDomains",
+                "sagemaker:DescribeUserProfile",
+                "sagemaker:ListUserProfiles",
+                "sagemaker:*App",
+                "sagemaker:ListApps"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "sagemaker:*",
+            "Resource": [
+                "arn:aws:sagemaker:*:*:flow-definition/*"
+            ],
+            "Condition": {
+                "StringEqualsIfExists": {
+                    "sagemaker:WorkteamType": [
+                        "private-crowd",
+                        "vendor-crowd"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "Others",
+            "Effect": "Allow",
+            "Action": [
+                "application-autoscaling:DeleteScalingPolicy",
+                "application-autoscaling:DeleteScheduledAction",
+                "application-autoscaling:DeregisterScalableTarget",
+                "application-autoscaling:DescribeScalableTargets",
+                "application-autoscaling:DescribeScalingActivities",
+                "application-autoscaling:DescribeScalingPolicies",
+                "application-autoscaling:DescribeScheduledActions",
+                "application-autoscaling:PutScalingPolicy",
+                "application-autoscaling:PutScheduledAction",
+                "application-autoscaling:RegisterScalableTarget",
+                "cloudwatch:DeleteAlarms",
+                "cloudwatch:DescribeAlarms",
+                "cloudwatch:GetMetricData",
+                "cloudwatch:GetMetricStatistics",
+                "cloudwatch:ListMetrics",
+                "cloudwatch:PutMetricAlarm",
+                "cloudwatch:PutMetricData",
+                "ec2:CreateNetworkInterface",
+                "ec2:CreateNetworkInterfacePermission",
+                "ec2:CreateVpcEndpoint",
+                "ec2:DeleteNetworkInterface",
+                "ec2:DeleteNetworkInterfacePermission",
+                "ec2:DescribeDhcpOptions",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeRouteTables",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeVpcEndpoints",
+                "ec2:DescribeVpcs",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:BatchGetImage",
+                "ecr:CreateRepository",
+                "ecr:Describe*",
+                "ecr:GetAuthorizationToken",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:StartImageScan",
+                "elastic-inference:Connect",
+                "elasticfilesystem:DescribeFileSystems",
+                "elasticfilesystem:DescribeMountTargets",
+                "fsx:DescribeFileSystems",
+                "iam:ListRoles",
+                "kms:DescribeKey",
+                "kms:ListAliases",
+                "lambda:ListFunctions",
+                "logs:CreateLogDelivery",
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:DeleteLogDelivery",
+                "logs:Describe*",
+                "logs:GetLogDelivery",
+                "logs:GetLogEvents",
+                "logs:ListLogDeliveries",
+                "logs:PutLogEvents",
+                "logs:PutResourcePolicy",
+                "logs:UpdateLogDelivery",
+                "sns:ListTopics",
+                "tag:GetResources"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Action": "iam:CreateServiceLinkedRole",
+            "Effect": "Allow",
+            "Resource": "arn:aws:iam::*:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint",
+            "Condition": {
+                "StringLike": {
+                    "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "sns:Subscribe",
+                "sns:CreateTopic",
+                "sns:Publish"
+            ],
+            "Resource": [
+                "arn:aws:sns:*:*:*SageMaker*",
+                "arn:aws:sns:*:*:*Sagemaker*",
+                "arn:aws:sns:*:*:*sagemaker*"
             ]
         }
     ]
