@@ -60,6 +60,7 @@ if __name__ == "__main__":
         "--images_dir", type=str, required=False, default=get_env_if_present("SM_CHANNEL_IMAGES")
     )
     parser.add_argument("--ag_config", type=str, default=get_env_if_present("SM_CHANNEL_CONFIG"))
+    parser.add_argument("--serving_script", type=str, default=get_env_if_present("SM_CHANNEL_SERVING"))
 
     args, _ = parser.parse_known_args()
 
@@ -132,3 +133,9 @@ if __name__ == "__main__":
         if config.get("leaderboard", False):
             lb = predictor.leaderboard(silent=False)
             lb.to_csv(f"{args.output_data_dir}/leaderboard.csv")
+
+    print('Saving serving script')
+    serving_script_saving_path = os.path.join(save_path, 'code')
+    os.mkdir(serving_script_saving_path)
+    serving_script_path = get_input_path(args.serving_script)
+    shutil.move(serving_script_path, os.path.join(serving_script_saving_path, os.path.basename(serving_script_path)))

@@ -73,6 +73,7 @@ from .data.infer_types import (
     infer_label_column_type_by_problem_type,
     infer_problem_type_output_shape,
 )
+from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
@@ -88,6 +89,7 @@ from .utils import (
     assign_feature_column_names,
     average_checkpoints,
     bbox_xyxy_to_xywh,
+    compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
@@ -120,6 +122,7 @@ from .utils import (
     try_to_infer_pos_label,
     turn_on_off_feature_column_info,
     update_config_by_rules,
+    use_realtime,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -1334,32 +1337,14 @@ class MultiModalPredictor:
 
     def _default_predict(
         self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
+        batch_size: int,
+        strategy: str,
     ) -> List[Dict]:
-
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
-            data=data,
-            requires_label=requires_label,
-        )
-
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy="dp")
-
-        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
-
-        if self._config.env.per_gpu_batch_size_evaluation:
-            batch_size = self._config.env.per_gpu_batch_size_evaluation
-        else:
-            batch_size = self._config.env.per_gpu_batch_size * self._config.env.eval_batch_size_ratio
-
-        if num_gpus > 1:
-            strategy = "dp"
-            # If using 'dp', the per_gpu_batch_size would be split by all GPUs.
-            # So, we need to use the GPU number as a multiplier to compute the batch size.
-            batch_size = batch_size * num_gpus
-        else:
-            strategy = None
 
         if hasattr(self._config, MATCHER):
             turn_on_off_feature_column_info(
@@ -1545,7 +1530,9 @@ class MultiModalPredictor:
             )
             processed_features.append(per_sample_features)
 
-        collate_fn = get_collate_fn(df_preprocessor=df_preprocessor, data_processors=data_processors)
+        collate_fn = get_collate_fn(
+            df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num
+        )
         batch = collate_fn(processed_features)
 
         return batch
@@ -1554,6 +1541,8 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
+        num_gpus: int,
+        precision: Union[int, str],
     ) -> List[Dict]:
         batch = self._process_batch(
             data=data,
@@ -1562,8 +1551,8 @@ class MultiModalPredictor:
         output = infer_batch(
             batch=batch,
             model=self._model,
-            precision=self._config.env.precision,
-            num_gpus=self._config.env.num_gpus,
+            precision=precision,
+            num_gpus=num_gpus,
             model_postprocess_fn=self._model_postprocess_fn,
         )
         return [output]
@@ -1572,17 +1561,52 @@ class MultiModalPredictor:
         self,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ) -> List[Dict]:
+
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
+            data=data,
+            requires_label=requires_label,
+        )
+
+        strategy = "dp"  # default used in inference.
+
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
+        if num_gpus == 1:
+            strategy = None
+
+        precision = infer_precision(num_gpus=num_gpus, precision=self._config.env.precision)
+
+        if not realtime:
+            batch_size = compute_inference_batch_size(
+                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+                eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+                per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,  # backward compatibility.
+                num_gpus=num_gpus,
+                strategy=strategy,
+            )
+
+        if realtime is None:
+            realtime = use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
+
         if realtime:
             outputs = self._realtime_predict(
                 data=data,
-                requires_label=requires_label,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
             )
         else:
             outputs = self._default_predict(
                 data=data,
-                requires_label=requires_label,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                batch_size=batch_size,
+                strategy=strategy,
             )
 
         return outputs
@@ -1592,7 +1616,7 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1608,7 +1632,9 @@ class MultiModalPredictor:
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1711,7 +1737,7 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -1726,7 +1752,9 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1786,7 +1814,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1805,7 +1833,9 @@ class MultiModalPredictor:
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------
@@ -1861,7 +1891,7 @@ class MultiModalPredictor:
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1879,7 +1909,9 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data.
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
 
         Returns
         -------

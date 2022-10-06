@@ -18,22 +18,23 @@ logger = logging.getLogger(__name__)
 class ETSModel(AbstractStatsmodelsModel):
     """Exponential smoothing with trend and seasonality.
 
-    Based on `statsmodels.tsa.exponential_smoothing.ets.ETSModel`.
+    Based on `statsmodels.tsa.exponential_smoothing.ets.ETSModel <https://www.statsmodels.org/stable/generated/statsmodels.tsa.exponential_smoothing.ets.ETSModel.html>`_.
 
-    See `AbstractStatsmodelsModel` for common parameters.
+    Our implementation contains several improvements over the Statsmodels version, such
+    as multi-CPU training and reducing the disk usage when saving models.
 
 
     Other Parameters
     ----------------
-    error : str, default = "add"
+    error : {"add", "mul"}, default = "add"
         Error model. Allowed values are "add" (additive) and "mul" (multiplicative).
         Note that "mul" is only applicable to time series with positive values.
-    trend : str or None, default = "add"
+    trend : {"add", "mul", None}, default = "add"
         Trend component model. Allowed values are "add" (additive), "mul" (multiplicative) and None (disabled).
         Note that "mul" is only applicable to time series with positive values.
     damped_trend : bool, default = False
         Whether or not the included trend component is damped.
-    seasonal : str or None, default = "add"
+    seasonal : {"add", "mul", None}, default = "add"
         Seasonal component model. Allowed values are "add" (additive), "mul" (multiplicative) and None (disabled).
         Note that "mul" is only applicable to time series with positive values.
     seasonal_period : int or None, default = None
@@ -42,6 +43,7 @@ class ETSModel(AbstractStatsmodelsModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+        Seasonality will also be disabled, if the length of the time series is < 2 * seasonal_period.
     maxiter : int, default = 1000
         Number of iterations during optimization.
     n_jobs : int or float, default = 0.5
@@ -121,9 +123,11 @@ class ETSModel(AbstractStatsmodelsModel):
 class ARIMAModel(AbstractStatsmodelsModel):
     """Autoregressive Integrated Moving Average (ARIMA) model.
 
-    Based on `statsmodels.tsa.statespace.sarimax.SARIMAX`
+    Based on `statsmodels.tsa.statespace.sarimax.SARIMAX <https://www.statsmodels.org/stable/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html>`_.
 
-    See `AbstractStatsmodelsModel` for common parameters.
+    Our implementation contains several improvements over the Statsmodels version, such
+    as multi-CPU training and reducing the disk usage when saving models.
+
 
     Other Parameters
     ----------------
@@ -140,8 +144,10 @@ class ARIMAModel(AbstractStatsmodelsModel):
     enforce_stationarity : bool, default = True
         Whether to transform the AR parameters to enforce stationarity in the autoregressive component of the model.
         If ARIMA crashes during fitting with an LU decomposition error, you can either set enforce_stationarity to
-        False or increase the differencing parameter `d` in `order`.
-    maxiter : int, default = 1000
+        False or increase the differencing parameter ``d`` in ``order``.
+    enforce_invertibility : bool, default = True
+        Whether to transform the MA parameters to enforce invertibility in the moving average component of the model.
+    maxiter : int, default = 50
         Number of iterations during optimization.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
@@ -156,6 +162,7 @@ class ARIMAModel(AbstractStatsmodelsModel):
         "seasonal_order",
         "seasonal_period",
         "enforce_stationarity",
+        "enforce_invertibility",
     ]
     statsmodels_allowed_fit_args = [
         "maxiter",

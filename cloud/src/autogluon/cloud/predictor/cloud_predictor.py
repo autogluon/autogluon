@@ -22,11 +22,9 @@ from ..data import FormatConverterFactory
 from ..job import SageMakerFitJob, SageMakerBatchTransformationJob
 from ..scripts import ScriptManager
 from ..utils.ag_sagemaker import (
-    AutoGluonSagemakerEstimator,
-    AutoGluonSagemakerInferenceModel,
+    AutoGluonRepackInferenceModel,
+    AutoGluonNonRepackInferenceModel,
     AutoGluonRealtimePredictor,
-    AutoGluonImageRealtimePredictor,
-    AutoGluonMultiModalRealtimePredictor,
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import setup_sagemaker_role_and_policy, setup_sagemaker_session
@@ -38,7 +36,6 @@ from ..utils.sagemaker_utils import (
     retrieve_latest_framework_version
 )
 from ..utils.utils import (
-    read_image_bytes_and_encode,
     convert_image_path_to_encoded_bytes_in_dataframe,
     zipfolder,
     is_compressed_file,
@@ -103,6 +100,9 @@ class CloudPredictor(ABC):
 
         self._region = self.sagemaker_session.boto_region_name
         self._fit_job = SageMakerFitJob(session=self.sagemaker_session)
+        # This holds the Model object after training.
+        # After saving or loading, this can only hold a string representing the name of the model in sagemaker model
+        self._fitted_sagemaker_model_entity = None
         self._batch_transform_jobs = MostRecentInsertedOrderedDict()
 
     @property
@@ -253,6 +253,7 @@ class CloudPredictor(ABC):
         train_data,
         tune_data,
         config,
+        serving_script,
         images=None,
     ):
         cloud_bucket, cloud_key_prefix = s3_path_to_bucket_prefix(self.cloud_output_path)
@@ -286,12 +287,18 @@ class CloudPredictor(ABC):
             key_prefix=util_key_prefix
         )
 
+        serving_input = self.sagemaker_session.upload_data(
+            path=serving_script,
+            bucket=cloud_bucket,
+            key_prefix=util_key_prefix
+        )
+
         images_input = self._upload_fit_image_artifact(
             images=images,
             bucket=cloud_bucket,
             key_prefix=util_key_prefix
         )
-        inputs = dict(train=train_input, config=config_input)
+        inputs = dict(train=train_input, config=config_input, serving=serving_input)
         if tune_input is not None:
             inputs['tune'] = tune_input
         if images_input is not None:
@@ -410,6 +417,7 @@ class CloudPredictor(ABC):
             tune_data=tune_data,
             config=config,
             images=image_path,
+            serving_script=ScriptManager.get_serve_script(self.predictor_type, framework_version)  # Training and Inference should have the same framework_version
         )
 
         self._fit_job.run(
@@ -527,7 +535,7 @@ class CloudPredictor(ABC):
         instance_type='ml.m5.2xlarge',
         initial_instance_count=1,
         wait=True,
-        autogluon_sagemaker_inference_model_kwargs=dict(),
+        model_kwargs=dict(),
         **kwargs
     ):
         """
@@ -555,9 +563,9 @@ class CloudPredictor(ABC):
         wait: Bool, default = True,
             Whether to wait for the endpoint to be deployed.
             To be noticed, the function won't return immediately because there are some preparations needed prior deployment.
-        autogluon_sagemaker_inference_model_kwargs: dict, default = dict()
-            Any extra arguments needed to initialize AutoGluonSagemakerInferenceModel
-            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel for all options
+        model_kwargs: dict, default = dict()
+            Any extra arguments needed to initialize Sagemaker Model
+            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#model for all options
         **kwargs:
             Any extra arguments needed to pass to deploy.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.Model.deploy for all options
@@ -575,19 +583,28 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
-        autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
-        user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
+        model_kwargs = copy.deepcopy(model_kwargs)
+        user_entry_point = model_kwargs.pop('entry_point', None)
         if user_entry_point:
             logger.warning(f'Providing a custom entry point could break the deployment. Please refer to `{entry_point}` for our implementation')
             entry_point = user_entry_point
 
+        repack_model = False
+        if predictor_path != self._fit_job.get_output_path() or user_entry_point is not None:
+            # Not inference on cloud trained model or not using inference on cloud trained model
+            # Need to repack the code into model. This will slow down batch inference and deployment
+            repack_model = True
         predictor_cls = self._realtime_predictor_cls
-        user_predictor_cls = autogluon_sagemaker_inference_model_kwargs.pop('predictor_cls', None)
+        user_predictor_cls = model_kwargs.pop('predictor_cls', None)
         if user_predictor_cls:
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonRealtimePredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
 
-        model = AutoGluonSagemakerInferenceModel(
+        if repack_model:
+            model_cls = AutoGluonRepackInferenceModel
+        else:
+            model_cls = AutoGluonNonRepackInferenceModel
+        model = model_cls(
             model_data=predictor_path,
             role=self.role_arn,
             region=self._region,
@@ -596,7 +613,7 @@ class CloudPredictor(ABC):
             instance_type=instance_type,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
-            **autogluon_sagemaker_inference_model_kwargs
+            **model_kwargs
         )
 
         logger.log(20, 'Deploying model to the endpoint')
@@ -716,7 +733,7 @@ class CloudPredictor(ABC):
         instance_type='ml.m5.2xlarge',
         instance_count=1,
         wait=True,
-        autogluon_sagemaker_inference_model_kwargs=dict(),
+        model_kwargs=dict(),
         transformer_kwargs=dict(),
         **kwargs,
     ):
@@ -752,9 +769,9 @@ class CloudPredictor(ABC):
         wait: bool, default = True
             Whether to wait for batch transform to complete.
             To be noticed, the function won't return immediately because there are some preparations needed prior transform.
-        autogluon_sagemaker_inference_model_kwargs: dict, default = dict()
-            Any extra arguments needed to initialize AutoGluonSagemakerInferenceModel
-            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#sagemaker.model.FrameworkModel for all options
+        model_kwargs: dict, default = dict()
+            Any extra arguments needed to initialize Sagemaker Model
+            Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/model.html#model for all options
         transformer_kwargs: dict
             Any extra arguments needed to pass to transformer.
             Please refer to https://sagemaker.readthedocs.io/en/stable/api/inference/transformer.html#sagemaker.transformer.Transformer for all options.
@@ -793,13 +810,18 @@ class CloudPredictor(ABC):
 
         self._serve_script_path = ScriptManager.get_serve_script(self.predictor_type, framework_version)
         entry_point = self._serve_script_path
-        autogluon_sagemaker_inference_model_kwargs = copy.deepcopy(autogluon_sagemaker_inference_model_kwargs)
-        user_entry_point = autogluon_sagemaker_inference_model_kwargs.pop('entry_point', None)
+        model_kwargs = copy.deepcopy(model_kwargs)
+        user_entry_point = model_kwargs.pop('entry_point', None)
+        repack_model = False
+        if predictor_path != self._fit_job.get_output_path() or user_entry_point is not None:
+            # Not inference on cloud trained model or not using inference on cloud trained model
+            # Need to repack the code into model. This will slow down batch inference and deployment
+            repack_model = True
         if user_entry_point:
             entry_point = user_entry_point
 
         predictor_cls = AutoGluonBatchPredictor
-        user_predictor_cls = autogluon_sagemaker_inference_model_kwargs.pop('predictor_cls', None)
+        user_predictor_cls = model_kwargs.pop('predictor_cls', None)
         if user_predictor_cls:
             logger.warning('Providing a custom predictor_cls could break the deployment. Please refer to `AutoGluonBatchPredictor` for how to provide a custom predictor')
             predictor_cls = user_predictor_cls
@@ -831,7 +853,8 @@ class CloudPredictor(ABC):
             content_type=content_type,
             wait=wait,
             transformer_kwargs=transformer_kwargs,
-            autogluon_sagemaker_inference_model_kwargs=autogluon_sagemaker_inference_model_kwargs,
+            model_kwargs=model_kwargs,
+            repack_model=repack_model,
             **kwargs
         )
         self._batch_transform_jobs[job_name] = batch_transform_job
