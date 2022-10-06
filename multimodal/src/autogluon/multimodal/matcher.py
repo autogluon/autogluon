@@ -1501,19 +1501,14 @@ class MultiModalMatcher:
                 fp,
                 ensure_ascii=True,
             )
-        # In case that users save to a path, which is not the original save_path.
-        if not os.path.samefile(path, self._save_path):
-            model_path = os.path.join(self._save_path, MODEL_CHECKPOINT)
-            if os.path.isfile(model_path):
-                shutil.copy(model_path, os.path.join(path, MODEL_CHECKPOINT))
-            else:
-                # FIXME(?) Fix the saving logic
-                RuntimeError(
-                    f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
-                    f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
-                    f"removed."
-                )
-            assert os.path.isfile(os.path.join(path, MODEL_CHECKPOINT))
+
+        task = MatcherLitModule(
+            query_model=self._query_model,
+            response_model=self._response_model,
+        )
+
+        checkpoint = {"state_dict": task.state_dict()}
+        torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(
