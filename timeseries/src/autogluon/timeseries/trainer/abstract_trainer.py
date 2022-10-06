@@ -568,6 +568,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if time_limit is not None and len(models) > 0:
             time_limit_model_split /= len(models)
 
+        # TODO: Allow HPO only for some models?
         model_names_trained = []
         for i, model in enumerate(models):
             if hyperparameter_tune_kwargs is not None:
