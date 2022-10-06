@@ -82,13 +82,17 @@ def get_default_hps(key, prediction_length):
             },
         },
         "default_hpo": {
+            "ARIMA": {
+                "order": ag.Categorical((2, 0, 1), (2, 1, 0), (2, 1, 1), (1, 1, 1)),
+                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
+            },
             "ETS": {
                 "trend": ag.Categorical("add", None),
                 "seasonal": ag.Categorical("add", None),
             },
-            "ARIMA": {
-                "order": ag.Categorical((2, 0, 1), (2, 1, 0), (2, 1, 1), (1, 1, 1)),
-                "seasonal_order": ag.Categorical((0, 0, 0), (1, 0, 0)),
+            "Theta": {
+                "deseasonalize": ag.Categorical(True, False),
+                "method": ag.Categorical("auto", "additive"),
             },
             "DeepAR": {
                 "cell_type": ag.Categorical("gru", "lstm"),
@@ -110,10 +114,6 @@ def get_default_hps(key, prediction_length):
                 "hidden_dim": ag.Categorical(32, 64),
                 "batch_size": 64,
                 "context_length": context_length,
-            },
-            "Theta": {
-                "deseasonalize": ag.Categorical(True, False),
-                "method": ag.Categorical("auto", "additive"),
             },
         },
     }
