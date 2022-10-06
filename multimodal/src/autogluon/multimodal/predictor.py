@@ -1506,13 +1506,10 @@ class MultiModalPredictor:
     def _process_batch(
         self,
         data: Union[pd.DataFrame, dict, list],
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
         requires_label: bool,
     ):
-        data, df_preprocessor, data_processors = self._on_predict_start(
-            config=self._config,
-            data=data,
-            requires_label=requires_label,
-        )
 
         modality_features, sample_num = apply_df_preprocessor(
             data=data,
@@ -1539,14 +1536,16 @@ class MultiModalPredictor:
 
     def _realtime_predict(
         self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
         num_gpus: int,
         precision: Union[int, str],
     ) -> List[Dict]:
         batch = self._process_batch(
             data=data,
-            requires_label=requires_label,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
         )
         output = infer_batch(
             batch=batch,
@@ -2140,9 +2139,16 @@ class MultiModalPredictor:
             else:
                 data = data[:2]
 
-        batch = self._process_batch(
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
             data=data,
             requires_label=requires_label,
+        )
+
+        batch = self._process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
         )
 
         ret = {}
