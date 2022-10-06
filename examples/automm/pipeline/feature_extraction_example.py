@@ -15,7 +15,7 @@ import torch
 from torch import tensor
 
 
-def eval(predictor, df, onnx_session=None):
+def evaluate(predictor, df, onnx_session=None):
     labels = df["score"].to_numpy()
 
     # TODO: line below only outputs one embedding since dataloader merge text columns automatically
@@ -60,12 +60,12 @@ def main(args):
         },
     )
     ag_load = time.time()
-    eval(predictor, test_df)
+    evaluate(predictor, test_df)
     ag_eval = time.time()
 
     ort_sess = ort.InferenceSession(args.onnx_path, providers=["CUDAExecutionProvider"])
     onnx_load = time.time()
-    eval(predictor, test_df, ort_sess)
+    evaluate(predictor, test_df, ort_sess)
     onnx_eval = time.time()
 
     print("Autogluon load time: %.4f" % (ag_load - start))
@@ -82,7 +82,7 @@ def main(args):
             "optimization.max_epochs": 1,
         },
     )
-    eval(predictor, test_df)
+    evaluate(predictor, test_df)
 
 
 if __name__ == "__main__":
