@@ -2,6 +2,7 @@ import codecs
 import random
 from typing import Iterable, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 from nlpaug import Augmenter
 from nlpaug.util import Method
