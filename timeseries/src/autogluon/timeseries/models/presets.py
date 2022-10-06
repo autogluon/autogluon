@@ -59,39 +59,18 @@ DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
 
 
-# TODO: Should we include TBATS to the presets?
 def get_default_hps(key, prediction_length):
     context_length = max(prediction_length * 2, MINIMUM_CONTEXT_LENGTH)
     default_model_hps = {
-        "toy": {
-            "ETS": {
-                "maxiter": 20,
-                "seasonal": None,
-            },
-            "ARIMA": {
-                "maxiter": 10,
-                "order": (1, 0, 0),
-            },
-            "DeepAR": {
-                "epochs": 10,
-                "num_batches_per_epoch": 10,
-                "context_length": 5,
-            },
-            "SimpleFeedForward": {
-                "epochs": 10,
-                "num_batches_per_epoch": 10,
-                "context_length": 5,
-            },
-            "Transformer": {
-                "epochs": 10,
-                "num_batches_per_epoch": 10,
-                "context_length": 5,
-            },
+        "local_models": {
+            "ARIMA": {},
+            "ETS": {},
             "Theta": {},
         },
         "default": {
-            "ETS": {},
             "ARIMA": {},
+            "ETS": {},
+            "Theta": {},
             "SimpleFeedForward": {
                 "context_length": context_length,
             },
@@ -156,23 +135,18 @@ def get_preset_models(
     will create models according to presets.
     """
     models = []
-    if hyperparameters is None:
-        hp_string = "default_hpo" if hyperparameter_tune else "default"
-        hyperparameters = copy.deepcopy(get_default_hps(hp_string, prediction_length))
-    elif isinstance(hyperparameters, str):
+    if isinstance(hyperparameters, str):
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters, prediction_length))
-    elif isinstance(hyperparameters, dict):
-        default_hps = copy.deepcopy(get_default_hps("default", prediction_length))
-        updated_hyperparameters = {}
-        for model, hps in hyperparameters.items():
-            updated_hyperparameters[model] = default_hps.get(model, {})
-            updated_hyperparameters[model].update(hps)
-        hyperparameters = copy.deepcopy(updated_hyperparameters)
     else:
-        raise ValueError(
-            f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
-            "Please see the documentation for TimeSeriesPredictor.fit"
-        )
+        hp_str = "default" if not hyperparameter_tune else "default_hpo"
+        default_hps = copy.deepcopy(get_default_hps(hp_str, prediction_length))
+
+        if hyperparameters is not None:
+            # filter only default_hps for models with hyperparameters provided
+            default_hps = {model: default_hps.get(model, {}) for model in hyperparameters}
+            for model in hyperparameters:
+                default_hps[model].update(hyperparameters[model])
+        hyperparameters = copy.deepcopy(default_hps)
 
     if hyperparameter_tune:
         verify_contains_searchspace(hyperparameters)

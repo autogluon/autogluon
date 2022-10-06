@@ -12,8 +12,10 @@ TIMESERIES_PRESETS_CONFIGS = dict(
             "num_trials": 20,
         },
     },
+    medium_quality={"hyperparameters": "default"},
+    local_models={"hyperparameters": "local_models"},
+    # TODO: Remove deprecated presets below
     high_quality={"hyperparameters": "default"},
     good_quality={"hyperparameters": "default"},
-    medium_quality={"hyperparameters": "default"},
-    low_quality={"hyperparameters": "toy"},
+    low_quality={"hyperparameters": "local_models"},
 )
