@@ -179,8 +179,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": ag.Int(1, 3)}},
+        {"ETS": {"maxiter": ag.space.Categorical(1)}, "SimpleFeedForward": {"epochs": ag.space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
