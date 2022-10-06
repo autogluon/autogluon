@@ -91,17 +91,15 @@ class CloudPredictor(ABC):
         """
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
-        self.role_arn = role_arn
-        if not self.role_arn:
-            try:
-                self.role_arn = sagemaker.get_execution_role()
-            except ClientError as e:
-                logger.warning(
-                    'Failed to get IAM role. Did you configure and authenticate the IAM role?',
-                    'For more information, https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html',
-                    'You can also use `CloudPredictor.setup_sagemaker_role_and_policy()` to create the role and policies for you.'
-                )
-                raise e
+        try:
+            self.role_arn = sagemaker.get_execution_role()
+        except ClientError as e:
+            logger.warning(
+                'Failed to get IAM role. Did you configure and authenticate the IAM role?',
+                'For more information, https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html',
+                'You can also use `CloudPredictor.setup_sagemaker_role_and_policy()` to create the role and policies for you.'
+            )
+            raise e
         self.sagemaker_session = setup_sagemaker_session()
         self.local_output_path = self._setup_local_output_path(local_output_path)
         self.cloud_output_path = self._setup_cloud_output_path(cloud_output_path)
