@@ -101,7 +101,6 @@ def infer_batch(
     if 1 < num_gpus <= batch_size:
         model = nn.DataParallel(model)
     model.to(device).eval()
-    print("guaguagua----------", batch)
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
     with precision_context, torch.no_grad():
