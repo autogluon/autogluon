@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Union
 from omegaconf import DictConfig
 from torch import nn
 
-from ..constants import QUERY, RESPONSE, AUTOMM, FUSION
+from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
 from .model import create_model
 
 logger = logging.getLogger(AUTOMM)
