@@ -518,7 +518,7 @@ class FT_Transformer(nn.Module):
         head_normalization: ModuleType,
         d_out: int,
         projection: Optional[bool] = False,
-        additive_attention: Optional[bool] = True,
+        additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
     ) -> None:
         super().__init__()

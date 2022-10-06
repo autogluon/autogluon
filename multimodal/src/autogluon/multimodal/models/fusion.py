@@ -243,6 +243,8 @@ class MultimodalFusionTransformer(nn.Module):
         head_normalization: Optional[str] = "layer_norm",
         adapt_in_features: Optional[str] = None,
         loss_weight: Optional[float] = None,
+        additive_attention: Optional[bool] = False,
+        share_qv_weights: Optional[bool] = False,
     ):
         super().__init__()
         logger.debug("initializing MultimodalFusionTransformer")
@@ -289,6 +291,8 @@ class MultimodalFusionTransformer(nn.Module):
             head_normalization=head_normalization,
             d_out=hidden_features,
             projection=False,
+            additive_attention=additive_attention,
+            share_qv_weights=share_qv_weights,
         )
 
         self.head = FT_Transformer.Head(
