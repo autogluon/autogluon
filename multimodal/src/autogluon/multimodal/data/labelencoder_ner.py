@@ -9,7 +9,13 @@ import pandas as pd
 from nptyping import NDArray
 from omegaconf import DictConfig, OmegaConf
 
-from ..constants import AUTOMM, END_OFFSET, ENTITY_GROUP, NER_ANNOTATION, START_OFFSET
+from ..constants import (
+    AUTOMM,
+    END_OFFSET,
+    ENTITY_GROUP,
+    NER_ANNOTATION,
+    START_OFFSET,
+)
 from .utils import process_ner_annotations
 
 logger = logging.getLogger(AUTOMM)
@@ -79,11 +85,20 @@ class NerLabelEncoder:
             for annot in json_ner_annotations:
                 all_entity_groups.append(annot[ENTITY_GROUP])
                 if self.entity_map is not None:
-                    sentence_annotations.append(
-                        ((annot[START_OFFSET], annot[END_OFFSET]), self.entity_map[annot[ENTITY_GROUP]])
-                    )
+                    if annot[ENTITY_GROUP] in self.entity_map:
+                        sentence_annotations.append(
+                            (
+                                (annot[START_OFFSET], annot[END_OFFSET]),
+                                self.entity_map[annot[ENTITY_GROUP]],
+                            )
+                        )
                 else:
-                    sentence_annotations.append(((annot[START_OFFSET], annot[END_OFFSET]), annot[ENTITY_GROUP]))
+                    sentence_annotations.append(
+                        (
+                            (annot[START_OFFSET], annot[END_OFFSET]),
+                            annot[ENTITY_GROUP],
+                        )
+                    )
             all_annotations.append(sentence_annotations)
         unique_entity_groups = list(set(all_entity_groups))
         return all_annotations, unique_entity_groups
@@ -155,7 +170,11 @@ class NerLabelEncoder:
                 temp_pred.append(inverse_pred_label)
                 if inverse_pred_label != self.ner_special_tags[-1]:
                     temp_offset.append(
-                        {ENTITY_GROUP: inverse_pred_label, START_OFFSET: offset[0], END_OFFSET: offset[1]}
+                        {
+                            ENTITY_GROUP: inverse_pred_label,
+                            START_OFFSET: offset[0],
+                            END_OFFSET: offset[1],
+                        }
                     )
             pred_label_only.append(temp_pred)
             pred_with_offset.append(temp_offset)
