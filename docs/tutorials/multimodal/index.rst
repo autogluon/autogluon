@@ -57,6 +57,12 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use CLIP to extract embeddings for retrieval problem.
 
    .. card::
+      :title: Semantic Search with AutoMM - Extract Embeddings
+      :link: semantic_search.html
+
+      How to use semantic embeddings to improve search ranking performance.
+
+   .. card::
       :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
       :link: efficient_finetuning_basic.html
 
@@ -82,4 +88,5 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
    efficient_finetuning_basic
    clip_zeroshot
    clip_embedding
+   semantic_search
    customization
