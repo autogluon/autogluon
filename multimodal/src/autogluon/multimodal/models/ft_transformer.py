@@ -432,6 +432,7 @@ class AdditiveAttention(nn.Module):
             "key_weight": betas,
         }
 
+
 class FT_Transformer(nn.Module):
     """Transformer with extra features.
 
