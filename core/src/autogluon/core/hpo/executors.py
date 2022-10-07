@@ -269,7 +269,6 @@ class RayHpoExecutor(HpoExecutor):
     def report(self, reporter, **kwargs):
         from ray.air import session
         session.report(kwargs)
-        # tune.report(**kwargs)
         
     def get_hpo_results(self, model_name, model_path_root, **kwargs):
         assert self.analysis is not None, 'Call `execute()` before `get_hpo_results()`'
