@@ -322,6 +322,7 @@ class AdditiveAttention(nn.Module):
     ----------
     [1] Wu, Chuhan, et al. "Fastformer: Additive attention can be all you need." arXiv preprint arXiv:2108.09084 (2021).
     """
+
     def __init__(
         self,
         *,
@@ -389,11 +390,11 @@ class AdditiveAttention(nn.Module):
                 nn.init.zeros_(m.bias)
 
     def forward(
-            self,
-            x_q: Tensor,
-            x_kv: Tensor,
-            *args,  # Not used. just to make the input consistent with MultiheadAttention.
-        ) -> Tuple[Tensor, Dict[str, Tensor]]:
+        self,
+        x_q: Tensor,
+        x_kv: Tensor,
+        *args,  # Not used. just to make the input consistent with MultiheadAttention.
+    ) -> Tuple[Tensor, Dict[str, Tensor]]:
 
         batch_size, n_q_tokens, d_token = x_q.shape
         batch_size, n_k_tokens, d_token = x_kv.shape
@@ -403,26 +404,16 @@ class AdditiveAttention(nn.Module):
         k = self.k_proj(x_kv)
 
         alphas = (self.W_q(q) / math.sqrt(self.head_dim)).softmax(dim=1)
-        q_r = (
-            q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
-        )
+        q_r = q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
         global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r)
-        global_query = (
-            global_query.reshape(batch_size, self.n_heads * self.head_dim)
-            .unsqueeze(1)
-        )
+        global_query = global_query.reshape(batch_size, self.n_heads * self.head_dim).unsqueeze(1)
 
         p = k * global_query
 
         betas = (self.W_k(p) / math.sqrt(self.head_dim)).softmax(dim=1)
-        p_r = (
-            p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
-        )
+        p_r = p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
         global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r)
-        global_key = (
-            global_key.reshape(batch_size, self.n_heads * self.head_dim)
-            .unsqueeze(1)
-        )
+        global_key = global_key.reshape(batch_size, self.n_heads * self.head_dim).unsqueeze(1)
 
         u = v * global_key
         output = q + self.dropout(self.r_out(u))
@@ -584,7 +575,9 @@ class FT_Transformer(nn.Module):
                         bias=True,
                         share_qv_weights=share_qv_weights,
                         initialization=attention_initialization,
-                    ) if additive_attention else MultiheadAttention(
+                    )
+                    if additive_attention
+                    else MultiheadAttention(
                         d_token=d_token,
                         n_heads=attention_n_heads,
                         dropout=attention_dropout,
