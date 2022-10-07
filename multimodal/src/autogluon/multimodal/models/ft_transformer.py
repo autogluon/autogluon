@@ -388,7 +388,6 @@ class AdditiveAttention(nn.Module):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
 
-
     def forward(
             self,
             x_q: Tensor,
