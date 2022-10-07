@@ -41,7 +41,7 @@ extras_require = {
         "ray>=2.0,<2.1",
     ],
     'raytune': [
-        'ray[tune]>=1.13,<1.14',
+        'ray[tune]>=2.0,<2.1',
         'hyperopt>=0.2.7,<0.2.8',
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
     ]
