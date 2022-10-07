@@ -38,7 +38,7 @@ install_requires = [
 
 extras_require = {
     'ray': [
-        "ray>=1.13,<1.14",
+        "ray>=2.0,<2.1",
     ],
     'raytune': [
         'ray[tune]>=1.13,<1.14',
