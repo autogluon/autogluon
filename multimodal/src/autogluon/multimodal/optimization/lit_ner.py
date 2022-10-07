@@ -253,6 +253,7 @@ class NerLitModule(pl.LightningModule):
             Index of mini-batch.
         dataloader_idx
             Index of dataloader.
+
         Returns
         -------
         A dictionary with the mini-batch's logits and features.
@@ -266,6 +267,7 @@ class NerLitModule(pl.LightningModule):
         """
         Configure optimizer. This function is registered by pl.LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
+
         Returns
         -------
         [optimizer]

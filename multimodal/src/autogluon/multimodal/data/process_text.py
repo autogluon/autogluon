@@ -522,6 +522,7 @@ class TextProcessor:
         ----------
         text
             All the raw text data in a dataset.
+
         Returns
         -------
         A dictionary containing one sample's text tokens, valid length, segment ids, attention mask,

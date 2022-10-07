@@ -264,6 +264,7 @@ def normalize_txt(text: str) -> str:
 def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False):
     """
     Generate token-level/word-level labels with given text and NER annotations.
+
     Parameters
     ----------
     ner_annotations
@@ -274,6 +275,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
         The tokenizer to be used.
     is_eval
         Whether it is for evaluation or not, default: False
+
     Returns
     -------
     Token-level labels or word-level lavels
@@ -306,12 +308,14 @@ def tokenize_ner_text(text, tokenizer):
     """
     Tokenization process for the NER task. It will be used for the token-level label generation
     and the input text tokenization.
+
     Parameters
     ----------
     text
         The raw text data.
     tokenizer
         The tokenizer to be used.
+
     Returns
     -------
     The output of tokenizer and word offsets.

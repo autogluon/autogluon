@@ -44,6 +44,7 @@ class NerLabelEncoder:
         ----------
         y
             The raw json annotations.
+
         Returns
         -------
         all_annotations
@@ -105,6 +106,7 @@ class NerLabelEncoder:
         ----------
         y
             The raw json annotations.
+
         Returns
         -------
         all_annotations
@@ -127,6 +129,7 @@ class NerLabelEncoder:
             The raw text data
         tokenizer
             The tokenizer to be used for text tokenization.
+
         Returns
         -------
         transformed_y
@@ -149,6 +152,7 @@ class NerLabelEncoder:
         ----------
         y
             NER model predictions.
+
         Returns
         -------
         pred_label_only
