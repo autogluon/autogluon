@@ -29,6 +29,7 @@ install_requires = [
     "boto3",
     "requests",
     "jsonschema",
+    'seqeval',
     "evaluate<=0.2.2",
     "timm<0.6.0",
     "torch>=1.9,<1.13",
