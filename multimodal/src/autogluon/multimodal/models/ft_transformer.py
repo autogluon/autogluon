@@ -403,11 +403,11 @@ class AdditiveAttention(nn.Module):
         v = self.qv_proj(x_kv) if self.share_qv_weights else self.v_proj(x_kv)
         k = self.k_proj(x_kv)
 
-        alphas = (self.W_q(q) / math.sqrt(self.head_dim)).softmax(dim=-1)
+        alphas = (self.W_q(q) / math.sqrt(self.head_dim)).softmax(dim=1)
         q_r = (
             q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
         )
-        global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r) / math.sqrt(n_k_tokens)
+        global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r)
         global_query = (
             global_query.reshape(batch_size, self.n_heads * self.head_dim)
             .unsqueeze(1)
@@ -415,11 +415,11 @@ class AdditiveAttention(nn.Module):
 
         p = k * global_query
 
-        betas = (self.W_k(p) / math.sqrt(self.head_dim)).softmax(dim=-1)
+        betas = (self.W_k(p) / math.sqrt(self.head_dim)).softmax(dim=1)
         p_r = (
             p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
         )
-        global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r) / math.sqrt(n_k_tokens)
+        global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r)
         global_key = (
             global_key.reshape(batch_size, self.n_heads * self.head_dim)
             .unsqueeze(1)
