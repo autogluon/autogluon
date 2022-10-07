@@ -407,7 +407,7 @@ class AdditiveAttention(nn.Module):
         q_r = (
             q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
         )
-        global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r)
+        global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r) / math.sqrt(n_k_tokens)
         global_query = (
             global_query.reshape(batch_size, self.n_heads * self.head_dim)
             .unsqueeze(1)
@@ -419,7 +419,7 @@ class AdditiveAttention(nn.Module):
         p_r = (
             p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
         )
-        global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r)
+        global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r) / math.sqrt(n_k_tokens)
         global_key = (
             global_key.reshape(batch_size, self.n_heads * self.head_dim)
             .unsqueeze(1)
