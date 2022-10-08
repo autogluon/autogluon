@@ -12,7 +12,6 @@ import sys
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
-from packaging import version
 
 import numpy as np
 import pandas as pd
@@ -20,6 +19,7 @@ import pytorch_lightning as pl
 import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
+from packaging import version
 from sklearn.model_selection import train_test_split
 from torch import nn
 
@@ -88,8 +88,8 @@ from .optimization.losses import RKDLoss
 from .optimization.utils import (
     get_loss_func,
     get_metric,
-    get_trainable_params_efficient_finetune,
     get_norm_layer_param_names,
+    get_trainable_params_efficient_finetune,
 )
 from .utils import (
     AutoMMModelCheckpoint,
