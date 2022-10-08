@@ -12,6 +12,7 @@ import sys
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
+from packaging import version
 
 import numpy as np
 import pandas as pd
@@ -38,6 +39,10 @@ from .constants import (
     CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
+    DEEPSPEED_ALLGATHER_SIZE,
+    DEEPSPEED_ALLREDUCE_SIZE,
+    DEEPSPEED_MIN_PL_VERSION,
+    DEEPSPEED_OFFLOADING,
     DEPRECATED_ZERO_SHOT,
     FEATURE_EXTRACTION,
     FEATURES,
@@ -80,9 +85,15 @@ from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
 from .optimization.losses import RKDLoss
-from .optimization.utils import get_loss_func, get_metric
+from .optimization.utils import (
+    get_loss_func,
+    get_metric,
+    get_trainable_params_efficient_finetune,
+    get_norm_layer_param_names,
+)
 from .utils import (
     AutoMMModelCheckpoint,
+    AutoMMModelCheckpointIO,
     CustomUnpickler,
     LogFilter,
     apply_log_filter,
@@ -885,6 +896,12 @@ class MultiModalPredictor:
         else:  # continuing training
             model = self._model
 
+        norm_param_names = get_norm_layer_param_names(model)
+
+        trainable_param_names = get_trainable_params_efficient_finetune(
+            norm_param_names, efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune")
+        )
+
         if self._data_processors is None:
             data_processors = create_fusion_data_processors(
                 config=config,
@@ -1064,8 +1081,8 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1112,6 +1129,8 @@ class MultiModalPredictor:
                 model_summary,
             ]
 
+        custom_checkpoint_plugin = AutoMMModelCheckpointIO(trainable_param_names=trainable_param_names)
+
         tb_logger = pl.loggers.TensorBoardLogger(
             save_dir=save_path,
             name="",
@@ -1135,7 +1154,21 @@ class MultiModalPredictor:
 
         if not hpo_mode:
             if num_gpus <= 1:
-                strategy = None
+                if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
+                    assert version.parse(pl.__version__) >= version.parse(
+                        DEEPSPEED_MIN_PL_VERSION
+                    ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+                    from .optimization.deepspeed import DeepSpeedStrategy
+
+                    strategy = DeepSpeedStrategy(
+                        stage=3,
+                        offload_optimizer=True,
+                        offload_parameters=False,
+                        allgather_bucket_size=DEEPSPEED_ALLGATHER_SIZE,
+                        reduce_bucket_size=DEEPSPEED_ALLREDUCE_SIZE,
+                    )
+                else:
+                    strategy = None
             else:
                 strategy = config.env.strategy
         else:
@@ -1148,10 +1181,10 @@ class MultiModalPredictor:
 
         config.env.num_gpus = num_gpus
         config.env.precision = precision
-        config.env.strategy = strategy
+        config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
         self._config = config
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
+        self.save(save_path, standalone=not trainable_param_names)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
@@ -1183,6 +1216,7 @@ class MultiModalPredictor:
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
                 reload_dataloaders_every_n_epochs=1,
+                plugins=[custom_checkpoint_plugin],
             )
 
         with warnings.catch_warnings():
@@ -1211,6 +1245,7 @@ class MultiModalPredictor:
                     top_k_average_method=config.optimization.top_k_average_method,
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
+                    strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1225,6 +1260,7 @@ class MultiModalPredictor:
         val_df,
         validation_metric_name,
         last_ckpt_path=None,
+        strict_loading=True,
     ):
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
@@ -1271,6 +1307,7 @@ class MultiModalPredictor:
                             model=model,
                             path=top_k_model_paths[0],
                             prefix=prefix,
+                            strict=strict_loading,
                         )
                         best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                         for i in range(1, len(top_k_model_paths)):
@@ -1281,6 +1318,7 @@ class MultiModalPredictor:
                                 model=self._model,
                                 state_dict=cand_avg_state_dict,
                                 prefix=prefix,
+                                strict=strict_loading,
                             )
                             cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                             if monitor_op(cand_score, best_score):
@@ -1312,6 +1350,7 @@ class MultiModalPredictor:
             model=model,
             state_dict=avg_state_dict,
             prefix=prefix,
+            strict=strict_loading,
         )
 
         if is_distill:
@@ -1346,6 +1385,37 @@ class MultiModalPredictor:
         strategy: str,
     ) -> List[Dict]:
 
+        if self._config.env.strategy == DEEPSPEED_OFFLOADING and "DeepSpeedStrategy" not in sys.modules:
+            # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting implementation to support inference.
+            from .optimization.deepspeed import DeepSpeedStrategy
+
+            strategy = DeepSpeedStrategy(
+                stage=3,
+                offload_optimizer=True,
+                offload_parameters=False,
+                allgather_bucket_size=DEEPSPEED_ALLGATHER_SIZE,
+                reduce_bucket_size=DEEPSPEED_ALLREDUCE_SIZE,
+            )
+            norm_param_names = get_norm_layer_param_names(self._model)
+            trainable_param_names = get_trainable_params_efficient_finetune(
+                norm_param_names, efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune")
+            )
+
+            optimization_kwargs = dict(
+                optim_type=self._config.optimization.optim_type,
+                lr_choice=self._config.optimization.lr_choice,
+                lr_schedule=self._config.optimization.lr_schedule,
+                lr=self._config.optimization.learning_rate,
+                lr_decay=self._config.optimization.lr_decay,
+                end_lr=self._config.optimization.end_lr,
+                lr_mult=self._config.optimization.lr_mult,
+                weight_decay=self._config.optimization.weight_decay,
+                warmup_steps=self._config.optimization.warmup_steps,
+            )
+        else:
+            optimization_kwargs = {}
+            trainable_param_names = []
+
         if hasattr(self._config, MATCHER):
             turn_on_off_feature_column_info(
                 data_processors=data_processors,
@@ -1369,6 +1439,9 @@ class MultiModalPredictor:
             task = LitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
             )
 
         blacklist_msgs = []
@@ -1381,6 +1454,7 @@ class MultiModalPredictor:
             blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
+
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 gpus=num_gpus,
@@ -1402,6 +1476,7 @@ class MultiModalPredictor:
                     "Consider increasing the value of the `num_workers` argument` "
                     ".* in the `DataLoader` init to improve performance.*",
                 )
+
                 outputs = evaluator.predict(
                     task,
                     datamodule=predict_dm,
@@ -1560,6 +1635,7 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
         realtime: Optional[bool] = None,
+        seed=123,
     ) -> List[Dict]:
 
         data, df_preprocessor, data_processors = self._on_predict_start(
@@ -1736,6 +1812,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         """
         Predict values for the label column of new data.
@@ -1770,6 +1847,8 @@ class MultiModalPredictor:
 
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
+
+        pl.seed_everything(seed, workers=True)
 
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -1963,11 +2042,12 @@ class MultiModalPredictor:
         state_dict: dict = None,
         path: str = None,
         prefix: str = "model.",
+        strict: bool = True,
     ):
         if state_dict is None:
             state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=strict)
         return model
 
     @staticmethod
@@ -2255,12 +2335,16 @@ class MultiModalPredictor:
         predictor = cls(label="dummy_label")
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
+        efficient_finetune = OmegaConf.select(predictor._config, "optimization.efficient_finetune")
+
         model = create_fusion_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
             num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
-            pretrained=False,  # set "pretrain=False" to prevent downloading online models
+            pretrained=False
+            if not efficient_finetune or efficient_finetune == "None"
+            else True,  # set "pretrain=False" to prevent downloading online models
         )
 
         if predictor._data_processors is None:
@@ -2309,6 +2393,7 @@ class MultiModalPredictor:
         model = cls._load_state_dict(
             model=model,
             path=load_path,
+            strict=not efficient_finetune or efficient_finetune == "None",
         )
 
         predictor._ckpt_path = ckpt_path

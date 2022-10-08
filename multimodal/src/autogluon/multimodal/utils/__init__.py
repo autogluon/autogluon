@@ -1,4 +1,4 @@
-from .checkpoint import AutoMMModelCheckpoint, average_checkpoints
+from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_checkpoints
 from .config import (
     apply_omegaconf_overrides,
     filter_search_space,

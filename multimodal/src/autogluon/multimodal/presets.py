@@ -60,7 +60,7 @@ def few_shot_text_classification():
     return {
         "model.names": ["t_few"],
         "model.t_few.checkpoint_name": "bigscience/T0_3B",
-        "model.t_few.gradient_checkpointing": False,  # Currently instable.
+        "model.t_few.gradient_checkpointing": True,
         "optimization.learning_rate": 3e-3,
         "optimization.lr_decay": 1.0,
         "optimization.efficient_finetune": "ia3",
@@ -74,7 +74,8 @@ def few_shot_text_classification():
         "optimization.top_k": 1,
         "optimization.max_epochs": -1,
         "env.batch_size": 8,
-        "env.per_gpu_batch_size": 1,
+        "env.per_gpu_batch_size": 8,
+        "env.eval_batch_size_ratio": 2,
         "env.precision": "bf16",
         "data.templates.turn_on": True,
     }

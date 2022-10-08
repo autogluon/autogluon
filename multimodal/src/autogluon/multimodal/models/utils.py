@@ -18,10 +18,10 @@ class DummyLayer(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.dummy_bias = nn.Parameter(torch.zeros(1, dtype=torch.float32))
+        self.dummy_bias = torch.ones(1, dtype=torch.float32, requires_grad=True)
 
     def forward(self, x):
-        return x + self.dummy_bias - self.dummy_bias
+        return x + self.dummy_bias.to(x) - self.dummy_bias.to(x)
 
 
 def init_weights(module: nn.Module):
