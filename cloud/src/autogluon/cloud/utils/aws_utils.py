@@ -82,6 +82,8 @@ def setup_sagemaker_role_and_policy(
         policies: List[Union[str, CustomIamPolicy]],
         account_id: str,
         bucket: str,
+        MaxSessionDuration: int = 12*60*60,
+        **kwargs
 ):
     iam = boto3.client('iam')
     role_arn = None
@@ -105,7 +107,9 @@ def setup_sagemaker_role_and_policy(
         create_iam_role(
             role_name=role_name,
             trust_relationship=json.dumps(trust_relationship),
-            description='AutoGluon SageMaker CloudPredictor role'
+            description='AutoGluon SageMaker CloudPredictor role',
+            MaxSessionDuration=MaxSessionDuration,
+            **kwargs
         )
     except ClientError as e:
         if not e.response['Error']['Code'] == 'EntityAlreadyExists':

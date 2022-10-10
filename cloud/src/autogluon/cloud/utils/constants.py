@@ -157,7 +157,9 @@ SAGEMAKER_CLOUD_POLICY = {
                 "sagemaker:*App",
                 "sagemaker:ListApps"
             ],
-            "Resource": "*"
+            "Resource": [
+                "*"
+            ]
         },
         {
             "Effect": "Allow",
@@ -236,12 +238,16 @@ SAGEMAKER_CLOUD_POLICY = {
                 "sns:ListTopics",
                 "tag:GetResources"
             ],
-            "Resource": "*"
+            "Resource": [
+                "*"
+            ]
         },
         {
             "Action": "iam:CreateServiceLinkedRole",
             "Effect": "Allow",
-            "Resource": "arn:aws:iam::*:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint",
+            "Resource": [
+                "arn:aws:iam::*:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint"
+            ],
             "Condition": {
                 "StringLike": {
                     "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"

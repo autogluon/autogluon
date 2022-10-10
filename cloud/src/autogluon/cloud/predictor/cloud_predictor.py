@@ -137,24 +137,32 @@ class CloudPredictor(ABC):
     @staticmethod
     def setup_sagemaker_role_and_policy(
         account_id: str,
-        cloud_output_path: str,
-        role_name: str = 'ag_sagemaker_cloud_predictor_role'
+        cloud_output_bucket: str,
+        policy_name: str = SAGEMAKER_CLOUD_POLICY_NAME,
+        role_name: str = 'ag_sagemaker_cloud_predictor_role',
+        **kwargs
     ) -> str:
         """
         Create an IAM role and attach required policies for CloudPredictor wit SageMaker backend.
-        Your current authenticated IAM user/role needs to have required permission to create IAM policies and IAM roles
-        This only create the role for you and you'll need to authenticate the role yourselves before using CloudPredictor
+        For the detailed trust_relationship and IAM policy. Please refer to `autogluon/cloud/utils/constants` `SAGEMAKER_TRUST_RELATIONSHIP` and `SAGEMAKER_CLOUD_POLICY`.
+        Your current authenticated IAM user/role needs to have required permission to create IAM policies and IAM roles.
+        This only create the role for you and you'll need to authenticate the role yourselves before using CloudPredictor.
         For how to authenticate the role: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html
 
         Parameters
         ----------
         account_id: str
             The AWS account ID you plan to use for CloudPredictor.
-        cloud_output_path: str
-            Path to s3 location where intermediate artifacts will be uploaded and trained models should be saved.
+        cloud_output_bucket: str
+            s3 bucket name where intermediate artifacts will be uploaded and trained models should be saved.
             You need to create this bucket beforehand and we would put this bucket in the policy being created.
+        policy_name: str
+            The policy name. If not specified, will use AutoGluonSageMakerCloudPredictor
         role_name: str
             The role name. If not specified, will use ag_sagemaker_cloud_predictor_role
+        kwargs:
+            Additional parameters to pass to IAM.Client.create_role
+            https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/iam.html#IAM.Client.create_role
 
         Return
         ------
@@ -162,7 +170,7 @@ class CloudPredictor(ABC):
             The role arn being created
         """
         sagemaker_cloud_predictor_policy = CustomIamPolicy(
-            name=SAGEMAKER_CLOUD_POLICY_NAME,
+            name=policy_name,
             document=SAGEMAKER_CLOUD_POLICY,
             description=SAGEMAKER_CLOUD_POLICY_DESCRIPTION,
         )
@@ -171,7 +179,8 @@ class CloudPredictor(ABC):
             trust_relationship=SAGEMAKER_TRUST_RELATIONSHIP,
             policies=[sagemaker_cloud_predictor_policy],
             account_id=account_id,
-            bucket=cloud_output_path,
+            bucket=cloud_output_bucket,
+            **kwargs
         )
         return role_arn
 
