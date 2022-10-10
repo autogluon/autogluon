@@ -347,7 +347,7 @@ class TimeSeriesPredictor:
         self.save()
         return self
 
-    # TODO: to be changed after ray tune integration
+    # TODO: Is this method safe to delete?
     def _get_scheduler_options(
         self,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]],

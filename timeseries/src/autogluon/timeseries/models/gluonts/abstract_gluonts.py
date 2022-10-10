@@ -2,6 +2,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Type
+from autogluon.core.hpo.constants import RAY_BACKEND
 
 import gluonts
 import numpy as np
@@ -309,3 +310,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             result_dfs.append(df)
 
         return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+
+    def _get_hpo_backend(self):
+        return RAY_BACKEND
