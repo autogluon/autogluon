@@ -77,11 +77,13 @@ from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_matcher import MatcherLitModule
+from .optimization.lit_mmdet import MMDetLitModule
 from .optimization.lit_module import LitModule
 from .optimization.losses import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
 from .utils import (
     AutoMMModelCheckpoint,
+    COCODataset,
     CustomUnpickler,
     LogFilter,
     apply_log_filter,
@@ -101,7 +103,6 @@ from .utils import (
     get_minmax_mode,
     get_mixup,
     get_onnx_input,
-    getCOCOCatIDs,
     infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
@@ -145,6 +146,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
+        output_shape: Optional[int] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
     ):
@@ -224,7 +226,7 @@ class MultiModalPredictor:
         self._pipeline = pipeline.lower() if pipeline is not None else None
         self._eval_metric_name = eval_metric
         self._validation_metric_name = None
-        self._output_shape = None
+        self._output_shape = output_shape
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
@@ -251,7 +253,7 @@ class MultiModalPredictor:
 
         if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
-                pipeline=self._pipeline, hyperparameters=hyperparameters
+                pipeline=self._pipeline, hyperparameters=hyperparameters, num_classes=self._output_shape
             )
 
     @property
@@ -282,6 +284,10 @@ class MultiModalPredictor:
         """
         self._verbosity = verbosity
         set_logger_verbosity(verbosity, logger=logger)
+
+    def fit_coco(self, anno_file, hyperparameters):
+        data = from_coco(anno_file)
+        self.fit(data,hyperparameters=hyperparameters)
 
     def fit(
         self,
@@ -466,6 +472,7 @@ class MultiModalPredictor:
             column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
+            pipeline = self._pipeline,
             data=train_data,
             valid_data=tuning_data,
         )
@@ -474,6 +481,7 @@ class MultiModalPredictor:
             column_types=column_types,
             data=train_data,
             provided_problem_type=self._problem_type,
+            pipeline = self._pipeline,
         )
 
         # Determine data scarcity mode, i.e. a few-shot scenario
@@ -505,20 +513,24 @@ class MultiModalPredictor:
                 f"Inferred problem type {problem_type} is different from " f"the previous {self._problem_type}"
             )
 
-        if self._output_shape is not None:
-            assert self._output_shape == output_shape, (
-                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-            )
+        if self._pipeline != OBJECT_DETECTION:
+            if self._output_shape is not None:
+                    assert self._output_shape == output_shape, (
+                        f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+                    )
+            else:
+                self._output_shape = output_shape
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
+                pipeline = self._pipeline,
                 eval_metric_name=self._eval_metric_name,
             )
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
-        minmax_mode = get_minmax_mode(validation_metric_name)
+        minmax_mode = get_minmax_mode(validation_metric_name, pipeline=self._pipeline)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -528,7 +540,6 @@ class MultiModalPredictor:
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._save_path = save_path
-        self._output_shape = output_shape
         self._column_types = column_types
 
         _fit_args = dict(
@@ -898,11 +909,14 @@ class MultiModalPredictor:
             label_encoder=df_preprocessor.label_generator,
             problem_type=self._problem_type,
         )
-        validation_metric, custom_metric_func = get_metric(
-            metric_name=validation_metric_name,
-            num_classes=self._output_shape,
-            pos_label=pos_label,
-        )
+        if validation_metric_name is not None:
+            validation_metric, custom_metric_func = get_metric(
+                metric_name=validation_metric_name,
+                num_classes=self._output_shape,
+                pos_label=pos_label,
+            )
+        else:
+            validation_metric, custom_metric_func = (None, None)
 
         mixup_active, mixup_fn = get_mixup(
             model_config=OmegaConf.select(config, "model"),
@@ -1054,6 +1068,12 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
+        elif self._pipeline == OBJECT_DETECTION:
+            task = MMDetLitModule(
+                model=model,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
         else:
             task = LitModule(
                 model=model,
@@ -1070,27 +1090,35 @@ class MultiModalPredictor:
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
 
-        checkpoint_callback = AutoMMModelCheckpoint(
-            dirpath=save_path,
-            save_top_k=config.optimization.top_k,
-            verbose=True,
-            monitor=task.validation_metric_name,
-            mode=minmax_mode,
-            save_last=True,
-        )
-        early_stopping_callback = pl.callbacks.EarlyStopping(
-            monitor=task.validation_metric_name,
-            patience=config.optimization.patience,
-            mode=minmax_mode,
-        )
-        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
-        model_summary = pl.callbacks.ModelSummary(max_depth=1)
-        callbacks = [
-            checkpoint_callback,
-            early_stopping_callback,
-            lr_callback,
-            model_summary,
-        ]
+        if self._pipeline == OBJECT_DETECTION:
+            lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+            model_summary = pl.callbacks.ModelSummary(max_depth=1)
+            callbacks = [
+                lr_callback,
+                model_summary,
+            ]
+        else:
+            checkpoint_callback = AutoMMModelCheckpoint(
+                dirpath=save_path,
+                save_top_k=config.optimization.top_k,
+                verbose=True,
+                monitor=task.validation_metric_name,
+                mode=minmax_mode,
+                save_last=True,
+            )
+            early_stopping_callback = pl.callbacks.EarlyStopping(
+                monitor=task.validation_metric_name,
+                patience=config.optimization.patience,
+                mode=minmax_mode,
+            )
+            lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+            model_summary = pl.callbacks.ModelSummary(max_depth=1)
+            callbacks = [
+                checkpoint_callback,
+                early_stopping_callback,
+                lr_callback,
+                model_summary,
+            ]
 
         use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
         if hpo_mode:
@@ -1441,7 +1469,8 @@ class MultiModalPredictor:
                 column_types = infer_label_column_type_by_problem_type(
                     column_types=column_types,
                     label_columns=self._label_column,
-                    problem_type=self._problem_type if self._problem_type else self._pipeline,
+                    problem_type=self._problem_type,
+                    pipeline = self._pipeline,
                     data=data,
                 )
         else:  # called .fit() or .load()
@@ -1452,7 +1481,7 @@ class MultiModalPredictor:
                 config=config.data,
                 column_types=column_types,
                 label_column=self._label_column,
-                train_df_x=data,
+                train_df_x=data, # TODO: drop label like in line 875?
                 train_df_y=data[self._label_column] if self._label_column else None,
             )
         else:  # called .fit() or .load()
@@ -1477,18 +1506,18 @@ class MultiModalPredictor:
         anno_file
             The annotation file in COCO format
         """
-        data = from_coco(anno_file)[["image", "rois"]]
+        from pycocotools.coco import COCO
+        from pycocotools.cocoeval import COCOeval
+
+        coco_dataset = COCODataset(anno_file)
+
+        data = from_coco(anno_file)
 
         outputs = self._predict(
             data=data,
             requires_label=False,
         )
         ret = extract_from_output(ret_type=BBOX, outputs=outputs)
-
-        from pycocotools.coco import COCO
-        from pycocotools.cocoeval import COCOeval
-
-        catIDs = getCOCOCatIDs()
 
         # Cache prediction results as COCO format
         if not self._save_path:
@@ -1497,33 +1526,19 @@ class MultiModalPredictor:
                 warn_if_exist=self._warn_if_exist,
             )
         self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
-        dt_file = os.path.join(self._save_path, "object_detection_result_cache.json")
-        coco_format_result = []
-        for i, row in data.iterrows():
-            image_id = int(row["image"][-16:-4])
-            for j, res in enumerate(ret[i]):
-                category_id = catIDs[j]
-                for bbox in res:
-                    coco_format_result.append(
-                        {
-                            "image_id": image_id,
-                            "category_id": category_id,
-                            "bbox": bbox_xyxy_to_xywh(bbox[:4].astype(float).tolist()),
-                            "score": float(bbox[4]),
-                        }
-                    )
-        with open(dt_file, "w") as f:
-            print(f"saving file at {dt_file}")
-            json.dump(coco_format_result, f)
+        cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
+        coco_dataset.save_result(ret, data, cache_path)
 
         cocoGt = COCO(anno_file)
-        cocoDt = cocoGt.loadRes(dt_file)
+        cocoDt = cocoGt.loadRes(cache_path)
         annType = "bbox"
 
         cocoEval = COCOeval(cocoGt, cocoDt, annType)
         cocoEval.evaluate()
         cocoEval.accumulate()
         cocoEval.summarize()
+
+        return cocoEval.stats
 
     def _process_batch(
         self,
@@ -1743,14 +1758,11 @@ class MultiModalPredictor:
             ret_type = PROBABILITY
         elif self._pipeline == OBJECT_DETECTION:
             ret_type = BBOX
+        elif self._pipeline == OCR_TEXT_RECOGNITION:
+            ret_type = [TEXT, SCORE]
         else:
             ret_type = LOGITS
 
-        if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
-            ret_type = BBOX
-
-        elif self._pipeline == OCR_TEXT_RECOGNITION:
-            ret_type = [TEXT, SCORE]
 
         if candidate_data:
             pred = self._match_queries_and_candidates(

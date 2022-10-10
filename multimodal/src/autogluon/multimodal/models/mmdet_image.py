@@ -94,14 +94,24 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
-
+        if num_classes:
+            if "bbox_head" in self.config.model.keys(): #yolov3
+                self.config.model["bbox_head"]["num_classes"] = num_classes
+            elif "roi_head" in self.config.model.keys(): #faster_rcnn
+                self.config.model["roi_head"]["bbox_head"]["num_classes"] = num_classes
+            else:
+                raise ValueError("Current model structure does not support automatic bbox_head reset. "
+                                 "Please change in config.")
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
 
-        if checkpoint is not None:
+        if self.pretrained and checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
-        if "CLASSES" in checkpoint.get("meta", {}):
+
+        if num_classes == 20: # TODO: remove hardcode
+            self.model.CLASSES = get_classes("voc")
+        elif "CLASSES" in checkpoint.get("meta", {}):
             self.model.CLASSES = checkpoint["meta"]["CLASSES"]
         else:
             warnings.simplefilter("once")
@@ -110,6 +120,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.model.cfg = self.config  # save the config in the model for convenience
 
         self.prefix = prefix
+
+        self.name_to_id = self.get_layer_ids()
 
     @property
     def image_key(self):
@@ -163,6 +175,15 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         ret = {BBOX: results}
         return {self.prefix: ret}
+
+    def forward_test(self, imgs, img_metas):
+        return self.model.forward_test(imgs=imgs, img_metas=img_metas)
+
+    def forward_train(self, img, img_metas, gt_bboxes, gt_labels):
+        return self.model.forward_train(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)
+
+    def _parse_losses(self, losses):
+        return self.model._parse_losses(losses)
 
     def get_layer_ids(
         self,

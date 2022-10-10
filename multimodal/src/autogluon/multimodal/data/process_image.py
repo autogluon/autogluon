@@ -164,9 +164,14 @@ class ImageProcessor:
             else:
                 assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
             cfg = model.model.cfg
-            cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
-            self.val_processor = Compose(cfg.data.test.pipeline)
-            self.train_processor = Compose(cfg.data.test.pipeline)
+            try: #yolov3
+                training_pipeline = cfg.data.train.dataset.pipeline
+            except: #faster_rcnn
+                training_pipeline = cfg.data.train.pipeline
+            training_pipeline = replace_ImageToTensor(training_pipeline)
+            cfg.data.val.pipeline = replace_ImageToTensor(cfg.data.val.pipeline)
+            self.val_processor = Compose(cfg.data.val.pipeline)
+            self.train_processor = Compose(training_pipeline)
             if isinstance(samples_per_gpu, int) and samples_per_gpu > 0:
                 self.samples_per_gpu = samples_per_gpu
             else:
@@ -399,14 +404,21 @@ class ImageProcessor:
         """
         images = []
         zero_images = []
+        mm_data = dict(img_prefix=None, bbox_fields=[])
         ret = {}
         column_start = 0
-        for per_col_name, per_col_image_paths in image_paths.items():
-            for img_path in per_col_image_paths[: self.max_img_num_per_col]:
-                if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
-                    data = dict(img_info=dict(filename=img_path), img_prefix=None)
-                    images.append(self.val_processor(data))
+        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
+            for per_col_name, per_col_content in image_paths.items():
+                if per_col_name != "rois":  # TODO: remove hardcode
+                    mm_data["img_info"] = dict(filename=per_col_content[0])
                 else:
+                    rois = np.array(per_col_content)
+                    mm_data["ann_info"] = dict(bboxes=rois[:, :4], labels=rois[:, 4])
+            if self.requires_column_info:
+                pass  # TODO
+        else:
+            for per_col_name, per_col_image_paths in image_paths.items():
+                for img_path in per_col_image_paths[: self.max_img_num_per_col]:
                     with warnings.catch_warnings():
                         warnings.filterwarnings(
                             "ignore",
@@ -435,14 +447,14 @@ class ImageProcessor:
                     else:
                         images.append(img)
 
-            if self.requires_column_info:
-                # only count the valid images since they are put ahead of the zero images in the below returning
-                ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
-                    [column_start, len(images)], dtype=np.int64
-                )
-                column_start = len(images)
+                if self.requires_column_info:
+                    # only count the valid images since they are put ahead of the zero images in the below returning
+                    ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
+                        [column_start, len(images)], dtype=np.int64
+                    )
+                    column_start = len(images)
         if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
-            ret.update({self.image_key: images[0]})
+            ret.update({self.image_key: self.train_processor(mm_data) if is_training else self.val_processor(mm_data)})
         else:
             ret.update(
                 {

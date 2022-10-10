@@ -12,6 +12,7 @@ from ..constants import (
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    COLLECTION,
     IMAGE,
     MULTICLASS,
     NULL,
@@ -92,6 +93,23 @@ def is_categorical_column(
             return True
         return False
 
+def is_collection_column(data: pd.Series) -> bool:
+    """
+    Identify if a column is a collection column.
+    Collections include set, list, and dict.
+
+    Parameters
+    ----------
+    X
+        One column of a multimodal pd.DataFrame for training.
+
+    Returns
+    -------
+    Whether the column is a collection column.
+    """
+    idx = data.first_valid_index()
+    return isinstance(data[idx], (list, dict, set))
+
 
 def is_rois_column(data: pd.Series) -> bool:
     """
@@ -110,10 +128,10 @@ def is_rois_column(data: pd.Series) -> bool:
     if isinstance(data[idx], list):
         return (
             len(data[idx])
-            and isinstance(data[idx][0], dict)
-            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+            and isinstance(data[idx][0], list)
+            and len(data[idx][0]) == 5
         )
-    else:
+    else: # support list input in json str
         isinstance(data[idx], str)
         rois = {}
         try:
@@ -122,8 +140,8 @@ def is_rois_column(data: pd.Series) -> bool:
             pass
         return (
             rois
-            and isinstance(rois, dict)
-            and set(["xmin", "ymin", "xmax", "ymax", "class"]).issubset(data[idx][0].keys())
+            and isinstance(rois, list)
+            and len(data[idx][0]) == 5
         )
 
 
@@ -296,12 +314,15 @@ def infer_column_types(
             # No valid index, thus, we will just ignore the column
             column_types[col_name] = NULL
             continue
-        if not isinstance(data[col_name][idx], list) and len(data[col_name].unique()) == 1 and is_training:
+        if (not isinstance(data[col_name][idx], (list, dict, set))) and len(data[col_name].unique()) == 1 and is_training:
             column_types[col_name] = NULL
             continue
+        # TODO: valid check for collections
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
+        elif is_collection_column(data[col_name]):
+            column_types[col_name] = COLLECTION
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
@@ -342,7 +363,8 @@ def check_missing_values(
 def infer_label_column_type_by_problem_type(
     column_types: Dict,
     label_columns: Union[str, List[str]],
-    problem_type: str,
+    problem_type: Optional[str],
+    pipeline: Optional[str],
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
     allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, ROIS),
@@ -359,6 +381,8 @@ def infer_label_column_type_by_problem_type(
         The label columns in a pd.DataFrame.
     problem_type
         Type of problem.
+    pipeline
+        Predictor pipeline, used when problem_type is None.
     data
         A pd.DataFrame.
     valid_data
@@ -392,8 +416,10 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
-        elif problem_type == OBJECT_DETECTION:
-            column_types[col_name] = ROIS
+
+        if problem_type is None:
+            if pipeline == OBJECT_DETECTION:
+                column_types[col_name] = ROIS
 
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
@@ -406,6 +432,7 @@ def infer_problem_type_output_shape(
     column_types: Optional[Dict] = None,
     data: Optional[pd.DataFrame] = None,
     provided_problem_type: Optional[str] = None,
+    pipeline: Optional[str] = None,
 ) -> Tuple[str, int]:
     """
     Infer the problem type and output shape based on the label column type and training data.
@@ -422,6 +449,8 @@ def infer_problem_type_output_shape(
         The multimodal pd.DataFrame for training.
     provided_problem_type
         The provided problem type.
+    pipeline
+        Predictor pipeline, used when problem_type is None.
 
     Returns
     -------
@@ -461,7 +490,15 @@ def infer_problem_type_output_shape(
                 f"for training. The supported problem types are"
                 f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}'"
             )
-
+    elif pipeline is not None:
+        if pipeline == OBJECT_DETECTION:
+            return None, None
+        else:
+            raise ValueError(
+                f"The label column '{label_column}' has type"
+                f" '{column_types[label_column]}', which is not supported yet while"
+                f" provided problem type is None and pipeline is f{pipeline}."
+            )
     else:
         if column_types[label_column] == CATEGORICAL:
             class_num = len(data[label_column].unique())

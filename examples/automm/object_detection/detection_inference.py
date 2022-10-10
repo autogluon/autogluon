@@ -20,6 +20,7 @@ def test_inference(dataset, checkpoint_name):
         df = from_coco("coco17/annotations/instances_val2017.json")[:10][["image"]]
     elif dataset == "voc":
         df = from_voc("VOCdevkit/VOC2007")[:10][["image"]]
+        print(from_voc("VOCdevkit/VOC2007")[:10])
 
     start = time.time()
     pred = predictor.predict(df, as_pandas=False)  # TODO: disable as_pandas flag for detection
@@ -60,7 +61,7 @@ def test_voc_inference(checkpoint_name="faster_rcnn_r50_fpn_1x_voc0712"):
 
 if __name__ == "__main__":
     # test coco inference
-    test_inference("coco", "faster_rcnn_r50_fpn_2x_coco")
+    #test_inference("coco", "faster_rcnn_r50_fpn_2x_coco")
 
     # test voc inference
     # VOC configs are not supported in mmcv.

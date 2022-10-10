@@ -29,6 +29,7 @@ TEXT_TOKEN_IDS = "text_token_ids"
 CHOICES_IDS = "choices_ids"
 TEXT_VALID_LENGTH = "text_valid_length"
 TEXT_SEGMENT_IDS = "text_segment_ids"
+COLLECTION = "collection"
 COLUMN = "column"
 
 # Output keys

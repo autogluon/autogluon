@@ -13,7 +13,9 @@ from ..constants import (
     BINARY,
     F1,
     METRIC_MODE_MAP,
+    MIN,
     MULTICLASS,
+    OBJECT_DETECTION,
     REGRESSION,
     RMSE,
     ROC_AUC,
@@ -28,6 +30,7 @@ logger = logging.getLogger(AUTOMM)
 
 def infer_metrics(
     problem_type: Optional[str] = None,
+    pipeline: Optional[str] = None,
     eval_metric_name: Optional[str] = None,
 ):
     """
@@ -39,6 +42,8 @@ def infer_metrics(
     ----------
     problem_type
         Type of problem.
+    pipeline
+        Predictor pipeline, used when problem_type is None.
     eval_metric_name
         Name of evaluation metric provided by users.
 
@@ -75,6 +80,11 @@ def infer_metrics(
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
         eval_metric_name = RMSE
+    elif problem_type is None:
+        if pipeline == OBJECT_DETECTION:
+            eval_metric_name = None
+        else:
+            raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 
@@ -83,7 +93,10 @@ def infer_metrics(
     return validation_metric_name, eval_metric_name
 
 
-def get_minmax_mode(metric_name: str):
+def get_minmax_mode(
+    metric_name: str,
+    pipeline: Optional[str] = None,
+):
     """
     Get minmax mode based on metric name
 
@@ -91,6 +104,8 @@ def get_minmax_mode(metric_name: str):
     ----------
     metric_name
         A string representing metric
+    pipeline
+        Predictor's pipeline, used to decide if we shall skip this.
 
     Returns
     -------
@@ -101,8 +116,13 @@ def get_minmax_mode(metric_name: str):
         - max
             It means that larger metric is better.
     """
-    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
-    return METRIC_MODE_MAP.get(metric_name)
+    if pipeline is None:
+        assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
+        return METRIC_MODE_MAP.get(metric_name)
+    elif pipeline == OBJECT_DETECTION:
+        return MIN
+    else:
+        return NotImplementedError("pipeline=f{} is not implemented for training")
 
 
 def compute_score(

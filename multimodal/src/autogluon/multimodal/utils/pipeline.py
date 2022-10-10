@@ -12,6 +12,7 @@ logger = logging.getLogger(AUTOMM)
 def init_pretrained(
     pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+    num_classes: Optional[int] = None
 ):
     """
     Zero shot initialization.
@@ -35,7 +36,7 @@ def init_pretrained(
     assert (
         len(config.model.names) == 1
     ), f"Zero shot mode only supports using one model, but detects multiple models {config.model.names}"
-    model = create_fusion_model(config=config, pretrained=True)
+    model = create_fusion_model(config=config, pretrained=True, num_classes=num_classes)
 
     data_processors = create_fusion_data_processors(
         config=config,

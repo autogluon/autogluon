@@ -90,6 +90,8 @@ def get_loss_func(
                 loss_func = nn.MSELoss()
         else:
             loss_func = nn.MSELoss()
+    elif problem_type is None:
+        return None
     else:
         raise NotImplementedError
 

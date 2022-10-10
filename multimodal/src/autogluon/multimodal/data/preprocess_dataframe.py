@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
+from ..constants import AUTOMM, CATEGORICAL, COLLECTION, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
@@ -68,7 +68,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type in [TEXT, IMAGE, IMAGE_PATH, NULL]:
+            if col_type in [TEXT, IMAGE, IMAGE_PATH, COLLECTION, ROIS, NULL]:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -109,6 +109,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._categorical_num_categories = []
         self._numerical_feature_names = []
         self._image_path_names = []
+        self._collection_names = []
 
     @property
     def label_column(self):
@@ -121,6 +122,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def image_path_names(self):
         return self._image_path_names
+
+    #property
+    def collection_names(self):
+        return self._collection_names
 
     @property
     def text_feature_names(self):
@@ -141,6 +146,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             + self._text_feature_names
             + self._numerical_feature_names
             + self._categorical_feature_names
+            + self._collection_names
         )
 
     @property
@@ -181,7 +187,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_y_called
 
     def get_column_names(self, modality: str):
-        if modality == IMAGE or modality == IMAGE_PATH:
+        if modality == IMAGE or modality == IMAGE_PATH or modality == ROIS:
             return self._image_path_names
         elif modality == TEXT:
             return self._text_feature_names
@@ -191,6 +197,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._numerical_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
+        elif modality == COLLECTION:
+            self._collection_names
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
@@ -254,8 +262,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type == IMAGE or col_type == IMAGE_PATH:
+            elif col_type == IMAGE or col_type == IMAGE_PATH or col_type == ROIS:
                 self._image_path_names.append(col_name)
+            elif col_type == COLLECTION:
+                self._collection_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
@@ -361,7 +371,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
         image_paths = {}
         for col_name in self._image_path_names:
-            processed_data = df[col_name].apply(lambda ele: ele.split(";")).tolist()
+            if col_name in ["rois", "rois_label"]: # TODO: remove hardcoding
+                processed_data = df[col_name].tolist()
+            else:
+                processed_data = df[col_name].apply(lambda ele: ele.split(";")).tolist()
             image_paths[col_name] = processed_data
         return image_paths
 

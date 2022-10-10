@@ -4,7 +4,7 @@ from nptyping import NDArray
 from torch import nn
 
 from ..constants import LABEL
-from .collator import Stack
+from .collator import List, Stack
 
 
 class LabelProcessor:
@@ -39,7 +39,10 @@ class LabelProcessor:
         -------
         A dictionary containing one model's collator function for labels.
         """
-        fn = {self.label_key: Stack()}
+        if self.prefix == "mmdet_image":
+            fn = {self.label_key: List()}
+        else:
+            fn = {self.label_key: Stack()}
         return fn
 
     def process_one_sample(
