@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 import autogluon.core as ag
 
@@ -155,9 +155,9 @@ def get_preset_models(
         )
 
     if hyperparameter_tune:
-        verify_contains_searchspace(hyperparameters)
+        verify_contains_at_least_one_searchspace(hyperparameters)
     else:
-        verify_no_searchspace(hyperparameters)
+        verify_contains_no_searchspaces(hyperparameters)
 
     invalid_model_names = set(invalid_model_names)
     all_assigned_names = set(invalid_model_names)
@@ -204,30 +204,26 @@ def get_preset_models(
     return models
 
 
-def verify_contains_searchspace(hyperparameters):
-    for model in hyperparameters:
-        model_contains_searchspace = False
-        model_hps = hyperparameters[model]
-        for hp in model_hps:
-            hp_value = model_hps[hp]
-            if isinstance(hp_value, ag.space.Space):
-                model_contains_searchspace = True
-                break
-        if not model_contains_searchspace:
+def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
+    for hp_value in model_hyperparameters.values():
+        if isinstance(hp_value, ag.space.Space):
+            return True
+    return False
+
+
+def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, Dict[str, Any]]):
+    if not any(contains_searchspace(model_hps) for model_hps in hyperparameters.values()):
+        raise ValueError(
+            f"Hyperparameter tuning specified, but not a single model contains a hyperparameter search space. "
+            f"Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
+            f"for at least one model."
+        )
+
+
+def verify_contains_no_searchspaces(hyperparameters: Dict[str, Dict[str, Any]]):
+    for model, model_hps in hyperparameters.items():
+        if contains_searchspace(model_hps):
             raise ValueError(
-                f"Hyperparameter tuning specified, but no hyperparameter search space provided for {model}. "
-                f"Please convert one of the fixed hyperparameter values of this model to a search space and "
-                f"try again, or do not specify hyperparameter tuning."
+                f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. "
+                f"However, for model {model} hyperparameters {model_hps} contain a search space."
             )
-
-
-def verify_no_searchspace(hyperparameters):
-    for model in hyperparameters:
-        model_hps = hyperparameters[model]
-        for hp in model_hps:
-            hp_value = model_hps[hp]
-            if isinstance(hp_value, ag.space.Space):
-                raise ValueError(
-                    f"Hyperparameter tuning not specified, so hyperparameters must have fixed values. For "
-                    f"{model}, hyperparameter {hp} currently given as search space: {hp_value}."
-                )

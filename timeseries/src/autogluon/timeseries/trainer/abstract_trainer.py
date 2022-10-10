@@ -18,6 +18,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
@@ -567,7 +568,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if time_limit is not None and len(models) > 0:
             time_limit_model_split /= len(models)
 
-        # TODO: Allow HPO only for some models?
         model_names_trained = []
         for i, model in enumerate(models):
             if hyperparameter_tune_kwargs is not None:
@@ -580,13 +580,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
                 logger.info(fit_log_message)
 
-                with tqdm.external_write_mode():
-                    model_names_trained += self.tune_model_hyperparameters(
-                        model,
-                        time_limit=time_left,
-                        train_data=train_data,
-                        val_data=val_data,
-                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                if contains_searchspace(model._user_params):
+                    with tqdm.external_write_mode():
+                        model_names_trained += self.tune_model_hyperparameters(
+                            model,
+                            time_limit=time_left,
+                            train_data=train_data,
+                            val_data=val_data,
+                            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        )
+                else:
+                    model_names_trained += self._train_and_save(
+                        train_data, model=model, val_data=val_data, time_limit=time_left
                     )
             else:
                 time_left = None
