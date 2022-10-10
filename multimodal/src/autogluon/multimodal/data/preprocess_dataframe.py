@@ -53,7 +53,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_generator = label_generator
 
         # Scaler used for numerical labels
-        numerical_label_preprocessing = OmegaConf.select(self._config.data, "label.numerical_label_preprocessing")
+        numerical_label_preprocessing = OmegaConf.select(config, "label.numerical_label_preprocessing")
         if numerical_label_preprocessing == "minmaxscaler":
             self._label_scaler = MinMaxScaler()
         elif numerical_label_preprocessing == "standardscaler":
@@ -73,8 +73,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
                     cat_order="count",
-                    minimum_cat_count=self._config.data.categorical.minimum_cat_count,
-                    maximum_num_cat=self._config.data.categorical.maximum_num_cat,
+                    minimum_cat_count=config.categorical.minimum_cat_count,
+                    maximum_num_cat=config.categorical.maximum_num_cat,
                     verbosity=0,
                 )
                 self._feature_generators[col_name] = generator
@@ -85,8 +85,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                         (
                             "scaler",
                             StandardScaler(
-                                with_mean=self._config.data.numerical.scaler_with_mean,
-                                with_std=self._config.data.numerical.scaler_with_std,
+                                with_mean=config.numerical.scaler_with_mean,
+                                with_std=config.numerical.scaler_with_std,
                             ),
                         ),
                     ]
@@ -222,7 +222,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             elif col_type == TEXT:
                 self._text_feature_names.append(col_name)
             elif col_type == CATEGORICAL:
-                if self._config.data.categorical.convert_to_text:
+                if self._config.categorical.convert_to_text:
                     # Convert categorical column as text column
                     col_value = col_value.astype("object")
                     processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
@@ -248,7 +248,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 if len(processed_data.unique()) == 1:
                     self._ignore_columns_set.add(col_name)
                     continue
-                if self._config.data.numerical.convert_to_text:
+                if self._config.numerical.convert_to_text:
                     self._text_feature_names.append(col_name)
                 else:
                     generator = self._feature_generators[col_name]
@@ -282,7 +282,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == ROIS:
             pass  # Do nothing. TODO: Shall we call fit here?
         elif self.label_type == NER_ANNOTATION:
-            self._label_generator.fit(y, X[self._text_feature_names[0]], self._config)
+            self._label_generator.fit(y, X[self._text_feature_names[0]])
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
 

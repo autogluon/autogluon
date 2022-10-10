@@ -67,12 +67,12 @@ def init_df_preprocessor(
     Initialized dataframe preprocessor.
     """
     if label_column is not None and column_types[label_column] == NER_ANNOTATION:
-        label_generator = NerLabelEncoder()
+        label_generator = NerLabelEncoder(config)
     else:
         label_generator = None
 
     df_preprocessor = MultiModalFeaturePreprocessor(
-        config=config,
+        config=config.data,
         column_types=column_types,
         label_column=label_column,
         label_generator=label_generator,

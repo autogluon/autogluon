@@ -4,9 +4,8 @@ from typing import List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
-from transformers import AutoTokenizer, T5TokenizerFast
+from transformers import AutoTokenizer
 from transformers import logging as hf_logging
-from transformers.models.t5 import T5PreTrainedModel
 
 from ..constants import (
     AUTOMM,
@@ -23,6 +22,7 @@ from ..constants import (
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
 )
+from .huggingface_text import HFAutoModelForTextPrediction
 from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
 
 hf_logging.set_verbosity_error()
@@ -30,16 +30,17 @@ hf_logging.set_verbosity_error()
 logger = logging.getLogger(AUTOMM)
 
 
-class HFAutoModelForNER(nn.Module):
+class HFAutoModelForNER(HFAutoModelForTextPrediction):
     """
-    Named entity recognition with huggingface backbones.
+    Named entity recognition with huggingface backbones. Inherit from HFAutoModelForTextPrediction.
     """
 
     def __init__(
         self,
         prefix: str,
-        checkpoint_name: str = "bert-base-cased",
+        checkpoint_name: str = "microsoft/deberta-v3-base",
         num_classes: Optional[int] = 0,
+        pooling_mode: Optional[str] = "cls",
         gradient_checkpointing: Optional[bool] = False,
         pretrained: Optional[bool] = True,
     ):
@@ -55,71 +56,23 @@ class HFAutoModelForNER(nn.Module):
             For example, you may use
                 English backbones:
                     - 'bert-base-cased'
-                Multilingual backbones:
-                    - 'bert-base-multilingual-cased'
         num_classes
             The number of classes. 1 for a regression task.
+        pooling_mode
+            The pooling mode to be used, it is not used in the NER task.
         gradient_checkpointing
             Whether to enable gradient checkpointing
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
         """
-        super().__init__()
+        super().__init__(prefix, checkpoint_name, num_classes, pooling_mode, gradient_checkpointing, pretrained)
         logger.debug(f"initializing {checkpoint_name}")
-        self.prefix = prefix
-        self.checkpoint_name = checkpoint_name
-
-        self.num_classes = num_classes
-        self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
 
         if self.config.model_type in {"gpt2", "roberta"}:
             # Refer to this PR: https://github.com/huggingface/transformers/pull/12116
             self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name, add_prefix_space=True)
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
-
-        self.tokenizer.model_max_length = 512
-
-        if isinstance(self.model, T5PreTrainedModel):
-            self.is_t5 = True
-            # Remove the decoder in T5
-            del self.model.decoder
-        else:
-            self.is_t5 = False
-
-        self.gradient_checkpointing = gradient_checkpointing
-        if gradient_checkpointing:
-            self.model.gradient_checkpointing_enable()
-            if self.is_t5:
-                self.dummy_layer = DummyLayer()
-
-        self.classifier = nn.Linear(self.config.hidden_size, num_classes) if num_classes else nn.Identity()
-        self.classifier.apply(init_weights)
-
-        self.name_to_id = self.get_layer_ids()
-        self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
-
-        if hasattr(self.model.config, "type_vocab_size") and self.model.config.type_vocab_size <= 1:
-            # Disable segment ids for models like RoBERTa
-            self.disable_seg_ids = True
-        else:
-            self.disable_seg_ids = False
-
-    @property
-    def label_key(self):
-        return f"{self.prefix}_{LABEL}"
-
-    @property
-    def text_token_ids_key(self):
-        return f"{self.prefix}_{TEXT_TOKEN_IDS}"
-
-    @property
-    def text_segment_ids_key(self):
-        return f"{self.prefix}_{TEXT_SEGMENT_IDS}"
-
-    @property
-    def text_valid_length_key(self):
-        return f"{self.prefix}_{TEXT_VALID_LENGTH}"
 
     @property
     def text_token_word_mapping_key(self):
@@ -128,18 +81,6 @@ class HFAutoModelForNER(nn.Module):
     @property
     def text_word_offsets_key(self):
         return f"{self.prefix}_{WORD_OFFSETS}"
-
-    @property
-    def text_column_prefix(self):
-        return f"{self.text_token_ids_key}_{COLUMN}"
-
-    @property
-    def text_feature_dim(self):
-        return self.model.config.hidden_size
-
-    @property
-    def label_key(self):
-        return f"{self.prefix}_{LABEL}"
 
     def forward(
         self,
@@ -192,7 +133,7 @@ class HFAutoModelForNER(nn.Module):
 
         pooled_features = outputs.last_hidden_state[:, 0, :]
 
-        logits = self.classifier(sequence_output)
+        logits = self.head(sequence_output)
 
         logits_label = torch.argmax(F.log_softmax(logits, dim=-1), dim=-1)
 
