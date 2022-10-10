@@ -4,7 +4,8 @@ import sagemaker
 from abc import ABC, abstractmethod
 from ..utils.ag_sagemaker import (
     AutoGluonSagemakerEstimator,
-    AutoGluonSagemakerInferenceModel,
+    AutoGluonRepackInferenceModel,
+    AutoGluonNonRepackInferenceModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,12 +229,17 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         split_type,
         content_type,
         wait,
-        autogluon_sagemaker_inference_model_kwargs,
+        model_kwargs,
         transformer_kwargs,
+        repack_model=False,
         **kwargs
     ):
+        if repack_model:
+            model_cls = AutoGluonRepackInferenceModel
+        else:
+            model_cls = AutoGluonNonRepackInferenceModel
         logger.log(20, 'Creating inference model...')
-        model = AutoGluonSagemakerInferenceModel(
+        model = model_cls(
             model_data=model_data,
             role=role,
             region=region,
@@ -242,10 +248,9 @@ class SageMakerBatchTransformationJob(SageMakerJob):
             instance_type=instance_type,
             entry_point=entry_point,
             predictor_cls=predictor_cls,
-            **autogluon_sagemaker_inference_model_kwargs
+            **model_kwargs
         )
         logger.log(20, 'Inference model created successfully')
-
         logger.log(20, 'Creating transformer...')
         transformer = model.transformer(
             instance_count=instance_count,
@@ -256,6 +261,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
         logger.log(20, 'Transformer created successfully')
 
         try:
+            logger.log(20, 'Transforming')
             transformer.transform(
                 test_input,
                 job_name=job_name,
@@ -265,6 +271,7 @@ class SageMakerBatchTransformationJob(SageMakerJob):
                 **kwargs
             )
             self._job_name = job_name
+            logger.log(20, 'Transform done')
         except Exception as e:
             transformer.delete_model()
             raise e

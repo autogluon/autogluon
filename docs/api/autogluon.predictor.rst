@@ -205,4 +205,4 @@ Additional Time Series APIs
 
 .. autoclass:: TimeSeriesDataFrame
     :members: freq, from_iterable_dataset, from_data_frame, from_pickle,
-              split_by_time, split_by_item, slice_by_timestep, subsequence
+              split_by_time, slice_by_timestep, slice_by_time

@@ -96,7 +96,6 @@ def create_data_processor(
             model=model,
             train_transform_types=model_config.train_transform_types,
             val_transform_types=model_config.val_transform_types,
-            samples_per_gpu=config.env.per_gpu_batch_size,  # TODO: should be different in MMDET eval, now we force eval_batch_size_ratio in MMDET to be 1
             norm_type=model_config.image_norm,
             size=model_config.image_size,
             max_img_num_per_col=model_config.max_img_num_per_col,

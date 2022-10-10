@@ -1,10 +1,10 @@
 # Forecasting Time Series - In Depth
-:label:`sec_forecastingadvanced`
+:label:`sec_forecasting_indepth`
 
 This tutorial provides an in-depth overview of the time series forecasting capabilities in AutoGluon.
 
 - What is probabilistic time series forecasting?
-- What forecasting models are available in AutoGluon?
+- Which forecasting models are available in AutoGluon?
 - How does AutoGluon evaluate performance of time series models?
 - What functionality does `TimeSeriesPredictor` offer?
     - Basic configuration with `presets` and `time_limit`
@@ -12,10 +12,10 @@ This tutorial provides an in-depth overview of the time series forecasting capab
     - Hyperparameter tuning
     - Forecasting irregularly-sampled time series
 
-This tutorial assumes that you are familiar with the contents of the [basic tutorial](forecasting-quickstart.md).
+This tutorial assumes that you are familiar with the contents of :ref:`sec_forecasting_quickstart`.
 
 ## What is probabilistic time series forecasting?
-A time series is a sequence of measurement made at regular intervals.
+A time series is a sequence of measurements made at regular intervals.
 The main objective of time series forecasting is to predict the future values of a time series given the past observations.
 
 A typical example of this task is demand forecasting.
@@ -29,7 +29,7 @@ determines the length of the forecast horizon.
 :width:`600px`
 
 
-The [predict](https://auto.gluon.ai/stable/api/autogluon.predictor.html#autogluon.timeseries.TimeSeriesPredictor.predict) method of a `TimeSeriesPredictor` generates two types of forecasts:
+The `predict` method of a `TimeSeriesPredictor` generates two types of forecasts:
 
 - **mean forecast** represents the expected value of the time series at each time step in the forecast horizon.
 - **quantile forecast** represents the quantiles of the forecast distribution.
@@ -46,12 +46,12 @@ By default, the predictor outputs the quantiles `[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 
 ```python
 predictor = TimeSeriesPredictor(quantile_levels=[0.05, 0.5, 0.95])
 ```
-or get forecast for the quantiles of interest at prediction time
+or generate forecasts for the quantiles of interest at prediction time
 ```python
 predictor.predict(data, quantile_levels=[0.05, 0.5, 0.95])
 ```
 
-## What forecasting models are available in AutoGluon?
+## Which forecasting models are available in AutoGluon?
 Forecasting models in AutoGluon can be divided into three broad categories: local, global, and ensemble models.
 
 **Local models** are simple statistical models that are specifically designed to capture patterns such as trend or seasonality.
@@ -64,7 +64,7 @@ Available local models include:
 If the dataset consists of multiple time series, we fit a separate local model to each time series — hence the name "local".
 This means, if we want to make a forecast for a new time series that wasn't part of the training set, all local models will be fit from scratch for the new time series.
 
-**Global models** are deep-learning-based algorithms that learn a single model from the entire training set consisting of multiple time series.
+**Global models** are machine learning algorithms that learn a single model from the entire training set consisting of multiple time series.
 AutoGluon relies on [GluonTS](https://ts.gluon.ai/stable/) for the implementation of global models in PyTorch and MXNet.
 Available global models include:
 
@@ -79,7 +79,7 @@ Finally, an **ensemble** model works by combining predictions of all other model
 By default, `TimeSeriesPredictor` always fits a `WeightedEnsemble` on top of other models.
 This can be disabled by setting `enable_ensemble=False` when calling the `fit` method.
 
-For a list of tunable hyperparameters for each model, their default values, and other details see [Model zoo](#TODO).
+For a list of tunable hyperparameters for each model, their default values, and other details see :ref:`forecasting_zoo`.
 
 ## How does AutoGluon evaluate performance of time series models?
 AutoGluon evaluates the performance of forecasting models by measuring how well their forecasts align with the actually observed time series.
@@ -93,9 +93,9 @@ predictor.evaluate(test_data)
 ```
 For each time series in `test_data`, the predictor does the following:
 
-1. Hide the last `prediction_length` values of the time series.
-2. Generate a forecast for the hidden part of the time series.
-3. Quantify how well the forecast matches the actually observed (hidden) values of the time series using the `eval_metric`.
+1. Hold out the last `prediction_length` values of the time series.
+2. Generate a forecast for the held out part of the time series, i.e., the forecast horizon.
+3. Quantify how well the forecast matches the actually observed (held out) values of the time series using the `eval_metric`.
 
 Finally, the scores are averaged over all time series in the dataset.
 
@@ -121,13 +121,13 @@ The score will be computed on the last `prediction_length` time steps of each ti
 :width:`450px`
 
 Multi-window backtesting typically results in more accurate estimation of the forecast quality on unseen data.
-However, this strategy decreases the amount of training data available for fitting models, so we should stick to single-window backtesting if the training time series are short.
+However, this strategy decreases the amount of training data available for fitting models, so we recommend using single-window backtesting if the training time series are short.
 
 
 ### How to choose and interpret the evaluation metric?
 Different evaluation metrics capture different properties of the forecast, and therefore depend on the application that the user has in mind.
 For example, weighted quantile loss (`"mean_wQuantileLoss"`) measures how well-calibrated the quantile forecast is; mean absolute scale error (`"MASE"`) compares the mean forecast to a naive baseline.
-For more details about the available metrics, see [Metrics overview](#TODO).
+For more details about the available metrics, see the documentation for [autogluon.timeseries.evaluator.TimeSeriesEvaluator](https://github.com/awslabs/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py#L53).
 
 Note that AutoGluon always reports all metrics in a **higher-is-better** format.
 For this purpose, some metrics are multiplied by -1.
@@ -193,12 +193,15 @@ predictor.fit(
 If no `time_limit` is provided, the predictor will train until all models have been fit.
 
 
-### Manually configuring the models
+
+### Manually configuring models
+:label:`sec_forecasting_indepth_manual_config`
+
 Advanced users can override the presets and manually specify what models should be trained by the predictor using the `hyperparameters` argument.
 
 
 ```python
-predictor = TimeSeriesPredictor()
+predictor = TimeSeriesPredictor(...)
 
 predictor.fit(
     train_data=train_data,
@@ -216,9 +219,11 @@ The code above will only train two models:
 - `DeepAR` (with default hyperparameters)
 - `ETS` (with the given `seasonality` and `seasonal_period`; all other parameters set to their defaults).
 
-For the full list of available models and the respective hyperparameters, see [Model zoo](#TODO).
+For the full list of available models and the respective hyperparameters, see :ref:`forecasting_zoo`.
 
 ### Hyperparameter tuning
+:label:`sec_forecasting_indepth_hpo`
+
 Advanced users can define search spaces for model hyperparameters and let AutoGluon automatically determine the best configuration for the model.
 
 ```python
@@ -244,11 +249,15 @@ AutGluon will automatically select the best model configuration that achieves th
 
 We can change the number of random search runs by passing a dictionary as `hyperparameter_tune_kwargs`
 ```python
+predictor.fit(
+    ...
     hyperparameter_tune_kwargs={
         "scheduler": "local",
         "searcher": "random",
         "num_trials": 20,
     },
+    ...
+)
 ```
 
 ### Forecasting irregularly-sampled time series

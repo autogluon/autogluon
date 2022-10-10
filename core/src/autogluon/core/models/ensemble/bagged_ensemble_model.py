@@ -300,7 +300,7 @@ class BaggedEnsembleModel(AbstractModel):
             pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
-        if self.temperature_scalar is not None:
+        if self.params_aux.get("temperature_scalar", None) is not None:
             pred_proba = self._apply_temperature_scaling(pred_proba)
         elif self.conformalize is not None:
             pred_proba = self._apply_conformalization(pred_proba)

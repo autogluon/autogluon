@@ -153,6 +153,7 @@ MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP)
+MMCV_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # metric learning loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

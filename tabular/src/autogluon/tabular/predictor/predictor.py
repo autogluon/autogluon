@@ -18,19 +18,15 @@ from autogluon.common.utils.file_utils import get_directory_size, get_directory_
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata, compare_autogluon_metadata
-from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
-from autogluon.core.calibrate.conformity_score import compute_conformity_score
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df, try_import_torch
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
-from autogluon.tabular.models import _IModelsModel
-
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import default_holdout_frac
@@ -908,9 +904,9 @@ class TabularPredictor:
 
         if calibrate:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                self._calibrate_model()
+                self._trainer.calibrate_model()
             elif self.problem_type == QUANTILE:
-                self._calibrate_model()
+                self._trainer.calibrate_model()
             else:
                 logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
 
@@ -919,74 +915,6 @@ class TabularPredictor:
 
         if save_space:
             self.save_space()
-
-    def _calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
-        """
-        Applies temperature scaling to the AutoGluon model. Applies
-        inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize negative log likelihood. Inversed
-        softmaxes are divided by temperature scalar then softmaxed to return
-        predicted probs.
-
-        Parameters:
-        -----------
-        model_name: str: default=None
-            model name to tune temperature scaling on. If set to None
-            then will tune best model only. Best model chosen by validation score
-        lr: float: default=0.01
-            The learning rate for temperature scaling algorithm
-        max_iter: int: default=1000
-            Number of iterations optimizer should take for
-            tuning temperature scaler
-        init_val: float: default=1.0
-            The initial value for temperature scalar term
-        """
-        # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
-        try:
-            # FIXME: Avoid depending on torch for temp scaling
-            try_import_torch
-        except ImportError:
-            logger.log(30, 'Warning: Torch is not installed, skipping calibration step...')
-            return
-
-        if model_name is None:
-            model_name = self.get_model_best()
-
-        model_full_dict = self._trainer.get_model_full_dict()
-        model_name_og = model_name
-        for m, m_full in model_full_dict.items():
-            if m_full == model_name:
-                model_name_og = m
-                break
-        if self._trainer.bagged_mode:
-            y_val_probs = self.get_oof_pred_proba(model_name_og, transformed=True, internal_oof=True).to_numpy()
-            y_val = self._trainer.load_y().to_numpy()
-        else:
-            X_val = self._trainer.load_X_val()
-            y_val_probs = self._trainer.predict_proba(X_val, model_name_og)
-            y_val = self._trainer.load_y_val().to_numpy()
-
-            if self.problem_type == BINARY:
-                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
-
-        model = self._trainer.load_model(model_name=model_name)
-        if self.problem_type == QUANTILE:
-            logger.log(15, f'Conformity scores being computed to calibrate model: {model_name}')
-            conformalize = compute_conformity_score(y_val_pred=y_val_probs, y_val=y_val,
-                                                    quantile_levels=self.quantile_levels)
-            model.conformalize = conformalize
-            model.save()
-        else:
-            logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-            temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                                   init_val=init_val, max_iter=max_iter, lr=lr)
-            if temp_scalar is None:
-                logger.log(15, f'Warning: Infinity found during calibration, skipping calibration on {model.name}! '
-                               f'This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).')
-            else:
-                logger.log(15, f'Temperature term found is: {temp_scalar}')
-                model.temperature_scalar = temp_scalar
-                model.save()
 
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(self,
@@ -2221,7 +2149,7 @@ class TabularPredictor:
     # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='Best', expand_pareto_frontier=False,
-                              time_limit=None):
+                              time_limit=None, refit_full=False):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -2243,6 +2171,9 @@ class TabularPredictor:
         time_limit : int, default = None
             Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limit` value is applied to each model.
             If None, the ensemble models train without time restriction.
+        refit_full : bool, default = False
+            If True, will apply refit_full to all weighted ensembles created during this call.
+            Identical to calling `predictor.refit_full(model=predictor.fit_weighted_ensemble(...))`
 
         Returns
         -------
@@ -2265,7 +2196,12 @@ class TabularPredictor:
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_stack_preds = trainer.get_inputs_to_stacker(X=X,
+                                                      base_models=base_models,
+                                                      fit=fit,
+                                                      use_orig_features=False,
+                                                      use_val_cache=True
+                                                      )
 
         models = []
 
@@ -2289,6 +2225,9 @@ class TabularPredictor:
         models += trainer.generate_weighted_ensemble(X=X_stack_preds, y=y, level=weighted_ensemble_level,
                                                      stack_name=stack_name, base_model_names=base_models,
                                                      name_suffix=name_suffix, time_limit=time_limit)
+
+        if refit_full:
+            models += self.refit_full(model=models)
 
         return models
 

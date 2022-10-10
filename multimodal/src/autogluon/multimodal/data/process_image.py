@@ -50,6 +50,7 @@ from ..constants import (
     COLUMN,
     IMAGE,
     IMAGE_VALID_NUM,
+    MMCV_MODELS,
     MMDET_IMAGE,
     MMOCR,
     MMOCR_TEXT_DET,
@@ -74,7 +75,6 @@ class ImageProcessor:
         model: nn.Module,
         train_transform_types: List[str],
         val_transform_types: List[str],
-        samples_per_gpu: Optional[int] = None,
         norm_type: Optional[str] = None,
         size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
@@ -90,8 +90,6 @@ class ImageProcessor:
             A list of image transforms used in training. Note that the transform order matters.
         val_transform_types
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
-        samples_per_gpu
-            Number of samples per gpu, used in MMDET to group data in each batch.
         norm_type
             How to normalize an image. We now support:
             - inception
@@ -158,8 +156,8 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
-            if self.prefix == MMDET_IMAGE:
+        if self.prefix.lower().startswith(MMCV_MODELS):
+            if self.prefix.lower().startswith(MMDET_IMAGE):
                 assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
             else:
                 assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
@@ -192,7 +190,7 @@ class ImageProcessor:
     def image_column_prefix(self):
         return f"{self.image_key}_{COLUMN}"
 
-    def collate_fn(self, image_column_names: Optional[List] = None) -> Dict:
+    def collate_fn(self, image_column_names: Optional[List] = None, per_gpu_batch_size: Optional[int] = None) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
         vary from sample to sample. Samples with less images will be padded zeros.
@@ -209,11 +207,11 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
+        if self.prefix.lower().startswith(MMCV_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
-                    self.image_key: lambda x: collate(x, samples_per_gpu=self.samples_per_gpu),
+                    self.image_key: lambda x: collate(x, samples_per_gpu=per_gpu_batch_size),
                 }
             )
         else:
