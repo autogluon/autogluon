@@ -189,7 +189,7 @@ class TabularModel(AbstractTimeSeriesModel):
         if self._drop_median_prediction:
             predictions.drop("0.5", axis=1, inplace=True)
         predictions = self._rescale_targets(predictions, scale_per_item)
-        return predictions
+        return TimeSeriesDataFrame(predictions)
 
     def _normalize_targets(self, data: TimeSeriesDataFrame, min_scale=1e-5) -> Tuple[TimeSeriesDataFrame, pd.Series]:
         """Normalize data such that each the average absolute value of each time series is equal to 1."""
