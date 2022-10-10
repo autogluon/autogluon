@@ -174,6 +174,8 @@ class ARIMAModel(AbstractStatsmodelsModel):
         sm_model_init_args["freq"] = data.freq
         sm_model_init_args["trend"] = "c"
         sm_model_init_args.setdefault("enforce_stationarity", True)
+        sm_model_init_args.setdefault("order", (1, 1, 1))
+        sm_model_init_args.setdefault("maxiter", 50)
 
         # Infer seasonal_period if seasonal_period is not given / is set to None
         seasonal_period = sm_model_init_args.pop("seasonal_period", None)
