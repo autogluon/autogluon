@@ -283,6 +283,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
     col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, tokenizer)
     num_words = len(set(token_to_word_mappings)) - 1
     word_label = [1] * num_words
+    # TODO: Potentially optimize word label generation via binary search
     for idx, word_offset in enumerate(word_offsets[:num_words, :]):
         for annot in ner_annotations:
             custom_offset = annot[0]

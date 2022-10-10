@@ -79,7 +79,6 @@ model:
     insert_sep: False
     text_segment_num: 2
     stochastic_chunk: False
-    num_classes: 1
     special_tags: 
       - X # CLS, SEP, and non-first tokens of a word will be labelled as X
       - O # Outside of a named entity

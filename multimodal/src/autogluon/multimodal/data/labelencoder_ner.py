@@ -20,16 +20,16 @@ class NerLabelEncoder:
     Label Encoder for the named entity recognition task.
     """
 
-    def __init__(self, entity_map: Optional[dict] = None):
+    def __init__(self, config: DictConfig, entity_map: Optional[dict] = None):
         self.entity_map = entity_map
-
-    def fit(self, y: pd.Series, x: pd.Series, config: DictConfig):
-        """
-        Extract the annotations, check the unique entity groups, and build entity to index mappings.
-        """
         model_config = config.model.ner
         self.ner_special_tags = OmegaConf.to_object(model_config.special_tags)
         self.prefix = config.model.names[0]
+
+    def fit(self, y: pd.Series, x: pd.Series):
+        """
+        Extract the annotations, check the unique entity groups, and build entity to index mappings.
+        """
         _, entity_groups = self.extract_ner_annotations(y)
         self.unique_entity_groups = self.ner_special_tags + entity_groups
         self.entity_map = {entity: index for index, entity in enumerate(self.unique_entity_groups)}
