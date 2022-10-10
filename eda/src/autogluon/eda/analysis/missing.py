@@ -32,10 +32,10 @@ class MissingValuesFacetAnalysis(AbstractAnalysis, StateCheckMixin):
             df = args.train_data.drop(columns=args.label, errors='ignore')
 
         state = self._initial_missing_values_analysis(df, args, state, fit_kwargs)
-        for section in ['mid_missing_counts', 'low_missing_counts']:
+        for section in ['low_missing_counts', 'mid_missing_counts', 'high_missing_counts']:
             state = self._identify_highly_correlated_fields_vs_missing_field(df, section, fit_kwargs, state)
             for field in state.missing_fields_correlations[section].keys():
-                a = BaseAnalysis(children=[
+                a = BaseAnalysis(state=state, children=[
                     Namespace(namespace=f'missing_values_field_analysis', train_data=df, label=field, children=[
                         Namespace(namespace=section, children=[
                             Namespace(namespace=field, children=[
@@ -47,16 +47,14 @@ class MissingValuesFacetAnalysis(AbstractAnalysis, StateCheckMixin):
                         ])
                     ])
                 ])
-                a.state = state
                 state = a.fit(**fit_kwargs)
 
     def _initial_missing_values_analysis(self, df, args, state, fit_kwargs):
-        a = BaseAnalysis(children=[
+        a = BaseAnalysis(state=state, children=[
             Namespace(namespace='missing_values', train_data=df, label=args.label, children=[
                 MissingValuesAnalysis(),
             ]),
         ])
-        a.state = state
         state = a.fit(**fit_kwargs)
         return state
 
@@ -70,13 +68,12 @@ class MissingValuesFacetAnalysis(AbstractAnalysis, StateCheckMixin):
                 Correlation(focus_field=field, **corr_args)
             ])
             corr_analyses.append(facet)
-        a = BaseAnalysis(children=[
+        a = BaseAnalysis(state=state, children=[
             Namespace(namespace='missing_fields_correlations', children=[
                 Namespace(namespace=section, children=[
                     *corr_analyses,
                 ]),
             ]),
         ])
-        a.state = state
         state = a.fit(**fit_kwargs)
         return state

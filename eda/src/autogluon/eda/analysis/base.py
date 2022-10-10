@@ -16,11 +16,12 @@ class AbstractAnalysis(ABC, StateCheckMixin):
     def __init__(self,
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
+                 state: AnalysisState = None,
                  **kwargs) -> None:
 
         self.parent = parent
         self.children: List[AbstractAnalysis] = children
-        self.state: AnalysisState = None
+        self.state: AnalysisState = state
         for c in self.children:
             c.parent = self
             c.state = self.state

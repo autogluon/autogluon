@@ -60,10 +60,12 @@ class MissingValuesFieldVisualization(AbstractVisualization):
 class MissingValuesFacetAnalysisVisualization(AbstractVisualization):
     def __init__(self,
                  namespace: str = None,
+                 field_args: Union[None, Dict[str, Any]] = {},
                  fig_args: Union[None, Dict[str, Any]] = {},
                  viz_args: Union[None, Dict[str, Any]] = {},
                  **kwargs) -> None:
         super().__init__(namespace, **kwargs)
+        self.field_args = field_args
         self.fig_args = fig_args
         self.viz_args = viz_args
 
@@ -122,14 +124,15 @@ class MissingValuesFacetAnalysisVisualization(AbstractVisualization):
         sections = {
             'low_missing_counts': 'Low',
             'mid_missing_counts': 'Medium',
-            # 'high_missing_counts': 'High',
+            'high_missing_counts': 'High',
         }
         for section, title in sections.items():
             field_analysis_tabs = {}
             for field in state.missing_values_field_analysis[section].keys():
-                # FIXME: fig_args=fig_args, viz_args=viz_args
-                field_analysis_tabs[field] = TargetFacetAnalysisVisualization(namespace=f'missing_values_field_analysis.{section}.{field}')
-            # TODO: display sample if correlations are present
+                args = self.field_args.get(field, dict(fig_args={}, viz_args={}))
+                fig_args = args['fig_args']
+                viz_args = args['viz_args']
+                field_analysis_tabs[field] = TargetFacetAnalysisVisualization(namespace=f'missing_values_field_analysis.{section}.{field}', fig_args=fig_args, viz_args=viz_args)
             field_analysis_tabs = TabLayout(facets=field_analysis_tabs)
 
             SimpleVerticalLinearLayout(
@@ -138,3 +141,12 @@ class MissingValuesFacetAnalysisVisualization(AbstractVisualization):
                     field_analysis_tabs,
                 ],
             ).render(state)
+
+    class ParametersBuilder:
+        __field_args = {}
+
+        def with_field_details(self, field: str, parameters: TargetFacetAnalysisVisualization.ParametersBuilder):
+            self.__field_args[field] = parameters.build()
+
+        def build(self):
+            return dict(field_args=self.__field_args)

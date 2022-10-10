@@ -4,6 +4,7 @@ from ..visualization import SimpleVerticalLinearLayout, FeatureInteractionVisual
 
 def analyze(train_data=None, test_data=None, val_data=None, model=None, label=None, sample=None, anlz_facets=[], viz_facets=[], return_state=False, state=None):
     a = BaseAnalysis(
+        state=state,
         train_data=train_data,
         test_data=test_data,
         val_data=val_data,
@@ -13,9 +14,6 @@ def analyze(train_data=None, test_data=None, val_data=None, model=None, label=No
             Sampler(sample=sample, children=anlz_facets),
         ]
     )
-
-    if state is not None:
-        a.state = state
 
     state = a.fit()
 

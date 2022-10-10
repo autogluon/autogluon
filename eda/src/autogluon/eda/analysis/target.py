@@ -44,13 +44,12 @@ class TargetFacetAnalysis(AbstractAnalysis, StateCheckMixin):
             FeatureInteraction(x=args.label),
         ]
 
-        a = BaseAnalysis(children=[
+        a = BaseAnalysis(state=state, children=[
             Namespace(namespace='target_correlations', train_data=args.train_data, children=[
                 RawTypesAnalysis(),
                 VariableTypeAnalysis(),
             ]),
         ])
-        a.state = state
         state = a.fit(**fit_kwargs)
 
         type = state.target_correlations.variable_type.train_data[args.label]
@@ -61,14 +60,13 @@ class TargetFacetAnalysis(AbstractAnalysis, StateCheckMixin):
         else:
             data = df
 
-        a = BaseAnalysis(children=[
+        a = BaseAnalysis(state=state, children=[
             Namespace(namespace='target_interaction', train_data=data[[args.label]], children=target_interation_facets),
             Namespace(namespace='target_statistics', train_data=args.train_data[[args.label]], children=target_statistics_facets),
             Namespace(namespace='target_correlations', train_data=args.train_data, children=[
                 Correlation(**corr_args),
             ]),
         ])
-        a.state = state
         state = a.fit(**fit_kwargs)
 
         state.target_correlations.label = args.label
@@ -92,6 +90,5 @@ class TargetFacetAnalysis(AbstractAnalysis, StateCheckMixin):
                 ])
             )
 
-        a = BaseAnalysis(children=anlz_facets)
-        a.state = state
+        a = BaseAnalysis(state=state, children=anlz_facets)
         a.fit(**fit_kwargs)
