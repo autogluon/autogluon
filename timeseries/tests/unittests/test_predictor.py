@@ -474,7 +474,9 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
-    with pytest.raises(ValueError, match="Hyperparameter tuning not specified, so hyperparameters must have fixed values"):
+    with pytest.raises(
+        ValueError, match="Hyperparameter tuning not specified, so hyperparameters must have fixed values"
+    ):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2)}},

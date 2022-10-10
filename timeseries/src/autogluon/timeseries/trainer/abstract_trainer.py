@@ -18,9 +18,9 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
