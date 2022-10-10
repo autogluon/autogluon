@@ -314,7 +314,7 @@ class MultiheadAttention(nn.Module):
 class AdditiveAttention(nn.Module):
     """Additive Attention with linear complexity to input sequence length.
 
-    Additive attention was proposed and use in FastFormer.
+    Additive attention was proposed and used in FastFormer.
     See Ref. [1] for details.
     This implementation is motivated by: https://github.com/jrzaurin/pytorch-widedeep.git
 

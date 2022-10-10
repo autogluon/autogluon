@@ -160,6 +160,10 @@ class CategoricalTransformer(nn.Module):
             Activation function type of the MLP layer.
         head_normalization
             Normalization scheme of the MLP layer.
+        additive_attention
+            If 'true' the transformer will use additive attention with linear complexity to sequence length.
+        share_qv_weights
+            if 'true', then value and query transformation parameters are shared in additive attention.
 
         References
         ----------
