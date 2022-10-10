@@ -300,7 +300,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
             token_label[idx] = word_label[counter]
             counter += 1
     if not is_eval:
-        return token_label  # return token-level labels for
+        return token_label  # return token-level labels for training
     else:
         return word_label  # return word-level labels for evaluation
 
