@@ -1009,7 +1009,7 @@ class AbstractModel:
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
-
+        
         try:
             hpo_executor.validate_search_space(search_space, self.name)
         except EmptySearchSpace:
@@ -1066,7 +1066,7 @@ class AbstractModel:
             model_path_root=self.path_root,
             time_start=time_start,
         )
-
+        
         # cleanup artifacts
         for data_file in [train_path, val_path]:
             try:
@@ -1075,7 +1075,7 @@ class AbstractModel:
                 pass
 
         return hpo_results
-
+    
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return CUSTOM_BACKEND
@@ -1351,13 +1351,6 @@ class AbstractModel:
 
     def _more_tags(self):
         return _DEFAULT_TAGS
-
+    
     def _get_model_base(self):
         return self
-
-    def get_user_params(self) -> dict:
-        """Used to access user-specified parameters for the model before initialization."""
-        if self._user_params is None:
-            return {}
-        else:
-            return self._user_params.copy()

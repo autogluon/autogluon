@@ -10,9 +10,9 @@ from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
 
-from ... import TimeSeriesEvaluator
-from ...dataset import TimeSeriesDataFrame
-from ...utils.metadata import get_prototype_metadata_dict
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.utils.metadata import get_prototype_metadata_dict
 from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
@@ -394,6 +394,13 @@ class AbstractTimeSeriesModel(AbstractModel):
         template = self.__class__(**params)
 
         return template
+
+    def get_user_params(self) -> dict:
+        """Used to access user-specified parameters for the model before initialization."""
+        if self._user_params is None:
+            return {}
+        else:
+            return self._user_params.copy()
 
 
 class AbstractTimeSeriesModelFactory:
