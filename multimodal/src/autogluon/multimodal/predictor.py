@@ -289,6 +289,7 @@ class MultiModalPredictor:
         set_logger_verbosity(verbosity, logger=logger)
 
     def fit_coco(self, anno_file, hyperparameters):
+        self.detection_anno_train = anno_file
         data = from_coco(anno_file)
         self.fit(data,hyperparameters=hyperparameters)
 
@@ -1496,7 +1497,7 @@ class MultiModalPredictor:
 
     def evaluate_coco(
         self,
-        anno_file: str,
+        anno_file_or_df: str,
     ):
         """
         Evaluate object detection model on a test dataset in COCO format.
@@ -1509,9 +1510,15 @@ class MultiModalPredictor:
         from pycocotools.coco import COCO
         from pycocotools.cocoeval import COCOeval
 
-        coco_dataset = COCODataset(anno_file)
+        if isinstance(anno_file_or_df, str):
+            anno_file = anno_file_or_df
+            data = from_coco(anno_file)
+        else:
+            # during validation, it will call evaluate with df as input
+            anno_file = self.detection_anno_train
+            data = anno_file_or_df
 
-        data = from_coco(anno_file)
+        coco_dataset = COCODataset(anno_file)
 
         outputs = self._predict(
             data=data,
@@ -1538,7 +1545,7 @@ class MultiModalPredictor:
         cocoEval.accumulate()
         cocoEval.summarize()
 
-        return cocoEval.stats
+        return cocoEval.stats[0]
 
     def _process_batch(
         self,
