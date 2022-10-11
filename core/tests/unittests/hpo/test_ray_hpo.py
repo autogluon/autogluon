@@ -65,7 +65,6 @@ def test_invalid_searcher():
                 mode='min',
                 save_dir=root,
                 ray_tune_adapter=DummyAdapter(),
-                stop={"training_iteration": 20},
             )
     
 def test_invalid_scheduler():
@@ -85,7 +84,6 @@ def test_invalid_scheduler():
                 mode='min',
                 save_dir=root,
                 ray_tune_adapter=DummyAdapter(),
-                stop={"training_iteration": 20},
             )
             
             
@@ -102,7 +100,6 @@ def test_invalid_preset():
                 mode='min',
                 save_dir=root,
                 ray_tune_adapter=DummyAdapter(),
-                stop={"training_iteration": 20},
             )
             
             
@@ -123,7 +120,6 @@ def test_empty_search_space():
                 mode='min',
                 save_dir=root,
                 ray_tune_adapter=DummyAdapter(),
-                stop={"training_iteration": 20},
             )
 
 
@@ -145,6 +141,5 @@ def test_run(searcher, scheduler):
             mode='min',
             save_dir=root,
             ray_tune_adapter=DummyAdapter(),
-            stop={"training_iteration": 20},
         )
         assert analysis is not None

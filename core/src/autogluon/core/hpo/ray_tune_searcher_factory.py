@@ -1,5 +1,5 @@
-from ray.tune.suggest.basic_variant import BasicVariantGenerator
-from ray.tune.suggest.hyperopt import HyperOptSearch
+from ray.tune.search.basic_variant import BasicVariantGenerator
+from ray.tune.search.hyperopt import HyperOptSearch
 
 class SearcherFactory:
     
