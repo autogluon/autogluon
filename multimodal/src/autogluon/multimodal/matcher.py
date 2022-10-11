@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import copy
-import functools
 import json
 import logging
 import operator
 import os
 import pickle
-import shutil
 import sys
 import warnings
 from datetime import timedelta
@@ -34,19 +32,14 @@ from .constants import (
     BEST_K_MODELS_FILE,
     BINARY,
     CLASSIFICATION,
-    DATA,
-    ENVIRONMENT,
     FEATURES,
     GREEDY_SOUP,
     LABEL,
     LAST_CHECKPOINT,
-    MATCHER,
     MAX,
     MIN,
-    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
-    OPTIMIZATION,
     PAIR,
     PROBABILITY,
     QUERY,
@@ -102,13 +95,9 @@ logger = logging.getLogger(AUTOMM)
 
 class MultiModalMatcher:
     """
-    MultiModalMatcher is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
-    are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
-    and the MultiModalMatcher can predict the values of one column conditioned on the features from the other columns.
-
-    The prediction can be either classification or regression. The feature columns can contain
-    image paths, text, numerical, and categorical values.
-
+    MultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
+    These embeddings can be used e.g. with cosine-similarity to find items with similar semantic meanings.
+    This can be useful for computing the semantic similarity of two items, semantic search, paraphrase mining, etc.
     """
 
     def __init__(
@@ -116,8 +105,8 @@ class MultiModalMatcher:
         query: Union[str, List[str]],
         response: Union[str, List[str]],
         negative: Optional[Union[str, List[str]]] = None,
-        match_label: Optional[Union[int, str]] = None,
         label: Optional[str] = None,
+        match_label: Optional[Union[int, str]] = None,
         problem_type: Optional[str] = None,
         eval_metric: Optional[str] = None,
         path: Optional[str] = None,
@@ -128,34 +117,26 @@ class MultiModalMatcher:
         """
         Parameters
         ----------
+        query
+            Names of columns that contains the query data.
+        response
+            Names of columns that contains the response data. If no label column is provided,
+            query and response columns form positive pairs.
+        negative
+            Names of columns that contains the negative data. Query and negative make up negative pairs.
         label
-            Name of the column that contains the target variable to predict.
+            Name of the label column. Label and negative shouldn't be used simultaneously.
+        match_label
+            For binary labels, which label indicates a pair of items match.
         problem_type
-            Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem
-            (options: 'binary', 'multiclass', 'regression').
+            Type of matching problem if the label column is available.
+            This could be binary, multiclass, or regression
+            if the label column contains binary, multiclass, or numeric labels.
             If `problem_type = None`, the prediction problem type is inferred
             based on the label-values in provided dataset.
-        pipeline
-            This defines inference tasks like FeatureExtraction, ZeroShotClassification, etc.
-            TODO: add more pipelines (ref: https://huggingface.co/docs/transformers/main_classes/pipelines)
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
-        hyperparameters
-            This is to override some default configurations.
-            For example, changing the text and image backbones can be done by formatting:
-
-            a string
-            hyperparameters = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
-
-            or a list of strings
-            hyperparameters = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
-
-            or a dictionary
-            hyperparameters = {
-                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-                        }
         path
             Path to directory where models and intermediate outputs should be saved.
             If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
@@ -269,7 +250,8 @@ class MultiModalMatcher:
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
-        """Set the verbosity level of the log.
+        """
+        Set the verbosity level of the log.
 
         Parameters
         ----------
@@ -292,11 +274,11 @@ class MultiModalMatcher:
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
         seed: Optional[int] = 123,
-        hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
-        Fit MultiModalMatcher predict label column of a dataframe based on the other columns,
-        which may contain image path, text, numeric, or categorical features.
+        Fit MultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
+        the semantic similarities of positive and negative pairs.
+        The data may contain image, text, numeric, or categorical features.
 
         Parameters
         ----------
@@ -348,23 +330,6 @@ class MultiModalMatcher:
             and whether hyper-parameter-tuning is utilized.
         seed
             The random seed to use for this training run.
-        hyperparameter_tune_kwargs
-                Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
-                If None, then hyperparameter tuning will not be performed.
-                    num_trials: int
-                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
-                    scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
-                        If str is passed, AutoGluon will create the scheduler for you with some default parameters.
-                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
-                    scheduler_init_args: Optional[dict] = None
-                        If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
-                    searcher: Union[str, ray.tune.suggest.SearchAlgorithm, ray.tune.suggest.Searcher]
-                        If str is passed, AutoGluon will create the searcher for you with some default parameters.
-                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
-                        You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
-                    scheduler_init_args: Optional[dict] = None
-                        If provided str to `searcher`, you can optionally provide custom init_args to the searcher
-                        You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
 
         Returns
         -------
@@ -374,7 +339,6 @@ class MultiModalMatcher:
         pl.seed_everything(seed, workers=True)
 
         if self._resume:
-            assert hyperparameter_tune_kwargs is None, "You can not resume training with HPO"
             save_path = process_save_path(path=self._save_path, resume=True)
         elif save_path is not None:
             save_path = process_save_path(path=save_path)
@@ -482,12 +446,11 @@ class MultiModalMatcher:
             minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=save_path,
-            ckpt_path=None if hyperparameter_tune_kwargs is not None else self._ckpt_path,
-            resume=False if hyperparameter_tune_kwargs is not None else self._resume,
-            enable_progress_bar=False if hyperparameter_tune_kwargs is not None else self._enable_progress_bar,
+            ckpt_path=self._ckpt_path,
+            resume=self._resume,
+            enable_progress_bar=self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
-            hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
         )
 
         self._fit(**_fit_args)
