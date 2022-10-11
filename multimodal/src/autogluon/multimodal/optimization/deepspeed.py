@@ -14,69 +14,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
-import contextlib
-import json
 import logging
-import os
-import platform
-from collections import OrderedDict
-from pathlib import Path
 from typing import Any, Dict, Generator, List, Mapping, Optional, Tuple, Union, cast
 
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.accelerators.cuda import CUDAAccelerator
-from pytorch_lightning.core.optimizer import _init_optimizers_and_lr_schedulers
 from pytorch_lightning.overrides.base import _LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase
 from pytorch_lightning.plugins.environments.cluster_environment import ClusterEnvironment
 from pytorch_lightning.plugins.precision import PrecisionPlugin
 from pytorch_lightning.strategies import DeepSpeedStrategy
-from pytorch_lightning.strategies.ddp import DDPStrategy
-from pytorch_lightning.strategies.utils import _fp_to_half
-from pytorch_lightning.trainer.states import TrainerFn
 from pytorch_lightning.utilities import GradClipAlgorithmType
-from pytorch_lightning.utilities.apply_func import apply_to_collection
-from pytorch_lightning.utilities.distributed import (
-    _get_process_group_backend_from_env,
-    get_default_process_group_backend_for_device,
-    log,
-)
-from pytorch_lightning.utilities.enums import AMPType, PrecisionType
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
-from pytorch_lightning.utilities.imports import _RequirementAvailable
 from pytorch_lightning.utilities.model_helpers import is_overridden
-from pytorch_lightning.utilities.optimizer import optimizers_to_device
-from pytorch_lightning.utilities.rank_zero import rank_zero_deprecation, rank_zero_info, rank_zero_warn
-from pytorch_lightning.utilities.seed import reset_seed
-from pytorch_lightning.utilities.types import _PATH, STEP_OUTPUT, LRSchedulerConfig, ReduceLROnPlateau, _LRScheduler
-from pytorch_lightning.utilities.warnings import WarningCache
-from torch import Tensor
-from torch.nn import Module
-from torch.optim import Optimizer
-
-warning_cache = WarningCache()
-
-_DEEPSPEED_AVAILABLE = _RequirementAvailable("deepspeed")
-if _DEEPSPEED_AVAILABLE:
-    import deepspeed
-
-
-def remove_module_hooks(model: torch.nn.Module) -> None:
-    # todo (tchaton) awaiting this feature to move upstream to DeepSpeed
-    for module in model.modules():
-        module._backward_hooks = OrderedDict()
-        module._is_full_backward_hook = None
-        module._forward_hooks = OrderedDict()
-        module._forward_pre_hooks = OrderedDict()
-        module._state_dict_hooks = OrderedDict()
-        module._load_state_dict_pre_hooks = OrderedDict()
-
+from pytorch_lightning.utilities.rank_zero import rank_zero_warn
+from pytorch_lightning.utilities.types import _PATH
 
 class CustomDeepSpeedStrategy(DeepSpeedStrategy):
-    strategy_name = "deepspeed"
-    DEEPSPEED_ENV_VAR = "PL_DEEPSPEED_CONFIG_PATH"
-
     """
     Provides capabilities to run training using the DeepSpeed library, with training optimizations for large
         billion parameter models. `For more information: https://pytorch-
@@ -293,18 +247,49 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
             when using ZeRO Stage 3. This differs from the DeepSpeed checkpoint which contains shards
             per worker.
         """
-        if not _DEEPSPEED_AVAILABLE:
-            raise MisconfigurationException(
-                "To use the `DeepSpeedStrategy`, you must have DeepSpeed installed."
-                " Install it by running `pip install -U deepspeed`."
-            )
-
         super().__init__(
             accelerator=accelerator,
             parallel_devices=parallel_devices,
             cluster_environment=cluster_environment,
             precision_plugin=precision_plugin,
             process_group_backend=process_group_backend,
+            zero_optimization=zero_optimization,
+            stage=stage,
+            remote_device=remote_device,
+            offload_optimizer=offload_optimizer,
+            offload_parameters=offload_parameters,
+            params_buffer_count=params_buffer_count,
+            params_buffer_size=params_buffer_size,
+            max_in_cpu=max_in_cpu,
+            offload_optimizer_device=offload_optimizer_device,
+            optimizer_buffer_count=optimizer_buffer_count,
+            block_size=block_size,
+            queue_depth=queue_depth,
+            single_submit=single_submit,
+            overlap_events=overlap_events,
+            thread_count=thread_count,
+            pin_memory=pin_memory,
+            sub_group_size=sub_group_size,
+            contiguous_gradients=contiguous_gradients,
+            overlap_comm=overlap_comm,
+            allgather_partitions=allgather_partitions,
+            reduce_scatter=reduce_scatter,
+            allgather_bucket_size=allgather_bucket_size,
+            reduce_bucket_size=reduce_bucket_size,
+            zero_allow_untested_optimizer=zero_allow_untested_optimizer,
+            logging_batch_size_per_gpu=logging_batch_size_per_gpu,
+            config=config,
+            logging_level=logging_level,
+            loss_scale=loss_scale,
+            initial_scale_power=initial_scale_power,
+            loss_scale_window=loss_scale_window,
+            hysteresis=hysteresis,
+            min_loss_scale=min_loss_scale,
+            partition_activations=partition_activations,
+            cpu_checkpointing=cpu_checkpointing,
+            contiguous_memory_optimization=contiguous_memory_optimization,
+            synchronize_checkpoint_boundary=synchronize_checkpoint_boundary,
+            load_full_weights=load_full_weights,
         )
 
     def init_deepspeed(self) -> None:
