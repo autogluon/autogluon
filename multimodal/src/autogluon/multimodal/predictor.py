@@ -533,7 +533,7 @@ class MultiModalPredictor:
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
-        minmax_mode = get_minmax_mode(validation_metric_name, pipeline=self._pipeline)
+        minmax_mode = get_minmax_mode(validation_metric_name)
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -1094,9 +1094,24 @@ class MultiModalPredictor:
         logger.debug(f"minmax_mode: {minmax_mode}")
 
         if self._pipeline == OBJECT_DETECTION:
+            checkpoint_callback = AutoMMModelCheckpoint(
+                dirpath=save_path,
+                save_top_k=config.optimization.top_k,
+                verbose=True,
+                monitor=task.validation_metric_name,
+                mode=minmax_mode,
+                save_last=True,
+            )
+            early_stopping_callback = pl.callbacks.EarlyStopping(
+                monitor=task.validation_metric_name,
+                patience=config.optimization.patience,
+                mode=minmax_mode,
+            )
             lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
             model_summary = pl.callbacks.ModelSummary(max_depth=1)
             callbacks = [
+                checkpoint_callback,
+                early_stopping_callback,
                 lr_callback,
                 model_summary,
             ]

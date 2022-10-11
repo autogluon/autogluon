@@ -13,6 +13,7 @@ Specifically, these include:
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchmetrics
@@ -43,13 +44,16 @@ from .utils import (
 
 from ..utils import (
     send_datacontainers_to_device,
-    unpack_datacontainers,)
+    unpack_datacontainers,
+)
 
 logger = logging.getLogger(AUTOMM)
 
 
 class MMDetLitModule(pl.LightningModule):
-    def __init__(self, model,
+    def __init__(
+        self,
+        model,
         optim_type: Optional[str] = None,
         lr_choice: Optional[str] = None,
         lr_schedule: Optional[str] = None,
@@ -64,7 +68,8 @@ class MMDetLitModule(pl.LightningModule):
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
-        efficient_finetune: Optional[str] = None,):
+        efficient_finetune: Optional[str] = None,
+    ):
         """
         In essence, `MMDetectionTrainer` is a pytorch-lightning version of the runners in `mmcv`. The implementation
         was especially influenced by the implementation of `EpochBasedRunner`.
@@ -89,6 +94,7 @@ class MMDetLitModule(pl.LightningModule):
                 f"which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
+        self.id2label = dict(zip(range(100), range(100))) # TODO: replace with real id2label
 
     def forward(self, x):
         """
@@ -110,7 +116,7 @@ class MMDetLitModule(pl.LightningModule):
 
     def _training_step(self, batch, batch_idx=0):
         # train dataloader.
-        #send_datacontainers_to_device(data=batch, device=self.device)
+        # send_datacontainers_to_device(data=batch, device=self.device)
         batch = unpack_datacontainers(batch)
 
         img_metas = batch["mmdet_image_image"]["img_metas"][0]
@@ -140,33 +146,49 @@ class MMDetLitModule(pl.LightningModule):
             Single data sample.
         """
         batch = unpack_datacontainers(sample)
-        print(batch)
-        exit()
 
-        img_metas = batch["mmdet_image_image"]["img_metas"][0]
-        imgs = [batch["mmdet_image_image"]["img"][0][0].float().to(self.device)]
-        pred = self.model.forward_test(
+        img_metas = batch["mmdet_image_image"]["img_metas"]
+        imgs = [batch["mmdet_image_image"]["img"][0].float().to(self.device)]
+        batch_result = self.model.forward_test(
             imgs=imgs,
             img_metas=img_metas,
-        ) # batch_size, 80, (n, 5)
+        )  # batch_size, 80, (n, 5)
 
-        res = {
-            "pred_bbox": [p[:, :4] for p in pred[0]],
-            "pred_score": [p[:, 4] for p in pred[0]],
-        } # only return first res
-        # TODO: check if res is correct here
-        '''
-        print(res)
-        print(res["pred_bbox"][62])
-        print(res["pred_score"][62])
-        print(res["pred_bbox"][63])
-        print(res["pred_score"][63])
-        print(res["pred_bbox"][64])
-        print(res["pred_score"][64])
-        print(res["pred_bbox"][66])
-        print(res["pred_score"][66])
-        exit()
-        '''
+        preds = []
+        target = []
+
+        for img_idx, img_result in enumerate(batch_result):
+            boxes = []
+            scores = []
+            labels = []
+            for category_idx, category_result in enumerate(img_result):
+                for item_idx, item_result in enumerate(category_result):
+                    boxes.append(item_result[:4])
+                    scores.append(float(item_result[4]))
+                    labels.append(category_idx)
+            preds.append(
+                dict(
+                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
+                    scores=torch.tensor(scores).float().to(self.device),
+                    labels=torch.tensor(labels).long().to(self.device),
+                )
+            )
+
+        batch_size = len(preds)
+        for i in range(batch_size):
+            boxes = batch["mmdet_image_image"]["gt_bboxes"][0][i]
+            labels = batch["mmdet_image_image"]["gt_labels"][0][i]
+            target.append(
+                dict(
+                    boxes=boxes.float().to(self.device),
+                    labels=labels.long().to(self.device),
+                )
+            )
+
+        # use MeanAveragePrecision, example code: https://github.com/Lightning-AI/metrics/blob/master/examples/detection_map.py
+        self.validation_metric.update(preds, target)
+
+        res = dict(preds=preds,target=target)
         return res
 
     def compute_loss(self, img, img_metas, gt_bboxes, gt_labels, *args, **kwargs):
@@ -230,16 +252,39 @@ class MMDetLitModule(pl.LightningModule):
             loss_name = map_loss_names.get(key, key)
             self.log(f"step/{loss_name}", losses[key])
 
-
     def training_step(self, batch, batch_idx):
         loss, log_vars = self._training_step(batch, batch_idx)
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        res = self.evaluate(batch, "val")
-        return res
+        self.evaluate(batch, "val")
+
+    def validation_epoch_end(self, validation_step_outputs):
+        mAPs = {"val_" + k: v for k, v in self.validation_metric.compute().items()}
+        self.print(mAPs)
+        #mAPs_per_class = mAPs.pop("val_map_per_class")
+        #mARs_per_class = mAPs.pop("val_mar_100_per_class")
+        self.log_dict(mAPs, sync_dist=True)
+        '''
+        self.log_dict(
+            {
+                f"val_map_{label}": value
+                for label, value in zip(self.id2label.values(), mAPs_per_class)
+            },
+            sync_dist=True,
+        )
+        self.log_dict(
+            {
+                f"val_mar_100_{label}": value
+                for label, value in zip(self.id2label.values(), mARs_per_class)
+            },
+            sync_dist=True,
+        )
+        '''
+        self.validation_metric.reset()
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
+        raise NotImplementedError("test with lit_mmdet is not implemented yet.")
         res = self.evaluate(batch, "test")
         return res
 

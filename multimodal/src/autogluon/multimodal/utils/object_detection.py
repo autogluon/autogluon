@@ -497,6 +497,9 @@ class COCODataset():
 
         self.category_ids = [cat["id"] for cat in d["categories"]]
 
+        print(self.category_ids)
+        exit()
+
     def get_image_id_from_path(self, image_path):
         return self.image_namenum_to_id[get_image_name_num(image_path)]
 

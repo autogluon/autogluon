@@ -12,6 +12,7 @@ from ..constants import (
     AVERAGE_PRECISION,
     BINARY,
     F1,
+    MAP,
     METRIC_MODE_MAP,
     MIN,
     MULTICLASS,
@@ -82,7 +83,7 @@ def infer_metrics(
         eval_metric_name = RMSE
     elif problem_type is None:
         if pipeline == OBJECT_DETECTION:
-            eval_metric_name = None
+            eval_metric_name = MAP
         else:
             raise NotImplementedError(f"Problem type: {problem_type}, pipeline: {pipeline} is not supported yet!")
     else:
@@ -95,7 +96,6 @@ def infer_metrics(
 
 def get_minmax_mode(
     metric_name: str,
-    pipeline: Optional[str] = None,
 ):
     """
     Get minmax mode based on metric name
@@ -104,8 +104,6 @@ def get_minmax_mode(
     ----------
     metric_name
         A string representing metric
-    pipeline
-        Predictor's pipeline, used to decide if we shall skip this.
 
     Returns
     -------
@@ -116,14 +114,8 @@ def get_minmax_mode(
         - max
             It means that larger metric is better.
     """
-    if pipeline is None:
-        assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
-        return METRIC_MODE_MAP.get(metric_name)
-    elif pipeline == OBJECT_DETECTION:
-        return MIN
-    else:
-        return NotImplementedError("pipeline=f{} is not implemented for training")
-
+    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
+    return METRIC_MODE_MAP.get(metric_name)
 
 def compute_score(
     metric_data: dict,

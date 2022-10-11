@@ -10,6 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_metric_learning import distances, losses, miners
 from torch import nn, optim
 from torch.nn import functional as F
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from transformers import Adafactor
 from transformers.trainer_pt_utils import get_parameter_names
 
@@ -34,6 +35,7 @@ from ..constants import (
     LORA,
     LORA_BIAS,
     LORA_NORM,
+    MAP,
     MULTICLASS,
     NORM_FIT,
     PAIR_MARGIN_MINER,
@@ -191,6 +193,9 @@ def get_metric(
         return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return CustomF1Score(num_classes=num_classes, pos_label=pos_label), None
+    elif metric_name == MAP:
+        return MeanAveragePrecision(box_format='xyxy',iou_type="bbox",class_metrics=False), None
+        # return MeanAveragePrecision(box_format='xyxy',iou_type="bbox",class_metrics=True), None # TODO: remove parameter hardcodings here
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

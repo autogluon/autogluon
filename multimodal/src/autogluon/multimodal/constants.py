@@ -49,6 +49,7 @@ ROIS = "rois"
 SCORE = "score"
 
 # Metric
+MAP = "map"
 MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
@@ -78,6 +79,7 @@ METRIC_MODE_MAP = {
     PEARSONR: MAX,
     SPEARMANR: MAX,
     F1: MAX,
+    MAP: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 

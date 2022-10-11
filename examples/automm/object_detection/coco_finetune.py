@@ -37,7 +37,7 @@ def voccoco_scratch(checkpoint_name="faster_rcnn_r50_fpn_2x_coco", train_path=vo
 def voccoco_finetune(
     checkpoint_name="faster_rcnn_r50_fpn_2x_coco", train_path=voc_train_path, test_path=voc_test_path
 ):
-    num_classes = 20
+    num_classes = 20 #TODO: remove hardcode
 
     predictor = MultiModalPredictor(
         label="rois_label",
@@ -58,7 +58,7 @@ def voccoco_finetune(
             "optimization.learning_rate": 1e-3,
             "optimization.weight_decay": 1e-4,
             "optimization.max_epochs": 50,
-            "env.per_gpu_batch_size": 2,
+            # "env.per_gpu_batch_size": 2,
         },
     )
     fit_end = time.time()

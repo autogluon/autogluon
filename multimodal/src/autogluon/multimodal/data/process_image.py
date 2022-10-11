@@ -168,12 +168,9 @@ class ImageProcessor:
                 training_pipeline = cfg.data.train.pipeline
             training_pipeline = replace_ImageToTensor(training_pipeline)
             cfg.data.val.pipeline = replace_ImageToTensor(cfg.data.val.pipeline)
-            self.val_processor = Compose(cfg.data.val.pipeline)
+            # self.val_processor = Compose(cfg.data.val.pipeline)
+            self.val_processor = Compose(training_pipeline)
             self.train_processor = Compose(training_pipeline)
-            if isinstance(samples_per_gpu, int) and samples_per_gpu > 0:
-                self.samples_per_gpu = samples_per_gpu
-            else:
-                raise ValueError(f"invalid samples_per_gpu value: {samples_per_gpu}")
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)
             self.val_processor = self.construct_processor(self.val_transform_types)
