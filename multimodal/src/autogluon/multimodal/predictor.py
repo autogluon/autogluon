@@ -1168,6 +1168,7 @@ class MultiModalPredictor:
                         DEEPSPEED_MIN_PL_VERSION
                     ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
                     from .optimization.deepspeed import CustomDeepSpeedStrategy
+
                     strategy = CustomDeepSpeedStrategy(
                         stage=3,
                         offload_optimizer=True,
@@ -1376,10 +1377,16 @@ class MultiModalPredictor:
             checkpoint = {"state_dict": avg_state_dict}
         else:
             if strategy and hasattr(strategy, "strategy_name") and strategy.strategy_name == DEEPSPEED_STRATEGY:
-                checkpoint = {"state_dict" : { name.partition("module.")[2]: param for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()}}
+                checkpoint = {
+                    "state_dict": {
+                        name.partition("module.")[2]: param
+                        for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()
+                    }
+                }
             else:
-                checkpoint = {"state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}}
-
+                checkpoint = {
+                    "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
+                }
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
