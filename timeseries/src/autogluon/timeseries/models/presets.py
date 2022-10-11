@@ -214,7 +214,7 @@ def contains_searchspace(model_hyperparameters: Dict[str, Any]) -> bool:
 def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, Dict[str, Any]]):
     if not any(contains_searchspace(model_hps) for model_hps in hyperparameters.values()):
         raise ValueError(
-            f"Hyperparameter tuning specified, but not a single model contains a hyperparameter search space. "
+            f"Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
             f"Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
             f"for at least one model."
         )

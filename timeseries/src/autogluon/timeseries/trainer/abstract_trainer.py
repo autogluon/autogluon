@@ -580,7 +580,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
                 logger.info(fit_log_message)
 
-                if contains_searchspace(model._user_params):
+                if contains_searchspace(model.get_user_params()):
                     with tqdm.external_write_mode():
                         model_names_trained += self.tune_model_hyperparameters(
                             model,
