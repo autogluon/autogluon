@@ -139,6 +139,8 @@ IA3_NORM = "ia3_norm"
 
 # DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
+DEEPSPEED_STRATEGY = "deepspeed"
+DEEPSPEED_MODULE = "autogluon.multimodal.optimization.deepspeed"
 DEEPSPEED_MIN_PL_VERSION = "1.7.7"
 
 # registered model keys. TODO: document how to add new models.

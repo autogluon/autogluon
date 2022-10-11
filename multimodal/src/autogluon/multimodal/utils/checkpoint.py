@@ -13,7 +13,7 @@ from pytorch_lightning.utilities.cloud_io import load as pl_load
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
 from pytorch_lightning.utilities.types import _METRIC, _PATH
 
-from ..constants import AUTOMM
+from ..constants import AUTOMM, DEEPSPEED_STRATEGY
 
 logger = logging.getLogger(AUTOMM)
 
@@ -190,7 +190,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         self.to_yaml()
 
         if (
-            trainer.strategy.strategy_name == "deepspeed"
+            trainer.strategy.strategy_name == DEEPSPEED_STRATEGY
         ):  # Deepspeed saves model and optimizer states in a sharded state in seperate folder (even when using single GPU). Merging folder to single checkpoint file.
             from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 

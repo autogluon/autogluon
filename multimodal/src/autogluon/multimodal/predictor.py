@@ -40,7 +40,9 @@ from .constants import (
     COLUMN_FEATURES,
     DATA,
     DEEPSPEED_MIN_PL_VERSION,
+    DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
+    DEEPSPEED_STRATEGY,
     DEPRECATED_ZERO_SHOT,
     FEATURE_EXTRACTION,
     FEATURES,
@@ -1166,7 +1168,6 @@ class MultiModalPredictor:
                         DEEPSPEED_MIN_PL_VERSION
                     ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
                     from .optimization.deepspeed import CustomDeepSpeedStrategy
-
                     strategy = CustomDeepSpeedStrategy(
                         stage=3,
                         offload_optimizer=True,
@@ -1252,6 +1253,7 @@ class MultiModalPredictor:
                     top_k_average_method=config.optimization.top_k_average_method,
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
+                    strategy=strategy,
                     strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
                     standalone=standalone,
                 )
@@ -1267,6 +1269,7 @@ class MultiModalPredictor:
         top_k_average_method,
         val_df,
         validation_metric_name,
+        strategy=None,
         last_ckpt_path=None,
         strict_loading=True,
         standalone=True,
@@ -1372,7 +1375,11 @@ class MultiModalPredictor:
         if not standalone:
             checkpoint = {"state_dict": avg_state_dict}
         else:
-            checkpoint = {"state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}}
+            if strategy and hasattr(strategy, "strategy_name") and strategy.strategy_name == DEEPSPEED_STRATEGY:
+                checkpoint = {"state_dict" : { name.partition("module.")[2]: param for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()}}
+            else:
+                checkpoint = {"state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}}
+
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
@@ -1398,7 +1405,7 @@ class MultiModalPredictor:
         strategy: str,
     ) -> List[Dict]:
 
-        if self._config.env.strategy == DEEPSPEED_OFFLOADING and "DeepSpeedStrategy" not in sys.modules:
+        if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
             from .optimization.deepspeed import CustomDeepSpeedStrategy
 
