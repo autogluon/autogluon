@@ -9,10 +9,10 @@ from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
-
-from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator
 from autogluon.timeseries.utils.metadata import get_prototype_metadata_dict
+
 from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
