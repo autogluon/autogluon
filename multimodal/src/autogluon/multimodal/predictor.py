@@ -2095,7 +2095,8 @@ class MultiModalPredictor:
 
         config = copy.deepcopy(self._config)
         if standalone and (
-            not OmegaConf.select(config, "optimization.efficient_finetune") or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
+            not OmegaConf.select(config, "optimization.efficient_finetune")
+            or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
         ):
             config = save_pretrained_model_configs(model=self._model, config=config, path=path)
 
