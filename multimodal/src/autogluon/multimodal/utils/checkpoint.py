@@ -80,18 +80,23 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
                 " to define how you'd like to use `storage_options`."
             )
 
-        if self.trainable_param_names:
-            updated_params = {}
-            for name, param in checkpoint["state_dict"].items():
-                adjusted_name = name.replace("model.", "", 1)
-                if adjusted_name in self.model_name_to_id and self.model_name_to_id[adjusted_name] == 0:
-                    updated_params[name] = param
-                if any([re.match(trainable_param_name, name) for trainable_param_name in self.trainable_param_names]):
-                    updated_params[name] = param
-        else:
-            updated_params = checkpoint["state_dict"]
+        if "state_dict" in checkpoint:
+            if self.trainable_param_names:
+                updated_params = {}
+                for name, param in checkpoint["state_dict"].items():
+                    adjusted_name = name.replace("model.", "", 1)
+                    if adjusted_name in self.model_name_to_id and self.model_name_to_id[adjusted_name] == 0:
+                        updated_params[name] = param
+                    if any(
+                        [re.match(trainable_param_name, name) for trainable_param_name in self.trainable_param_names]
+                    ):
+                        updated_params[name] = param
+            else:
+                updated_params = checkpoint["state_dict"]
 
-        checkpoint["state_dict"] = updated_params
+            checkpoint["state_dict"] = updated_params
+        else:
+            print("OUTSIDE here")
 
         fs = get_filesystem(path)
         fs.makedirs(os.path.dirname(path), exist_ok=True)
@@ -131,10 +136,6 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
     Here, we resolve it by storing the best_models to "SAVE_DIR/best_k_models.yaml".
 
     """
-
-    def _save_checkpoint(self, trainer, filepath):
-
-        trainer.save_checkpoint(filepath, self.save_weights_only)
 
     def _update_best_and_save(
         self,

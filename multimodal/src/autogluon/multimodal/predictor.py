@@ -1372,7 +1372,7 @@ class MultiModalPredictor:
         if not standalone:
             checkpoint = {"state_dict": avg_state_dict}
         else:
-            checkpoint = {"state_dict": {prefix + name: param for name, param in self._model.state_dict().items()}}
+            checkpoint = {"state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}}
 
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
