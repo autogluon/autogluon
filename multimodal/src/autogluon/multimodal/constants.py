@@ -4,7 +4,7 @@ CATEGORICAL = "categorical"
 TEXT = "text"
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
-INDEX = "index"
+IDENTIFIER = "identifier"
 
 # Problem types
 CLASSIFICATION = "classification"

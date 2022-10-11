@@ -7,7 +7,7 @@ from nlpaug import Augmenter
 from nlpaug.util import Method
 from text_unidecode import unidecode
 
-from ..constants import INDEX, MMCV_MODELS
+from ..constants import IDENTIFIER, MMCV_MODELS
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -266,7 +266,7 @@ def get_per_sample_features(modality_features: dict, modality_types: dict, idx: 
                 if (
                     modality_types
                     and modality_types[per_modality]
-                    and modality_types[per_modality][per_col_name].endswith(INDEX)
+                    and modality_types[per_modality][per_col_name].endswith(IDENTIFIER)
                 ):
                     per_sample_features = corpus[per_col_name][per_sample_features]
 

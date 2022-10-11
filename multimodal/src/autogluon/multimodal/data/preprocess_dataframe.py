@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, INDEX, LABEL, NULL, NUMERICAL, ROIS, TEXT
+from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, IDENTIFIER, LABEL, NULL, NUMERICAL, ROIS, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
@@ -346,7 +346,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 processed_data = col_value.apply(lambda ele: "" if pd.isnull(ele) else str(ele))
             elif col_type == NUMERICAL:
                 processed_data = pd.to_numeric(col_value).apply("{:.3f}".format)
-            elif col_type == f"{TEXT}_{INDEX}":
+            elif col_type == f"{TEXT}_{IDENTIFIER}":
                 processed_data = col_value
             else:
                 raise ValueError(f"Column {col_name} has type {col_type}, which can't be converted to text.")
@@ -384,7 +384,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             col_type = self._column_types[col_name]
             if col_type == IMAGE_PATH or IMAGE:
                 processed_data = col_value.apply(lambda ele: ele.split(";")).tolist()
-            elif col_type == f"{IMAGE}_{INDEX}":
+            elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
             else:
                 raise ValueError(f"Unknown image type {col_type} for column {col_name}")

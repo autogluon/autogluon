@@ -13,7 +13,7 @@ from ..constants import (
     CATEGORICAL,
     CLASSIFICATION,
     IMAGE_PATH,
-    INDEX,
+    IDENTIFIER,
     MULTICLASS,
     NULL,
     NUMERICAL,
@@ -240,9 +240,9 @@ def is_text_column(data: pd.Series) -> bool:
     return True
 
 
-def is_index_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> bool:
+def is_identifier_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> bool:
     """
-    Check if a column is one index column.
+    Check if a column is one identifier column.
 
     Parameters
     ----------
@@ -255,7 +255,7 @@ def is_index_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> 
 
     Returns
     -------
-    Whether the column is an index column.
+    Whether the column is an identifier column.
     """
     if not corpus or col_name not in corpus:
         return False
@@ -377,8 +377,8 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        if is_index_column(data[col_name], col_name=col_name, corpus=corpus):
-            column_types[col_name] = (f"{corpus_types[col_name]}_{INDEX}",)
+        if is_identifier_column(data[col_name], col_name=col_name, corpus=corpus):
+            column_types[col_name] = (f"{corpus_types[col_name]}_{IDENTIFIER}",)
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
