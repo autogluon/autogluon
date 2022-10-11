@@ -105,7 +105,7 @@ def create_fusion_model_dict(
     return single_models, fusion_model
 
 
-def build_siamese_network(
+def make_siamese(
     query_config: DictConfig,
     response_config: DictConfig,
     single_models: Dict,
@@ -267,7 +267,7 @@ def create_siamese_model(
         query_model_names=query_config.model.names,
         response_model_names=response_config.model.names,
     )
-    query_model, response_model = build_siamese_network(
+    query_model, response_model = make_siamese(
         query_config=query_config,
         response_config=response_config,
         single_models=single_models,
