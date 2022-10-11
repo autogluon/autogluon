@@ -32,7 +32,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     """
     if ret_type == LOGITS:
         logits = [ele[LOGITS] for ele in outputs]
-        ret = torch.cat(logits).nan_to_num(nan=float("-inf"))
+        ret = torch.cat(logits).nan_to_num(nan=-1e4)
     elif ret_type == PROBABILITY:
         probability = [ele[PROBABILITY] for ele in outputs]
         ret = torch.cat(probability).nan_to_num(nan=0)
