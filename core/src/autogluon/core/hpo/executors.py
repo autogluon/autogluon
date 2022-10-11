@@ -190,7 +190,7 @@ class RayHpoExecutor(HpoExecutor):
         self.hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
         
     def validate_search_space(self, search_space, model_name):
-        from ray.tune.sample import Domain
+        from ray.tune.search.sample import Domain
         if not any(isinstance(search_space[hyperparam], (Space, Domain)) for hyperparam in search_space):
             logger.warning(f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. "
                            f"Will train one model based on the provided hyperparameters.")
@@ -267,8 +267,8 @@ class RayHpoExecutor(HpoExecutor):
         self.analysis = analysis
         
     def report(self, reporter, **kwargs):
-        from ray import tune
-        tune.report(**kwargs)
+        from ray.air import session
+        session.report(kwargs)
         
     def get_hpo_results(self, model_name, model_path_root, **kwargs):
         assert self.analysis is not None, 'Call `execute()` before `get_hpo_results()`'

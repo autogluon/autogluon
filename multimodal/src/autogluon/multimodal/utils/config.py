@@ -32,7 +32,7 @@ def filter_search_space(hyperparameters: dict, keys_to_filter: Union[str, List[s
     assert any(
         key.startswith(valid_keys) for valid_keys in VALID_CONFIG_KEYS for key in keys_to_filter
     ), f"Invalid keys: {keys_to_filter}. Valid options are {VALID_CONFIG_KEYS}"
-    from ray.tune.sample import Domain
+    from ray.tune.search.sample import Domain
 
     from autogluon.core.space import Space
 
