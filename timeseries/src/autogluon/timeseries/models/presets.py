@@ -151,7 +151,7 @@ def get_preset_models(
     else:
         raise ValueError(
             f"hyperparameters must be a dict, a string or None (received {type(hyperparameters)}). "
-            "Please see the documentation for TimeSeriesPredictor.fit"
+            f"Please see the documentation for TimeSeriesPredictor.fit"
         )
 
     if hyperparameter_tune:
