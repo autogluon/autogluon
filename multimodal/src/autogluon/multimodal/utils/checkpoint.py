@@ -63,21 +63,41 @@ def average_checkpoints(
 
 class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
     """
-    Class that customizes how checkpoints are saved. Saves either the entire the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substentially when training very large models with parameter-efficient finetuning methods.
+    Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substentially when training very large models with parameter-efficient finetuning methods.
     Class is based on pl.plugins.TorchCheckpointIO.
+
     """
 
     def __init__(self, trainable_param_names, model_name_to_id):
+        """
+        Parameters
+        ----------
+        trainable_param_names
+            A list of regular expressions or exact names of layers to filter which parameters should be saved. If empty save entire model.
+        model_name_to_id
+            A dictionary mapping the layer names (keys) of the model to their ids (values).
+        """
         super().__init__()
         self.trainable_param_names = trainable_param_names
         self.model_name_to_id = model_name_to_id
 
     def save_checkpoint(self, checkpoint: Dict[str, Any], path: _PATH, storage_options: Optional[Any] = None) -> None:
+        """
+        Save model/training states as a checkpoint file through state-dump and file-write.
+
+        Parameters
+        ----------
+        checkpoint
+            dict containing model and trainer state
+        path
+            write-target path
+        storage_options
+            Optional parameters when saving the model/training states. Not currently considered.
+        """
         if storage_options is not None:
             raise TypeError(
                 "`Trainer.save_checkpoint(..., storage_options=...)` with `storage_options` arg"
-                f" is not supported for `{self.__class__.__name__}`. Please implement your custom `CheckpointIO`"
-                " to define how you'd like to use `storage_options`."
+                f" is not supported for `{self.__class__.__name__}`."
             )
 
         if "state_dict" in checkpoint:
@@ -95,8 +115,6 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
                 updated_params = checkpoint["state_dict"]
 
             checkpoint["state_dict"] = updated_params
-        else:
-            print("OUTSIDE here")
 
         fs = get_filesystem(path)
         fs.makedirs(os.path.dirname(path), exist_ok=True)
@@ -112,6 +130,17 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
             atomic_save(checkpoint, path)
 
     def load_checkpoint(self, path: _PATH, map_location: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Load checkpoint from a path when resuming or loading ckpt for test/validate/predict stages.
+
+        Parameters
+        ----------
+        path
+            Path to checkpoint
+        map_location
+            a function, torch.device, string or a dict specifying how to remap storage locations.
+        """
+
         fs = get_filesystem(path)
         if not fs.exists(path):
             raise FileNotFoundError(f"Checkpoint at {path} not found. Aborting training.")
@@ -119,6 +148,14 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         return pl_load(path, map_location=map_location)
 
     def remove_checkpoint(self, path: _PATH) -> None:
+        """
+        Remove checkpoint file from the filesystem.
+
+        Parameters
+        ----------
+        path
+            Path to checkpoint
+        """
         fs = get_filesystem(path)
         if fs.exists(path):
             fs.rm(path, recursive=True)
@@ -137,6 +174,9 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
 
     """
 
+    def _save_checkpoint(self, trainer, filepath):
+        trainer.save_checkpoint(filepath, self.save_weights_only)
+
     def _update_best_and_save(
         self,
         current: torch.Tensor,
@@ -151,7 +191,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
 
         if (
             trainer.strategy.strategy_name == "deepspeed"
-        ):  # Deepspeed saves sharded model and optimizer states. Merging them default but does not maintain optimizer/lr-scheduler states.
+        ):  # Deepspeed saves model and optimizer states in a sharded state in seperate folder (even when using single GPU). Merging folder to single checkpoint file.
             from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 
             current_save_path = self.kth_best_model_path
@@ -160,8 +200,5 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
             os.rename(current_save_path + ".tmp", current_save_path)
             client_state = torch.load(current_save_path, map_location=torch.device("cpu"))
             state_dict = client_state["state_dict"]
-            state_dict_new = {}
-            # for name, parameter in state_dict.items():
-            #     state_dict_new[name.replace("model.", "", 1)] = parameter # Remove model prefix to remain consistent.
             client_state["state_dict"] = state_dict
             torch.save(client_state, current_save_path)
