@@ -41,7 +41,7 @@ class LitModule(pl.LightningModule):
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
         efficient_finetune: Optional[str] = None,
-        trainable_param_names: Optional[List] = [],
+        trainable_param_names: Optional[List] = None,
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
@@ -125,7 +125,7 @@ class LitModule(pl.LightningModule):
             )
         self.custom_metric_func = custom_metric_func
         self.model_postprocess_fn = model_postprocess_fn
-        self.trainable_param_names = trainable_param_names
+        self.trainable_param_names = trainable_param_names if trainable_param_names else []
 
     def _compute_template_loss(
         self,

@@ -1,4 +1,5 @@
-# Slightly adapted file of pytorch_lightning.strategies.deepspeed to adjust for additional memory requirements when running deepspeed inference.
+# Slightly adapted file of pytorch_lightning.strategies.deepspeed (l.490) to not init deepspeed using pytorch-lightning's deepspeed ifnerence workaround as this has higher memory requirements and can result in OOM during inference.
+# TODO: Support deepspeed_inference, custom kernels, and quantization for fast inference.
 
 # Copyright The PyTorch Lightning team.
 #

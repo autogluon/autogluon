@@ -67,9 +67,10 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
     Class is based on pl.plugins.TorchCheckpointIO.
     """
 
-    def __init__(self, trainable_param_names):
+    def __init__(self, trainable_param_names, model_name_to_id):
         super().__init__()
         self.trainable_param_names = trainable_param_names
+        self.model_name_to_id = model_name_to_id
 
     def save_checkpoint(self, checkpoint: Dict[str, Any], path: _PATH, storage_options: Optional[Any] = None) -> None:
         if storage_options is not None:
@@ -82,6 +83,9 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         if self.trainable_param_names:
             updated_params = {}
             for name, param in checkpoint["state_dict"].items():
+                adjusted_name = name.replace("model.", "", 1)
+                if adjusted_name in self.model_name_to_id and self.model_name_to_id[adjusted_name] == 0:
+                    updated_params[name] = param
                 if any([re.match(trainable_param_name, name) for trainable_param_name in self.trainable_param_names]):
                     updated_params[name] = param
         else:

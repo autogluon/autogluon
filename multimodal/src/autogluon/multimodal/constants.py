@@ -137,11 +137,9 @@ IA3 = "ia3"
 IA3_BIAS = "ia3_bias"
 IA3_NORM = "ia3_norm"
 
-# DeepSpeed constants (for now gather/reduce size are constants for single GPU)
+# DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
 DEEPSPEED_MIN_PL_VERSION = "1.7.7"
-DEEPSPEED_ALLGATHER_SIZE = 1e9
-DEEPSPEED_ALLREDUCE_SIZE = 1e9
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"

@@ -39,8 +39,6 @@ from .constants import (
     CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
-    DEEPSPEED_ALLGATHER_SIZE,
-    DEEPSPEED_ALLREDUCE_SIZE,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_OFFLOADING,
     DEPRECATED_ZERO_SHOT,
@@ -310,6 +308,7 @@ class MultiModalPredictor:
         holdout_frac: Optional[float] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
+        standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
@@ -393,6 +392,8 @@ class MultiModalPredictor:
             knowledge to a student predictor, i.e., the current predictor.
         seed
             The random seed to use for this training run.
+        standalone
+            Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
         hyperparameter_tune_kwargs
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -559,6 +560,7 @@ class MultiModalPredictor:
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
+            standalone=standalone,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
         )
 
@@ -856,6 +858,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
+        standalone: bool = True,
         **hpo_kwargs,
     ):
         if self._config is not None:  # continuous training
@@ -972,6 +975,8 @@ class MultiModalPredictor:
                 top_k_average_method=config.optimization.top_k_average_method,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
+                strict_loading=not trainable_param_names,
+                standalone=standalone,
             )
 
             return self
@@ -1129,7 +1134,9 @@ class MultiModalPredictor:
                 model_summary,
             ]
 
-        custom_checkpoint_plugin = AutoMMModelCheckpointIO(trainable_param_names=trainable_param_names)
+        custom_checkpoint_plugin = AutoMMModelCheckpointIO(
+            trainable_param_names=trainable_param_names, model_name_to_id=model.name_to_id
+        )
 
         tb_logger = pl.loggers.TensorBoardLogger(
             save_dir=save_path,
@@ -1164,8 +1171,8 @@ class MultiModalPredictor:
                         stage=3,
                         offload_optimizer=True,
                         offload_parameters=False,
-                        allgather_bucket_size=DEEPSPEED_ALLGATHER_SIZE,
-                        reduce_bucket_size=DEEPSPEED_ALLREDUCE_SIZE,
+                        allgather_bucket_size=config.env.deepspeed_allgather_size,
+                        reduce_bucket_size=config.env.deepspeed_allreduce_size,
                     )
                 else:
                     strategy = None
@@ -1184,7 +1191,7 @@ class MultiModalPredictor:
         config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
         self._config = config
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path, standalone=not trainable_param_names)
+        self.save(save_path, standalone=standalone)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
@@ -1246,6 +1253,7 @@ class MultiModalPredictor:
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
                     strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1261,6 +1269,7 @@ class MultiModalPredictor:
         validation_metric_name,
         last_ckpt_path=None,
         strict_loading=True,
+        standalone=True,
     ):
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
@@ -1360,7 +1369,11 @@ class MultiModalPredictor:
                 new_prefix="model",
             )
 
-        checkpoint = {"state_dict": avg_state_dict}
+        if not standalone:
+            checkpoint = {"state_dict": avg_state_dict}
+        else:
+            checkpoint = {"state_dict": {prefix + name: param for name, param in self._model.state_dict().items()}}
+
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
         # clean old checkpoints + the intermediate files stored
@@ -1393,8 +1406,8 @@ class MultiModalPredictor:
                 stage=3,
                 offload_optimizer=True,
                 offload_parameters=False,
-                allgather_bucket_size=DEEPSPEED_ALLGATHER_SIZE,
-                reduce_bucket_size=DEEPSPEED_ALLREDUCE_SIZE,
+                allgather_bucket_size=self._config.env.deepspeed_allgather_size,
+                reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
             )
             norm_param_names = get_norm_layer_param_names(self._model)
             trainable_param_names = get_trainable_params_efficient_finetune(
@@ -2047,7 +2060,10 @@ class MultiModalPredictor:
         if state_dict is None:
             state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
-        model.load_state_dict(state_dict, strict=strict)
+        load_result = model.load_state_dict(state_dict, strict=strict)
+        assert (
+            len(load_result.unexpected_keys) == 0
+        ), f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
         return model
 
     @staticmethod
@@ -2078,7 +2094,9 @@ class MultiModalPredictor:
         """
 
         config = copy.deepcopy(self._config)
-        if standalone:
+        if standalone and (
+            not config.optimization.efficient_finetune or config.optimization.efficient_finetune == "None"
+        ):
             config = save_pretrained_model_configs(model=self._model, config=config, path=path)
 
         os.makedirs(path, exist_ok=True)
@@ -2114,9 +2132,11 @@ class MultiModalPredictor:
                 fp,
                 ensure_ascii=True,
             )
+
         # In case that users save to a path, which is not the original save_path.
         if os.path.abspath(path) != os.path.abspath(self._save_path):
             model_path = os.path.join(self._save_path, "model.ckpt")
+            print(model_path, path)
             if os.path.isfile(model_path):
                 shutil.copy(model_path, path)
             else:
