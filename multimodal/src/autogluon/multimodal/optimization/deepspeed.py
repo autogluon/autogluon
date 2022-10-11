@@ -1,4 +1,4 @@
-# Slightly adapted file of pytorch_lightning.strategies.deepspeed (l.490) to not init deepspeed using pytorch-lightning's deepspeed ifnerence workaround as this has higher memory requirements and can result in OOM during inference.
+# Slightly adapted file of pytorch_lightning.strategies.deepspeed (l.490) to not init deepspeed using pytorch-lightning's deepspeed inference workaround as this has higher memory requirements and can result in OOM during inference.
 # TODO: Support deepspeed_inference, custom kernels, and quantization for fast inference.
 
 # Copyright The PyTorch Lightning team.
@@ -572,42 +572,6 @@ class DeepSpeedStrategy(DDPStrategy):
                 checkpoint_in_cpu=checkpoint_config.get("cpu_checkpointing"),
                 profile=checkpoint_config.get("profile"),
             )
-
-    def _initialize_deepspeed_inference(self, model: Module) -> None:
-        # todo: Currently DeepSpeed requires optimizers at inference to partition weights correctly
-        assert isinstance(self.config, dict)
-        optimizer, scheduler = None, None
-        if "optimizer" not in self.config:
-            rank_zero_info(
-                "You have not specified an optimizer or scheduler within the DeepSpeed config."
-                " Using `configure_optimizers` to define optimizer and scheduler."
-            )
-            optimizer, lr_scheduler, _ = self._init_optimizers()
-            if lr_scheduler is not None:
-                scheduler = lr_scheduler.scheduler
-        # todo: this is required for DeepSpeed throughput timers
-        inference_config = {"train_micro_batch_size_per_gpu": 1}
-        if "fp16" in self.config:
-            inference_config.update({"fp16": self.config["fp16"]})
-        if self.zero_stage_3:
-            inference_config.update(
-                {
-                    "zero_allow_untested_optimizer": self.config["zero_allow_untested_optimizer"],
-                    "zero_optimization": self.config["zero_optimization"],
-                }
-            )
-        # Remove all module hooks before initializing new model
-        remove_module_hooks(model)
-        model, _, _, _ = deepspeed.initialize(
-            args=argparse.Namespace(device_rank=self.root_device.index),
-            config=inference_config,
-            model=model,
-            optimizer=optimizer,
-            lr_scheduler=scheduler,
-            model_parameters=[],
-            dist_init_required=False,
-        )
-        self.model = model
 
     @property
     def lightning_module(self) -> Optional["pl.LightningModule"]:
