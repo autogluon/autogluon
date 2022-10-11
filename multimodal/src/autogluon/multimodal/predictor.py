@@ -1399,7 +1399,7 @@ class MultiModalPredictor:
     ) -> List[Dict]:
 
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and "DeepSpeedStrategy" not in sys.modules:
-            # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting implementation to support inference.
+            # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
             from .optimization.deepspeed import DeepSpeedStrategy
 
             strategy = DeepSpeedStrategy(
