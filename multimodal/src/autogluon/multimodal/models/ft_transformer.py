@@ -341,12 +341,12 @@ class AdditiveAttention(nn.Module):
         n_heads:
             the number of heads. If greater than 1, then the module will have
             an addition output layer (so called "mixing" layer).
-        bias:
-            if `True`, then input (and output, if presented) layers also have bias.
-            `True` is a reasonable default choice.
         dropout:
             dropout rate for the attention map. The dropout is applied to
             *probabilities* and do not affect logits.
+        bias:
+            if `True`, then input (and output, if presented) layers also have bias.
+            `True` is a reasonable default choice.
         share_qv_weights:
             if 'True', then value and query transformation parameters are shared.
         initialization:
