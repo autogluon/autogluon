@@ -238,7 +238,9 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
     return sample_features
 
 
-def get_per_sample_features(modality_features: dict, modality_types: dict, idx: int, id_mappings: Optional[dict] = None):
+def get_per_sample_features(
+    modality_features: dict, modality_types: dict, idx: int, id_mappings: Optional[dict] = None
+):
     """
     Extract the modality features of one sample.
 

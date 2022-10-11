@@ -1179,7 +1179,9 @@ class MultiModalMatcher:
         ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
         query_embeddings = list(query_embeddings.values())[0]
 
-        response_embeddings = self.extract_embedding(response_data, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True)
+        response_embeddings = self.extract_embedding(
+            response_data, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True
+        )
         assert (
             len(response_embeddings) == 1
         ), f"Multiple embedding types `{response_embeddings.keys()}` exist in candidate data. Please reduce them to one type."

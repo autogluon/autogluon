@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, IDENTIFIER, LABEL, NULL, NUMERICAL, ROIS, TEXT
+from ..constants import AUTOMM, CATEGORICAL, IDENTIFIER, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
