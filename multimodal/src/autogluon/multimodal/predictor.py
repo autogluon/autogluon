@@ -1165,9 +1165,9 @@ class MultiModalPredictor:
                     assert version.parse(pl.__version__) >= version.parse(
                         DEEPSPEED_MIN_PL_VERSION
                     ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
-                    from .optimization.deepspeed import DeepSpeedStrategy
+                    from .optimization.deepspeed import CustomDeepSpeedStrategy
 
-                    strategy = DeepSpeedStrategy(
+                    strategy = CustomDeepSpeedStrategy(
                         stage=3,
                         offload_optimizer=True,
                         offload_parameters=False,
@@ -1400,9 +1400,9 @@ class MultiModalPredictor:
 
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and "DeepSpeedStrategy" not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
-            from .optimization.deepspeed import DeepSpeedStrategy
+            from .optimization.deepspeed import CustomDeepSpeedStrategy
 
-            strategy = DeepSpeedStrategy(
+            strategy = CustomDeepSpeedStrategy(
                 stage=3,
                 offload_optimizer=True,
                 offload_parameters=False,
