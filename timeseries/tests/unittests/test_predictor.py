@@ -462,7 +462,7 @@ def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
-    with pytest.raises(ValueError, match="not a single model contains a hyperparameter search space"):
+    with pytest.raises(ValueError, match="no model contains a hyperparameter search space"):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters={"SimpleFeedForward": {"epochs": 1}},
