@@ -265,7 +265,7 @@ class MultiModalMatcher:
     def fit(
         self,
         train_data: pd.DataFrame,
-        corpus: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
         presets: Optional[str] = None,
         tuning_data: Optional[pd.DataFrame] = None,
         time_limit: Optional[int] = None,
@@ -284,8 +284,9 @@ class MultiModalMatcher:
         ----------
         train_data
             A dataframe containing training data.
-        corpus
-             A multimodal corpus including text, image, etc.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         presets
             Name of the presets. See the available presets in `presets.py`.
         tuning_data
@@ -376,7 +377,7 @@ class MultiModalMatcher:
             valid_data=tuning_data,
             label_columns=self._label_column,
             provided_column_types=column_types,
-            corpus=corpus,
+            id_mappings=id_mappings,
         )
         column_types = infer_label_column_type_by_problem_type(
             column_types=column_types,
@@ -441,7 +442,7 @@ class MultiModalMatcher:
         _fit_args = dict(
             train_df=train_data,
             val_df=tuning_data,
-            corpus=corpus,
+            id_mappings=id_mappings,
             validation_metric_name=validation_metric_name,
             minmax_mode=minmax_mode,
             max_time=time_limit,
@@ -537,7 +538,7 @@ class MultiModalMatcher:
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
-        corpus: Dict[str, Dict],
+        id_mappings: Dict[str, Dict],
         validation_metric_name: str,
         minmax_mode: str,
         max_time: timedelta,
@@ -666,7 +667,7 @@ class MultiModalMatcher:
             num_workers=config.env.num_workers,
             train_data=train_df,
             val_data=val_df,
-            corpus=corpus,
+            id_mappings=id_mappings,
         )
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
@@ -944,7 +945,7 @@ class MultiModalMatcher:
     def _predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Dict[str, Dict],
+        id_mappings: Dict[str, Dict],
         requires_label: bool,
         signature: Optional[str] = None,
     ) -> List[Dict]:
@@ -1012,7 +1013,7 @@ class MultiModalMatcher:
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
-            corpus=corpus,
+            id_mappings=id_mappings,
         )
         if self._match_label is not None:
             match_label = label_df_preprocessor.label_generator.transform([self._match_label]).item()
@@ -1067,7 +1068,7 @@ class MultiModalMatcher:
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
     ):
@@ -1078,8 +1079,9 @@ class MultiModalMatcher:
         ----------
         data
             A dataframe, containing the same columns as the training data
-        corpus
-             A multimodal corpus including text, image, etc.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
@@ -1094,7 +1096,7 @@ class MultiModalMatcher:
 
         outputs = self._predict(
             data=data,
-            corpus=corpus,
+            id_mappings=id_mappings,
             requires_label=True,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
@@ -1146,7 +1148,7 @@ class MultiModalMatcher:
         self,
         query_data: Union[pd.DataFrame, dict, list],
         response_data: Union[pd.DataFrame, dict, list],
-        corpus: Dict[str, Dict],
+        id_mappings: Dict[str, Dict],
         return_prob: Optional[bool] = False,
         as_pandas: Optional[bool] = None,
     ):
@@ -1159,8 +1161,9 @@ class MultiModalMatcher:
             The query data.
         response_data
             The response data.
-        corpus
-            A multimodal corpus including text, image, etc.
+        id_mappings
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
         return_prob
             Whether to return the probability.
         as_pandas
@@ -1170,13 +1173,13 @@ class MultiModalMatcher:
         -------
         Search results.
         """
-        query_embeddings = self.extract_embedding(query_data, signature=QUERY, corpus=corpus, as_tensor=True)
+        query_embeddings = self.extract_embedding(query_data, signature=QUERY, id_mappings=id_mappings, as_tensor=True)
         assert (
             len(query_embeddings) == 1
         ), f"Multiple embedding types `{query_embeddings.keys()}` exist in query data. Please reduce them to one type."
         query_embeddings = list(query_embeddings.values())[0]
 
-        response_embeddings = self.extract_embedding(response_data, signature=RESPONSE, corpus=corpus, as_tensor=True)
+        response_embeddings = self.extract_embedding(response_data, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True)
         assert (
             len(response_embeddings) == 1
         ), f"Multiple embedding types `{response_embeddings.keys()}` exist in candidate data. Please reduce them to one type."
@@ -1199,7 +1202,7 @@ class MultiModalMatcher:
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
         as_pandas: Optional[bool] = None,
     ):
         """
@@ -1210,8 +1213,9 @@ class MultiModalMatcher:
         data
              The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
-        corpus
-             A multimodal corpus including text, image, etc.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
 
@@ -1221,7 +1225,7 @@ class MultiModalMatcher:
         """
         outputs = self._predict(
             data=data,
-            corpus=corpus,
+            id_mappings=id_mappings,
             requires_label=False,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
@@ -1244,7 +1248,7 @@ class MultiModalMatcher:
     def predict_proba(
         self,
         data: Union[pd.DataFrame, dict, list],
-        corpus: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
     ):
@@ -1257,8 +1261,9 @@ class MultiModalMatcher:
         data
             The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
-        corpus
-             A multimodal corpus including text, image, etc.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -1273,7 +1278,7 @@ class MultiModalMatcher:
         """
         outputs = self._predict(
             data=data,
-            corpus=corpus,
+            id_mappings=id_mappings,
             requires_label=False,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
@@ -1296,7 +1301,7 @@ class MultiModalMatcher:
         self,
         data: Union[pd.DataFrame, dict, list],
         signature: str,
-        corpus: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
     ):
@@ -1310,8 +1315,9 @@ class MultiModalMatcher:
             follow same format (except for the `label` column).
         signature
             query or response
-        corpus
-             A multimodal corpus including text, image, etc.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         as_tensor
             Whether to return a Pytorch tensor.
         as_pandas
@@ -1325,7 +1331,7 @@ class MultiModalMatcher:
         """
         outputs = self._predict(
             data=data,
-            corpus=corpus,
+            id_mappings=id_mappings,
             signature=signature,
             requires_label=False,
         )

@@ -24,7 +24,7 @@ class BaseDataset(torch.utils.data.Dataset):
         data: pd.DataFrame,
         preprocessor: List[MultiModalFeaturePreprocessor],
         processors: List[dict],
-        corpus: Optional[Dict[str, Dict]] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
         is_training: bool = False,
     ):
         """
@@ -36,8 +36,9 @@ class BaseDataset(torch.utils.data.Dataset):
             A list of multimodal feature preprocessors generating model-agnostic features.
         processors
             Data processors customizing data for each modality per model.
-        corpus
-             A multimodal corpus including text, image, etc.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         is_training
             Whether in training mode. Some data processing may be different between training
             and validation/testing/prediction, e.g., image data augmentation is used only in
@@ -61,7 +62,7 @@ class BaseDataset(torch.utils.data.Dataset):
 
         assert len(set(self.lengths)) == 1
 
-        self.corpus = corpus
+        self.id_mappings = id_mappings
 
     def __len__(self):
         """

@@ -238,7 +238,7 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
     return sample_features
 
 
-def get_per_sample_features(modality_features: dict, modality_types: dict, idx: int, corpus: Optional[dict] = None):
+def get_per_sample_features(modality_features: dict, modality_types: dict, idx: int, id_mappings: Optional[dict] = None):
     """
     Extract the modality features of one sample.
 
@@ -250,8 +250,9 @@ def get_per_sample_features(modality_features: dict, modality_types: dict, idx: 
         Data types of all columns.
     idx
         The sample index.
-    corpus
-        A multimodal corpus including text, image, etc.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
 
     Returns
     -------
@@ -268,7 +269,7 @@ def get_per_sample_features(modality_features: dict, modality_types: dict, idx: 
                     and modality_types[per_modality]
                     and modality_types[per_modality][per_col_name].endswith(IDENTIFIER)
                 ):
-                    per_sample_features = corpus[per_col_name][per_sample_features]
+                    per_sample_features = id_mappings[per_col_name][per_sample_features]
 
                 per_modality_ret[per_col_name] = per_sample_features
             ret[per_modality] = per_modality_ret

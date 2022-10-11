@@ -240,7 +240,7 @@ def is_text_column(data: pd.Series) -> bool:
     return True
 
 
-def is_identifier_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]) -> bool:
+def is_identifier_column(data: pd.Series, col_name: str, id_mappings: Dict[str, Dict]) -> bool:
     """
     Check if a column is one identifier column.
 
@@ -250,14 +250,15 @@ def is_identifier_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]
         One column of multimodal pd.DataFrame.
     col_name
         Name of the column.
-    corpus
-        A multimodal corpus including text, image, etc.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
 
     Returns
     -------
     Whether the column is an identifier column.
     """
-    if not corpus or col_name not in corpus:
+    if not id_mappings or col_name not in id_mappings:
         return False
 
     sample_num = min(len(data), 500)
@@ -265,7 +266,7 @@ def is_identifier_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]
     failure_count = 0
     for index in data:
         try:
-            per_value = corpus[col_name][index]
+            per_value = id_mappings[col_name][index]
         except:
             failure_count += 1
 
@@ -274,42 +275,42 @@ def is_identifier_column(data: pd.Series, col_name: str, corpus: Dict[str, Dict]
     elif 0 < failure_count < sample_num:
         raise warnings.warn(
             f"Among {sample_num} sampled indexes in column {col_name}, "
-            f"we can't index all their values from the corpus ({failure_count} failures). "
-            f"You may need to assure that all the indexes of column {col_name} exist in your corpus.",
+            f"we can't index all their values from the id_mappings ({failure_count} failures). "
+            f"You may need to assure that all the indexes of column {col_name} exist in your id_mappings.",
             UserWarning,
         )
     else:
         return False
 
 
-def infer_corpus_types(corpus: Dict[str, Dict]) -> Dict:
+def infer_id_mappings_types(id_mappings: Dict[str, Dict]) -> Dict:
     """
-    Infer the data types in a corpus.
+    Infer the data types in id_mappings.
 
     Parameters
     ----------
-    corpus
-        A multimodal corpus including text, image, etc.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
 
     Returns
     -------
-    A dictionary containing the mappings from corpus names to their data types.
+    A dictionary containing the data types in id_mappings.
     """
-    corpus_types = collections.OrderedDict()
-    if corpus is None:
-        return corpus_types
+    id_mappings_types = collections.OrderedDict()
+    if id_mappings is None:
+        return id_mappings_types
 
-    for per_name, per_corpus in corpus.items():
-        per_corpus = pd.Series(per_corpus.values())
-        if is_imagepath_column(per_corpus, col_name=per_name):
-            corpus_types[per_name] = IMAGE_PATH
-        elif is_text_column(per_corpus):
-            corpus_types[per_name] = TEXT
+    for per_name, per_id_mappings in id_mappings.items():
+        per_id_mappings = pd.Series(per_id_mappings.values())
+        if is_imagepath_column(per_id_mappings, col_name=per_name):
+            id_mappings_types[per_name] = IMAGE_PATH
+        elif is_text_column(per_id_mappings):
+            id_mappings_types[per_name] = TEXT
         else:
             raise ValueError(
-                f"Corpus {per_name} has an invalid type. " f"Currently, we only support image and text types."
+                f"{per_name} in the id_mappings has an invalid type. Currently, we only support image and text types."
             )
-    return corpus_types
+    return id_mappings_types
 
 
 def infer_column_types(
@@ -319,7 +320,7 @@ def infer_column_types(
     provided_column_types: Optional[Dict] = None,
     allowable_column_types: Optional[List[str]] = None,
     fallback_column_type: Optional[str] = None,
-    corpus: Optional[Dict[str, Dict]] = None,
+    id_mappings: Optional[Dict[str, Dict]] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -339,6 +340,9 @@ def infer_column_types(
         What column types are allowed. This is the prior knowledge inferred from the model type.
     fallback_column_type
         What's the fallback column type if the detected type if out of the allowable_column_types.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
 
     Returns
     -------
@@ -359,7 +363,7 @@ def infer_column_types(
     else:
         is_training = True
 
-    corpus_types = infer_corpus_types(corpus)
+    id_mappings_types = infer_id_mappings_types(id_mappings)
 
     for col_name in data.columns:
         if provided_column_types is not None and col_name in provided_column_types:
@@ -377,8 +381,8 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        if is_identifier_column(data[col_name], col_name=col_name, corpus=corpus):
-            column_types[col_name] = (f"{corpus_types[col_name]}_{IDENTIFIER}",)
+        if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
+            column_types[col_name] = (f"{id_mappings_types[col_name]}_{IDENTIFIER}",)
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
