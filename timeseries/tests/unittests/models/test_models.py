@@ -21,9 +21,13 @@ from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_wi
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
+from .test_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
-TESTABLE_MODELS = GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS
+TESTABLE_MODELS = (
+    GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS
+)
+TESTABLE_MODELS = TABULAR_TESTABLE_MODELS
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
 
@@ -37,7 +41,7 @@ def trained_models():
             path=temp_model_path + os.path.sep,
             freq="H",
             prediction_length=prediction_length,
-            hyperparameters={"epochs": 1},
+            hyperparameters={"epochs": 1, "maxiter": 1},
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -170,6 +174,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         quantile_levels=quantile_levels,
         hyperparameters={
             "epochs": 1,
+            "maxiter": 1,
         },
     )
     # TFT cannot handle arbitrary quantiles
@@ -177,7 +182,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
+    predictions = model.predict(DUMMY_TS_DATAFRAME)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
@@ -193,8 +198,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 ):
     train_data = DUMMY_TS_DATAFRAME
     model = trained_models[(prediction_length, repr(model_class))]
-
-    model.fit(train_data=train_data)
 
     predictions = model.predict(train_data)
 

@@ -5,22 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from gluonts.time_feature import TimeFeature, get_lags_for_frequency, time_features_from_frequency_str
-from joblib import Parallel, delayed
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-
-TS_METRIC_TO_TABULAR_METRIC = {
-    "mean_wQuantileLoss": "pinball_loss",
-    "MAPE": "mean_absolute_percentage_error",
-    "sMAPE": "mean_absolute_percentage_error",
-    "MASE": "mean_absolute_error",
-    "RMSE": "root_mean_squared_error",
-    "MSE": "mean_squared_error",
-}
 
 logger = logging.getLogger(__name__)
 
@@ -59,23 +48,15 @@ class TabularModel(AbstractTimeSeriesModel):
         self._available_features: pd.Index = None
         self._drop_median_prediction = False
 
-        # TODO: Should we always produce quantiles here?
-        if self.eval_metric == "mean_wQuantileLoss":
-            # Make sure that median is included in the quantiles - used for autoregressive generation
-            if 0.5 not in self.quantile_levels:
-                self._drop_median_prediction = True
-                self.quantile_levels = sorted(self.quantile_levels + [0.5])
-            self.tabular_predictor = TabularPredictor(
-                label=self.target,
-                problem_type=ag.constants.QUANTILE,
-                quantile_levels=self.quantile_levels,
-            )
-        else:
-            self.tabular_predictor = TabularPredictor(
-                label=self.target,
-                problem_type=ag.constants.REGRESSION,
-                eval_metric=TS_METRIC_TO_TABULAR_METRIC[eval_metric],
-            )
+        if 0.5 not in self.quantile_levels:
+            self._drop_median_prediction = True
+            self.quantile_levels = sorted(self.quantile_levels + [0.5])
+
+        self.tabular_predictor = TabularPredictor(
+            label=self.target,
+            problem_type=ag.constants.QUANTILE,
+            quantile_levels=self.quantile_levels,
+        )
 
     def _get_features_dataframe(
         self,
@@ -91,13 +72,13 @@ class TabularModel(AbstractTimeSeriesModel):
         last_k_values: int, optional
             If provided, features will be generated only for the last `last_k_values` timesteps of each time series.
         """
-        dataframe_per_item = []
         if last_k_values is None:
             selected_slice = slice(None, None)
         else:
             selected_slice = slice(-last_k_values, None)
 
-        # TODO: Parallelize with joblib
+        # TODO Parrallelize the code
+        dataframe_per_item = []
         for item_id in data.item_ids:
             series = data.loc[item_id][self.target]
             time_feature_columns = {
@@ -110,6 +91,10 @@ class TabularModel(AbstractTimeSeriesModel):
 
         return pd.concat(dataframe_per_item, ignore_index=True)
 
+    def _generate_features_from_freq(self, freq: str):
+        self._lag_indices = get_lags_for_frequency(freq)
+        self._time_features = time_features_from_frequency_str(freq)
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -117,10 +102,10 @@ class TabularModel(AbstractTimeSeriesModel):
         time_limit: int = None,
         **kwargs,
     ) -> None:
+        self._check_fit_params()
         if self.tabular_predictor._learner.is_fit:
-            raise AssertionError(f"{self.name} has already been fit!")
-        self._lag_indices = get_lags_for_frequency(train_data.freq)
-        self._time_features = time_features_from_frequency_str(train_data.freq)
+            raise AssertionError(f"{self.name} predictor has already been fit!")
+        self._generate_features_from_freq(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
         train_df = self._get_features_dataframe(train_data)
@@ -129,6 +114,10 @@ class TabularModel(AbstractTimeSeriesModel):
         self._available_features = train_df.columns
 
         if val_data is not None:
+            if val_data.freq != train_data.freq:
+                raise ValueError(
+                    f"train_data and val_data must have the same freq (received {train_data.freq} and {val_data.freq})"
+                )
             val_data, _ = self._normalize_targets(val_data)
             val_df = self._get_features_dataframe(val_data, last_k_values=self.prediction_length)
             val_df = val_df[self._available_features]
@@ -139,15 +128,22 @@ class TabularModel(AbstractTimeSeriesModel):
             )
             val_df = None
 
-        # TODO: Select suitable presets for TabularPredictor
-        # TODO: Set verbosity
+        # TODO: Other presets for TabularPredictor?
+        # TODO: Speed up prediction for Quantile XT/RF models
+        # TODO: Add catboost with MultiQuantile loss (after catboost v1.1)
+        # TODO: Other tabular models in quantile? (LightGBM?)
         self.tabular_predictor.fit(
             train_data=train_df,
             tuning_data=val_df,
             time_limit=time_limit,
+            excluded_model_types=["XT", "RF"],
+            verbosity=2,
         )
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
+        if quantile_levels is not None:
+            raise ValueError(f"{self.name} cannot predict custom quantiles. Please set `quantile_levels=None`.")
+
         data, scale_per_item = self._normalize_targets(data)
 
         last_observed_timestamp = data.slice_by_timestep(-1, None).index.get_level_values(TIMESTAMP)
@@ -167,15 +163,10 @@ class TabularModel(AbstractTimeSeriesModel):
             full_df_with_dummy = pd.concat([full_df, next_step_dummy])
             features = self._get_features_dataframe(full_df_with_dummy, last_k_values=1)
             preds = self.tabular_predictor.predict(features[self._available_features])
-            if self.eval_metric == "mean_wQuantileLoss":
-                next_values = preds[0.5].values
-                preds.rename(str, axis=1, inplace=True)
-                preds.insert(0, "mean", next_values)
-            else:
-                next_values = preds.values
-                preds = preds.to_frame(name="mean")
-                for q in self.quantile_levels:
-                    preds[str(q)] = np.nan
+            # Use median forecast as observation for the next timestep
+            next_values = preds[0.5].values
+            preds.rename(str, axis=1, inplace=True)
+            preds.insert(0, "mean", next_values)
 
             preds.index = next_index
             predictions_list.append(preds)
@@ -189,7 +180,7 @@ class TabularModel(AbstractTimeSeriesModel):
         if self._drop_median_prediction:
             predictions.drop("0.5", axis=1, inplace=True)
         predictions = self._rescale_targets(predictions, scale_per_item)
-        return TimeSeriesDataFrame(predictions)
+        return TimeSeriesDataFrame(predictions).loc[data.item_ids]
 
     def _normalize_targets(self, data: TimeSeriesDataFrame, min_scale=1e-5) -> Tuple[TimeSeriesDataFrame, pd.Series]:
         """Normalize data such that each the average absolute value of each time series is equal to 1."""
