@@ -38,7 +38,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.get_model_names()
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["toy"])  # noqa
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["local_only"])  # noqa
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -56,7 +56,7 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp
     assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["toy"])  # noqa
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["local_only"])  # noqa
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
@@ -180,7 +180,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
     "hyperparameters",
     [
         {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": ag.Int(1, 3)}},
+        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": ag.space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -456,3 +456,43 @@ def test_given_model_fails_when_predictor_predicts_then_exception_is_caught_by_l
         arima_predict.side_effect = RuntimeError("Numerical error")
         with pytest.raises(RuntimeError, match="Prediction failed, please provide a different model to"):
             predictor.predict(DUMMY_TS_DATAFRAME)
+
+
+def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_exception_is_raised(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
+    with pytest.raises(ValueError, match="no model contains a hyperparameter search space"):
+        predictor.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+            hyperparameter_tune_kwargs="random",
+        )
+
+
+def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits_then_exception_is_raised(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
+    with pytest.raises(
+        ValueError, match="Hyperparameter tuning not specified, so hyperparameters must have fixed values"
+    ):
+        predictor.fit(
+            train_data=DUMMY_TS_DATAFRAME,
+            hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2)}},
+        )
+
+
+def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_no_exception_is_raised(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, enable_ensemble=False)
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"SimpleFeedForward": {"epochs": ag.space.Categorical(1, 2), "ETS": {}}},
+        hyperparameter_tune_kwargs={
+            "scheduler": "local",
+            "searcher": "random",
+            "num_trials": 2,
+        },
+    )

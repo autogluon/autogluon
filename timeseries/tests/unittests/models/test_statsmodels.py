@@ -3,13 +3,14 @@ import logging
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.models.statsmodels import ARIMAModel, ETSModel
+from autogluon.timeseries.models.statsmodels import ARIMAModel, ETSModel, ThetaModel
 
 from ..common import DUMMY_TS_DATAFRAME, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_item_index
 
 TESTABLE_MODELS = [
     ARIMAModel,
     ETSModel,
+    ThetaModel,
 ]
 
 
@@ -42,14 +43,6 @@ def test_when_statsmodels_models_saved_then_n_jobs_is_saved(model_class, n_jobs,
 
     loaded_model = model.__class__.load(path=model.path)
     assert model.n_jobs == loaded_model.n_jobs
-
-
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_statsmodels_model_fitted_then_freq_is_saved_to_sm_model_init_args(model_class, temp_model_path):
-    model = model_class(path=temp_model_path, hyperparameters={"maxiter": 1})
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
-    single_fitted_model = next(iter(model._fitted_models.values()))
-    assert single_fitted_model.sm_model_init_args["freq"] == DUMMY_TS_DATAFRAME.freq
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -87,6 +80,8 @@ def get_seasonal_period_from_fitted_local_model(model, model_name):
         return model.sm_model_init_args["seasonal_order"][-1]
     elif model_name == "ETS":
         return model.sm_model_init_args["seasonal_periods"]
+    elif model_name == "Theta":
+        return model.sm_model_init_args["period"]
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

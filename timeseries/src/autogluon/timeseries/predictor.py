@@ -1,6 +1,7 @@
 import logging
 import pprint
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
@@ -20,6 +21,12 @@ from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter, MultiWindo
 from .trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
+
+DEPRECATED_PRESETS_TO_FALLBACK = {
+    "low_quality": "fast_training",
+    "high_quality": "medium_quality",
+    "good_quality": "medium_quality",
+}
 
 
 class TimeSeriesPredictor:
@@ -222,12 +229,12 @@ class TimeSeriesPredictor:
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="best_quality"``
-            to get a high-accuracy predictor, or set ``presets="low_quality"`` to get a toy predictor that
-            trains quickly but lacks accuracy.
+            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly fit multiple simple
+            statistical models.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
-            Available presets are "best_quality", "high_quality", "good_quality", "medium_quality", and "low_quality".
+            Available presets are "best_quality", "medium_quality", and "fast_training".
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
             ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).
@@ -235,7 +242,7 @@ class TimeSeriesPredictor:
             Determines the hyperparameters used by each model.
 
             If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
-            "toy", or "toy_hpo", where "toy" settings correspond to models only intended for prototyping.
+            or "local_only".
 
             If dict is provided, the keys are strings or Types that indicate which model types to train. In this case,
             the predictor will only train the given model types. Stable model options include: "DeepAR", "MQCNN", and
@@ -275,8 +282,6 @@ class TimeSeriesPredictor:
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity, logger=logger)
-        if presets is not None:
-            logger.info(f"presets is set to {presets}")
 
         fit_args = dict(
             prediction_length=self.prediction_length,
@@ -291,6 +296,14 @@ class TimeSeriesPredictor:
         logger.info("================ TimeSeriesPredictor ================")
         logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
+            if presets in DEPRECATED_PRESETS_TO_FALLBACK:
+                new_presets = DEPRECATED_PRESETS_TO_FALLBACK[presets]
+                warnings.warn(
+                    f"Presets {presets} are deprecated as of version 0.6.0. Please see the documentation for "
+                    f"TimeSeriesPredictor.fit for the list of available presets. "
+                    f"Falling back to presets='{new_presets}'."
+                )
+                presets = new_presets
             logger.info(f"Setting presets to: {presets}")
         logger.info("Fitting with arguments:")
         logger.info(f"{pprint.pformat(fit_args)}")

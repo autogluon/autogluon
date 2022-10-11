@@ -46,8 +46,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         hyperparameters: str or Dict
             A dictionary mapping selected model names, model classes or model factory to hyperparameter
             settings. Model names should be present in `trainer.presets.DEFAULT_MODEL_NAMES`. Optionally,
-            the user may provide one of "toy", "toy_hpo", "default", "default_hpo" to specify
-            presets.
+            the user may provide one of "local_only", "default", "default_hpo" to specify presets.
         val_data: TimeSeriesDataFrame
             Optional validation data set to report validation scores on.
         hyperparameter_tune_kwargs

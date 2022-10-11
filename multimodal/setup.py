@@ -35,14 +35,13 @@ install_requires = [
     "fairscale>=0.4.5,<=0.4.6",
     "scikit-image>=0.19.1,<0.20.0",
     "smart_open>=5.2.1,<5.3.0",
-    "pytorch_lightning>=1.6.0,<1.7.0",
+    "pytorch_lightning>=1.6.0,<1.8.0",
     "text-unidecode<=1.3",
     "torchmetrics>=0.7.2,<0.8.0",
     "transformers>=4.18.0,<4.21.0",
     "nptyping>=1.4.4,<1.5.0",
     "omegaconf>=2.1.1,<2.2.0",
     "sentencepiece>=0.1.95,<0.2.0",
-    "protobuf<=3.18.1",  # https://github.com/awslabs/autogluon/issues/1762
     f"autogluon.core[raytune]=={version}",
     f"autogluon.features=={version}",
     f"autogluon.common=={version}",
@@ -60,6 +59,8 @@ extras_require = {
     "tests": [
         "black~=22.0,>=22.3",
         "isort>=5.10",
+        "datasets>=2.3.2,<=2.3.2",
+        "onnxruntime-gpu>=1.12.1,<=1.12.1;platform_system!='Darwin'",
     ]
 }
 
