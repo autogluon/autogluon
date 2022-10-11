@@ -16,12 +16,12 @@ from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-
-from .. import TimeSeriesDataFrame, TimeSeriesEvaluator
-from ..models.abstract import AbstractTimeSeriesModel
-from ..models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
-from ..models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from ..utils.warning_filters import disable_tqdm
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesEnsembleSelection, TimeSeriesEnsembleWrapper
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.models.presets import contains_searchspace
+from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -580,13 +580,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
                 logger.info(fit_log_message)
 
-                with tqdm.external_write_mode():
-                    model_names_trained += self.tune_model_hyperparameters(
-                        model,
-                        time_limit=time_left,
-                        train_data=train_data,
-                        val_data=val_data,
-                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                if contains_searchspace(model.get_user_params()):
+                    with tqdm.external_write_mode():
+                        model_names_trained += self.tune_model_hyperparameters(
+                            model,
+                            time_limit=time_left,
+                            train_data=train_data,
+                            val_data=val_data,
+                            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                        )
+                else:
+                    model_names_trained += self._train_and_save(
+                        train_data, model=model, val_data=val_data, time_limit=time_left
                     )
             else:
                 time_left = None
