@@ -10,7 +10,6 @@ from warnings import warn
 
 import networkx as nx
 import pandas as pd
-from ray.tune import ExperimentAnalysis
 from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -453,21 +452,21 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
-        if hpo_results and isinstance(hpo_results, (ExperimentAnalysis, dict)):
-            if isinstance(hpo_results, ExperimentAnalysis):
-                best_val_score = hpo_results.best_result["validation_performance"]
-                best_config = hpo_results.get_best_config()
-            else:
-                best_val_score = hpo_results.get("best_reward")
-                best_config = hpo_results.get("best_config")
-
+        if len(model_names_trained) > 0:
             if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
                 sign_str = "-"
             else:
                 sign_str = ""
-            logger.info(f"\t{best_val_score:<7.4f}".ljust(15) + f"= Validation score ({sign_str}{self.eval_metric})")
+
+            trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
+            best_model_result = max(trained_model_results, key=lambda x: x["val_score"])
+
+            logger.info(
+                f"\t{best_model_result['val_score']:<7.4f}".ljust(15)
+                + f"= Validation score ({sign_str}{self.eval_metric})"
+            )
             logger.info(f"\t{total_tuning_time:<7.2f} s".ljust(15) + "= Total tuning time")
-            logger.debug(f"\tBest hyperparameter configuration: {best_config}")
+            logger.debug(f"\tBest hyperparameter configuration: {best_model_result['hyperparameters']}")
 
         return model_names_trained
 
