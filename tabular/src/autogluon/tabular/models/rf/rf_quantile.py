@@ -127,10 +127,12 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
         X_leaves = self.apply(X)
         unique_leaves = np.unique(X_leaves)
         for leaf in unique_leaves:
-            quantiles[X_leaves == leaf] = weighted_percentile(self.y_train_[self.y_train_leaves_ == leaf], quantile)
+            quantiles[X_leaves == leaf] = weighted_percentile(
+                self.y_train_[self.y_train_leaves_ == leaf], quantile)
         return quantiles
 
-    def fit(self, X, y, sample_weight=None, check_input=True, X_idx_sorted=None):
+    def fit(self, X, y, sample_weight=None, check_input=True,
+            X_idx_sorted=None):
         """
         Build a decision tree classifier from the training set (X, y).
 
