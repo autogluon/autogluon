@@ -364,13 +364,11 @@ class AdditiveAttention(nn.Module):
         self.n_heads = n_heads
         self.share_qv_weights = share_qv_weights
         self.dropout = nn.Dropout(dropout)
-
         if share_qv_weights:
             self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
         else:
             self.q_proj = nn.Linear(d_token, d_token, bias=bias)
             self.v_proj = nn.Linear(d_token, d_token, bias=bias)
-
         self.k_proj = nn.Linear(d_token, d_token, bias=bias)
         self.W_q = nn.Linear(d_token, n_heads)
         self.W_k = nn.Linear(d_token, n_heads)
