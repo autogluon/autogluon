@@ -11,12 +11,13 @@ from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
+from .lit_module import LitModule
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(AUTOMM)
 
 
-class NerLitModule(pl.LightningModule):
+class NerLitModule(LitModule):
     """
     Control the loops for training, evaluation, and prediction of Named Entity Recognition. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:
@@ -109,23 +110,26 @@ class NerLitModule(pl.LightningModule):
             - None (do not use efficient finetuning strategies)
 
         """
-        super().__init__()
-        self.save_hyperparameters(
-            ignore=["model", "validation_metric", "test_metric", "loss_func", "model_postprocess_fn"]
-        )
-        self.save_hyperparameters(ignore=["model", "validation_metric", "test_metric", "loss_func"])
-        self.model = model
-        self.validation_metric = validation_metric
-        self.validation_metric_name = f"val_{validation_metric_name}"
-        self.loss_func = loss_func
-        self.mixup_fn = mixup_fn
-        if isinstance(validation_metric, BaseAggregator) and custom_metric_func is None:
-            raise ValueError(
-                f"validation_metric {validation_metric} is an aggregation metric,"
-                "which must be used with a customized metric function."
-            )
-        self.custom_metric_func = custom_metric_func
-        self.model_postprocess_fn = model_postprocess_fn
+        super().__init__(model, 
+                        optim_type,
+                        lr_choice,
+                        lr_schedule,
+                        lr: Optional,
+                        lr_decay,
+                        end_lr,
+                        lr_mult,
+                        weight_decay,
+                        warmup_steps,
+                        loss_func,
+                        validation_metric,
+                        validation_metric_name,
+                        custom_metric_func,
+                        test_metric,
+                        efficient_finetune,
+                        trainable_param_names,
+                        mixup_fn,
+                        mixup_off_epoch,
+                        model_postprocess_fn)
 
     def _compute_loss(
         self,
@@ -145,56 +149,6 @@ class NerLitModule(pl.LightningModule):
                 )
                 * weight
             )
-        return loss
-
-    def _compute_metric_score(
-        self,
-        metric: torchmetrics.Metric,
-        custom_metric_func: Callable,
-        logits: torch.Tensor,
-        label: torch.Tensor,
-    ):
-        if isinstance(metric, (torchmetrics.AUROC, torchmetrics.AveragePrecision)):
-            prob = F.softmax(logits.float(), dim=1)
-            metric.update(preds=prob[:, 1], target=label)  # only for binary classification
-        elif isinstance(metric, BaseAggregator):
-            metric.update(custom_metric_func(logits, label))
-        else:
-            metric.update(logits.squeeze(dim=1), label)
-
-    def _shared_step(
-        self,
-        batch: Dict,
-    ):
-        label = batch[self.model.label_key]
-        if self.mixup_fn is not None:
-            self.mixup_fn.mixup_enabled = self.training & (self.current_epoch < self.hparams.mixup_off_epoch)
-            batch, label = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
-        output = self.model(batch)
-        loss = self._compute_loss(output=output, label=label)
-        return output, loss
-
-    def training_step(self, batch, batch_idx):
-        """
-        Per training step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#training-loop
-
-        Parameters
-        ----------
-        batch
-            A dictionary containing the mini-batch data, including both input data and
-            ground-truth labels. The mini-batch data are passed to each individual model,
-            which indexes its required input data by keys with its model prefix. The
-            ground-truth labels are used here to compute the training loss.
-        batch_idx
-            Index of mini-batch.
-
-        Returns
-        -------
-        Average loss of the mini-batch data.
-        """
-        output, loss = self._shared_step(batch)
-        self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -236,109 +190,3 @@ class NerLitModule(pl.LightningModule):
             on_step=False,
             on_epoch=True,
         )
-
-    def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        """
-        Per prediction step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#prediction-loop
-
-        Parameters
-        ----------
-        batch
-            A dictionary containing the mini-batch data.
-            The mini-batch data are passed to each individual model,
-            which indexes its required input data by keys with its model prefix.
-            Ground-truth labels are not needed for prediction.
-        batch_idx
-            Index of mini-batch.
-        dataloader_idx
-            Index of dataloader.
-
-        Returns
-        -------
-        A dictionary with the mini-batch's logits and features.
-        """
-        output = self.model(batch)
-        if self.model_postprocess_fn:
-            output = self.model_postprocess_fn(output)
-        return output[self.model.prefix]
-
-    def configure_optimizers(self):
-        """
-        Configure optimizer. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
-
-        Returns
-        -------
-        [optimizer]
-            Optimizer.
-        [sched]
-            Learning rate scheduler.
-        """
-        kwargs = dict(
-            model=self.model,
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
-        )
-        if self.hparams.lr_choice == "two_stages":
-            logger.debug("applying 2-stage learning rate...")
-            grouped_parameters = apply_two_stages_lr(
-                lr_mult=self.hparams.lr_mult,
-                return_params=True,
-                **kwargs,
-            )
-        elif self.hparams.lr_choice == "layerwise_decay":
-            logger.debug("applying layerwise learning rate decay...")
-            grouped_parameters = apply_layerwise_lr_decay(
-                lr_decay=self.hparams.lr_decay,
-                efficient_finetune=self.hparams.efficient_finetune,
-                trainable_param_names=self.hparams.trainable_param_names,
-                **kwargs,
-            )
-        else:
-            logger.debug("applying single learning rate...")
-            grouped_parameters = apply_single_lr(
-                **kwargs,
-            )
-
-        optimizer = get_optimizer(
-            optim_type=self.hparams.optim_type,
-            optimizer_grouped_parameters=grouped_parameters,
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
-        )
-
-        logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
-        if self.trainer.max_steps is None or -1:
-            max_steps = (
-                len(self.trainer.datamodule.train_dataloader())
-                * self.trainer.max_epochs
-                // self.trainer.accumulate_grad_batches
-            )
-            logger.debug(
-                f"len(trainer.datamodule.train_dataloader()): {len(self.trainer.datamodule.train_dataloader())}"
-            )
-            logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
-            logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
-        else:
-            max_steps = self.trainer.max_steps
-
-        logger.debug(f"max steps: {max_steps}")
-
-        warmup_steps = self.hparams.warmup_steps
-        if isinstance(warmup_steps, float):
-            warmup_steps = int(max_steps * warmup_steps)
-
-        logger.debug(f"warmup steps: {warmup_steps}")
-        logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
-        scheduler = get_lr_scheduler(
-            optimizer=optimizer,
-            num_max_steps=max_steps,
-            num_warmup_steps=warmup_steps,
-            lr_schedule=self.hparams.lr_schedule,
-            end_lr=self.hparams.end_lr,
-        )
-
-        sched = {"scheduler": scheduler, "interval": "step"}
-        logger.debug("done configuring optimizer and scheduler")
-        return [optimizer], [sched]
