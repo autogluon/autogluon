@@ -2,11 +2,12 @@ import enum
 import math
 import warnings
 from typing import Callable, Dict, List, Optional, Tuple, Union, cast
-from .utils import init_weights
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+
+from .utils import init_weights
 
 ModuleType = Union[str, Callable[..., nn.Module]]
 _INTERNAL_ERROR_MESSAGE = "Internal error. Please, open an issue."
