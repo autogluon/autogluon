@@ -1,9 +1,7 @@
-import copy
 import logging
 import re
-from packaging.version import parse as vparse
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Type, Union
+from typing import Any, Dict, Iterator, List, Optional, Type
 
 import gluonts
 import numpy as np
@@ -28,8 +26,6 @@ logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
 gluonts_env.use_tqdm = False
 
-GLUONTS_GE_v010 = vparse(gluonts.__version__) >= vparse("0.10")
-
 
 class SimpleGluonTSDataset(GluonTSDataset):
     """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
@@ -46,11 +42,6 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
 
-        # GluonTS v0.10 and above prefer pd.Period as the main timestamp type
-        self.time_type_constructor: Type = (
-            lambda t: pd.Period(t, freq=self.freq) if GLUONTS_GE_v010 else pd.Timestamp(t, freq=self.freq)
-        )
-
     @property
     def freq(self):
         return self.time_series_df.freq
@@ -64,7 +55,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             yield {
                 "item_id": j,
                 "target": df[self.target_field_name].to_numpy(dtype=np.float64),
-                "start": self.time_type_constructor(df.index[0]),
+                "start": pd.Period(df.index[0], freq=self.freq),
             }
 
 
@@ -301,23 +292,17 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
             " the model trained to forecast all quantiles?"
         )
-        
+
         result_dfs = []
         for i, forecast in enumerate(forecasts):
-            item_forecast_dict = dict(
-                mean=forecast_means[i]
-            )
+            item_forecast_dict = dict(mean=forecast_means[i])
             for quantile in quantile_levels:
-                item_forecast_dict[quantile] = forecast.quantile(str(quantile))
+                item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
 
             df = pd.DataFrame(item_forecast_dict)
             df[ITEMID] = forecast.item_id
             df[TIMESTAMP] = pd.date_range(
-                start=(
-                    forecasts[i].start_date.to_timestamp(how="S")
-                    if isinstance(forecasts[i].start_date, pd.Period)  # GluonTS version is >=0.10
-                    else forecasts[i].start_date
-                ),
+                start=forecasts[i].start_date.to_timestamp(how="S"),
                 periods=self.prediction_length,
                 freq=self.freq,
             )

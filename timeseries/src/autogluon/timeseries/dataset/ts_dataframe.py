@@ -4,7 +4,7 @@ import copy
 import itertools
 import warnings
 from collections.abc import Iterable
-from typing import Any, Optional, Tuple, Type, Union
+from typing import Any, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -200,7 +200,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
             if not ("target" in ts and "start" in ts):
                 raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
-            if not isinstance(ts["start"], pd.Timestamp) or ts["start"].freq is None:
+            if not isinstance(ts["start"], (pd.Timestamp, pd.Period)) or ts["start"].freq is None:
                 raise ValueError(
                     f"{i}'th time-series must have timestamp as 'start' with freq specified, got {ts['start']}"
                 )
@@ -258,8 +258,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         all_ts = []
         for i, ts in enumerate(iterable_dataset):
             start_timestamp = ts["start"]
+            freq = start_timestamp.freq
+            if isinstance(start_timestamp, pd.Period):
+                start_timestamp = start_timestamp.to_timestamp(how="S")
             target = ts["target"]
-            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=start_timestamp.freq))
+            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=freq))
             idx = pd.MultiIndex.from_product([(i,), datetime_index], names=[ITEMID, TIMESTAMP])
             ts_df = pd.Series(target, name="target", index=idx).to_frame()
             all_ts.append(ts_df)
