@@ -195,13 +195,14 @@ def is_imagepath_column(
     # Tolerate high failure rate in case that many image files may be corrupted.
     if failure_ratio <= 0.9:
         if failure_ratio > 0:
-            logger.warning(
+            warnings.warning(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
                 "and estimate the potential influence. By default, we skip the samples with missing images. "
                 "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                "which uses a zero image to replace any missing image."
+                "which uses a zero image to replace any missing image.",
+                UserWarning,
             )
         return True
     else:
@@ -273,7 +274,7 @@ def is_identifier_column(data: pd.Series, col_name: str, id_mappings: Dict[str, 
     if failure_count == 0:
         return True
     elif 0 < failure_count < sample_num:
-        raise warnings.warn(
+        warnings.warn(
             f"Among {sample_num} sampled indexes in column {col_name}, "
             f"we can't index all their values from the id_mappings ({failure_count} failures). "
             f"You may need to assure that all the indexes of column {col_name} exist in your id_mappings.",

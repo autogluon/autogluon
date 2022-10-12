@@ -129,7 +129,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     @property
     def image_feature_names(self):
-        return self._image_feature_names if hasattr(self, "_image_feature_names") else self._image_path_names
+        return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
 
     @property
     def text_feature_names(self):
@@ -330,7 +330,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the text data stored in a dictionary.
+        text_features
+            All the text data stored in a dictionary.
+        text_types
+            The column types of these text data, e.g., text or text_identifier.
         """
         assert (
             self._fit_called or self._fit_x_called
@@ -372,7 +375,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the image paths stored in a dictionary.
+        image_features
+            All the image data stored in a dictionary.
+        image_types
+            The column types of these image data, e.g., image_path or image_identifier.
         """
         assert (
             self._fit_called or self._fit_x_called
@@ -410,7 +416,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the numerical features (a dictionary of np.ndarray).
+        numerical_features
+            All the numerical features (a dictionary of np.ndarray).
+        None
+            The column types of numerical data, which is None currently since only one numerical type exists.
         """
         assert (
             self._fit_called or self._fit_x_called
@@ -440,7 +449,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the categorical encodings (a dictionary of np.ndarray).
+        categorical_features
+            All the categorical encodings (a dictionary of np.ndarray).
+        None
+            The column types of categorical data, which is None currently since only one categorical type exists.
         """
         assert (
             self._fit_called or self._fit_x_called
@@ -475,7 +487,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        All the labels (a dictionary of np.ndarray).
+        labels
+            All the labels (a dictionary of np.ndarray).
+        label_types
+            The label column types.
         """
         assert (
             self._fit_called or self._fit_y_called
