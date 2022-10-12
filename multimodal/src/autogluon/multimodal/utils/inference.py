@@ -15,6 +15,7 @@ from ..constants import (
     MASKS,
     NER,
     NER_ANNOTATION,
+    NER_RET,
     PROBABILITY,
     SCORE,
     TEXT,
@@ -74,7 +75,7 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         return [ele[TEXT] for ele in outputs]  # single image
     elif ret_type == SCORE:
         return [ele[SCORE] for ele in outputs]
-    elif ret_type == NER:
+    elif ret_type == NER_RET:
         ner_pred = []
         as_ndarray = False
         for ele in outputs:

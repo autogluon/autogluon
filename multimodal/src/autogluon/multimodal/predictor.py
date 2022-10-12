@@ -54,6 +54,7 @@ from .constants import (
     MODEL_CHECKPOINT,
     MULTICLASS,
     NER,
+    NER_RET,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
@@ -1655,7 +1656,7 @@ class MultiModalPredictor:
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
         elif self._problem_type == NER:
-            ret_type = NER
+            ret_type = NER_RET
         else:
             ret_type = LOGITS
 
@@ -1801,7 +1802,7 @@ class MultiModalPredictor:
             ret_type = [TEXT, SCORE]
 
         if self._problem_type == NER:
-            ret_type = NER
+            ret_type = NER_RET
 
         if candidate_data:
             pred = self._match_queries_and_candidates(

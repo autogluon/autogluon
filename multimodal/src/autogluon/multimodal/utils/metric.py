@@ -16,7 +16,7 @@ from ..constants import (
     METRIC_MODE_MAP,
     MULTICLASS,
     NER,
-    NER_METRIC,
+    OVERALL_ACCURACY,
     REGRESSION,
     RMSE,
     ROC_AUC,
@@ -75,7 +75,7 @@ def infer_metrics(
     if problem_type == MULTICLASS:
         eval_metric_name = ACCURACY
     elif problem_type == NER:
-        eval_metric_name = NER_METRIC
+        eval_metric_name = OVERALL_ACCURACY
     elif problem_type == BINARY:
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
@@ -132,7 +132,7 @@ def compute_score(
     -------
     Computed score.
     """
-    if metric_name == NER_METRIC:
+    if metric_name == OVERALL_ACCURACY:
         metric = evaluate.load("seqeval")
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 

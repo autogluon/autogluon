@@ -462,6 +462,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == ROIS:
             y = y_df  # Do nothing. TODO: Shall we transform this?
         elif self.label_type == NER_ANNOTATION:
+            # TODO: Add transform_multimodal and process_multimodal.py
             text_column_index = 0  # Currently, we only support one text column.
             x_df = df[self._text_feature_names[text_column_index]]
             y = self._label_generator.transform(y_df)

@@ -13,6 +13,7 @@ REGRESSION = "regression"
 FEW_SHOT = "few_shot"
 DEFAULT_SHOT = "default_shot"
 DEPRECATED_ZERO_SHOT = "zero_shot"
+NER = "ner"
 
 # Pipelines
 FEATURE_EXTRACTION = "feature_extraction"
@@ -52,7 +53,7 @@ MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
 ACC = "acc"
-NER_METRIC = "overall_accuracy"
+OVERALL_ACCURACY = "overall_accuracy"
 RMSE = "rmse"
 ROOT_MEAN_SQUARED_ERROR = "root_mean_squared_error"
 R2 = "r2"
@@ -78,7 +79,7 @@ METRIC_MODE_MAP = {
     PEARSONR: MAX,
     SPEARMANR: MAX,
     F1: MAX,
-    NER_METRIC: MAX,
+    OVERALL_ACCURACY: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -153,7 +154,8 @@ FUSION_TRANSFORMER = "fusion_transformer"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
-HF_MODELS = (HF_TEXT, T_FEW, CLIP)
+NER_TEXT = "ner_text"
+HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
 MMCV_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
 # metric learning loss type
@@ -182,5 +184,5 @@ START_OFFSET = "start"
 END_OFFSET = "end"
 TOKEN_WORD_MAPPING = "token_word_mapping"
 WORD_OFFSETS = "word_offsets"
-NER = "ner"
+NER_RET = "ner_ret"
 NER_ANNOTATION = "ner_annotation"
