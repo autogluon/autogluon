@@ -587,6 +587,7 @@ class MultiModalPredictor:
         metric = "val_" + _fit_args.get("validation_metric_name")
         mode = _fit_args.get("minmax_mode")
         save_path = _fit_args.get("save_path")
+        time_budget_s = _fit_args.get("max_time")
         is_distill = False
         if _fit_args.get("teacher_predictor", None) is not None:
             is_distill = True
@@ -608,6 +609,7 @@ class MultiModalPredictor:
                 ray_tune_adapter=ray_tune_adapter,
                 total_resources=resources,
                 minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
+                time_budget_s=time_budget_s,
                 run_config_kwargs=run_config_kwargs,
                 verbose=2,
             )
