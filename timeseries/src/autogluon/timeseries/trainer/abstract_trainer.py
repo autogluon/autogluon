@@ -429,7 +429,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         tuning_start_time = time.time()
         with disable_tqdm():
-            hpo_models, hpo_results = model.hyperparameter_tune(
+            hpo_models, _ = model.hyperparameter_tune(
                 train_data=train_data,
                 val_data=val_data,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
@@ -438,9 +438,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
         total_tuning_time = time.time() - tuning_start_time
 
-        self.hpo_results[model.name] = hpo_results
+        self.hpo_results[model.name] = hpo_models
         model_names_trained = []
-        # TODO: Does this code still work if all model configurations failed?
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
             model_path = model_info["path"]

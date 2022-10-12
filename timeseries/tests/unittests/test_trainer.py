@@ -193,9 +193,10 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
 
     assert len(leaderboard) == 2 + 1  # include ensemble
 
-    config_history = next(iter(trainer.hpo_results.values()))["config_history"]
+    hpo_results_first_model = next(iter(trainer.hpo_results.values()))
+    config_history = [result["hyperparameters"] for result in hpo_results_first_model.values()]
     assert len(config_history) == 2
-    assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
+    assert all(1 <= config["epochs"] <= 4 for config in config_history)
 
 
 @pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
@@ -256,7 +257,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
             hyperparameter_tune_kwargs={
-                "num_samples": 2,
+                "num_trials": 2,
                 "searcher": "random",
                 "scheduler": "local",
             },
@@ -489,9 +490,10 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
         leaderboard = trainer.leaderboard()
 
     assert len(leaderboard) == 2 + 1  # include ensemble
-    config_history = next(iter(trainer.hpo_results.values()))["config_history"]
+    hpo_results_first_model = next(iter(trainer.hpo_results.values()))
+    config_history = [result["hyperparameters"] for result in hpo_results_first_model.values()]
     assert len(config_history) == 2
-    assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
+    assert all(1 <= config["epochs"] <= 4 for config in config_history)
 
 
 @pytest.mark.parametrize(
