@@ -110,26 +110,28 @@ class NerLitModule(LitModule):
             - None (do not use efficient finetuning strategies)
 
         """
-        super().__init__(model, 
-                        optim_type,
-                        lr_choice,
-                        lr_schedule,
-                        lr: Optional,
-                        lr_decay,
-                        end_lr,
-                        lr_mult,
-                        weight_decay,
-                        warmup_steps,
-                        loss_func,
-                        validation_metric,
-                        validation_metric_name,
-                        custom_metric_func,
-                        test_metric,
-                        efficient_finetune,
-                        trainable_param_names,
-                        mixup_fn,
-                        mixup_off_epoch,
-                        model_postprocess_fn)
+        super().__init__(
+            model,
+            optim_type,
+            lr_choice,
+            lr_schedule,
+            lr,
+            lr_decay,
+            end_lr,
+            lr_mult,
+            weight_decay,
+            warmup_steps,
+            loss_func,
+            validation_metric,
+            validation_metric_name,
+            custom_metric_func,
+            test_metric,
+            efficient_finetune,
+            trainable_param_names,
+            mixup_fn,
+            mixup_off_epoch,
+            model_postprocess_fn,
+        )
 
     def _compute_loss(
         self,
