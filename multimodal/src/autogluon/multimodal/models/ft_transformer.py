@@ -2,6 +2,7 @@ import enum
 import math
 import warnings
 from typing import Callable, Dict, List, Optional, Tuple, Union, cast
+from .utils import init_weights
 
 import torch
 import torch.nn.functional as F
@@ -363,27 +364,19 @@ class AdditiveAttention(nn.Module):
         self.share_qv_weights = share_qv_weights
         self.dropout = nn.Dropout(dropout)
 
-        trainable = []
         if share_qv_weights:
             self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
-            trainable.extend([self.qv_proj])
         else:
             self.q_proj = nn.Linear(d_token, d_token, bias=bias)
             self.v_proj = nn.Linear(d_token, d_token, bias=bias)
-            trainable.extend([self.q_proj, self.v_proj])
 
         self.k_proj = nn.Linear(d_token, d_token, bias=bias)
         self.W_q = nn.Linear(d_token, n_heads)
         self.W_k = nn.Linear(d_token, n_heads)
         self.r_out = nn.Linear(d_token, d_token)
-        trainable.extend([self.k_proj, self.W_q, self.W_k, self.r_out])
 
-        for m in trainable:
-            # the "xavier" branch tries to follow torch.nn.MultiheadAttention;
-            if initialization == "xavier":
-                nn.init.xavier_uniform_(m.weight, gain=1 / math.sqrt(2))
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
+        if initialization == "xavier":
+            self.apply(init_weights)
 
     def forward(
         self,
@@ -508,6 +501,52 @@ class FT_Transformer(nn.Module):
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
     ) -> None:
+        """
+        Parameters
+        ----------
+        d_token
+            The size of one token for `_CategoricalFeatureTokenizer`.
+        n_blocks
+            Number of the `FT_Transformer` blocks, which should be non-negative.
+        attention_n_heads
+            Number of attention heads in each `FT_Transformer` block, which should be positive.
+        attention_dropout
+            Dropout ratio for the Multi Headed Attention module.
+        attention_initialization
+            Weights initialization scheme for Multi Headed Attention module.
+        attention_normalization
+            Normalization policy for attention layers. "layer_norm" is a good default.
+        ffn_d_hidden
+            Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
+        ffn_dropout
+            Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
+        ffn_activation
+            Activation function type for the Feed-Forward Network module.
+        ffn_normalization
+            Normalization scheme of the Feed-Forward Network module.
+        residual_dropout
+            Dropout ratio for the linear layers in FT_Transformer block.
+        prenormalization, first_prenormalization
+            Prenormalization to stabilize the training.
+        n_tokens
+            Number of tokens of the input sequence.
+        kv_compression_ratio
+            The compression ration to reduce the input sequence length.
+        kv_compression_sharing
+            If `true` the projections will share weights.
+        head_activation
+            Activation function type of the MLP layer.
+        head_normalization
+            Normalization scheme of the MLP layer.
+        d_out
+            Output dimension.
+        projection
+            Whether to use a project head.
+        additive_attention
+            If 'true' the transformer will use additive attention with linear complexity to sequence length.
+        share_qv_weights
+            if 'true', then value and query transformation parameters are shared in additive attention.
+        """
         super().__init__()
         if isinstance(last_layer_query_idx, int):
             raise ValueError(
