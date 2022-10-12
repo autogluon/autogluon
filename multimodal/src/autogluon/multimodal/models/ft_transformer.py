@@ -380,11 +380,7 @@ class AdditiveAttention(nn.Module):
 
         for m in trainable:
             # the "xavier" branch tries to follow torch.nn.MultiheadAttention;
-            # the second condition checks if W_v plays the role of W_out; the latter one
-            # is initialized with Kaiming in torch
             if initialization == "xavier":
-                # gain is needed since W_qkv is represented with 3 separate layers (it
-                # implies different fan_out)
                 nn.init.xavier_uniform_(m.weight, gain=1 / math.sqrt(2))
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
