@@ -204,7 +204,7 @@ class CategoricalTransformer(nn.Module):
 
         if kv_compression_ratio is not None:
             # number of tokens depends on whether the CLS token is included or not.
-            if self.cls_token:
+            if cls_token:
                 n_tokens = self.categorical_feature_tokenizer.n_tokens + 1
             else:
                 n_tokens = self.categorical_feature_tokenizer.n_tokens
