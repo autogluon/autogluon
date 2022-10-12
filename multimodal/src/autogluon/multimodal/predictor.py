@@ -569,6 +569,8 @@ class MultiModalPredictor:
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
+        from ray.air.config import CheckpointConfig
+
         from autogluon.core.hpo.ray_hpo import (
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
@@ -577,7 +579,6 @@ class MultiModalPredictor:
             cleanup_trials,
             run,
         )
-        from ray.air.config import CheckpointConfig
 
         ray_tune_adapter = AutommRayTuneAdapter()
         if try_import_ray_lightning():
