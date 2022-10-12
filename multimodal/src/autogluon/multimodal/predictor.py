@@ -105,6 +105,7 @@ from .utils import (
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
+    get_onnx_input,
     getCOCOCatIDs,
     infer_batch,
     infer_dtypes_by_model_names,
@@ -397,7 +398,7 @@ class MultiModalPredictor:
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
                     scheduler_init_args: Optional[dict] = None
                         If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
-                    searcher: Union[str, ray.tune.suggest.SearchAlgorithm, ray.tune.suggest.Searcher]
+                    searcher: Union[str, ray.tune.search.SearchAlgorithm, ray.tune.search.Searcher]
                         If str is passed, AutoGluon will create the searcher for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
                         You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
@@ -1528,14 +1529,12 @@ class MultiModalPredictor:
         cocoEval.accumulate()
         cocoEval.summarize()
 
-    def _realtime_predict(
+    def _process_batch(
         self,
-        data: pd.DataFrame,
+        data: Union[pd.DataFrame, dict, list],
         df_preprocessor: MultiModalFeaturePreprocessor,
         data_processors: Dict,
-        num_gpus: int,
-        precision: Union[int, str],
-    ) -> List[Dict]:
+    ):
 
         modality_features, sample_num = apply_df_preprocessor(
             data=data,
@@ -1557,6 +1556,22 @@ class MultiModalPredictor:
             df_preprocessor=df_preprocessor, data_processors=data_processors, per_gpu_batch_size=sample_num
         )
         batch = collate_fn(processed_features)
+
+        return batch
+
+    def _realtime_predict(
+        self,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
+    ) -> List[Dict]:
+        batch = self._process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+        )
         output = infer_batch(
             batch=batch,
             model=self._model,
@@ -2082,6 +2097,124 @@ class MultiModalPredictor:
                     f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
                     f"removed."
                 )
+
+    def export_onnx(
+        self,
+        onnx_path: Optional[str] = None,
+        data: Optional[pd.DataFrame] = None,
+        batch_size: Optional[int] = None,
+        verbose: Optional[bool] = False,
+        opset_version: Optional[int] = 13,
+    ):
+        """
+        Export this predictor's model to ONNX file.
+
+        Parameters
+        ----------
+        onnx_path
+            The export path of onnx model.
+        data
+            Raw data used to trace and export the model.
+            If this is None, will check if a processed batch is provided.
+        batch_size
+            The batch_size of export model's input.
+            Normally the batch_size is a dynamic axis, so we could use a small value for faster export.
+        verbose
+            verbose flag in torch.onnx.export.
+        opset_version
+            opset_version flag in torch.onnx.export.
+        """
+        # TODO: Support CLIP
+        # TODO: Add test
+
+        valid_input, dynamic_axes, default_onnx_path, batch = get_onnx_input(
+            pipeline=self._pipeline, config=self._config
+        )
+
+        if not batch_size:
+            batch_size = 2  # batch_size should be a dynamic_axis, so we could use a small value for faster export
+        if data is not None:
+            batch = self.get_processed_batch_for_deployment(
+                data=data, valid_input=valid_input, onnx_tracing=True, batch_size=batch_size
+            )
+
+        if not onnx_path:
+            onnx_path = default_onnx_path
+
+        torch.onnx.export(
+            self._model.eval(),
+            batch,
+            onnx_path,
+            opset_version=opset_version,
+            verbose=verbose,
+            input_names=valid_input,
+            dynamic_axes=dynamic_axes,
+        )
+
+    def get_processed_batch_for_deployment(
+        self,
+        data: pd.DataFrame,
+        valid_input: Optional[List] = None,
+        onnx_tracing: bool = False,
+        batch_size: int = None,
+        to_numpy: bool = True,
+        requires_label: bool = False,
+    ):
+        """
+        Get the processed batch of raw data given.
+
+        Parameters
+        ----------
+        data
+            The raw data to process
+        valid_input
+            Used to filter valid data. No filter happens if it is empty.
+        onnx_tracing
+            If the output is used for onnx tracing.
+        batch_size
+            The batch_size of output batch.
+            If onnx_tracing, it will only output one mini-batch, and all int tensor values will be converted to long.
+        to_numpy
+            Output numpy array if True. Only valid if not onnx_tracing.
+
+        Returns
+        -------
+        Tensor or numpy array.
+        The output processed batch could be used for export/evaluate deployed model.
+        """
+        # TODO: add support for data = dict or list
+        if onnx_tracing:
+            if batch_size:
+                data = data[:batch_size]
+            else:
+                data = data[:2]
+
+        data, df_preprocessor, data_processors = self._on_predict_start(
+            config=self._config,
+            data=data,
+            requires_label=requires_label,
+        )
+
+        batch = self._process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+        )
+
+        ret = {}
+        for k in batch:
+            if valid_input and k not in valid_input:
+                continue
+            if onnx_tracing:
+                ret[k] = batch[k].long() if isinstance(batch[k], torch.IntTensor) else batch[k]
+            elif to_numpy:
+                ret[k] = batch[k].cpu().detach().numpy().astype(int)
+            else:
+                ret[k] = batch[k]
+        if not onnx_tracing:
+            if batch_size:
+                raise NotImplementedError("We should split the batch here.")  # TODO
+        return ret
 
     @staticmethod
     def _load_metadata(

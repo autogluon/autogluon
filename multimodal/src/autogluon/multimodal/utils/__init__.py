@@ -35,5 +35,6 @@ from .metric import compute_score, get_minmax_mode, infer_metrics
 from .misc import logits_to_prob, tensor_to_ndarray
 from .model import create_fusion_model, create_model, modify_duplicate_model_names, select_model
 from .object_detection import bbox_xyxy_to_xywh, from_coco, getCOCOCatIDs
+from .onnx import get_onnx_input
 from .pipeline import init_pretrained
 from .save import process_save_path, save_pretrained_model_configs, save_text_tokenizers
