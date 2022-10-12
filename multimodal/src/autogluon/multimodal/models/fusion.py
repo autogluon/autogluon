@@ -243,7 +243,71 @@ class MultimodalFusionTransformer(nn.Module):
         head_normalization: Optional[str] = "layer_norm",
         adapt_in_features: Optional[str] = None,
         loss_weight: Optional[float] = None,
+        additive_attention: Optional[bool] = False,
+        share_qv_weights: Optional[bool] = False,
     ):
+        """
+        Parameters
+        ----------
+        prefix
+            The fusion model's prefix
+        models
+            The individual models whose output features will be fused.
+        hidden_features
+            A list of integers representing the hidden feature dimensions. For example,
+            [512, 128, 64] indicates three hidden MLP layers with their corresponding output
+            feature dimensions.
+        num_classes
+            The number of classes.
+        n_blocks
+            Number of the `FT_Transformer` blocks, which should be non-negative.
+        attention_n_heads
+            Number of attention heads in each `FT_Transformer` block, which should be positive.
+        attention_dropout
+            Dropout ratio for the Multi Headed Attention module.
+        attention_initialization
+            Weights initialization scheme for Multi Headed Attention module.
+        attention_normalization
+            Normalization policy for attention layers. "layer_norm" is a good default.
+        residual_dropout
+            Dropout ratio for the linear layers in FT_Transformer block.
+        ffn_d_hidden
+            Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
+        ffn_dropout
+            Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
+        ffn_activation
+            Activation function type for the Feed-Forward Network module.
+        ffn_normalization
+            Normalization scheme of the Feed-Forward Network module.
+        prenormalization, first_prenormalization
+            Prenormalization to stabilize the training.
+        kv_compression_ratio
+            The compression ration to reduce the input sequence length.
+        kv_compression_sharing
+            If `true` the projections will share weights.
+        head_activation
+            Activation function type of the MLP layer.
+        head_normalization
+            Normalization scheme of the MLP layer.
+        adapt_in_features
+            Choice of how to adapt the features of each model. We now support
+            - min
+                Adapt all features to the minimum dimension. For example, if three models have
+                feature dimensions [512, 768, 64], it will linearly map all the features to
+                dimension 64.
+            - max
+                Adapt all features to the maximum dimension. For example, if three models have
+                feature dimensions are [512, 768, 64], it will linearly map all the features to
+                dimension 768.
+        loss_weight
+            The weight of individual models. For example, if we fuse the features of ViT, CLIP, and BERT,
+            The loss will be computed as "loss = fusion_loss + loss_weight(vit_loss + clip_loss + bert_loss)".
+            Basically, it supports adding an auxiliary loss for each individual model.
+        additive_attention
+            If 'true' the transformer will use additive attention with linear complexity to sequence length.
+        share_qv_weights
+            if 'true', then value and query transformation parameters are shared in additive attention.
+        """
         super().__init__()
         logger.debug("initializing MultimodalFusionTransformer")
         if loss_weight is not None:
@@ -289,6 +353,8 @@ class MultimodalFusionTransformer(nn.Module):
             head_normalization=head_normalization,
             d_out=hidden_features,
             projection=False,
+            additive_attention=additive_attention,
+            share_qv_weights=share_qv_weights,
         )
 
         self.head = FT_Transformer.Head(

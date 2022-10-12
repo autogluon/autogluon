@@ -120,7 +120,7 @@ def infer_precision(num_gpus: int, precision: Union[int, str], as_torch: Optiona
     return precision
 
 
-def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torch.device):
+def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List, Tuple], device: torch.device):
     """
     Move an object to the given device.
 
@@ -145,7 +145,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module, Dict, List], device: torc
         for k, v in obj.items():
             res[k] = move_to_device(v, device)
         return res
-    elif isinstance(obj, list):
+    elif isinstance(obj, list) or isinstance(obj, tuple):
         res = []
         for v in obj:
             res.append(move_to_device(v, device))

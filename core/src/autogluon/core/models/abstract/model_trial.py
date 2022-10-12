@@ -21,7 +21,6 @@ def model_trial(
     reporter=None,  # reporter only used by custom strategy, hence optional
     time_limit=None,
     fit_kwargs=None,
-    checkpoint_dir=None,  # Tabular doesn't support checkpoint in the middle yet. This is here to disable warning from ray tune
 ):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel."""
     try:

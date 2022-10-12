@@ -406,7 +406,7 @@ class MultiModalPredictor:
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
                     scheduler_init_args: Optional[dict] = None
                         If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
-                    searcher: Union[str, ray.tune.suggest.SearchAlgorithm, ray.tune.suggest.Searcher]
+                    searcher: Union[str, ray.tune.search.SearchAlgorithm, ray.tune.search.Searcher]
                         If str is passed, AutoGluon will create the searcher for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
                         You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.

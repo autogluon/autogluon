@@ -60,6 +60,7 @@ Available local models include:
 
 - `ETS`
 - `ARIMA`
+- `Theta`
 
 If the dataset consists of multiple time series, we fit a separate local model to each time series — hence the name "local".
 This means, if we want to make a forecast for a new time series that wasn't part of the training set, all local models will be fit from scratch for the new time series.
@@ -177,7 +178,7 @@ The following presets are available:
 
 <!-- **TODO: These will be significantly changed by 0.6.0** -->
 
-- `"low_quality"`: quickly train a few toy models. This setting should only be used as a sanity check.
+- `"fast_training"`: train simple statistical models (`"ETS"`, `"ARIMA"`, `"Theta"`). These model are fast to train but can be slow at prediction time for unseen data.
 - `"medium_quality"`: train several selected models (`"ETS"`, `"ARIMA"`, `"DeepAR"`, `"SimpleFeedForward"`, `"TemporalFusionTransformer"`) without hyperparameter optimization. A good baseline setting.
 - `"best_quality"`: Train all available models with hyperparameter optimization.
 
