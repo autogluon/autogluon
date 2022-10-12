@@ -24,7 +24,6 @@ def test_hpo(searcher, scheduler):
         "data.numerical.convert_to_text": False,
         "env.num_workers": 0,
         "env.num_workers_evaluation": 0,
-        "env.num_gpus": 0
     }
 
     hyperparameter_tune_kwargs = {
