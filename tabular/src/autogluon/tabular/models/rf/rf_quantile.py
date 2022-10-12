@@ -173,10 +173,11 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
             y = np.ravel(y)
 
         # apply method requires X to be of dtype np.float32
-        X, y = check_X_y(X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
+        X, y = check_X_y(
+            X, y, accept_sparse="csc", dtype=np.float32, multi_output=False)
         super(BaseTreeQuantileRegressor, self).fit(
-            X, y, sample_weight=sample_weight, check_input=check_input, X_idx_sorted=X_idx_sorted
-        )
+            X, y, sample_weight=sample_weight, check_input=check_input,
+            X_idx_sorted=X_idx_sorted)
         self.y_train_ = y
 
         # Stores the leaf nodes that the samples lie in.
@@ -286,17 +287,15 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
         y_train_leaves_[i] is the leaf that y_train[i] ends up at.
     """
 
-    def __init__(
-        self,
-        criterion="squared_error",
-        splitter="best",
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        max_features=None,
-        random_state=None,
-        max_leaf_nodes=None,
-    ):
+    def __init__(self,
+                 criterion="squared_error",
+                 splitter="best",
+                 max_depth=None,
+                 min_samples_split=2,
+                 min_samples_leaf=1,
+                 max_features=None,
+                 random_state=None,
+                 max_leaf_nodes=None):
         super(DecisionTreeQuantileRegressor, self).__init__(
             criterion=criterion,
             splitter=splitter,
@@ -305,22 +304,19 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
             min_samples_leaf=min_samples_leaf,
             max_features=max_features,
             max_leaf_nodes=max_leaf_nodes,
-            random_state=random_state,
-        )
+            random_state=random_state)
 
 
 class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
-    def __init__(
-        self,
-        criterion="squared_error",
-        splitter="random",
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        max_features="auto",
-        random_state=None,
-        max_leaf_nodes=None,
-    ):
+    def __init__(self,
+                 criterion='squared_error',
+                 splitter='random',
+                 max_depth=None,
+                 min_samples_split=2,
+                 min_samples_leaf=1,
+                 max_features='auto',
+                 random_state=None,
+                 max_leaf_nodes=None):
         super(ExtraTreeQuantileRegressor, self).__init__(
             criterion=criterion,
             splitter=splitter,
@@ -329,8 +325,8 @@ class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
             min_samples_leaf=min_samples_leaf,
             max_features=max_features,
             max_leaf_nodes=max_leaf_nodes,
-            random_state=random_state,
-        )
+            random_state=random_state)
+
 
 
 def generate_sample_indices(random_state, n_samples):
@@ -642,43 +638,38 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
         http://www.jmlr.org/papers/volume7/meinshausen06a/meinshausen06a.pdf
     """
 
-    def __init__(
-        self,
-        n_estimators=10,
-        criterion="squared_error",
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        max_features="auto",
-        max_leaf_nodes=None,
-        bootstrap=True,
-        oob_score=False,
-        n_jobs=1,
-        random_state=None,
-        verbose=0,
-        warm_start=False,
-        max_samples=None,
-    ):
+    def __init__(self,
+                 n_estimators=10,
+                 criterion='squared_error',
+                 max_depth=None,
+                 min_samples_split=2,
+                 min_samples_leaf=1,
+                 max_features='auto',
+                 max_leaf_nodes=None,
+                 bootstrap=True,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0,
+                 warm_start=False,
+                 max_samples=None):
         super(RandomForestQuantileRegressor, self).__init__(
             base_estimator=DecisionTreeQuantileRegressor(),
             n_estimators=n_estimators,
-            estimator_params=(
-                "criterion",
-                "max_depth",
-                "min_samples_split",
-                "min_samples_leaf",
-                "max_features",
-                "max_leaf_nodes",
-                "random_state",
-            ),
+            estimator_params=("criterion",
+                              "max_depth",
+                              "min_samples_split",
+                              "min_samples_leaf",
+                              "max_features",
+                              "max_leaf_nodes",
+                              "random_state"),
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
             random_state=random_state,
             verbose=verbose,
             warm_start=warm_start,
-            max_samples=max_samples,
-        )
+            max_samples=max_samples)
 
         self.criterion = criterion
         self.max_depth = max_depth
@@ -794,43 +785,36 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         http://www.jmlr.org/papers/volume7/meinshausen06a/meinshausen06a.pdf
     """
 
-    def __init__(
-        self,
-        n_estimators=10,
-        criterion="squared_error",
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        max_features="auto",
-        max_leaf_nodes=None,
-        bootstrap=True,
-        oob_score=False,
-        n_jobs=1,
-        random_state=None,
-        verbose=0,
-        warm_start=False,
-        max_samples=None,
-    ):
+    def __init__(self,
+                 n_estimators=10,
+                 criterion='squared_error',
+                 max_depth=None,
+                 min_samples_split=2,
+                 min_samples_leaf=1,
+                 max_features='auto',
+                 max_leaf_nodes=None,
+                 bootstrap=True,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0,
+                 warm_start=False,
+                 max_samples=None):
         super(ExtraTreesQuantileRegressor, self).__init__(
             base_estimator=ExtraTreeQuantileRegressor(),
             n_estimators=n_estimators,
-            estimator_params=(
-                "criterion",
-                "max_depth",
-                "min_samples_split",
-                "min_samples_leaf",
-                "max_features",
-                "max_leaf_nodes",
-                "random_state",
-            ),
+            estimator_params=("criterion", "max_depth", "min_samples_split",
+                              "min_samples_leaf",
+                              "max_features",
+                              "max_leaf_nodes",
+                              "random_state"),
             bootstrap=bootstrap,
             oob_score=oob_score,
             n_jobs=n_jobs,
             random_state=random_state,
             verbose=verbose,
             warm_start=warm_start,
-            max_samples=max_samples,
-        )
+            max_samples=max_samples)
 
         self.criterion = criterion
         self.max_depth = max_depth
