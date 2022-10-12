@@ -557,7 +557,7 @@ class MultiModalPredictor:
             resources = dict(num_gpus=torch.cuda.device_count())
             if _fit_args["max_time"] is not None:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
-            _fit_args['predictor'] = self
+            _fit_args["predictor"] = self
             predictor = self._hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
