@@ -656,7 +656,6 @@ class MultiModalPredictor:
             with open(best_k_model_path, "w") as yaml_file:
                 yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
 
-            last_ckpt_path = analysis.get_last_checkpoint(best_trial)._local_path
             with analysis.get_last_checkpoint(best_trial).as_directory() as last_ckpt_dir:
                 predictor._top_k_average(
                     model=predictor._model,
