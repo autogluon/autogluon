@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def weighted_percentile(a, q, weights=None, sorter=None, is_filtered=False):
     """
     Returns the weighted percentile of a at q given weights.
+
     Parameters
     ----------
     a: array-like, shape=(n_samples,)
@@ -35,9 +36,11 @@ def weighted_percentile(a, q, weights=None, sorter=None, is_filtered=False):
     -------
     percentile: float
         Weighted percentile of a at q.
+
     References
     ----------
     1. https://en.wikipedia.org/wiki/Percentile#The_Weighted_Percentile_method
+
     Notes
     -----
     Note that weighted_percentile(a, q) is not equivalent to
@@ -333,6 +336,7 @@ class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
 def generate_sample_indices(random_state, n_samples):
     """
     Generates bootstrap indices for each tree fit.
+
     Parameters
     ----------
     random_state: int, RandomState instance or None
@@ -342,6 +346,7 @@ def generate_sample_indices(random_state, n_samples):
         by np.random.
     n_samples: int
         Number of samples to generate from each tree.
+
     Returns
     -------
     sample_indices: array-like, shape=(n_samples), dtype=np.int32
@@ -538,6 +543,7 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
     The sub-sample size is always the same as the original
     input sample size but the samples are drawn with replacement if
     `bootstrap=True` (default).
+
     Parameters
     ----------
     n_estimators : integer, optional (default=10)
@@ -629,6 +635,7 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
         y_train_leaves_[i, j] provides the leaf node that y_train_[i]
         ends up when estimator j is fit. If y_train_[i] is given
         a weight of zero when estimator j is fit, then the value is -1.
+
     References
     ----------
     .. [1] Nicolai Meinshausen, Quantile Regression Forests
@@ -688,6 +695,7 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
     randomized decision trees (a.k.a. extra-trees) on various sub-samples
     of the dataset and use averaging to improve the predictive accuracy
     and control over-fitting.
+
     Parameters
     ----------
     n_estimators : integer, optional (default=10)
@@ -754,6 +762,7 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         When set to ``True``, reuse the solution of the previous call to fit
         and add more estimators to the ensemble, otherwise, just fit a whole
         new forest.
+
     Attributes
     ----------
     estimators_ : list of ExtraTreeQuantileRegressor
@@ -778,6 +787,7 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         y_train_leaves_[i, j] provides the leaf node that y_train_[i]
         ends up when estimator j is fit. If y_train_[i] is given
         a weight of zero when estimator j is fit, then the value is -1.
+
     References
     ----------
     .. [1] Nicolai Meinshausen, Quantile Regression Forests
