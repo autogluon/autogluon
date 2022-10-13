@@ -1568,13 +1568,9 @@ class MultiModalPredictor:
 
             map_metric.update(preds, target)
 
-        print(map_metric.compute())
-        exit()
-
-
-
-
-
+        ret = map_metric.compute()
+        print(ret)
+        return ret
 
         ret = extract_from_output(ret_type=BBOX, outputs=outputs)
 

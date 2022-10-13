@@ -343,10 +343,10 @@ def _check_load_coco_bbox(
             class_label = coco.loadCats(obj["category_id"])[0]["id"] if is_voc else COCOId2Idx(coco.loadCats(obj["category_id"])[0]["id"])
             rois.append(
                 [
-                    xmin,
-                    ymin,
-                    xmax,
-                    ymax,
+                    float(xmin),
+                    float(ymin),
+                    float(xmax),
+                    float(ymax),
                     class_label,
                 ]
             )
