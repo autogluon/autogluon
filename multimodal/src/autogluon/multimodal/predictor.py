@@ -1663,7 +1663,10 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ) -> List[Dict]:
+
+        pl.seed_everything(seed, workers=True)
 
         data, df_preprocessor, data_processors = self._on_predict_start(
             config=self._config,
@@ -1718,6 +1721,7 @@ class MultiModalPredictor:
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         """
         Evaluate model on a test dataset.
@@ -1754,6 +1758,7 @@ class MultiModalPredictor:
             data=data,
             requires_label=True,
             realtime=realtime,
+            seed=seed,
         )
         logits_or_prob = extract_from_output(ret_type=ret_type, outputs=outputs)
 
@@ -1875,8 +1880,6 @@ class MultiModalPredictor:
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
 
-        pl.seed_everything(seed, workers=True)
-
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1888,6 +1891,7 @@ class MultiModalPredictor:
                 data=data,
                 requires_label=False,
                 realtime=realtime,
+                seed=seed,
             )
 
             if self._pipeline == OCR_TEXT_RECOGNITION:
@@ -1919,6 +1923,7 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1967,6 +1972,7 @@ class MultiModalPredictor:
                 data=data,
                 requires_label=False,
                 realtime=realtime,
+                seed=seed,
             )
             logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
 
