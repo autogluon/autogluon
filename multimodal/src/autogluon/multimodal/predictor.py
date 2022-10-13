@@ -90,7 +90,6 @@ from .utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
-    bbox_xyxy_to_xywh,
     compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
@@ -288,17 +287,12 @@ class MultiModalPredictor:
         self._verbosity = verbosity
         set_logger_verbosity(verbosity, logger=logger)
 
-    def fit_coco(self, anno_file, hyperparameters):
-        self.detection_anno_train = anno_file
-        data = from_coco(anno_file)
-        self.fit(data,hyperparameters=hyperparameters)
-
     def fit(
         self,
-        train_data: pd.DataFrame,
+        train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
         config: Optional[dict] = None,
-        tuning_data: Optional[pd.DataFrame] = None,
+        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
@@ -411,6 +405,12 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
+        if self._pipeline == OBJECT_DETECTION:
+            self.detection_anno_train = train_data
+            train_data = from_coco(train_data)
+            if tuning_data is not None:
+                tuning_data = from_coco(tuning_data)
+
         if hyperparameter_tune_kwargs is not None:
             # TODO: can we support hyperparameters being the same format as regular training?
             # currently the string format would make it very hard to get search space, which is an object
@@ -1096,50 +1096,27 @@ class MultiModalPredictor:
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
 
-        if self._pipeline == OBJECT_DETECTION:
-            checkpoint_callback = AutoMMModelCheckpoint(
-                dirpath=save_path,
-                save_top_k=config.optimization.top_k,
-                verbose=True,
-                monitor=task.validation_metric_name,
-                mode=minmax_mode,
-                save_last=True,
-            )
-            early_stopping_callback = pl.callbacks.EarlyStopping(
-                monitor=task.validation_metric_name,
-                patience=config.optimization.patience,
-                mode=minmax_mode,
-            )
-            lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
-            model_summary = pl.callbacks.ModelSummary(max_depth=1)
-            callbacks = [
-                checkpoint_callback,
-                early_stopping_callback,
-                lr_callback,
-                model_summary,
-            ]
-        else:
-            checkpoint_callback = AutoMMModelCheckpoint(
-                dirpath=save_path,
-                save_top_k=config.optimization.top_k,
-                verbose=True,
-                monitor=task.validation_metric_name,
-                mode=minmax_mode,
-                save_last=True,
-            )
-            early_stopping_callback = pl.callbacks.EarlyStopping(
-                monitor=task.validation_metric_name,
-                patience=config.optimization.patience,
-                mode=minmax_mode,
-            )
-            lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
-            model_summary = pl.callbacks.ModelSummary(max_depth=1)
-            callbacks = [
-                checkpoint_callback,
-                early_stopping_callback,
-                lr_callback,
-                model_summary,
-            ]
+        checkpoint_callback = AutoMMModelCheckpoint(
+            dirpath=save_path,
+            save_top_k=config.optimization.top_k,
+            verbose=True,
+            monitor=task.validation_metric_name,
+            mode=minmax_mode,
+            save_last=True,
+        )
+        early_stopping_callback = pl.callbacks.EarlyStopping(
+            monitor=task.validation_metric_name,
+            patience=config.optimization.patience,
+            mode=minmax_mode,
+        )
+        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        model_summary = pl.callbacks.ModelSummary(max_depth=1)
+        callbacks = [
+            checkpoint_callback,
+            early_stopping_callback,
+            lr_callback,
+            model_summary,
+        ]
 
         use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
         if hpo_mode:
@@ -1486,7 +1463,7 @@ class MultiModalPredictor:
                 config=config.data,
                 column_types=column_types,
                 label_column=self._label_column,
-                train_df_x=data, # TODO: drop label like in line 875?
+                train_df_x=data, # TODO: drop label like in line 884?
                 train_df_y=data[self._label_column] if self._label_column else None,
             )
         else:  # called .fit() or .load()
@@ -1532,7 +1509,7 @@ class MultiModalPredictor:
 
         from torchmetrics.detection.mean_ap import MeanAveragePrecision
         map_metric = MeanAveragePrecision(box_format='xyxy',iou_type="bbox",class_metrics=False)
-        for output in outputs:
+        for output in outputs: # TODO: refactor here
             pred_results = output["bbox"]
             preds = []
             for img_idx, img_result in enumerate(pred_results):
@@ -1568,35 +1545,7 @@ class MultiModalPredictor:
 
             map_metric.update(preds, target)
 
-        ret = map_metric.compute()
-        print(ret)
-        return ret
-
-        ret = extract_from_output(ret_type=BBOX, outputs=outputs)
-
-        # Cache prediction results as COCO format
-        if not self._save_path:
-            self._save_path = setup_outputdir(
-                path=None,
-                warn_if_exist=self._warn_if_exist,
-            )
-        self._save_path = os.path.abspath(os.path.expanduser(self._save_path))
-        cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
-        coco_dataset.save_result(ret, data, cache_path)
-
-        cocoGt = COCO(anno_file)
-        cocoDt = cocoGt.loadRes(cache_path)
-        annType = "bbox"
-
-        cocoEval = COCOeval(cocoGt, cocoDt, annType)
-        cocoEval.evaluate()
-        cocoEval.accumulate()
-        cocoEval.summarize()
-
-        if isinstance(metrics, list):
-            metrics = metrics[0]
-
-        return {metrics: cocoEval.stats[0]}
+        return map_metric.compute()
 
     def _process_batch(
         self,

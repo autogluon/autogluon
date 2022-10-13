@@ -14,7 +14,6 @@ from ..constants import (
     F1,
     MAP,
     METRIC_MODE_MAP,
-    MIN,
     MULTICLASS,
     OBJECT_DETECTION,
     REGRESSION,
@@ -116,6 +115,7 @@ def get_minmax_mode(
     """
     assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
     return METRIC_MODE_MAP.get(metric_name)
+
 
 def compute_score(
     metric_data: dict,

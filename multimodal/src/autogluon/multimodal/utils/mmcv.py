@@ -12,8 +12,7 @@ def assert_tensor_type(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         if not isinstance(args[0].data, torch.Tensor):
             raise AttributeError(
-                f"{args[0].__class__.__name__} has no attribute "
-                f"{func.__name__} for type {args[0].datatype}"
+                f"{args[0].__class__.__name__} has no attribute " f"{func.__name__} for type {args[0].datatype}"
             )
         return func(*args, **kwargs)
 
@@ -94,6 +93,7 @@ except ImportError:
         def dim(self) -> int:
             return self.data.dim()
 
+
 def unpack_datacontainers(datacontainers):
     """
     Recursively unpack all `mmcv.parallel.DataContainer` objects from a dictionary.
@@ -143,9 +143,7 @@ def datacontainer_to_cuda(container, device: Union[str, torch.device]):
 
     assert not container.cpu_only, f"{container} is not meant to be moved to {device}"
     if container.stack:
-        assert isinstance(
-            container.data, torch.Tensor
-        ), f"Expected `torch.Tensor` but got {type(container.data)}"
+        assert isinstance(container.data, torch.Tensor), f"Expected `torch.Tensor` but got {type(container.data)}"
         container._data = container.data.to(device)
     else:
         if isinstance(container.data, torch.Tensor):
@@ -153,9 +151,7 @@ def datacontainer_to_cuda(container, device: Union[str, torch.device]):
         else:
             if isinstance(container.data, list):
                 it = range(len(container.data))
-            elif isinstance(container.data, dict) or isinstance(
-                container.data, OrderedDict
-            ):
+            elif isinstance(container.data, dict) or isinstance(container.data, OrderedDict):
                 it = container.data.keys()
             else:
                 raise TypeError(f"Unidentified iterator type: {type(container.data)}")
