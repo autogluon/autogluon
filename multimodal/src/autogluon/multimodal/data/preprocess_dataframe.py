@@ -371,7 +371,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
         image_paths = {}
         for col_name in self._image_path_names:
-            if col_name in ["rois", "rois_label"]: # TODO: remove hardcoding
+            if self._column_types[col_name] == ROIS:
                 processed_data = df[col_name].tolist()
             else:
                 processed_data = df[col_name].apply(lambda ele: ele.split(";")).tolist()
