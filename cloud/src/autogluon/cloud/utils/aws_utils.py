@@ -1,136 +1,8 @@
 import boto3
-import json
 import sagemaker
 
-from botocore.exceptions import ClientError
 from botocore.config import Config
-from dataclasses import dataclass
-from typing import List, Union, Optional
-
-from .constants import (
-    TRUST_RELATIONSHIP_ACCOUNT_PLACE_HOLDER,
-    POLICY_ACCOUNT_PLACE_HOLDER,
-    POLICY_BUCKET_PLACE_HOLDER
-)
-from ..version import __version__
-
-
-@dataclass
-class CustomIamPolicy:
-    name: str
-    document: dict
-    description: str
-
-    @property
-    def document_str(self):
-        return json.dumps(self.document)
-
-    def replace_place_holder(self, account_id=None, bucket=None):
-        """Replace placeholder inside template with given values"""
-        statements = self.document.get('Statement', [])
-        for statement in statements:
-            resources = statement.get('Resource', None)
-            if resources is not None:
-                if account_id is not None:
-                    statement['Resource'] = [resource.replace(POLICY_ACCOUNT_PLACE_HOLDER, account_id) for resource in statement['Resource']]
-                if bucket is not None:
-                    statement['Resource'] = [resource.replace(POLICY_BUCKET_PLACE_HOLDER, bucket) for resource in statement['Resource']]
-
-
-def replace_trust_relationship_place_holder(trust_relationship, account_id):
-    statements = trust_relationship.get('Statement', [])
-    for statement in statements:
-        for principal in statement['Principal'].keys():
-            statement['Principal'][principal] = statement['Principal'][principal].replace(TRUST_RELATIONSHIP_ACCOUNT_PLACE_HOLDER, account_id)
-
-
-def create_iam_role(role_name: str, trust_relationship: str, description: str, **kwargs):
-    iam = boto3.client('iam')
-    role_arn = None
-    try:
-        response = iam.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=trust_relationship,
-            Description=description,
-            **kwargs,
-        )
-        role_arn = response['Role']['Arn']
-    except ClientError as e:
-        raise e
-    return role_arn
-
-
-def create_iam_policy(policy_name: str, policy_document: str, policy_description, **kwargs):
-    iam = boto3.client('iam')
-    policy_arn = None
-    try:
-        response = iam.create_policy(
-            PolicyName=policy_name,
-            PolicyDocument=policy_document,
-            Description=policy_description,
-            **kwargs
-        )
-        policy_arn = response['Policy']['Arn']
-    except ClientError as e:
-        raise e
-    return policy_arn
-
-
-def setup_sagemaker_role_and_policy(
-        role_name: str,
-        trust_relationship: dict,
-        policies: List[Union[str, CustomIamPolicy]],
-        account_id: str,
-        bucket: str,
-        MaxSessionDuration: int = 12*60*60,
-        **kwargs
-):
-    iam = boto3.client('iam')
-    role_arn = None
-    # create policies based on cloud module version if passed in a CustomIamPolicy
-    policies_to_attach = list()  # this list holds all policies in ARN
-    for policy in policies:
-        if isinstance(policy, CustomIamPolicy):
-            try:
-                policy.replace_place_holder(account_id, bucket)
-                print(policy.document)
-                policy = create_iam_policy(policy.name, policy.document_str, policy.description)
-            except ClientError as e:
-                if not e.response['Error']['Code'] == 'EntityAlreadyExists':
-                    raise e
-                
-        policies_to_attach.append(policy)
-    # setup trust relationship
-    replace_trust_relationship_place_holder(trust_relationship, account_id)
-    # create IAM role
-    try:
-        create_iam_role(
-            role_name=role_name,
-            trust_relationship=json.dumps(trust_relationship),
-            description='AutoGluon SageMaker CloudPredictor role',
-            MaxSessionDuration=MaxSessionDuration,
-            **kwargs
-        )
-    except ClientError as e:
-        if not e.response['Error']['Code'] == 'EntityAlreadyExists':
-            raise e
-        else:
-            # if exists, add missing policies if any
-            response = iam.list_attached_role_policies(RoleName=role_name)
-            attached_policy = response['AttachedPolicies']
-            attached_policy = [policy['PolicyArn'] for policy in attached_policy]
-            missing_policies = [policy for policy in policies_to_attach if policy not in attached_policy]
-            policies_to_attach = missing_policies
-    # attach policies
-    for policy in policies_to_attach:
-        # This does nothing if the policy is already attached
-        iam.attach_role_policy(
-            PolicyArn=policy,
-            RoleName=role_name
-        )
-
-    role_arn = iam.get_role(RoleName=role_name)['Role']['Arn']
-    return role_arn
+from typing import Optional
 
 
 def setup_sagemaker_session(
@@ -172,8 +44,8 @@ def setup_sagemaker_session(
     if config is None:
         config = Config(
             connect_timeout=connect_timeout,
-            read_timeout=60,
-            retries={'max_attempts': 20},
+            read_timeout=read_timeout,
+            retries=retries,
             **kwargs
         )
     sm_boto = boto3.client('sagemaker', config=config)

@@ -1,5 +1,6 @@
 import boto3
 import copy
+import json
 import os
 import yaml
 import tarfile
@@ -10,6 +11,7 @@ import sagemaker
 from abc import ABC, abstractmethod
 from botocore.exceptions import ClientError
 from datetime import datetime
+from typing import Optional
 
 from autogluon.common.loaders import load_pd
 from autogluon.common.loaders import load_pkl
@@ -27,17 +29,19 @@ from ..utils.ag_sagemaker import (
     AutoGluonRealtimePredictor,
     AutoGluonBatchPredictor
 )
-from ..utils.aws_utils import (
-    CustomIamPolicy,
-    setup_sagemaker_role_and_policy,
-    setup_sagemaker_session
-)
+from ..utils.aws_utils import setup_sagemaker_session
 from ..utils.constants import (
-    SAGEMAKER_CLOUD_POLICY_NAME,
-    SAGEMAKER_CLOUD_POLICY,
-    SAGEMAKER_CLOUD_POLICY_DESCRIPTION,
-    SAGEMAKER_TRUST_RELATIONSHIP,
     VALID_ACCEPT
+)
+from ..utils.iam import (
+    TRUST_RELATIONSHIP_FILE_NAME,
+    IAM_POLICY_FILE_NAME,
+    SAGEMAKER_TRUST_RELATIONSHIP,
+    SAGEMAKER_CLOUD_POLICY
+)
+from ..utils.iam import (
+    replace_iam_policy_place_holder,
+    replace_trust_relationship_place_holder
 )
 from ..utils.misc import MostRecentInsertedOrderedDict
 from ..utils.sagemaker_utils import (
@@ -97,7 +101,11 @@ class CloudPredictor(ABC):
             logger.warning(
                 'Failed to get IAM role. Did you configure and authenticate the IAM role?',
                 'For more information, https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html',
-                'You can also use `CloudPredictor.setup_sagemaker_role_and_policy()` to create the role and policies for you.'
+                f'If you do not have a role created yet, \
+                You can use {self.__class__.__name__}.generate_trust_relationship_and_iam_policy_file() to get the required trust relationship and iam policy',
+                'You can then use the generated trust relationship and IAM policy to create an IAM role',
+                'For more information, https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create.html',
+                'IMPORTANT: Please review the generated trust relationship and IAM policy before you create an IAM role with them'
             )
             raise e
         self.sagemaker_session = setup_sagemaker_session()
@@ -135,19 +143,15 @@ class CloudPredictor(ABC):
         return None
 
     @staticmethod
-    def setup_sagemaker_role_and_policy(
+    def generate_trust_relationship_and_iam_policy_file(
         account_id: str,
         cloud_output_bucket: str,
-        policy_name: str = SAGEMAKER_CLOUD_POLICY_NAME,
-        role_name: str = 'ag_sagemaker_cloud_predictor_role',
-        **kwargs
-    ) -> str:
+        output_path: Optional[str] = None
+    ):
         """
-        Create an IAM role and attach required policies for CloudPredictor wit SageMaker backend.
-        For the detailed trust_relationship and IAM policy. Please refer to `autogluon/cloud/utils/constants` `SAGEMAKER_TRUST_RELATIONSHIP` and `SAGEMAKER_CLOUD_POLICY`.
-        Your current authenticated IAM user/role needs to have required permission to create IAM policies and IAM roles.
-        This only create the role for you and you'll need to authenticate the role yourselves before using CloudPredictor.
-        For how to authenticate the role: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html
+        Generate required trust relationship and IAM policy file in json format for CloudPredictor wit SageMaker backend.
+        Users can use the generated files to create an IAM role for themselves.
+        IMPORTANT: Make sure you review both files before creating the role!
 
         Parameters
         ----------
@@ -156,33 +160,43 @@ class CloudPredictor(ABC):
         cloud_output_bucket: str
             s3 bucket name where intermediate artifacts will be uploaded and trained models should be saved.
             You need to create this bucket beforehand and we would put this bucket in the policy being created.
-        policy_name: str
-            The policy name. If not specified, will use AutoGluonSageMakerCloudPredictor
-        role_name: str
-            The role name. If not specified, will use ag_sagemaker_cloud_predictor_role
-        kwargs:
-            Additional parameters to pass to IAM.Client.create_role
-            https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/iam.html#IAM.Client.create_role
+        output_path: str
+            Where you would like the generated file being written to.
+            If not specified, will write to the current folder.
 
         Return
         ------
-        role_arn: str
-            The role arn being created
+        A dict containing the trust relationship and IAM policy files paths
         """
-        sagemaker_cloud_predictor_policy = CustomIamPolicy(
-            name=policy_name,
-            document=SAGEMAKER_CLOUD_POLICY,
-            description=SAGEMAKER_CLOUD_POLICY_DESCRIPTION,
+        if output_path is None:
+            output_path = '.'
+        trust_relationship_file_path = os.path.join(output_path, TRUST_RELATIONSHIP_FILE_NAME)
+        iam_policy_file_path = os.path.join(output_path, IAM_POLICY_FILE_NAME)
+
+        trust_relationship = replace_trust_relationship_place_holder(
+            trust_relationship_document=SAGEMAKER_TRUST_RELATIONSHIP,
+            account_id=account_id
         )
-        role_arn = setup_sagemaker_role_and_policy(
-            role_name=role_name,
-            trust_relationship=SAGEMAKER_TRUST_RELATIONSHIP,
-            policies=[sagemaker_cloud_predictor_policy],
+        iam_policy = replace_iam_policy_place_holder(
+            policy_document=SAGEMAKER_CLOUD_POLICY,
             account_id=account_id,
-            bucket=cloud_output_bucket,
-            **kwargs
+            bucket=cloud_output_bucket
         )
-        return role_arn
+        with open(trust_relationship_file_path, 'w') as file:
+            json.dump(trust_relationship, file, indent=4)
+
+        with open(iam_policy_file_path, 'w') as file:
+            json.dump(iam_policy, file, indent=4)
+
+        logger.info(f'Generated trust relationship to {trust_relationship_file_path}')
+        logger.info(f'Generated iam policy to {iam_policy_file_path}')
+        logger.info('IMPORTANT: Please review the trust relationship and iam policy before you use them to create an IAM role')
+        logger.info('Please refer to AWS documentation on how to create an IAM role: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create.html')
+
+        return {
+            'trust_relationship': trust_relationship_file_path,
+            'iam_policy': iam_policy_file_path
+        }
 
     def info(self):
         """
