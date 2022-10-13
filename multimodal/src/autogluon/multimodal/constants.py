@@ -195,4 +195,3 @@ RESPONSE = "response"
 QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
 PAIR = "pair"
 TRIPLET = "triplet"
-
