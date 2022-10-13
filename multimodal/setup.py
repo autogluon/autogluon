@@ -28,7 +28,7 @@ install_requires = [
     "tqdm",
     "boto3",
     "requests",
-    "timm<0.6.0",
+    "timm<0.7.0",
     "torch>=1.9,<1.13",
     "torchvision<0.14.0",
     "torchtext<0.14.0",
