@@ -12,7 +12,6 @@ from ..constants import (
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
-    COLLECTION,
     IMAGE,
     MULTICLASS,
     NULL,
@@ -92,24 +91,6 @@ def is_categorical_column(
                 return False
             return True
         return False
-
-def is_collection_column(data: pd.Series) -> bool:
-    """
-    Identify if a column is a collection column.
-    Collections include set, list, and dict.
-
-    Parameters
-    ----------
-    X
-        One column of a multimodal pd.DataFrame for training.
-
-    Returns
-    -------
-    Whether the column is a collection column.
-    """
-    idx = data.first_valid_index()
-    return isinstance(data[idx], (list, dict, set))
-
 
 def is_rois_column(data: pd.Series) -> bool:
     """
@@ -321,8 +302,6 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        elif is_collection_column(data[col_name]):
-            column_types[col_name] = COLLECTION
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column

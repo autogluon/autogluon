@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, COLLECTION, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
+from ..constants import AUTOMM, CATEGORICAL, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
 
 logger = logging.getLogger(AUTOMM)
 
@@ -68,7 +68,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type in [TEXT, IMAGE, IMAGE_PATH, COLLECTION, ROIS, NULL]:
+            if col_type in [TEXT, IMAGE, IMAGE_PATH, ROIS, NULL]:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -109,7 +109,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._categorical_num_categories = []
         self._numerical_feature_names = []
         self._image_path_names = []
-        self._collection_names = []
 
     @property
     def label_column(self):
@@ -122,10 +121,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def image_path_names(self):
         return self._image_path_names
-
-    #property
-    def collection_names(self):
-        return self._collection_names
 
     @property
     def text_feature_names(self):
@@ -146,7 +141,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             + self._text_feature_names
             + self._numerical_feature_names
             + self._categorical_feature_names
-            + self._collection_names
         )
 
     @property
@@ -197,8 +191,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._numerical_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
-        elif modality == COLLECTION:
-            self._collection_names
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
@@ -264,8 +256,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     self._numerical_feature_names.append(col_name)
             elif col_type == IMAGE or col_type == IMAGE_PATH or col_type == ROIS:
                 self._image_path_names.append(col_name)
-            elif col_type == COLLECTION:
-                self._collection_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
