@@ -2,7 +2,6 @@ import copy
 import logging
 from typing import Any, Dict, List, Union
 
-
 import autogluon.core as ag
 
 from .abstract import AbstractTimeSeriesModel
