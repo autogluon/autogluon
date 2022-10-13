@@ -31,6 +31,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         Defaults to ``AutoGluonTabularModel.default_tabular_hyperparameters``.
         Note that the selected models must support ``problem_type="quantile"``.
     """
+
     # TODO: Add XT/RF after https://github.com/awslabs/autogluon/pull/2204 is merged
     # TODO: Add catboost with MultiQuantile loss (after catboost v1.1)?
     # TODO: Other tabular models in quantile? (LightGBM?)
@@ -143,7 +144,9 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             val_df = None
 
         # TODO: Other presets for TabularPredictor?
-        tabular_hyperparameters = self._get_model_params().get("tabular_hyperparameters", self.default_tabular_hyperparameters)
+        tabular_hyperparameters = self._get_model_params().get(
+            "tabular_hyperparameters", self.default_tabular_hyperparameters
+        )
         self.tabular_predictor.fit(
             train_data=train_df,
             tuning_data=val_df,
