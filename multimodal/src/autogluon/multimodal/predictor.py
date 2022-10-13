@@ -1414,6 +1414,7 @@ class MultiModalPredictor:
 
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
+            # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in pytorch-lighting.
             from .optimization.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
@@ -1662,7 +1663,6 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
         realtime: Optional[bool] = None,
-        seed=123,
     ) -> List[Dict]:
 
         data, df_preprocessor, data_processors = self._on_predict_start(
@@ -2151,7 +2151,6 @@ class MultiModalPredictor:
         # In case that users save to a path, which is not the original save_path.
         if os.path.abspath(path) != os.path.abspath(self._save_path):
             model_path = os.path.join(self._save_path, "model.ckpt")
-            print(model_path, path)
             if os.path.isfile(model_path):
                 shutil.copy(model_path, path)
             else:
