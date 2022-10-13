@@ -604,7 +604,7 @@ def apply_layerwise_lr_decay(
         group_name = "layer_%d_%s" % (layer_id, group_name)
 
         if group_name not in parameter_group_names:
-            scale = lr_decay ** layer_id
+            scale = lr_decay**layer_id
             parameter_group_names[group_name] = {
                 "weight_decay": this_weight_decay,
                 "params": [],
