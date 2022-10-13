@@ -478,7 +478,7 @@ class MultiModalPredictor:
             column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
-            pipeline = self._pipeline,
+            pipeline=self._pipeline,
             data=train_data,
             valid_data=tuning_data,
         )
@@ -487,7 +487,7 @@ class MultiModalPredictor:
             column_types=column_types,
             data=train_data,
             provided_problem_type=self._problem_type,
-            pipeline = self._pipeline,
+            pipeline=self._pipeline,
         )
 
         # Determine data scarcity mode, i.e. a few-shot scenario
@@ -521,16 +521,16 @@ class MultiModalPredictor:
 
         if self._pipeline != OBJECT_DETECTION:
             if self._output_shape is not None:
-                    assert self._output_shape == output_shape, (
-                        f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-                    )
+                assert self._output_shape == output_shape, (
+                    f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+                )
             else:
                 self._output_shape = output_shape
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=problem_type,
-                pipeline = self._pipeline,
+                pipeline=self._pipeline,
                 eval_metric_name=self._eval_metric_name,
             )
         else:
@@ -1452,7 +1452,7 @@ class MultiModalPredictor:
                     column_types=column_types,
                     label_columns=self._label_column,
                     problem_type=self._problem_type,
-                    pipeline = self._pipeline,
+                    pipeline=self._pipeline,
                     data=data,
                 )
         else:  # called .fit() or .load()
@@ -1463,7 +1463,7 @@ class MultiModalPredictor:
                 config=config.data,
                 column_types=column_types,
                 label_column=self._label_column,
-                train_df_x=data, # TODO: drop label like in line 884?
+                train_df_x=data,  # TODO: drop label like in line 884?
                 train_df_y=data[self._label_column] if self._label_column else None,
             )
         else:  # called .fit() or .load()
@@ -1505,11 +1505,12 @@ class MultiModalPredictor:
         outputs = self._predict(
             data=data,
             requires_label=True,
-        ) # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+        )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
         from torchmetrics.detection.mean_ap import MeanAveragePrecision
-        map_metric = MeanAveragePrecision(box_format='xyxy',iou_type="bbox",class_metrics=False)
-        for output in outputs: # TODO: refactor here
+
+        map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
+        for output in outputs:  # TODO: refactor here
             pred_results = output["bbox"]
             preds = []
             for img_idx, img_result in enumerate(pred_results):
@@ -1534,8 +1535,8 @@ class MultiModalPredictor:
             gts = output["label"]
             for gt in gts:
                 img_gt = np.array(gt)
-                boxes = img_gt[:,:4]
-                labels = img_gt[:,4]
+                boxes = img_gt[:, :4]
+                labels = img_gt[:, 4]
                 target.append(
                     dict(
                         boxes=torch.tensor(boxes).float().to("cuda:0"),
@@ -1810,7 +1811,6 @@ class MultiModalPredictor:
             ret_type = [TEXT, SCORE]
         else:
             ret_type = LOGITS
-
 
         if candidate_data:
             pred = self._match_queries_and_candidates(

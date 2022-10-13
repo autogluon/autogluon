@@ -162,9 +162,9 @@ class ImageProcessor:
             else:
                 assert mmocr is not None, "Please install MMOCR by: pip install mmocr."
             cfg = model.model.cfg
-            try: #yolov3
+            try:  # yolov3
                 training_pipeline = cfg.data.train.dataset.pipeline
-            except: #faster_rcnn
+            except:  # faster_rcnn
                 training_pipeline = cfg.data.train.pipeline
             self.val_processor = Compose(replace_ImageToTensor(cfg.data.val.pipeline))
             self.train_processor = Compose(replace_ImageToTensor(training_pipeline))

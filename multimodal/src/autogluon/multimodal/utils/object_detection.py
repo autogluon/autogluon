@@ -296,7 +296,10 @@ def bbox_clip_xyxy(
 
 
 def _check_load_coco_bbox(
-    coco, entry: dict, min_object_area: Optional[Union[int, float]] = 0, use_crowd: Optional[bool] = False,
+    coco,
+    entry: dict,
+    min_object_area: Optional[Union[int, float]] = 0,
+    use_crowd: Optional[bool] = False,
     is_voc: Optional[bool] = False,
 ):
     """
@@ -339,8 +342,12 @@ def _check_load_coco_bbox(
         xmin, ymin, xmax, ymax = bbox_clip_xyxy(bbox_xywh_to_xyxy(obj["bbox"]), width, height)
         # require non-zero box area
         if obj["area"] > 0 and xmax > xmin and ymax > ymin:
-            #TODO: remove hardcoding here
-            class_label = coco.loadCats(obj["category_id"])[0]["id"] if is_voc else COCOId2Idx(coco.loadCats(obj["category_id"])[0]["id"])
+            # TODO: remove hardcoding here
+            class_label = (
+                coco.loadCats(obj["category_id"])[0]["id"]
+                if is_voc
+                else COCOId2Idx(coco.loadCats(obj["category_id"])[0]["id"])
+            )
             rois.append(
                 [
                     float(xmin),
@@ -395,7 +402,7 @@ def from_coco(
         anno_file = os.path.expanduser(anno_file)
     coco = COCO(anno_file)
 
-    is_voc = ("voc" in anno_file)
+    is_voc = "voc" in anno_file
 
     if isinstance(root, Path):
         root = str(root.expanduser().resolve())
@@ -421,13 +428,15 @@ def from_coco(
             abs_path = os.path.join(root, entry["file_name"])
         if not os.path.exists(abs_path):
             raise IOError("Image: {} not exists.".format(abs_path))
-        rois, _ = _check_load_coco_bbox(coco, entry, min_object_area=min_object_area, use_crowd=use_crowd, is_voc=is_voc)
+        rois, _ = _check_load_coco_bbox(
+            coco, entry, min_object_area=min_object_area, use_crowd=use_crowd, is_voc=is_voc
+        )
         if not rois:
             continue
         d["image"].append(abs_path)
         d["rois"].append(rois)
     df = pd.DataFrame(d)
-    df['rois_label'] = df.loc[:, 'rois'].copy()
+    df["rois_label"] = df.loc[:, "rois"].copy()
     return df.sort_values("image").reset_index(drop=True)
 
 
@@ -480,7 +489,8 @@ def get_image_name_num(path):
     end_idx = path.rindex(".")
     return int(path[start_idx:end_idx])
 
-class COCODataset():
+
+class COCODataset:
     def __init__(self, anno_file):
         self.anno_file = anno_file
         self.is_voc = "voc" in anno_file

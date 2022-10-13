@@ -60,7 +60,7 @@ class MMDetLitModule(pl.LightningModule):
         test_metric: Optional[torchmetrics.Metric] = None,
         efficient_finetune: Optional[str] = None,
     ):
-        super().__init__() # TODO: inherit LitModule
+        super().__init__()  # TODO: inherit LitModule
         self.save_hyperparameters(
             ignore=[
                 "model",
@@ -79,7 +79,7 @@ class MMDetLitModule(pl.LightningModule):
                 f"which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
-        self.id2label = dict(zip(range(100), range(100))) # TODO: replace with real id2label
+        self.id2label = dict(zip(range(100), range(100)))  # TODO: replace with real id2label
 
     def forward(self, x):
         """
@@ -164,11 +164,11 @@ class MMDetLitModule(pl.LightningModule):
 
         batch_size = len(preds)
         batch = unpack_datacontainers(sample)
-        gt = batch["mmdet_image_label"] # batch_size, (n, 5)
+        gt = batch["mmdet_image_label"]  # batch_size, (n, 5)
         for i in range(batch_size):
             img_gt = np.array(gt[i])
-            boxes = img_gt[:,:4]
-            labels = img_gt[:,4]
+            boxes = img_gt[:, :4]
+            labels = img_gt[:, 4]
             target.append(
                 dict(
                     boxes=torch.tensor(boxes).float().to(self.device),

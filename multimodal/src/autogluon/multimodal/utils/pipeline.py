@@ -12,7 +12,7 @@ logger = logging.getLogger(AUTOMM)
 def init_pretrained(
     pipeline: Optional[str],
     hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-    num_classes: Optional[int] = None
+    num_classes: Optional[int] = None,
 ):
     """
     Zero shot initialization.

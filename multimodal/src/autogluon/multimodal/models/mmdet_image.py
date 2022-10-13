@@ -95,13 +95,14 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
         if num_classes:
-            if "bbox_head" in self.config.model.keys(): #yolov3
+            if "bbox_head" in self.config.model.keys():  # yolov3
                 self.config.model["bbox_head"]["num_classes"] = num_classes
-            elif "roi_head" in self.config.model.keys(): #faster_rcnn
+            elif "roi_head" in self.config.model.keys():  # faster_rcnn
                 self.config.model["roi_head"]["bbox_head"]["num_classes"] = num_classes
             else:
-                raise ValueError("Current model structure does not support automatic bbox_head reset. "
-                                 "Please change in config.")
+                raise ValueError(
+                    "Current model structure does not support automatic bbox_head reset. " "Please change in config."
+                )
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
@@ -109,7 +110,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if self.pretrained and checkpoint is not None:
             checkpoint = load_checkpoint(self.model, checkpoint, map_location="cpu")
 
-        if num_classes == 20: # TODO: remove hardcode
+        if num_classes == 20:  # TODO: remove hardcode
             self.model.CLASSES = get_classes("voc")
         elif "CLASSES" in checkpoint.get("meta", {}):
             self.model.CLASSES = checkpoint["meta"]["CLASSES"]

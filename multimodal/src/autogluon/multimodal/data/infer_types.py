@@ -92,6 +92,7 @@ def is_categorical_column(
             return True
         return False
 
+
 def is_rois_column(data: pd.Series) -> bool:
     """
     Identify if a column is one rois column.
@@ -107,23 +108,15 @@ def is_rois_column(data: pd.Series) -> bool:
     """
     idx = data.first_valid_index()
     if isinstance(data[idx], list):
-        return (
-            len(data[idx])
-            and isinstance(data[idx][0], list)
-            and len(data[idx][0]) == 5
-        )
-    else: # support list input in json str
+        return len(data[idx]) and isinstance(data[idx][0], list) and len(data[idx][0]) == 5
+    else:  # support list input in json str
         isinstance(data[idx], str)
         rois = {}
         try:
             rois = json.loads(data[idx][0])
         except:
             pass
-        return (
-            rois
-            and isinstance(rois, list)
-            and len(data[idx][0]) == 5
-        )
+        return rois and isinstance(rois, list) and len(data[idx][0]) == 5
 
 
 def is_numerical_column(
@@ -295,7 +288,11 @@ def infer_column_types(
             # No valid index, thus, we will just ignore the column
             column_types[col_name] = NULL
             continue
-        if (not isinstance(data[col_name][idx], (list, dict, set))) and len(data[col_name].unique()) == 1 and is_training:
+        if (
+            (not isinstance(data[col_name][idx], (list, dict, set)))
+            and len(data[col_name].unique()) == 1
+            and is_training
+        ):
             column_types[col_name] = NULL
             continue
         # TODO: valid check for collections
