@@ -1026,14 +1026,13 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
-        if self._problem_type == NER:
+        elif self._problem_type == NER:
             task = NerLitModule(
                 model=model,
                 loss_func=loss_func,
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 model_postprocess_fn=model_postprocess_fn,
                 **metrics_kwargs,
                 **optimization_kwargs,
