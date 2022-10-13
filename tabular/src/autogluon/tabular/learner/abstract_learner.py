@@ -172,6 +172,84 @@ class AbstractTabularLearner(AbstractLearner):
                 y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=X_index)
         return y_pred
 
+    def _inverse_transform_proba(
+            self,
+            y_pred_proba,
+            as_pandas=True,
+            index=None,
+            as_multiclass=True,
+            inverse_transform=True):
+        """
+        Given internal prediction probabilities, convert them to external prediction probabilities.
+        """
+        if inverse_transform:
+            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
+        if as_multiclass and (self.problem_type == BINARY):
+            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
+        if as_pandas:
+            if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=index)
+            elif self.problem_type == QUANTILE:
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.quantile_levels, index=index)
+            else:
+                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=index)
+        return y_pred_proba
+
+    # FIXME: bagged_mode isn't quite right, instead check if val data used
+    def predict_proba_dict(self,
+                           X: DataFrame = None,
+                           models: List[str] = None,
+                           transform_features=True,
+                           as_pandas=True,
+                           as_multiclass=True,
+                           inverse_transform=True,
+                           ) -> dict:
+        """
+        Returns a dictionary of prediction probabilities where the key is
+        the model name and the value is the model's prediction probabilities on the data.
+
+        Parameters
+        ----------
+        X : DataFrame, default = None
+            The data to predict on.
+            If None:
+                If bagged mode is disabled, the validation data is used.
+                If bagged mode is enabled, the out-of-fold prediction probabilities are used.
+        models : List[str], default = None
+            The list of models to get predictions for.
+            If None, all models that can infer are used.
+        # TODO: Finish docs
+
+        """
+        trainer = self.load_trainer()
+
+        if models is None:
+            models = trainer.get_model_names(can_infer=True)
+        if X is not None and transform_features:
+            X = self.transform_features(X)
+        if X is None:
+            if trainer.bagged_mode:
+                X = trainer.load_X()
+                model_pred_proba_dict = dict()
+                for m in models:
+                    model_pred_proba_dict[m] = trainer.get_model_oof(m)
+            else:
+                X = trainer.load_X_val()
+                model_pred_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models, use_val_cache=True)
+        else:
+            model_pred_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models)
+
+        if inverse_transform:
+            # Inverse Transform labels
+            for m, pred_proba in model_pred_proba_dict.items():
+                model_pred_proba_dict[m] = self._inverse_transform_proba(y_pred_proba=pred_proba,
+                                                                         as_pandas=as_pandas,
+                                                                         as_multiclass=as_multiclass,
+                                                                         index=X.index,
+                                                                         inverse_transform=True)
+        return model_pred_proba_dict
+
+
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
             raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")

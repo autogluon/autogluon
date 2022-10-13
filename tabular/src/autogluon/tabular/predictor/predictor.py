@@ -1619,6 +1619,16 @@ class TabularPredictor:
         return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
                                          only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
 
+    def get_model_pred_proba_dict(self, data=None, models=None, as_pandas=True, as_multiclass=True, inverse_transform=True):
+        # TODO: Add docs
+        model_pred_proba_dict = self._learner.predict_proba_dict(X=data,
+                                                                 models=models,
+                                                                 as_pandas=as_pandas,
+                                                                 as_multiclass=as_multiclass,
+                                                                 inverse_transform=inverse_transform,
+                                                                 )
+        return model_pred_proba_dict
+
     def fit_summary(self, verbosity=3, show_plot=False):
         """
         Output summary of information about models produced during `fit()`.
