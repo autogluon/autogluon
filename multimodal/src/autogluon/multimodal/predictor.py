@@ -47,7 +47,6 @@ from .constants import (
     LAST_CHECKPOINT,
     LOGITS,
     MASKS,
-    MATCHER,
     MAX,
     MIN,
     MODEL,
@@ -74,10 +73,9 @@ from .data.infer_types import (
     infer_problem_type_output_shape,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
+from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
-from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_module import LitModule
 from .optimization.losses import RKDLoss
 from .optimization.utils import get_loss_func, get_metric
@@ -798,24 +796,6 @@ class MultiModalPredictor:
             flag=True,
         )
 
-        logger.debug(
-            f"teacher preprocessor text_feature_names: {teacher_predictor._df_preprocessor._text_feature_names}"
-        )
-        logger.debug(f"teacher preprocessor image_path_names: {teacher_predictor._df_preprocessor._image_path_names}")
-        logger.debug(
-            f"teacher preprocessor categorical_feature_names: {teacher_predictor._df_preprocessor._categorical_feature_names}"
-        )
-        logger.debug(
-            f"teacher preprocessor numerical_feature_names: {teacher_predictor._df_preprocessor._numerical_feature_names}"
-        )
-
-        logger.debug(f"student preprocessor text_feature_names: {self._df_preprocessor._text_feature_names}")
-        logger.debug(f"student preprocessor image_path_names: {self._df_preprocessor._image_path_names}")
-        logger.debug(
-            f"student preprocessor categorical_feature_names: {self._df_preprocessor._categorical_feature_names}"
-        )
-        logger.debug(f"student preprocessor numerical_feature_names: {self._df_preprocessor._numerical_feature_names}")
-
         return (
             teacher_predictor._model,
             critics,
@@ -854,7 +834,7 @@ class MultiModalPredictor:
             presets=presets,
             config=config,
             overrides=hyperparameters,
-            is_distill=teacher_predictor is not None,
+            extra=["distiller"] if teacher_predictor is not None else None,
         )
 
         config = update_config_by_rules(
@@ -936,16 +916,6 @@ class MultiModalPredictor:
         self._model = model
         self._model_postprocess_fn = model_postprocess_fn
 
-        if hasattr(config, MATCHER):
-            warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
-            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
-            turn_on_off_feature_column_info(
-                data_processors=data_processors,
-                flag=True,
-            )
-        else:
-            match_label = None
-
         if max_time == timedelta(seconds=0):
             self._top_k_average(
                 model=model,
@@ -1019,8 +989,6 @@ class MultiModalPredictor:
             custom_metric_func=custom_metric_func,
         )
         is_distill = teacher_model is not None
-        is_match = hasattr(config, MATCHER)
-        assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
             output_feature_loss_weight = OmegaConf.select(
                 self._config, "distiller.output_feature_loss_weight", default=0.0
@@ -1049,14 +1017,6 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
-        elif is_match:
-            task = MatcherLitModule(
-                model=model,
-                matches=config.matcher.matches,
-                match_label=match_label,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
         else:
             task = LitModule(
                 model=model,
@@ -1064,7 +1024,6 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 model_postprocess_fn=model_postprocess_fn,
                 **metrics_kwargs,
                 **optimization_kwargs,
@@ -1346,11 +1305,6 @@ class MultiModalPredictor:
         strategy: str,
     ) -> List[Dict]:
 
-        if hasattr(self._config, MATCHER):
-            turn_on_off_feature_column_info(
-                data_processors=data_processors,
-                flag=True,
-            )
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1358,18 +1312,11 @@ class MultiModalPredictor:
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-        if hasattr(self._config, MATCHER):
-            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
-            task = MatcherLitModule(
-                model=self._model,
-                matches=self._config.matcher.matches,
-                match_label=match_label,
-            )
-        else:
-            task = LitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-            )
+
+        task = LitModule(
+            model=self._model,
+            model_postprocess_fn=self._model_postprocess_fn,
+        )
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
@@ -1510,7 +1457,7 @@ class MultiModalPredictor:
         data_processors: Dict,
     ):
 
-        modality_features, sample_num = apply_df_preprocessor(
+        modality_features, modality_types, sample_num = apply_df_preprocessor(
             data=data,
             df_preprocessor=df_preprocessor,
             modalities=data_processors.keys(),
@@ -1518,10 +1465,14 @@ class MultiModalPredictor:
 
         processed_features = []
         for i in range(sample_num):
-            per_sample_features = apply_data_processor(
+            per_sample_features = get_per_sample_features(
                 modality_features=modality_features,
-                data_processors=data_processors,
+                modality_types=modality_types,
                 idx=i,
+            )
+            per_sample_features = apply_data_processor(
+                per_sample_features=per_sample_features,
+                data_processors=data_processors,
                 is_training=False,
             )
             processed_features.append(per_sample_features)
@@ -1642,32 +1593,24 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION:
             return self.evaluate_coco(data)
 
-        if hasattr(self._config, MATCHER):
-            ret_type = PROBABILITY
-        else:
-            ret_type = LOGITS
-
         outputs = self._predict(
             data=data,
             requires_label=True,
             realtime=realtime,
         )
-        logits_or_prob = extract_from_output(ret_type=ret_type, outputs=outputs)
+        logits = extract_from_output(ret_type=LOGITS, outputs=outputs)
 
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
-            if ret_type == LOGITS:
-                y_pred_prob = logits_to_prob(logits_or_prob)
-            else:
-                y_pred_prob = logits_or_prob
+            y_pred_prob = logits_to_prob(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(
-            y_pred=logits_or_prob,
+            y_pred=logits,
             inverse_categorical=False,
         )
         y_pred_inv = self._df_preprocessor.transform_prediction(
-            y_pred=logits_or_prob,
+            y_pred=logits,
             inverse_categorical=True,
         )
         y_true = self._df_preprocessor.transform_label_for_metric(df=data)
@@ -1758,9 +1701,7 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if hasattr(self._config, MATCHER):
-            ret_type = PROBABILITY
-        elif self._pipeline == OBJECT_DETECTION:
+        if self._pipeline == OBJECT_DETECTION:
             ret_type = BBOX
         else:
             ret_type = LOGITS
@@ -1785,21 +1726,21 @@ class MultiModalPredictor:
             )
 
             if self._pipeline == OCR_TEXT_RECOGNITION:
-                logits_or_prob = []
+                logits = []
                 for r_type in ret_type:
-                    logits_or_prob.append(extract_from_output(outputs=outputs, ret_type=r_type))
+                    logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
             else:
-                logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+                logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
                 pred = self._df_preprocessor.transform_prediction(
-                    y_pred=logits_or_prob,
+                    y_pred=logits,
                 )
             else:
-                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
-                    pred = logits_or_prob.argmax(axis=1)
+                if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
+                    pred = logits.argmax(axis=1)
                 else:
-                    pred = logits_or_prob
+                    pred = logits
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
@@ -1845,11 +1786,6 @@ class MultiModalPredictor:
             REGRESSION,
         ], f"Problem {self._problem_type} has no probability output."
 
-        if hasattr(self._config, MATCHER):
-            ret_type = PROBABILITY
-        else:
-            ret_type = LOGITS
-
         if candidate_data:
             prob = self._match_queries_and_candidates(
                 query_data=data,
@@ -1862,12 +1798,9 @@ class MultiModalPredictor:
                 requires_label=False,
                 realtime=realtime,
             )
-            logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
 
-            if ret_type == LOGITS:
-                prob = logits_to_prob(logits_or_prob)
-            else:
-                prob = logits_or_prob
+            prob = logits_to_prob(logits)
 
         if not as_multiclass:
             if self._problem_type == BINARY:

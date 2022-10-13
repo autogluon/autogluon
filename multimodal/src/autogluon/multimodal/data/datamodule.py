@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from pytorch_lightning import LightningDataModule
@@ -29,6 +29,7 @@ class BaseDataModule(LightningDataModule):
         val_data: Optional[pd.DataFrame] = None,
         test_data: Optional[pd.DataFrame] = None,
         predict_data: Optional[pd.DataFrame] = None,
+        id_mappings: Optional[Dict[str, Dict]] = None,
     ):
         """
         Parameters
@@ -54,6 +55,9 @@ class BaseDataModule(LightningDataModule):
             Test data.
         predict_data
             Prediction data. No labels required in it.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when the dataframe contains the query/response indexes instead of their contents.
         """
         super().__init__()
         self.prepare_data_per_node = True
@@ -71,6 +75,7 @@ class BaseDataModule(LightningDataModule):
         self.val_data = val_data
         self.test_data = test_data
         self.predict_data = predict_data
+        self.id_mappings = id_mappings
 
     def set_dataset(self, split):
         data_split = getattr(self, f"{split}_data")
@@ -78,6 +83,7 @@ class BaseDataModule(LightningDataModule):
             data=data_split,
             preprocessor=self.df_preprocessor,
             processors=self.data_processors,
+            id_mappings=self.id_mappings,
             is_training=split == TRAIN,
         )
 

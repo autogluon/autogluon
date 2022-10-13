@@ -28,8 +28,8 @@ def test_preset_to_config():
 
 
 def test_basic_config():
-    basic_config = get_basic_automm_config(is_distill=False)
+    basic_config = get_basic_automm_config()
     assert list(basic_config.keys()).sort() == [MODEL, DATA, OPTIMIZATION, ENVIRONMENT].sort()
 
-    basic_config = get_basic_automm_config(is_distill=True)
+    basic_config = get_basic_automm_config(extra=[DISTILLER])
     assert list(basic_config.keys()).sort() == [MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER].sort()
