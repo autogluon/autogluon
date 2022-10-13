@@ -466,7 +466,7 @@ class MultiModalMatcher:
     ):
         if self._query_df_preprocessor is None:
             query_df_preprocessor = init_df_preprocessor(
-                config=query_config.data,
+                config=query_config,
                 column_types={k: column_types[k] for k in self._query},
                 train_df_x=data[self._query],
             )
@@ -475,7 +475,7 @@ class MultiModalMatcher:
 
         if self._response_df_preprocessor is None:
             response_df_preprocessor = init_df_preprocessor(
-                config=response_config.data,
+                config=response_config,
                 column_types={k: column_types[k] for k in self._response},
                 train_df_x=data[self._response],
             )
@@ -484,7 +484,7 @@ class MultiModalMatcher:
 
         if self._label_df_preprocessor is None:
             label_df_preprocessor = init_df_preprocessor(
-                config=response_config.data,
+                config=response_config,
                 column_types={self._label_column: column_types[self._label_column]},
                 label_column=self._label_column,
                 train_df_y=data[self._label_column],
