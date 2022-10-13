@@ -1,19 +1,9 @@
-"""
-Useful documentation for mmdetection:
-    https://mmdetection.readthedocs.io/en/latest/api.html?
-Originally, the `DataLoaders` in mmdetection handle multi-gpu by custom collate functions and importantly the
-mmcv.parallel.MMDataParallel class which wraps the dataloader which interpret the specific format of input. Since
-pytorch-lightning handles such multi-gpu training, we use a classic `torch.utils.data.DataLoader` object to batch data
-but parse the output of collate function during `training_step` and `validation_step`.
-Specifically, these include:
-    - the logic that receives `_sample` and converts it into `sample` in `MMDetectionTrainer::evaluate`
-    - the logic that receives `_batch` and converts it into `batch` in `MMDetectionTrainer::_training_step`
-"""
-
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
+from mmcv.parallel import scatter
+from mmcv.ops import RoIPool
 import pytorch_lightning as pl
 import torch
 import torchmetrics
@@ -70,12 +60,7 @@ class MMDetLitModule(pl.LightningModule):
         test_metric: Optional[torchmetrics.Metric] = None,
         efficient_finetune: Optional[str] = None,
     ):
-        """
-        In essence, `MMDetectionTrainer` is a pytorch-lightning version of the runners in `mmcv`. The implementation
-        was especially influenced by the implementation of `EpochBasedRunner`.
-        https://mmcv.readthedocs.io/en/latest/_modules/mmcv/runner/epoch_based_runner.html
-        """
-        super().__init__()
+        super().__init__() # TODO: inherit LitModule
         self.save_hyperparameters(
             ignore=[
                 "model",
@@ -108,14 +93,10 @@ class MMDetLitModule(pl.LightningModule):
             }
         """
         # out = self.model.forward(x)
+        # TODO
         pass
 
     def _predict_step(self, batch, batch_idx=0):
-        assert not self.model.training
-        assert not self.model.model.training
-        from mmcv.parallel import scatter
-        from mmcv.ops import RoIPool
-
         data = batch["mmdet_image_image"]
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
@@ -129,12 +110,9 @@ class MMDetLitModule(pl.LightningModule):
         return pred_results
 
     def _training_step(self, batch, batch_idx=0):
-        assert self.model.training
-        assert self.model.model.training
-        # train dataloader.
-        # send_datacontainers_to_device(data=batch, device=self.device)
         batch = unpack_datacontainers(batch)
 
+        # TODO: test mmcv scatter
         img_metas = batch["mmdet_image_image"]["img_metas"][0]
         img = batch["mmdet_image_image"]["img"][0].float().to(self.device)
         batch_size = img.shape[0]
@@ -181,39 +159,6 @@ class MMDetLitModule(pl.LightningModule):
                     labels=torch.tensor(labels).long().to(self.device),
                 )
             )
-
-        '''
-        batch = unpack_datacontainers(sample)
-
-        img_metas = batch["mmdet_image_image"]["img_metas"][0]
-        imgs = [batch["mmdet_image_image"]["img"][0][0].float().to(self.device)]
-
-
-        batch_result = self.model.forward_test(
-            imgs=imgs,
-            img_metas=img_metas,
-        )  # batch_size, 80, (n, 5)
-
-        preds = []
-        target = []
-
-        for img_idx, img_result in enumerate(batch_result):
-            boxes = []
-            scores = []
-            labels = []
-            for category_idx, category_result in enumerate(img_result):
-                for item_idx, item_result in enumerate(category_result):
-                    boxes.append(item_result[:4])
-                    scores.append(float(item_result[4]))
-                    labels.append(category_idx)
-            preds.append(
-                dict(
-                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
-                    scores=torch.tensor(scores).float().to(self.device),
-                    labels=torch.tensor(labels).long().to(self.device),
-                )
-            )
-        '''
 
         target = []
 
@@ -305,27 +250,10 @@ class MMDetLitModule(pl.LightningModule):
         self.evaluate(batch, "val")
 
     def validation_epoch_end(self, validation_step_outputs):
+        # TODO: add mAP/mAR_per_class
         mAPs = {"val_" + k: v for k, v in self.validation_metric.compute().items()}
         self.print(mAPs)
-        #mAPs_per_class = mAPs.pop("val_map_per_class")
-        #mARs_per_class = mAPs.pop("val_mar_100_per_class")
         self.log_dict(mAPs, sync_dist=True)
-        '''
-        self.log_dict(
-            {
-                f"val_map_{label}": value
-                for label, value in zip(self.id2label.values(), mAPs_per_class)
-            },
-            sync_dist=True,
-        )
-        self.log_dict(
-            {
-                f"val_mar_100_{label}": value
-                for label, value in zip(self.id2label.values(), mARs_per_class)
-            },
-            sync_dist=True,
-        )
-        '''
         self.validation_metric.reset()
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
