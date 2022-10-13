@@ -158,7 +158,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         data, scale_per_item = self._normalize_targets(data)
 
         last_observed_timestamp = data.slice_by_timestep(-1, None).index.get_level_values(TIMESTAMP)
-        offset = pd.tseries.frequencies.get_offset(data.freq)
+        offset = pd.tseries.frequencies.to_offset(data.freq)
         item_ids = data.item_ids
         nan_array = np.full(len(item_ids), fill_value=np.nan)
 

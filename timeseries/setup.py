@@ -31,6 +31,7 @@ install_requires = [
     "gluonts>=0.8.0,<0.10.0",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
+    f"autogluon.tabular=={version}",
 ]
 
 try:
