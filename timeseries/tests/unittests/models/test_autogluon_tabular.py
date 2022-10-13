@@ -1,11 +1,12 @@
 import pytest
+from unittest import mock
 
-from autogluon.timeseries.models.tabular import TabularModel
+from autogluon.timeseries.models.autogluon_tabular import AutoGluonTabularModel
 
 from ..common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
 
 TESTABLE_MODELS = [
-    TabularModel,
+    AutoGluonTabularModel,
 ]
 
 
@@ -18,8 +19,9 @@ TESTABLE_MODELS = [
     ],
 )
 def test_when_feature_df_is_constructed_then_shape_is_correct(df, last_k_values, expected_length):
-    model = TabularModel()
-    model._generate_features_from_freq(DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.freq)
+    model = AutoGluonTabularModel()
+    # Initialize model._lag_indices and model._time_features from freq
+    model.fit(train_data=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, time_limit=2)
     df = model._get_features_dataframe(DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, last_k_values=last_k_values)
     expected_num_features = len(model._lag_indices) + len(model._time_features) + 1
     assert df.shape == (expected_length, expected_num_features)

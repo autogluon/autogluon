@@ -18,10 +18,10 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.gluonts import GenericGluonTSModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
+from .test_autogluon_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_sktime import TESTABLE_MODELS as SKTIME_TESTABLE_MODELS
 from .test_statsmodels import TESTABLE_MODELS as STATSMODELS_TESTABLE_MODELS
-from .test_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = (

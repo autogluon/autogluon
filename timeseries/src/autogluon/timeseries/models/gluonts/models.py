@@ -17,7 +17,6 @@ with warning_filter():
     from gluonts.model.transformer import TransformerEstimator
     from gluonts.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.context import get_mxnet_context
-    from gluonts.nursery.autogluon_tabular import TabularEstimator
 
 from .abstract_gluonts import AbstractGluonTSModel
 

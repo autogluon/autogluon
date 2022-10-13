@@ -1,3 +1,4 @@
+from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
     DeepARModel,
     MQCNNModel,
@@ -8,7 +9,6 @@ from .gluonts import (
 )
 from .sktime import SktimeARIMAModel, SktimeAutoARIMAModel, SktimeAutoETSModel, SktimeTBATSModel, SktimeThetaModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaModel
-from .tabular import TabularModel
 
 __all__ = [
     "DeepARModel",
@@ -25,5 +25,5 @@ __all__ = [
     "ARIMAModel",
     "ETSModel",
     "ThetaModel",
-    "TabularModel",
+    "AutoGluonTabularModel",
 ]

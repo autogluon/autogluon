@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+# TODO: Drop GluonTS dependency
 from gluonts.time_feature import TimeFeature, get_lags_for_frequency, time_features_from_frequency_str
 
 import autogluon.core as ag
@@ -14,14 +16,28 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 logger = logging.getLogger(__name__)
 
 
-class TabularModel(AbstractTimeSeriesModel):
+class AutoGluonTabularModel(AbstractTimeSeriesModel):
     """Uses TabularPredictor to forecast future time series values one step at a time.
 
     The forecasting is converted to a tabular problem using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
+
+    Other Parameters
+    ----------------
+    tabular_hyperparmeters : Dict[Dict[str, Any]], optional
+        Hyperparameters dictionary passed to `TabularPredictor.fit`. Contains the names of models that should be fit.
+        Defaults to ``AutoGluonTabularModel.default_tabular_hyperparameters``.
+        Note that the selected models must support ``problem_type="quantile"``.
     """
+    # TODO: Add XT/RF after https://github.com/awslabs/autogluon/pull/2204 is merged
+    # TODO: Add catboost with MultiQuantile loss (after catboost v1.1)?
+    # TODO: Other tabular models in quantile? (LightGBM?)
+    default_tabular_hyperparameters = {
+        "NN_TORCH": {},
+        "FASTAI": {},
+    }
 
     def __init__(
         self,
@@ -87,13 +103,9 @@ class TabularModel(AbstractTimeSeriesModel):
             lag_columns = {f"lag_{idx}": series.shift(idx).values.ravel()[selected_slice] for idx in self._lag_indices}
             columns = {**time_feature_columns, **lag_columns, "target": series.values.ravel()[selected_slice]}
             df = pd.DataFrame(columns, index=series.index[selected_slice])
-            dataframe_per_item.append(df.iloc[selected_slice])
+            dataframe_per_item.append(df)
 
         return pd.concat(dataframe_per_item, ignore_index=True)
-
-    def _generate_features_from_freq(self, freq: str):
-        self._lag_indices = get_lags_for_frequency(freq)
-        self._time_features = time_features_from_frequency_str(freq)
 
     def _fit(
         self,
@@ -105,7 +117,8 @@ class TabularModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         if self.tabular_predictor._learner.is_fit:
             raise AssertionError(f"{self.name} predictor has already been fit!")
-        self._generate_features_from_freq(train_data.freq)
+        self._lag_indices = get_lags_for_frequency(train_data.freq)
+        self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
         train_df = self._get_features_dataframe(train_data)
@@ -129,14 +142,12 @@ class TabularModel(AbstractTimeSeriesModel):
             val_df = None
 
         # TODO: Other presets for TabularPredictor?
-        # TODO: Speed up prediction for Quantile XT/RF models
-        # TODO: Add catboost with MultiQuantile loss (after catboost v1.1)
-        # TODO: Other tabular models in quantile? (LightGBM?)
+        tabular_hyperparameters = self._get_model_params().get("tabular_hyperparameters", self.default_tabular_hyperparameters)
         self.tabular_predictor.fit(
             train_data=train_df,
             tuning_data=val_df,
             time_limit=time_limit,
-            excluded_model_types=["XT", "RF"],
+            hyperparameters=tabular_hyperparameters,
             verbosity=2,
         )
 
