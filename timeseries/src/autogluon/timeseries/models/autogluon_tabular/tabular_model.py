@@ -117,6 +117,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         if self.tabular_predictor._learner.is_fit:
             raise AssertionError(f"{self.name} predictor has already been fit!")
+        verbosity = kwargs.get("verbosity", 2)
         self._lag_indices = get_lags_for_frequency(train_data.freq)
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
@@ -148,7 +149,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             tuning_data=val_df,
             time_limit=time_limit,
             hyperparameters=tabular_hyperparameters,
-            verbosity=2,
+            verbosity=verbosity - 2,
         )
 
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:

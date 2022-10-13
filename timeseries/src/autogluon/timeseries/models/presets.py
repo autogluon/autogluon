@@ -2,12 +2,12 @@ import copy
 import logging
 from typing import Any, Dict, List, Union
 
-from autogluon_tabular import AutoGluonTabularModel
 
 import autogluon.core as ag
 
 from .abstract import AbstractTimeSeriesModel
 from .abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from .autogluon_tabular import AutoGluonTabularModel
 from .gluonts import (
     DeepARModel,
     MQCNNModel,
