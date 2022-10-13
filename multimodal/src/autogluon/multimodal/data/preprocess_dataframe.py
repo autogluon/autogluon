@@ -523,7 +523,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             text_column_index = 0  # Currently, we only support one text column.
             x_df = df[self._text_feature_names[text_column_index]]
             y = self._label_generator.transform(y_df)
-            x = self.transform_text(df)
+            x = self.transform_text(df)[0]
             # Labelprocessor needs both ner annotations and text.
             ret = {
                 NER_ANNOTATION: y,
