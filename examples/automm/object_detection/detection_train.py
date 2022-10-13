@@ -55,7 +55,7 @@ def detection_train(
     import time
 
     start = time.time()
-    predictor.fit_coco(
+    predictor.fit(
         train_path,
         hyperparameters={
             "optimization.learning_rate": lr,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
     parser.add_argument("--num_classes", default=20, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--wd", default=1e-4, type=float)
+    parser.add_argument("--wd", default=1e-3, type=float)
     parser.add_argument("--epochs", default=50, type=int)
     args = parser.parse_args()
 
