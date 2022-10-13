@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import List, Optional
 
-from .constants import DATA, DISTILLER, ENVIRONMENT, MODEL, OPTIMIZATION
+from .constants import DATA, DISTILLER, ENVIRONMENT, MATCHER, MODEL, OPTIMIZATION, QUERY, RESPONSE
 from .registry import Registry
 
 automm_presets = Registry("automm_presets")
@@ -141,6 +141,11 @@ def feature_extraction():
     }
 
 
+@automm_presets.register()
+def siamese_network():
+    return automm_presets.create("default")
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.
@@ -160,14 +165,14 @@ def list_automm_presets(verbose: bool = False):
     return preset_details
 
 
-def get_basic_automm_config(is_distill: Optional[bool] = False):
+def get_basic_automm_config(extra: Optional[List[str]] = None):
     """
     Get the basic config of AutoMM.
 
     Parameters
     ----------
-    is_distill
-        Whether in the distillation mode.
+    extra
+        A list of extra config keys.
 
     Returns
     -------
@@ -179,8 +184,9 @@ def get_basic_automm_config(is_distill: Optional[bool] = False):
         OPTIMIZATION: "adamw",
         ENVIRONMENT: "default",
     }
-    if is_distill:
-        config[DISTILLER] = "default"
+    if extra:
+        for k in extra:
+            config[k] = "default"
 
     return config
 

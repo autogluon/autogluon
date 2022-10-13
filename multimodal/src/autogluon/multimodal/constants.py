@@ -4,6 +4,7 @@ CATEGORICAL = "categorical"
 TEXT = "text"
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
+IDENTIFIER = "identifier"
 
 # Problem types
 CLASSIFICATION = "classification"
@@ -149,8 +150,9 @@ NUMERICAL_MLP = "numerical_mlp"
 CATEGORICAL_MLP = "categorical_mlp"
 NUMERICAL_TRANSFORMER = "numerical_transformer"
 CATEGORICAL_TRANSFORMER = "categorical_transformer"
-FUSION_MLP = "fusion_mlp"
-FUSION_TRANSFORMER = "fusion_transformer"
+FUSION = "fusion"
+FUSION_MLP = f"{FUSION}_mlp"
+FUSION_TRANSFORMER = f"{FUSION}_transformer"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
@@ -158,13 +160,13 @@ NER_TEXT = "ner_text"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT)
 MMCV_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 
-# metric learning loss type
+# matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"
 
-# metric learning distance type
+# matcher distance type
 COSINE_SIMILARITY = "cosine_similarity"
 
-# metric learning miner type
+# matcher miner type
 PAIR_MARGIN_MINER = "pair_margin_miner"
 
 # checkpoints
@@ -186,3 +188,11 @@ TOKEN_WORD_MAPPING = "token_word_mapping"
 WORD_OFFSETS = "word_offsets"
 NER_RET = "ner_ret"
 NER_ANNOTATION = "ner_annotation"
+
+# matcher
+QUERY = "query"
+RESPONSE = "response"
+QUERY_RESPONSE = f"{QUERY}_{RESPONSE}"
+PAIR = "pair"
+TRIPLET = "triplet"
+

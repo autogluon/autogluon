@@ -48,13 +48,13 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
     """
     if ret_type == LOGITS:
         logits = [ele[LOGITS] for ele in outputs]
-        ret = torch.cat(logits)
+        ret = torch.cat(logits).nan_to_num(nan=-1e4)
     elif ret_type == PROBABILITY:
         probability = [ele[PROBABILITY] for ele in outputs]
-        ret = torch.cat(probability)
+        ret = torch.cat(probability).nan_to_num(nan=0)
     elif ret_type == FEATURES:
         features = [ele[FEATURES] for ele in outputs]
-        ret = torch.cat(features)
+        ret = torch.cat(features).nan_to_num(nan=0)
     elif ret_type == COLUMN_FEATURES:
         ret = {}
         column_features = [ele[COLUMN_FEATURES][FEATURES] for ele in outputs]  # a list of dicts

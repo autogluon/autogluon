@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional, Union
 
-from nptyping import NDArray
 from torch import nn
 
 from ..constants import LABEL, NER, NER_ANNOTATION, TEXT
@@ -77,8 +76,7 @@ class LabelProcessor:
 
     def __call__(
         self,
-        all_labels: Dict[str, Union[NDArray[(Any,), Any], list]],
-        idx: int,
+        labels: Dict[str, Union[int, float]],
         is_training: bool,
     ) -> Dict:
         """
@@ -86,10 +84,8 @@ class LabelProcessor:
 
         Parameters
         ----------
-        all_labels
-            All labels in a dataset.
-        idx
-            The sample index in a dataset.
+        labels
+            Labels of one sample.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
 
@@ -97,7 +93,4 @@ class LabelProcessor:
         -------
         A dictionary containing one sample's processed label.
         """
-        per_sample_labels = {
-            per_column_name: per_column_labels[idx] for per_column_name, per_column_labels in all_labels.items()
-        }
-        return self.process_one_sample(per_sample_labels)
+        return self.process_one_sample(labels)

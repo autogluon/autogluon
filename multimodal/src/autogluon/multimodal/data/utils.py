@@ -8,7 +8,7 @@ from nlpaug import Augmenter
 from nlpaug.util import Method
 from text_unidecode import unidecode
 
-from ..constants import MMCV_MODELS
+from ..constants import IDENTIFIER, MMCV_MODELS
 from .collator import Dict
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 
@@ -172,7 +172,11 @@ def get_collate_fn(
     return Dict(collate_fn)
 
 
-def apply_df_preprocessor(data: pd.DataFrame, df_preprocessor: MultiModalFeaturePreprocessor, modalities: Iterable):
+def apply_df_preprocessor(
+    data: pd.DataFrame,
+    df_preprocessor: MultiModalFeaturePreprocessor,
+    modalities: Iterable,
+):
     """
     Preprocess one dataframe with one df_preprocessor.
 
@@ -189,34 +193,36 @@ def apply_df_preprocessor(data: pd.DataFrame, df_preprocessor: MultiModalFeature
     -------
     modality_features
         Preprocessed features of given modalities.
+    modality_types
+        Minor modality types of each major modality.
     sample_num
         Number of samples.
     """
     lengths = []
     modality_features = {}
+    modality_types = {}
     for per_modality in modalities:
-        per_modality_features = getattr(df_preprocessor, f"transform_{per_modality}")(data)
+        per_modality_features, per_modality_types = getattr(df_preprocessor, f"transform_{per_modality}")(data)
         modality_features[per_modality] = per_modality_features
+        modality_types[per_modality] = per_modality_types
         if per_modality_features:
             lengths.append(len(per_modality_features[next(iter(per_modality_features))]))
     assert len(set(lengths)) == 1  # make sure each modality has the same sample num
     sample_num = lengths[0]
 
-    return modality_features, sample_num
+    return modality_features, modality_types, sample_num
 
 
-def apply_data_processor(modality_features: dict, data_processors: dict, idx: int, is_training: bool):
+def apply_data_processor(per_sample_features: dict, data_processors: dict, is_training: bool):
     """
     Process one sample's features.
 
     Parameters
     ----------
-    modality_features
-        Features of different modalities got from `apply_df_preprocessor`.
+    per_sample_features
+        Modality features of one sample.
     data_processors
         A dict of data processors.
-    idx
-        The sample index.
     is_training
         Whether is training.
 
@@ -227,12 +233,51 @@ def apply_data_processor(modality_features: dict, data_processors: dict, idx: in
     sample_features = {}
     for per_modality, per_modality_processors in data_processors.items():
         for per_model_processor in per_modality_processors:
-            if modality_features[per_modality]:
-                sample_features.update(
-                    per_model_processor(modality_features[per_modality], idx=idx, is_training=is_training)
-                )
+            if per_modality in per_sample_features and per_sample_features[per_modality]:
+                sample_features.update(per_model_processor(per_sample_features[per_modality], is_training=is_training))
 
     return sample_features
+
+
+def get_per_sample_features(
+    modality_features: dict, modality_types: dict, idx: int, id_mappings: Optional[dict] = None
+):
+    """
+    Extract the modality features of one sample.
+
+    Parameters
+    ----------
+    modality_features
+        Modality features of all samples.
+    modality_types
+        Data types of all columns.
+    idx
+        The sample index.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
+
+    Returns
+    -------
+    One sample's modality features.
+    """
+    ret = dict()
+    for per_modality, per_modality_features in modality_features.items():
+        if per_modality_features:
+            per_modality_ret = dict()
+            for per_col_name, per_col_features in per_modality_features.items():
+                per_sample_features = per_col_features[idx]
+                if (
+                    modality_types
+                    and modality_types[per_modality]
+                    and modality_types[per_modality][per_col_name].endswith(IDENTIFIER)
+                ):
+                    per_sample_features = id_mappings[per_col_name][per_sample_features]
+
+                per_modality_ret[per_col_name] = per_sample_features
+            ret[per_modality] = per_modality_ret
+
+    return ret
 
 
 def register_encoding_decoding_error_handlers() -> None:
