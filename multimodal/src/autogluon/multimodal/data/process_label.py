@@ -4,7 +4,7 @@ from nptyping import NDArray
 from torch import nn
 
 from ..constants import LABEL
-from .collator import List, Stack
+from .collator import List as ColList, Stack
 
 
 class LabelProcessor:
@@ -30,7 +30,7 @@ class LabelProcessor:
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
-    def collate_fn(self, label_column_names: Optional[List] = None, per_gpu_batch_size: Optional[int] = None) -> Dict:
+    def collate_fn(self, label_column_names: Optional[List] = None) -> Dict:
         """
         Collate individual labels into a batch. Here it stacks labels.
         This function will be used when creating Pytorch DataLoader.
@@ -40,7 +40,7 @@ class LabelProcessor:
         A dictionary containing one model's collator function for labels.
         """
         if self.prefix == "mmdet_image":
-            fn = {self.label_key: List()}
+            fn = {self.label_key: ColList()}
         else:
             fn = {self.label_key: Stack()}
         return fn
