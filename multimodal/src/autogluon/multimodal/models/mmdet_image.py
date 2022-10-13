@@ -176,8 +176,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         ret = {BBOX: results}
         return {self.prefix: ret}
 
-    def forward_test(self, imgs, img_metas):
-        return self.model.forward_test(imgs=imgs, img_metas=img_metas)
+    def forward_test(self, imgs, img_metas, rescale=True):
+        return self.model.forward_test(imgs=imgs, img_metas=img_metas, rescale=rescale)
 
     def forward_train(self, img, img_metas, gt_bboxes, gt_labels):
         return self.model.forward_train(img=img, img_metas=img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels)

@@ -497,15 +497,13 @@ class COCODataset():
 
         self.category_ids = [cat["id"] for cat in d["categories"]]
 
-        print(self.category_ids)
-        exit()
-
     def get_image_id_from_path(self, image_path):
         return self.image_namenum_to_id[get_image_name_num(image_path)]
 
     def save_result(self, ret, data, save_path):
         coco_format_result = []
-        for i, row in data.iterrows():
+
+        for i, row in data.reset_index(drop=True).iterrows():
             image_id = self.get_image_id_from_path(row["image"])
             for j, res in enumerate(ret[i]):
                 category_id = self.category_ids[j]

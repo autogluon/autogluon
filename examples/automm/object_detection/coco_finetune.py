@@ -35,9 +35,8 @@ def voccoco_scratch(checkpoint_name="faster_rcnn_r50_fpn_2x_coco", train_path=vo
 
 
 def voccoco_finetune(
-    checkpoint_name="faster_rcnn_r50_fpn_2x_coco", train_path=voc_train_path, test_path=voc_test_path
+    checkpoint_name="faster_rcnn_r50_fpn_2x_coco", train_path=voc_train_path, test_path=voc_test_path, num_classes=20,
 ):
-    num_classes = 20 #TODO: remove hardcode
 
     predictor = MultiModalPredictor(
         label="rois_label",
@@ -70,6 +69,6 @@ def voccoco_finetune(
 
 
 if __name__ == "__main__":
-    # voccoco_finetune("yolov3_mobilenetv2_320_300e_coco", coco_test_path, coco_test_path)
+    # voccoco_finetune("yolov3_mobilenetv2_320_300e_coco", coco_test_path, coco_test_path, 80)
     voccoco_finetune("yolov3_mobilenetv2_320_300e_coco")
     # voccoco_finetune("faster_rcnn_r50_fpn_2x_coco")

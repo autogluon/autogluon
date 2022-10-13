@@ -110,11 +110,26 @@ class MMDetLitModule(pl.LightningModule):
         # out = self.model.forward(x)
         pass
 
-    def _predict_step(self, batch):
-        # TODO: implement based on `simple_test`
-        pass
+    def _predict_step(self, batch, batch_idx=0):
+        assert not self.model.training
+        assert not self.model.model.training
+        from mmcv.parallel import scatter
+        from mmcv.ops import RoIPool
+        data = batch["mmdet_image_image"]
+        data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
+        data["img"] = [img.data[0] for img in data["img"]]
+        if next(self.model.parameters()).is_cuda:
+            # scatter to specified GPU
+            data = scatter(data, [self.device])[0]
+        else:
+            for m in self.model.modules():
+                assert not isinstance(m, RoIPool), "CPU inference with RoIPool is not supported currently."
+        pred_results = self.model.model(return_loss=False, rescale=True, **data)
+        return pred_results
 
     def _training_step(self, batch, batch_idx=0):
+        assert self.model.training
+        assert self.model.model.training
         # train dataloader.
         # send_datacontainers_to_device(data=batch, device=self.device)
         batch = unpack_datacontainers(batch)
@@ -145,10 +160,34 @@ class MMDetLitModule(pl.LightningModule):
         sample: dict
             Single data sample.
         """
+        pred_results = self._predict_step(sample)
+
+        preds = []
+        for img_idx, img_result in enumerate(pred_results):
+            img_result = img_result
+            boxes = []
+            scores = []
+            labels = []
+            for category_idx, category_result in enumerate(img_result):
+                for item_idx, item_result in enumerate(category_result):
+                    boxes.append(item_result[:4])
+                    scores.append(float(item_result[4]))
+                    labels.append(category_idx)
+            preds.append(
+                dict(
+                    boxes=torch.tensor(np.array(boxes).astype(float)).float().to(self.device),
+                    scores=torch.tensor(scores).float().to(self.device),
+                    labels=torch.tensor(labels).long().to(self.device),
+                )
+            )
+
+        '''
         batch = unpack_datacontainers(sample)
 
-        img_metas = batch["mmdet_image_image"]["img_metas"]
-        imgs = [batch["mmdet_image_image"]["img"][0].float().to(self.device)]
+        img_metas = batch["mmdet_image_image"]["img_metas"][0]
+        imgs = [batch["mmdet_image_image"]["img"][0][0].float().to(self.device)]
+
+
         batch_result = self.model.forward_test(
             imgs=imgs,
             img_metas=img_metas,
@@ -173,23 +212,28 @@ class MMDetLitModule(pl.LightningModule):
                     labels=torch.tensor(labels).long().to(self.device),
                 )
             )
+        '''
+
+        target = []
 
         batch_size = len(preds)
+        batch = unpack_datacontainers(sample)
+        gt = batch["mmdet_image_label"] # batch_size, (n, 5)
         for i in range(batch_size):
-            boxes = batch["mmdet_image_image"]["gt_bboxes"][0][i]
-            labels = batch["mmdet_image_image"]["gt_labels"][0][i]
+            img_gt = np.array(gt[i])
+            boxes = img_gt[:,:4]
+            labels = img_gt[:,4]
             target.append(
                 dict(
-                    boxes=boxes.float().to(self.device),
-                    labels=labels.long().to(self.device),
+                    boxes=torch.tensor(boxes).float().to(self.device),
+                    labels=torch.tensor(labels).long().to(self.device),
                 )
             )
 
         # use MeanAveragePrecision, example code: https://github.com/Lightning-AI/metrics/blob/master/examples/detection_map.py
         self.validation_metric.update(preds, target)
 
-        res = dict(preds=preds,target=target)
-        return res
+        return pred_results
 
     def compute_loss(self, img, img_metas, gt_bboxes, gt_labels, *args, **kwargs):
         """
@@ -288,9 +332,9 @@ class MMDetLitModule(pl.LightningModule):
         res = self.evaluate(batch, "test")
         return res
 
-    def predict_step(self, batch, batch_idx):
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
         pred = self._predict_step(batch, batch_idx)
-        return pred
+        return {"bbox": pred, "label": batch["mmdet_image_label"]}
 
     def configure_optimizers(self):
         """

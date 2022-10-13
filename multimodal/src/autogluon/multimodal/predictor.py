@@ -465,6 +465,8 @@ class MultiModalPredictor:
                 stratify=stratify,
                 random_state=np.random.RandomState(seed),
             )
+            train_data = train_data.reset_index(drop=True)
+            tuning_data = tuning_data.reset_index(drop=True)
 
         column_types = infer_column_types(
             data=train_data,
@@ -1409,6 +1411,8 @@ class MultiModalPredictor:
                 matches=self._config.matcher.matches,
                 match_label=match_label,
             )
+        elif self._pipeline == OBJECT_DETECTION:
+            task = MMDetLitModule(model=self._model)
         else:
             task = LitModule(
                 model=self._model,
@@ -1498,6 +1502,7 @@ class MultiModalPredictor:
     def evaluate_coco(
         self,
         anno_file_or_df: str,
+        metrics: str,
     ):
         """
         Evaluate object detection model on a test dataset in COCO format.
@@ -1522,8 +1527,55 @@ class MultiModalPredictor:
 
         outputs = self._predict(
             data=data,
-            requires_label=False,
-        )
+            requires_label=True,
+        ) # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+
+        from torchmetrics.detection.mean_ap import MeanAveragePrecision
+        map_metric = MeanAveragePrecision(box_format='xyxy',iou_type="bbox",class_metrics=False)
+        for output in outputs:
+            pred_results = output["bbox"]
+            preds = []
+            for img_idx, img_result in enumerate(pred_results):
+                img_result = img_result
+                boxes = []
+                scores = []
+                labels = []
+                for category_idx, category_result in enumerate(img_result):
+                    for item_idx, item_result in enumerate(category_result):
+                        boxes.append(item_result[:4])
+                        scores.append(float(item_result[4]))
+                        labels.append(category_idx)
+                preds.append(
+                    dict(
+                        boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cuda:0"),
+                        scores=torch.tensor(scores).float().to("cuda:0"),
+                        labels=torch.tensor(labels).long().to("cuda:0"),
+                    )
+                )
+
+            target = []
+            gts = output["label"]
+            for gt in gts:
+                img_gt = np.array(gt)
+                boxes = img_gt[:,:4]
+                labels = img_gt[:,4]
+                target.append(
+                    dict(
+                        boxes=torch.tensor(boxes).float().to("cuda:0"),
+                        labels=torch.tensor(labels).long().to("cuda:0"),
+                    )
+                )
+
+            map_metric.update(preds, target)
+
+        print(map_metric.compute())
+        exit()
+
+
+
+
+
+
         ret = extract_from_output(ret_type=BBOX, outputs=outputs)
 
         # Cache prediction results as COCO format
@@ -1545,7 +1597,10 @@ class MultiModalPredictor:
         cocoEval.accumulate()
         cocoEval.summarize()
 
-        return cocoEval.stats[0]
+        if isinstance(metrics, list):
+            metrics = metrics[0]
+
+        return {metrics: cocoEval.stats[0]}
 
     def _process_batch(
         self,
@@ -1684,7 +1739,7 @@ class MultiModalPredictor:
         Optionally return a dataframe of prediction results.
         """
         if self._pipeline == OBJECT_DETECTION:
-            return self.evaluate_coco(data)
+            return self.evaluate_coco(data, metrics)
 
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY

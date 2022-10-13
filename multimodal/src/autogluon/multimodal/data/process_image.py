@@ -167,9 +167,9 @@ class ImageProcessor:
             except: #faster_rcnn
                 training_pipeline = cfg.data.train.pipeline
             training_pipeline = replace_ImageToTensor(training_pipeline)
-            cfg.data.val.pipeline = replace_ImageToTensor(cfg.data.val.pipeline)
+            val_pipeline = replace_ImageToTensor(cfg.data.val.pipeline)
             # self.val_processor = Compose(cfg.data.val.pipeline)
-            self.val_processor = Compose(training_pipeline)
+            self.val_processor = Compose(val_pipeline)
             self.train_processor = Compose(training_pipeline)
         else:
             self.train_processor = self.construct_processor(self.train_transform_types)

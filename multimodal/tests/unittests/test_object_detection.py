@@ -20,11 +20,7 @@ def download_sample_images():
     [
         "faster_rcnn_r50_fpn_2x_coco",
         "yolov3_mobilenetv2_320_300e_coco",
-<<<<<<< HEAD
-        "centernet_resnet18_140e_coco.py",
-=======
         "mask_rcnn_r50_fpn_2x_coco",
->>>>>>> a00564954d8a91741616edab0ef2f9554baec8ed
         "detr_r50_8x2_150e_coco",
     ],
 )
