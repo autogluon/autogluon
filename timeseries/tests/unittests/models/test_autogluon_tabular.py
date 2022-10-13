@@ -1,5 +1,6 @@
-import pytest
 from unittest import mock
+
+import pytest
 
 from autogluon.timeseries.models.autogluon_tabular import AutoGluonTabularModel
 

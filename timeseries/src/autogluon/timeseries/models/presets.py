@@ -2,6 +2,8 @@ import copy
 import logging
 from typing import Any, Dict, List, Union
 
+from autogluon_tabular import AutoGluonTabularModel
+
 import autogluon.core as ag
 
 from .abstract import AbstractTimeSeriesModel
@@ -35,6 +37,7 @@ MODEL_TYPES = dict(
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     Theta=ThetaModel,
+    AutoGluonTabular=AutoGluonTabularModel,
 )
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -51,6 +54,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     ARIMA=50,
     ETS=60,
     Theta=60,
+    AutoGluonTabularModel=0,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 MINIMUM_CONTEXT_LENGTH = 10
