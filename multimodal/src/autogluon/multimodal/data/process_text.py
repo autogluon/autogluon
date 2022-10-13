@@ -569,7 +569,7 @@ class TextProcessor:
             texts = {col_name: normalize_txt(col_text) for col_name, col_text in texts.items()}
 
         if self.prefix == NER:
-            return self.process_ner_text(per_sample_text)
+            return self.process_ner_text(texts)
         else:
             return self.build_one_token_sequence_from_text(texts, is_training)
 
