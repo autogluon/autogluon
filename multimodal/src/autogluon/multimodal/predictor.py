@@ -1442,7 +1442,6 @@ class MultiModalPredictor:
                 **optimization_kwargs,
             )
 
-
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
             blacklist_msgs.append("Automatic Mixed Precision")
