@@ -46,6 +46,10 @@ function install_features {
     python3 -m pip install --upgrade -e features/
 }
 
+function install_eda {
+    echo "python3 -m pip install --upgrade -e eda/"
+}
+
 function install_tabular {
     python3 -m pip install --upgrade -e tabular/[tests]
 }
@@ -94,5 +98,6 @@ function install_all {
     install_text
     install_vision
     install_timeseries
+    install_eda
     install_autogluon
 }
