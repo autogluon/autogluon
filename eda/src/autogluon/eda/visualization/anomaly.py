@@ -18,9 +18,12 @@ class AnomalyVisualization(AbstractVisualization, JupyterMixin):
         keys_pres = self._at_least_one_key_must_be_present(state, ['top_train_anomalies', 'top_test_anomalies'])
         return keys_pres
 
-    def _display_anom_water(self, test_samp, shap_data) -> None:
+    def _display_anom_water(self, score, test_samp, shap_data) -> None:
         plt.clf()
         fig = waterfall(shap_data, show=False)
+        test_samp['anomaly score'] = round(score, 3)
+        cols = list(test_samp.index)
+        test_samp = test_samp.reindex(index = [cols[-1]] + cols[:-1])
         self.display_obj(test_samp.to_frame().T)
         self.display_obj(fig)
 
@@ -28,10 +31,10 @@ class AnomalyVisualization(AbstractVisualization, JupyterMixin):
         if 'top_train_anomalies' in state:
             header_text = f'Top {len(state.top_train_anomalies)} anomalies in training set'
             self.render_header_if_needed(state, header_text)
-            for test_samp, shap_data in state.top_train_anomalies:
-                self._display_anom_water(test_samp, shap_data)
+            for score, test_samp, shap_data in state.top_train_anomalies:
+                self._display_anom_water(score, test_samp, shap_data)
         if 'top_test_anomalies' in state:
             header_text = f'Top {len(state.top_test_anomalies)} anomalies in test set'
             self.render_header_if_needed(state, header_text)
-            for test_samp, shap_data in state.top_test_anomalies:
-                self._display_anom_water(test_samp, shap_data)
+            for score, test_samp, shap_data in state.top_test_anomalies:
+                self._display_anom_water(score, test_samp, shap_data)
