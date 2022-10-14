@@ -12,8 +12,13 @@ from ..constants import (
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    ENTITY_GROUP,
+    IDENTIFIER,
     IMAGE,
+    IMAGE_PATH,
     MULTICLASS,
+    NER,
+    NER_ANNOTATION,
     NULL,
     NUMERICAL,
     OBJECT_DETECTION,
@@ -187,49 +192,123 @@ def is_imagepath_column(
     # Tolerate high failure rate in case that many image files may be corrupted.
     if failure_ratio <= 0.9:
         if failure_ratio > 0:
-            logger.warning(
+            warnings.warning(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
                 "and estimate the potential influence. By default, we skip the samples with missing images. "
                 "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                "which uses a zero image to replace any missing image."
+                "which uses a zero image to replace any missing image.",
+                UserWarning,
             )
         return True
     else:
         return False
 
 
-def is_text_column(X: pd.Series) -> bool:
+def is_text_column(data: pd.Series) -> bool:
     """
     Identify if a column is one text column.
 
     Parameters
     ----------
-    X
+    data
         One column of a multimodal pd.DataFrame for training.
 
     Returns
     -------
     Whether the column is a text column.
     """
-    if len(X) > 5000:
+    if len(data) > 5000:
         # Sample to speed-up type inference
-        X = X.sample(n=5000, random_state=0)
-    X_unique = X.unique()
-    num_unique = len(X_unique)
-    num_rows = len(X)
+        data = data.sample(n=5000, random_state=0)
+    data_unique = data.unique()
+    num_unique = len(data_unique)
+    num_rows = len(data)
     unique_ratio = num_unique / num_rows
     if unique_ratio <= 0.01:
         return False
     try:
-        avg_words = pd.Series(X_unique).str.split().str.len().mean()
+        avg_words = pd.Series(data_unique).str.split().str.len().mean()
     except AttributeError:
         return False
     if avg_words < 3:
         return False
 
     return True
+
+
+def is_identifier_column(data: pd.Series, col_name: str, id_mappings: Dict[str, Dict]) -> bool:
+    """
+    Check if a column is one identifier column.
+
+    Parameters
+    ----------
+    data
+        One column of multimodal pd.DataFrame.
+    col_name
+        Name of the column.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
+
+    Returns
+    -------
+    Whether the column is an identifier column.
+    """
+    if not id_mappings or col_name not in id_mappings:
+        return False
+
+    sample_num = min(len(data), 500)
+    data = data.sample(n=sample_num, random_state=0).tolist()
+    failure_count = 0
+    for index in data:
+        try:
+            per_value = id_mappings[col_name][index]
+        except:
+            failure_count += 1
+
+    if failure_count == 0:
+        return True
+    elif 0 < failure_count < sample_num:
+        warnings.warn(
+            f"Among {sample_num} sampled indexes in column {col_name}, "
+            f"we can't index all their values from the id_mappings ({failure_count} failures). "
+            f"You may need to assure that all the indexes of column {col_name} exist in your id_mappings.",
+            UserWarning,
+        )
+    else:
+        return False
+
+
+def infer_id_mappings_types(id_mappings: Dict[str, Dict]) -> Dict:
+    """
+    Infer the data types in id_mappings.
+
+    Parameters
+    ----------
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+
+    Returns
+    -------
+    A dictionary containing the data types in id_mappings.
+    """
+    id_mappings_types = collections.OrderedDict()
+    if id_mappings is None:
+        return id_mappings_types
+
+    for per_name, per_id_mappings in id_mappings.items():
+        per_id_mappings = pd.Series(per_id_mappings.values())
+        if is_imagepath_column(per_id_mappings, col_name=per_name):
+            id_mappings_types[per_name] = IMAGE_PATH
+        elif is_text_column(per_id_mappings):
+            id_mappings_types[per_name] = TEXT
+        else:
+            raise ValueError(
+                f"{per_name} in the id_mappings has an invalid type. Currently, we only support image and text types."
+            )
+    return id_mappings_types
 
 
 def infer_column_types(
@@ -239,6 +318,7 @@ def infer_column_types(
     provided_column_types: Optional[Dict] = None,
     allowable_column_types: Optional[List[str]] = None,
     fallback_column_type: Optional[str] = None,
+    id_mappings: Optional[Dict[str, Dict]] = None,
 ) -> Dict:
     """
     Infer the column types of a multimodal pd.DataFrame.
@@ -258,6 +338,9 @@ def infer_column_types(
         What column types are allowed. This is the prior knowledge inferred from the model type.
     fallback_column_type
         What's the fallback column type if the detected type if out of the allowable_column_types.
+    id_mappings
+        Id-to-content mappings. The contents can be text, image, etc.
+        This is used when the dataframe contains the query/response indexes instead of their contents.
 
     Returns
     -------
@@ -277,6 +360,8 @@ def infer_column_types(
         is_training = False
     else:
         is_training = True
+
+    id_mappings_types = infer_id_mappings_types(id_mappings)
 
     for col_name in data.columns:
         if provided_column_types is not None and col_name in provided_column_types:
@@ -299,6 +384,8 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
+        if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
+            column_types[col_name] = (f"{id_mappings_types[col_name]}_{IDENTIFIER}",)
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
         ):  # Infer categorical column
@@ -306,7 +393,7 @@ def infer_column_types(
         elif is_numerical_column(data[col_name], valid_data[col_name]):  # Infer numerical column
             column_types[col_name] = NUMERICAL
         elif is_imagepath_column(data[col_name], col_name):  # Infer image-path column
-            column_types[col_name] = IMAGE
+            column_types[col_name] = IMAGE_PATH
         elif is_text_column(data[col_name]):  # Infer text column
             column_types[col_name] = TEXT
         else:  # All the other columns are treated as categorical
@@ -343,7 +430,7 @@ def infer_label_column_type_by_problem_type(
     pipeline: Optional[str],
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, ROIS),
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
@@ -372,6 +459,9 @@ def infer_label_column_type_by_problem_type(
     -------
     Column types with the label columns' types inferred from the problem type.
     """
+    if label_columns is None:
+        return column_types
+
     if isinstance(label_columns, str):
         label_columns = [label_columns]
 
@@ -392,6 +482,8 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
+        elif problem_type == NER:
+            column_types[col_name] = NER_ANNOTATION
 
         if problem_type is None:
             if pipeline == OBJECT_DETECTION:
@@ -435,6 +527,9 @@ def infer_problem_type_output_shape(
     output_shape
         Shape of output.
     """
+    if label_column is None:
+        return None, None
+
     if provided_problem_type is not None:
         if provided_problem_type == MULTICLASS or provided_problem_type == BINARY:
             class_num = len(data[label_column].unique())
@@ -460,11 +555,18 @@ def infer_problem_type_output_shape(
                 return MULTICLASS, class_num
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
+        elif provided_problem_type == NER:
+            unique_entity_groups = [
+                annot[ENTITY_GROUP]
+                for annotation in data[label_column].iteritems()
+                for annot in json.loads(annotation[-1])
+            ]
+            return provided_problem_type, len(set(unique_entity_groups))
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
                 f"for training. The supported problem types are"
-                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}'"
+                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}', '{NER}'"
             )
     elif pipeline is not None:
         if pipeline == OBJECT_DETECTION:
@@ -510,7 +612,7 @@ def set_fallback_column_type(column_types: Dict, allowable_column_types: List[st
     The filtered column types.
     """
     for col_name, col_type in column_types.items():
-        if col_type not in allowable_column_types:
+        if not col_type.startswith(tuple(allowable_column_types)):
             column_types[col_name] = fallback_column_type
 
     return column_types

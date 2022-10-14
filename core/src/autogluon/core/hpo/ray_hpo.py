@@ -26,10 +26,11 @@ from .. import Space
 from ..ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
 
 from ray import tune
-from ray.tune import PlacementGroupFactory
-from ray.tune.sample import Domain
+from ray import air
+from ray.tune import PlacementGroupFactory, ExperimentAnalysis
+from ray.tune.search.sample import Domain
 from ray.tune.schedulers import TrialScheduler
-from ray.tune.suggest import SearchAlgorithm, Searcher
+from ray.tune.search import SearchAlgorithm, Searcher
 
 
 logger = logging.getLogger(__name__)
@@ -154,7 +155,8 @@ def run(
     model_estimate_memory_usage: Optional[int] = None,
     time_budget_s: Optional[float] = None,
     verbose: int = 1,
-    **kwargs
+    tune_config_kwargs: Optional[dict] = None,
+    run_config_kwargs: Optional[dict] = None,
     ) -> tune.ExperimentAnalysis:
     """
     Parse hyperparameter_tune_kwargs
@@ -204,8 +206,10 @@ def run(
         Time limit for the HPO.
     verbose
         0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
-    **kwargs
-        Additional args being passed to tune.run
+    tune_config_kwargs
+        Additional args being passed to tune.TuneConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.tune.tune_config.TuneConfig
+    run_config_kwargs
+        Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.air.config.RunConfig
     """
     assert mode in [MIN, MAX], f'mode {mode} is not a valid option. Options are {[MIN, MAX]}'
     if isinstance(hyperparameter_tune_kwargs, str):
@@ -231,7 +235,11 @@ def run(
     )
 
     if not ray.is_initialized():
-        ray.init(log_to_driver=False, **total_resources)
+        ray.init(
+            log_to_driver=False,
+            runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+            **total_resources
+        )
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -246,29 +254,44 @@ def run(
     resources_per_trial = _validate_resources_per_trial(resources_per_trial)
     ray_tune_adapter.resources_per_trial = resources_per_trial
     trainable_args = ray_tune_adapter.trainable_args_update_method(trainable_args)
-    tune_kwargs = _get_default_tune_kwargs()
-    tune_kwargs.update(kwargs)
     
     original_path = os.getcwd()
     save_dir = os.path.normpath(save_dir)
-    analysis = tune.run(
-        tune.with_parameters(trainable, **trainable_args),
-        config=search_space,
-        num_samples=num_samples,
-        search_alg=searcher,
-        scheduler=scheduler,
-        metric=metric,
-        mode=mode,
-        time_budget_s=time_budget_s,
-        resources_per_trial=resources_per_trial,
-        verbose=verbose,
-        local_dir=os.path.dirname(save_dir),  # TODO: is there a better way to force ray write to autogluon folder?
-        name=os.path.basename(save_dir),
-        **tune_kwargs
+    if tune_config_kwargs is None:
+        tune_config_kwargs = dict()
+    if run_config_kwargs is None:
+        run_config_kwargs = dict()
+    
+    tuner = tune.Tuner(
+        tune.with_resources(
+            tune.with_parameters(trainable, **trainable_args),
+            resources_per_trial
+        ),
+        param_space=search_space,
+        tune_config=tune.TuneConfig(
+            num_samples=num_samples,
+            search_alg=searcher,
+            scheduler=scheduler,
+            metric=metric,
+            mode=mode,
+            time_budget_s=time_budget_s,
+            **tune_config_kwargs
+        ),
+        run_config=air.RunConfig(
+            name=os.path.basename(save_dir),
+            local_dir=os.path.dirname(save_dir),
+            verbose=verbose,
+            **run_config_kwargs
+        ),
+        _tuner_kwargs={
+            "trial_name_creator": _trial_name_creator,
+            "trial_dirname_creator": _trial_dirname_creator
+        }
     )
+    results = tuner.fit()
 
     os.chdir(original_path)  # go back to the original directory to avoid relative path being broken
-    return analysis
+    return results._experiment_analysis
 
 
 def cleanup_trials(save_dir: str, trials_to_keep: Optional[List[str]]):
@@ -304,23 +327,14 @@ def cleanup_checkpoints(save_dir):
     directories = [dir for dir in os.listdir(save_dir) if os.path.isdir(os.path.join(save_dir, dir)) and dir.startswith('checkpoint')]
     for directory in directories:
         shutil.rmtree(os.path.join(save_dir, directory))
-
-
+        
+        
 def _trial_name_creator(trial):
     return trial.trial_id
 
 
 def _trial_dirname_creator(trial):
     return trial.trial_id
-
-
-def _get_default_tune_kwargs():
-    kwargs = dict(
-        raise_on_failed_trial=False,
-        trial_name_creator=_trial_name_creator,
-        trial_dirname_creator=_trial_dirname_creator,
-    )
-    return kwargs
 
 
 def _validate_resources_per_trial(resources_per_trial):

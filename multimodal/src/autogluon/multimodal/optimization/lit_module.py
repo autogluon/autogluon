@@ -41,7 +41,7 @@ class LitModule(pl.LightningModule):
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
         efficient_finetune: Optional[str] = None,
-        trainable_param_names: Optional[List[str]] = None,
+        trainable_param_names: Optional[List] = None,
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
@@ -125,6 +125,7 @@ class LitModule(pl.LightningModule):
             )
         self.custom_metric_func = custom_metric_func
         self.model_postprocess_fn = model_postprocess_fn
+        self.trainable_param_names = trainable_param_names if trainable_param_names else []
 
     def _compute_template_loss(
         self,
@@ -319,7 +320,7 @@ class LitModule(pl.LightningModule):
             grouped_parameters = apply_layerwise_lr_decay(
                 lr_decay=self.hparams.lr_decay,
                 efficient_finetune=self.hparams.efficient_finetune,
-                trainable_param_names=self.hparams.trainable_param_names,
+                trainable_param_names=self.trainable_param_names,
                 **kwargs,
             )
         else:
@@ -337,16 +338,19 @@ class LitModule(pl.LightningModule):
 
         logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:
-            max_steps = (
-                len(self.trainer.datamodule.train_dataloader())
-                * self.trainer.max_epochs
-                // self.trainer.accumulate_grad_batches
-            )
-            logger.debug(
-                f"len(trainer.datamodule.train_dataloader()): {len(self.trainer.datamodule.train_dataloader())}"
-            )
-            logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
-            logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
+            if "deepspeed" in self.trainer.strategy.strategy_name:
+                max_steps = 1
+            else:
+                max_steps = (
+                    len(self.trainer.datamodule.train_dataloader())
+                    * self.trainer.max_epochs
+                    // self.trainer.accumulate_grad_batches
+                )
+                logger.debug(
+                    f"len(trainer.datamodule.train_dataloader()): {len(self.trainer.datamodule.train_dataloader())}"
+                )
+                logger.debug(f"trainer.max_epochs: {self.trainer.max_epochs}")
+                logger.debug(f"trainer.accumulate_grad_batches: {self.trainer.accumulate_grad_batches}")
         else:
             max_steps = self.trainer.max_steps
 

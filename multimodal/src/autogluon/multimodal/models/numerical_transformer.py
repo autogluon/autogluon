@@ -382,6 +382,8 @@ class NumericalTransformer(nn.Module):
         head_activation: Optional[str] = "relu",
         head_normalization: Optional[str] = "layer_norm",
         embedding_arch: Optional[List[str]] = ["linear"],
+        additive_attention: Optional[bool] = False,
+        share_qv_weights: Optional[bool] = False,
     ):
         """
         Parameters
@@ -436,6 +438,10 @@ class NumericalTransformer(nn.Module):
             A list containing the names of embedding layers.
             Currently support:
             {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'layernorm'}
+        additive_attention
+            If 'true' the transformer will use additive attention with linear complexity to sequence length.
+        share_qv_weights
+            if 'true', then value and query transformation parameters are shared in additive attention.
 
         References
         ----------
@@ -500,6 +506,8 @@ class NumericalTransformer(nn.Module):
             head_activation=head_activation,
             head_normalization=head_normalization,
             d_out=out_features,
+            additive_attention=additive_attention,
+            share_qv_weights=share_qv_weights,
         )
 
         self.head = FT_Transformer.Head(

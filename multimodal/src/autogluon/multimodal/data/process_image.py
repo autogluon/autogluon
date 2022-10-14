@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import PIL
 import torch
+from PIL import ImageFile
 from timm.data.constants import (
     IMAGENET_DEFAULT_MEAN,
     IMAGENET_DEFAULT_STD,
@@ -62,6 +63,7 @@ from .trivial_augmenter import TrivialAugment
 from .utils import extract_value_from_config
 
 logger = logging.getLogger(AUTOMM)
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ImageProcessor:
@@ -460,8 +462,7 @@ class ImageProcessor:
 
     def __call__(
         self,
-        all_image_paths: Dict[str, List[List[str]]],
-        idx: int,
+        images: Dict[str, List[str]],
         is_training: bool,
     ) -> Dict:
         """
@@ -469,10 +470,8 @@ class ImageProcessor:
 
         Parameters
         ----------
-        all_image_paths
-            Paths of all the images in a dataset.
-        idx
-            The sample index in a dataset.
+        images
+            Images of one sample.
         is_training
             Whether to process images in the training mode.
 
@@ -480,10 +479,9 @@ class ImageProcessor:
         -------
         A dictionary containing one sample's processed images and their number.
         """
-        per_sample_paths = {
-            per_column_name: per_column_paths[idx] for per_column_name, per_column_paths in all_image_paths.items()
-        }
-        return self.process_one_sample(per_sample_paths, is_training)
+        images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
+
+        return self.process_one_sample(images, is_training)
 
     def __getstate__(self):
         odict = self.__dict__.copy()  # get attribute dictionary

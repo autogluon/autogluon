@@ -1,6 +1,7 @@
-from .checkpoint import AutoMMModelCheckpoint, average_checkpoints
+from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_checkpoints
 from .config import (
     apply_omegaconf_overrides,
+    customize_model_names,
     filter_search_space,
     get_config,
     get_local_pretrained_config_paths,
@@ -28,9 +29,11 @@ from .environment import (
     is_interactive,
     move_to_device,
 )
+from .hpo import hpo_trial
 from .inference import extract_from_output, infer_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
-from .log import LogFilter, apply_log_filter
+from .log import LogFilter, apply_log_filter, make_exp_dir
+from .matcher import create_siamese_model
 from .metric import compute_score, get_minmax_mode, infer_metrics
 from .misc import logits_to_prob, tensor_to_ndarray
 from .mmcv import send_datacontainers_to_device, unpack_datacontainers

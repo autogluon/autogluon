@@ -192,6 +192,9 @@ class TFewModel(nn.Module):
 
         inputs_embeds = self.model.encoder.embed_tokens(text_token_ids)
 
+        if self.gradient_checkpointing:
+            inputs_embeds = self.dummy_layer(inputs_embeds)
+
         # Forward input through the encoder
         encoder_hidden_states_or = self.model.encoder(inputs_embeds=inputs_embeds, attention_mask=text_masks)[0]
         encoder_hidden_states = encoder_hidden_states_or.unsqueeze(dim=1).repeat(1, num_choices, 1, 1).flatten(0, 1)
@@ -207,13 +210,7 @@ class TFewModel(nn.Module):
             decoder_attention_mask=decoder_attention_mask,
         )
 
-        if self.gradient_checkpointing:
-            # FIXME(?) This is a hack! We added a DummyLayer to ensure that the
-            #  gradient checkpointing will assign output layer as require_grad=True
-            #  Reference: https://discuss.pytorch.org/t/checkpoint-with-no-grad-requiring-inputs-problem/19117/9
-            model_output = self.dummy_layer(model_output.logits)
-        else:
-            model_output = model_output.logits
+        model_output = model_output.logits
 
         target_template_logits = model_output  # Decoder Logits over the vocabulary for target template sequence
 

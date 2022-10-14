@@ -37,7 +37,9 @@ from ..constants import (
     LORA_NORM,
     MAP,
     MULTICLASS,
+    NER,
     NORM_FIT,
+    OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
     QUADRATIC_KAPPA,
@@ -92,6 +94,8 @@ def get_loss_func(
                 loss_func = nn.MSELoss()
         else:
             loss_func = nn.MSELoss()
+    elif problem_type == NER:
+        loss_func = nn.CrossEntropyLoss(ignore_index=0)
     elif problem_type is None:
         return None
     else:
@@ -168,7 +172,7 @@ def get_metric(
         A customized metric function.
     """
     metric_name = metric_name.lower()
-    if metric_name in [ACC, ACCURACY]:
+    if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
         return torchmetrics.Accuracy(), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
         return torchmetrics.MeanSquaredError(squared=False), None
@@ -542,7 +546,7 @@ def apply_layerwise_lr_decay(
     lr_decay: float,
     weight_decay: float,
     efficient_finetune: Optional[str] = None,
-    trainable_param_names: Optional[List[str]] = None,
+    trainable_param_names: Optional[List] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -572,12 +576,6 @@ def apply_layerwise_lr_decay(
     parameter_group_names = {}
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
-    norm_param_names = get_norm_layer_param_names(model)
-
-    trainable_param_names = get_trainable_params_efficient_finetune(
-        norm_param_names,
-        efficient_finetune=efficient_finetune,
-    )
 
     for name, param in model.named_parameters():
         layer_id = model.name_to_id[name]
@@ -586,6 +584,7 @@ def apply_layerwise_lr_decay(
         elif (
             efficient_finetune is not None
             and efficient_finetune != "None"
+            and trainable_param_names
             and not any([re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names])
         ):
             param.requires_grad = False
@@ -706,67 +705,119 @@ def get_metric_learning_distance_func(
         raise ValueError(f"Unknown distance measure: {name}")
 
 
-def get_metric_learning_loss_funcs(
-    matches: List[DictConfig],
+def infer_matcher_loss(data_format: str, problem_type: str):
+    """
+    Infer the loss type to train the matcher.
+
+    Parameters
+    ----------
+    data_format
+        The training data format, e.g., pair or triplet.
+    problem_type
+        Type of problem.
+
+    Returns
+    -------
+    The loss name.
+    """
+    if data_format == "pair":
+        if problem_type is None:
+            return ["multi_negatives_softmax_loss"]
+        elif problem_type == BINARY:
+            return ["contrastive_loss"]
+        elif problem_type == REGRESSION:
+            return ["cosine_similarity_loss"]
+        else:
+            raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
+    elif data_format == "triplet":
+        if problem_type is None:
+            return ["multi_negatives_softmax_loss"]
+        else:
+            raise ValueError(f"Unsupported data format {data_format} with problem type {problem_type}")
+    else:
+        raise ValueError(f"Unsupported data format: {data_format}")
+
+
+def get_matcher_loss_func(
+    data_format: str,
+    problem_type: str,
+    loss_type: Optional[str] = None,
+    pos_margin: Optional[float] = None,
+    neg_margin: Optional[float] = None,
+    distance_type: Optional[str] = None,
 ):
     """
     Return a list of pytorch metric learning's loss functions based on their names.
 
     Parameters
     ----------
-    matches
-        A list of matches from the matcher config.
+    data_format
+        The training data format, e.g., pair or triplet.
+    problem_type
+        Type of problem.
+    loss_type
+        The provided loss type.
+    pos_margin
+        The positive margin in computing the metric learning loss.
+    neg_margin
+        The negative margin in computing the metric learning loss.
+    distance_type
+        The distance function type.
 
     Returns
     -------
-    A list of loss functions from the pytorch metric learning package.
+    A loss function of metric learning.
     """
-    metric_learning_loss_funcs = []
-    for per_match in matches:
-        if per_match.loss.type.lower() == CONTRASTIVE_LOSS:
-            metric_learning_loss_funcs.append(
-                losses.ContrastiveLoss(
-                    pos_margin=per_match.loss.pos_margin,
-                    neg_margin=per_match.loss.neg_margin,
-                    distance=get_metric_learning_distance_func(per_match.distance.type),
-                )
-            )
-        else:
-            raise ValueError(f"Unknown metric learning loss: {per_match.loss.type}")
 
-    return metric_learning_loss_funcs
+    allowable_loss_types = infer_matcher_loss(data_format=data_format, problem_type=problem_type)
+    if loss_type is not None:
+        assert loss_type in allowable_loss_types, f"data format {data_format} can't use loss {loss_type}."
+    else:
+        loss_type = allowable_loss_types[0]
+
+    if loss_type.lower() == CONTRASTIVE_LOSS:
+        return losses.ContrastiveLoss(
+            pos_margin=pos_margin,
+            neg_margin=neg_margin,
+            distance=get_metric_learning_distance_func(distance_type),
+        )
+    else:
+        raise ValueError(f"Unknown metric learning loss: {loss_type}")
 
 
-def get_metric_learning_miner_funcs(
-    matches: List[DictConfig],
+def get_matcher_miner_func(
+    miner_type: str,
+    pos_margin: float,
+    neg_margin: float,
+    distance_type: str,
 ):
     """
-    Return a list of pytorch metric learning's miner functions based on their names.
+    Return a pytorch metric learning's miner functions based on their names.
     The miners are used to mine the positive and negative examples.
 
     Parameters
     ----------
-    matches
-        A list of matches from the matcher config.
+    miner_type
+        The miner function type.
+    pos_margin
+        The positive margin used by the miner function.
+    neg_margin
+        The negative margin used by the miner function.
+    distance_type
+        The distance function type.
 
     Returns
     -------
-    A list of miner functions from the pytorch metric learning package.
+    A miner function to mine positive and negative samples.
     """
-    metric_learning_miner_funcs = []
-    for per_match in matches:
-        if per_match.miner.type.lower() == PAIR_MARGIN_MINER:
-            metric_learning_miner_funcs.append(
-                miners.PairMarginMiner(
-                    pos_margin=per_match.miner.pos_margin,
-                    neg_margin=per_match.miner.neg_margin,
-                    distance=get_metric_learning_distance_func(per_match.distance.type),
-                )
-            )
-        else:
-            raise ValueError(f"Unknown metric learning miner: {per_match.miner.type}")
-
-    return metric_learning_miner_funcs
+    if miner_type.lower() == PAIR_MARGIN_MINER:
+        return miners.PairMarginMiner(
+            pos_margin=pos_margin,
+            neg_margin=neg_margin,
+            distance=get_metric_learning_distance_func(distance_type),
+        )
+    else:
+        raise ValueError(f"Unknown metric learning miner: {miner_type}")
 
 
 def generate_metric_learning_labels(

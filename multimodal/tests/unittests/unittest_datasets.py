@@ -442,3 +442,67 @@ class AmazonReviewSentimentCrossLingualDataset:
     @property
     def test_df(self):
         return self._test_en_df
+
+
+class IDChangeDetectionDataset:
+    def __init__(self):
+        sha1sum_id = "b4a7f3ad12778d65e2ff9a2e4e7bd002c91a0458"
+        dataset = "id_change_detection"
+        file_name = f"{dataset}_for_unit_tests.zip"
+        url = get_repo_url() + file_name
+        save_path = os.path.join(get_data_home_dir(), file_name)
+        self._path = os.path.join(get_data_home_dir(), dataset)
+        download(
+            url=url,
+            path=save_path,
+            sha1_hash=sha1sum_id,
+        )
+        protected_zip_extraction(
+            save_path,
+            sha1_hash=sha1sum_id,
+            folder=self._path,
+        )
+        # Extract
+        self._train_df = pd.read_csv(os.path.join(self._path, "train.csv"), index_col=0)
+
+        self._test_df = pd.read_csv(os.path.join(self._path, "test.csv"), index_col=0)
+
+        for img_col in self.image_columns:
+            self._train_df[img_col] = self._train_df[img_col].apply(
+                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+            )
+            self._test_df[img_col] = self._test_df[img_col].apply(
+                lambda ele: path_expander(ele, base_folder=os.path.join(self._path, "images"))
+            )
+
+    @property
+    def feature_columns(self):
+        return ["Previous Image", "Current Image", "Product Title", "Product Type"]
+
+    @property
+    def label_columns(self):
+        return ["Is Identity Changed?"]
+
+    @property
+    def train_df(self):
+        return self._train_df
+
+    @property
+    def test_df(self):
+        return self._test_df
+
+    @property
+    def image_columns(self):
+        return ["Previous Image", "Current Image"]
+
+    @property
+    def metric(self):
+        return "roc_auc"
+
+    @property
+    def problem_type(self):
+        return BINARY
+
+    @property
+    def match_label(self):
+        return 0

@@ -19,6 +19,7 @@ import pytorch_lightning as pl
 import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
+from packaging import version
 from sklearn.model_selection import train_test_split
 from torch import nn
 
@@ -38,6 +39,10 @@ from .constants import (
     CLASSIFICATION,
     COLUMN_FEATURES,
     DATA,
+    DEEPSPEED_MIN_PL_VERSION,
+    DEEPSPEED_MODULE,
+    DEEPSPEED_OFFLOADING,
+    DEEPSPEED_STRATEGY,
     DEPRECATED_ZERO_SHOT,
     FEATURE_EXTRACTION,
     FEATURES,
@@ -47,12 +52,13 @@ from .constants import (
     LAST_CHECKPOINT,
     LOGITS,
     MASKS,
-    MATCHER,
     MAX,
     MIN,
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    NER,
+    NER_RET,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
@@ -74,16 +80,22 @@ from .data.infer_types import (
     infer_problem_type_output_shape,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn
+from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
-from .optimization.lit_matcher import MatcherLitModule
 from .optimization.lit_mmdet import MMDetLitModule
 from .optimization.lit_module import LitModule
+from .optimization.lit_ner import NerLitModule
 from .optimization.losses import RKDLoss
-from .optimization.utils import get_loss_func, get_metric
+from .optimization.utils import (
+    get_loss_func,
+    get_metric,
+    get_norm_layer_param_names,
+    get_trainable_params_efficient_finetune,
+)
 from .utils import (
     AutoMMModelCheckpoint,
+    AutoMMModelCheckpointIO,
     COCODataset,
     CustomUnpickler,
     LogFilter,
@@ -104,6 +116,8 @@ from .utils import (
     get_minmax_mode,
     get_mixup,
     get_onnx_input,
+    getCOCOCatIDs,
+    hpo_trial,
     infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
@@ -253,6 +267,9 @@ class MultiModalPredictor:
             self._problem_type = None
             self._pipeline = ZERO_SHOT_IMAGE_CLASSIFICATION
 
+        if problem_type is not None and problem_type.lower() == NER:
+            self._pipeline = None
+
         if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
                 pipeline=self._pipeline, hyperparameters=hyperparameters, num_classes=self._output_shape
@@ -300,6 +317,7 @@ class MultiModalPredictor:
         holdout_frac: Optional[float] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         seed: Optional[int] = 123,
+        standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
     ):
         """
@@ -383,6 +401,8 @@ class MultiModalPredictor:
             knowledge to a student predictor, i.e., the current predictor.
         seed
             The random seed to use for this training run.
+        standalone
+            Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
         hyperparameter_tune_kwargs
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -393,7 +413,7 @@ class MultiModalPredictor:
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
                     scheduler_init_args: Optional[dict] = None
                         If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
-                    searcher: Union[str, ray.tune.suggest.SearchAlgorithm, ray.tune.suggest.Searcher]
+                    searcher: Union[str, ray.tune.search.SearchAlgorithm, ray.tune.search.Searcher]
                         If str is passed, AutoGluon will create the searcher for you with some default parameters.
                         If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
                         You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
@@ -562,6 +582,7 @@ class MultiModalPredictor:
             config=config,
             hyperparameters=hyperparameters,
             teacher_predictor=teacher_predictor,
+            standalone=standalone,
             hpo_mode=(hyperparameter_tune_kwargs is not None),  # skip average checkpoint if in hpo mode
         )
 
@@ -570,6 +591,7 @@ class MultiModalPredictor:
             resources = dict(num_gpus=torch.cuda.device_count())
             if _fit_args["max_time"] is not None:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
+            _fit_args["predictor"] = self
             predictor = self._hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
@@ -581,6 +603,8 @@ class MultiModalPredictor:
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
+        from ray.air.config import CheckpointConfig
+
         from autogluon.core.hpo.ray_hpo import (
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
@@ -602,8 +626,14 @@ class MultiModalPredictor:
         if _fit_args.get("teacher_predictor", None) is not None:
             is_distill = True
         try:
+            run_config_kwargs = {
+                "checkpoint_config": CheckpointConfig(
+                    num_to_keep=3,
+                    checkpoint_score_attribute=metric,
+                ),
+            }
             analysis = run(
-                trainable=self._hpo_fit_wrapper,
+                trainable=hpo_trial,
                 trainable_args=_fit_args,
                 search_space=search_space,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
@@ -614,8 +644,7 @@ class MultiModalPredictor:
                 total_resources=resources,
                 minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
                 time_budget_s=time_budget_s,
-                keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
-                checkpoint_score_attr=metric,
+                run_config_kwargs=run_config_kwargs,
                 verbose=2,
             )
         except EmptySearchSpace:
@@ -661,17 +690,17 @@ class MultiModalPredictor:
             with open(best_k_model_path, "w") as yaml_file:
                 yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
 
-            last_ckpt_path = analysis.get_last_checkpoint(best_trial)
-            predictor._top_k_average(
-                model=predictor._model,
-                save_path=best_trial_path,
-                last_ckpt_path=last_ckpt_path,
-                minmax_mode=mode,
-                is_distill=is_distill,
-                top_k_average_method=predictor._config.optimization.top_k_average_method,
-                val_df=_fit_args["val_df"],
-                validation_metric_name=predictor._validation_metric_name,
-            )
+            with analysis.get_last_checkpoint(best_trial).as_directory() as last_ckpt_dir:
+                predictor._top_k_average(
+                    model=predictor._model,
+                    save_path=best_trial_path,
+                    last_ckpt_path=last_ckpt_dir,
+                    minmax_mode=mode,
+                    is_distill=is_distill,
+                    top_k_average_method=predictor._config.optimization.top_k_average_method,
+                    val_df=_fit_args["val_df"],
+                    validation_metric_name=predictor._validation_metric_name,
+                )
             cleanup_checkpoints(best_trial_path)
             # move trial predictor one level up
             contents = os.listdir(best_trial_path)
@@ -684,19 +713,6 @@ class MultiModalPredictor:
             predictor._save_path = save_path
 
             return predictor
-
-    def _hpo_fit_wrapper(self, sampled_hyperparameters, checkpoint_dir=None, **_fit_args):
-        from ray import tune
-
-        _fit_args[
-            "hyperparameters"
-        ] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
-        _fit_args["save_path"] = tune.get_trial_dir()  # We want to save each trial to a separate directory
-        logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
-        if checkpoint_dir is not None:
-            _fit_args["resume"] = True
-            _fit_args["ckpt_path"] = os.path.join(checkpoint_dir, RAY_TUNE_CHECKPOINT)
-        self._fit(**_fit_args)
 
     def _setup_distillation(
         self,
@@ -812,24 +828,6 @@ class MultiModalPredictor:
             flag=True,
         )
 
-        logger.debug(
-            f"teacher preprocessor text_feature_names: {teacher_predictor._df_preprocessor._text_feature_names}"
-        )
-        logger.debug(f"teacher preprocessor image_path_names: {teacher_predictor._df_preprocessor._image_path_names}")
-        logger.debug(
-            f"teacher preprocessor categorical_feature_names: {teacher_predictor._df_preprocessor._categorical_feature_names}"
-        )
-        logger.debug(
-            f"teacher preprocessor numerical_feature_names: {teacher_predictor._df_preprocessor._numerical_feature_names}"
-        )
-
-        logger.debug(f"student preprocessor text_feature_names: {self._df_preprocessor._text_feature_names}")
-        logger.debug(f"student preprocessor image_path_names: {self._df_preprocessor._image_path_names}")
-        logger.debug(
-            f"student preprocessor categorical_feature_names: {self._df_preprocessor._categorical_feature_names}"
-        )
-        logger.debug(f"student preprocessor numerical_feature_names: {self._df_preprocessor._numerical_feature_names}")
-
         return (
             teacher_predictor._model,
             critics,
@@ -859,6 +857,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         teacher_predictor: Union[str, MultiModalPredictor] = None,
         hpo_mode: bool = False,
+        standalone: bool = True,
         **hpo_kwargs,
     ):
         if self._config is not None:  # continuous training
@@ -868,8 +867,11 @@ class MultiModalPredictor:
             presets=presets,
             config=config,
             overrides=hyperparameters,
-            is_distill=teacher_predictor is not None,
+            extra=["distiller"] if teacher_predictor is not None else None,
         )
+
+        if self._problem_type == NER:
+            self._output_shape += len(OmegaConf.to_object(config.model.ner.special_tags))
 
         config = update_config_by_rules(
             problem_type=self._problem_type,
@@ -878,7 +880,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config.data,
+                config=config,
                 column_types=self._column_types,
                 label_column=self._label_column,
                 train_df_x=train_df.drop(columns=self._label_column),
@@ -898,6 +900,12 @@ class MultiModalPredictor:
             )
         else:  # continuing training
             model = self._model
+
+        norm_param_names = get_norm_layer_param_names(model)
+
+        trainable_param_names = get_trainable_params_efficient_finetune(
+            norm_param_names, efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune")
+        )
 
         if self._data_processors is None:
             data_processors = create_fusion_data_processors(
@@ -953,16 +961,6 @@ class MultiModalPredictor:
         self._model = model
         self._model_postprocess_fn = model_postprocess_fn
 
-        if hasattr(config, MATCHER):
-            warnings.warn("Matching is experimental. We may change its behaviors in future.", UserWarning)
-            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
-            turn_on_off_feature_column_info(
-                data_processors=data_processors,
-                flag=True,
-            )
-        else:
-            match_label = None
-
         if max_time == timedelta(seconds=0):
             self._top_k_average(
                 model=model,
@@ -972,6 +970,8 @@ class MultiModalPredictor:
                 top_k_average_method=config.optimization.top_k_average_method,
                 val_df=val_df,
                 validation_metric_name=validation_metric_name,
+                strict_loading=not trainable_param_names,
+                standalone=standalone,
             )
 
             return self
@@ -1036,8 +1036,6 @@ class MultiModalPredictor:
             custom_metric_func=custom_metric_func,
         )
         is_distill = teacher_model is not None
-        is_match = hasattr(config, MATCHER)
-        assert not (is_distill and is_match), "Can't do distillation and matching simultaneously"
         if is_distill:
             output_feature_loss_weight = OmegaConf.select(
                 self._config, "distiller.output_feature_loss_weight", default=0.0
@@ -1066,11 +1064,15 @@ class MultiModalPredictor:
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
-        elif is_match:
-            task = MatcherLitModule(
+        elif self._problem_type == NER:
+            task = NerLitModule(
                 model=model,
-                matches=config.matcher.matches,
-                match_label=match_label,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1087,8 +1089,8 @@ class MultiModalPredictor:
                 efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                trainable_param_names=OmegaConf.select(config, "optimization.trainable_param_names", default=None),
                 model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1135,6 +1137,10 @@ class MultiModalPredictor:
                 model_summary,
             ]
 
+        custom_checkpoint_plugin = AutoMMModelCheckpointIO(
+            trainable_param_names=trainable_param_names, model_name_to_id=model.name_to_id
+        )
+
         tb_logger = pl.loggers.TensorBoardLogger(
             save_dir=save_path,
             name="",
@@ -1158,7 +1164,21 @@ class MultiModalPredictor:
 
         if not hpo_mode:
             if num_gpus <= 1:
-                strategy = None
+                if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
+                    assert version.parse(pl.__version__) >= version.parse(
+                        DEEPSPEED_MIN_PL_VERSION
+                    ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+                    from .optimization.deepspeed import CustomDeepSpeedStrategy
+
+                    strategy = CustomDeepSpeedStrategy(
+                        stage=3,
+                        offload_optimizer=True,
+                        offload_parameters=False,
+                        allgather_bucket_size=config.env.deepspeed_allgather_size,
+                        reduce_bucket_size=config.env.deepspeed_allreduce_size,
+                    )
+                else:
+                    strategy = None
             else:
                 strategy = config.env.strategy
         else:
@@ -1171,10 +1191,10 @@ class MultiModalPredictor:
 
         config.env.num_gpus = num_gpus
         config.env.precision = precision
-        config.env.strategy = strategy
+        config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
         self._config = config
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path)
+        self.save(save_path, standalone=standalone)
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
@@ -1206,6 +1226,7 @@ class MultiModalPredictor:
                 if hasattr(config.optimization, "check_val_every_n_epoch")
                 else 1,
                 reload_dataloaders_every_n_epochs=1,
+                plugins=[custom_checkpoint_plugin],
             )
 
         with warnings.catch_warnings():
@@ -1234,6 +1255,9 @@ class MultiModalPredictor:
                     top_k_average_method=config.optimization.top_k_average_method,
                     val_df=val_df,
                     validation_metric_name=validation_metric_name,
+                    strategy=strategy,
+                    strict_loading=not trainable_param_names,  # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1247,7 +1271,10 @@ class MultiModalPredictor:
         top_k_average_method,
         val_df,
         validation_metric_name,
+        strategy=None,
         last_ckpt_path=None,
+        strict_loading=True,
+        standalone=True,
     ):
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
@@ -1294,6 +1321,7 @@ class MultiModalPredictor:
                             model=model,
                             path=top_k_model_paths[0],
                             prefix=prefix,
+                            strict=strict_loading,
                         )
                         best_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                         for i in range(1, len(top_k_model_paths)):
@@ -1304,6 +1332,7 @@ class MultiModalPredictor:
                                 model=self._model,
                                 state_dict=cand_avg_state_dict,
                                 prefix=prefix,
+                                strict=strict_loading,
                             )
                             cand_score = self.evaluate(val_df, [validation_metric_name])[validation_metric_name]
                             if monitor_op(cand_score, best_score):
@@ -1335,6 +1364,7 @@ class MultiModalPredictor:
             model=model,
             state_dict=avg_state_dict,
             prefix=prefix,
+            strict=strict_loading,
         )
 
         if is_distill:
@@ -1344,7 +1374,21 @@ class MultiModalPredictor:
                 new_prefix="model",
             )
 
-        checkpoint = {"state_dict": avg_state_dict}
+        if not standalone:
+            checkpoint = {"state_dict": avg_state_dict}
+        else:
+            if strategy and hasattr(strategy, "strategy_name") and strategy.strategy_name == DEEPSPEED_STRATEGY:
+                checkpoint = {
+                    "state_dict": {
+                        name.partition("module.")[2]: param
+                        for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()
+                    }
+                }
+            else:
+                checkpoint = {
+                    "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
+                }
+
         torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
         # clean old checkpoints + the intermediate files stored
@@ -1369,11 +1413,38 @@ class MultiModalPredictor:
         strategy: str,
     ) -> List[Dict]:
 
-        if hasattr(self._config, MATCHER):
-            turn_on_off_feature_column_info(
-                data_processors=data_processors,
-                flag=True,
+        if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
+            # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
+            # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in pytorch-lighting.
+            from .optimization.deepspeed import CustomDeepSpeedStrategy
+
+            strategy = CustomDeepSpeedStrategy(
+                stage=3,
+                offload_optimizer=True,
+                offload_parameters=False,
+                allgather_bucket_size=self._config.env.deepspeed_allgather_size,
+                reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
             )
+            norm_param_names = get_norm_layer_param_names(self._model)
+            trainable_param_names = get_trainable_params_efficient_finetune(
+                norm_param_names, efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune")
+            )
+
+            optimization_kwargs = dict(
+                optim_type=self._config.optimization.optim_type,
+                lr_choice=self._config.optimization.lr_choice,
+                lr_schedule=self._config.optimization.lr_schedule,
+                lr=self._config.optimization.learning_rate,
+                lr_decay=self._config.optimization.lr_decay,
+                end_lr=self._config.optimization.end_lr,
+                lr_mult=self._config.optimization.lr_mult,
+                weight_decay=self._config.optimization.weight_decay,
+                warmup_steps=self._config.optimization.warmup_steps,
+            )
+        else:
+            optimization_kwargs = {}
+            trainable_param_names = []
+
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1381,12 +1452,14 @@ class MultiModalPredictor:
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-        if hasattr(self._config, MATCHER):
-            match_label = self._df_preprocessor.label_generator.transform([self._config.matcher.match_label]).item()
-            task = MatcherLitModule(
+
+        if self._problem_type == NER:
+            task = NerLitModule(
                 model=self._model,
-                matches=self._config.matcher.matches,
-                match_label=match_label,
+                model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
             )
         elif self._pipeline == OBJECT_DETECTION:
             task = MMDetLitModule(model=self._model)
@@ -1394,6 +1467,9 @@ class MultiModalPredictor:
             task = LitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
             )
 
         blacklist_msgs = []
@@ -1406,6 +1482,7 @@ class MultiModalPredictor:
             blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
+
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 gpus=num_gpus,
@@ -1427,6 +1504,7 @@ class MultiModalPredictor:
                     "Consider increasing the value of the `num_workers` argument` "
                     ".* in the `DataLoader` init to improve performance.*",
                 )
+
                 outputs = evaluator.predict(
                     task,
                     datamodule=predict_dm,
@@ -1460,7 +1538,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config.data,
+                config=config,
                 column_types=column_types,
                 label_column=self._label_column,
                 train_df_x=data,  # TODO: drop label like in line 884?
@@ -1555,7 +1633,7 @@ class MultiModalPredictor:
         data_processors: Dict,
     ):
 
-        modality_features, sample_num = apply_df_preprocessor(
+        modality_features, modality_types, sample_num = apply_df_preprocessor(
             data=data,
             df_preprocessor=df_preprocessor,
             modalities=data_processors.keys(),
@@ -1563,10 +1641,14 @@ class MultiModalPredictor:
 
         processed_features = []
         for i in range(sample_num):
-            per_sample_features = apply_data_processor(
+            per_sample_features = get_per_sample_features(
                 modality_features=modality_features,
-                data_processors=data_processors,
+                modality_types=modality_types,
                 idx=i,
+            )
+            per_sample_features = apply_data_processor(
+                per_sample_features=per_sample_features,
+                data_processors=data_processors,
                 is_training=False,
             )
             processed_features.append(per_sample_features)
@@ -1605,7 +1687,10 @@ class MultiModalPredictor:
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ) -> List[Dict]:
+
+        pl.seed_everything(seed, workers=True)
 
         data, df_preprocessor, data_processors = self._on_predict_start(
             config=self._config,
@@ -1660,6 +1745,7 @@ class MultiModalPredictor:
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         """
         Evaluate model on a test dataset.
@@ -1687,8 +1773,8 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION:
             return self.evaluate_coco(data, metrics)
 
-        if hasattr(self._config, MATCHER):
-            ret_type = PROBABILITY
+        if self._problem_type == NER:
+            ret_type = NER_RET
         else:
             ret_type = LOGITS
 
@@ -1696,26 +1782,28 @@ class MultiModalPredictor:
             data=data,
             requires_label=True,
             realtime=realtime,
+            seed=seed,
         )
-        logits_or_prob = extract_from_output(ret_type=ret_type, outputs=outputs)
+        logits = extract_from_output(ret_type=ret_type, outputs=outputs)
 
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
-            if ret_type == LOGITS:
-                y_pred_prob = logits_to_prob(logits_or_prob)
-            else:
-                y_pred_prob = logits_or_prob
+            y_pred_prob = logits_to_prob(logits)
             metric_data[Y_PRED_PROB] = y_pred_prob
 
         y_pred = self._df_preprocessor.transform_prediction(
-            y_pred=logits_or_prob,
+            y_pred=logits,
             inverse_categorical=False,
         )
         y_pred_inv = self._df_preprocessor.transform_prediction(
-            y_pred=logits_or_prob,
+            y_pred=logits,
             inverse_categorical=True,
         )
-        y_true = self._df_preprocessor.transform_label_for_metric(df=data)
+
+        if self._problem_type == NER:
+            y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
+        else:
+            y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update(
             {
@@ -1724,24 +1812,37 @@ class MultiModalPredictor:
             }
         )
 
+        metrics_is_none = False
+
         if metrics is None:
+            metrics_is_none = True
             metrics = [self._eval_metric_name]
         if isinstance(metrics, str):
             metrics = [metrics]
 
         results = {}
-        for per_metric in metrics:
-            pos_label = try_to_infer_pos_label(
-                data_config=self._config.data,
-                label_encoder=self._df_preprocessor.label_generator,
-                problem_type=self._problem_type,
-            )
+        if self._problem_type == NER:
             score = compute_score(
                 metric_data=metric_data,
-                metric_name=per_metric.lower(),
-                pos_label=pos_label,
+                metric_name=self._eval_metric_name.lower(),
             )
-            results[per_metric] = score
+            if metrics_is_none:
+                results = score
+            else:
+                results.update({per_metric: score[per_metric] for per_metric in metrics})
+        else:
+            for per_metric in metrics:
+                pos_label = try_to_infer_pos_label(
+                    data_config=self._config.data,
+                    label_encoder=self._df_preprocessor.label_generator,
+                    problem_type=self._problem_type,
+                )
+                score = compute_score(
+                    metric_data=metric_data,
+                    metric_name=per_metric.lower(),
+                    pos_label=pos_label,
+                )
+                results[per_metric] = score
 
         if return_pred:
             return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
@@ -1781,6 +1882,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         """
         Predict values for the label column of new data.
@@ -1803,14 +1905,15 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if hasattr(self._config, MATCHER):
-            ret_type = PROBABILITY
-        elif self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
+        if self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
         else:
             ret_type = LOGITS
+
+        if self._problem_type == NER:
+            ret_type = NER_RET
 
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -1823,24 +1926,25 @@ class MultiModalPredictor:
                 data=data,
                 requires_label=False,
                 realtime=realtime,
+                seed=seed,
             )
 
             if self._pipeline == OCR_TEXT_RECOGNITION:
-                logits_or_prob = []
+                logits = []
                 for r_type in ret_type:
-                    logits_or_prob.append(extract_from_output(outputs=outputs, ret_type=r_type))
+                    logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
             else:
-                logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+                logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
                 pred = self._df_preprocessor.transform_prediction(
-                    y_pred=logits_or_prob,
+                    y_pred=logits,
                 )
             else:
-                if isinstance(logits_or_prob, (torch.Tensor, np.ndarray)) and logits_or_prob.ndim == 2:
-                    pred = logits_or_prob.argmax(axis=1)
+                if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
+                    pred = logits.argmax(axis=1)
                 else:
-                    pred = logits_or_prob
+                    pred = logits
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
@@ -1854,6 +1958,7 @@ class MultiModalPredictor:
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        seed: Optional[int] = 123,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1884,12 +1989,8 @@ class MultiModalPredictor:
         """
         assert self._problem_type not in [
             REGRESSION,
+            NER,
         ], f"Problem {self._problem_type} has no probability output."
-
-        if hasattr(self._config, MATCHER):
-            ret_type = PROBABILITY
-        else:
-            ret_type = LOGITS
 
         if candidate_data:
             prob = self._match_queries_and_candidates(
@@ -1902,13 +2003,11 @@ class MultiModalPredictor:
                 data=data,
                 requires_label=False,
                 realtime=realtime,
+                seed=seed,
             )
-            logits_or_prob = extract_from_output(outputs=outputs, ret_type=ret_type)
+            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
 
-            if ret_type == LOGITS:
-                prob = logits_to_prob(logits_or_prob)
-            else:
-                prob = logits_or_prob
+            prob = logits_to_prob(logits)
 
         if not as_multiclass:
             if self._problem_type == BINARY:
@@ -1987,13 +2086,15 @@ class MultiModalPredictor:
     def _as_pandas(
         self,
         data: Union[pd.DataFrame, dict, list],
-        to_be_converted: np.ndarray,
+        to_be_converted: Union[np.ndarray, dict],
     ):
         if isinstance(data, pd.DataFrame):
             index = data.index
         else:
             index = None
-        if to_be_converted.ndim == 1:
+        if isinstance(to_be_converted, list) or (
+            isinstance(to_be_converted, np.ndarray) and to_be_converted.ndim == 1
+        ):
             return pd.Series(to_be_converted, index=index, name=self._label_column)
         else:
             return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)
@@ -2004,11 +2105,15 @@ class MultiModalPredictor:
         state_dict: dict = None,
         path: str = None,
         prefix: str = "model.",
+        strict: bool = True,
     ):
         if state_dict is None:
             state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
-        model.load_state_dict(state_dict)
+        load_result = model.load_state_dict(state_dict, strict=strict)
+        assert (
+            len(load_result.unexpected_keys) == 0
+        ), f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
         return model
 
     @staticmethod
@@ -2039,7 +2144,10 @@ class MultiModalPredictor:
         """
 
         config = copy.deepcopy(self._config)
-        if standalone:
+        if standalone and (
+            not OmegaConf.select(config, "optimization.efficient_finetune")
+            or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
+        ):
             config = save_pretrained_model_configs(model=self._model, config=config, path=path)
 
         os.makedirs(path, exist_ok=True)
@@ -2075,6 +2183,7 @@ class MultiModalPredictor:
                 fp,
                 ensure_ascii=True,
             )
+
         # In case that users save to a path, which is not the original save_path.
         if os.path.abspath(path) != os.path.abspath(self._save_path):
             model_path = os.path.join(self._save_path, "model.ckpt")
@@ -2296,12 +2405,16 @@ class MultiModalPredictor:
         predictor = cls(label="dummy_label")
         predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
 
+        efficient_finetune = OmegaConf.select(predictor._config, "optimization.efficient_finetune")
+
         model = create_fusion_model(
             config=predictor._config,
             num_classes=predictor._output_shape,
             num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
             num_categories=predictor._df_preprocessor.categorical_num_categories,
-            pretrained=False,  # set "pretrain=False" to prevent downloading online models
+            pretrained=False
+            if not efficient_finetune or efficient_finetune == "None"
+            else True,  # set "pretrain=False" to prevent downloading online models
         )
 
         if predictor._data_processors is None:
@@ -2350,6 +2463,7 @@ class MultiModalPredictor:
         model = cls._load_state_dict(
             model=model,
             path=load_path,
+            strict=not efficient_finetune or efficient_finetune == "None",
         )
 
         predictor._ckpt_path = ckpt_path
