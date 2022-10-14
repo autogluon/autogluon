@@ -248,7 +248,10 @@ class MMDetLitModule(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         pred = self._predict_step(batch, batch_idx)
-        return {"bbox": pred, "label": batch["mmdet_image_label"]}
+        if "mmdet_image_label" in batch:
+            return {"bbox": pred, "label": batch["mmdet_image_label"]}
+        else:
+            return {"bbox": pred}
 
     def configure_optimizers(self):
         """
