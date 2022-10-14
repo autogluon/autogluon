@@ -1,13 +1,16 @@
 from typing import Union, List, Dict
 
+from IPython.display import display, Markdown
 from ipywidgets import HBox, Output, Layout, Tab
 
 from .base import AbstractVisualization
-from .jupyter import JupyterMixin
 from .. import AnalysisState
 
 
 class SimpleVerticalLinearLayout(AbstractVisualization):
+    """
+    Renders facets in a sequential order (facets will appear in a vertical layout).
+    """
 
     def __init__(self,
                  facets: Union[AbstractVisualization, List[AbstractVisualization]],
@@ -27,7 +30,11 @@ class SimpleVerticalLinearLayout(AbstractVisualization):
             facet.render(state)
 
 
-class SimpleHorizontalLayout(SimpleVerticalLinearLayout, JupyterMixin):
+class SimpleHorizontalLayout(SimpleVerticalLinearLayout):
+    """
+    Render components horizontally using `HBox` widget.
+    See `HBox widget <https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20List.html#HBox>`_ documentation for details.
+    """
 
     def _render(self, state: AnalysisState) -> None:
         outs = [Output() for i in range(len(self.facets))]
@@ -38,7 +45,12 @@ class SimpleHorizontalLayout(SimpleVerticalLinearLayout, JupyterMixin):
         self.display_obj(HBox(outs, layout=Layout(flex='row wrap')))
 
 
-class TabLayout(SimpleVerticalLinearLayout, JupyterMixin):
+class TabLayout(SimpleVerticalLinearLayout):
+    """
+    Render components using `Tab` widget.
+    See `HBox widget <https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20List.html#Tabs>`_ documentation for details.
+
+    """
 
     def __init__(self,
                  facets: Dict[str, AbstractVisualization],
@@ -59,7 +71,12 @@ class TabLayout(SimpleVerticalLinearLayout, JupyterMixin):
                 facet.render(state)
 
 
-class MarkdownSectionComponent(AbstractVisualization, JupyterMixin):
+class MarkdownSectionComponent(AbstractVisualization):
+    """
+    Render provided string as a Markdown cell.
+    See `Jupyter Markdown cell <https://jupyter-notebook.readthedocs.io/en/stable/examples/Notebook/Working%20With%20Markdown%20Cells.html>`_
+    documentation for details.
+    """
 
     def __init__(self,
                  markdown: str,
@@ -72,4 +89,4 @@ class MarkdownSectionComponent(AbstractVisualization, JupyterMixin):
         return True
 
     def _render(self, state: AnalysisState) -> None:
-        self.render_markdown(self.markdown)
+        display(Markdown(self.markdown))
