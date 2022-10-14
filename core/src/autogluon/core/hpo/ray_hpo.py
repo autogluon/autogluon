@@ -235,7 +235,11 @@ def run(
     )
 
     if not ray.is_initialized():
-        ray.init(log_to_driver=False, **total_resources)
+        ray.init(
+            log_to_driver=False,
+            runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+            **total_resources
+        )
 
     resources_per_trial = hyperparameter_tune_kwargs.get('resources_per_trial', None)
     resources_per_trial = ray_tune_adapter.get_resources_per_trial(
@@ -259,9 +263,9 @@ def run(
         run_config_kwargs = dict()
     
     tuner = tune.Tuner(
-        tune.with_parameters(
-            tune.with_resources(trainable, resources_per_trial),
-            **trainable_args
+        tune.with_resources(
+            tune.with_parameters(trainable, **trainable_args),
+            resources_per_trial
         ),
         param_space=search_space,
         tune_config=tune.TuneConfig(
@@ -278,13 +282,16 @@ def run(
             local_dir=os.path.dirname(save_dir),
             verbose=verbose,
             **run_config_kwargs
-        )
+        ),
+        _tuner_kwargs={
+            "trial_name_creator": _trial_name_creator,
+            "trial_dirname_creator": _trial_dirname_creator
+        }
     )
-    tuner.fit()
-    analysis = ExperimentAnalysis(save_dir)  # TODO: update this to use tune.ResultGrid when it reach the same feature parity
+    results = tuner.fit()
 
     os.chdir(original_path)  # go back to the original directory to avoid relative path being broken
-    return analysis
+    return results._experiment_analysis
 
 
 def cleanup_trials(save_dir: str, trials_to_keep: Optional[List[str]]):
@@ -320,6 +327,14 @@ def cleanup_checkpoints(save_dir):
     directories = [dir for dir in os.listdir(save_dir) if os.path.isdir(os.path.join(save_dir, dir)) and dir.startswith('checkpoint')]
     for directory in directories:
         shutil.rmtree(os.path.join(save_dir, directory))
+        
+        
+def _trial_name_creator(trial):
+    return trial.trial_id
+
+
+def _trial_dirname_creator(trial):
+    return trial.trial_id
 
 
 def _validate_resources_per_trial(resources_per_trial):

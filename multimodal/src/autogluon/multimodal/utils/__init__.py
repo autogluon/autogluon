@@ -29,6 +29,7 @@ from .environment import (
     is_interactive,
     move_to_device,
 )
+from .hpo import hpo_trial
 from .inference import extract_from_output, infer_batch, use_realtime
 from .load import CustomUnpickler, load_text_tokenizers
 from .log import LogFilter, apply_log_filter, make_exp_dir
