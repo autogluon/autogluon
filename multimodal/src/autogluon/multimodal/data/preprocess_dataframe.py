@@ -208,15 +208,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return self._fit_y_called
 
     def get_column_names(self, modality: str):
-<<<<<<< HEAD
-        if modality == IMAGE or modality == IMAGE_PATH or modality == ROIS:
-            return self._image_path_names
-        elif modality == TEXT:
-=======
-        if modality.startswith(IMAGE):
+        if modality.startswith(IMAGE) or modality == ROIS:
             return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
         elif modality.startswith(TEXT):
->>>>>>> 9a5b54bc7120e77b11d72092aeee44d58cc4d33d
             return self._text_feature_names
         elif modality == CATEGORICAL:
             return self._categorical_feature_names
@@ -287,13 +281,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-<<<<<<< HEAD
-            elif col_type == IMAGE or col_type == IMAGE_PATH or col_type == ROIS:
-                self._image_path_names.append(col_name)
-=======
-            elif col_type.startswith(IMAGE):
+            elif col_type.startswith(IMAGE) or col_type == ROIS:
                 self._image_feature_names.append(col_name)
->>>>>>> 9a5b54bc7120e77b11d72092aeee44d58cc4d33d
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
