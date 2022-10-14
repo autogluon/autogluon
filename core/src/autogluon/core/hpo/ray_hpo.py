@@ -238,6 +238,7 @@ def run(
         ray.init(
             log_to_driver=False,
             runtime_env={"env_vars": {"PL_DISABLE_FORK": "1"}},  # https://github.com/ray-project/ray/issues/28197
+            logging_level=logging.ERROR,  # https://github.com/ray-project/ray/issues/29216
             **total_resources
         )
 
