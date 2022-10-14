@@ -138,6 +138,12 @@ IA3 = "ia3"
 IA3_BIAS = "ia3_bias"
 IA3_NORM = "ia3_norm"
 
+# DeepSpeed constants
+DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
+DEEPSPEED_STRATEGY = "deepspeed"
+DEEPSPEED_MODULE = "autogluon.multimodal.optimization.deepspeed"
+DEEPSPEED_MIN_PL_VERSION = "1.7.1"
+
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
 TIMM_IMAGE = "timm_image"

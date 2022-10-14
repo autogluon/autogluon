@@ -535,6 +535,7 @@ def apply_layerwise_lr_decay(
     lr_decay: float,
     weight_decay: float,
     efficient_finetune: Optional[str] = None,
+    trainable_param_names: Optional[List] = None,
 ):
     """
     Assign monotonically decreasing learning rates for layers from the output end to the input end.
@@ -564,12 +565,6 @@ def apply_layerwise_lr_decay(
     parameter_group_names = {}
     parameter_group_vars = {}
     decay_param_names = get_weight_decay_param_names(model)
-    norm_param_names = get_norm_layer_param_names(model)
-
-    trainable_param_names = get_trainable_params_efficient_finetune(
-        norm_param_names,
-        efficient_finetune=efficient_finetune,
-    )
 
     for name, param in model.named_parameters():
         layer_id = model.name_to_id[name]
@@ -578,6 +573,7 @@ def apply_layerwise_lr_decay(
         elif (
             efficient_finetune is not None
             and efficient_finetune != "None"
+            and trainable_param_names
             and not any([re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names])
         ):
             param.requires_grad = False
