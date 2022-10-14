@@ -116,6 +116,7 @@ from .utils import (
     get_mixup,
     get_onnx_input,
     getCOCOCatIDs,
+    hpo_trial,
     infer_batch,
     infer_dtypes_by_model_names,
     infer_metrics,
@@ -575,6 +576,7 @@ class MultiModalPredictor:
             resources = dict(num_gpus=torch.cuda.device_count())
             if _fit_args["max_time"] is not None:
                 _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
+            _fit_args["predictor"] = self
             predictor = self._hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 resources=resources,
@@ -586,6 +588,8 @@ class MultiModalPredictor:
         return self
 
     def _hyperparameter_tune(self, hyperparameter_tune_kwargs, resources, **_fit_args):
+        from ray.air.config import CheckpointConfig
+
         from autogluon.core.hpo.ray_hpo import (
             AutommRayTuneAdapter,
             AutommRayTuneLightningAdapter,
@@ -607,8 +611,14 @@ class MultiModalPredictor:
         if _fit_args.get("teacher_predictor", None) is not None:
             is_distill = True
         try:
+            run_config_kwargs = {
+                "checkpoint_config": CheckpointConfig(
+                    num_to_keep=3,
+                    checkpoint_score_attribute=metric,
+                ),
+            }
             analysis = run(
-                trainable=self._hpo_fit_wrapper,
+                trainable=hpo_trial,
                 trainable_args=_fit_args,
                 search_space=search_space,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
@@ -619,8 +629,7 @@ class MultiModalPredictor:
                 total_resources=resources,
                 minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
                 time_budget_s=time_budget_s,
-                keep_checkpoints_num=3,  # TODO: find a way to extract this from config. Might need to separate generate config and trial specific config
-                checkpoint_score_attr=metric,
+                run_config_kwargs=run_config_kwargs,
                 verbose=2,
             )
         except EmptySearchSpace:
@@ -666,17 +675,17 @@ class MultiModalPredictor:
             with open(best_k_model_path, "w") as yaml_file:
                 yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
 
-            last_ckpt_path = analysis.get_last_checkpoint(best_trial)
-            predictor._top_k_average(
-                model=predictor._model,
-                save_path=best_trial_path,
-                last_ckpt_path=last_ckpt_path,
-                minmax_mode=mode,
-                is_distill=is_distill,
-                top_k_average_method=predictor._config.optimization.top_k_average_method,
-                val_df=_fit_args["val_df"],
-                validation_metric_name=predictor._validation_metric_name,
-            )
+            with analysis.get_last_checkpoint(best_trial).as_directory() as last_ckpt_dir:
+                predictor._top_k_average(
+                    model=predictor._model,
+                    save_path=best_trial_path,
+                    last_ckpt_path=last_ckpt_dir,
+                    minmax_mode=mode,
+                    is_distill=is_distill,
+                    top_k_average_method=predictor._config.optimization.top_k_average_method,
+                    val_df=_fit_args["val_df"],
+                    validation_metric_name=predictor._validation_metric_name,
+                )
             cleanup_checkpoints(best_trial_path)
             # move trial predictor one level up
             contents = os.listdir(best_trial_path)
@@ -689,19 +698,6 @@ class MultiModalPredictor:
             predictor._save_path = save_path
 
             return predictor
-
-    def _hpo_fit_wrapper(self, sampled_hyperparameters, checkpoint_dir=None, **_fit_args):
-        from ray import tune
-
-        _fit_args[
-            "hyperparameters"
-        ] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
-        _fit_args["save_path"] = tune.get_trial_dir()  # We want to save each trial to a separate directory
-        logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
-        if checkpoint_dir is not None:
-            _fit_args["resume"] = True
-            _fit_args["ckpt_path"] = os.path.join(checkpoint_dir, RAY_TUNE_CHECKPOINT)
-        self._fit(**_fit_args)
 
     def _setup_distillation(
         self,

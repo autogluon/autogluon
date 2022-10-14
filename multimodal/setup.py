@@ -38,7 +38,7 @@ install_requires = [
     "fairscale>=0.4.5,<=0.4.6",
     "scikit-image>=0.19.1,<0.20.0",
     "smart_open>=5.2.1,<5.3.0",
-    "pytorch_lightning>=1.6.0,<1.8.0",
+    "pytorch_lightning>=1.7.4,<1.8.0",
     "text-unidecode<=1.3",
     "torchmetrics>=0.7.2,<0.8.0",
     "transformers>=4.18.0,<4.21.0",
