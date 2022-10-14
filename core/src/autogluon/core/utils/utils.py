@@ -11,11 +11,12 @@ from typing import Callable, List
 
 import numpy as np
 import pandas as pd
-import psutil
 import scipy.stats
 from pandas import DataFrame, Series
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
+
+from autogluon.common.utils.utils import disable_if_lite_mode
 
 from .miscs import warning_filter
 from ..constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, QUANTILE
@@ -28,7 +29,9 @@ def get_cpu_count():
     return multiprocessing.cpu_count()
 
 
+@disable_if_lite_mode(ret=4096)
 def get_memory_size():
+    import psutil
     return bytes_to_mega_bytes(psutil.virtual_memory().total)
 
 
@@ -865,7 +868,9 @@ def _compute_mean_stddev_and_p_value(values: list):
     return mean, stddev, p_value, n
 
 
+@disable_if_lite_mode(ret=1)
 def _get_safe_fi_batch_count(X, num_features, X_transformed=None, max_memory_ratio=0.2, max_feature_batch_count=200):
+    import psutil
     # calculating maximum number of features that are safe to process in parallel
     X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
     if X_transformed is not None:

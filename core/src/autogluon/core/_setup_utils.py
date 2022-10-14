@@ -3,15 +3,18 @@
 # Refer to https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/_min_dependencies.py for original implementation
 
 import os
+from wheel.bdist_wheel import bdist_wheel
 
 AUTOGLUON = 'autogluon'
+PACKAGE_NAME = os.getenv('AUTOGLUON_PACKAGE_NAME', AUTOGLUON)
+# TODO: make it more explicit, maybe use another env variable
+LITE_MODE = 'lite' in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..')
 )
 
-PYTHON_REQUIRES = '>=3.7, <3.10'
-
+PYTHON_REQUIRES = '>=3.7, <3.10' if not LITE_MODE else '>=3.7, <3.11'
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
@@ -25,6 +28,12 @@ DEPENDENT_PACKAGES = {
     'tqdm': '>=4.38.0',
     'Pillow': '>=9.0.1,<9.1.0',
     'timm': '>=0.5.4,<0.6.0',
+} if not LITE_MODE else {
+    'numpy': '>=1.21,<1.23',
+    'pandas': '>=1.2.5,!=1.4.0,<=1.5.0',
+    'scikit-learn': '>=1.0.0,<=1.1.1',
+    'scipy': '>=1.5.4,<=1.9.1',
+    'tqdm': '>=4.38.0',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
@@ -79,15 +88,16 @@ def create_version_file(*, version, submodule):
     with open(version_path, 'w') as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
+        f.write("__lite__ = '{}'\n".format(LITE_MODE))
 
 
 def default_setup_args(*, version, submodule):
     from setuptools import find_packages
     long_description = open(os.path.join(AUTOGLUON_ROOT_PATH, 'README.md')).read()
     if submodule is None:
-        name = AUTOGLUON
+        name = PACKAGE_NAME
     else:
-        name = f'{AUTOGLUON}.{submodule}'
+        name = f'{PACKAGE_NAME}.{submodule}'
     setup_args = dict(
         name=name,
         version=version,

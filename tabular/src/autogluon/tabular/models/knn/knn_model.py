@@ -2,10 +2,10 @@ import logging
 
 import numpy as np
 import math
-import psutil
 import time
 
 from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
+from autogluon.common.utils.utils import disable_if_lite_mode
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.utils import get_cpu_count
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
@@ -107,7 +107,9 @@ class KNNModel(AbstractModel):
         expected_final_model_size_bytes = model_size_bytes * 3.6 # Roughly what can be expected of the final KNN model in memory size
         return expected_final_model_size_bytes
 
+    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
+        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         expected_final_model_size_bytes = self.estimate_memory_usage(**kwargs) 
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB

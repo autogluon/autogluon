@@ -5,13 +5,13 @@ import random
 import re
 import time
 import warnings
-import psutil
 
 import numpy as np
 from pandas import DataFrame, Series
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.utils import disable_if_lite_mode, get_autogluon_metadata
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
@@ -224,7 +224,11 @@ class LGBModel(AbstractModel):
         if num_cpus == 0:
             # TODO Avoid using psutil when lgb fixed the mem leak.
             # psutil.cpu_count() is faster in inference than psutil.cpu_count(logical=False)
-            num_cpus = psutil.cpu_count()
+            if get_autogluon_metadata()["lite"]:
+                num_cpus = 1
+            else:
+                import psutil
+                num_cpus = psutil.cpu_count()
         if self.problem_type == REGRESSION:
             return self.model.predict(X, num_threads=num_cpus)
 
@@ -330,7 +334,9 @@ class LGBModel(AbstractModel):
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
 
+    @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
+        import psutil
         # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0

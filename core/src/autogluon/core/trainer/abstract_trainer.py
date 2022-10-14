@@ -8,7 +8,6 @@ from typing import Dict, List, Union, Tuple
 import networkx as nx
 import numpy as np
 import pandas as pd
-import psutil
 import shutil
 from pathlib import Path
 
@@ -1161,6 +1160,7 @@ class AbstractTrainer:
                     for child in info[model]['children_info'].values():
                         model_mem_size_map[model] += child['memory_size']
             total_mem_required = sum(model_mem_size_map.values())
+            import psutil
             available_mem = psutil.virtual_memory().available
             memory_proportion = total_mem_required / available_mem
             if memory_proportion > max_memory:

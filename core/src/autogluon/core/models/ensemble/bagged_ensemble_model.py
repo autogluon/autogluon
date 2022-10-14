@@ -4,7 +4,6 @@ import logging
 import math
 import os
 import platform
-import psutil
 import time
 from collections import Counter
 from statistics import mean
@@ -1106,6 +1105,7 @@ class BaggedEnsembleModel(AbstractModel):
         num_folds_in_parallel_with_mem = math.inf
 
         if initialized_model_base.estimate_memory_usage is not None:
+            import psutil
             fold_estimate_memory_usage = initialized_model_base.estimate_memory_usage(X=X, **kwargs)
             total_memory_available = psutil.virtual_memory().available
             num_folds_in_parallel_with_mem = total_memory_available // fold_estimate_memory_usage

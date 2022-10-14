@@ -68,15 +68,29 @@ def get_package_versions() -> Dict[str, str]:
 
 
 def get_autogluon_metadata() -> Dict[str, Any]:
-    from ..version import __version__
+    from ..version import __version__, __lite__
     metadata = dict(
         system=platform.system(),
         version=f'{__version__}',
+        lite=__lite__,
         py_version=get_python_version(include_micro=False),
         py_version_micro=get_python_version(include_micro=True),
         packages=get_package_versions(),
     )
     return metadata
+
+
+def disable_if_lite_mode(ret=None):
+    def inner(func):
+        def do_nothing(*args, **kwargs):
+            if callable(ret):
+                return ret(*args, **kwargs)
+            return ret
+        metadata = get_autogluon_metadata()
+        if metadata['lite']:
+            return do_nothing
+        return func
+    return inner
 
 
 def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=True) -> list:

@@ -4,12 +4,12 @@ import os
 import time
 import pandas as pd
 import pickle
-import psutil
 from abc import abstractmethod
 
 from numpy import ndarray
 from pandas import DataFrame, Series
 
+from autogluon.common.utils.utils import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 
 from ...ray.resources_calculator import ResourceCalculatorFactory, ResourceCalculator
@@ -361,8 +361,10 @@ class ParallelLocalFoldFittingStrategy(LocalFoldFittingStrategy):
         self.num_gpus = self._get_gpu_count(num_gpus)
         self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(num_jobs, num_folds_parallel)
 
+    @disable_if_lite_mode(ret=True)
     def is_mem_sufficient(self):
         '''Check if the memory is sufficient to do parallel training'''
+        import psutil
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
         total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()

@@ -4,7 +4,6 @@ import traceback
 
 import numpy as np
 import pandas as pd
-import psutil
 from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
@@ -222,6 +221,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     # TODO: REMOVE NEED FOR text_data input!
     def _adjust_vectorizer_memory_usage(self, transform_matrix, text_data, vectorizer_fit, downsample_ratio: int = None):
+        import psutil
         # This assumes that the ngrams eventually turn into int32/float32 downstream
         predicted_ngrams_memory_usage_bytes = len(text_data) * 4 * (transform_matrix.shape[1] + 1) + 80
         mem_avail = psutil.virtual_memory().available

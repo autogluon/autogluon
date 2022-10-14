@@ -7,7 +7,6 @@ from pandas import DataFrame
 from . import load_pointer
 from ..savers import save_pointer
 from ..utils import multiprocessing_utils, s3_utils
-from .load_s3 import list_bucket_prefix_suffix_s3
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +155,7 @@ def load_multi(path_list, delimiter=',', encoding='utf-8', columns_to_keep_list=
 
 
 def load_multipart_s3(bucket, prefix, columns_to_keep=None, dtype=None, sample_count=None, filters=None, worker_count=None, multiprocessing_method='forkserver'):
+    from .load_s3 import list_bucket_prefix_suffix_s3
     if prefix[-1] == '/':
         prefix = prefix[:-1]
     files = list_bucket_prefix_suffix_s3(bucket=bucket, prefix=prefix, suffix='/part-')

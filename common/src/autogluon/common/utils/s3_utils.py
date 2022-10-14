@@ -1,5 +1,3 @@
-import boto3
-
 
 def is_s3_url(path):
     if (path[:2] == 's3') and ('://' in path[:6]):
@@ -20,6 +18,7 @@ def s3_bucket_prefix_to_path(bucket, prefix, version='s3'):
 
 
 def delete_s3_prefix(bucket, prefix):
+    import boto3
     s3 = boto3.resource('s3')
     objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
 

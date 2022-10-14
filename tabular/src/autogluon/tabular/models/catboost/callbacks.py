@@ -1,7 +1,6 @@
 
 import logging
 import time
-import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +19,7 @@ class MemoryCheckCallback:
         Whether to log information on memory status even if memory usage is low.
     """
     def __init__(self, period: int = 10, verbose=False):
+        import psutil
         self.period = period
         self.mem_status = psutil.Process()
         self.init_mem_rss = self.mem_status.memory_info().rss
@@ -39,6 +39,7 @@ class MemoryCheckCallback:
 
     def memory_check(self, iter) -> bool:
         """Checks if memory usage is unsafe. If so, then returns True to signal the model to stop training early."""
+        import psutil
         available_bytes = psutil.virtual_memory().available
         cur_rss = self.mem_status.memory_info().rss
 

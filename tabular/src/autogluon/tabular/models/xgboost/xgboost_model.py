@@ -1,9 +1,8 @@
 import time
 import logging
 
-import psutil
-
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
+from autogluon.common.utils.utils import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.models import AbstractModel
@@ -183,7 +182,9 @@ class XGBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
         return approx_mem_size_req
 
+    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
+        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if approx_mem_size_req > 1e9:  # > 1 GB
@@ -195,7 +196,10 @@ class XGBoostModel(AbstractModel):
             elif ratio > (0.75 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train XGBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
+    @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
+        import psutil
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0

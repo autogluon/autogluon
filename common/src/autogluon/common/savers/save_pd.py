@@ -1,4 +1,4 @@
-import multiprocessing, os, boto3, json, logging
+import multiprocessing, os, json, logging
 from io import StringIO
 import numpy as np
 
@@ -41,6 +41,7 @@ def save(path, df, index=False, verbose=True, type=None, sep=',', compression='g
         if is_local:
             df.to_csv(path, index=index, sep=sep, header=header)
         else:
+            import boto3
             buffer = StringIO()
             df.to_csv(buffer, index=index, sep=sep, header=header)
             bucket, prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)

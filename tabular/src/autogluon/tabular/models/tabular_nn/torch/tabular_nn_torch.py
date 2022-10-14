@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import psutil
 import random
 import time
 import warnings
@@ -9,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY
+from autogluon.common.utils.utils import disable_if_lite_mode
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import try_import_torch
@@ -559,7 +559,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
+    @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
+        import psutil
         # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0

@@ -1,4 +1,4 @@
-import os, boto3, logging
+import os, logging
 
 from ..utils import s3_utils
 
@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 
 def get_pointer_content(path, verbose=True):
     if s3_utils.is_s3_url(path):
+        import boto3
         bucket, key = s3_utils.s3_path_to_bucket_prefix(path)
         s3 = boto3.resource('s3')
         obj = s3.Object(bucket, key)

@@ -5,9 +5,9 @@ import sys
 import time
 
 import numpy as np
-import psutil
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
+from autogluon.common.utils.utils import disable_if_lite_mode
 from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
@@ -123,13 +123,21 @@ class RFModel(AbstractModel):
         expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum
         return expected_min_memory_usage
 
+    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
+        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         available_mem = psutil.virtual_memory().available
         expected_min_memory_usage = self.estimate_memory_usage(**kwargs) / available_mem
         if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
             logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
             raise NotEnoughMemoryError
+
+    @disable_if_lite_mode(ret=0)
+    def _expected_mem_usage(self, n_estimators_final, bytes_per_estimator):
+        import psutil
+        available_mem = psutil.virtual_memory().available
+        return n_estimators_final * bytes_per_estimator / available_mem
 
     def _fit(self,
              X,
@@ -156,9 +164,8 @@ class RFModel(AbstractModel):
 
         num_trees_per_estimator = self._get_num_trees_per_estimator()
         bytes_per_estimator = num_trees_per_estimator * len(X) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
-        available_mem = psutil.virtual_memory().available
-        expected_memory_usage = n_estimators_final * bytes_per_estimator / available_mem
-        
+        expected_memory_usage = self._expected_mem_usage(n_estimators_final, bytes_per_estimator)
+
         if n_estimators_final > n_estimators_test * 2:
             if self.problem_type == MULTICLASS:
                 n_estimator_increments = [n_estimators_test, n_estimators_final]

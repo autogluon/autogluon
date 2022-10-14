@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-import psutil
 import numpy as np
 
 from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
@@ -10,7 +9,7 @@ from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, S
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from autogluon.core.utils import try_import_catboost
+from autogluon.core.utils import try_import_catboost, disable_if_lite_mode
 
 from .callbacks import EarlyStoppingCallback, MemoryCheckCallback, TimeCheckCallback
 from .catboost_utils import get_catboost_metric_from_ag_metric
@@ -219,6 +218,7 @@ class CatBoostModel(AbstractModel):
     #  It will return an updated iterations to train on that will avoid running OOM and running over time limit.
     #  Remove this logic once CatBoost fixes GPU support for callbacks and custom metrics.
     def _estimate_iter_in_time_gpu(self, *, X, eval_set, time_limit, verbose, params, num_rows_train, time_start, model_type):
+        import psutil
         import math
         import pickle
         import sys
@@ -285,7 +285,9 @@ class CatBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {'ag.early_stop'}
 
+    @disable_if_lite_mode()
     def _validate_fit_memory_usage(self, **kwargs):
+        import psutil
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if approx_mem_size_req > 1e9:  # > 1 GB
@@ -297,7 +299,9 @@ class CatBoostModel(AbstractModel):
             elif ratio > (0.75 * max_memory_usage_ratio):
                 logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
+    @disable_if_lite_mode(ret=(1, 0))
     def _get_default_resources(self):
+        import psutil
         # psutil.cpu_count(logical=False) is faster in training than psutil.cpu_count()
         num_cpus = psutil.cpu_count(logical=False)
         num_gpus = 0

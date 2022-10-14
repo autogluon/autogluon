@@ -1,5 +1,5 @@
 # TODO: Standardize / unify this code with ag.save()
-import os, pickle, tempfile, logging, boto3
+import os, pickle, tempfile, logging
 
 from ..utils import compression_utils, s3_utils
 
@@ -38,6 +38,7 @@ def save_with_fn(path, object, pickle_fn, format=None, verbose=True, compression
             pickle_fn(object, fout)
 
 def save_s3(path: str, obj, pickle_fn, verbose=True):
+    import boto3
     if verbose:
         logger.info(f'save object to {path}')
     with tempfile.TemporaryFile() as f:

@@ -1,4 +1,4 @@
-import boto3, os, pathlib, logging
+import os, pathlib, logging
 
 from . import load_pd
 from ..utils import s3_utils
@@ -6,6 +6,7 @@ from ..utils import s3_utils
 logger = logging.getLogger(__name__)
 
 def list_bucket_s3(bucket):
+    import boto3
     logger.log(15, 'Listing s3 bucket: '+str(bucket))
 
     s3bucket = boto3.resource('s3')
@@ -18,6 +19,7 @@ def list_bucket_s3(bucket):
 
 
 def download(input_bucket, input_prefix, local_path):
+    import boto3
     directory = os.path.dirname(local_path)
     pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
 
@@ -30,6 +32,7 @@ def list_bucket_prefix_s3(bucket, prefix):
 
 
 def list_bucket_prefix_suffix_s3(bucket, prefix, suffix=None, banned_suffixes=None):
+    import boto3
     if banned_suffixes is None:
         banned_suffixes = []
     s3 = boto3.resource('s3')
@@ -50,6 +53,7 @@ def list_bucket_prefix_suffix_s3(bucket, prefix, suffix=None, banned_suffixes=No
 
 
 def list_bucket_prefix_suffix_contains_s3(bucket, prefix, suffix=None, banned_suffixes=None, contains=None):
+    import boto3
     if banned_suffixes is None:
         banned_suffixes = []
     s3 = boto3.resource('s3')

@@ -4,7 +4,6 @@ import contextlib
 import gc
 import logging
 import os
-import psutil
 import tempfile
 
 import numpy as np
@@ -93,6 +92,7 @@ class FastTextModel(AbstractModel):
         self._label_inv_map = {v: k for k, v in self._label_map.items()}
         np.random.seed(0)
         idxs = np.random.permutation(list(range(len(X))))
+        import psutil
         with tempfile.NamedTemporaryFile(mode="w+t") as f:
             logger.debug("generate training data")
             for label, text in zip(y.iloc[idxs], (X[i] for i in idxs)):
