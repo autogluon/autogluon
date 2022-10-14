@@ -5,8 +5,8 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchmetrics
-from mmcv.parallel import scatter
 from mmcv.ops import RoIPool
+from mmcv.parallel import scatter
 from omegaconf import DictConfig
 from torch import nn
 from torch.nn.modules.loss import _Loss
@@ -20,13 +20,7 @@ except ImportError:
 
 from ..constants import AUTOMM
 from ..utils import unpack_datacontainers
-from .utils import (
-    apply_layerwise_lr_decay,
-    apply_single_lr,
-    apply_two_stages_lr,
-    get_lr_scheduler,
-    get_optimizer,
-)
+from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 
 logger = logging.getLogger(AUTOMM)

@@ -4,7 +4,8 @@ from nptyping import NDArray
 from torch import nn
 
 from ..constants import LABEL
-from .collator import List as ColList, Stack
+from .collator import List as ColList
+from .collator import Stack
 
 
 class LabelProcessor:
