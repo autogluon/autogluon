@@ -1805,7 +1805,7 @@ class MultiModalPredictor:
         """
         if hasattr(self._config, MATCHER):
             ret_type = PROBABILITY
-        elif self._pipeline == OBJECT_DETECTION:
+        elif self._pipeline == OBJECT_DETECTION or self._pipeline == OCR_TEXT_DETECTION:
             ret_type = BBOX
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
