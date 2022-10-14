@@ -17,7 +17,7 @@ runs:
       uses: aws-actions/configure-aws-credentials@v1
       with:
         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiRole
-        role-duration-seconds: 7200
+        role-duration-seconds: 14400
         aws-region: us-east-1
     - name: Install dependencies
       shell: bash
