@@ -25,7 +25,7 @@ An example to finetune an MMDetection model on VOC:
         --epochs <epochs>
 
 Note that for now it's required to install nightly build torchmetrics.
-This will be solved in next pr.
+This will be solved in next pr. (MeanAveragePrecision will be moved to AG temporarily.)
 """
 
 import argparse
