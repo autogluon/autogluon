@@ -392,8 +392,8 @@ class TextProcessor:
             if col_name == CHOICES_IDS:
                 answer_ids = self.tokenizer(
                     col_text,
-                    return_tensors="pt",
-                    padding=True,
+                    padding="max_length",
+                    max_length=20,  # TODO: Currently hardcoded max_length for textual choices.
                 )["input_ids"]
                 tokens[col_name] = answer_ids
                 continue
