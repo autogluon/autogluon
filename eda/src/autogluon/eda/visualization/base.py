@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 
-from .. import AnalysisState, StateCheckMixin
+from ..state import AnalysisState, StateCheckMixin
 
 logger = logging.getLogger(__name__)
 

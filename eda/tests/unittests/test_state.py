@@ -1,4 +1,4 @@
-from autogluon.eda import AnalysisState, StateCheckMixin
+from autogluon.eda.state import AnalysisState, StateCheckMixin
 
 
 def test_analysis_state():

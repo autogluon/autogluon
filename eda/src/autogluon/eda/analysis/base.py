@@ -6,7 +6,7 @@ from typing import List, Union, Tuple
 
 from pandas import DataFrame
 
-from .. import AnalysisState, StateCheckMixin
+from ..state import AnalysisState, StateCheckMixin
 
 logger = logging.getLogger(__name__)
 
