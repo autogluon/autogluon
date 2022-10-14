@@ -46,7 +46,7 @@ class AbstractVisualization(ABC, StateCheckMixin):
             `True` if all the pre-requisites for rendering are present
 
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def _render(self, state: AnalysisState) -> None:
@@ -63,7 +63,7 @@ class AbstractVisualization(ABC, StateCheckMixin):
         -------
 
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     def render(self, state: AnalysisState) -> None:
         """

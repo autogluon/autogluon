@@ -25,9 +25,9 @@ install_requires = [
     'scikit-learn',
     'pandas',
     'matplotlib',
-    'missingno',
-    'phik',
-    'seaborn',
+    'missingno>=0.5.1,<0.6',
+    'phik>=0.12.2,<0.13',
+    'seaborn>=0.12.0,<0.13',
 ]
 
 extras_require = dict()

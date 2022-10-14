@@ -84,7 +84,7 @@ class AbstractAnalysis(ABC, StateCheckMixin):
             `True` if all the pre-requisites for fitting are present
 
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
@@ -102,7 +102,7 @@ class AbstractAnalysis(ABC, StateCheckMixin):
         fit_kwargs
             arguments passed into fit call
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     def fit(self, **kwargs) -> AnalysisState:
         """
