@@ -25,8 +25,18 @@ class TestAnomaly(unittest.TestCase):
         )
         ano_ana = AnomalyDetector(**analysis_args)
         ano_ana.fit()
-        assert ano_ana.state.test_ano_scores.shape[0] == 40
-        assert len(ano_ana.state.top_anomalies) == 10
+        assert len(ano_ana.state.top_test_anomalies) == 10
+
+    def test_ano_analysis_train_only(self):
+        train, test = load_data()
+        analysis_args = dict(
+            train_data=train,
+            label='18',
+            num_anomalies=10,
+            fit_train=True,
+        )
+        ano_ana = AnomalyDetector(**analysis_args)
+        ano_ana.fit()
 
     def test_ano_auto(self):
         train, test = load_data()
