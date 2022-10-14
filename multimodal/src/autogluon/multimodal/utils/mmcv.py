@@ -1,6 +1,6 @@
+import functools
 from collections import OrderedDict
 
-import functools
 from typing import Callable, Type, Union
 
 import numpy as np

@@ -2,11 +2,11 @@ import logging
 from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
-from mmcv.parallel import scatter
-from mmcv.ops import RoIPool
 import pytorch_lightning as pl
 import torch
 import torchmetrics
+from mmcv.parallel import scatter
+from mmcv.ops import RoIPool
 from omegaconf import DictConfig
 from torch import nn
 from torch.nn.modules.loss import _Loss
@@ -18,24 +18,16 @@ try:
 except ImportError:
     pass
 
-from ..constants import AUTOMM, PROBABILITY
+from ..constants import AUTOMM
+from ..utils import unpack_datacontainers
 from .utils import (
     apply_layerwise_lr_decay,
     apply_single_lr,
     apply_two_stages_lr,
-    compute_probability,
-    gather_column_features,
-    generate_metric_learning_labels,
     get_lr_scheduler,
-    get_metric_learning_loss_funcs,
-    get_metric_learning_miner_funcs,
     get_optimizer,
 )
 
-from ..utils import (
-    send_datacontainers_to_device,
-    unpack_datacontainers,
-)
 
 logger = logging.getLogger(AUTOMM)
 
