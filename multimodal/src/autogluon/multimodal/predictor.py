@@ -1054,6 +1054,7 @@ class MultiModalPredictor:
                 mixup_fn=mixup_fn,
                 mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1432,6 +1433,9 @@ class MultiModalPredictor:
             task = NerLitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
             )
         else:
             task = LitModule(
@@ -1734,7 +1738,7 @@ class MultiModalPredictor:
             realtime=realtime,
             seed=seed,
         )
-        logits = extract_from_output(ret_type=LOGITS, outputs=outputs)
+        logits = extract_from_output(ret_type=ret_type, outputs=outputs)
 
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:

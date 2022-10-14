@@ -143,6 +143,10 @@ def infer_batch(
         if model_postprocess_fn:
             output = model_postprocess_fn(output)
 
+    if isinstance(model, nn.DataParallel):
+        model = model.module
+    else:
+        model = model
     return output[model.prefix]
 
 

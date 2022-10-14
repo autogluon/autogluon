@@ -529,7 +529,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 NER_ANNOTATION: y,
                 TEXT: x[self._text_feature_names[text_column_index]],
             }
-            return ret, {self._label_column: self.label_type}
+            return ret, None
         else:
             raise NotImplementedError
 
