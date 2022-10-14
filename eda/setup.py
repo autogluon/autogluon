@@ -28,6 +28,8 @@ install_requires = [
     'missingno>=0.5.1,<0.6',
     'phik>=0.12.2,<0.13',
     'seaborn>=0.12.0,<0.13',
+    'ipython>=8.0,<9.0',
+    'ipywidgets>=8.0,<9.0',
 ]
 
 extras_require = dict()
