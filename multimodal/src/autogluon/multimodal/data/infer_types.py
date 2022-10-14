@@ -12,9 +12,13 @@ from ..constants import (
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    ENTITY_GROUP,
     IDENTIFIER,
+    IMAGE,
     IMAGE_PATH,
     MULTICLASS,
+    NER,
+    NER_ANNOTATION,
     NULL,
     NUMERICAL,
     REGRESSION,
@@ -427,7 +431,7 @@ def infer_label_column_type_by_problem_type(
     problem_type: str,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL),
+    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
@@ -477,6 +481,8 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = CATEGORICAL
         elif problem_type == REGRESSION:
             column_types[col_name] = NUMERICAL
+        elif problem_type == NER:
+            column_types[col_name] = NER_ANNOTATION
 
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
@@ -541,11 +547,18 @@ def infer_problem_type_output_shape(
                 return MULTICLASS, class_num
         elif provided_problem_type == REGRESSION:
             return provided_problem_type, 1
+        elif provided_problem_type == NER:
+            unique_entity_groups = [
+                annot[ENTITY_GROUP]
+                for annotation in data[label_column].iteritems()
+                for annot in json.loads(annotation[-1])
+            ]
+            return provided_problem_type, len(set(unique_entity_groups))
         else:
             raise ValueError(
                 f"Problem type '{provided_problem_type}' doesn't have a valid output shape "
                 f"for training. The supported problem types are"
-                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}'"
+                f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}', '{CLASSIFICATION}', '{NER}'"
             )
 
     else:

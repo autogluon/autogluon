@@ -2,6 +2,7 @@ import logging
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
+import evaluate
 from sklearn.metrics import f1_score
 
 from autogluon.core.metrics import get_metric
@@ -14,6 +15,8 @@ from ..constants import (
     F1,
     METRIC_MODE_MAP,
     MULTICLASS,
+    NER,
+    OVERALL_ACCURACY,
     REGRESSION,
     RMSE,
     ROC_AUC,
@@ -71,6 +74,8 @@ def infer_metrics(
 
     if problem_type == MULTICLASS:
         eval_metric_name = ACCURACY
+    elif problem_type == NER:
+        eval_metric_name = OVERALL_ACCURACY
     elif problem_type == BINARY:
         eval_metric_name = ROC_AUC
     elif problem_type == REGRESSION:
@@ -127,6 +132,10 @@ def compute_score(
     -------
     Computed score.
     """
+    if metric_name == OVERALL_ACCURACY:
+        metric = evaluate.load("seqeval")
+        return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
+
     metric = get_metric(metric_name)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])

@@ -2,6 +2,7 @@ import codecs
 import random
 from typing import Iterable, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 from nlpaug import Augmenter
 from nlpaug.util import Method
@@ -303,3 +304,84 @@ def normalize_txt(text: str) -> str:
     )
     text = unidecode(text)
     return text
+
+
+def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False):
+    """
+    Generate token-level/word-level labels with given text and NER annotations.
+
+    Parameters
+    ----------
+    ner_annotations
+        The NER annotations.
+    ner_text
+        The corresponding raw text.
+    tokenizer
+        The tokenizer to be used.
+    is_eval
+        Whether it is for evaluation or not, default: False
+
+    Returns
+    -------
+    Token-level labels or word-level lavels
+    """
+    col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, tokenizer)
+    num_words = len(set(token_to_word_mappings)) - 1
+    word_label = [1] * num_words
+    # TODO: Potentially optimize word label generation via binary search
+    for idx, word_offset in enumerate(word_offsets[:num_words, :]):
+        for annot in ner_annotations:
+            custom_offset = annot[0]
+            custom_label = annot[1]
+            if word_offset[0] == custom_offset[0]:
+                word_label[idx] = custom_label
+
+    token_label = [0] * len(col_tokens.input_ids)
+    temp = set()
+    counter = 0
+    for idx, token_to_word in enumerate(token_to_word_mappings):
+        if token_to_word != -1 and token_to_word not in temp:
+            temp.add(token_to_word)
+            token_label[idx] = word_label[counter]
+            counter += 1
+    if not is_eval:
+        return token_label  # return token-level labels for training
+    else:
+        return word_label  # return word-level labels for evaluation
+
+
+def tokenize_ner_text(text, tokenizer):
+    """
+    Tokenization process for the NER task. It will be used for the token-level label generation
+    and the input text tokenization.
+
+    Parameters
+    ----------
+    text
+        The raw text data.
+    tokenizer
+        The tokenizer to be used.
+
+    Returns
+    -------
+    The output of tokenizer and word offsets.
+    """
+    # pre-tokenization is required for NER token-level label generation.
+    words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+    words = [word for word, offset in words_with_offsets]
+    word_offsets = np.array([[offset[0], offset[1]] for word, offset in words_with_offsets], dtype=np.int32)
+    col_tokens = tokenizer(
+        words,
+        is_split_into_words=True,
+        return_offsets_mapping=True,
+        padding="max_length",
+        truncation=True,
+        max_length=tokenizer.model_max_length,
+        return_token_type_ids=True,
+    )
+    # token to word mappings: it will tell us which token belongs to which word.
+    token_to_word_mappings = [i if i != None else -1 for i in col_tokens.word_ids()]
+    assert len(set(token_to_word_mappings)) == len(words) + 1, "The token to word mappings are incorrect!"
+    offset_mapping = np.array(col_tokens.offset_mapping, dtype=np.int32)
+    word_offsets = np.pad(word_offsets, ((0, offset_mapping.shape[0] - len(words)), (0, 0)), "constant")
+    return col_tokens, token_to_word_mappings, word_offsets

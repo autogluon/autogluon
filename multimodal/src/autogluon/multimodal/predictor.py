@@ -57,6 +57,8 @@ from .constants import (
     MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
+    NER,
+    NER_RET,
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
@@ -82,6 +84,7 @@ from .data.utils import apply_data_processor, apply_df_preprocessor, get_collate
 from .models.utils import get_model_postprocess_fn
 from .optimization.lit_distiller import DistillerLitModule
 from .optimization.lit_module import LitModule
+from .optimization.lit_ner import NerLitModule
 from .optimization.losses import RKDLoss
 from .optimization.utils import (
     get_loss_func,
@@ -261,6 +264,9 @@ class MultiModalPredictor:
             )
             self._problem_type = None
             self._pipeline = ZERO_SHOT_IMAGE_CLASSIFICATION
+
+        if problem_type is not None and problem_type.lower() == NER:
+            self._pipeline = None
 
         if self._pipeline is not None:
             self._config, self._model, self._data_processors = init_pretrained(
@@ -849,6 +855,9 @@ class MultiModalPredictor:
             extra=["distiller"] if teacher_predictor is not None else None,
         )
 
+        if self._problem_type == NER:
+            self._output_shape += len(OmegaConf.to_object(config.model.ner.special_tags))
+
         config = update_config_by_rules(
             problem_type=self._problem_type,
             config=config,
@@ -856,7 +865,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config.data,
+                config=config,
                 column_types=self._column_types,
                 label_column=self._label_column,
                 train_df_x=train_df.drop(columns=self._label_column),
@@ -1034,6 +1043,18 @@ class MultiModalPredictor:
                 output_feature_adaptor=output_feature_adaptor,
                 output_feature_loss_func=output_feature_loss_func,
                 rkd_loss_func=rkd_loss_func,
+                **metrics_kwargs,
+                **optimization_kwargs,
+            )
+        elif self._problem_type == NER:
+            task = NerLitModule(
+                model=model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_fn,
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=trainable_param_names,
                 **metrics_kwargs,
                 **optimization_kwargs,
             )
@@ -1408,13 +1429,22 @@ class MultiModalPredictor:
             predict_data=data,
         )
 
-        task = LitModule(
-            model=self._model,
-            model_postprocess_fn=self._model_postprocess_fn,
-            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-            trainable_param_names=trainable_param_names,
-            **optimization_kwargs,
-        )
+        if self._problem_type == NER:
+            task = NerLitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
+            )
+        else:
+            task = LitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=trainable_param_names,
+                **optimization_kwargs,
+            )
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
@@ -1474,7 +1504,7 @@ class MultiModalPredictor:
 
         if self._df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
-                config=config.data,
+                config=config,
                 column_types=column_types,
                 label_column=self._label_column,
                 train_df_x=data,
@@ -1697,13 +1727,18 @@ class MultiModalPredictor:
         if self._pipeline == OBJECT_DETECTION:
             return self.evaluate_coco(data)
 
+        if self._problem_type == NER:
+            ret_type = NER_RET
+        else:
+            ret_type = LOGITS
+
         outputs = self._predict(
             data=data,
             requires_label=True,
             realtime=realtime,
             seed=seed,
         )
-        logits = extract_from_output(ret_type=LOGITS, outputs=outputs)
+        logits = extract_from_output(ret_type=ret_type, outputs=outputs)
 
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
@@ -1718,7 +1753,11 @@ class MultiModalPredictor:
             y_pred=logits,
             inverse_categorical=True,
         )
-        y_true = self._df_preprocessor.transform_label_for_metric(df=data)
+
+        if self._problem_type == NER:
+            y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
+        else:
+            y_true = self._df_preprocessor.transform_label_for_metric(df=data)
 
         metric_data.update(
             {
@@ -1727,24 +1766,37 @@ class MultiModalPredictor:
             }
         )
 
+        metrics_is_none = False
+
         if metrics is None:
+            metrics_is_none = True
             metrics = [self._eval_metric_name]
         if isinstance(metrics, str):
             metrics = [metrics]
 
         results = {}
-        for per_metric in metrics:
-            pos_label = try_to_infer_pos_label(
-                data_config=self._config.data,
-                label_encoder=self._df_preprocessor.label_generator,
-                problem_type=self._problem_type,
-            )
+        if self._problem_type == NER:
             score = compute_score(
                 metric_data=metric_data,
-                metric_name=per_metric.lower(),
-                pos_label=pos_label,
+                metric_name=self._eval_metric_name.lower(),
             )
-            results[per_metric] = score
+            if metrics_is_none:
+                results = score
+            else:
+                results.update({per_metric: score[per_metric] for per_metric in metrics})
+        else:
+            for per_metric in metrics:
+                pos_label = try_to_infer_pos_label(
+                    data_config=self._config.data,
+                    label_encoder=self._df_preprocessor.label_generator,
+                    problem_type=self._problem_type,
+                )
+                score = compute_score(
+                    metric_data=metric_data,
+                    metric_name=per_metric.lower(),
+                    pos_label=pos_label,
+                )
+                results[per_metric] = score
 
         if return_pred:
             return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
@@ -1817,6 +1869,9 @@ class MultiModalPredictor:
 
         elif self._pipeline == OCR_TEXT_RECOGNITION:
             ret_type = [TEXT, SCORE]
+
+        if self._problem_type == NER:
+            ret_type = NER_RET
 
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -1892,6 +1947,7 @@ class MultiModalPredictor:
         """
         assert self._problem_type not in [
             REGRESSION,
+            NER,
         ], f"Problem {self._problem_type} has no probability output."
 
         if candidate_data:
@@ -1988,13 +2044,15 @@ class MultiModalPredictor:
     def _as_pandas(
         self,
         data: Union[pd.DataFrame, dict, list],
-        to_be_converted: np.ndarray,
+        to_be_converted: Union[np.ndarray, dict],
     ):
         if isinstance(data, pd.DataFrame):
             index = data.index
         else:
             index = None
-        if to_be_converted.ndim == 1:
+        if isinstance(to_be_converted, list) or (
+            isinstance(to_be_converted, np.ndarray) and to_be_converted.ndim == 1
+        ):
             return pd.Series(to_be_converted, index=index, name=self._label_column)
         else:
             return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)

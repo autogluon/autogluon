@@ -5,7 +5,23 @@ import pandas as pd
 import torch
 from torch import nn
 
-from ..constants import AUTOMM, BBOX, COLUMN_FEATURES, FEATURES, IMAGE, LOGITS, MASKS, PROBABILITY, SCORE, TEXT
+from ..constants import (
+    AUTOMM,
+    BBOX,
+    COLUMN_FEATURES,
+    FEATURES,
+    IMAGE,
+    LOGITS,
+    MASKS,
+    NER,
+    NER_ANNOTATION,
+    NER_RET,
+    PROBABILITY,
+    SCORE,
+    TEXT,
+    TOKEN_WORD_MAPPING,
+    WORD_OFFSETS,
+)
 from .environment import get_precision_context, move_to_device
 from .misc import tensor_to_ndarray
 
@@ -59,6 +75,25 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         return [ele[TEXT] for ele in outputs]  # single image
     elif ret_type == SCORE:
         return [ele[SCORE] for ele in outputs]
+    elif ret_type == NER_RET:
+        ner_pred = []
+        as_ndarray = False
+        for ele in outputs:
+            logits_label = ele[NER_ANNOTATION].detach().cpu().numpy()
+            token_word_mapping = ele[TOKEN_WORD_MAPPING].detach().cpu().numpy()
+            word_offsets = ele[WORD_OFFSETS].detach().cpu().numpy()
+            for token_preds, mappings, offsets in zip(logits_label, token_word_mapping, word_offsets):
+                pred_one_sentence, word_offset = [], []
+                counter = 0
+                temp = set()
+                for token_pred, mapping in zip(token_preds, mappings):
+                    if mapping != -1 and mapping not in temp:
+                        temp.add(mapping)
+                        word_offset.append(list(offsets[counter]))
+                        pred_one_sentence.append(token_pred)
+                        counter += 1
+                ner_pred.append((pred_one_sentence, word_offset))
+        return ner_pred
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 
@@ -108,6 +143,10 @@ def infer_batch(
         if model_postprocess_fn:
             output = model_postprocess_fn(output)
 
+    if isinstance(model, nn.DataParallel):
+        model = model.module
+    else:
+        model = model
     return output[model.prefix]
 
 

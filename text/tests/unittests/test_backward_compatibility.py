@@ -5,7 +5,7 @@ import numpy.testing as npt
 
 from autogluon.multimodal.constants import BINARY, MULTICLASS
 from autogluon.text import TextPredictor
-from datasets import AmazonReviewSentimentCrossLingualDataset
+from unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 from utils import (
     download,
     protected_zip_extraction,

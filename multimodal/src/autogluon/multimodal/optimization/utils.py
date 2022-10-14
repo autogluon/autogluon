@@ -35,7 +35,9 @@ from ..constants import (
     LORA_BIAS,
     LORA_NORM,
     MULTICLASS,
+    NER,
     NORM_FIT,
+    OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
     QUADRATIC_KAPPA,
@@ -90,6 +92,8 @@ def get_loss_func(
                 loss_func = nn.MSELoss()
         else:
             loss_func = nn.MSELoss()
+    elif problem_type == NER:
+        loss_func = nn.CrossEntropyLoss(ignore_index=0)
     else:
         raise NotImplementedError
 
@@ -164,7 +168,7 @@ def get_metric(
         A customized metric function.
     """
     metric_name = metric_name.lower()
-    if metric_name in [ACC, ACCURACY]:
+    if metric_name in [ACC, ACCURACY, OVERALL_ACCURACY]:
         return torchmetrics.Accuracy(), None
     elif metric_name in [RMSE, ROOT_MEAN_SQUARED_ERROR]:
         return torchmetrics.MeanSquaredError(squared=False), None

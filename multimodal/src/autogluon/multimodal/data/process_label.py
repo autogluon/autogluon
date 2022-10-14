@@ -2,8 +2,9 @@ from typing import Any, Dict, List, Optional, Union
 
 from torch import nn
 
-from ..constants import LABEL
+from ..constants import LABEL, NER, NER_ANNOTATION, TEXT
 from .collator import Stack
+from .utils import process_ner_annotations
 
 
 class LabelProcessor:
@@ -24,6 +25,10 @@ class LabelProcessor:
             The prefix connecting a processor to its corresponding model.
         """
         self.prefix = model.prefix
+        self.tokenizer = None
+        self.model = model
+        if self.prefix == NER:
+            self.tokenizer = model.tokenizer
 
     @property
     def label_key(self):
@@ -43,7 +48,7 @@ class LabelProcessor:
 
     def process_one_sample(
         self,
-        labels: Dict[str, Union[int, float]],
+        labels: Dict[str, Union[int, float, list]],
     ) -> Dict:
         """
         Process one sample's labels. Here it only picks the first label.
@@ -57,9 +62,17 @@ class LabelProcessor:
         -------
         A dictionary containing one sample's label.
         """
-        return {
-            self.label_key: labels[next(iter(labels))],  # get the first key's value
-        }
+        if self.prefix == NER:
+            ner_annotation = labels[NER_ANNOTATION]
+            ner_text = labels[TEXT]
+            # online label generation
+            return {
+                self.label_key: process_ner_annotations(ner_annotation, ner_text, self.tokenizer),
+            }
+        else:
+            return {
+                self.label_key: labels[next(iter(labels))],  # get the first key's value
+            }
 
     def __call__(
         self,

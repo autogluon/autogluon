@@ -73,6 +73,19 @@ model:
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
+  ner:
+    checkpoint_name: "bert-base-cased"
+    max_text_len: 512
+    gradient_checkpointing: False
+    data_types:
+      - "text"
+    tokenizer_name: "hf_auto"
+    insert_sep: False
+    text_segment_num: 2
+    stochastic_chunk: False
+    special_tags: 
+      - X # CLS, SEP, and non-first tokens of a word will be labelled as X
+      - O # Outside of a named entity
   t_few:
     checkpoint_name: "t5-small" #"bigscience/T0_3B"
     gradient_checkpointing: False

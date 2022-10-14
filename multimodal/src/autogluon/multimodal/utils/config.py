@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import AUTOMM, HF_MODELS, REGRESSION, VALID_CONFIG_KEYS
+from ..constants import AUTOMM, HF_MODELS, NER, REGRESSION, VALID_CONFIG_KEYS
 from ..presets import get_automm_presets, get_basic_automm_config
 
 logger = logging.getLogger(AUTOMM)
@@ -470,4 +470,6 @@ def update_config_by_rules(
                 "the loss_function automatically otherwise.",
                 UserWarning,
             )
+    if problem_type == NER:
+        config.model.names = [NER]
     return config

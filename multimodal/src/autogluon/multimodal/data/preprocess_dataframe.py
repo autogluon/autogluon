@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,20 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
 from autogluon.features import CategoryFeatureGenerator
 
-from ..constants import AUTOMM, CATEGORICAL, IDENTIFIER, IMAGE, IMAGE_PATH, LABEL, NULL, NUMERICAL, ROIS, TEXT
+from ..constants import (
+    AUTOMM,
+    CATEGORICAL,
+    IDENTIFIER,
+    IMAGE,
+    IMAGE_PATH,
+    LABEL,
+    NER,
+    NER_ANNOTATION,
+    NULL,
+    NUMERICAL,
+    ROIS,
+    TEXT,
+)
 
 logger = logging.getLogger(AUTOMM)
 
@@ -29,7 +42,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         config: DictConfig,
         column_types: Dict,
         label_column: Optional[str] = None,
-        label_generator: Optional[LabelEncoder] = None,
+        label_generator: Optional[object] = None,
     ):
         """
         Parameters
@@ -41,7 +54,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         label_column
             Name of the label column in pd.DataFrame. Can be None to support zero-short learning.
         label_generator
-            A sklearn LabelEncoder instance.
+            A sklearn LabelEncoder instance, or a customized encoder, e.g. NerPreprocessor.
         """
         self._column_types = column_types
         self._label_column = label_column
@@ -275,7 +288,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
                 )
 
-    def _fit_y(self, y: pd.Series):
+    def _fit_y(self, y: pd.Series, X: Optional[pd.DataFrame] = None):
         """
         Fit the label column data to initialize the label encoder or scalar.
 
@@ -295,6 +308,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
         elif self.label_type == ROIS:
             pass  # Do nothing. TODO: Shall we call fit here?
+        elif self.label_type == NER_ANNOTATION:
+            self._label_generator.fit(y, X[self._text_feature_names[0]])
         else:
             raise NotImplementedError(f"Type of label column is not supported. Label column type={self._label_column}")
 
@@ -312,7 +327,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if X is not None:
             self._fit_x(X=X)
         if y is not None:
-            self._fit_y(y=y)
+            self._fit_y(y=y, X=X)
 
     def transform_text(
         self,
@@ -503,6 +518,18 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
             y = y_df  # Do nothing. TODO: Shall we transform this?
+        elif self.label_type == NER_ANNOTATION:
+            # TODO: Add transform_multimodal and process_multimodal.py
+            text_column_index = 0  # Currently, we only support one text column.
+            x_df = df[self._text_feature_names[text_column_index]]
+            y = self._label_generator.transform(y_df)
+            x = self.transform_text(df)[0]
+            # Labelprocessor needs both ner annotations and text.
+            ret = {
+                NER_ANNOTATION: y,
+                TEXT: x[self._text_feature_names[text_column_index]],
+            }
+            return ret, None
         else:
             raise NotImplementedError
 
@@ -511,6 +538,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_label_for_metric(
         self,
         df: pd.DataFrame,
+        tokenizer: Optional[Any] = None,
     ) -> NDArray[(Any,), Any]:
         """
         Prepare ground-truth labels to compute metric scores in evaluation. Note that
@@ -536,6 +564,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             # need to compute the metric on the raw numerical values (no normalization)
             y = pd.to_numeric(y_df).to_numpy()
+        elif self.label_type == NER_ANNOTATION:
+            x_df = df[self._text_feature_names[0]]
+            y = self._label_generator.transform_label_for_metric(y_df, x_df, tokenizer)
         else:
             raise NotImplementedError
 
@@ -543,7 +574,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
     def transform_prediction(
         self,
-        y_pred: np.ndarray,
+        y_pred: Union[np.ndarray, dict],
         inverse_categorical: bool = True,
     ) -> NDArray[(Any,), Any]:
         """
@@ -578,6 +609,13 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y_pred = np.squeeze(y_pred)
             # Convert nan to 0
             y_pred = np.nan_to_num(y_pred)
+        elif self.label_type == NER_ANNOTATION:
+            y_pred = self._label_generator.inverse_transform(y_pred)
+            if inverse_categorical:
+                # Return annotations and offsets
+                y_pred = y_pred[1]
+            else:
+                y_pred = y_pred[0]
         else:
             raise NotImplementedError
 
