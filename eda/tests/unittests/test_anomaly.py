@@ -47,6 +47,7 @@ class TestAnomaly(unittest.TestCase):
         )
         ano_analysis_args = dict(
             num_anomalies=6,
+            fit_train = True,
         )
         ano_viz_args = dict(headers=True)
         auto.analyze(**analysis_args, anlz_facets=[

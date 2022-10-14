@@ -15,9 +15,8 @@ class AnomalyVisualization(AbstractVisualization, JupyterMixin):
         self.headers = headers
 
     def can_handle(self, state: AnalysisState) -> bool:
-        keys_pres = self._all_keys_must_be_present(state, ['top_anomalies'])
-        enough_test = state.test_ano_scores.shape[0] >= len(state.top_anomalies)
-        return keys_pres and enough_test
+        keys_pres = self._at_least_one_key_must_be_present(state, ['top_train_anomalies', 'top_test_anomalies'])
+        return keys_pres
 
     def _display_anom_water(self, test_samp, shap_data) -> None:
         plt.clf()
@@ -26,7 +25,13 @@ class AnomalyVisualization(AbstractVisualization, JupyterMixin):
         self.display_obj(fig)
 
     def _render(self, state: AnalysisState) -> None:
-        header_text = f'Top {len(state.top_anomalies)} anomalies in test set'
-        self.render_header_if_needed(state, header_text)
-        for test_samp, shap_data in state.top_anomalies:
-            self._display_anom_water(test_samp, shap_data)
+        if 'top_train_anomalies' in state:
+            header_text = f'Top {len(state.top_train_anomalies)} anomalies in training set'
+            self.render_header_if_needed(state, header_text)
+            for test_samp, shap_data in state.top_train_anomalies:
+                self._display_anom_water(test_samp, shap_data)
+        if 'top_test_anomalies' in state:
+            header_text = f'Top {len(state.top_test_anomalies)} anomalies in test set'
+            self.render_header_if_needed(state, header_text)
+            for test_samp, shap_data in state.top_test_anomalies:
+                self._display_anom_water(test_samp, shap_data)
