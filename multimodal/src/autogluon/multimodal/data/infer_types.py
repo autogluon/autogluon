@@ -427,7 +427,7 @@ def infer_label_column_type_by_problem_type(
     column_types: Dict,
     label_columns: Union[str, List[str]],
     problem_type: Optional[str],
-    pipeline: Optional[str],
+    pipeline: Optional[str] = None,
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
     allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),

@@ -54,6 +54,7 @@ install_requires = [
     "openmim>0.1.5,<=0.2.1",
     "pycocotools>=2.0.4,<=2.0.4",
     "defusedxml>=0.7.1,<=0.7.1",
+    "albumentations>=1.1.0,<=1.2.0",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
