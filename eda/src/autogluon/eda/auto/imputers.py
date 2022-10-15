@@ -48,8 +48,7 @@ def __show_stage_info(_df_val, importance, predictor, show_importance, show_lead
     if show_leaderboards:
         display(predictor.leaderboard(_df_val, silent=True))
     if show_importance:
-
-        display(importance[importance.importance>0.0001])
+        display(importance[importance.importance > 0.0001])
         # fig, ax = plt.subplots(**fig_args)
         # sns.barplot(ax=ax, data=importance.reset_index(), y='index', x='importance')
         # plt.show(fig)

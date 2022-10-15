@@ -3,6 +3,8 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['AnalysisState', 'StateCheckMixin']
+
 
 class AnalysisState(dict):
     """Enabling dot.notation access to dictionary attributes and dynamic code assist in jupyter"""

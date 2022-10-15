@@ -3,6 +3,9 @@ from .jupyter import JupyterMixin
 from .. import AnalysisState
 from ..state import StateCheckMixin
 
+__all__ = ['XShiftSummary']
+
+
 class XShiftSummary(AbstractVisualization, JupyterMixin, StateCheckMixin):
     """
     Summarize the results of the XShiftDetector.  It will render the results as markdown in jupyter.
@@ -15,7 +18,7 @@ class XShiftSummary(AbstractVisualization, JupyterMixin, StateCheckMixin):
         self.headers = headers
 
     def _summary(self,
-                results: dict) -> str:
+                 results: dict) -> str:
         """Output the results of C2ST in a human readable format
         """
         if not results['detection_status']:
@@ -52,4 +55,3 @@ class XShiftSummary(AbstractVisualization, JupyterMixin, StateCheckMixin):
         header_text = 'Detecting distribution shift'
         self.render_header_if_needed(state, header_text)
         self.render_markdown(res_md)
-

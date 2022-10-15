@@ -1,7 +1,9 @@
 from typing import Union, List, Any, Dict
 
+from .base import AbstractAnalysis
 from .. import AnalysisState
-from ..analysis import AbstractAnalysis
+
+__all__ = ['Correlation', 'CorrelationSignificance']
 
 
 class FeatureInteraction(AbstractAnalysis):
@@ -46,14 +48,12 @@ class FeatureInteraction(AbstractAnalysis):
 class Correlation(AbstractAnalysis):
 
     def __init__(self, method='spearman',
-                 significance=False,
                  focus_field: Union[None, str] = None,
                  focus_field_threshold: float = 0.5,
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         self.method = method
-        self.significance = significance
         self.focus_field = focus_field
         self.focus_field_threshold = focus_field_threshold
         super().__init__(parent, children, **kwargs)
@@ -63,11 +63,7 @@ class Correlation(AbstractAnalysis):
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.correlations = {}
-        if self.significance:
-            state.significance_matrix = {}
         state.correlations_method = self.method
-        if self.significance:
-            state.significance_matrix = {}
         for (ds, df) in self.available_datasets(args):
             if self.method == 'phik':
                 state.correlations[ds] = df.phik_matrix(**self.args, verbose=False)
@@ -89,8 +85,13 @@ class Correlation(AbstractAnalysis):
                 high_corr = state.correlations[ds][[self.focus_field]].sort_values(self.focus_field, ascending=False).drop(self.focus_field)
                 state.correlations_focus_high_corr[ds] = high_corr
 
-            if self.significance:
-                if self.method == 'phik':
-                    state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)
-                else:
-                    state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)
+
+class CorrelationSignificance(AbstractAnalysis):
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return 'correlations' in state and 'correlations_method' in state
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        state.significance_matrix = {}
+        for (ds, df) in self.available_datasets(args):
+            state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)

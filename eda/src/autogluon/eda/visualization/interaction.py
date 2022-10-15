@@ -1,15 +1,16 @@
 from typing import Union, Dict, Any
 
-import ipywidgets as wgts
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from IPython.display import display
 from scipy import stats
 
-from . import AnalysisState
+from .base import AbstractVisualization
+from .jupyter import JupyterMixin
+from ..state import AnalysisState
 from ..util.types import map_raw_type_to_feature_type
-from ..visualization import JupyterMixin, AbstractVisualization
+
+__all__ = ['CorrelationVisualization', 'CorrelationSignificanceVisualization']
 
 
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
@@ -88,7 +89,9 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     chart_args['stat'] = 'density'
                     dists = state.distributions_fit[ds][x]
 
-                self._get_sns_chart_method(chart_type)(ax=ax, data=data, **chart_args)
+                chart = self._get_sns_chart_method(chart_type)(ax=ax, data=data, **chart_args)
+                if chart_type in ('countplot', 'barplot', 'boxplot'):
+                    plt.setp(chart.get_xticklabels(), rotation=90)
 
                 if dists is not None:
                     x_min, x_max = ax.get_xlim()
@@ -158,52 +161,75 @@ class CorrelationVisualization(AbstractVisualization, JupyterMixin):
         self.fig_args = fig_args
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(state, ['correlations'])
+        return 'correlations' in state
 
     def _render(self, state: AnalysisState) -> None:
         for ds, corr in state.correlations.items():
-            if len(state.correlations.train_data) <= 1:
+            # Don't render single cell
+            if len(state.correlations[ds]) <= 1:
                 continue
+
             if state.correlations_focus_field is not None:
                 focus_field_header = f'; focus: {state.correlations_focus_field} >= {state.correlations_focus_field_threshold}'
             else:
                 focus_field_header = ''
             self.render_header_if_needed(state, f'{ds} - {state.correlations_method} correlation matrix{focus_field_header}')
-            widgets = [w for w in ['correlations', 'significance_matrix'] if w in state]
-            outs = [wgts.Output(scroll=False) for _ in widgets]
-            tab = wgts.Tab(children=outs)
-            for i, c in enumerate([w for w in widgets]):
-                titles = {
-                    'correlations': 'correlations',
-                    'significance_matrix': 'significance matrix'
-                }
-                tab.set_title(i, titles[c])
-            if len(widgets) > 1:
-                display(tab)
-            for widget, out in zip(widgets, outs):
-                if len(widgets) > 1:
-                    with out:
-                        self.__render_internal(state, widget)
-                else:
-                    self.__render_internal(state, widget)
 
-    def __render_internal(self, state, widget):
-        fig, ax = plt.subplots(**self.fig_args)
-        if widget == 'significance_matrix':
-            args = {'center': 3, 'vmax': 5, 'cmap': 'Spectral', 'robust': True}
-        else:
+            fig, ax = plt.subplots(**self.fig_args)
             args = {
                 'vmin': 0 if state.correlations_method == 'phik' else -1,
                 'vmax': 1, 'center': 0, 'cmap': 'Spectral'
             }
-        sns.heatmap(state[widget].train_data,
-                    annot=True,
-                    ax=ax,
-                    linewidths=.9,
-                    linecolor='white',
-                    fmt='.2f',
-                    square=True,
-                    cbar_kws={"shrink": 0.5},
-                    **args)
-        plt.yticks(rotation=0)
-        plt.show(fig)
+            sns.heatmap(corr,
+                        annot=True,
+                        ax=ax,
+                        linewidths=.9,
+                        linecolor='white',
+                        fmt='.2f',
+                        square=True,
+                        cbar_kws={"shrink": 0.5},
+                        **args)
+            plt.yticks(rotation=0)
+            plt.show(fig)
+
+
+class CorrelationSignificanceVisualization(AbstractVisualization, JupyterMixin):
+
+    def __init__(self,
+                 headers: bool = False,
+                 namespace: str = None,
+                 fig_args: Union[None, Dict[str, Any]] = {},
+                 **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.headers = headers
+        self.fig_args = fig_args
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return 'significance_matrix' in state
+
+    def _render(self, state: AnalysisState) -> None:
+        for ds, corr in state.correlations.items():
+            # Don't render single cell
+            if len(state.significance_matrix[ds]) <= 1:
+                continue
+
+            if state.correlations_focus_field is not None:
+                focus_field_header = f'; focus: {state.correlations_focus_field} >= {state.correlations_focus_field_threshold}'
+            else:
+                focus_field_header = ''
+            self.render_header_if_needed(state, f'{ds} - {state.correlations_method} correlation matrix significance{focus_field_header}')
+
+            fig, ax = plt.subplots(**self.fig_args)
+            args = {'center': 3, 'vmax': 5, 'cmap': 'Spectral', 'robust': True}
+
+            sns.heatmap(corr,
+                        annot=True,
+                        ax=ax,
+                        linewidths=.9,
+                        linecolor='white',
+                        fmt='.2f',
+                        square=True,
+                        cbar_kws={"shrink": 0.5},
+                        **args)
+            plt.yticks(rotation=0)
+            plt.show(fig)

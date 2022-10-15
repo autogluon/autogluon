@@ -6,9 +6,11 @@ from typing import List, Union, Tuple
 
 from pandas import DataFrame
 
-from .. import AnalysisState, StateCheckMixin
+from ..state import AnalysisState, StateCheckMixin
 
 logger = logging.getLogger(__name__)
+
+__all__ = ['AbstractAnalysis', 'BaseAnalysis', 'Namespace']
 
 
 class AbstractAnalysis(ABC, StateCheckMixin):
@@ -134,6 +136,21 @@ class AbstractAnalysis(ABC, StateCheckMixin):
             for c in self.children:
                 c.fit(**kwargs)
         return self.state
+
+
+class BaseAnalysis(AbstractAnalysis):
+
+    def __init__(self,
+                 parent: Union[None, AbstractAnalysis] = None,
+                 children: List[AbstractAnalysis] = [],
+                 **kwargs) -> None:
+        super().__init__(parent, children, **kwargs)
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return True
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
+        pass
 
 
 class Namespace(AbstractAnalysis):

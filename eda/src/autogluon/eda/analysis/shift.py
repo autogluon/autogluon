@@ -1,14 +1,18 @@
-from typing import Union, List, Any, Optional
 import copy
-import pandas as pd
+from typing import Union, List, Any
+
 import numpy as np
-from autogluon.core.metrics import balanced_accuracy, BINARY_METRICS, roc_auc
+import pandas as pd
+
 from autogluon.core.constants import BINARY
+from autogluon.core.metrics import BINARY_METRICS, roc_auc
 from autogluon.core.utils import generate_train_test_split
 from autogluon.tabular import TabularPredictor
-from .. import AnalysisState
 from .base import AbstractAnalysis
+from .. import AnalysisState
 from ..state import StateCheckMixin
+
+__all__ = ['XShiftDetector']
 
 
 class XShiftDetector(AbstractAnalysis, StateCheckMixin):
@@ -31,6 +35,8 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         that the default value is a column in the data.
     classifier_kwargs : dict, default = {}
         The kwargs passed to the classifier, a member of classifier_class
+    classifier_fit_kwargs : dict, default = {}
+        The kwargs passed to the classifier's `fit` call, a member of classifier_class
     num_permutations: int, default = 1000
         The number of permutations used for any permutation based method
     test_size_2st: float, default = 0.3
@@ -54,15 +60,17 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
                  eval_metric: str = 'roc_auc',
                  sample_label: str = 'i2vkyc0p64',
                  classifier_kwargs: dict = None,
+                 classifier_fit_kwargs: dict = None,
                  num_permutations: int = 1000,
                  test_size_2st: float = 0.3,
-                 parent: Union[None,AbstractAnalysis] = None,
+                 parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)
         if classifier_kwargs is None:
             classifier_kwargs = {}
         self.classifier_kwargs = classifier_kwargs
+        self.classifier_fit_kwargs = classifier_fit_kwargs
         self.classifier_class = classifier_class
         self.compute_fi = compute_fi
         named_metrics = BINARY_METRICS
@@ -100,7 +108,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
                 X = X.drop(columns=[label])
             if label in X_test.columns:
                 X_test = X_test.drop(columns=[label])
-        self.C2ST.fit((X, X_test), **fit_kwargs)
+        self.C2ST.fit((X, X_test), **self.classifier_fit_kwargs, **fit_kwargs)
         # Feature importance
         if self.C2ST.has_fi and self.compute_fi:
             fi_scores = self.C2ST.feature_importance()
@@ -117,12 +125,16 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
             'feature_importance': fi_scores,
         }
 
+
 def post_fit(func):
     """decorator for post-fit methods"""
+
     def pff_wrapper(self, *args, **kwargs):
         assert self._is_fit, f'.fit needs to be called prior to .{func.__name__}'
         return func(self, *args, **kwargs)
+
     return pff_wrapper
+
 
 class Classifier2ST:
     """A classifier 2 sample test, which tests for a difference between a source and target dataset.  It fits a
@@ -148,6 +160,7 @@ class Classifier2ST:
     test_size_2st: float, default = 0.3
         The size of the test set in the training test split in 2ST
     """
+
     def __init__(self,
                  classifier_class,
                  sample_label='xshift_label',
@@ -175,8 +188,8 @@ class Classifier2ST:
     def _make_source_target_label(data, sample_label):
         """Turn a source, target pair into a single dataframe with label column"""
         source, target = data[0].copy(), data[1].copy()
-        source.loc[:,sample_label] = 0
-        target.loc[:,sample_label] = 1
+        source.loc[:, sample_label] = 0
+        target.loc[:, sample_label] = 1
         data = pd.concat((source, target), ignore_index=True)
         return data
 
@@ -194,10 +207,10 @@ class Classifier2ST:
             sample_label = self.sample_label
             assert sample_label in data.columns, "sample_label needs to be a column of data"
             assert self.split, "sample_label requires the split parameter"
-            data = data.copy() # makes a copy
+            data = data.copy()  # makes a copy
         else:
             assert len(data) == 2, "Data needs to be tuple/list of (source, target) if sample_label is None"
-            data = self._make_source_target_label(data, self.sample_label) # makes a copy
+            data = self._make_source_target_label(data, self.sample_label)  # makes a copy
         if data.index.has_duplicates:
             data = data.reset_index(drop=True)
         train, test, y_train, y_test = generate_train_test_split(data.drop(columns=[self.sample_label]),
@@ -234,7 +247,7 @@ class Classifier2ST:
 
     @post_fit
     def pvalue(self,
-               num_permutations: int=1000):
+               num_permutations: int = 1000):
         """Compute the p-value which measures the significance level for the test statistic
 
         Parameters
@@ -261,5 +274,3 @@ class Classifier2ST:
         assert self.compute_fi, "Set compute_fi to True to compute feature importances"
         fi_scores = self.classifier.feature_importance(self._test)
         return fi_scores
-
-

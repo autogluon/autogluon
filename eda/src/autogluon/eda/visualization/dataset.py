@@ -5,7 +5,9 @@ from pandas import DataFrame
 
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from .. import AnalysisState
+from ..state import AnalysisState
+
+__all__ = ['DatasetStatistics', 'DatasetTypeMismatch']
 
 
 class DatasetStatistics(AbstractVisualization, JupyterMixin):
@@ -71,7 +73,7 @@ class DatasetTypeMismatch(AbstractVisualization, JupyterMixin):
         self.headers = headers
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return 'raw_types' in state
+        return 'raw_type' in state
 
     def _render(self, state: AnalysisState) -> None:
         df = pd.DataFrame(state.raw_type).sort_index()
