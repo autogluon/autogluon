@@ -5,8 +5,6 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchmetrics
-from mmcv.ops import RoIPool
-from mmcv.parallel import scatter
 from omegaconf import DictConfig
 from torch import nn
 from torch.nn.modules.loss import _Loss
@@ -82,6 +80,9 @@ class MMDetLitModule(pl.LightningModule):
         pass
 
     def _predict_step(self, batch, batch_idx=0):
+        from mmcv.ops import RoIPool
+        from mmcv.parallel import scatter
+        
         data = batch["mmdet_image_image"]
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
