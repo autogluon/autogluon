@@ -18,6 +18,8 @@ from ..constants import (
     FEW_SHOT,
     IMAGE,
     LABEL,
+    MULTIMODAL,
+    NER,
     NER_ANNOTATION,
     NUMERICAL,
     TEXT,
@@ -28,6 +30,7 @@ from ..data import (
     LabelProcessor,
     MixupModule,
     MultiModalFeaturePreprocessor,
+    MultiModalProcessor,
     NerLabelEncoder,
     NumericalProcessor,
     TextProcessor,
@@ -144,6 +147,12 @@ def create_data_processor(
         )
     elif data_type == LABEL:
         data_processor = LabelProcessor(model=model)
+    elif data_type == MULTIMODAL:
+        data_processor = MultiModalProcessor(
+            model=model,
+            tokenizer_name=model_config.tokenizer_name,
+            max_len=model_config.max_text_len,
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -183,6 +192,7 @@ def create_fusion_data_processors(
         CATEGORICAL: [],
         NUMERICAL: [],
         LABEL: [],
+        MULTIMODAL: [],
     }
 
     model_dict = {model.prefix: model}
@@ -194,6 +204,19 @@ def create_fusion_data_processors(
     assert sorted(list(model_dict.keys())) == sorted(config.model.names)
 
     for per_name, per_model in model_dict.items():
+        model_config = getattr(config.model, per_model.prefix)
+
+        if per_name == NER:
+            data_processors[MULTIMODAL].append(
+                create_data_processor(
+                    data_type=MULTIMODAL,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            requires_label = False
+            model_config.data_types.remove(TEXT)
+
         if requires_label:
             # each model has its own label processor
             label_processor = create_data_processor(
@@ -202,7 +225,7 @@ def create_fusion_data_processors(
                 model=per_model,
             )
             data_processors[LABEL].append(label_processor)
-        model_config = getattr(config.model, per_model.prefix)
+
         if requires_data and model_config.data_types:
             for data_type in model_config.data_types:
                 per_data_processor = create_data_processor(

@@ -15,7 +15,6 @@ from ..constants import (
     AUTOMM,
     CHOICES_IDS,
     COLUMN,
-    NER,
     TEXT,
     TEXT_SEGMENT_IDS,
     TEXT_TOKEN_IDS,
@@ -26,12 +25,7 @@ from ..constants import (
 from .collator import Pad, Stack
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
-from .utils import (
-    extract_value_from_config,
-    normalize_txt,
-    register_encoding_decoding_error_handlers,
-    tokenize_ner_text,
-)
+from .utils import extract_value_from_config, normalize_txt, register_encoding_decoding_error_handlers
 
 logger = logging.getLogger(AUTOMM)
 
@@ -221,14 +215,6 @@ class TextProcessor:
         return f"{self.prefix}_{TEXT_VALID_LENGTH}"
 
     @property
-    def text_token_word_mapping_key(self):
-        return f"{self.prefix}_{TOKEN_WORD_MAPPING}"
-
-    @property
-    def text_word_offsets_key(self):
-        return f"{self.prefix}_{WORD_OFFSETS}"
-
-    @property
     def text_column_prefix(self):
         return f"{self.text_token_ids_key}_{COLUMN}"
 
@@ -255,14 +241,6 @@ class TextProcessor:
                 self.choices_ids_key: Pad(pad_val=0),
             }
         )
-
-        if self.prefix == NER:
-            fn.update(
-                {
-                    self.text_token_word_mapping_key: Pad(pad_val=0),
-                    self.text_word_offsets_key: Pad(pad_val=0),
-                }
-            )
 
         return fn
 
@@ -511,41 +489,6 @@ class TextProcessor:
         else:
             return np.minimum(lengths, max_length)
 
-    def process_ner_text(
-        self,
-        text: Dict[str, str],
-    ):
-        """
-        Process the NER text data.
-        Parameters
-        ----------
-        text
-            All the raw text data in a dataset.
-
-        Returns
-        -------
-        A dictionary containing one sample's text tokens, valid length, segment ids, attention mask,
-        offset mapping, word offsets, and choice ids.
-        """
-        col_tokens, ret = None, {}
-        for col_name, col_text in text.items():
-            col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(col_text, self.tokenizer)
-            if self.requires_column_info:
-                ret[f"{self.text_column_prefix}_{col_name}"] = np.array(
-                    [0, sum(col_tokens.attention_mask)], dtype=np.int64
-                )
-        ret.update(
-            {
-                self.text_token_ids_key: np.array(col_tokens.input_ids, dtype=np.int32),
-                self.text_valid_length_key: sum(col_tokens.attention_mask),
-                self.text_segment_ids_key: np.array(col_tokens.token_type_ids, dtype=np.int32),
-                self.text_token_word_mapping_key: token_to_word_mappings,
-                self.text_word_offsets_key: word_offsets,
-                self.choices_ids_key: np.array([], dtype=np.int32),
-            }
-        )
-        return ret
-
     def __call__(
         self,
         texts: Dict[str, str],
@@ -568,10 +511,7 @@ class TextProcessor:
         if self.normalize_text:
             texts = {col_name: normalize_txt(col_text) for col_name, col_text in texts.items()}
 
-        if self.prefix == NER:
-            return self.process_ner_text(texts)
-        else:
-            return self.build_one_token_sequence_from_text(texts, is_training)
+        return self.build_one_token_sequence_from_text(texts, is_training)
 
     def __deepcopy__(self, memo):
         cls = self.__class__

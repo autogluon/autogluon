@@ -19,6 +19,7 @@ from ..constants import (
     IMAGE,
     IMAGE_PATH,
     LABEL,
+    MULTIMODAL,
     NER,
     NER_ANNOTATION,
     NULL,
@@ -218,6 +219,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._numerical_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
+        elif modality == MULTIMODAL:
+            if self.label_type == NER_ANNOTATION:
+                return self._text_feature_names + [self._label_column]
+            else:
+                raise ValueError(f"Please specify which columns are included for {modality}.")
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
@@ -518,22 +524,34 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
             y = y_df  # Do nothing. TODO: Shall we transform this?
-        elif self.label_type == NER_ANNOTATION:
-            # TODO: Add transform_multimodal and process_multimodal.py
-            text_column_index = 0  # Currently, we only support one text column.
-            x_df = df[self._text_feature_names[text_column_index]]
-            y = self._label_generator.transform(y_df)
-            x = self.transform_text(df)[0]
-            # Labelprocessor needs both ner annotations and text.
-            ret = {
-                NER_ANNOTATION: y,
-                TEXT: x[self._text_feature_names[text_column_index]],
-            }
-            return ret, None
         else:
             raise NotImplementedError
 
         return {self._label_column: y}, {self._label_column: self.label_type}
+
+    def transform_multimodal(
+        self,
+        df: pd.DataFrame,
+    ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
+        ret = {}
+        if self.label_type == NER_ANNOTATION:
+            # text column should always present
+            text_column_index = 0  # Currently, we only support one text column.
+            x_df = df[self._text_feature_names[text_column_index]]
+            x = self.transform_text(df)[0]
+            ret.update(
+                {
+                    TEXT: x[self._text_feature_names[text_column_index]],
+                }
+            )
+            if self._label_column in df:
+                y_df = df[self._label_column]
+                y = self._label_generator.transform(y_df)
+                ret.update({NER_ANNOTATION: y})
+        else:
+            raise NotImplementedError
+
+        return ret, None
 
     def transform_label_for_metric(
         self,

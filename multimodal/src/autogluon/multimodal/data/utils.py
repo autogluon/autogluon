@@ -323,7 +323,7 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
 
     Returns
     -------
-    Token-level labels or word-level lavels
+    Token-level/word-level labels and text features.
     """
     col_tokens, token_to_word_mappings, word_offsets = tokenize_ner_text(ner_text, tokenizer)
     num_words = len(set(token_to_word_mappings)) - 1
@@ -333,7 +333,8 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
         for annot in ner_annotations:
             custom_offset = annot[0]
             custom_label = annot[1]
-            if word_offset[0] == custom_offset[0]:
+            # support multiple words in an annotated offset range.
+            if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
                 word_label[idx] = custom_label
 
     token_label = [0] * len(col_tokens.input_ids)
@@ -345,9 +346,11 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
             token_label[idx] = word_label[counter]
             counter += 1
     if not is_eval:
-        return token_label  # return token-level labels for training
+        label = token_label  # return token-level labels for training
     else:
-        return word_label  # return word-level labels for evaluation
+        label = word_label  # return word-level labels for evaluation
+
+    return label, col_tokens, token_to_word_mappings, word_offsets
 
 
 def tokenize_ner_text(text, tokenizer):

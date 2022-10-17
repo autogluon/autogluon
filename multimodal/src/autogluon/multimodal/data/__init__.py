@@ -7,5 +7,6 @@ from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .process_categorical import CategoricalProcessor
 from .process_image import ImageProcessor
 from .process_label import LabelProcessor
+from .process_multimodal import MultiModalProcessor
 from .process_numerical import NumericalProcessor
 from .process_text import TextProcessor
