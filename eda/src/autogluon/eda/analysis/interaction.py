@@ -1,8 +1,12 @@
+import re
 from typing import Union, List, Any, Dict
 
 import numpy as np
+import pandas as pd
 from scipy.cluster import hierarchy as hc
 from scipy.stats import spearmanr
+from pandas.api.types import is_object_dtype, is_numeric_dtype
+from scipy.stats import chi2_contingency, spearmanr, kruskal
 
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from .base import AbstractAnalysis
@@ -136,3 +140,60 @@ class FeatureDistanceAnalysis(AbstractAnalysis, StateCheckMixin):
             'linkage': z,
         }
         state['feature_distance'] = s
+
+class NonparametricAssociation(AbstractAnalysis):
+    """
+    """
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def custom_kruskal(df, obj_col_name, num_col_name):
+        cat_groups = [v[num_col_name] for i,v in df[[obj_col_name, num_col_name]].groupby(obj_col_name)]
+        test_res = kruskal(*cat_groups)
+        return {'test_statistic': test_res.statistic,
+                'pvalue': test_res.pvalue,
+                'test': 'kruskal'}
+
+    @staticmethod
+    def custom_chi2(obj_col1, obj_col2):
+        conttable = pd.crosstab(obj_col1, obj_col2)
+        chi2_res = chi2_contingency(conttable)
+        return {'test_statistic': chi2_res[0],
+                'pvalue': chi2_res[1],
+                'test': 'chi2'}
+
+    @staticmethod
+    def custom_spearman(num_col1, num_col2):
+        test_res = spearmanr(num_col1, num_col2)
+        return {'test_statistic': test_res.correlation,
+                'pvalue': test_res.pvalue,
+                'test': 'spearman'}
+
+    @staticmethod
+    def nonparametric_test(df, col1, col2):
+        """choose the non-parametric test based on the column dtypes"""
+        def convert_dtype(col_dtype):
+            if is_object_dtype(df.dtypes[col_dtype]):
+                return 'object'
+            if is_numeric_dtype(df.dtypes[col_dtype]):
+                return 'numeric'
+            assert False, "Columns must be one of object or numeric dtype"
+
+        col_dtypes = {col: convert_dtype(col) for col in [col1, col2]}
+        object_col = [col for col, dty in col_dtypes.items() if dty == 'object']
+        numeric_col = [col for col, dty in col_dtypes.items() if dty == 'numeric']
+        if len(object_col) == 2:
+            return NonparametricAssociation.custom_chi2(df[object_col[0]], df[object_col[1]])
+        elif len(numeric_col) == 2:
+            return NonparametricAssociation.custom_spearman(df[numeric_col[0]], df[numeric_col[1]])
+        else:
+            return NonparametricAssociation.custom_kruskal(df, object_col[0], numeric_col[0])
+
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        pass
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        pass
+
