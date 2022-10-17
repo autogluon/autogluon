@@ -347,51 +347,6 @@ class TimeSeriesPredictor:
         self.save()
         return self
 
-    # TODO: Is this method safe to delete?
-    def _get_scheduler_options(
-        self,
-        hyperparameter_tune_kwargs: Optional[Union[str, Dict]],
-        time_limit: Optional[int] = None,
-    ) -> Tuple[Optional[Type], Optional[Dict[str, Any]]]:
-        """Validation logic for ``hyperparameter_tune_kwargs``. Returns True if ``hyperparameter_tune_kwargs`` is None
-        or can construct a valid scheduler. Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
-        """
-        if hyperparameter_tune_kwargs is None:
-            return None, None
-
-        num_trials: Optional[int] = None
-        if isinstance(hyperparameter_tune_kwargs, dict):
-            num_trials = hyperparameter_tune_kwargs.get("num_trials")
-            if time_limit is None and num_trials is None:
-                logger.warning(
-                    "None of time_limit and num_trials are set, defaulting to num_trials=2",
-                )
-                num_trials = 2
-            else:
-                num_trials = hyperparameter_tune_kwargs.get("num_trials", 999)
-        elif isinstance(hyperparameter_tune_kwargs, str):
-            num_trials = 999
-
-        scheduler_cls, scheduler_params = scheduler_factory(
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            time_out=time_limit,
-            nthreads_per_trial="auto",
-            ngpus_per_trial="auto",
-            num_trials=num_trials,
-        )
-
-        if scheduler_params["num_trials"] == 1:
-            logger.warning("Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. ")
-            return None, None
-
-        scheduler_ngpus = scheduler_params["resource"].get("num_gpus", 0)
-        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-            logger.warning(
-                f"Warning: TimeSeriesPredictor currently doesn't use >1 GPU per training run. "
-                f"Detected {scheduler_ngpus} GPUs."
-            )
-        return scheduler_cls, scheduler_params
-
     def get_model_names(self) -> List[str]:
         """Returns the list of model names trained by this predictor object."""
         return self._trainer.get_model_names()
