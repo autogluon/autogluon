@@ -82,7 +82,7 @@ class MMDetLitModule(pl.LightningModule):
     def _predict_step(self, batch, batch_idx=0):
         from mmcv.ops import RoIPool
         from mmcv.parallel import scatter
-        
+
         data = batch["mmdet_image_image"]
         data["img_metas"] = [img_metas.data[0] for img_metas in data["img_metas"]]
         data["img"] = [img.data[0] for img in data["img"]]
