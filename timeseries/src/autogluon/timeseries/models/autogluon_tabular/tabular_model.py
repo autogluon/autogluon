@@ -60,7 +60,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        self._lag_indices: List[int] = None
+        self._lag_indices: np.array = None
         self._time_features: List[TimeFeature] = None
         self._available_features: pd.Index = None
         self._drop_median_prediction = False
@@ -89,24 +89,34 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         last_k_values: int, optional
             If provided, features will be generated only for the last `last_k_values` timesteps of each time series.
         """
-        if last_k_values is None:
-            selected_slice = slice(None, None)
-        else:
-            selected_slice = slice(-last_k_values, None)
 
-        # TODO Parrallelize the code
-        dataframe_per_item = []
-        for item_id in data.item_ids:
-            series = data.loc[item_id][self.target]
-            time_feature_columns = {
-                feature.__class__.__name__: feature(series.index[selected_slice]) for feature in self._time_features
-            }
-            lag_columns = {f"lag_{idx}": series.shift(idx).values.ravel()[selected_slice] for idx in self._lag_indices}
-            columns = {**time_feature_columns, **lag_columns, "target": series.values.ravel()[selected_slice]}
-            df = pd.DataFrame(columns, index=series.index[selected_slice])
-            dataframe_per_item.append(df)
+        def get_lag_features_and_target(group):
+            timestamp = group.index.get_level_values(TIMESTAMP)
+            lag_columns = {f"lag_{idx}": group.shift(idx).values.ravel() for idx in self._lag_indices}
+            features = pd.DataFrame(lag_columns, index=timestamp)
+            # Starting from the end of the time series, mask the values as if the last `prediction_length` steps weren't observed
+            # This mimics what will happen at test time, when we simultaneously predict the next `prediction_length` values
+            num_windows = (len(group) - 1) // self.prediction_length
+            # We don't hide any past values for the first `remainder` values, otherwise the features will be all empty
+            remainder = len(group) - num_windows * self.prediction_length
+            num_hidden = np.concatenate([np.zeros(remainder), np.tile(np.arange(self.prediction_length), num_windows)])
+            mask = num_hidden[:, None] >= self._lag_indices[None]  # shape [num_timesteps, num_lags]
+            features[mask] = np.nan
 
-        return pd.concat(dataframe_per_item, ignore_index=True)
+            # Prediction target
+            features[self.target] = group.values.ravel()
+            return features
+
+        features = data[self.target].groupby(level=ITEMID, sort=False).apply(get_lag_features_and_target)
+        timestamps = features.index.get_level_values(TIMESTAMP)
+        for time_feat in self._time_features:
+            features[time_feat.__class__.__name__] = time_feat(timestamps)
+
+        if last_k_values is not None:
+            features = features.groupby(level=ITEMID, sort=False).tail(last_k_values)
+
+        features.reset_index(inplace=True, drop=True)
+        return features
 
     def _fit(
         self,
@@ -119,7 +129,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         if self.tabular_predictor._learner.is_fit:
             raise AssertionError(f"{self.name} predictor has already been fit!")
         verbosity = kwargs.get("verbosity", 2)
-        self._lag_indices = get_lags_for_frequency(train_data.freq)
+        self._lag_indices = np.array(get_lags_for_frequency(train_data.freq), dtype=np.int64)
         self._time_features = time_features_from_frequency_str(train_data.freq)
 
         train_data, _ = self._normalize_targets(train_data)
@@ -155,45 +165,44 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             verbosity=verbosity - 2,
         )
 
+    def _extend_index(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Add self.prediction_length many time steps with dummy values to each timeseries in the dataset."""
+
+        def extend_single_time_series(group):
+            offset = pd.tseries.frequencies.to_offset(data.freq)
+            cutoff = group.index.get_level_values(TIMESTAMP)[-1]
+            new_index = pd.date_range(cutoff + offset, freq=offset, periods=self.prediction_length).rename(TIMESTAMP)
+            new_values = np.full([self.prediction_length], fill_value=np.nan)
+            new_df = pd.DataFrame(new_values, index=new_index, columns=[self.target])
+            return pd.concat([group.droplevel(ITEMID), new_df])
+
+        return data.groupby(ITEMID, sort=False).apply(extend_single_time_series)
+
     def predict(self, data: TimeSeriesDataFrame, quantile_levels: List[float] = None, **kwargs) -> TimeSeriesDataFrame:
         if quantile_levels is not None:
-            raise ValueError(f"{self.name} cannot predict custom quantiles. Please set `quantile_levels=None`.")
+            output_quantiles = quantile_levels
+            if not set(quantile_levels).issubset(set(self.quantile_levels)):
+                raise ValueError(
+                    f"{self.name} expects quantile_levels to be a subset of {self.quantile_levels} "
+                    f" (received quantile_levels = {quantile_levels})."
+                )
+        else:
+            output_quantiles = self.quantile_levels
+            if self._drop_median_prediction:
+                output_quantiles.remove(0.5)
 
         data, scale_per_item = self._normalize_targets(data)
+        data_extended = self._extend_index(data)
+        features = self._get_features_dataframe(data_extended, last_k_values=self.prediction_length)
+        predictions = self.tabular_predictor.predict(features[self._available_features])
 
-        last_observed_timestamp = data.slice_by_timestep(-1, None).index.get_level_values(TIMESTAMP)
-        offset = pd.tseries.frequencies.to_offset(data.freq)
-        item_ids = data.item_ids
-        nan_array = np.full(len(item_ids), fill_value=np.nan)
+        preds_index = data_extended.slice_by_timestep(-self.prediction_length, None).index
+        predictions.set_index(preds_index, inplace=True)
 
-        predictions_list = []
-        full_df = data
+        predictions["mean"] = predictions[0.5]
+        predictions = predictions[["mean"] + output_quantiles]
+        predictions.rename(str, axis=1, inplace=True)
 
-        # Autoregressively generate predictions
-        for idx in range(1, self.prediction_length + 1):
-            next_timestamp = last_observed_timestamp + idx * offset
-            next_index = pd.MultiIndex.from_arrays([item_ids, next_timestamp])
-            next_step_dummy = pd.DataFrame(nan_array, index=next_index, columns=[self.target])
-            # Target for the next timestep (to be predicted) is set to NaN
-            full_df_with_dummy = pd.concat([full_df, next_step_dummy])
-            features = self._get_features_dataframe(full_df_with_dummy, last_k_values=1)
-            preds = self.tabular_predictor.predict(features[self._available_features])
-            # Use median forecast as observation for the next timestep
-            next_values = preds[0.5].values
-            preds.rename(str, axis=1, inplace=True)
-            preds.insert(0, "mean", next_values)
-
-            preds.index = next_index
-            predictions_list.append(preds)
-
-            # Use predictions for the next timestep as if they were actually observed
-            next_values_with_index = pd.DataFrame(next_values, index=next_index, columns=[self.target])
-            full_df = pd.concat([full_df, next_values_with_index])
-            data = pd.concat([data, next_values_with_index])
-
-        predictions = pd.concat(predictions_list).sort_index()
-        if self._drop_median_prediction:
-            predictions.drop("0.5", axis=1, inplace=True)
         predictions = self._rescale_targets(predictions, scale_per_item)
         return TimeSeriesDataFrame(predictions).loc[data.item_ids]
 

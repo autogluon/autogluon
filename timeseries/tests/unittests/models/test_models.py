@@ -27,7 +27,6 @@ AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = (
     GLUONTS_TESTABLE_MODELS + SKTIME_TESTABLE_MODELS + STATSMODELS_TESTABLE_MODELS + TABULAR_TESTABLE_MODELS
 )
-TESTABLE_MODELS = TABULAR_TESTABLE_MODELS
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
 
@@ -182,7 +181,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         return
 
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    predictions = model.predict(DUMMY_TS_DATAFRAME)
+    predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
 
     assert isinstance(predictions, TimeSeriesDataFrame)
 
