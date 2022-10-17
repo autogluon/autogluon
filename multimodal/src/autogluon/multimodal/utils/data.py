@@ -20,6 +20,7 @@ from ..constants import (
     LABEL,
     NER_ANNOTATION,
     NUMERICAL,
+    ROIS,
     TEXT,
 )
 from ..data import (
