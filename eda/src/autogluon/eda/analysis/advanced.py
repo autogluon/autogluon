@@ -25,7 +25,7 @@ class TargetFacetAnalysis(AbstractAnalysis, StateCheckMixin):
         self.fit_distributions = fit_distributions
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, ['train_data', 'label'])
+        return self.all_keys_must_be_present(args, 'train_data', 'label')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         corr_args = {**dict(method=self.correlation_method, focus_field=args.label, focus_field_threshold=self.correlations_focus_threshold),
@@ -112,7 +112,7 @@ class MissingValuesFacetAnalysis(AbstractAnalysis, StateCheckMixin):
         self.use_all_datasets = use_all_datasets
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, ['train_data', 'label'])
+        return self.all_keys_must_be_present(args, 'train_data', 'label')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         if self.use_all_datasets:

@@ -21,7 +21,7 @@ class TargetFacetAnalysisVisualization(AbstractVisualization):
         self.viz_args = viz_args
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(state, ['target_correlations', 'target_statistics'])
+        return self.all_keys_must_be_present(state, 'target_correlations', 'target_statistics')
 
     def _render(self, state: AnalysisState) -> None:
         viz_facets = []

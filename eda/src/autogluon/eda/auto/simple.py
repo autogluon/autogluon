@@ -29,9 +29,10 @@ def analyze(train_data=None, test_data=None, val_data=None, model=None, label=No
 
 
 def analyze_interaction(x=None, y=None, hue=None, viz_args={}, fig_args={}, **analysis_args):
+    key = '__analysis__'
     analyze(**analysis_args, anlz_facets=[
         RawTypesAnalysis(),
-        FeatureInteraction(x=x, y=y, hue=hue),
+        FeatureInteraction(key=key, x=x, y=y, hue=hue),
     ], viz_facets=[
-        FeatureInteractionVisualization(fig_args=fig_args, **viz_args),
+        FeatureInteractionVisualization(key=key, fig_args=fig_args, **viz_args),
     ])

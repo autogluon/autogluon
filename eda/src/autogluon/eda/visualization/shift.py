@@ -48,7 +48,7 @@ class XShiftSummary(AbstractVisualization, JupyterMixin, StateCheckMixin):
         return ret_md
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self.at_least_one_key_must_be_present(state, ['xshift_results'])
+        return self.at_least_one_key_must_be_present(state, 'xshift_results')
 
     def _render(self, state: AnalysisState) -> None:
         res_md = self._summary(state.xshift_results)

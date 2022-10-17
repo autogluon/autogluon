@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ class AnalysisState(dict):
 
 
 class StateCheckMixin:
-    def at_least_one_key_must_be_present(self, state: AnalysisState, keys: List[str]):
+    def at_least_one_key_must_be_present(self, state: AnalysisState, *keys):
         """
         Checks if at least one key is present in the state
 
@@ -44,7 +43,7 @@ class StateCheckMixin:
         ----------
         state: AnalysisState
             state object to perform check on
-        keys: List[str]
+        keys:
             list of the keys to check
 
         Returns
@@ -57,7 +56,7 @@ class StateCheckMixin:
         logger.warning(f'{self.__class__.__name__}: at least one of the following keys must be present: {keys}')
         return False
 
-    def all_keys_must_be_present(self, state: AnalysisState, keys: List[str]):
+    def all_keys_must_be_present(self, state: AnalysisState, *keys):
         """
         Checks if all the keys are present in the state
 
@@ -65,7 +64,7 @@ class StateCheckMixin:
         ----------
         state: AnalysisState
             state object to perform check on
-        keys: List[str]
+        keys:
             list of the keys to check
 
         Returns

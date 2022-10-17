@@ -72,7 +72,7 @@ class VariableTypeAnalysis(AbstractAnalysis):
         self.numeric_as_categorical_threshold = numeric_as_categorical_threshold
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(state, ['raw_type'])
+        return self.all_keys_must_be_present(state, 'raw_type')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
         state.variable_type = {}

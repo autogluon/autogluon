@@ -89,7 +89,7 @@ class XShiftDetector(AbstractAnalysis, StateCheckMixin):
         self.num_permutations = num_permutations
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(args, ['train_data', 'test_data'])
+        return self.all_keys_must_be_present(args, 'train_data', 'test_data')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         """ Fit method.  `args` can contain

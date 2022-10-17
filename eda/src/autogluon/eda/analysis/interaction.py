@@ -1,9 +1,16 @@
 from typing import Union, List, Any, Dict
 
+import numpy as np
+from scipy.cluster import hierarchy as hc
+from scipy.stats import spearmanr
+
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from .base import AbstractAnalysis
 from .. import AnalysisState
 
 __all__ = ['Correlation', 'CorrelationSignificance']
+
+from ..state import StateCheckMixin
 
 
 class FeatureInteraction(AbstractAnalysis):
@@ -12,6 +19,7 @@ class FeatureInteraction(AbstractAnalysis):
                  x: Union[None, str] = None,
                  y: [None, str] = None,
                  hue: str = None,
+                 key: str = None,
                  parent: Union[None, AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
@@ -19,9 +27,10 @@ class FeatureInteraction(AbstractAnalysis):
         self.x = x
         self.y = y
         self.hue = hue
+        self.key = key
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return True
+        return self.all_keys_must_be_present(state, 'raw_type')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         cols = {
@@ -29,19 +38,24 @@ class FeatureInteraction(AbstractAnalysis):
             'y': self.y,
             'hue': self.hue,
         }
-        cols = {k: v for k, v in cols.items() if v is not None}
-        interactions: List[Dict[str, Any]] = state.get('interactions', [])
 
+        if self.key is None:
+            # if key is not provided, then convert to form: 'x:A|y:B|hue:C'; if values is not provided, then skip the value
+            self.key = '|'.join([f'{k}:{v}' for k, v in {k: cols[k] for k in cols.keys()}.items() if v is not None])
+        cols = {k: v for k, v in cols.items() if v is not None}
+
+        interactions: Dict[str, Dict[str, Any]] = state.get('interactions', {})
         for (ds, df) in self.available_datasets(args):
             missing_cols = [c for c in cols.values() if c not in df.columns]
             if len(missing_cols) == 0:
                 df = df[cols.values()]
-                ds_interaction = {
+                interaction = {
                     'features': cols,
-                    'dataset': ds,
                     'data': df,
                 }
-                interactions.append(ds_interaction)
+                if ds not in interactions:
+                    interactions[ds] = {}
+                interactions[ds][self.key] = interaction
         state.interactions = interactions
 
 
@@ -89,9 +103,36 @@ class Correlation(AbstractAnalysis):
 class CorrelationSignificance(AbstractAnalysis):
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
-        return 'correlations' in state and 'correlations_method' in state
+        return self.all_keys_must_be_present(state, 'correlations', 'correlations_method')
 
     def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs):
         state.significance_matrix = {}
         for (ds, df) in self.available_datasets(args):
             state.significance_matrix[ds] = df[state.correlations[ds].columns].significance_matrix(**self.args, verbose=False)
+
+
+class FeatureDistanceAnalysis(AbstractAnalysis, StateCheckMixin):
+    def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(args, 'train_data', 'label')
+
+    def _fit(self, state: AnalysisState, args: AnalysisState, **fit_kwargs) -> None:
+        x = args.train_data.drop(labels=[args.label], axis=1)
+        feature_generator = AutoMLPipelineFeatureGenerator(
+            enable_numeric_features=True,
+            enable_categorical_features=True,
+            enable_datetime_features=False,
+            enable_text_special_features=False,
+            enable_text_ngram_features=False,
+            enable_raw_text_features=False,
+            enable_vision_features=False,
+        )
+        x_transformed = feature_generator.fit_transform(X=x)
+        corr = np.round(spearmanr(x_transformed).correlation, 4)
+        np.fill_diagonal(corr, 1)
+        corr_condensed = hc.distance.squareform(1 - np.nan_to_num(corr))
+        z = hc.linkage(corr_condensed, method='average')
+        s = {
+            'columns': x_transformed.columns,
+            'linkage': z,
+        }
+        state['feature_distance'] = s

@@ -24,7 +24,7 @@ class DatasetStatistics(AbstractVisualization, JupyterMixin):
         self.sort_asc = sort_asc
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self.at_least_one_key_must_be_present(state, ['dataset_stats', 'missing_statistics', 'raw_type'])
+        return self.at_least_one_key_must_be_present(state, 'dataset_stats', 'missing_statistics', 'raw_type')
 
     def _render(self, state: AnalysisState) -> None:
         datasets = []

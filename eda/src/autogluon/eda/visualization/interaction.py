@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from scipy import stats
+from scipy.cluster import hierarchy as hc
 
 from .base import AbstractVisualization
 from .jupyter import JupyterMixin
-from ..state import AnalysisState
+from ..state import AnalysisState, StateCheckMixin
 from ..util.types import map_raw_type_to_feature_type
 
 __all__ = ['CorrelationVisualization', 'CorrelationSignificanceVisualization']
@@ -16,28 +17,28 @@ __all__ = ['CorrelationVisualization', 'CorrelationSignificanceVisualization']
 class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
 
     def __init__(self,
+                 key: str,
                  headers: bool = False,
                  namespace: str = None,
                  numeric_as_categorical_threshold=20,
                  fig_args: Union[None, Dict[str, Any]] = {},
                  chart_args: Union[None, Dict[str, Any]] = {},
-                 render_only_idx: Union[None, int] = None,
                  **kwargs) -> None:
         super().__init__(namespace, **kwargs)
+        self.key = key
         self.headers = headers
         self.numeric_as_categorical_threshold = numeric_as_categorical_threshold
         self.fig_args = fig_args
         self.chart_args = chart_args
-        self.render_only_idx = render_only_idx
 
     def can_handle(self, state: AnalysisState) -> bool:
-        return self.all_keys_must_be_present(state, ['interactions', 'raw_type'])
+        return self.all_keys_must_be_present(state, 'interactions', 'raw_type')
 
     def _render(self, state: AnalysisState) -> None:
-        for idx, i in enumerate(state.interactions):
-            if self.render_only_idx is not None and self.render_only_idx != idx:
+        for ds in state.interactions.keys():
+            if self.key not in state.interactions[ds]:
                 continue
-            ds = i['dataset']
+            i = state.interactions[ds][self.key]
             df = i['data'].copy()
             x, y, hue = [i['features'].get(k, None) for k in ['x', 'y', 'hue']]
             x_type, y_type, hue_type = [map_raw_type_to_feature_type(var, state.raw_type[ds].get(var, None), df, self.numeric_as_categorical_threshold)
@@ -54,7 +55,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     'x': x,
                     'y': y,
                     'hue': hue,
-                    **self.chart_args.get(idx, {}),
+                    **self.chart_args.get(self.key, {}),
                 }
                 chart_args = {k: v for k, v in chart_args.items() if v is not None}
                 if chart_type != 'kdeplot':
@@ -63,7 +64,7 @@ class FeatureInteractionVisualization(AbstractVisualization, JupyterMixin):
                     # Don't show ci ticks
                     chart_args['ci'] = None
 
-                fig, ax = plt.subplots(**self.fig_args.get(idx, {}))
+                fig, ax = plt.subplots(**self.fig_args.get(self.key, {}))
 
                 # convert to categoricals for plots
                 for col, typ in zip([x, y, hue], [x_type, y_type, hue_type]):
@@ -233,3 +234,24 @@ class CorrelationSignificanceVisualization(AbstractVisualization, JupyterMixin):
                         **args)
             plt.yticks(rotation=0)
             plt.show(fig)
+
+
+class FeatureDistanceAnalysisVisualization(AbstractVisualization, StateCheckMixin):
+    def __init__(self,
+                 namespace: str = None,
+                 fig_args: Union[None, Dict[str, Any]] = {},
+                 **kwargs) -> None:
+        super().__init__(namespace, **kwargs)
+        self.fig_args = fig_args
+
+    def can_handle(self, state: AnalysisState) -> bool:
+        return self.all_keys_must_be_present(state, 'feature_distance')
+
+    def _render(self, state: AnalysisState) -> None:
+        fig, ax = plt.subplots(**self.fig_args)
+        default_args = dict(
+            orientation='left'
+        )
+        ax.grid(False)
+        hc.dendrogram(ax=ax, Z=state.feature_distance.linkage, labels=state.feature_distance.columns, **{**default_args, **self._kwargs})
+        plt.show(fig)
