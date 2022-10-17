@@ -32,6 +32,7 @@ import argparse
 
 from autogluon.multimodal import MultiModalPredictor
 
+
 def detection_train(
     train_path,
     test_path=None,
@@ -77,7 +78,9 @@ def detection_train(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json", type=str)
+    parser.add_argument(
+        "--train_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_trainval.json", type=str
+    )
     parser.add_argument("--test_path", default="/media/data/datasets/voc/VOCdevkit/VOCCOCO/voc07_test.json", type=str)
     parser.add_argument("--checkpoint_name", default="yolov3_mobilenetv2_320_300e_coco", type=str)
     parser.add_argument("--num_classes", default=20, type=int)
