@@ -44,8 +44,8 @@ def map_id_content(ids, contents):
 dataset = ir_datasets.load("beir/fiqa/dev")
 
 # Prepare dataset
-docs_df = pd.DataFrame(dataset.docs_iter())
-queries_df = pd.DataFrame(dataset.queries_iter())
+docs_df = pd.DataFrame(dataset.docs_iter()).sample(frac=0.2, random_state=42)
+queries_df = pd.DataFrame(dataset.queries_iter()).sample(frac=0.2, random_state=42)
 docs_text = docs_df["text"].tolist()
 docs_id = docs_df["doc_id"].tolist()
 queries_text = queries_df["text"].tolist()
