@@ -30,9 +30,7 @@ from ..utils.ag_sagemaker import (
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import setup_sagemaker_session
-from ..utils.constants import (
-    VALID_ACCEPT
-)
+from ..utils.constants import VALID_ACCEPT
 from ..utils.iam import (
     TRUST_RELATIONSHIP_FILE_NAME,
     IAM_POLICY_FILE_NAME,
@@ -149,7 +147,7 @@ class CloudPredictor(ABC):
         output_path: Optional[str] = None
     ):
         """
-        Generate required trust relationship and IAM policy file in json format for CloudPredictor wit SageMaker backend.
+        Generate required trust relationship and IAM policy file in json format for CloudPredictor with SageMaker backend.
         Users can use the generated files to create an IAM role for themselves.
         IMPORTANT: Make sure you review both files before creating the role!
 

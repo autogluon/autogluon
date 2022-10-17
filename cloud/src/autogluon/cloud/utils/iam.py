@@ -108,6 +108,11 @@ SAGEMAKER_CLOUD_POLICY = {
         {
             "Effect": "Allow",
             "Action": [
+                "s3:CreateBucket",
+                "s3:GetBucketLocation",
+                "s3:ListBucket",
+                "s3:GetBucketCors",
+                "s3:PutBucketCors",
                 "s3:GetBucketAcl",
                 "s3:PutObjectAcl"
             ],
@@ -120,21 +125,6 @@ SAGEMAKER_CLOUD_POLICY = {
             ]
         },
         {
-            "Sid": "S3Bucket",
-            "Effect": "Allow",
-            "Action": [
-                "s3:CreateBucket",
-                "s3:GetBucketLocation",
-                "s3:ListBucket",
-                "s3:ListAllMyBuckets",
-                "s3:GetBucketCors",
-                "s3:PutBucketCors"
-            ],
-            "Resource": [
-                "arn:aws:s3:::*"
-            ]
-        },
-        {
             "Sid": "ListEvents",
             "Effect": "Allow",
             "Action": [
@@ -143,22 +133,8 @@ SAGEMAKER_CLOUD_POLICY = {
                 "sagemaker:ListEndpoints",
                 "sagemaker:ListTransformJobs",
                 "sagemaker:ListTrainingJobs",
-                "sagemaker:ListModels"
-            ],
-            "Resource": [
-                "*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "sagemaker:CreatePresignedDomainUrl",
-                "sagemaker:DescribeDomain",
+                "sagemaker:ListModels",
                 "sagemaker:ListDomains",
-                "sagemaker:DescribeUserProfile",
-                "sagemaker:ListUserProfiles",
-                "sagemaker:*App",
-                "sagemaker:ListApps"
             ],
             "Resource": [
                 "*"
@@ -183,50 +159,10 @@ SAGEMAKER_CLOUD_POLICY = {
             "Sid": "Others",
             "Effect": "Allow",
             "Action": [
-                "application-autoscaling:DeleteScalingPolicy",
-                "application-autoscaling:DeleteScheduledAction",
-                "application-autoscaling:DeregisterScalableTarget",
-                "application-autoscaling:DescribeScalableTargets",
-                "application-autoscaling:DescribeScalingActivities",
-                "application-autoscaling:DescribeScalingPolicies",
-                "application-autoscaling:DescribeScheduledActions",
-                "application-autoscaling:PutScalingPolicy",
-                "application-autoscaling:PutScheduledAction",
-                "application-autoscaling:RegisterScalableTarget",
-                "cloudwatch:DeleteAlarms",
-                "cloudwatch:DescribeAlarms",
-                "cloudwatch:GetMetricData",
-                "cloudwatch:GetMetricStatistics",
-                "cloudwatch:ListMetrics",
-                "cloudwatch:PutMetricAlarm",
-                "cloudwatch:PutMetricData",
-                "ec2:CreateNetworkInterface",
-                "ec2:CreateNetworkInterfacePermission",
-                "ec2:CreateVpcEndpoint",
-                "ec2:DeleteNetworkInterface",
-                "ec2:DeleteNetworkInterfacePermission",
-                "ec2:DescribeDhcpOptions",
-                "ec2:DescribeNetworkInterfaces",
-                "ec2:DescribeRouteTables",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DescribeSubnets",
-                "ec2:DescribeVpcEndpoints",
-                "ec2:DescribeVpcs",
-                "ecr:BatchCheckLayerAvailability",
                 "ecr:BatchGetImage",
-                "ecr:CreateRepository",
                 "ecr:Describe*",
                 "ecr:GetAuthorizationToken",
                 "ecr:GetDownloadUrlForLayer",
-                "ecr:StartImageScan",
-                "elastic-inference:Connect",
-                "elasticfilesystem:DescribeFileSystems",
-                "elasticfilesystem:DescribeMountTargets",
-                "fsx:DescribeFileSystems",
-                "iam:ListRoles",
-                "kms:DescribeKey",
-                "kms:ListAliases",
-                "lambda:ListFunctions",
                 "logs:CreateLogDelivery",
                 "logs:CreateLogGroup",
                 "logs:CreateLogStream",
@@ -237,37 +173,10 @@ SAGEMAKER_CLOUD_POLICY = {
                 "logs:ListLogDeliveries",
                 "logs:PutLogEvents",
                 "logs:PutResourcePolicy",
-                "logs:UpdateLogDelivery",
-                "sns:ListTopics",
-                "tag:GetResources"
+                "logs:UpdateLogDelivery"
             ],
             "Resource": [
                 "*"
-            ]
-        },
-        {
-            "Action": "iam:CreateServiceLinkedRole",
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:iam::*:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint"
-            ],
-            "Condition": {
-                "StringLike": {
-                    "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"
-                }
-            }
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "sns:Subscribe",
-                "sns:CreateTopic",
-                "sns:Publish"
-            ],
-            "Resource": [
-                "arn:aws:sns:*:*:*SageMaker*",
-                "arn:aws:sns:*:*:*Sagemaker*",
-                "arn:aws:sns:*:*:*sagemaker*"
             ]
         }
     ]
@@ -281,6 +190,7 @@ def replace_trust_relationship_place_holder(trust_relationship_document, account
         for principal in statement['Principal'].keys():
             statement['Principal'][principal] = statement['Principal'][principal].replace(TRUST_RELATIONSHIP_ACCOUNT_PLACE_HOLDER, account_id)
     return trust_relationship_document
+
 
 def replace_iam_policy_place_holder(policy_document, account_id=None, bucket=None):
     """Replace placeholder inside template with given values"""
