@@ -384,7 +384,7 @@ def infer_column_types(
 
         if is_rois_column(data[col_name]):
             column_types[col_name] = ROIS
-        if is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
+        elif is_identifier_column(data[col_name], col_name=col_name, id_mappings=id_mappings):
             column_types[col_name] = (f"{id_mappings_types[col_name]}_{IDENTIFIER}",)
         elif is_categorical_column(
             data[col_name], valid_data[col_name], is_label=col_name in label_columns
