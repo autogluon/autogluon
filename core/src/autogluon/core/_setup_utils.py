@@ -24,7 +24,6 @@ DEPENDENT_PACKAGES = {
     'gluoncv': '>=0.10.5,<0.10.6',
     'tqdm': '>=4.38.0',
     'Pillow': '>=9.0.1,<9.1.0',
-    'timm': '>=0.5.4,<0.6.0',
 }
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES

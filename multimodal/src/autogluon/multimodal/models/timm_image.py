@@ -21,7 +21,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self,
         prefix: str,
         checkpoint_name: str,
-        num_classes: Optional[int] = None,
+        num_classes: Optional[int] = 0,
         mix_choice: Optional[str] = "all_logits",
         pretrained: Optional[bool] = True,
     ):
