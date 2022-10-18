@@ -99,6 +99,7 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": ag.Int(1, 3)}}
+    num_trials = 2
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
     with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
@@ -111,17 +112,18 @@ def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_perfo
             hyperparameter_tune_kwargs={
                 "searcher": "random",
                 "scheduler": "local",
-                "num_trials": 2,
+                "num_trials": num_trials,
             },
         )
 
         leaderboard = learner.leaderboard()
 
-    assert len(leaderboard) == 2 + 1  # include ensemble
+    assert len(leaderboard) == num_trials + 1  # include ensemble
 
-    config_history = learner.load_trainer().hpo_results[model_name]["config_history"]
+    hpo_results_for_model = learner.load_trainer().hpo_results[model_name]
+    config_history = [result["hyperparameters"] for result in hpo_results_for_model.values()]
     assert len(config_history) == 2
-    assert all(1 <= model["epochs"] <= 3 for model in config_history.values())
+    assert all(1 <= config["epochs"] <= 3 for config in config_history)
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
