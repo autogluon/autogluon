@@ -261,7 +261,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         return list(self.gts_predictor.predict(**predictor_kwargs))
 
     @staticmethod
-    def _sample_to_quantile_forecast(forecast: np.ndarray, quantile_levels: List[float]) -> QuantileForecast:
+    def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
         forecast_arrays = []
 
         quantile_keys = [str(q) for q in quantile_levels]
