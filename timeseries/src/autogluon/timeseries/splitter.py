@@ -67,12 +67,12 @@ def append_suffix_to_item_id(ts_dataframe: TimeSeriesDataFrame, suffix: str) -> 
 class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     """Reserve multiple windows at the end of each time series as the validation set.
 
-    MultiWindowSplitter ensures that each training series doesn't get shorter than ``>= prediction_length + 1``.
-
-    The first valdation series contains the entire series (i.e. the last ``prediction_length`` elements are used for
+    The first validation series contains the entire series (i.e. the last ``prediction_length`` elements are used for
     computing the validation score). For each following validation series we cut off the last ``prediction_length``
     time steps. This process is repeated until ``num_windows`` validation series are generated, or until all training
     series have length less than ``prediction_length + 1``.
+
+    MultiWindowSplitter guarantees that each training series has length of at least ``prediction_length + 1``.
 
     Example:
         input_series = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], prediction_length = 3, num_windows = 2
