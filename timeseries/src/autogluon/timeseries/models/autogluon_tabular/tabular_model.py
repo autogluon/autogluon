@@ -166,7 +166,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             hyperparameters=tabular_hyperparameters,
             verbosity=verbosity - 2,
         )
-        # Logger level is changed inside .fit(), restore to the previous value
+        # Logger level is changed inside .fit(), restore to the initial value
         autogluon_logger.setLevel(logging_level)
 
     def _extend_index(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
