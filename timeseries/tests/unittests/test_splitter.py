@@ -6,12 +6,6 @@ from autogluon.timeseries.splitter import LastWindowSplitter, MultiWindowSplitte
 
 from .common import DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
-SPLITTERS = [
-    LastWindowSplitter(),
-    MultiWindowSplitter(num_windows=2),
-    MultiWindowSplitter(num_windows=5),
-]
-
 
 def get_original_item_id_and_slice(tuning_item_id: str):
     """Extract information from tuning set item_id that has format f"{item_id}_[{start}:{end}]"."""
@@ -37,7 +31,7 @@ def test_when_multi_window_splitter_splits_then_train_items_have_correct_length(
 
 
 @pytest.mark.parametrize("item_id_to_length", [{"A": 22, "B": 50, "C": 10}, {"A": 23}])
-@pytest.mark.parametrize("prediction_length, num_windows", [(5, 2), (2, 5), (8, 1)])
+@pytest.mark.parametrize("prediction_length, num_windows", [(5, 2), (2, 5), (8, 1), (10, 2)])
 def test_when_multi_window_splitter_splits_then_val_item_ids_correctly_represent_length(
     item_id_to_length, prediction_length, num_windows
 ):
@@ -52,8 +46,8 @@ def test_when_multi_window_splitter_splits_then_val_item_ids_correctly_represent
         assert expected_length == new_length
 
 
-@pytest.mark.parametrize("splitter", SPLITTERS)
-def test_when_multi_window_splitter_splits_then_cached_freq_is_preserved(splitter):
+def test_when_multi_window_splitter_splits_then_cached_freq_is_preserved():
+    splitter = MultiWindowSplitter()
     prediction_length = 10
     train_data, val_data = splitter.split(
         ts_dataframe=DUMMY_VARIABLE_LENGTH_TS_DATAFRAME, prediction_length=prediction_length
