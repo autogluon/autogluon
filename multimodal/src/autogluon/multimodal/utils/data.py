@@ -207,6 +207,7 @@ def create_fusion_data_processors(
         model_config = getattr(config.model, per_model.prefix)
 
         if per_name == NER:
+            # create a multimodal processor for NER.
             data_processors[MULTIMODAL].append(
                 create_data_processor(
                     data_type=MULTIMODAL,
