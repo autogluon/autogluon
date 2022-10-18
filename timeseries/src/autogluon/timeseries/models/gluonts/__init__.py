@@ -1,5 +1,4 @@
 from .models import (
-    AutoTabularModel,
     DeepARModel,
     GenericGluonTSModel,
     MQCNNModel,
@@ -11,7 +10,6 @@ from .models import (
 )
 
 __all__ = [
-    "AutoTabularModel",
     "DeepARModel",
     "GenericGluonTSModel",
     "MQCNNModel",
