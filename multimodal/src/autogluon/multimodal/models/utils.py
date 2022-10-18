@@ -540,7 +540,7 @@ def get_hf_config_and_model(checkpoint_name: str, pretrained: Optional[bool] = T
     config = AutoConfig.from_pretrained(checkpoint_name)
 
     if pretrained:
-        model = AutoModel.from_pretrained(checkpoint_name)
+        model = AutoModel.from_pretrained(checkpoint_name, low_cpu_mem_usage=True)
     else:
         model = AutoModel.from_config(config)
 
