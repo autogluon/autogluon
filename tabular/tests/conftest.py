@@ -235,6 +235,46 @@ class ModelFitHelper:
         return model, label_cleaner, feature_generator
 
 
+# Helper functions for training models outside of predictors
+class CompileHelper:
+    @staticmethod
+    def fit_compile_and_validate_dataset(dataset_name,
+                                         fit_args,
+                                         sample_size=1000,
+                                         delete_directory=True,
+                                         extra_metrics=None,
+                                         expected_model_count=2):
+        directory_prefix = './datasets/'
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        label = dataset_info['label']
+        save_path = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
+        init_args = dict(
+            label=label,
+            path=save_path,
+        )
+        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
+        predictor.persist_models(models='all')
+        if sample_size is not None and sample_size < len(test_data):
+            test_data = test_data.sample(n=sample_size, random_state=0)
+        predictor.predict(test_data)
+        pred_proba = predictor.predict_proba(test_data)
+        predictor.evaluate(test_data)
+        predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+
+        model_names = predictor.get_model_names()
+        model_name = model_names[0]
+        assert len(model_names) == expected_model_count
+        predictor.info()
+        results = predictor.leaderboard(test_data, extra_info=False, extra_metrics=extra_metrics)
+        with open(save_path + "results.csv", "w") as fp:
+            fp.write(results.to_csv(index=False))
+
+        assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
+        if delete_directory:
+            shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+        return predictor
+
+
 @pytest.fixture
 def dataset_loader_helper():
     return DatasetLoaderHelper
@@ -248,3 +288,8 @@ def fit_helper():
 @pytest.fixture
 def model_fit_helper():
     return ModelFitHelper
+
+
+@pytest.fixture
+def compile_helper():
+    return CompileHelper

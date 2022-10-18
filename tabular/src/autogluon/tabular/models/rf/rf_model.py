@@ -37,6 +37,66 @@ class RFOnnxPredictor:
         return pred_proba
 
 
+class RFNativeCompiler:
+    name = 'native'
+    save_in_pkl = True
+
+    @staticmethod
+    def can_compile():
+        return True
+
+    @staticmethod
+    def compile(obj, path: str):
+        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+        from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
+        if isinstance(obj.model, (RandomForestClassifier, RandomForestRegressor,
+                                  ExtraTreesClassifier, ExtraTreesRegressor)):
+            with open(path + 'model_native.pkl', 'wb') as fp:
+                fp.write(pickle.dumps(obj))
+        else:
+            pkl = None
+            with open(path + 'model_native.pkl', 'rb') as fp:
+                pkl = fp.read()
+            return pickle.loads(pkl).model
+        return obj.model
+
+    @staticmethod
+    def load(obj, path: str):
+        pkl = None
+        with open(path + 'model_native.pkl', 'rb') as fp:
+            pkl = fp.read()
+        model = pickle.loads(pkl)
+        return model.model
+
+
+class InferenceSessionWrapper:
+    """
+    Wrap around InferenceSession in onnxruntime, since it cannot be pickled.
+    See https://github.com/microsoft/onnxruntime/issues/10097
+    """
+    def __init__(self, onnx_bytes):
+        import onnxruntime as rt
+        self.sess = rt.InferenceSession(onnx_bytes.SerializeToString())
+        self.onnx_bytes = onnx_bytes
+
+    def run(self, *args):
+        return self.sess.run(*args)
+
+    def get_inputs(self, *args):
+        return self.sess.get_inputs(*args)
+
+    def get_outputs(self, *args):
+        return self.sess.get_outputs(*args)
+
+    def __getstate__(self):
+        return {'onnx_bytes': self.onnx_bytes}
+
+    def __setstate__(self, values):
+        import onnxruntime as rt
+        self.onnx_bytes = values['onnx_bytes']
+        self.sess = rt.InferenceSession(onnx_bytes.SerializeToString())
+
+
 class RFOnnxCompiler:
     name = 'onnx'
     save_in_pkl = False
@@ -65,23 +125,10 @@ class RFOnnxCompiler:
 
     @staticmethod
     def load(obj, path: str):
-        import onnxruntime as rt
-        model = rt.InferenceSession(path + "model.onnx")
+        import onnx
+        onnx_bytes = onnx.load(path + "model.onnx")
+        model = InferenceSessionWrapper(onnx_bytes)
         return RFOnnxPredictor(obj=obj, model=model)
-
-    # @staticmethod
-    # def predict(obj, X):
-    #     input_name = obj._model_onnx.get_inputs()[0].name
-    #     label_name = obj._model_onnx.get_outputs()[0].name
-    #     return obj._model_onnx.run([label_name], {input_name: X})[0]
-    #
-    # @staticmethod
-    # def predict_proba(obj, X):
-    #     input_name = obj._model_onnx.get_inputs()[0].name
-    #     label_name = obj._model_onnx.get_outputs()[1].name
-    #     pred_proba = obj._model_onnx.run([label_name], {input_name: X})[0]
-    #     pred_proba = np.array([[r[i] for i in range(obj.num_classes)] for r in pred_proba])
-    #     return pred_proba
 
 
 class RFModel(AbstractModel):
@@ -294,43 +341,6 @@ class RFModel(AbstractModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
         # self.compile(path=self.path)
 
-    def compile(self, path: str):
-        print('compiling')
-        # Convert into ONNX format
-        from skl2onnx import convert_sklearn
-        from skl2onnx.common.data_types import FloatTensorType
-        initial_type = [('float_input', FloatTensorType([None, self._num_features_post_process]))]
-        onx = convert_sklearn(self.model, initial_types=initial_type)
-        import os
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path + "model.onnx", "wb") as f:
-            f.write(onx.SerializeToString())
-
-        # Compute the prediction with ONNX Runtime
-        import onnxruntime as rt
-        import numpy
-        self._model_onnx = rt.InferenceSession(path + "model.onnx")
-        # input_name = sess.get_inputs()[0].name
-        # label_name = sess.get_outputs()[0].name
-        # pred_onx = sess.run([label_name], {input_name: X_test.astype(numpy.float32)})[0]
-
-    def _load_onnx(self, path: str):
-        import onnxruntime as rt
-        sess = rt.InferenceSession(path + "model.onnx")
-        return sess
-
-    def _predict_onnx(self, X):
-        input_name = self._model_onnx.get_inputs()[0].name
-        label_name = self._model_onnx.get_outputs()[0].name
-        return self._model_onnx.run([label_name], {input_name: X})[0]
-
-    def _predict_proba_onnx(self, X):
-        input_name = self._model_onnx.get_inputs()[0].name
-        label_name = self._model_onnx.get_outputs()[1].name
-        pred_proba = self._model_onnx.run([label_name], {input_name: X})[0]
-        pred_proba = np.array([[r[i] for i in range(self.num_classes)] for r in pred_proba])
-        return pred_proba
-
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
     def _predict_proba(self, X, **kwargs):
         X = self.preprocess(X, **kwargs)
@@ -466,41 +476,8 @@ class RFModel(AbstractModel):
             tags['valid_oof'] = True
         return tags
 
-    # def save(self, path: str = None, verbose=True) -> str:
-    #     _model = self.model
-    #     # self.model = None
-    #     # _model_onnx = self._model_onnx
-    #     # self._model_onnx = None
-    #     if _model is not None:
-    #         self._is_model_saved = True
-    #     # if _model_onnx is not None:
-    #     #     self._is_model_onnx_saved = True
-    #     path = super().save(path=path, verbose=verbose)
-    #     # if _model is not None:
-    #     #     save_func_map = {
-    #     #         'onnx': self._save_onnx,
-    #     #         None: self._save_native,
-    #     #     }
-    #     #     kwargs = dict(path=path, model=_model)
-    #     #     save_func_map[self._get_compiler()](**kwargs)
-    #     self.model = _model
-    #     # self._model_onnx = _model_onnx
-    #     return path
-    #
-    # @classmethod
-    # def load(cls, path: str, reset_paths=True, verbose=True):
-    #     model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-    #     # model._model_onnx = model._load_onnx(path=path)
-    #     # if model._is_model_saved:
-    #     #     load_func_map = {
-    #     #         'onnx': model._load_onnx,
-    #     #         None: model._load_native,
-    #     #     }
-    #     #     model.model = load_func_map[model._get_compiler()](path=path)
-    #     return model
-    #
     def _valid_compilers(self):
-        return [RFOnnxCompiler]
+        return [RFNativeCompiler, RFOnnxCompiler]
 
     def _get_compiler(self):
         compiler = self.params_aux.get('compiler', None)
@@ -509,10 +486,10 @@ class RFModel(AbstractModel):
         if compiler is not None and compiler not in compiler_names:
             raise AssertionError(f'Unknown compiler: {compiler}. Valid compilers: {compiler_names}')
         if compiler is None:
-            return RFOnnxCompiler
+            return RFNativeCompiler
         compiler_cls = compiler_names[compiler]
         if not compiler_cls.can_compile():
-            compiler_cls = RFOnnxCompiler
+            compiler_cls = RFNativeCompiler
         return compiler_cls
 
     def save(self, path: str = None, verbose=True) -> str:

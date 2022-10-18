@@ -250,6 +250,7 @@ class AbstractModel:
             get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
             predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
             temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
+            compiler='native', # The compiler backend that is used for prediction. This defaults to 'native' backend for all models. A list of supported compilers can be found via calling _valid_compilers.
         )
         return default_auxiliary_params
 
@@ -884,6 +885,9 @@ class AbstractModel:
         save_pkl.save(path=file_path, object=self, verbose=verbose)
         self.model = _model
         return path
+
+    def _get_compiler(self):
+        return None
 
     def get_trained_params(self) -> dict:
         """
