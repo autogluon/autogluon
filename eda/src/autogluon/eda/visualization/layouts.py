@@ -6,6 +6,8 @@ from ipywidgets import HBox, Output, Layout, Tab
 from .base import AbstractVisualization
 from .. import AnalysisState
 
+__all__ = ['MarkdownSectionComponent', 'SimpleVerticalLinearLayout', 'SimpleHorizontalLayout', 'TabLayout']
+
 
 class SimpleVerticalLinearLayout(AbstractVisualization):
     """
@@ -37,12 +39,12 @@ class SimpleHorizontalLayout(SimpleVerticalLinearLayout):
     """
 
     def _render(self, state: AnalysisState) -> None:
-        outs = [Output() for i in range(len(self.facets))]
+        outs = [Output() for _ in range(len(self.facets))]
         for out, facet in zip(outs, self.facets):
             with out:
                 facet.render(state)
 
-        self.display_obj(HBox(outs, layout=Layout(flex='row wrap')))
+        display(HBox(outs, layout=Layout(flex='row wrap')))
 
 
 class TabLayout(SimpleVerticalLinearLayout):
@@ -65,7 +67,7 @@ class TabLayout(SimpleVerticalLinearLayout):
         tab = Tab(children=outs, width=400)
         for i, name in enumerate(self.facet_tab_names):
             tab.set_title(i, name)
-        self.display_obj(tab)
+        display(tab)
         for out, facet in zip(outs, self.facets):
             with out:
                 facet.render(state)
