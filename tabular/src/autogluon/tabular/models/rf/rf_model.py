@@ -1,6 +1,7 @@
 import logging
 import math
 import pickle
+import os
 import sys
 import time
 
@@ -49,6 +50,7 @@ class RFNativeCompiler:
     def compile(obj, path: str):
         from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
         from sklearn.ensemble import ExtraTreesRegressor, ExtraTreesClassifier
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         if isinstance(obj.model, (RandomForestClassifier, RandomForestRegressor,
                                   ExtraTreesClassifier, ExtraTreesRegressor)):
             with open(path + 'model_native.pkl', 'wb') as fp:
@@ -111,13 +113,14 @@ class RFOnnxCompiler:
 
     @staticmethod
     def compile(obj, path: str):
+        if isinstance(obj.model, RFOnnxPredictor):
+            return obj.model
         print('compiling')
         # Convert into ONNX format
         from skl2onnx import convert_sklearn
         from skl2onnx.common.data_types import FloatTensorType
         initial_type = [('float_input', FloatTensorType([None, obj._num_features_post_process]))]
         onx = convert_sklearn(obj.model, initial_types=initial_type)
-        import os
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path + "model.onnx", "wb") as f:
             f.write(onx.SerializeToString())
@@ -339,7 +342,7 @@ class RFModel(AbstractModel):
             model.estimators_ = None
         self.model = model
         self.params_trained['n_estimators'] = self.model.n_estimators
-        # self.compile(path=self.path)
+        self.compile(path=self.path)
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
     def _predict_proba(self, X, **kwargs):
@@ -353,7 +356,6 @@ class RFModel(AbstractModel):
             return self.model.predict(X, quantile_levels=self.quantile_levels)
 
         y_pred_proba = self.model.predict_proba(X)
-        # y_pred_proba = self._predict_proba_onnx(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
     def get_oof_pred_proba(self, X, normalize=None, **kwargs):
