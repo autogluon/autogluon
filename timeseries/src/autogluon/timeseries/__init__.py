@@ -1,7 +1,8 @@
 import logging
 
-from autogluon.common.utils.log_utils import _add_stream_handler 
 from packaging.version import parse
+
+from autogluon.common.utils.log_utils import _add_stream_handler
 
 try:
     from .version import __version__
