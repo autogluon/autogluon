@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from gluonts.evaluation import Evaluator as GluonTSEvaluator
 from gluonts.evaluation import make_evaluation_predictions
@@ -106,8 +107,7 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
         zero_forecast_list.append(
             SampleForecast(
                 samples=np.zeros_like(s.samples),  # noqa
-                start_date=s.start_date,
-                freq=s.freq,
+                start_date=pd.Period(s.start_date, freq=s.freq),
                 item_id=s.item_id,
             )
         )

@@ -8,15 +8,15 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
-    import gluonts.model.deepar
-    from gluonts.model.deepar import DeepAREstimator
+    import gluonts.time_feature
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
     from gluonts.model.prophet import ProphetPredictor
-    from gluonts.model.seq2seq import MQCNNEstimator, MQRNNEstimator
-    from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
-    from gluonts.model.transformer import TransformerEstimator
-    from gluonts.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.context import get_mxnet_context
+    from gluonts.mx.model.deepar import DeepAREstimator
+    from gluonts.mx.model.simple_feedforward import SimpleFeedForwardEstimator
+    from gluonts.mx.model.transformer import TransformerEstimator
+    from gluonts.mx.model.tft import TemporalFusionTransformerEstimator
+    from gluonts.mx.model.seq2seq import MQCNNEstimator, MQRNNEstimator
 
 from .abstract_gluonts import AbstractGluonTSModel
 
@@ -46,8 +46,8 @@ def time_features_from_frequency_str_safe(*args, **kwargs):
         return []
 
 
-gluonts.model.deepar._estimator.get_lags_for_frequency = get_lags_for_frequency_safe
-gluonts.model.deepar._estimator.time_features_from_frequency_str = time_features_from_frequency_str_safe
+gluonts.time_feature.get_lags_for_frequency = get_lags_for_frequency_safe
+gluonts.time_feature.time_features_from_frequency_str = time_features_from_frequency_str_safe
 
 
 class DeepARModel(AbstractGluonTSModel):

@@ -1,12 +1,12 @@
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
 # TODO: Drop GluonTS dependency
-from gluonts.time_feature import TimeFeature, get_lags_for_frequency, time_features_from_frequency_str
+from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
 
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
@@ -61,7 +61,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self._lag_indices: np.array = None
-        self._time_features: List[TimeFeature] = None
+        self._time_features: List[Callable] = None
         self._available_features: pd.Index = None
         self._drop_median_prediction = False
 
@@ -110,7 +110,7 @@ class AutoGluonTabularModel(AbstractTimeSeriesModel):
         features = data[self.target].groupby(level=ITEMID, sort=False).apply(get_lag_features_and_target)
         timestamps = features.index.get_level_values(TIMESTAMP)
         for time_feat in self._time_features:
-            features[time_feat.__class__.__name__] = time_feat(timestamps)
+            features[time_feat.__name__] = time_feat(timestamps)
 
         if last_k_values is not None:
             features = features.groupby(level=ITEMID, sort=False).tail(last_k_values)

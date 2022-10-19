@@ -3,8 +3,8 @@ from functools import partial
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from gluonts.model.prophet import PROPHET_IS_INSTALLED
-from gluonts.model.seq2seq import MQRNNEstimator
-from gluonts.model.transformer import TransformerEstimator
+from gluonts.mx.model.seq2seq import MQRNNEstimator
+from gluonts.mx.model.transformer import TransformerEstimator
 
 import autogluon.core as ag
 from autogluon.timeseries.models.gluonts import (  # MQRNNModel,; TransformerModel,
