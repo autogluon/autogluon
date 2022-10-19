@@ -13,4 +13,4 @@ install_features
 install_eda
 
 cd eda/
-python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+python3 -m pytest --mypy --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Union
+from typing import List, Union, Optional
 
 from .base import AbstractAnalysis
 from ..state import AnalysisState
@@ -19,7 +19,7 @@ class Sampler(AbstractAnalysis):
         sample size; if `int`, then row number is used;
         `float` must be between 0.0 and 1.0 and represents fraction of dataset to sample;
         `None` means no sampling
-    parent: Union[None, AbstractAnalysis], default = None
+    parent: Optional[AbstractAnalysis], default = None
         parent Analysis
     children: List[AbstractAnalysis], default []
         wrapped analyses; these will receive sampled `args` during `fit` call
@@ -43,7 +43,7 @@ class Sampler(AbstractAnalysis):
 
     def __init__(self,
                  sample: Union[None, int, float] = None,
-                 parent: Union[None, AbstractAnalysis] = None,
+                 parent: Optional[AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
                  **kwargs) -> None:
         super().__init__(parent, children, **kwargs)

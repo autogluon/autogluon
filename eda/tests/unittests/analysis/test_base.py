@@ -95,7 +95,7 @@ def test_abstractanalysis_fit_gathers_args():
 
 def test_namespaces():
     def side_effect(state: AnalysisState, args: AnalysisState, **fit_kwargs):
-        state.update = fit_kwargs
+        state.upd = fit_kwargs
 
     inner_analysis: BaseAnalysis = BaseAnalysis(arg=1)
     inner_analysis._fit = MagicMock()
@@ -116,4 +116,4 @@ def test_namespaces():
         Namespace(namespace='ns2', children=[inner_analysis])
     ]).fit(op='fit3')
 
-    assert state == {'ns1': {'update': {'op': 'fit1'}}, 'ns2': {'update': {'op': 'fit3'}}}
+    assert state == {'ns1': {'upd': {'op': 'fit1'}}, 'ns2': {'upd': {'op': 'fit3'}}}

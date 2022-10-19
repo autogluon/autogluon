@@ -8,7 +8,7 @@ __all__ = ['AnalysisState', 'StateCheckMixin']
 class AnalysisState(dict):
     """Enabling dot.notation access to dictionary attributes and dynamic code assist in jupyter"""
     __getattr__ = dict.get
-    __delattr__ = dict.__delitem__
+    __delattr__ = dict.__delitem__  # type: ignore
 
     def __init__(self, *args, **kwargs) -> None:
         for arg in args:
