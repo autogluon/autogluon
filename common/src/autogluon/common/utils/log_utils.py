@@ -77,9 +77,13 @@ def _check_if_kaggle() -> bool:
 
 
 def _add_stream_handler():
-    stream_handler = logging.StreamHandler()
-    # add stream_handler to AG logger
-    _logger_ag.addHandler(stream_handler)
+    # add stream_handler to AG logger if it doesn't already exist
+    if not any(h for h in _logger_ag.handlers if isinstance(h, logging.StreamHandler)):
+        stream_handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(message)s')
+        stream_handler.setFormatter(formatter)
+        _logger_ag.addHandler(stream_handler)
+        _logger_ag.propagate = False
 
 
 __FIXED_KAGGLE_LOGGING = False

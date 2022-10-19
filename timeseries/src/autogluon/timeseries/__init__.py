@@ -1,5 +1,6 @@
 import logging
 
+from autogluon.common.utils.log_utils import _add_stream_handler 
 from packaging.version import parse
 
 try:
@@ -23,4 +24,4 @@ from .dataset import TimeSeriesDataFrame
 from .evaluator import TimeSeriesEvaluator
 from .predictor import TimeSeriesPredictor
 
-logging.basicConfig(format="%(message)s")  # just print message in logs
+_add_stream_handler()

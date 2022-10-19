@@ -1,3 +1,5 @@
+from autogluon.common.utils.log_utils import _add_stream_handler 
+
 from .dataset import TabularDataset
 from .space import Space, Categorical, Real, Int, Bool
 from . import metrics
@@ -12,6 +14,6 @@ __logging.getLogger("distributed.utils_perf").setLevel(__logging.ERROR)
 __logging.getLogger("distributed.logging.distributed").setLevel(__logging.ERROR)
 __logging.getLogger("distributed.worker").setLevel(__logging.ERROR)
 
-__logging.basicConfig(format='%(message)s')  # just print message in logs
+_add_stream_handler()
 
 from .version import __version__
