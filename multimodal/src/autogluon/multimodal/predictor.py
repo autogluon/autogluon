@@ -528,9 +528,15 @@ class MultiModalPredictor:
             )
 
         if self._output_shape is not None:
-            assert self._output_shape == output_shape, (
-                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-            )
+            # Fix output shape inconsistency in countinuos training
+            if self._problem_type is not None and self._problem_type == NER and self._config is not None:
+                assert self._output_shape == (
+                    output_shape + len(OmegaConf.to_object(self._config.model.ner.special_tags))
+                ), (f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}")
+            else:
+                assert self._output_shape == output_shape, (
+                    f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+                )
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
