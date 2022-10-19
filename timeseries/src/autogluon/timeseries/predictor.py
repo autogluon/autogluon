@@ -105,6 +105,7 @@ class TimeSeriesPredictor:
     quantiles : List[float]
         Alias for :attr:`quantile_levels`.
     """
+
     # TODO: Update description of presets after the presets are finalized
     # TODO: Update docstring for predict
 
