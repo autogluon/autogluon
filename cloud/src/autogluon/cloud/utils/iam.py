@@ -49,12 +49,11 @@ SAGEMAKER_CLOUD_POLICY = {
                 "sagemaker:InvokeEndpoint"
             ],
             "Resource": [
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:artifact/*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:transform-job/*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint/*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:training-job/*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:model/*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint-config/*"
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint/ag-cloudpredictor-serving-trained-model*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint-config/ag-cloudpredictor-serving-trained-model*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:model/autogluon-inference*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:training-job/ag-cloudpredictor-training*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:transform-job/ag-cloudpredictor-batch-transform*"
             ]
         },
         {
