@@ -158,8 +158,7 @@ class RayHpoExecutor(HpoExecutor):
     custom_to_ray_searcher_preset_map = {
         'local_random': 'random',
         'random': 'random',
-        # TODO: Should this be changed to 'auto': 'bayes'?
-        'auto': 'random',
+        'auto': 'bayes',
     }
     
     def __init__(self):
