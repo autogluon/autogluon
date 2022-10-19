@@ -25,6 +25,8 @@ class NerLabelEncoder:
         model_config = config.model.ner
         self.ner_special_tags = OmegaConf.to_object(model_config.special_tags)
         self.prefix = config.model.names[0]
+        self.b_prefix = "b-"
+        self.i_prefix = "i-"
 
     def fit(self, y: pd.Series, x: pd.Series):
         """
@@ -78,20 +80,25 @@ class NerLabelEncoder:
                 raise ValueError(f"The provided json annotations are invalid: {e.message}")
             sentence_annotations = []
             for annot in json_ner_annotations:
-                all_entity_groups.append(annot[ENTITY_GROUP])
+                entity_group = annot[ENTITY_GROUP]
+                if not (
+                    entity_group.lower().startswith(self.b_prefix) or entity_group.lower().startswith(self.i_prefix)
+                ):
+                    entity_group = self.b_prefix + entity_group
+                all_entity_groups.append(entity_group)
                 if self.entity_map is not None:
-                    if annot[ENTITY_GROUP] in self.entity_map:
+                    if entity_group in self.entity_map:
                         sentence_annotations.append(
                             (
                                 (annot[START_OFFSET], annot[END_OFFSET]),
-                                self.entity_map[annot[ENTITY_GROUP]],
+                                self.entity_map[entity_group],
                             )
                         )
                 else:
                     sentence_annotations.append(
                         (
                             (annot[START_OFFSET], annot[END_OFFSET]),
-                            annot[ENTITY_GROUP],
+                            entity_group,
                         )
                     )
             all_annotations.append(sentence_annotations)
