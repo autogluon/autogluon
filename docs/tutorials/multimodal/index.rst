@@ -63,6 +63,12 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
       How to use semantic embeddings to improve search ranking performance.
 
    .. card::
+      :title: Named Entity Recognition with AutoMM - Quick Start
+      :link: ner.html
+
+      How to use AutoMM for entity extraction.
+
+   .. card::
       :title: Parameter-Efficient Finetuning in AutoMM -- Basic Usage
       :link: efficient_finetuning_basic.html
 
@@ -89,4 +95,5 @@ In the following, we prepared a few tutorials to help you learn how to use `Auto
    clip_zeroshot
    clip_embedding
    semantic_search
+   ner
    customization
