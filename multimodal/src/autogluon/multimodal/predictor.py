@@ -76,7 +76,7 @@ from .constants import (
 from .data.datamodule import BaseDataModule
 from .data.infer_types import (
     infer_column_types,
-    infer_label_column_type_by_problem_type,
+    infer_label_column_type_by_problem_type_and_pipeline,
     infer_problem_type_output_shape,
 )
 from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
@@ -494,7 +494,7 @@ class MultiModalPredictor:
             label_columns=self._label_column,
             provided_column_types=column_types,
         )
-        column_types = infer_label_column_type_by_problem_type(
+        column_types = infer_label_column_type_by_problem_type_and_pipeline(
             column_types=column_types,
             label_columns=self._label_column,
             problem_type=self._problem_type,
@@ -1526,7 +1526,7 @@ class MultiModalPredictor:
                 data=data, allowable_column_types=allowable_dtypes, fallback_column_type=fallback_dtype
             )
             if self._label_column and self._label_column in data.columns:
-                column_types = infer_label_column_type_by_problem_type(
+                column_types = infer_label_column_type_by_problem_type_and_pipeline(
                     column_types=column_types,
                     label_columns=self._label_column,
                     problem_type=self._problem_type,
