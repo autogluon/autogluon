@@ -162,7 +162,7 @@ class MultiModalPredictor:
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 3,
-        output_shape: Optional[int] = None,
+        output_shape: Optional[int] = None,  # TODO: infer this for detection
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
     ):

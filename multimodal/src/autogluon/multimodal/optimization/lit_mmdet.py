@@ -62,7 +62,7 @@ class MMDetLitModule(pl.LightningModule):
                 f"which must be used with a customized metric function."
             )
         self.custom_metric_func = custom_metric_func
-        self.id2label = dict(zip(range(100), range(100)))  # TODO: replace with real id2label
+        self.id2label = self.model.id2label
 
     def _predict_step(self, batch, batch_idx=0):
         from mmcv.ops import RoIPool
@@ -157,30 +157,34 @@ class MMDetLitModule(pl.LightningModule):
         Equivalent to `val_step` and `train_step` of `self.model`.
         https://github.com/open-mmlab/mmdetection/blob/56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L221
         https://github.com/open-mmlab/mmdetection/blob/56e42e72cdf516bebb676e586f408b98f854d84c/mmdet/models/detectors/base.py#L256
-        x: dict
-            batch of data. For example,
-            ```
-            {
-                "img": torch.Tensor, Size: [batch_size, C, W, H],
-                "img_metas": [
-                    {
-                        'filename': 'data/VOCdevkit/VOC2007/JPEGImages/000001.jpg',
-                        'ori_filename': 'JPEGImages/000001.jpg',
-                        'ori_shape': (500, 353, 3),
-                        ...
-                    },
-                    ...(batch size times)
-                ],
-                "gt_bboxes": [
-                    torch.Tensor, Size: [# objects in image, 4],
-                    ...(batch size times)
-                ],
-                "gt_labels": [
-                    torch.Tensor, Size: [# objects in image],
-                    ...(batch size times)
-                ],
-            }
-            ```
+        Parameters
+        ----------
+        img
+            Image Tensor
+            torch.Tensor, Size: [batch_size, C, W, H]
+        img_metas
+            List of image metadata dict
+            [
+                {
+                    'filename': 'data/VOCdevkit/VOC2007/JPEGImages/000001.jpg',
+                    'ori_filename': 'JPEGImages/000001.jpg',
+                    'ori_shape': (500, 353, 3),
+                    ...
+                },
+                ...(batch size times)
+            ]
+        gt_bboxes
+            List of ground-truth bounding boxes position tensors
+            [
+                torch.Tensor, Size: [# objects in image, 4],
+                ...(batch size times)
+            ]
+        gt_labels
+            List of ground-truth bounding boxes label tensors
+            [
+                torch.Tensor, Size: [# objects in image],
+                ...(batch size times)
+            ]
         """
         losses = self.model.forward_train(
             img=img,

@@ -57,6 +57,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         logger.debug(f"initializing {checkpoint_name}")
         self.checkpoint_name = checkpoint_name
         self.pretrained = pretrained
+        self.num_classes = num_classes
 
         if checkpoint_name == "faster_rcnn_r50_fpn_1x_voc0712":
             # download voc configs in our s3 bucket
@@ -94,15 +95,21 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
         if isinstance(config_file, str):
             self.config = mmcv.Config.fromfile(config_file)
-        if num_classes:
-            if "bbox_head" in self.config.model.keys():  # yolov3
-                self.config.model["bbox_head"]["num_classes"] = num_classes
-            elif "roi_head" in self.config.model.keys():  # faster_rcnn
-                self.config.model["roi_head"]["bbox_head"]["num_classes"] = num_classes
+
+        if "bbox_head" in self.config.model.keys():  # yolov3
+            if self.num_classes:
+                self.config.model["bbox_head"]["num_classes"] = self.num_classes
             else:
-                raise ValueError(
-                    "Current model structure does not support automatic bbox_head reset. " "Please change in config."
-                )
+                self.num_classes = self.config.model["bbox_head"]["num_classes"]
+        elif "roi_head" in self.config.model.keys():  # faster_rcnn
+            if self.num_classes:
+                self.config.model["roi_head"]["bbox_head"]["num_classes"] = self.num_classes
+            else:
+                self.num_classes = self.config.model["roi_head"]["bbox_head"]["num_classes"]
+        else:
+            raise ValueError("Cannot retrieve num_classes for current model structure.")
+        self.id2label = dict(zip(range(self.num_classes), range(self.num_classess)))
+
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
         self.model = build_detector(self.config.model, test_cfg=self.config.get("test_cfg"))
