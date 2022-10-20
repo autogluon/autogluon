@@ -47,7 +47,7 @@ function install_features {
 }
 
 function install_eda {
-    python3 -m pip install --upgrade -e eda/
+    python3 -m pip install --upgrade -e eda/[tests]
 }
 
 function install_tabular {

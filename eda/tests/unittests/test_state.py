@@ -40,16 +40,16 @@ def test_analysis_state_nested_mutation():
 
 
 def test_statecheckmixin_at_least_one_key_must_be_present():
-    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), ['missing']) is False
-    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), ['q']) is True
-    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), ['w']) is True
-    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), ['q', 'w']) is True
-    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), ['q', 'missing']) is True
+    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), 'missing') is False
+    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), 'q') is True
+    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), 'w') is True
+    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), 'q', 'w') is True
+    assert StateCheckMixin().at_least_one_key_must_be_present(AnalysisState(q=42, w=43), 'q', 'missing') is True
 
 
 def test_statecheckmixin_all_keys_must_be_present():
-    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), ['missing']) is False
-    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), ['q']) is True
-    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), ['w']) is True
-    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), ['q', 'w']) is True
-    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), ['q', 'missing']) is False
+    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), 'missing') is False
+    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), 'q') is True
+    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), 'w') is True
+    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), 'q', 'w') is True
+    assert StateCheckMixin().all_keys_must_be_present(AnalysisState(q=42, w=43), 'q', 'missing') is False

@@ -4,7 +4,7 @@ from autogluon.eda import AnalysisState
 from autogluon.eda.visualization.base import AbstractVisualization
 
 
-class TestVizualization(AbstractVisualization):
+class SomeVisualization(AbstractVisualization):
 
     def can_handle(self, state: AnalysisState) -> bool:
         return 'required_key' in state
@@ -13,8 +13,8 @@ class TestVizualization(AbstractVisualization):
         pass
 
 
-def test_abstractvisualization_cannot_render():
-    viz = TestVizualization()
+def test_AbstractVisualization_cannot_render():
+    viz = SomeVisualization()
     viz._render = MagicMock()
     viz.can_handle = MagicMock(wraps=viz.can_handle)
     viz.render(AnalysisState({'ns1': {'required_key': True, 'data': 1}, 'ns2': {}}))
@@ -22,8 +22,8 @@ def test_abstractvisualization_cannot_render():
     viz._render.assert_not_called()
 
 
-def test_abstractvisualization_can_render():
-    viz = TestVizualization(namespace='ns1')
+def test_AbstractVisualization_can_render():
+    viz = SomeVisualization(namespace='ns1')
     viz._render = MagicMock()
     viz.can_handle = MagicMock(wraps=viz.can_handle)
     viz.render(AnalysisState({'ns1': {'required_key': True, 'data': 1}, 'ns2': {}}))
