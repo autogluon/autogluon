@@ -13,6 +13,7 @@ from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.utils import warning_filter
 from autogluon.core.utils.savers import save_pkl
 
@@ -309,3 +310,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             result_dfs.append(df)
 
         return TimeSeriesDataFrame.from_data_frame(pd.concat(result_dfs))
+
+    def _get_hpo_backend(self):
+        return RAY_BACKEND

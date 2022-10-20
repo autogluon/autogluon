@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import List, Type
 
@@ -20,6 +21,7 @@ with warning_filter():
 
 from .abstract_gluonts import AbstractGluonTSModel
 
+logger = logging.getLogger(__name__)
 
 # HACK: DeepAR currently raises an exception when it finds a frequency it doesn't like.
 #  we monkey-patch the get_lags and features functions here to return a default
@@ -235,14 +237,19 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     Based on `gluonts.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html?highlight=simplefeedforward>`_.
     See GluonTS documentation for additional hyperparameters.
 
+    Note that AutoGluon uses hyperparameters ``hidden_dim`` and ``num_layers`` instead of ``num_hidden_dimensions``
+    used in GluonTS. This is done to ensure compatibility with Ray Tune.
+
 
     Other Parameters
     ----------------
     context_length : int, optional
         Number of time units that condition the predictions
         (default: None, in which case context_length = prediction_length)
-    num_hidden_dimensions : List[int], default = [40, 40]
-        Number of hidden nodes in each layer
+    hidden_dim: int, default = 40
+        Number of hidden units in each layer of the MLP
+    num_layers : int, default = 2
+        Number of hidden layers in the MLP
     distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
         Distribution to fit
     batch_normalization : bool, default = False
@@ -261,6 +268,23 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
+
+    def _get_estimator(self) -> GluonTSEstimator:
+        """Return the GluonTS Estimator object for the model"""
+        hyperparameters = self._get_estimator_init_args()
+        # Workaround: Ray Tune doesn't support lists as hyperparameters, so we build `num_hidden_dimensions`
+        # from `hidden_dim` and `num_layers`
+        if "num_hidden_dimensions" in hyperparameters:
+            logger.warning(
+                f"Hyperparameter 'num_hidden_dimensions' is ignored by {self.name}. "
+                f"Please use hyperparameters 'hidden_dim' and 'num_layers' instead."
+            )
+        hidden_dim = hyperparameters.pop("hidden_dim", 40)
+        num_layers = hyperparameters.pop("num_layers", 2)
+        hyperparameters["num_hidden_dimensions"] = [hidden_dim] * num_layers
+
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSModel):

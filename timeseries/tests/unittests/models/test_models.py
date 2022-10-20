@@ -110,22 +110,20 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         freq="H",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": ag.Int(3, 4),
+            "epochs": ag.Int(1, 3),
         },
     )
+    num_trials = 2
 
-    hyperparameter_tune_kwargs = "auto"
-
-    models, results = model.hyperparameter_tune(
-        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+    hpo_results, _ = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
         time_limit=100,
         train_data=DUMMY_TS_DATAFRAME,
         val_data=DUMMY_TS_DATAFRAME,
     )
-
-    assert len(results["config_history"]) == 2
-    assert results["config_history"][0]["epochs"] == 3
-    assert results["config_history"][1]["epochs"] == 4
+    assert len(hpo_results) == num_trials
+    for result in hpo_results.values():
+        assert 1 <= result["hyperparameters"]["epochs"] <= 3
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
