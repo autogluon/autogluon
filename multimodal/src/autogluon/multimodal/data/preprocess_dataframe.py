@@ -281,7 +281,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     generator = self._feature_generators[col_name]
                     generator.fit(np.expand_dims(processed_data.to_numpy(), axis=-1))
                     self._numerical_feature_names.append(col_name)
-            elif col_type.startswith(IMAGE) or col_type == ROIS:
+            elif col_type.startswith(IMAGE) or col_type == ROIS: # TODO: Use transform_multimodal and remove this hack
                 self._image_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
