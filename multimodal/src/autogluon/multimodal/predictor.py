@@ -1786,10 +1786,11 @@ class MultiModalPredictor:
                 metric_data=metric_data,
                 metric_name=self._eval_metric_name.lower(),
             )
+            score = {k.lower(): v for k, v in score.items()}
             if metrics_is_none:
                 results = score
             else:
-                results.update({per_metric: score[per_metric] for per_metric in metrics})
+                results.update({per_metric: score[per_metric.lower()] for per_metric in metrics})
         else:
             for per_metric in metrics:
                 pos_label = try_to_infer_pos_label(
