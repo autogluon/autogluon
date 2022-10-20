@@ -26,12 +26,34 @@ def test_xt_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-def test_xt_compile_binary(compile_helper):
+def test_xt_compile_binary(fit_helper):
     fit_args = dict(
         hyperparameters={XTModel: [
             {}, # defaults to native compiler
-            {'ag_args_fit': {'compiler': "onnx"}},
+            {'ag_args_fit': {'compiler': "onnx", 'compiler_fallback_to_native': False}},
         ]},
     )
     dataset_name = 'adult'
-    compile_helper.fit_compile_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
+
+
+def test_xt_compile_multiclass(fit_helper):
+    fit_args = dict(
+        hyperparameters={XTModel: [
+            {}, # defaults to native compiler
+            {'ag_args_fit': {'compiler': "onnx", 'compiler_fallback_to_native': False}},
+        ]},
+    )
+    dataset_name = 'covertype_small'
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)
+
+
+def test_xt_compile_regression(fit_helper):
+    fit_args = dict(
+        hyperparameters={XTModel: [
+            {}, # defaults to native compiler
+            {'ag_args_fit': {'compiler': "onnx", 'compiler_fallback_to_native': False}},
+        ]},
+    )
+    dataset_name = 'ames'
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=3)

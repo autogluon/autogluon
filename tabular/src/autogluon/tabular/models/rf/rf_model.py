@@ -19,7 +19,6 @@ from autogluon.features.generators import LabelEncoderFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
-# FIXME: DOESNT WORK ON REGRESSION PREDICTIONS
 class RFOnnxPredictor:
     def __init__(self, obj, model):
         self.num_classes = obj.num_classes
@@ -28,7 +27,7 @@ class RFOnnxPredictor:
     def predict(self, X):
         input_name = self.model.get_inputs()[0].name
         label_name = self.model.get_outputs()[0].name
-        return self.model.run([label_name], {input_name: X})[0]
+        return self.model.run([label_name], {input_name: X})[0].squeeze()
 
     def predict_proba(self, X):
         input_name = self.model.get_inputs()[0].name
@@ -54,21 +53,17 @@ class RFNativeCompiler:
         if isinstance(obj.model, (RandomForestClassifier, RandomForestRegressor,
                                   ExtraTreesClassifier, ExtraTreesRegressor)):
             with open(path + 'model_native.pkl', 'wb') as fp:
-                fp.write(pickle.dumps(obj))
+                fp.write(pickle.dumps(obj.model))
+            return obj.model
         else:
-            pkl = None
-            with open(path + 'model_native.pkl', 'rb') as fp:
-                pkl = fp.read()
-            return pickle.loads(pkl).model
-        return obj.model
+            return RFNativeCompiler.load(obj=obj, path=path)
 
     @staticmethod
     def load(obj, path: str):
         pkl = None
         with open(path + 'model_native.pkl', 'rb') as fp:
             pkl = fp.read()
-        model = pickle.loads(pkl)
-        return model.model
+        return pickle.loads(pkl)
 
 
 class InferenceSessionWrapper:
@@ -78,8 +73,8 @@ class InferenceSessionWrapper:
     """
     def __init__(self, onnx_bytes):
         import onnxruntime as rt
-        self.sess = rt.InferenceSession(onnx_bytes.SerializeToString())
-        self.onnx_bytes = onnx_bytes
+        self.sess = rt.InferenceSession(onnx_bytes.SerializeToString(),
+                                        providers=['CPUExecutionProvider'])
 
     def run(self, *args):
         return self.sess.run(*args)
@@ -91,13 +86,11 @@ class InferenceSessionWrapper:
         return self.sess.get_outputs(*args)
 
     def __getstate__(self):
-        return {'onnx_bytes': self.onnx_bytes}
+        # No need to duplicate the model parameters here.
+        return {}
 
     def __setstate__(self, values):
-        import onnxruntime as rt
-        self.onnx_bytes = values['onnx_bytes']
-        self.sess = rt.InferenceSession(onnx_bytes.SerializeToString())
-
+        pass
 
 class RFOnnxCompiler:
     name = 'onnx'
@@ -115,7 +108,6 @@ class RFOnnxCompiler:
     def compile(obj, path: str):
         if isinstance(obj.model, RFOnnxPredictor):
             return obj.model
-        print('compiling')
         # Convert into ONNX format
         from skl2onnx import convert_sklearn
         from skl2onnx.common.data_types import FloatTensorType
@@ -490,7 +482,11 @@ class RFModel(AbstractModel):
         if compiler is None:
             return RFNativeCompiler
         compiler_cls = compiler_names[compiler]
+        compiler_fallback = self.params_aux.get('compiler_fallback_to_native', True)
         if not compiler_cls.can_compile():
+            if not compiler_fallback:
+                raise AssertionError(f'Specified compiler ({compiler}) is unable to '
+                                     'compile (potentially lacking dependencies) and "compiler_fallback==False"')
             compiler_cls = RFNativeCompiler
         return compiler_cls
 
