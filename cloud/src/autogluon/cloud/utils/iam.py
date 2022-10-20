@@ -1,3 +1,5 @@
+from .constants import SAGEMAKER_RESOURCE_PREFIX
+
 TRUST_RELATIONSHIP_FILE_NAME = 'ag_cloud_sagemaker_trust_relationship.json'
 IAM_POLICY_FILE_NAME = 'ag_cloud_sagemaker_iam_policy.json'
 
@@ -49,11 +51,11 @@ SAGEMAKER_CLOUD_POLICY = {
                 "sagemaker:InvokeEndpoint"
             ],
             "Resource": [
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint/ag-cloudpredictor-serving-trained-model*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint-config/ag-cloudpredictor-serving-trained-model*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint/{SAGEMAKER_RESOURCE_PREFIX}*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:endpoint-config/{SAGEMAKER_RESOURCE_PREFIX}*",
                 f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:model/autogluon-inference*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:training-job/ag-cloudpredictor-training*",
-                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:transform-job/ag-cloudpredictor-batch-transform*"
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:training-job/{SAGEMAKER_RESOURCE_PREFIX}*",
+                f"arn:aws:sagemaker:*:{POLICY_ACCOUNT_PLACE_HOLDER}:transform-job/{SAGEMAKER_RESOURCE_PREFIX}*"
             ]
         },
         {
