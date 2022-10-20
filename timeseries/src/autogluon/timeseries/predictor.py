@@ -3,13 +3,13 @@ import pprint
 import time
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
@@ -137,21 +137,6 @@ class TimeSeriesPredictor:
         self.quantile_levels = quantile_levels or kwargs.get(
             "quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         )
-
-        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
-        learner_kwargs = kwargs.pop("learner_kwargs", dict())
-        learner_kwargs = learner_kwargs.copy()
-        learner_kwargs.update(
-            dict(
-                path_context=self.path,
-                eval_metric=eval_metric,
-                target=self.target,
-                prediction_length=self.prediction_length,
-                quantile_levels=self.quantile_levels,
-            )
-        )
-        self._learner: AbstractLearner = learner_type(**learner_kwargs)
-        self._learner_type = type(self._learner)
         if validation_splitter == "last_window":
             splitter = LastWindowSplitter()
         elif validation_splitter == "multi_window":
@@ -164,15 +149,31 @@ class TimeSeriesPredictor:
                 f"`autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` "
                 f"(received {validation_splitter} of type {type(validation_splitter)})."
             )
-        self.validation_splitter: AbstractTimeSeriesSplitter = splitter
+
+        learner_type = kwargs.pop("learner_type", TimeSeriesLearner)
+        learner_kwargs = kwargs.pop("learner_kwargs", dict())
+        learner_kwargs = learner_kwargs.copy()
+        learner_kwargs.update(
+            dict(
+                path_context=self.path,
+                eval_metric=eval_metric,
+                target=self.target,
+                prediction_length=self.prediction_length,
+                quantile_levels=self.quantile_levels,
+                # TODO: Should we expose the validation splitter as self.validation_splitter?
+                validation_splitter=splitter,
+            )
+        )
+        self._learner: AbstractLearner = learner_type(**learner_kwargs)
+        self._learner_type = type(self._learner)
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
     def _check_and_prepare_data_frame(self, df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        """Given a sequence of ``TimeSeriesDataFrame``s, replace their time indexes if
-        ``self.ignore_time_index`` is set, and ensure their frequencies are available.
+        """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
+        ``self.ignore_time_index`` is True.
         """
         if df is None:
             return df
@@ -196,6 +197,7 @@ class TimeSeriesPredictor:
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
+        static_feature_metadata: Union[str, FeatureMetadata] = "infer",
         enable_ensemble: bool = True,
         **kwargs,
     ) -> "TimeSeriesPredictor":
@@ -211,7 +213,7 @@ class TimeSeriesPredictor:
             time series are used for computing the validation score.
 
             If not provided, AutoGluon will split :attr:`train_data` into training and tuning subsets using
-            ``self.validation_splitter``. If ``tuning_data`` is provided, ``self.validation_splitter`` will be ignored.
+            ``validation_splitter``. If ``tuning_data`` is provided, ``validation_splitter`` will be ignored.
             See the description of ``validation_splitter`` in the docstring for
             :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
@@ -327,6 +329,8 @@ class TimeSeriesPredictor:
         if hyperparameters is None:
             hyperparameters = "default"
 
+        # TODO: Ensure that static features in train_data and tuning_data match if tuning_data is given
+
         train_data = self._check_and_prepare_data_frame(train_data)
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
@@ -340,6 +344,7 @@ class TimeSeriesPredictor:
             evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            static_feature_metadata=static_feature_metadata,
             enable_ensemble=enable_ensemble,
             **kwargs,
         )
@@ -359,29 +364,15 @@ class TimeSeriesPredictor:
         logger.info(f"{pprint.pformat(fit_args)}")
         logger.info(
             f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items. "
-            f"Average time series length is {len(train_data) / train_data.num_items}."
+            f"Average time series length is {len(train_data) / train_data.num_items:.1f}."
         )
         if tuning_data is not None:
             logger.info(
                 f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
-                f"Average time series length is {len(tuning_data) / tuning_data.num_items}."
+                f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
             )
         logger.info(f"Training artifacts will be saved to: {Path(self.path).resolve()}")
         logger.info("=====================================================")
-
-        # Inform the user extra columns in dataset will not be used.
-        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
-        if len(extra_columns) > 0:
-            logger.warning(f"Provided columns {extra_columns} will not be used.")
-
-        if tuning_data is None:
-            logger.warning(
-                "Validation data is None. "
-                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
-            )
-            train_data, tuning_data = self.validation_splitter.split(
-                ts_dataframe=train_data, prediction_length=self.prediction_length
-            )
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(

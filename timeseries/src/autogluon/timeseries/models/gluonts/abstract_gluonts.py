@@ -11,6 +11,8 @@ from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from gluonts.dataset.field_names import FieldName
+
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
@@ -32,15 +34,33 @@ class SimpleGluonTSDataset(GluonTSDataset):
     GluonTS Dataset protocol via lazy iterations.
     """
 
+    time_series_df: TimeSeriesDataFrame
+    feat_static_cat: Optional[pd.DataFrame] = None
+    feat_static_real: Optional[pd.DataFrame] = None
+
     def __init__(
         self,
         time_series_df: TimeSeriesDataFrame,
         target_field_name: str = "target",
+        use_static_features: bool = False,
     ):
         assert time_series_df is not None
         assert time_series_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         self.time_series_df = time_series_df
         self.target_field_name = target_field_name
+
+        feat_static_cat_columns = []
+        feat_static_real_columns = []
+        if use_static_features:
+            for column_name, values in time_series_df.static_features.iteritems():
+                if values.dtype == "category":
+                    feat_static_cat_columns.append(column_name)
+                else:
+                    feat_static_real_columns.append(column_name)
+        if len(feat_static_cat_columns) > 0:
+            self.feat_static_cat = time_series_df[feat_static_cat_columns].astype(np.int64)
+        if len(feat_static_real_columns) > 0:
+            self.feat_static_real = time_series_df[feat_static_real_columns].astype(np.float64)
 
     @property
     def freq(self):
@@ -50,13 +70,18 @@ class SimpleGluonTSDataset(GluonTSDataset):
         return len(self.time_series_df.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for j in self.time_series_df.item_ids:  # noqa
-            df = self.time_series_df.loc[j]
-            yield {
-                "item_id": j,
-                "target": df[self.target_field_name].to_numpy(dtype=np.float64),
-                "start": pd.Period(df.index[0], freq=self.freq),
+        for item_id in self.time_series_df.item_ids:  # noqa
+            df = self.time_series_df.loc[item_id]
+            time_series = {
+                FieldName.ITEM_ID: item_id,
+                FieldName.TARGET: df[self.target_field_name].to_numpy(),
+                FieldName.START: pd.Period(df.index[0], freq=self.freq),
             }
+            if self.feat_static_cat is not None:
+                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy()
+            if self.feat_static_real is not None:
+                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy()
+            yield time_series
 
 
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
@@ -85,6 +110,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     gluonts_estimator_class: Type[GluonTSEstimator] = None
+    use_static_features: bool = False
 
     def __init__(
         self,
@@ -175,9 +201,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             return self.gluonts_estimator_class.from_hyperparameters(**self._get_estimator_init_args())
 
     def _to_gluonts_dataset(self, time_series_df: Optional[TimeSeriesDataFrame]) -> Optional[GluonTSDataset]:
-        return (
-            SimpleGluonTSDataset(time_series_df, target_field_name=self.target) if time_series_df is not None else None
-        )
+        if time_series_df is not None:
+            return SimpleGluonTSDataset(
+                time_series_df, target_field_name=self.target, use_static_features=self.use_static_features
+            )
+        else:
+            return None
 
     def _fit(
         self,
@@ -197,6 +226,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             )
 
         self._check_fit_params()
+        self.use_static_features = train_data.static_features is not None
 
         callbacks = [TimeLimitCallback(time_limit)]
 

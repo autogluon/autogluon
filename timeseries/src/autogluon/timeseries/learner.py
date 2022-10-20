@@ -1,17 +1,26 @@
 import logging
 import time
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
 import pandas as pd
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.features.generators import PipelineFeatureGenerator
 from autogluon.core.learner import AbstractLearner
 
 from . import TimeSeriesEvaluator
 from .dataset import TimeSeriesDataFrame
 from .models.abstract import AbstractTimeSeriesModel
+from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
 from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
+
+
+class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
+    """Extracts continuous and categorical features from a dataset."""
+
+    pass
 
 
 class TimeSeriesLearner(AbstractLearner):
@@ -28,6 +37,7 @@ class TimeSeriesLearner(AbstractLearner):
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
         eval_metric: Optional[str] = None,
         prediction_length: int = 1,
+        validation_splitter: AbstractTimeSeriesSplitter = LastWindowSplitter(),
         **kwargs,
     ):
         super().__init__(path_context=path_context, random_state=random_state)
@@ -39,6 +49,7 @@ class TimeSeriesLearner(AbstractLearner):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
+        self.validation_splitter = validation_splitter
         logger.info(f"Learner random seed set to {random_state}")
 
     def load_trainer(self) -> AbstractTimeSeriesTrainer:
@@ -51,6 +62,7 @@ class TimeSeriesLearner(AbstractLearner):
         val_data: TimeSeriesDataFrame = None,
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
+        static_feature_metadata: Optional[FeatureMetadata] = None,
         **kwargs,
     ) -> None:
         return self._fit(
@@ -58,6 +70,7 @@ class TimeSeriesLearner(AbstractLearner):
             val_data=val_data,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            static_feature_metadata=static_feature_metadata,
             **kwargs,
         )
 
@@ -68,6 +81,7 @@ class TimeSeriesLearner(AbstractLearner):
         hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
+        static_feature_metadata: Optional[FeatureMetadata] = None,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -78,6 +92,26 @@ class TimeSeriesLearner(AbstractLearner):
             + (f"Time limit = {time_limit}" if time_limit else "")
         )
         logger.info(f"AutoGluon will save models to {self.path}")
+
+        # Process static features
+        train_data, val_data = self._preprocess_static_features(
+            train_data=train_data, static_feature_metadata=static_feature_metadata, val_data=val_data
+        )
+
+        # Process dynamic features
+        extra_columns = [c for c in train_data.columns.copy() if c != self.target]
+        if len(extra_columns) > 0:
+            logger.warning(f"Provided columns {extra_columns} will not be used.")
+
+        # Train / validation split
+        if val_data is None:
+            logger.warning(
+                "Validation data is None. "
+                + self.validation_splitter.describe_validation_strategy(prediction_length=self.prediction_length)
+            )
+            train_data, val_data = self.validation_splitter.split(
+                ts_dataframe=train_data, prediction_length=self.prediction_length
+            )
 
         trainer_init_kwargs = kwargs.copy()
         trainer_init_kwargs.update(
@@ -105,6 +139,31 @@ class TimeSeriesLearner(AbstractLearner):
         self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
+
+    def _preprocess_static_features(
+        self,
+        train_data: TimeSeriesDataFrame,
+        static_feature_metadata: FeatureMetadata,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        self.feature_pipeline = PipelineFeatureGenerator()
+        if train_data.static_features is not None:
+            train_data_processed = train_data.copy(deep=False)
+            train_data_processed.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
+        else:
+            train_data_processed = train_data
+
+        if (
+            val_data is not None
+            and val_data.static_features is not None
+            and train_data_processed.static_features is not None
+        ):
+            val_data_processed = val_data.copy(deep=False)
+            val_data_processed.static_features = self.feature_pipeline.transform(val_data.static_features)
+        else:
+            val_data_processed = val_data
+
+        return train_data_processed, val_data_processed
 
     def predict(
         self,
