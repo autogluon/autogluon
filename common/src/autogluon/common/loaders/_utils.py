@@ -105,7 +105,7 @@ def download(url: str,
              path: Optional[str] = None,
              overwrite: Optional[bool] = False,
              sha1_hash: Optional[str] = None,
-             retries: Optional[int] = 5,
+             retries: int = 5,
              verify_ssl: Optional[bool] = True) -> str:
     """Download a given URL
 
@@ -269,7 +269,7 @@ def protected_zip_extraction(zipfile_path, sha1_hash, folder):
 
     if signature:
         # Create the signature
-        with open(os.path.join(folder, signature), 'w') as of:
+        with open(os.path.join(folder, signature), 'w'):
             pass
 
     return folder

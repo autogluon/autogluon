@@ -71,7 +71,7 @@ def _check_if_kaggle() -> bool:
     """
     root_logger = logging.getLogger()
     for handler in root_logger.root.handlers[:]:
-        if hasattr(handler, 'baseFilename') and (handler.baseFilename == '/tmp/kaggle.log'):
+        if hasattr(handler, 'baseFilename') and (handler.baseFilename == '/tmp/kaggle.log'):  # type: ignore
             return True
     return False
 
