@@ -137,7 +137,6 @@ class XGBoostModel(AbstractModel):
             X=X,
             y=y,
             eval_set=eval_set,
-            eval_metric=eval_metric,
             verbose=False,
             callbacks=callbacks,
             sample_weight=sample_weight
