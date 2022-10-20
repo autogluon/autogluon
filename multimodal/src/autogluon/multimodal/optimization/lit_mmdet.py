@@ -64,21 +64,6 @@ class MMDetLitModule(pl.LightningModule):
         self.custom_metric_func = custom_metric_func
         self.id2label = dict(zip(range(100), range(100)))  # TODO: replace with real id2label
 
-    def forward(self, x):
-        """
-        x: dict
-            batch of data. For example,
-            {
-                "img":
-                "img_metas":
-                "gt_bboxes":
-                "gt_labels":
-            }
-        """
-        # out = self.model.forward(x)
-        # TODO
-        pass
-
     def _predict_step(self, batch, batch_idx=0):
         from mmcv.ops import RoIPool
         from mmcv.parallel import scatter

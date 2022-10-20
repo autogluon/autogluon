@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from torch import nn
 
-from ..constants import LABEL, NER, NER_ANNOTATION, TEXT
+from ..constants import LABEL, MMDET_IMAGE, NER, NER_ANNOTATION, TEXT
 from .collator import List as ColList
 from .collator import Stack
 from .utils import process_ner_annotations
@@ -44,7 +44,7 @@ class LabelProcessor:
         -------
         A dictionary containing one model's collator function for labels.
         """
-        if self.prefix == "mmdet_image":
+        if self.prefix == MMDET_IMAGE:
             fn = {self.label_key: ColList()}
         else:
             fn = {self.label_key: Stack()}
