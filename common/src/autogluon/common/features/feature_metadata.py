@@ -1,7 +1,7 @@
 import copy
 import logging
-from typing import Dict, List, Tuple
 from collections import defaultdict
+from typing import Dict, List, Tuple, Set, Union, Any
 
 import pandas as pd
 
@@ -34,6 +34,7 @@ class FeatureMetadata:
         This is an alternative representation of the special types.
         Only one of type_group_map_special and type_map_special can be specified.
     """
+
     def __init__(self, type_map_raw: Dict[str, str], type_group_map_special: Dict[str, List[str]] = None, type_map_special: Dict[str, List[str]] = None):
         if type_group_map_special is None:
             if type_map_special is not None:
@@ -62,12 +63,14 @@ class FeatureMetadata:
             if feature not in type_map_raw_keys:
                 features_invalid.append(feature)
         if features_invalid:
-            raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_map_raw. Invalid features: {features_invalid}")
+            raise AssertionError(
+                f"{len(features_invalid)} features are present in type_group_map_special but not in type_map_raw. Invalid features: {features_invalid}")
 
     # Note: This is not optimized for speed. Do not rely on this function during inference.
     # TODO: Add valid_names, invalid_names arguments which override all other arguments for the features listed?
     def get_features(self, valid_raw_types: list = None, valid_special_types: list = None, invalid_raw_types: list = None, invalid_special_types: list = None,
-                     required_special_types: list = None, required_raw_special_pairs: List[Tuple[str, List[str]]] = None, required_exact=False, required_at_least_one_special=False) -> List[str]:
+                     required_special_types: list = None, required_raw_special_pairs: List[Tuple[str, Union[List[str], Set[str]]]] = None,
+                     required_exact=False, required_at_least_one_special=False) -> List[str]:
         """
         Returns a list of features held within the feature metadata object after being pruned through the available parameters.
 
@@ -93,7 +96,8 @@ class FeatureMetadata:
             If None, then no features are pruned through this logic.
         required_raw_special_pairs : List[Tuple[str, List[str]]], default None
             If a feature does not satisfy the (raw_type, special_types) requirement of at least one of the elements in this list, it is pruned.
-            Identical to getting the union of calling get_features(valid_raw_types=[raw_type], required_special_types=special_types) for every element of (raw_type, special_types) in required_raw_special_pairs
+            Identical to getting the union of calling get_features(valid_raw_types=[raw_type], required_special_types=special_types) for every
+            element of (raw_type, special_types) in required_raw_special_pairs
             If raw_type is None, then any feature will satisfy the raw type requirement.
             If special_types is None, then any feature will satisfy the special type requirement (including those with no special types).
         required_exact : bool, default False
@@ -114,7 +118,9 @@ class FeatureMetadata:
             features = [feature for feature in features if self.get_feature_type_raw(feature) in valid_raw_types]
         if valid_special_types is not None:
             valid_special_types_set = set(valid_special_types)
-            features = [feature for feature in features if not valid_special_types_set.isdisjoint(self.get_feature_types_special(feature)) or not self.get_feature_types_special(feature)]
+            features = [feature for feature in features
+                        if not valid_special_types_set.isdisjoint(self.get_feature_types_special(feature))
+                        or not self.get_feature_types_special(feature)]
         if invalid_raw_types is not None:
             features = [feature for feature in features if self.get_feature_type_raw(feature) not in invalid_raw_types]
         if invalid_special_types is not None:
@@ -254,7 +260,7 @@ class FeatureMetadata:
         metadata.type_map_raw = {rename_map.get(key, key): val for key, val in metadata.type_map_raw.items()}
         after_len = len(metadata.type_map_raw.keys())
         if before_len != after_len:
-            raise AssertionError(f'key names conflicted during renaming. Do not rename features to exist feature names.')
+            raise AssertionError('key names conflicted during renaming. Do not rename features to exist feature names.')
         for dtype in metadata.type_group_map_special:
             metadata.type_group_map_special[dtype] = [rename_map.get(feature, feature) for feature in metadata.type_group_map_special[dtype]]
         return metadata
@@ -282,7 +288,8 @@ class FeatureMetadata:
                 raise AssertionError(f"Metadata objects to join share raw features, but `shared_raw_features='error'`. Shared features: {shared_features}")
             if shared_features_diff_types:
                 if shared_raw_features == 'overwrite':
-                    logger.log(20, f'Overwriting type_map_raw during FeatureMetadata join. Shared features with conflicting types: {shared_features_diff_types}')
+                    logger.log(20, f'Overwriting type_map_raw during FeatureMetadata join. '
+                                   f'Shared features with conflicting types: {shared_features_diff_types}')
                     shared_features = []
                 elif shared_raw_features == 'error_if_diff':
                     logger.error('ERROR: Conflicting metadata:')
@@ -290,7 +297,8 @@ class FeatureMetadata:
                     self.print_feature_metadata_full(log_prefix='\t', log_level=40)
                     logger.error('Metadata 2:')
                     metadata.print_feature_metadata_full(log_prefix='\t', log_level=40)
-                    raise AssertionError(f"Metadata objects to join share raw features but do not agree on raw dtypes, and `shared_raw_features='error_if_diff'`. Shared conflicting features: {shared_features_diff_types}")
+                    raise AssertionError(f"Metadata objects to join share raw features but do not agree on raw dtypes, "
+                                         f"and `shared_raw_features='error_if_diff'`. Shared conflicting features: {shared_features_diff_types}")
         type_map_raw.update({key: val for key, val in metadata.type_map_raw.items() if key not in shared_features})
 
         type_group_map_special = self._add_type_group_map_special([self.type_group_map_special, metadata.type_group_map_special])
@@ -330,7 +338,7 @@ class FeatureMetadata:
 
     def to_dict(self, inverse=False) -> dict:
         if not inverse:
-            feature_metadata_dict = dict()
+            feature_metadata_dict: Dict[Union[str, Tuple[str, tuple]], Any] = dict()
         else:
             feature_metadata_dict = defaultdict(list)
 
@@ -364,7 +372,8 @@ class FeatureMetadata:
                     output[i] = ((raw, special[0]), features)
                 elif len(special) > 1:
                     output[i] = ((raw, special[0]), features)
-                    logger.warning(f'Warning: print_only_one_special=True was set, but features with {len(special)} special types were found. Invalid Types: {output[i]}')
+                    logger.warning(f'Warning: print_only_one_special=True was set, but features with {len(special)} special types were found. '
+                                   f'Invalid Types: {output[i]}')
                 else:
                     output[i] = ((raw, None), features)
         max_key_len = max([len(str(key)) for key, _ in output])
