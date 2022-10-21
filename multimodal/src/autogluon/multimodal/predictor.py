@@ -491,6 +491,10 @@ class MultiModalPredictor:
             data=train_data,
             valid_data=tuning_data,
         )
+
+        if self._config is not None:  # continuous training
+            config = self._config
+
         problem_type, output_shape = infer_problem_type_output_shape(
             label_column=self._label_column,
             column_types=column_types,
@@ -528,15 +532,9 @@ class MultiModalPredictor:
             )
 
         if self._output_shape is not None:
-            # Fix output shape inconsistency in countinuos training
-            if self._problem_type is not None and self._problem_type == NER and self._config is not None:
-                assert self._output_shape == (
-                    output_shape + len(OmegaConf.to_object(self._config.model.ner.special_tags))
-                ), (f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}")
-            else:
-                assert self._output_shape == output_shape, (
-                    f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-                )
+            assert self._output_shape == output_shape, (
+                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
+            )
 
         if self._validation_metric_name is None or self._eval_metric_name is None:
             validation_metric_name, eval_metric_name = infer_metrics(
@@ -860,9 +858,6 @@ class MultiModalPredictor:
             overrides=hyperparameters,
             extra=["distiller"] if teacher_predictor is not None else None,
         )
-
-        if self._problem_type == NER:
-            self._output_shape += len(OmegaConf.to_object(config.model.ner.special_tags))
 
         config = update_config_by_rules(
             problem_type=self._problem_type,
@@ -1790,7 +1785,13 @@ class MultiModalPredictor:
             if metrics_is_none:
                 results = score
             else:
-                results.update({per_metric: score[per_metric.lower()] for per_metric in metrics})
+                for per_metric in metrics:
+                    if per_metric.lower() in score:
+                        results.update({per_metric: score[per_metric.lower()]})
+                    else:
+                        logger.warning(f"Warning: {per_metric} is not a suppported evaluation metric!")
+                if not results:
+                    results = score  # If the results dict is empty, return all scores.
         else:
             for per_metric in metrics:
                 pos_label = try_to_infer_pos_label(
