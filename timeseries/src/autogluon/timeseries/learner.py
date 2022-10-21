@@ -2,25 +2,20 @@ import logging
 import time
 from typing import Any, Dict, Optional, Tuple, Type, Union
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.features.generators import PipelineFeatureGenerator
 from autogluon.core.learner import AbstractLearner
+from autogluon.timeseries.utils.features import ContinuousAndCategoricalFeatureGenerator
 
-from . import TimeSeriesEvaluator
 from .dataset import TimeSeriesDataFrame
+from .evaluator import TimeSeriesEvaluator
 from .models.abstract import AbstractTimeSeriesModel
 from .splitter import AbstractTimeSeriesSplitter, LastWindowSplitter
 from .trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
-
-
-class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
-    """Extracts continuous and categorical features from a dataset."""
-
-    pass
 
 
 class TimeSeriesLearner(AbstractLearner):
@@ -99,6 +94,7 @@ class TimeSeriesLearner(AbstractLearner):
         )
 
         # Process dynamic features
+        # TODO: Handle dynamic features
         extra_columns = [c for c in train_data.columns.copy() if c != self.target]
         if len(extra_columns) > 0:
             logger.warning(f"Provided columns {extra_columns} will not be used.")
@@ -146,24 +142,42 @@ class TimeSeriesLearner(AbstractLearner):
         static_feature_metadata: FeatureMetadata,
         val_data: Optional[TimeSeriesDataFrame] = None,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        self.feature_pipeline = PipelineFeatureGenerator()
+        self.feature_pipeline = ContinuousAndCategoricalFeatureGenerator(feature_metadata=static_feature_metadata)
+
+        # Avoid modifying train_data outside of predictor
+        train_data = train_data.copy(deep=False)
         if train_data.static_features is not None:
-            train_data_processed = train_data.copy(deep=False)
-            train_data_processed.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
-        else:
-            train_data_processed = train_data
+            original_columns = train_data.static_features.columns
+            train_data.static_features = self.feature_pipeline.fit_transform(train_data.static_features)
 
-        if (
-            val_data is not None
-            and val_data.static_features is not None
-            and train_data_processed.static_features is not None
-        ):
-            val_data_processed = val_data.copy(deep=False)
-            val_data_processed.static_features = self.feature_pipeline.transform(val_data.static_features)
-        else:
-            val_data_processed = val_data
+            mapped_to_categorical = []
+            mapped_to_continuous = []
+            unused = []
+            for col_name in original_columns:
+                if col_name not in train_data.static_features:
+                    unused.append(col_name)
+                elif train_data.static_features[col_name].dtype == "category":
+                    mapped_to_categorical.append(col_name)
+                else:
+                    mapped_to_continuous.append(col_name)
+            train_data.static_features[mapped_to_continuous] = train_data.static_features[mapped_to_continuous].astype(
+                np.float64
+            )
 
-        return train_data_processed, val_data_processed
+            logger.info("Following types of static features have been inferred:")
+            logger.info(f"\tcategorical: {mapped_to_categorical}")
+            logger.info(f"\tcontinuous (numeric): {mapped_to_continuous}")
+            logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
+            logger.info("Please manually set static_feature_metadata if the inferred types are incorrect.")
+
+        if val_data is not None and val_data.static_features is not None:
+            val_data = val_data.copy(deep=False)
+            if train_data.static_features is not None:
+                val_data.static_features = self.feature_pipeline.transform(val_data.static_features)
+            else:
+                val_data.static_features = None
+
+        return train_data, val_data
 
     def predict(
         self,

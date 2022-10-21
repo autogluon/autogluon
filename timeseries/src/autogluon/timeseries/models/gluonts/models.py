@@ -7,6 +7,7 @@ import mxnet as mx
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
+from autogluon.timeseries.utils.features import get_categorical_and_continuous_features
 
 with warning_filter():
     import gluonts.time_feature
@@ -101,6 +102,28 @@ class DeepARModel(AbstractGluonTSModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = DeepAREstimator
+
+    def _get_model_params(self) -> dict:
+        args = super()._get_model_params()
+        args.update(
+            dict(
+                use_feat_static_cat=self.use_feat_static_cat,
+                use_feat_static_real=self.use_feat_static_real,
+                use_feat_dynamic_real=self.use_feat_dynamic_real,
+                cardinality=self.feat_static_cat_cardinality,
+            )
+        )
+        return args
+
+    def _deferred_init_params_aux(self, **kwargs) -> None:
+        super()._deferred_init_params_aux(**kwargs)
+        if "dataset" in kwargs:
+            ds = kwargs.get("dataset")
+            if ds.static_features is not None:
+                feat_static_cat, feat_static_real = get_categorical_and_continuous_features(ds.static_features)
+                self.use_feat_static_cat = len(feat_static_cat.columns) > 0
+                self.use_feat_static_real = len(feat_static_real.columns) > 0
+                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
 
 class AbstractGluonTSSeq2SeqModel(AbstractGluonTSModel):

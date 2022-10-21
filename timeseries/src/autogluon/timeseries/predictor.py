@@ -197,7 +197,7 @@ class TimeSeriesPredictor:
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
-        static_feature_metadata: Union[str, FeatureMetadata] = "infer",
+        static_feature_metadata: Optional[FeatureMetadata] = None,
         enable_ensemble: bool = True,
         **kwargs,
     ) -> "TimeSeriesPredictor":
