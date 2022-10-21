@@ -108,7 +108,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 self.num_classes = self.config.model["roi_head"]["bbox_head"]["num_classes"]
         else:
             raise ValueError("Cannot retrieve num_classes for current model structure.")
-        self.id2label = dict(zip(range(self.num_classes), range(self.num_classess)))
+        self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
 
         # build model and load pretrained weights
         assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
