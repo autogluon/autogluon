@@ -57,8 +57,7 @@ class TimeSeriesPredictor:
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options:
 
-        - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the
-            specified ``quantile_levels`` scaled by the total value of the time series
+        - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
@@ -89,10 +88,8 @@ class TimeSeriesPredictor:
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, validation_splitter is ignored. Possible choices:
 
         - ``"last_window"`` - use last ``prediction_length`` time steps of each time series for validation.
-        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series
-            for validation.
-        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom
-            splitting strategy (for advanced users only).
+        - ``"multi_window"`` - use last 3 non-overlapping windows of length ``prediction_length`` of each time series for validation.
+        - object of type :class:`~autogluon.timeseries.splitter.AbstractTimeSeriesSplitter` implementing a custom splitting strategy (for advanced users only).
 
     Other Parameters
     ----------------
@@ -108,6 +105,9 @@ class TimeSeriesPredictor:
     quantiles : List[float]
         Alias for :attr:`quantile_levels`.
     """
+
+    # TODO: Update description of presets after the presets are finalized
+    # TODO: Update docstring for predict
 
     predictor_file_name = "predictor.pkl"
 
@@ -239,33 +239,83 @@ class TimeSeriesPredictor:
             provided, user-provided values for other arguments (specifically, ``hyperparameters`` and
             ``hyperparameter_tune_kwargs`` will be used (defaulting to their default values specified below).
         hyperparameters : str or dict, default = "default"
-            Determines the hyperparameters used by each model.
+            Determines what models are trained and what hyperparameters are used by each model.
 
-            If str is passed, will use a preset hyperparameter configuration, can be one of "default", "default_hpo",
-            or "local_only".
+            If str is passed, will use a preset hyperparameter configuration. Can be one of "default", "default_hpo",
+            or "local_only". These configurations are defined in ``autogluon/timeseries/trainer/models/presets.py``.
 
-            If dict is provided, the keys are strings or Types that indicate which model types to train. In this case,
-            the predictor will only train the given model types. Stable model options include: "DeepAR", "MQCNN", and
-            "SFF" (SimpleFeedForward). See References for more detail on these models.
+            If dict is provided, the keys are strings or Types that indicate which models to train. Each value is
+            itself a dict containing hyperparameters for each of the trained models. Any omitted hyperparameters not
+            specified here will be set to default. For example::
 
-            Values in the ``hyperparameters`` dict are themselves dictionaries of hyperparameter settings for each model
-            type. Each hyperparameter can either be a single fixed value or a search space containing many possible
-            values. A search space should only be provided when ``hyperparameter_tune_kwargs`` is specified (i.e.,
-            hyperparameter-tuning is utilized). Any omitted hyperparameters not specified here will be set to default
-            values which are given in``autogluon/timeseries/trainer/models/presets.py``. Specific hyperparameter
-            choices for each of the recommended models can be found in the references.
+                predictor.fit(
+                    ...
+                    hyperparameters={
+                        "DeepAR": {},
+                        "ETS": {"seasonal_period": 7},
+                    }
+                )
+
+            The above example will only train two models:
+
+            * ``DeepAR`` (with default hyperparameters)
+            * ``ETS`` (with the given `seasonal_period`; all other parameters set to their defaults)
+
+            Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
+
+            The hyperparameters for each model can be fixed values (as shown above), or search spaces over which
+            hyperparameter optimization is performed. A search space should only be provided when
+            ``hyperparameter_tune_kwargs`` is given (i.e., hyperparameter-tuning is utilized). For example::
+
+                import autogluon.core as ag
+
+                predictor.fit(
+                    ...
+                    hyperparameters={
+                        "DeepAR": {
+                            "num_cells": ag.space.Int(20, 100),
+                            "cell_type": ag.space.Categorical("lstm", "gru")
+                        },
+                    },
+                    hyperparameter_tune_kwargs="auto",
+                )
+
+            In the above example, multiple versions of the DeepAR model with different values of the parameters
+            "num_cells" and "cell_type" will be trained.
         hyperparameter_tune_kwargs : str or dict, optional
+            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run). If ``None``, then
+            hyperparameter tuning will not be performed.
+
+            Ray Tune backend is used to tune deep-learning forecasting models from GluonTS. All other models use a
+            custom HPO backed based on random search.
+
+            Can be set to a string to choose one of available presets:
+
+            * ``"random"`` - 10 trials of random search
+            * ``"auto"`` - 10 trials of bayesian optimization GluonTS models, 10 trials of random search for other models
+
+            Alternatively, a dict can be passed for more fine-grained control. The dict must include the following keys
+
+            * ``"num_trials"`` - int, number of configurations to train for each tuned model
+            * ``"searcher"`` - one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
+            * ``"scheduler"`` - the only supported option is ``"local"`` (all models trained on the same machine)
+
+            Example::
+
+                predictor.fit(
+                    ...
+                    hyperparameter_tune_kwargs={
+                        "scheduler": "local",
+                        "searcher": "auto",
+                        "num_trials": 5,
+                    }
+                )
+
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
 
-        References
-        ----------
-            - DeepAR: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.deepar.html
-            - MQCNN: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.seq2seq.html
-            - SFF: https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html
         """
-        # TODO: Update docstring for presets, hyperparameters and hyperparameter_tune_kwargs
         time_start = time.time()
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
@@ -346,51 +396,6 @@ class TimeSeriesPredictor:
 
         self.save()
         return self
-
-    # TODO: to be changed after ray tune integration
-    def _get_scheduler_options(
-        self,
-        hyperparameter_tune_kwargs: Optional[Union[str, Dict]],
-        time_limit: Optional[int] = None,
-    ) -> Tuple[Optional[Type], Optional[Dict[str, Any]]]:
-        """Validation logic for ``hyperparameter_tune_kwargs``. Returns True if ``hyperparameter_tune_kwargs`` is None
-        or can construct a valid scheduler. Returns False if hyperparameter_tune_kwargs results in an invalid scheduler.
-        """
-        if hyperparameter_tune_kwargs is None:
-            return None, None
-
-        num_trials: Optional[int] = None
-        if isinstance(hyperparameter_tune_kwargs, dict):
-            num_trials = hyperparameter_tune_kwargs.get("num_trials")
-            if time_limit is None and num_trials is None:
-                logger.warning(
-                    "None of time_limit and num_trials are set, defaulting to num_trials=2",
-                )
-                num_trials = 2
-            else:
-                num_trials = hyperparameter_tune_kwargs.get("num_trials", 999)
-        elif isinstance(hyperparameter_tune_kwargs, str):
-            num_trials = 999
-
-        scheduler_cls, scheduler_params = scheduler_factory(
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            time_out=time_limit,
-            nthreads_per_trial="auto",
-            ngpus_per_trial="auto",
-            num_trials=num_trials,
-        )
-
-        if scheduler_params["num_trials"] == 1:
-            logger.warning("Warning: Specified num_trials == 1 for hyperparameter tuning, disabling HPO. ")
-            return None, None
-
-        scheduler_ngpus = scheduler_params["resource"].get("num_gpus", 0)
-        if scheduler_ngpus is not None and isinstance(scheduler_ngpus, int) and scheduler_ngpus > 1:
-            logger.warning(
-                f"Warning: TimeSeriesPredictor currently doesn't use >1 GPU per training run. "
-                f"Detected {scheduler_ngpus} GPUs."
-            )
-        return scheduler_cls, scheduler_params
 
     def get_model_names(self) -> List[str]:
         """Returns the list of model names trained by this predictor object."""

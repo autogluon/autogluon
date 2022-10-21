@@ -193,9 +193,10 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
 
     assert len(leaderboard) == 2 + 1  # include ensemble
 
-    config_history = next(iter(trainer.hpo_results.values()))["config_history"]
+    hpo_results_first_model = next(iter(trainer.hpo_results.values()))
+    config_history = [result["hyperparameters"] for result in hpo_results_first_model.values()]
     assert len(config_history) == 2
-    assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
+    assert all(1 <= config["epochs"] <= 4 for config in config_history)
 
 
 @pytest.mark.skipif(not PROPHET_IS_INSTALLED, reason="Prophet is not installed.")
@@ -256,7 +257,7 @@ def test_given_hyperparameters_with_spaces_to_prophet_when_trainer_called_then_h
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
             hyperparameter_tune_kwargs={
-                "num_samples": 2,
+                "num_trials": 2,
                 "searcher": "random",
                 "scheduler": "local",
             },
@@ -466,9 +467,15 @@ def test_given_hyperparameters_and_custom_models_when_trainer_model_templates_ca
 
 
 @mock.patch("autogluon.timeseries.models.presets.get_default_hps")
+@pytest.mark.parametrize(
+    "hyperparameter_tune_kwargs, expected_num_trained_models",
+    [("auto", 10), ("random", 10), ({"searcher": "random", "scheduler": "local", "num_trials": 4}, 4)],
+)
 def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_then_hpo_is_performed(
     mock_default_hps,
     temp_model_path,
+    hyperparameter_tune_kwargs,
+    expected_num_trained_models,
 ):
     hyperparameters = {GenericGluonTSModelFactory(MQRNNEstimator): {"epochs": ag.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
@@ -480,18 +487,15 @@ def test_given_hyperparameters_with_spaces_and_custom_model_when_trainer_called_
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters=hyperparameters,
             val_data=DUMMY_TS_DATAFRAME,
-            hyperparameter_tune_kwargs={
-                "num_trials": 2,
-                "searcher": "random",
-                "scheduler": "local",
-            },
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
         leaderboard = trainer.leaderboard()
 
-    assert len(leaderboard) == 2 + 1  # include ensemble
-    config_history = next(iter(trainer.hpo_results.values()))["config_history"]
-    assert len(config_history) == 2
-    assert all(1 <= model["epochs"] <= 4 for model in config_history.values())
+    assert len(leaderboard) == expected_num_trained_models + 1  # include ensemble
+    hpo_results_first_model = next(iter(trainer.hpo_results.values()))
+    config_history = [result["hyperparameters"] for result in hpo_results_first_model.values()]
+    assert len(config_history) == expected_num_trained_models
+    assert all(1 <= config["epochs"] <= 4 for config in config_history)
 
 
 @pytest.mark.parametrize(

@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import List, Type
 
@@ -8,19 +9,19 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract.abstract_timeseries_model import AbstractTimeSeriesModelFactory
 
 with warning_filter():
-    import gluonts.model.deepar
-    from gluonts.model.deepar import DeepAREstimator
+    import gluonts.time_feature
     from gluonts.model.estimator import Estimator as GluonTSEstimator, DummyEstimator
     from gluonts.model.prophet import ProphetPredictor
-    from gluonts.model.seq2seq import MQCNNEstimator, MQRNNEstimator
-    from gluonts.model.simple_feedforward import SimpleFeedForwardEstimator
-    from gluonts.model.transformer import TransformerEstimator
-    from gluonts.model.tft import TemporalFusionTransformerEstimator
     from gluonts.mx.context import get_mxnet_context
-    from gluonts.nursery.autogluon_tabular import TabularEstimator
+    from gluonts.mx.model.deepar import DeepAREstimator
+    from gluonts.mx.model.simple_feedforward import SimpleFeedForwardEstimator
+    from gluonts.mx.model.transformer import TransformerEstimator
+    from gluonts.mx.model.tft import TemporalFusionTransformerEstimator
+    from gluonts.mx.model.seq2seq import MQCNNEstimator, MQRNNEstimator
 
 from .abstract_gluonts import AbstractGluonTSModel
 
+logger = logging.getLogger(__name__)
 
 # HACK: DeepAR currently raises an exception when it finds a frequency it doesn't like.
 #  we monkey-patch the get_lags and features functions here to return a default
@@ -47,8 +48,8 @@ def time_features_from_frequency_str_safe(*args, **kwargs):
         return []
 
 
-gluonts.model.deepar._estimator.get_lags_for_frequency = get_lags_for_frequency_safe
-gluonts.model.deepar._estimator.time_features_from_frequency_str = time_features_from_frequency_str_safe
+gluonts.time_feature.get_lags_for_frequency = get_lags_for_frequency_safe
+gluonts.time_feature.time_features_from_frequency_str = time_features_from_frequency_str_safe
 
 
 class DeepARModel(AbstractGluonTSModel):
@@ -236,14 +237,19 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     Based on `gluonts.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.model.simple_feedforward.html?highlight=simplefeedforward>`_.
     See GluonTS documentation for additional hyperparameters.
 
+    Note that AutoGluon uses hyperparameters ``hidden_dim`` and ``num_layers`` instead of ``num_hidden_dimensions``
+    used in GluonTS. This is done to ensure compatibility with Ray Tune.
+
 
     Other Parameters
     ----------------
     context_length : int, optional
         Number of time units that condition the predictions
         (default: None, in which case context_length = prediction_length)
-    num_hidden_dimensions : List[int], default = [40, 40]
-        Number of hidden nodes in each layer
+    hidden_dim: int, default = 40
+        Number of hidden units in each layer of the MLP
+    num_layers : int, default = 2
+        Number of hidden layers in the MLP
     distr_output : gluonts.mx.DistributionOutput, default = StudentTOutput()
         Distribution to fit
     batch_normalization : bool, default = False
@@ -262,6 +268,23 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     """
 
     gluonts_estimator_class: Type[GluonTSEstimator] = SimpleFeedForwardEstimator
+
+    def _get_estimator(self) -> GluonTSEstimator:
+        """Return the GluonTS Estimator object for the model"""
+        hyperparameters = self._get_estimator_init_args()
+        # Workaround: Ray Tune doesn't support lists as hyperparameters, so we build `num_hidden_dimensions`
+        # from `hidden_dim` and `num_layers`
+        if "num_hidden_dimensions" in hyperparameters:
+            logger.warning(
+                f"Hyperparameter 'num_hidden_dimensions' is ignored by {self.name}. "
+                f"Please use hyperparameters 'hidden_dim' and 'num_layers' instead."
+            )
+        hidden_dim = hyperparameters.pop("hidden_dim", 40)
+        num_layers = hyperparameters.pop("num_layers", 2)
+        hyperparameters["num_hidden_dimensions"] = [hidden_dim] * num_layers
+
+        with warning_filter():
+            return self.gluonts_estimator_class.from_hyperparameters(**hyperparameters)
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSModel):
@@ -474,37 +497,4 @@ class ProphetModel(AbstractGluonTSModel):
             freq=model_init_params["freq"],
             prediction_length=model_init_params["prediction_length"],
             prophet_params={k: v for k, v in model_init_params.items() if k in self.allowed_prophet_parameters},
-        )
-
-
-# TODO: AutoGluon Tabular will be removed from GluonTS to avoid circular dependencies
-class AutoTabularModel(AbstractGluonTSModel):
-    """Autotabular model from Gluon-TS, which in turn uses autogluon.tabular
-    predictors for fitting a forecast model.
-
-    See `AbstractGluonTSModel` for common parameters.
-
-    Other Parameters
-    ----------------
-    lag_indices : List[int], optional
-        List of indices of the lagged observations to use as features. If
-        None, this will be set automatically based on the frequency.
-    scaling : Callable[[pd.Series], Tuple[pd.Series, float]], optional
-        Function to be used to scale time series. This should take a pd.Series object
-        as input, and return a scaled pd.Series and the scale (float). By default,
-        this divides a series by the mean of its absolute value.
-    disable_auto_regression : bool, default = False
-        Weather to forcefully disable auto-regression in the model. If ``True``,
-        this will remove any lag index which is smaller than ``prediction_length``.
-        This will make predictions more efficient, but may impact their accuracy.
-    """
-
-    # TODO: AutoTabular model is experimental, may need its own logic for
-    # TODO: handling time limit and training data. See PR #1538.
-    def _get_estimator(self):
-        return TabularEstimator(
-            freq=self.freq,
-            prediction_length=self.prediction_length,
-            time_limit=self.params_aux["time_limit"],
-            last_k_for_val=self.prediction_length,
         )

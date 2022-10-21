@@ -7,7 +7,7 @@ on:
       - '.github/workflows/cloud_continuous_integration.yml'
       - '.github/workflow_scripts/test_cloud.sh'
   pull_request_target:
-    types: [labeled, synchronize]
+    types: [labeled, synchronize, opened]
     paths:
       - 'cloud/**'
       - '.github/workflows/cloud_continuous_integration.yml'

@@ -25,7 +25,8 @@ def get_type_family_raw(dtype) -> str:
         elif np.issubdtype(dtype, np.floating):
             return 'float'
     except Exception as err:
-        logger.error(f'Warning: dtype {dtype} is not recognized as a valid dtype by numpy! AutoGluon may incorrectly handle this feature...')
+        logger.error(f'Warning: dtype {dtype} is not recognized as a valid dtype by numpy! '
+                     f'AutoGluon may incorrectly handle this feature...')
         logger.error(err)
 
     if dtype.name in ['bool', 'bool_']:
@@ -95,7 +96,8 @@ def get_type_group_map_special(df: DataFrame) -> defaultdict:
 
 
 # TODO: Expand to int64 -> date features (milli from epoch etc)
-# TODO: This takes a surprisingly long time to run, ~30 seconds a laptop for 50,000 rows of datetime_as_object for a single column. Try to optimize.
+# TODO: This takes a surprisingly long time to run, ~30 seconds a laptop for
+#  50,000 rows of datetime_as_object for a single column. Try to optimize.
 def check_if_datetime_as_object_feature(X: Series) -> bool:
     type_family = get_type_family_raw(X.dtype)
     # TODO: Check if low numeric numbers, could be categorical encoding!
@@ -156,14 +158,17 @@ def get_bool_true_val(series: pd.Series):
 
     series must have exactly 2 unique values
 
-    We make the assumption that the value chosen as `True` between the two options is mostly arbitrary, with the exception that np.nan will not be considered `True`.
-    When possible, we try to sort the values so that (0, 1) will choose 1 as True, however this decision should ideally not impact downstream models much.
+    We make the assumption that the value chosen as `True` between the two options is mostly arbitrary,
+    with the exception that np.nan will not be considered `True`.
+    When possible, we try to sort the values so that (0, 1) will choose 1 as True, however this decision
+    should ideally not impact downstream models much.
     Any new unseen values (including nan) at inference time will be mapped to `False` automatically.
 
     In this code, 0 and 0.0 (int and float) are treated as the same value. Similarly with any other integer and float (such as 1 and 1.0).
 
     """
-    # This is a safety net in case the unique types are mixed (such as string and int). In this scenario, an exception is raised and therefore we use the unsorted values.
+    # This is a safety net in case the unique types are mixed (such as string and int). In this scenario, an exception is raised
+    # and therefore we use the unsorted values.
     try:
         uniques = series.unique()
         # Sort the values to avoid relying on row-order when determining which value is mapped to `True`.

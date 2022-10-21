@@ -21,7 +21,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         self,
         prefix: str,
         checkpoint_name: str,
-        num_classes: Optional[int] = None,
+        num_classes: Optional[int] = 0,
         mix_choice: Optional[str] = "all_logits",
         pretrained: Optional[bool] = True,
     ):
@@ -108,16 +108,17 @@ class TimmAutoModelForImagePrediction(nn.Module):
                 images.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None, None, None]
             )  # mixed shape: (b, 3, h, w)
             features = self.model(mixed_images)
-            logits = self.head(features)
+            if self.num_classes > 0:
+                logits = self.head(features)
 
         elif self.mix_choice == "all_logits":  # mix outputs
             b, n, c, h, w = images.shape
             features = self.model(images.reshape((b * n, c, h, w)))  # (b*n, num_features)
-            logits = self.head(features)
+            if self.num_classes > 0:
+                logits = self.head(features)
             steps = torch.arange(0, n).type_as(image_valid_num)
-            image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(logits)  # (b, n)
+            image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(features)  # (b, n)
             features = features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
-            logits = logits.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_classes)
 
             # collect features by image column names
             column_features, column_feature_masks = get_column_features(
@@ -130,7 +131,9 @@ class TimmAutoModelForImagePrediction(nn.Module):
             ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 
             features = features.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_features)
-            logits = logits.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_classes)
+            if self.num_classes > 0:
+                logits = logits.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_classes)
+                logits = logits.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_classes)
 
         else:
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
