@@ -147,6 +147,16 @@ def siamese_network():
     return automm_presets.create("default")
 
 
+@automm_presets.register()
+def text_match_text():
+    return {
+        "model.names": ["hf_text"],
+        "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
+        "model.hf_text.pooling_mode": "mean",
+        # "env.eval_batch_size_ratio": 1,
+    }
+
+
 def list_automm_presets(verbose: bool = False):
     """
     List all available presets.

@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Union
 
 from omegaconf import DictConfig
 from torch import nn
+import torch
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
 from .model import create_model
@@ -278,3 +279,23 @@ def create_siamese_model(
     )
 
     return query_model, response_model
+
+
+def compute_semantic_similarity(a: torch.Tensor, b: torch.Tensor, cosine: Optional[bool] = True):
+    if not isinstance(a, torch.Tensor):
+        a = torch.as_tensor(a)
+
+    if not isinstance(b, torch.Tensor):
+        b = torch.as_tensor(b)
+
+    if len(a.shape) == 1:
+        a = a.unsqueeze(0)
+
+    if len(b.shape) == 1:
+        b = b.unsqueeze(0)
+
+    if cosine:
+        a = torch.nn.functional.normalize(a, p=2, dim=1)
+        b = torch.nn.functional.normalize(b, p=2, dim=1)
+
+    return torch.mm(a, b.transpose(0, 1))

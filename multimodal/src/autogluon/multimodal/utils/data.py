@@ -375,6 +375,7 @@ def data_to_df(
     data: Union[pd.DataFrame, Dict, List],
     required_columns: Optional[List] = None,
     all_columns: Optional[List] = None,
+    header: Optional[str] = None,
 ):
     """
     Convert the input data to a dataframe.
@@ -394,8 +395,13 @@ def data_to_df(
     """
     if isinstance(data, pd.DataFrame):
         pass
-    elif isinstance(data, (list, dict)):
+    elif isinstance(data, dict):
         data = pd.DataFrame(data)
+    elif isinstance(data, list):
+        if header is None:
+            data = pd.DataFrame(data)
+        else:
+            data = pd.DataFrame({header: data})
     elif isinstance(data, str):
         data = load_pd.load(data)
     else:
