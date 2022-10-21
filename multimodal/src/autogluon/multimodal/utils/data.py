@@ -214,7 +214,8 @@ def create_fusion_data_processors(
                 )
             )
             requires_label = False
-            model_config.data_types.remove(TEXT)
+            if TEXT in model_config.data_types:
+                model_config.data_types.remove(TEXT)
 
         if requires_label:
             # each model has its own label processor
