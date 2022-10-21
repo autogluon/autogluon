@@ -51,7 +51,7 @@ from ..constants import (
     COLUMN,
     IMAGE,
     IMAGE_VALID_NUM,
-    MMCV_MODELS,
+    MMLAB_MODELS,
     MMDET_IMAGE,
     MMOCR,
     MMOCR_TEXT_DET,
@@ -158,7 +158,7 @@ class ImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        if self.prefix.lower().startswith(MMCV_MODELS):
+        if self.prefix.lower().startswith(MMLAB_MODELS):
             if self.prefix.lower().startswith(MMDET_IMAGE):
                 assert mmdet is not None, "Please install MMDetection by: pip install mmdet."
             else:
@@ -203,7 +203,7 @@ class ImageProcessor:
             for col_name in image_column_names:
                 fn[f"{self.image_column_prefix}_{col_name}"] = Stack()
 
-        if self.prefix.lower().startswith(MMCV_MODELS):
+        if self.prefix.lower().startswith(MMLAB_MODELS):
             assert mmcv is not None, "Please install mmcv-full by: mim install mmcv-full."
             fn.update(
                 {
@@ -401,7 +401,7 @@ class ImageProcessor:
         mm_data = dict(img_prefix=None, bbox_fields=[])
         ret = {}
         column_start = 0
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
+        if self.prefix.lower().startswith(MMLAB_MODELS):
             for per_col_name, per_col_content in image_paths.items():
                 if per_col_name != "rois":  # TODO: remove hardcode
                     mm_data["img_info"] = dict(filename=per_col_content[0])
@@ -447,7 +447,7 @@ class ImageProcessor:
                         [column_start, len(images)], dtype=np.int64
                     )
                     column_start = len(images)
-        if self.prefix == MMDET_IMAGE or self.prefix.lower().startswith(MMOCR):
+        if self.prefix.lower().startswith(MMLAB_MODELS):
             ret.update({self.image_key: self.train_processor(mm_data) if is_training else self.val_processor(mm_data)})
         else:
             ret.update(
