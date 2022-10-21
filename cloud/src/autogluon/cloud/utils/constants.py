@@ -3,3 +3,5 @@ VALID_ACCEPT = [
     'text/csv',
     'application/json'
 ]
+
+SAGEMAKER_RESOURCE_PREFIX = 'ag-cloudpredictor'

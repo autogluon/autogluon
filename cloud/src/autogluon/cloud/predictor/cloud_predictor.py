@@ -30,7 +30,10 @@ from ..utils.ag_sagemaker import (
     AutoGluonBatchPredictor
 )
 from ..utils.aws_utils import setup_sagemaker_session
-from ..utils.constants import VALID_ACCEPT
+from ..utils.constants import (
+    VALID_ACCEPT,
+    SAGEMAKER_RESOURCE_PREFIX
+)
 from ..utils.iam import (
     TRUST_RELATIONSHIP_FILE_NAME,
     IAM_POLICY_FILE_NAME,
@@ -424,7 +427,7 @@ class CloudPredictor(ABC):
             If provided a specific version, will use this version.
         job_name: str, default = None
             Name of the launched training job.
-            If None, CloudPredictor will create one with prefix ag-CloudPredictor
+            If None, CloudPredictor will create one with prefix ag-cloudpredictor
         instance_type: str, default = 'ml.m5.2xlarge'
             Instance type the predictor will be trained on with SageMaker.
         instance_count: int, default = 1
@@ -455,7 +458,7 @@ class CloudPredictor(ABC):
         logger.log(20, f'Training with framework_version=={framework_version}')
 
         if not job_name:
-            job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor")
+            job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
 
         autogluon_sagemaker_estimator_kwargs = copy.deepcopy(autogluon_sagemaker_estimator_kwargs)
         autogluon_sagemaker_estimator_kwargs.pop('output_path', None)
@@ -620,7 +623,7 @@ class CloudPredictor(ABC):
             If None, will deploy the most recent trained predictor trained with `fit()`.
         endpoint_name: str
             The endpoint name to use for the deployment.
-            If None, CloudPredictor will create one
+            If None, CloudPredictor will create one with prefix `ag-cloudpredictor`
         framework_version: str, default = `latest`
             Inference container version of autogluon.
             If `latest`, will use the latest available container version.
@@ -646,7 +649,7 @@ class CloudPredictor(ABC):
         predictor_path = self._upload_predictor(predictor_path, f'endpoints/{endpoint_name}/predictor')
 
         if not endpoint_name:
-            endpoint_name = sagemaker.utils.unique_name_from_base("sagemaker-autogluon-serving-trained-model")
+            endpoint_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
         framework_version, py_version = self._parse_framework_version(framework_version, 'inference')
         logger.log(20, f'Deploying with framework_version=={framework_version}')
 
@@ -830,7 +833,7 @@ class CloudPredictor(ABC):
             If provided a specific version, will use this version.
         job_name: str, default = None
             Name of the launched training job.
-            If None, CloudPredictor will create one with prefix ag-CloudPredictor-batch-transform.
+            If None, CloudPredictor will create one with prefix ag-cloudpredictor.
         instance_count: int, default = 1,
             Number of instances used to do batch transform.
         instance_type: str, default = 'ml.m5.2xlarge'
@@ -868,7 +871,7 @@ class CloudPredictor(ABC):
         predictor_path = self._upload_predictor(predictor_path, cloud_key_prefix + '/predictor')
 
         if not job_name:
-            job_name = sagemaker.utils.unique_name_from_base("ag-CloudPredictor-batch-transform")
+            job_name = sagemaker.utils.unique_name_from_base(SAGEMAKER_RESOURCE_PREFIX)
 
         if test_data_image_column is not None:
             logger.warning('Batch inference with image modality could be slow because of some technical details.')
