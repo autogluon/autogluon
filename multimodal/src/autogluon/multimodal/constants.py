@@ -50,7 +50,7 @@ ROIS = "rois"
 SCORE = "score"
 
 # Metric
-MAP = "map"
+MAP = "mAP"
 MAX = "max"
 MIN = "min"
 ACCURACY = "accuracy"
