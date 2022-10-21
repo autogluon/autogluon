@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import evaluate
 from sklearn.metrics import f1_score
+import pytrec_eval
 
 from autogluon.core.metrics import get_metric
 

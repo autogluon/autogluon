@@ -151,9 +151,8 @@ def siamese_network():
 def text_match_text():
     return {
         "model.names": ["hf_text"],
-        "model.hf_text.checkpoint_name": "sentence-transformers/msmarco-MiniLM-L-12-v3",
+        "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
         "model.hf_text.pooling_mode": "mean",
-        # "env.eval_batch_size_ratio": 1,
     }
 
 
