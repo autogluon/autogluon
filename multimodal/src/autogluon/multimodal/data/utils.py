@@ -333,7 +333,8 @@ def process_ner_annotations(ner_annotations, ner_text, tokenizer, is_eval=False)
         for annot in ner_annotations:
             custom_offset = annot[0]
             custom_label = annot[1]
-            if word_offset[0] == custom_offset[0]:
+            # support multiple words in an annotated offset range.
+            if word_offset[0] >= custom_offset[0] and word_offset[1] <= custom_offset[1]:
                 word_label[idx] = custom_label
 
     token_label = [0] * len(col_tokens.input_ids)
