@@ -99,6 +99,7 @@ class BaseDataset(torch.utils.data.Dataset):
                 per_ret = apply_data_processor(
                     per_sample_features=per_sample_features,
                     data_processors=per_processors_group,
+                    feature_modalities=getattr(self, f"modality_types_{group_id}"),
                     is_training=self.is_training,
                 )
                 ret.update(per_ret)

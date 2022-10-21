@@ -150,8 +150,6 @@ def create_data_processor(
     elif data_type == MULTIMODAL:
         data_processor = MultiModalProcessor(
             model=model,
-            tokenizer_name=model_config.tokenizer_name,
-            max_len=model_config.max_text_len,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from torch import nn
@@ -97,6 +97,7 @@ class NumericalProcessor:
     def __call__(
         self,
         numerical_features: Dict[str, float],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -106,6 +107,8 @@ class NumericalProcessor:
         ----------
         numerical_features
             Numerical features of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to do processing in the training mode. This unused flag is for the API compatibility.
 

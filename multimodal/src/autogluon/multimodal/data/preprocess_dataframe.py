@@ -524,6 +524,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
         elif self.label_type == ROIS:
             y = y_df  # Do nothing. TODO: Shall we transform this?
+        elif self.label_type == NER_ANNOTATION:
+            y = self._label_generator.transform(y_df)
         else:
             raise NotImplementedError
 
@@ -533,25 +535,19 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self,
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, NDArray[(Any,), Any]], Dict[str, str]]:
-        ret = {}
+        ret_data, ret_type = {}, {}
         if self.label_type == NER_ANNOTATION:
-            # text column should always present
-            text_column_index = 0  # Currently, we only support one text column.
-            x_df = df[self._text_feature_names[text_column_index]]
-            x = self.transform_text(df)[0]
-            ret.update(
-                {
-                    TEXT: x[self._text_feature_names[text_column_index]],
-                }
-            )
+            x = self.transform_text(df)
+            ret_data.update(x[0])
+            ret_type.update(x[1])
             if self._label_column in df:
-                y_df = df[self._label_column]
-                y = self._label_generator.transform(y_df)
-                ret.update({NER_ANNOTATION: y})
+                y = self.transform_label(df)
+                ret_data.update(y[0])
+                ret_type.update(y[1])
         else:
             raise NotImplementedError
 
-        return ret, None
+        return ret_data, ret_type
 
     def transform_label_for_metric(
         self,

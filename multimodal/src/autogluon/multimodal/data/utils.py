@@ -213,7 +213,9 @@ def apply_df_preprocessor(
     return modality_features, modality_types, sample_num
 
 
-def apply_data_processor(per_sample_features: dict, data_processors: dict, is_training: bool):
+def apply_data_processor(
+    per_sample_features: dict, data_processors: dict, feature_modalities: dict, is_training: bool
+):
     """
     Process one sample's features.
 
@@ -234,7 +236,11 @@ def apply_data_processor(per_sample_features: dict, data_processors: dict, is_tr
     for per_modality, per_modality_processors in data_processors.items():
         for per_model_processor in per_modality_processors:
             if per_modality in per_sample_features and per_sample_features[per_modality]:
-                sample_features.update(per_model_processor(per_sample_features[per_modality], is_training=is_training))
+                sample_features.update(
+                    per_model_processor(
+                        per_sample_features[per_modality], feature_modalities[per_modality], is_training=is_training
+                    )
+                )
 
     return sample_features
 

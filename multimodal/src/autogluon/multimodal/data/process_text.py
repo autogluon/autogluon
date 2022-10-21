@@ -3,7 +3,7 @@ import logging
 import os
 import warnings
 from copy import deepcopy
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from nptyping import NDArray
@@ -492,6 +492,7 @@ class TextProcessor:
     def __call__(
         self,
         texts: Dict[str, str],
+        feature_modalities: Dict[str, Union[int, float, list]],
         is_training: bool,
     ) -> Dict:
         """
@@ -501,6 +502,8 @@ class TextProcessor:
         ----------
         texts
             Texts of one sample.
+        feature_modalities
+            The modality of the feature columns.
         is_training
             Whether to do processing in the training mode.
 
