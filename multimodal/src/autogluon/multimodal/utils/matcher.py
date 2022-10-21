@@ -3,9 +3,9 @@ import functools
 import logging
 from typing import Dict, List, Optional, Union
 
+import torch
 from omegaconf import DictConfig
 from torch import nn
-import torch
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
 from .model import create_model

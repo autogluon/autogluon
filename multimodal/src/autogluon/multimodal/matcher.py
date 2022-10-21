@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import heapq
 import json
 import logging
 import operator
@@ -19,7 +20,6 @@ import yaml
 from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
 from torch import nn
-import heapq
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import setup_outputdir
@@ -69,7 +69,9 @@ from .utils import (
     average_checkpoints,
     compute_inference_batch_size,
     compute_num_gpus,
+    compute_ranking_score,
     compute_score,
+    compute_semantic_similarity,
     create_fusion_data_processors,
     create_siamese_model,
     customize_model_names,
@@ -82,6 +84,7 @@ from .utils import (
     infer_metrics,
     infer_precision,
     init_df_preprocessor,
+    init_pretrained_matcher,
     load_text_tokenizers,
     process_save_path,
     save_pretrained_model_configs,
@@ -89,9 +92,6 @@ from .utils import (
     select_model,
     tensor_to_ndarray,
     try_to_infer_pos_label,
-    compute_semantic_similarity,
-    compute_ranking_score,
-    init_pretrained_matcher,
 )
 
 logger = logging.getLogger(AUTOMM)
@@ -228,9 +228,15 @@ class MultiModalMatcher:
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
 
         if self._pipeline is not None:
-            self._config, self._query_config, self._response_config, self._query_model, self._response_model, self._query_processors, self._response_processors = init_pretrained_matcher(
-                pipeline=self._pipeline, hyperparameters=hyperparameters
-            )
+            (
+                self._config,
+                self._query_config,
+                self._response_config,
+                self._query_model,
+                self._response_model,
+                self._query_processors,
+                self._response_processors,
+            ) = init_pretrained_matcher(pipeline=self._pipeline, hyperparameters=hyperparameters)
 
     @property
     def query(self):
@@ -540,7 +546,9 @@ class MultiModalMatcher:
         # only need labels for the response model
         if response_model is None:
             label_processors = None
-        elif self._label_processors is None and all(v is not None for v in [self._label_column, response_model, response_config]):
+        elif self._label_processors is None and all(
+            v is not None for v in [self._label_column, response_model, response_config]
+        ):
             label_processors = create_fusion_data_processors(
                 model=response_model,
                 config=response_config,
@@ -1143,13 +1151,17 @@ class MultiModalMatcher:
 
         rank_labels = {}
         for i, per_row in qr_relevance.iterrows():
-            rank_labels.setdefault(per_row[self._query[0]], {})[per_row[self._response[0]]] = int(per_row[self._label_column])
+            rank_labels.setdefault(per_row[self._query[0]], {})[per_row[self._response[0]]] = int(
+                per_row[self._label_column]
+            )
 
         rank_results = dict()
         query_embeddings = self.extract_embedding(query_data, signature=QUERY, id_mappings=id_mappings, as_tensor=True)
         num_chunks = max(1, len(response_data) // chunk_size)
         for response_chunk in np.array_split(response_data, num_chunks):
-            response_embeddings = self.extract_embedding(response_chunk, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True)
+            response_embeddings = self.extract_embedding(
+                response_chunk, signature=RESPONSE, id_mappings=id_mappings, as_tensor=True
+            )
             similarity_scores = compute_semantic_similarity(a=query_embeddings, b=response_embeddings, cosine=cosine)
             similarity_scores[torch.isnan(similarity_scores)] = -1
             top_k_scores, top_k_indices = torch.topk(
@@ -1323,7 +1335,7 @@ class MultiModalMatcher:
 
         for query_start_idx in range(0, len(query_data), query_chunk_size):
             query_embeddings = self.extract_embedding(
-                query_data[query_start_idx:query_start_idx + query_chunk_size],
+                query_data[query_start_idx : query_start_idx + query_chunk_size],
                 signature=QUERY,
                 id_mappings=id_mappings,
                 as_tensor=True,
@@ -1331,7 +1343,7 @@ class MultiModalMatcher:
             # Iterate over chunks of the corpus
             for response_start_idx in range(0, len(response_data), response_chunk_size):
                 response_embeddings = self.extract_embedding(
-                    response_data[response_start_idx:response_start_idx + response_chunk_size],
+                    response_data[response_start_idx : response_start_idx + response_chunk_size],
                     signature=RESPONSE,
                     id_mappings=id_mappings,
                     as_tensor=True,
@@ -1359,7 +1371,9 @@ class MultiModalMatcher:
                         corpus_id = response_start_idx + sub_response_id
                         query_id = query_start_idx + query_itr
                         if len(queries_result_list[query_id]) < top_k:
-                            heapq.heappush(queries_result_list[query_id], (score, corpus_id))  # heaqp tracks the quantity of the first element in the tuple
+                            heapq.heappush(
+                                queries_result_list[query_id], (score, corpus_id)
+                            )  # heaqp tracks the quantity of the first element in the tuple
                         else:
                             heapq.heappushpop(queries_result_list[query_id], (score, corpus_id))
 
@@ -1367,8 +1381,10 @@ class MultiModalMatcher:
         for query_id in range(len(queries_result_list)):
             for doc_itr in range(len(queries_result_list[query_id])):
                 score, corpus_id = queries_result_list[query_id][doc_itr]
-                queries_result_list[query_id][doc_itr] = {'corpus_id': corpus_id, 'score': score}
-            queries_result_list[query_id] = sorted(queries_result_list[query_id], key=lambda x: x['score'], reverse=True)
+                queries_result_list[query_id][doc_itr] = {"corpus_id": corpus_id, "score": score}
+            queries_result_list[query_id] = sorted(
+                queries_result_list[query_id], key=lambda x: x["score"], reverse=True
+            )
 
         return queries_result_list
 

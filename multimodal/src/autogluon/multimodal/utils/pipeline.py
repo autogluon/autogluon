@@ -1,12 +1,12 @@
+import copy
 import logging
 from typing import Dict, List, Optional, Tuple, Union
-import copy
 
 from ..constants import AUTOMM, QUERY, RESPONSE
-from .config import get_config, customize_model_names
+from .config import customize_model_names, get_config
 from .data import create_fusion_data_processors
-from .model import create_fusion_model
 from .matcher import create_siamese_model
+from .model import create_fusion_model
 
 logger = logging.getLogger(AUTOMM)
 

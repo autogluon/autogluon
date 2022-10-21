@@ -145,7 +145,9 @@ def compute_score(
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
 
-def compute_ranking_score(results: Dict[str, Dict], qrel_dict: Dict[str, Dict], cutoff: Optional[List[int]] = [5, 10, 20]):
+def compute_ranking_score(
+    results: Dict[str, Dict], qrel_dict: Dict[str, Dict], cutoff: Optional[List[int]] = [5, 10, 20]
+):
     """
     Compute NDCG, MAP, Recall, and Precision.
 
@@ -173,9 +175,7 @@ def compute_ranking_score(results: Dict[str, Dict], qrel_dict: Dict[str, Dict], 
     recall_string = "recall." + ",".join([str(k) for k in cutoff])
     precision_string = "P." + ",".join([str(k) for k in cutoff])
 
-    evaluator = pytrec_eval.RelevanceEvaluator(
-        qrel_dict, {map_string, ndcg_string, recall_string, precision_string}
-    )
+    evaluator = pytrec_eval.RelevanceEvaluator(qrel_dict, {map_string, ndcg_string, recall_string, precision_string})
     # print(f"qrel_dict: {json.dumps(qrel_dict, indent=1)}")
     # print(f"results: {json.dumps(results, indent=1)}")
     scores = evaluator.evaluate(results)
