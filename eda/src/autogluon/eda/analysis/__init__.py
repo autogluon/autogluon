@@ -7,3 +7,4 @@ from .interaction import *
 from .model import *
 from .missing import *
 from .shift import XShiftDetector
+from .transform import ApplyFeatureGenerator

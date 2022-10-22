@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
 
 from pandas import DataFrame
 
@@ -16,9 +16,9 @@ __all__ = ['AbstractAnalysis', 'BaseAnalysis', 'Namespace']
 class AbstractAnalysis(ABC, StateCheckMixin):
 
     def __init__(self,
-                 parent: Union[None, AbstractAnalysis] = None,
+                 parent: Optional[AbstractAnalysis] = None,
                  children: List[AbstractAnalysis] = [],
-                 state: AnalysisState = None,
+                 state: Optional[AnalysisState] = None,
                  **kwargs) -> None:
 
         self.parent = parent
