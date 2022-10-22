@@ -7,7 +7,7 @@ import gluonts
 import numpy as np
 import pandas as pd
 from gluonts.dataset.common import Dataset as GluonTSDataset
-from gluonts.env import env as gluonts_env
+from gluonts.core.settings import let
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
@@ -25,7 +25,6 @@ from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
-gluonts_env.use_tqdm = False
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
@@ -209,7 +208,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks, **kwargs)
 
         estimator = self._get_estimator()
-        with warning_filter(), disable_root_logger():
+        with warning_filter(), disable_root_logger(), let(gluonts.env.env, use_tqdm=False):
             self.gts_predictor = estimator.train(
                 self._to_gluonts_dataset(train_data),
                 validation_data=self._to_gluonts_dataset(val_data),
@@ -226,7 +225,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         input_index_type = type(data.index.levels[0][0])
 
-        with warning_filter():
+        with warning_filter(), let(gluonts.env.env, use_tqdm=False):
             quantiles = quantile_levels or self.quantile_levels
             if not all(0 < q < 1 for q in quantiles):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
