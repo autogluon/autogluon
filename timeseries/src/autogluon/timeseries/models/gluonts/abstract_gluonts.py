@@ -6,8 +6,8 @@ from typing import Any, Dict, Iterator, List, Optional, Type
 import gluonts
 import numpy as np
 import pandas as pd
-from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.core.settings import let
+from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
