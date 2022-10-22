@@ -335,7 +335,7 @@ class TimeSeriesPredictor:
         tuning_data = self._check_and_prepare_data_frame(tuning_data)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
-        set_logger_verbosity(verbosity, logger=logger)
+        set_logger_verbosity(verbosity)
 
         fit_args = dict(
             prediction_length=self.prediction_length,

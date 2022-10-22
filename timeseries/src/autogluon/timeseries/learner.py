@@ -167,7 +167,8 @@ class TimeSeriesLearner(AbstractLearner):
             logger.info("Following types of static features have been inferred:")
             logger.info(f"\tcategorical: {mapped_to_categorical}")
             logger.info(f"\tcontinuous (numeric): {mapped_to_continuous}")
-            logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
+            if len(unused) > 0:
+                logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
             logger.info("Please manually set static_feature_metadata if the inferred types are incorrect.")
 
         if val_data is not None and val_data.static_features is not None:
