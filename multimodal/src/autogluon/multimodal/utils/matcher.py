@@ -1,17 +1,17 @@
 import copy
 import functools
-import logging
 import heapq
+import logging
 from typing import Dict, List, Optional, Union
 
+import pandas as pd
 import torch
 from omegaconf import DictConfig
 from torch import nn
-import pandas as pd
 
 from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
-from .model import create_model
 from .data import data_to_df
+from .model import create_model
 
 logger = logging.getLogger(AUTOMM)
 
@@ -390,8 +390,6 @@ def semantic_search(
         for doc_itr in range(len(queries_result_list[query_id])):
             score, corpus_id = queries_result_list[query_id][doc_itr]
             queries_result_list[query_id][doc_itr] = {"corpus_id": corpus_id, "score": score}
-        queries_result_list[query_id] = sorted(
-            queries_result_list[query_id], key=lambda x: x["score"], reverse=True
-        )
+        queries_result_list[query_id] = sorted(queries_result_list[query_id], key=lambda x: x["score"], reverse=True)
 
     return queries_result_list

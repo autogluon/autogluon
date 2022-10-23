@@ -1030,7 +1030,7 @@ class MultiModalMatcher:
         if signature == QUERY:
             query_config = self._query_config
             query_model = self._query_model
-            query_columns = self._query if self._query else list(data.columns),
+            query_columns = (self._query if self._query else list(data.columns),)
             if isinstance(query_columns, tuple):
                 query_columns = query_columns[0]
         elif signature == RESPONSE:
