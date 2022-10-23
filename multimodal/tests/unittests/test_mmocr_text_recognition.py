@@ -48,6 +48,3 @@ def test_mmocr_text_recognition_inference(checkpoint_name):
 
     assert pred[0][0] == MMOCR_res[0]["text"]
     assert pred[1][0] == MMOCR_res[0]["score"]
-
-if __name__ == '__main__':
-    test_mmocr_text_recognition_inference("abinet_academic")

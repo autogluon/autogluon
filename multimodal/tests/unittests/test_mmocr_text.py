@@ -17,14 +17,10 @@ def download_sample_images():
     return mmocr_image_name
 
 
-# TODO: when using crnn checkpoint, the results are wrong.
 @pytest.mark.parametrize(
-    "checkpoint_name",
+    "det_ckpt_name,recog_ckpt_name",
     [
-        "abinet_academic",
-        "sar_r31_parallel_decoder_academic",
-        "seg_r31_1by16_fpnocr_academic",
-        "nrtr_r31_1by16_1by8_academic",
+        ("textsnake_r50_fpn_unet_1200e_ctw1500", "abinet_academic")
     ],
 )
 def test_mmocr_text_recognition_inference(det_ckpt_name, recog_ckpt_name):
@@ -47,16 +43,8 @@ def test_mmocr_text_recognition_inference(det_ckpt_name, recog_ckpt_name):
     recog_config_file = recog_ckpt_name + ".py"
     ocr = MMOCR(det_ckpt=det_ckpt, det_config=det_config_file, recog_ckpt=recog_ckpt, recog_config=recog_config_file)
     MMOCR_res = ocr.readtext(mmocr_image_name, output=None)
-    print(pred)
-    print(MMOCR_res)
 
-    assert len(pred[0]) == len(MMOCR_res[0]["text"])
+    assert len(pred[0][0]) == len(MMOCR_res[0]["text"])
 
-    for p in pred[0]:
+    for p in pred[0][0]:
         assert p in MMOCR_res[0]["text"]
-
-    # assert pred[0][0] == MMOCR_res[0]["text"]
-    # assert pred[1][0] == MMOCR_res[0]["score"]
-
-if __name__ == '__main__':
-    test_mmocr_text_recognition_inference("textsnake_r50_fpn_unet_1200e_ctw1500", "abinet_academic")

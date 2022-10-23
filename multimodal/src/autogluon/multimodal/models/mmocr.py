@@ -142,8 +142,9 @@ class MMOCRAutoModel(nn.Module):
             return {self.prefix: ret}
         elif self.det_model != None and self.recog_model != None:
             det_results = self.det_model(return_loss=False, rescale=True, **data)
-            mmocr_image_name = "/home/ubuntu/develop/autogluon/demo.jpg"
-            arrays = [mmcv.imread(mmocr_image_name)]
+            arrays = []
+            for img_meta in data["img_metas"]:
+                arrays.append(mmcv.imread(img_meta[0]["filename"]))
 
             bboxes_list = [res for res in det_results]
             end2end_res = []
