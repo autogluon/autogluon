@@ -147,8 +147,8 @@ def test_timm_zero_shot(checkpoint_name):
     assert np.all(masks["123"] == np.array([1]))
 
 
-def test_matcher_text_zero_shot():
-    matcher = MultiModalMatcher(pipeline="text_match_text")
+def test_matcher_text_similarity():
+    matcher = MultiModalMatcher(pipeline="text_similarity")
     corpus = ['A man is eating food.',
               'A man is eating a piece of bread.',
               'The girl is carrying a baby.',
@@ -180,7 +180,3 @@ def test_matcher_text_zero_shot():
     corpus_embeddings = matcher.extract_embedding({"abc": corpus}, signature="response")
     assert len(query_embeddings) == len(queries)
     assert len(corpus_embeddings) == len(corpus)
-
-
-if __name__ == "__main__":
-    test_matcher_text_zero_shot()
