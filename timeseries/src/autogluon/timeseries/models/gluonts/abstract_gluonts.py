@@ -12,6 +12,7 @@ from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
+from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
@@ -26,6 +27,9 @@ from .callback import GluonTSEarlyStoppingCallback, TimeLimitCallback
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
+
+
+GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
@@ -54,7 +58,17 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
     @property
     def freq(self):
-        return self.time_series_df.freq
+        # FIXME: GluonTS expects a frequency string, but only supports a limited number of such strings 
+        # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception. 
+        # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
+        # any lags or features.
+        freq_ = self.time_series_df.freq
+        pd_offset = to_offset(freq_)
+        
+        # normalize freq str to handle peculiarities such as W-SUN
+        offset_base_alias = pd_offset.name.split("-")[0]
+        
+        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else freq_
 
     def __len__(self):
         return len(self.time_series_df.item_ids)  # noqa

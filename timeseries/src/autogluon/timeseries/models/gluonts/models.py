@@ -23,34 +23,6 @@ from .abstract_gluonts import AbstractGluonTSModel
 
 logger = logging.getLogger(__name__)
 
-# HACK: DeepAR currently raises an exception when it finds a frequency it doesn't like.
-#  we monkey-patch the get_lags and features functions here to return a default
-#  instead of failing. We can remove this after porting to pytorch + patching GluonTS
-def get_lags_for_frequency_safe(*args, **kwargs):
-    from gluonts.time_feature import get_lags_for_frequency
-
-    try:
-        return get_lags_for_frequency(*args, **kwargs)
-    except Exception as e:
-        if "invalid frequency" not in str(e):
-            raise
-        return get_lags_for_frequency(freq_str="A")
-
-
-def time_features_from_frequency_str_safe(*args, **kwargs):
-    from gluonts.time_feature import time_features_from_frequency_str
-
-    try:
-        return time_features_from_frequency_str(*args, **kwargs)
-    except Exception as e:
-        if "Unsupported frequency" not in str(e):
-            raise
-        return []
-
-
-gluonts.time_feature.get_lags_for_frequency = get_lags_for_frequency_safe
-gluonts.time_feature.time_features_from_frequency_str = time_features_from_frequency_str_safe
-
 
 class DeepARModel(AbstractGluonTSModel):
     """DeepAR model from GluonTS.

@@ -46,7 +46,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
         if epochs is not None:
             trainer_kwargs.update({"max_epochs": epochs})
-        trainer_kwargs.update({"callbacks": callbacks, "progress_bar_refresh_rate": 0})
+        trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
 
         return from_hyperparameters(
             self.gluonts_estimator_class,
