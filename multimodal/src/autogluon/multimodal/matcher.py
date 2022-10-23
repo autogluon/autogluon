@@ -1149,9 +1149,9 @@ class MultiModalMatcher:
 
     def _ranking_evaluate(
         self,
+        qr_relevance: Union[pd.DataFrame, dict, list],
         query_data: Union[pd.DataFrame, dict, list],
-        response_data: Union[pd.DataFrame, dict, list] = None,
-        qr_relevance: Union[pd.DataFrame, dict, list] = None,
+        response_data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Dict[str, Dict]] = None,
         chunk_size: Optional[int] = 1024,
         cosine: Optional[bool] = True,
@@ -1264,7 +1264,6 @@ class MultiModalMatcher:
         data: Optional[Union[pd.DataFrame, dict, list]] = None,
         query_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         response_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        qr_relevance: Optional[Union[pd.DataFrame, dict, list]] = None,
         id_mappings: Optional[Dict[str, Dict]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
@@ -1293,11 +1292,11 @@ class MultiModalMatcher:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        if all(v is not None for v in [query_data, response_data, qr_relevance]):
+        if all(v is not None for v in [data, query_data, response_data]):
             return self._ranking_evaluate(
+                qr_relevance=data,
                 query_data=query_data,
                 response_data=response_data,
-                qr_relevance=qr_relevance,
                 id_mappings=id_mappings,
                 chunk_size=chunk_size,
                 cosine=cosine,
