@@ -29,6 +29,8 @@ install_requires = [
     "pandas",
     "psutil>=5.7.3,<5.9",
     "gluonts~=0.11.0",
+    "torch>=1.9,<1.13",
+    "pytorch-lightning>=1.7.4,<1.8.0",
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular=={version}",
@@ -49,7 +51,6 @@ except (ImportError, AssertionError):
 extras_require = {
     "tests": ["pytest", "flake8~=4.0", "flaky~=3.7", "pytest-timeout~=2.1", "isort>=5.10", "black~=22.0,>=22.3"],
     "sktime": ["sktime~=0.13,>=0.13.1", "pmdarima~=1.8.2", "tbats~=1.1"],
-    "torch": ["torch<1.13", "pytorch-lightning~=1.6.5"],
 }
 
 all_requires = []

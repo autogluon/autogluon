@@ -14,8 +14,8 @@ from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils import warning_filter
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.utils.warning_filters import disable_root_logger
+from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
-from ..abstract_gluonts import AbstractGluonTSModel, SimpleGluonTSDataset
 from .callback import PLTimeLimitCallback
 
 # TODO: enable in GluonTS v0.10
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
 
 
-class AbstractGluonTSPytorchModel(AbstractGluonTSModel):
+class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator]
 
     def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
@@ -44,8 +44,9 @@ class AbstractGluonTSPytorchModel(AbstractGluonTSModel):
         epochs = init_args.get("max_epochs", init_args.get("epochs"))
         callbacks = init_args.get("callbacks", [])
 
-        if epochs:
-            trainer_kwargs.update({"max_epochs": epochs, "callbacks": callbacks, "progress_bar_refresh_rate": 0})
+        if epochs is not None:
+            trainer_kwargs.update({"max_epochs": epochs})
+        trainer_kwargs.update({"callbacks": callbacks, "progress_bar_refresh_rate": 0})
 
         return from_hyperparameters(
             self.gluonts_estimator_class,
@@ -91,7 +92,7 @@ class AbstractGluonTSPytorchModel(AbstractGluonTSModel):
         return model
 
 
-class DeepARPyTorchModel(AbstractGluonTSPytorchModel):
+class DeepARPyTorchModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:

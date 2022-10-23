@@ -16,12 +16,12 @@ class PLTimeLimitCallback(pl.callbacks.Callback):
         self.start_time = None
         self.time_limit = time_limit
 
-    def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         self.start_time = time.time()
 
-    def on_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> bool:
+    def on_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> bool:
         if self.time_limit is not None:
             cur_time = time.time()
             if cur_time - self.start_time > self.time_limit:
-                logger.warning("Time limit exceed during training, stop training.")
+                logger.warning("Time limit exceeded during training, stop training.")
                 trainer.should_stop = True
