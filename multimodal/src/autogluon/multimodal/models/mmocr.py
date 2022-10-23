@@ -38,7 +38,7 @@ logger = logging.getLogger(AUTOMM)
 
 class MMOCRAutoModel(nn.Module):
     """
-    Support MMOCR object detection models.
+    Support MMOCR models.
     Refer to https://github.com/open-mmlab/mmocr
     """
 
